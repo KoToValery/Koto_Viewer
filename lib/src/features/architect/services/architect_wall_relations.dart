@@ -8,6 +8,10 @@ class ArchitectWallClearance {
   final int side;
   final double distance;
   final Offset start, end;
+
+  /// Endpoint readouts pivot the wall instead of translating the whole wall.
+  final bool? atStart;
+  final String? supportId;
   const ArchitectWallClearance({
     required this.wallId,
     required this.neighborId,
@@ -15,14 +19,20 @@ class ArchitectWallClearance {
     required this.distance,
     required this.start,
     required this.end,
+    this.atStart,
+    this.supportId,
   });
   Offset get midpoint => (start + end) / 2;
+  String get key => atStart == null
+      ? neighborId
+      : '$neighborId-${atStart! ? 'start' : 'end'}';
 
   ArchitectWallClearance nearView(
     ArchitectWall wall,
     ArchitectWall neighbor,
     Rect view,
   ) {
+    if (atStart != null) return this;
     double along(Offset p) {
       final d = p - wall.centerStart;
       return d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
@@ -41,6 +51,82 @@ class ArchitectWallClearance {
       start: start + shift,
       end: end + shift,
     );
+  }
+
+  /// Distances from connected endpoint junctions, along their supports, to
+  /// perpendicular reference walls. The junction remains on the same support
+  /// line when edited; the opposite endpoint is an independent fixed anchor.
+  static List<ArchitectWallClearance> endpoints(
+    ArchitectWall wall,
+    List<ArchitectWall> walls, {
+    bool includeParallel = false,
+  }) {
+    double dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
+    double cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
+    final result = <ArchitectWallClearance>[];
+    final ordered = walls.toList()..sort((a, b) => a.id.compareTo(b.id));
+    for (final atStart in [true, false]) {
+      if (!(atStart ? wall.connectStart : wall.connectEnd)) continue;
+      final point = atStart ? wall.startPoint : wall.endPoint;
+      ArchitectWallClearance? best;
+      for (final support in ordered) {
+        if (support.id == wall.id ||
+            support.isDetached ||
+            !support.connectsAt(point) ||
+            cross(support.unitVector, wall.unitVector).abs() < 1e-5) {
+          continue;
+        }
+        final lines = [
+          (support.startPoint, support.endPoint),
+          (support.coreCenterStart, support.coreCenterEnd),
+          (support.polygonCorners[0], support.polygonCorners[1]),
+          (support.polygonCorners[3], support.polygonCorners[2]),
+        ];
+        final onSupport = lines.any((line) {
+          final d = point - line.$1;
+          final along = dot(d, support.unitVector);
+          return cross(d, support.unitVector).abs() < .001 &&
+              along >= -.001 &&
+              along <= support.length + .001;
+        });
+        if (!onSupport) continue;
+        for (final target in ordered) {
+          if (target.id == wall.id ||
+              target.id == support.id ||
+              dot(target.unitVector, support.unitVector).abs() > 1e-5 ||
+              (!includeParallel &&
+                  cross(target.unitVector, wall.unitVector).abs() < 1e-5)) {
+            continue;
+          }
+          final axisDistance = dot(
+            target.centerStart - point,
+            support.unitVector,
+          );
+          final distance = math.max(
+            0.0,
+            axisDistance.abs() - target.thickness / 2,
+          );
+          if (axisDistance.abs() < target.thickness / 2 - 1e-8) continue;
+          final direction = support.unitVector * axisDistance.sign;
+          final end = point + direction * distance;
+          final station = dot(end - target.centerStart, target.unitVector);
+          if (station < -.001 || station > target.length + .001) continue;
+          if (best != null && best.distance <= distance) continue;
+          best = ArchitectWallClearance(
+            wallId: wall.id,
+            neighborId: target.id,
+            side: axisDistance.sign.toInt(),
+            distance: distance,
+            start: point,
+            end: end,
+            atStart: atStart,
+            supportId: support.id,
+          );
+        }
+      }
+      if (best != null) result.add(best);
+    }
+    return result;
   }
 
   /// Finished-face distance to the nearest facing wall on each side.

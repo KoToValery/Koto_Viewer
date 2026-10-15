@@ -4043,6 +4043,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallInsertPoint => 'Point';
 
   @override
+  String get architectWallParallelHelp =>
+      'Tap to move across the wall without changing its angle. Hold to enter a signed offset.';
+
+  @override
+  String architectWallEndpointValue(int endpoint, String distance) {
+    return '$endpoint · $distance';
+  }
+
+  @override
+  String get architectWallEndpointClearance => 'End offset';
+
+  @override
+  String get architectMagnetHelp => 'Snap to walls, axes and drawing points.';
+
+  @override
   String get architectWallParallel => 'Parallel';
 
   @override

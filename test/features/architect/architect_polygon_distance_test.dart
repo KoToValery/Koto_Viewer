@@ -325,7 +325,7 @@ void main() {
         find.byKey(const ValueKey('polygon-edit-close')),
       );
       final magnetRect = tester.getRect(
-        find.byKey(const ValueKey('architect-magnet')),
+        find.byKey(const ValueKey('architect-settings')),
       );
       expect(closeRect.overlaps(magnetRect), isFalse);
       final oldContour =

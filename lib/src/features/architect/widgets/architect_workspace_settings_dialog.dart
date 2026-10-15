@@ -128,7 +128,8 @@ class _ArchitectWorkspaceSettingsDialogState
               SwitchListTile(
                 key: const ValueKey('architect-settings-snap'),
                 contentPadding: EdgeInsets.zero,
-                title: Text(l.architectSnap),
+                title: Text(l.architectWallMagnet),
+                subtitle: Text(l.architectMagnetHelp),
                 value: magnetic,
                 onChanged: (value) => setState(() => magnetic = value),
               ),

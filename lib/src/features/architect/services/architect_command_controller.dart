@@ -100,10 +100,12 @@ class UpdateArchitectWall extends ArchitectModelCommand {
   final String storeyId;
   final ArchitectWall wall;
   final bool carryConnections;
+  final Set<String> fixedWallIds;
   const UpdateArchitectWall({
     required this.storeyId,
     required this.wall,
     this.carryConnections = true,
+    this.fixedWallIds = const {},
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
@@ -152,6 +154,8 @@ class UpdateArchitectWall extends ArchitectModelCommand {
       for (final other in s.walls)
         other.id == wall.id
             ? wall
+            : fixedWallIds.contains(other.id)
+            ? other
             : other.copyWith(
                 startPoint: other.connectStart
                     ? attached(other.startPoint)
@@ -405,6 +409,80 @@ class SetArchitectWallClearance extends ArchitectModelCommand {
       delta: delta,
       extendSupports: true,
     ).apply(project);
+  }
+}
+
+/// Edit just one supported junction; the opposite wall endpoint stays fixed.
+class SetArchitectWallEndpointClearance extends ArchitectModelCommand {
+  final String storeyId, wallId, neighborId, supportId;
+  final bool atStart;
+  final double distance;
+  const SetArchitectWallEndpointClearance({
+    required this.storeyId,
+    required this.wallId,
+    required this.neighborId,
+    required this.supportId,
+    required this.atStart,
+    required this.distance,
+  });
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    if (!distance.isFinite || distance < 0) {
+      throw ArgumentError('Invalid clearance');
+    }
+    final storey = ArchitectModelCommand.storey(project, storeyId);
+    final wall = storey.walls.firstWhere((w) => w.id == wallId);
+    final gap =
+        ArchitectWallClearance.endpoints(
+              wall,
+              storey.walls,
+              includeParallel: true,
+            )
+            .where(
+              (g) =>
+                  g.atStart == atStart &&
+                  g.neighborId == neighborId &&
+                  g.supportId == supportId,
+            )
+            .firstOrNull;
+    if (gap == null) {
+      throw ArgumentError('Junction no longer faces the reference');
+    }
+    final basis = storey.walls.firstWhere((w) => w.id == supportId);
+    final direction = basis.unitVector * gap.side.toDouble();
+    final point = gap.end - direction * distance;
+    var updated = UpdateArchitectWall(
+      storeyId: storeyId,
+      fixedWallIds: {neighborId},
+      wall: wall.copyWith(
+        startPoint: atStart ? point : null,
+        endPoint: atStart ? null : point,
+      ),
+    ).apply(project);
+    final support = updated.storeys
+        .firstWhere((s) => s.id == storeyId)
+        .walls
+        .firstWhere((w) => w.id == supportId);
+    final d = point - support.startPoint;
+    final along = d.dx * support.unitVector.dx + d.dy * support.unitVector.dy;
+    final extended = along < 0
+        ? support.copyWith(
+            startPoint: support.startPoint + support.unitVector * along,
+          )
+        : along > support.length
+        ? support.copyWith(
+            endPoint: support.startPoint + support.unitVector * along,
+          )
+        : null;
+    if (extended != null) {
+      updated = UpdateArchitectWall(
+        storeyId: storeyId,
+        wall: extended,
+        carryConnections: false,
+      ).apply(updated);
+    }
+    return updated;
   }
 }
 
@@ -1446,7 +1524,8 @@ class ArchitectCommandController
     final viewed = snapshot.storeys.any((s) => s.id == id)
         ? id
         : snapshot.activeStoreyId;
-    if (viewed == snapshot.activeStoreyId && current.units == snapshot.units &&
+    if (viewed == snapshot.activeStoreyId &&
+        current.units == snapshot.units &&
         current.dimensionScale == snapshot.dimensionScale) {
       return snapshot;
     }

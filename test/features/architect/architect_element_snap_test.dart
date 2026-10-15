@@ -498,7 +498,7 @@ void main() {
     await tool_ui.prepare(tester, Icons.timeline_rounded);
     await tool_ui.choose(tester, Icons.timeline_rounded);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('architect-magnet')));
+    await tool_ui.setMagnetic(tester, false);
     await tester.pump();
     await workspace.wallTap(tester, const Offset(1, -.4));
     await workspace.wallTap(tester, const Offset(8.03, .03));
@@ -593,11 +593,11 @@ void main() {
       final inputRect = tester.getRect(
         find.byKey(const ValueKey('architect-viewport-input')),
       );
-      final magnetRect = tester.getRect(
-        find.byKey(const ValueKey('architect-magnet')),
+      final settingsRect = tester.getRect(
+        find.byKey(const ValueKey('architect-settings')),
       );
-      expect(tester.getRect(find.byType(AppBar)).contains(magnetRect.center), isTrue);
-      expect(inputRect.contains(magnetRect.center), isFalse);
+      expect(tester.getRect(find.byType(AppBar)).contains(settingsRect.center), isTrue);
+      expect(inputRect.contains(settingsRect.center), isFalse);
       final finger =
           workspace.screen(tester, const Offset(.03, .04)) +
           const Offset(0, 64);

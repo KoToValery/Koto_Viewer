@@ -106,7 +106,6 @@ class Architect2dPainter extends CustomPainter {
   final String? zoneCloseLabel;
   final String? zoneCategoryName;
 
-
   // Edge extrusion preview
   final List<Offset>? zoneExtrudePreviewPolygon;
   final Offset? zoneExtrudeV1;
@@ -333,8 +332,12 @@ class Architect2dPainter extends CustomPainter {
     }
     if (layer != ArchitectPaintLayer.model) {
       ArchitectGridAxisPainterHelper.drawNeighborDistances(
-        canvas: canvas, project: _project, selectedAxisId: selectedAxisId,
-        zoomScale: zoomScale, palette: palette, visibleRect: viewport?.visibleRect,
+        canvas: canvas,
+        project: _project,
+        selectedAxisId: selectedAxisId,
+        zoomScale: zoomScale,
+        palette: palette,
+        visibleRect: viewport?.visibleRect,
       );
       ArchitectElementsPainterHelper.drawSlabDrafting(
         canvas: canvas,
@@ -738,13 +741,41 @@ class Architect2dPainter extends CustomPainter {
       final wall = project.activeStorey.walls.firstWhere(
         (w) => w.id == gap.wallId,
       );
-      final tick = wall.unitVector * (4 / zoomScale);
+      final direction = gap.end - gap.start;
+      final tick =
+          (direction.distance < 1e-8
+              ? wall.unitVector
+              : Offset(-direction.dy, direction.dx) / direction.distance) *
+          (4 / zoomScale);
       final paint = Paint()
         ..color = palette.foreground(const Color(0xFF008C9E))
         ..strokeWidth = 1 / zoomScale;
       canvas.drawLine(gap.start, gap.end, paint);
       for (final point in [gap.start, gap.end]) {
         canvas.drawLine(point - tick, point + tick, paint);
+      }
+      if (gap.atStart != null) {
+        canvas.drawCircle(
+          gap.start,
+          7 / zoomScale,
+          Paint()..color = const Color(0xFFFFB74D),
+        );
+        final marker = TextPainter(
+          text: TextSpan(
+            text: gap.atStart! ? '1' : '2',
+            style: TextStyle(
+              color: Colors.black,
+              fontFamily: 'Roboto',
+              fontWeight: FontWeight.bold,
+              fontSize: 10 / zoomScale,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        marker.paint(
+          canvas,
+          gap.start - Offset(marker.width / 2, marker.height / 2),
+        );
       }
     }
     if (wallTrimSpan != null) {

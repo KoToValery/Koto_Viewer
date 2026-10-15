@@ -866,6 +866,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _wallExtendId = null;
     _multiSelect = false;
     _moveSelection = false;
+    _wallParallelMove = false;
     _interactionEpoch++;
     _cancelActiveDrags();
     _zoneTool.cancelAll();
@@ -891,6 +892,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _zoneTool.cancelEditingZone();
       _multiSelect = false;
       _moveSelection = false;
+      _wallParallelMove = false;
+      _wallEndpointClearanceId = null;
       _wallExtendId = null;
       _wallCutIds = {};
       _wallCutStart = null;
@@ -997,6 +1000,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _wallDragStart = false;
   Offset _wallGrabOffset = Offset.zero;
   bool _wallParallelMove = false;
+  String? _wallEndpointClearanceId;
   void _toggleParallelMove() {
     _cancelActiveDrags();
     setState(() {
@@ -1004,6 +1008,38 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _moveSelection = _wallParallelMove;
       _polygonEditId = null;
       _wallCutIds = {};
+    });
+  }
+
+  Future<void> _editParallelOffset() async {
+    final wall = _selectedWall;
+    if (wall == null || _effectiveSelection.length != 1) return;
+    final value = await showArchitectAxisValueDialog(
+      context: context,
+      title: context.l10n.architectWallParallel,
+      label: '${context.l10n.offsetAction} (${_project.units.symbol})',
+      value: '0',
+      numeric: true,
+    );
+    if (!mounted || value == null) return;
+    final distance = _project.units.fromUnit(
+      double.parse(value.replaceAll(',', '.')),
+    );
+    if (distance.abs() < 1e-9) return;
+    final current = _project.activeStorey.walls
+        .where((w) => w.id == wall.id)
+        .firstOrNull;
+    if (current == null) return;
+    _executeWallEdit(
+      MoveArchitectElements(
+        storeyId: _project.activeStoreyId,
+        elementIds: {wall.id},
+        delta: current.normalVector * distance,
+      ),
+    );
+    setState(() {
+      _wallParallelMove = true;
+      _moveSelection = true;
     });
   }
 
@@ -3601,17 +3637,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     final walls = (_elementMovePreview ?? _project).activeStorey.walls;
     final selected = walls.where((w) => ids.contains(w.id));
-    return selected.isEmpty
-        ? []
-        : ArchitectWallClearance.nearest(selected.first, walls)
-              .map(
-                (gap) => gap.nearView(
-                  selected.first,
-                  walls.firstWhere((w) => w.id == gap.neighborId),
-                  _viewport.visibleRect,
-                ),
-              )
-              .toList();
+    if (selected.isEmpty) return [];
+    final endpoints = ArchitectWallClearance.endpoints(
+      selected.first,
+      walls,
+      includeParallel: _wallEndpointClearanceId == selected.first.id,
+    );
+    return [
+          ...ArchitectWallClearance.nearest(selected.first, walls).where(
+            (gap) => !endpoints.any((end) => end.neighborId == gap.neighborId),
+          ),
+          ...endpoints,
+        ]
+        .map(
+          (gap) => gap.nearView(
+            selected.first,
+            walls.firstWhere((w) => w.id == gap.neighborId),
+            _viewport.visibleRect,
+          ),
+        )
+        .toList();
   }
 
   Widget _buildWallClearanceOverlay() => Positioned.fill(
@@ -3664,7 +3709,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ).computeMetrics().isNotEmpty;
             },
           );
-          placements[gap.neighborId] = rect;
+          placements[gap.key] = rect;
           excluded.add(rect);
         }
         return Stack(
@@ -3672,16 +3717,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             for (final gap in clearances)
               Builder(
                 builder: (context) {
-                  final rect = placements[gap.neighborId]!;
+                  final rect = placements[gap.key]!;
                   return Positioned.fromRect(
                     rect: rect,
                     child: IgnorePointer(
                       ignoring:
                           _radialMenuScreenPosition != null ||
-                          (_activeTool == ArchitectTool.select &&
+                          (gap.atStart == null &&
+                              _activeTool == ArchitectTool.select &&
                               !_moveSelection),
                       child: Tooltip(
-                        message: context.l10n.architectWallClearance,
+                        message: gap.atStart == null
+                            ? context.l10n.architectWallClearance
+                            : context.l10n.architectWallEndpointClearance,
                         child: Material(
                           color: const Color(0xEE1E242C),
                           elevation: 3,
@@ -3691,19 +3739,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             side: const BorderSide(color: Colors.white24),
                           ),
                           child: InkWell(
-                            key: ValueKey('wall-clearance-${gap.neighborId}'),
+                            key: ValueKey('wall-clearance-${gap.key}'),
                             onTap: () {
                               setState(() => _radialMenuScreenPosition = null);
                               _editWallClearance(gap);
                             },
                             child: Center(
                               child: Text(
-                                _project.units.format(
-                                  gap.distance,
-                                  decimals: 3,
-                                ),
-                                style: const TextStyle(
-                                  color: Colors.cyanAccent,
+                                gap.atStart == null
+                                    ? _project.units.format(
+                                        gap.distance,
+                                        decimals: 3,
+                                      )
+                                    : context.l10n.architectWallEndpointValue(
+                                        gap.atStart! ? 1 : 2,
+                                        _project.units.format(
+                                          gap.distance,
+                                          decimals: 3,
+                                        ),
+                                      ),
+                                style: TextStyle(
+                                  color: gap.atStart == null
+                                      ? Colors.cyanAccent
+                                      : const Color(0xFFFFB74D),
                                   fontSize: 12,
                                 ),
                               ),
@@ -4018,6 +4076,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _editWallClearance(ArchitectWallClearance gap) {
+    if (gap.atStart != null) {
+      setState(() {
+        _wallEndpointClearanceId = gap.wallId;
+        _wallParallelMove = false;
+        _moveSelection = false;
+      });
+    }
     var distance = gap.distance;
     final storeyId = _project.activeStoreyId;
     showDialog<void>(
@@ -4026,7 +4091,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         child: SizedBox(
           width: 220,
           child: ArchitectWallDraftingPanel(
-            title: context.l10n.architectWallClearance,
+            title: gap.atStart == null
+                ? context.l10n.architectWallClearance
+                : context.l10n.architectWallEndpointClearance,
             endLabel: context.l10n.save,
             length: _project.units.toUnit(distance),
             unit: _project.units.symbol,
@@ -4038,12 +4105,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             onEnd: () {
               Navigator.of(dialogContext).pop();
               _executeWallEdit(
-                SetArchitectWallClearance(
-                  storeyId: storeyId,
-                  wallId: gap.wallId,
-                  neighborId: gap.neighborId,
-                  distance: distance,
-                ),
+                gap.atStart != null
+                    ? SetArchitectWallEndpointClearance(
+                        storeyId: storeyId,
+                        wallId: gap.wallId,
+                        neighborId: gap.neighborId,
+                        supportId: gap.supportId!,
+                        atStart: gap.atStart!,
+                        distance: distance,
+                      )
+                    : SetArchitectWallClearance(
+                        storeyId: storeyId,
+                        wallId: gap.wallId,
+                        neighborId: gap.neighborId,
+                        distance: distance,
+                      ),
               );
             },
             onCancel: () => Navigator.of(dialogContext).pop(),
@@ -4688,6 +4764,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         setState(() {
           _polygonEditId = null;
           _polygonSelectedEdge = null;
+          _wallParallelMove = false;
           _moveSelection = true;
         });
         break;
@@ -4814,6 +4891,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final primary = _selectionIds.contains(id)
           ? id
           : _selectionIds.lastOrNull;
+      if (primary != _selectedElementId || _selectionIds.length != 1) {
+        _wallEndpointClearanceId = null;
+        _wallParallelMove = false;
+        _moveSelection = false;
+      }
       _selectedElementId = primary;
       _selectedZoneId = null;
       if (primary != null) {
@@ -4942,16 +5024,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         : wallIds.single;
                   });
                 },
-              ),
-            if (wallIds.length == 1)
-              IconButton(
-                key: const ValueKey('architect-wall-parallel'),
-                tooltip: l.architectWallParallel,
-                icon: Icon(
-                  Icons.swap_vert,
-                  color: _wallParallelMove ? Colors.amber : Colors.white,
-                ),
-                onPressed: _toggleParallelMove,
               ),
           ],
         ),
@@ -5305,9 +5377,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _radialMenuScreenPosition = null;
                     _polygonEditId = null;
                     _polygonSelectedEdge = null;
+                    _wallParallelMove = false;
                     _moveSelection = !_moveSelection;
                   }),
                 ),
+                if (wallIds.length == 1 && ids.length == 1)
+                  Tooltip(
+                    message: l.architectWallParallelHelp,
+                    child: InkWell(
+                      key: const ValueKey('architect-wall-parallel'),
+                      onTap: _toggleParallelMove,
+                      onLongPress: _editParallelOffset,
+                      child: SizedBox(
+                        width: 32,
+                        height: 40,
+                        child: Icon(
+                          Icons.swap_vert,
+                          size: 19,
+                          color: _wallParallelMove
+                              ? Colors.amber
+                              : Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ),
                 IconButton(
                   constraints: const BoxConstraints.tightFor(
                     width: 26,
@@ -5376,10 +5469,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             wallIds: wallIds,
                           ),
                         );
-                      } else if (action == 'magnet') {
-                        _changeViewPreference(
-                          () => _magnetEnabled = !_magnetEnabled,
-                        );
                       } else if (action == 'join') {
                         try {
                           _commands.execute(
@@ -5398,8 +5487,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         _editWallLength();
                       } else if (action == 'point') {
                         _insertMidpoint(wallIds.single);
-                      } else if (action == 'parallel') {
-                        _toggleParallelMove();
                       }
                     },
                     itemBuilder: (_) => [
@@ -5424,11 +5511,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         value: 'mirror',
                         child: Text(l.architectWallMirror),
                       ),
-                      CheckedPopupMenuItem(
-                        value: 'magnet',
-                        checked: _magnetEnabled,
-                        child: Text(l.architectWallMagnet),
-                      ),
                       if (wallIds.length == 1 && !_multiSelect) ...[
                         PopupMenuItem(
                           value: 'length',
@@ -5437,10 +5519,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         PopupMenuItem(
                           value: 'point',
                           child: Text(l.bimNewPoint),
-                        ),
-                        PopupMenuItem(
-                          value: 'parallel',
-                          child: Text(l.architectWallParallel),
                         ),
                         PopupMenuItem(
                           key: const ValueKey('wall-extend'),
@@ -5801,28 +5879,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           () => _showGhostStoreys = !_showGhostStoreys,
                         ),
                       ),
-                      KeyedSubtree(
-                        key: ValueKey(
-                          _activeTool == ArchitectTool.wall
-                              ? 'wall-magnet'
-                              : 'architect-magnet',
-                        ),
-                        child: IconButton(
-                          key: const ValueKey('architect-snap-toggle'),
-                          tooltip: _magnetEnabled
-                              ? l10n.snapEnabledTooltip
-                              : l10n.snapDisabledTooltip,
-                          icon: Icon(
-                            Icons.sensors,
-                            color: _magnetEnabled
-                                ? Colors.cyanAccent
-                                : Colors.white54,
-                          ),
-                          onPressed: () => _changeViewPreference(
-                            () => _magnetEnabled = !_magnetEnabled,
-                          ),
-                        ),
-                      ),
                       if (!compactActions)
                         IconButton(
                           key: const ValueKey('architect-grid-toggle'),
@@ -6065,6 +6121,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _elementTool.cancelSlabDrafting();
                     _selectedZoneId = null;
                     _selectedElementId = null;
+                    _wallParallelMove = false;
+                    _wallEndpointClearanceId = null;
+                    _moveSelection = false;
                     _activeTool = tool;
                     _pendingShape = null;
                     _shapePanelAnchor = null;

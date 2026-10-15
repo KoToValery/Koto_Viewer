@@ -321,8 +321,10 @@ void main() {
         'architect-wall-parallel',
       ]) {
         final button = find.byKey(ValueKey(key));
-        expect(find.descendant(of: floating, matching: button), findsOneWidget);
-        expect(find.descendant(of: selection, matching: button), findsNothing);
+        expect(find.descendant(of: floating, matching: button),
+          key == 'architect-wall-parallel' ? findsNothing : findsOneWidget);
+        expect(find.descendant(of: selection, matching: button),
+          key == 'architect-wall-parallel' ? findsOneWidget : findsNothing);
       }
       await tester.tap(find.byKey(const ValueKey('architect-wall-parallel')));
       await tester.pump();

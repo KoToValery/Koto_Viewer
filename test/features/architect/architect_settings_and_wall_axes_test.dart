@@ -309,7 +309,6 @@ void main() {
           'architect-undo',
           'architect-redo',
           'architect-ghost-storeys',
-          'architect-snap-toggle',
           'architect-settings',
           'architect-more',
         ]) {

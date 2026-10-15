@@ -4057,6 +4057,22 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallInsertPoint => 'Точка';
 
   @override
+  String get architectWallParallelHelp =>
+      'Тап за местене напречно без промяна на ъгъла. Задръж за точен отстъп със знак.';
+
+  @override
+  String architectWallEndpointValue(int endpoint, String distance) {
+    return '$endpoint · $distance';
+  }
+
+  @override
+  String get architectWallEndpointClearance => 'Отстъп на край';
+
+  @override
+  String get architectMagnetHelp =>
+      'Прилепване към стени, оси и точки от чертежа.';
+
+  @override
   String get architectWallParallel => 'Успоредно';
 
   @override

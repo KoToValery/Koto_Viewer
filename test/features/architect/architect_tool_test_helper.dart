@@ -41,3 +41,16 @@ Future<void> choose(WidgetTester tester, IconData icon) async {
   await prepare(tester, icon);
   await tester.tap(find.byIcon(icon));
 }
+
+Future<void> setMagnetic(WidgetTester tester, bool enabled) async {
+  await tester.tap(find.byKey(const ValueKey('architect-settings')));
+  await tester.pumpAndSettle();
+  final toggle = find.byKey(const ValueKey('architect-settings-snap'));
+  await tester.ensureVisible(toggle);
+  if (tester.widget<SwitchListTile>(toggle).value != enabled) {
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+  }
+  await tester.tap(find.byKey(const ValueKey('architect-settings-save')));
+  await tester.pumpAndSettle();
+}

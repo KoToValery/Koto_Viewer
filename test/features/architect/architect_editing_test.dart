@@ -865,7 +865,8 @@ void main() {
       expect(rect.right, lessThanOrEqualTo(360));
       expect(
         find.descendant(
-          of: find.byKey(const ValueKey('architect-wall-floating-actions')),
+          of: find.byKey(ValueKey(key == 'architect-wall-parallel'
+            ? 'architect-selection-bar' : 'architect-wall-floating-actions')),
           matching: button,
         ),
         findsOneWidget,

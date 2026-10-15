@@ -7025,6 +7025,30 @@ abstract class AppLocalizations {
   /// **'Point'**
   String get architectWallInsertPoint;
 
+  /// Wall positioning control guidance
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to move across the wall without changing its angle. Hold to enter a signed offset.'**
+  String get architectWallParallelHelp;
+
+  /// Endpoint marker number and its editable offset
+  ///
+  /// In en, this message translates to:
+  /// **'{endpoint} · {distance}'**
+  String architectWallEndpointValue(int endpoint, String distance);
+
+  /// Wall positioning control guidance
+  ///
+  /// In en, this message translates to:
+  /// **'End offset'**
+  String get architectWallEndpointClearance;
+
+  /// Wall positioning control guidance
+  ///
+  /// In en, this message translates to:
+  /// **'Snap to walls, axes and drawing points.'**
+  String get architectMagnetHelp;
+
   /// No description provided for @architectWallParallel.
   ///
   /// In en, this message translates to:
