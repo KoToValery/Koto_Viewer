@@ -5143,4 +5143,24 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get stairCheckGroupSteps => 'Подстъпи в група';
+
+  @override
+  String architectWallOvershootDetected(int distance) {
+    return 'Изскачащ край: $distance cm';
+  }
+
+  @override
+  String get architectWallOvershootTrim => 'Изчисти';
+
+  @override
+  String get architectWallOvershootDismiss => 'Отказ';
+
+  @override
+  String architectWallOvershootTrimmed(int distance) {
+    return 'Изскачащият край е изчистен ($distance cm)';
+  }
+
+  @override
+  String get architectWallOvershootTooltip =>
+      'Изчистване на изскачащия край до ъгъла';
 }

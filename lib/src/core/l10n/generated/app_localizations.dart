@@ -8944,6 +8944,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Risers per group'**
   String get stairCheckGroupSteps;
+
+  /// Notice when a wall protrudes past another wall
+  ///
+  /// In en, this message translates to:
+  /// **'Wall overshoot: {distance} cm'**
+  String architectWallOvershootDetected(int distance);
+
+  /// Action to trim protruding wall stub
+  ///
+  /// In en, this message translates to:
+  /// **'Trim'**
+  String get architectWallOvershootTrim;
+
+  /// Action to keep protruding wall stub as is
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get architectWallOvershootDismiss;
+
+  /// Feedback message after trimming wall overshoot
+  ///
+  /// In en, this message translates to:
+  /// **'Wall corner trimmed ({distance} cm)'**
+  String architectWallOvershootTrimmed(int distance);
+
+  /// Tooltip for trimming wall overshoot
+  ///
+  /// In en, this message translates to:
+  /// **'Trim protruding wall stub to corner'**
+  String get architectWallOvershootTooltip;
 }
 
 class _AppLocalizationsDelegate

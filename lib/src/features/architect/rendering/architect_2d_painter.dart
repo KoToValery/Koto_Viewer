@@ -20,6 +20,7 @@ import '../models/architect_wall.dart';
 import 'architect_dimension_layout.dart';
 import '../services/architect_selection.dart';
 import '../services/architect_wall_relations.dart';
+import '../services/architect_wall_overshoot_detector.dart';
 
 enum ArchitectPaintLayer { all, model, interaction }
 
@@ -130,6 +131,7 @@ class Architect2dPainter extends CustomPainter {
   final Offset? slabCandidatePoint;
   final bool polygonEditInvalid;
   final (Offset, Offset)? polygonLeaderLine;
+  final ArchitectWallOvershoot? activeOvershoot;
 
   Architect2dPainter({
     required ArchitectProject project,
@@ -137,6 +139,7 @@ class Architect2dPainter extends CustomPainter {
     this.layer = ArchitectPaintLayer.all,
     this.paintGrid = true,
     this.palette = const ArchitectCanvasPalette.light(),
+    this.activeOvershoot,
     required this.activeTool,
     this.activeDraftStart,
     this.activeDraftEnd,
@@ -672,6 +675,12 @@ class Architect2dPainter extends CustomPainter {
         final corners = wall.polygonCorners;
         final core = wall.coreCorners;
         final i = end ? 0 : 1, j = end ? 3 : 2;
+        final midCap = (corners[i] + corners[j]) / 2;
+        if (activeStorey.walls.any(
+          (w) => w.id != wall.id && w.containsPoint(midCap, tolerance: 0.001),
+        )) {
+          continue;
+        }
         final isCut = wall.isCutAt(activeStorey.cutPlaneHeight);
         if (isCut) {
           canvas.drawLine(
@@ -803,6 +812,29 @@ class Architect2dPainter extends CustomPainter {
           gap.start - Offset(marker.width / 2, marker.height / 2),
         );
       }
+    }
+    if (activeOvershoot != null) {
+      final stubStart = activeOvershoot!.intersectionPoint;
+      final stubEnd = activeOvershoot!.stubPoint;
+      _drawDashedLine(
+        canvas,
+        stubStart,
+        stubEnd,
+        Paint()
+          ..color = Colors.amberAccent
+          ..strokeWidth = 2.5 / zoomScale,
+        zoomScale,
+      );
+      canvas.drawCircle(
+        stubStart,
+        4.0 / zoomScale,
+        Paint()..color = Colors.amberAccent,
+      );
+      canvas.drawCircle(
+        stubEnd,
+        2.5 / zoomScale,
+        Paint()..color = Colors.amberAccent,
+      );
     }
     if (wallTrimSpan != null) {
       final span = wallTrimSpan!;
@@ -1044,6 +1076,7 @@ class Architect2dPainter extends CustomPainter {
       wallCutGuideLine != oldDelegate.wallCutGuideLine ||
       wallCutAnchor != oldDelegate.wallCutAnchor ||
       wallCutLine != oldDelegate.wallCutLine ||
+      activeOvershoot != oldDelegate.activeOvershoot ||
       _zoomScale != oldDelegate._zoomScale ||
       underlayDoc != oldDelegate.underlayDoc;
 }

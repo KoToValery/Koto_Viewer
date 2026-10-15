@@ -1641,5 +1641,10 @@
   "stairClearDimensionsHelp": "Размерите са светли, между ограничаващите проекции на ръкохватките. Вътрешният радиус започва от ограничаващия вътрешен ръб или проекцията на парапета.",
   "stairUnsupported": "Тази комбинация не може да се изчертае. Промени височината или броя подстъпи.",
   "stairLegacy": "Схематично стълбище. Преизчисли, за да го превърнеш в параметрично.",
-  "stairCheckGroupSteps": "Подстъпи в група"
+  "stairCheckGroupSteps": "Подстъпи в група",
+  "architectWallOvershootDetected": "Изскачащ край: {distance} cm",
+  "architectWallOvershootTrim": "Изчисти",
+  "architectWallOvershootDismiss": "Отказ",
+  "architectWallOvershootTrimmed": "Изскачащият край е изчистен ({distance} cm)",
+  "architectWallOvershootTooltip": "Изчистване на изскачащия край до ъгъла"
 }

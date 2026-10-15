@@ -60,7 +60,8 @@ class ArchitectWallLayers {
     }
     final body = ArchitectWallNetwork.body(cutWalls);
     final core = ArchitectWallNetwork.body(cutWalls, faceOffsets: faces);
-    final uncutBody = ArchitectWallNetwork.body(uncutWalls);
+    final rawUncutBody = ArchitectWallNetwork.body(uncutWalls);
+    final uncutBody = Path.combine(PathOperation.difference, rawUncutBody, body);
 
     return ArchitectWallLayers(
       body,

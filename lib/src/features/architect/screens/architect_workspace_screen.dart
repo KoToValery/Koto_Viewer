@@ -75,6 +75,8 @@ import '../widgets/architect_wall_drafting_panel.dart';
 import 'fenestration_editor_screen.dart';
 import '../models/architect_fenestration_style.dart';
 import '../services/fenestration_library_service.dart';
+import '../services/architect_wall_overshoot_detector.dart';
+import '../widgets/architect_wall_overshoot_banner.dart';
 
 // === SECTION: TABLE OF CONTENTS ===
 // 1. STATE & TOOL CONTROLLERS
@@ -1060,6 +1062,55 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (wall.id == _selectedElementId) return wall;
     }
     return null;
+  }
+
+  final Set<String> _dismissedOvershoots = {};
+
+  ArchitectWallOvershoot? get _activeOvershoot {
+    if (_is3DView) return null;
+    final walls = _project.activeStorey.walls;
+    if (_selectedWallIds.length == 1) {
+      final wall =
+          walls.where((w) => w.id == _selectedWallIds.first).firstOrNull;
+      if (wall != null) {
+        final list = ArchitectWallOvershootDetector.detectForWall(
+          wall,
+          walls,
+          ignoredIds: _dismissedOvershoots,
+        );
+        if (list.isNotEmpty) return list.first;
+      }
+    }
+    final all = ArchitectWallOvershootDetector.detectInStorey(
+      _project.activeStorey,
+      ignoredIds: _dismissedOvershoots,
+    );
+    return all.firstOrNull;
+  }
+
+  void _handleTrimOvershoot(ArchitectWallOvershoot overshoot) {
+    final commands = ArchitectWallOvershootDetector.createTrimCommands(
+      storeyId: _project.activeStoreyId,
+      overshoot: overshoot,
+    );
+    _commands.executeBatch(commands);
+    _saveBiMProjectIfAttached();
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.l10n.architectWallOvershootTrimmed(overshoot.overshootCm),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    setState(() {});
+  }
+
+  void _handleDismissOvershoot(ArchitectWallOvershoot overshoot) {
+    setState(() {
+      _dismissedOvershoots.add(overshoot.id);
+    });
   }
 
   Offset? _cursorModel;
@@ -5068,7 +5119,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 });
               },
             ),
-            if (wallIds.length == 1)
+            if (wallIds.length == 1) ...[
               IconButton(
                 key: const ValueKey('architect-wall-extend'),
                 tooltip: l.architectWallExtend,
@@ -5092,6 +5143,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   });
                 },
               ),
+              () {
+                final wall = _project.activeStorey.walls
+                    .where((w) => w.id == wallIds.single)
+                    .firstOrNull;
+                final overshoot = wall != null
+                    ? ArchitectWallOvershootDetector.detectForWall(
+                        wall,
+                        _project.activeStorey.walls,
+                      ).firstOrNull
+                    : null;
+                if (overshoot != null) {
+                  return IconButton(
+                    key: const ValueKey('architect-wall-trim-overshoot'),
+                    tooltip: l.architectWallOvershootTooltip,
+                    icon: const Icon(
+                      Icons.auto_fix_high_rounded,
+                      color: Colors.amberAccent,
+                    ),
+                    onPressed: () => _handleTrimOvershoot(overshoot),
+                  );
+                }
+                return const SizedBox.shrink();
+              }(),
+            ],
           ],
         ),
       ),
@@ -5383,6 +5458,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ),
                     onPressed: _selectConnectedWalls,
                   ),
+                if (wallIds.length == 1) () {
+                  final wall = _project.activeStorey.walls
+                      .where((w) => w.id == wallIds.first)
+                      .firstOrNull;
+                  final overshoot = wall != null
+                      ? ArchitectWallOvershootDetector.detectForWall(
+                          wall,
+                          _project.activeStorey.walls,
+                        ).firstOrNull
+                      : null;
+                  if (overshoot != null) {
+                    return IconButton(
+                      key: const ValueKey('architect-selection-trim-overshoot'),
+                      constraints: const BoxConstraints.tightFor(
+                        width: 26,
+                        height: 40,
+                      ),
+                      padding: EdgeInsets.zero,
+                      tooltip: l.architectWallOvershootTooltip,
+                      icon: const Icon(
+                        Icons.auto_fix_high_rounded,
+                        color: Colors.amberAccent,
+                        size: 18,
+                      ),
+                      onPressed: () => _handleTrimOvershoot(overshoot),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                }(),
                 IconButton(
                   key: const ValueKey('architect-select-similar'),
                   constraints: const BoxConstraints.tightFor(
@@ -6340,6 +6444,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           onResequence: _handleResequenceAxes,
                           onAlignAll: _handleAlignAllAxes,
                           onGenerateFromWalls: _generateAxesFromWalls,
+                        ),
+                      ),
+                    // Floating Overshoot Notice Banner
+                    if (_activeOvershoot != null && !_is3DView)
+                      Positioned(
+                        bottom: 16,
+                        left: 16,
+                        right: 16,
+                        child: Center(
+                          child: ArchitectWallOvershootBanner(
+                            overshoot: _activeOvershoot!,
+                            onTrim: () => _handleTrimOvershoot(_activeOvershoot!),
+                            onDismiss: () =>
+                                _handleDismissOvershoot(_activeOvershoot!),
+                          ),
                         ),
                       ),
                   ],
@@ -7511,6 +7630,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         slabCandidatePoint: _elementTool.slabCandidatePoint,
         polygonEditInvalid: _polygonEditor.invalid,
         polygonLeaderLine: _polygonEditor.leaderLine,
+        activeOvershoot: _activeOvershoot,
       );
 
   // === SECTION: 3D SOLID VIEWPORT ===

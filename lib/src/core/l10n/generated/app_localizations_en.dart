@@ -5126,4 +5126,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stairCheckGroupSteps => 'Risers per group';
+
+  @override
+  String architectWallOvershootDetected(int distance) {
+    return 'Wall overshoot: $distance cm';
+  }
+
+  @override
+  String get architectWallOvershootTrim => 'Trim';
+
+  @override
+  String get architectWallOvershootDismiss => 'Keep';
+
+  @override
+  String architectWallOvershootTrimmed(int distance) {
+    return 'Wall corner trimmed ($distance cm)';
+  }
+
+  @override
+  String get architectWallOvershootTooltip =>
+      'Trim protruding wall stub to corner';
 }

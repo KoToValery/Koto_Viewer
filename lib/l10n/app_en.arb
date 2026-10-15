@@ -3566,5 +3566,31 @@
   "stairClearDimensionsHelp": "Use finished clear widths between limiting handrail projections. For a spiral, the inner radius starts at the limiting inner edge or handrail projection.",
   "stairUnsupported": "This combination cannot be drawn. Adjust the height or riser count.",
   "stairLegacy": "Schematic stair. Recalculate to convert it to a parametric stair.",
-  "stairCheckGroupSteps": "Risers per group"
+  "stairCheckGroupSteps": "Risers per group",
+  "architectWallOvershootDetected": "Wall overshoot: {distance} cm",
+  "@architectWallOvershootDetected": {
+    "description": "Notice when a wall protrudes past another wall",
+    "placeholders": {
+      "distance": { "type": "int" }
+    }
+  },
+  "architectWallOvershootTrim": "Trim",
+  "@architectWallOvershootTrim": {
+    "description": "Action to trim protruding wall stub"
+  },
+  "architectWallOvershootDismiss": "Keep",
+  "@architectWallOvershootDismiss": {
+    "description": "Action to keep protruding wall stub as is"
+  },
+  "architectWallOvershootTrimmed": "Wall corner trimmed ({distance} cm)",
+  "@architectWallOvershootTrimmed": {
+    "description": "Feedback message after trimming wall overshoot",
+    "placeholders": {
+      "distance": { "type": "int" }
+    }
+  },
+  "architectWallOvershootTooltip": "Trim protruding wall stub to corner",
+  "@architectWallOvershootTooltip": {
+    "description": "Tooltip for trimming wall overshoot"
+  }
 }
