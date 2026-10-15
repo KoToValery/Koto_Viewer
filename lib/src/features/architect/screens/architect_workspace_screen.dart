@@ -829,6 +829,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_wallExtendId != null && !valid.contains(_wallExtendId)) {
       _wallExtendId = null;
     }
+    if (_wallJoinSourceId != null && !valid.contains(_wallJoinSourceId)) {
+      _wallJoinSourceId = null;
+      _wallJoinPointer = null;
+    }
     if (_isActivelyDraggingHandle) {
       _cancelActiveDrags();
       _interactionEpoch++;
@@ -868,6 +872,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _wallCutConfirmedDir = null;
     _wallStartAttachment = null;
     _wallExtendId = null;
+    _wallJoinSourceId = null;
+    _wallJoinPointer = null;
     _multiSelect = false;
     _moveSelection = false;
     _wallParallelMove = false;
@@ -899,6 +905,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _wallParallelMove = false;
       _wallEndpointClearanceId = null;
       _wallExtendId = null;
+      _wallJoinSourceId = null;
+      _wallJoinPointer = null;
       _wallCutIds = {};
       _wallCutStart = null;
       _wallCutConfirmedDir = null;
@@ -973,6 +981,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   WallReferenceLine _wallReference = WallReferenceLine.center;
   WallExteriorSide _wallExteriorSide = WallExteriorSide.left;
   String? _wallExtendId;
+  String? _wallJoinSourceId;
+  Offset? _wallJoinPointer;
+  (Offset, Offset)? get _wallJoinLeaderLine {
+    if (_wallJoinSourceId == null) return null;
+    final wall = _project.activeStorey.walls
+        .where((w) => w.id == _wallJoinSourceId)
+        .firstOrNull;
+    if (wall == null) return null;
+    final center = (wall.startPoint + wall.endPoint) / 2;
+    final target = _wallJoinPointer ??
+        (center + wall.normalVector * (wall.thickness + 0.6));
+    return (center, target);
+  }
   Set<String> _wallCutIds = {};
   Offset? _wallCutStart;
   Offset? _wallCutConfirmedDir;
@@ -2310,6 +2331,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _cursorModel = snap.point;
       _activeSnapLabel = snap.snapLabel;
     }
+    if (_wallJoinSourceId != null) {
+      _wallJoinPointer = rawModel;
+    }
     _repaintPreview();
   }
 
@@ -2423,6 +2447,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _duplicateSourceId = null;
     _polygonEditor.cancel();
     _radialMenuScreenPosition = null;
+    _wallJoinSourceId = null;
+    _wallJoinPointer = null;
     _controlTrimClick = false;
     _groupDragIds = {};
     _placingWithHold = false;
@@ -2825,6 +2851,52 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _wallCutStart = null;
           _wallCutConfirmedDir = null;
           _wallCutIds = {};
+        });
+        return;
+      }
+    }
+    if (_wallJoinSourceId != null) {
+      final sourceId = _wallJoinSourceId!;
+      final hit = _hitSelection(rawModel);
+      final hitWall = _project.activeStorey.walls
+          .where((w) => w.id == hit && w.id != sourceId)
+          .firstOrNull;
+      if (hitWall != null) {
+        try {
+          _commands.execute(
+            JoinArchitectWalls(
+              storeyId: _project.activeStoreyId,
+              wallIds: {sourceId, hitWall.id},
+            ),
+          );
+          _saveBiMProjectIfAttached();
+          HapticFeedback.mediumImpact();
+          setState(() {
+            _wallJoinSourceId = null;
+            _wallJoinPointer = null;
+            _selectionIds.clear();
+            _selectedElementId = null;
+            _selectedZoneId = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.l10n.architectWallJoinSuccess),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } on ArgumentError {
+          _operationError();
+          setState(() {
+            _wallJoinSourceId = null;
+            _wallJoinPointer = null;
+          });
+        }
+        return;
+      }
+      if (hit == sourceId) {
+        setState(() {
+          _wallJoinSourceId = null;
+          _wallJoinPointer = null;
         });
         return;
       }
@@ -4464,6 +4536,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             color: const Color(0xFF64FFDA),
           ),
           _radialItem(
+            action: ArchitectRadialAction.join,
+            color: const Color(0xFF00E5FF),
+          ),
+          _radialItem(
             action: ArchitectRadialAction.move,
             color: const Color(0xFFFFB300),
           ),
@@ -4573,6 +4649,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           action: ArchitectRadialAction.duplicate,
 
           color: const Color(0xFF64FFDA),
+        ),
+      );
+
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.join,
+
+          color: const Color(0xFF00E5FF),
         ),
       );
 
@@ -4793,6 +4877,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         case ArchitectRadialAction.properties:
           _showProperties();
           return;
+        case ArchitectRadialAction.join:
+          _triggerWallJoin();
+          return;
         default:
           break;
       }
@@ -4902,6 +4989,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         if (axis != null) {
           _handleAxisOffset(axis);
         }
+        break;
+
+      case ArchitectRadialAction.join:
+        _triggerWallJoin();
         break;
     }
   }
@@ -5073,6 +5164,57 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         .toSet();
   }
 
+  void _triggerWallJoin() {
+    final wallIds = _selectedWallIds;
+    if (wallIds.length >= 2) {
+      _cancelActiveDrags();
+      try {
+        _commands.execute(
+          JoinArchitectWalls(
+            storeyId: _project.activeStoreyId,
+            wallIds: wallIds,
+          ),
+        );
+        _saveBiMProjectIfAttached();
+        HapticFeedback.mediumImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.architectWallJoinSuccess),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } on ArgumentError {
+        _operationError();
+      }
+    } else if (wallIds.length == 1) {
+      final sourceId = wallIds.single;
+      setState(() {
+        _radialMenuScreenPosition = null;
+        _wallCutIds = {};
+        _wallCutStart = null;
+        _wallCutConfirmedDir = null;
+        _wallExtendId = null;
+        _moveSelection = false;
+        _wallParallelMove = false;
+        if (_wallJoinSourceId == sourceId) {
+          _wallJoinSourceId = null;
+          _wallJoinPointer = null;
+        } else {
+          _wallJoinSourceId = sourceId;
+          final wall = _project.activeStorey.walls
+              .where((w) => w.id == sourceId)
+              .firstOrNull;
+          if (wall != null) {
+            final center = (wall.startPoint + wall.endPoint) / 2;
+            _wallJoinPointer =
+                center + wall.normalVector * (wall.thickness + 0.6);
+          }
+        }
+      });
+      HapticFeedback.selectionClick();
+    }
+  }
+
   Widget _buildWallSelectionActions(Set<String> wallIds) {
     final l = context.l10n;
     return Material(
@@ -5118,6 +5260,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   _wallParallelMove = false;
                 });
               },
+            ),
+            IconButton(
+              key: const ValueKey('architect-wall-join'),
+              tooltip: l.architectWallJoinTooltip,
+              icon: Icon(
+                Icons.call_merge,
+                color: _wallJoinSourceId != null ? Colors.amber : Colors.white,
+              ),
+              onPressed: () => _triggerWallJoin(),
             ),
             if (wallIds.length == 1) ...[
               IconButton(
@@ -6461,6 +6612,67 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           ),
                         ),
                       ),
+                    if (_wallJoinSourceId != null && !_is3DView)
+                      Positioned(
+                        bottom: 16,
+                        left: 16,
+                        right: 16,
+                        child: Center(
+                          child: Material(
+                            key: const ValueKey('architect-wall-join-banner'),
+                            color: const Color(0xEE1E242C),
+                            borderRadius: BorderRadius.circular(24),
+                            elevation: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: const Color(0xFF00E5FF),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.call_merge,
+                                    color: Color(0xFF00E5FF),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    context.l10n.architectWallJoinSelectSecond,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  GestureDetector(
+                                    key: const ValueKey(
+                                      'architect-wall-join-cancel',
+                                    ),
+                                    onTap: () => setState(() {
+                                      _wallJoinSourceId = null;
+                                      _wallJoinPointer = null;
+                                    }),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Colors.white70,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -7630,6 +7842,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         slabCandidatePoint: _elementTool.slabCandidatePoint,
         polygonEditInvalid: _polygonEditor.invalid,
         polygonLeaderLine: _polygonEditor.leaderLine,
+        wallJoinLeaderLine: _wallJoinLeaderLine,
         activeOvershoot: _activeOvershoot,
       );
 

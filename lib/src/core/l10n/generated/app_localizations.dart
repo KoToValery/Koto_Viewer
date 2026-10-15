@@ -8974,6 +8974,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Trim protruding wall stub to corner'**
   String get architectWallOvershootTooltip;
+
+  /// Radial menu action to join two walls
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get architectRadialJoin;
+
+  /// Tooltip for join walls action
+  ///
+  /// In en, this message translates to:
+  /// **'Join walls'**
+  String get architectWallJoinTooltip;
+
+  /// Instruction message when picking second wall to join
+  ///
+  /// In en, this message translates to:
+  /// **'Select second wall to join'**
+  String get architectWallJoinSelectSecond;
+
+  /// Feedback message when walls are successfully joined
+  ///
+  /// In en, this message translates to:
+  /// **'Walls joined'**
+  String get architectWallJoinSuccess;
+
+  /// Error message when walls cannot be joined
+  ///
+  /// In en, this message translates to:
+  /// **'Walls cannot be joined'**
+  String get architectWallJoinIncompatible;
 }
 
 class _AppLocalizationsDelegate

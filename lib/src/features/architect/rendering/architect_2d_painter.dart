@@ -69,6 +69,7 @@ class Architect2dPainter extends CustomPainter {
   final (Offset, Offset)? wallCutGuideLine;
   final Offset? wallCutAnchor;
   final (Offset, Offset)? wallCutLine;
+  final (Offset, Offset)? wallJoinLeaderLine;
   final ArchitectWallTrimSpan? wallTrimSpan;
   final List<ArchitectWallClearance> wallClearances;
   final Set<String> selectedElementIds;
@@ -153,6 +154,7 @@ class Architect2dPainter extends CustomPainter {
     this.wallCutGuideLine,
     this.wallCutAnchor,
     this.wallCutLine,
+    this.wallJoinLeaderLine,
     this.wallTrimSpan,
     this.wallClearances = const [],
     this.selectedElementIds = const {},
@@ -834,6 +836,48 @@ class Architect2dPainter extends CustomPainter {
         stubEnd,
         2.5 / zoomScale,
         Paint()..color = Colors.amberAccent,
+      );
+    }
+    if (wallJoinLeaderLine != null) {
+      final (from, to) = wallJoinLeaderLine!;
+      final linePaint = Paint()
+        ..color = const Color(0xFF00E5FF)
+        ..strokeWidth = 2.0 / zoomScale
+        ..style = PaintingStyle.stroke;
+      _drawDashedLine(canvas, from, to, linePaint, zoomScale);
+      canvas.drawCircle(
+        from,
+        4.0 / zoomScale,
+        Paint()..color = const Color(0xFF00E5FF),
+      );
+      final handleRadius = 13.0 / zoomScale;
+      canvas.drawCircle(
+        to,
+        handleRadius,
+        Paint()..color = const Color(0x3300E5FF),
+      );
+      canvas.drawCircle(
+        to,
+        handleRadius,
+        Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8 / zoomScale,
+      );
+      final plusPaint = Paint()
+        ..color = Colors.white
+        ..strokeWidth = 2.0 / zoomScale
+        ..strokeCap = StrokeCap.round;
+      final arm = 5.5 / zoomScale;
+      canvas.drawLine(
+        Offset(to.dx - arm, to.dy),
+        Offset(to.dx + arm, to.dy),
+        plusPaint,
+      );
+      canvas.drawLine(
+        Offset(to.dx, to.dy - arm),
+        Offset(to.dx, to.dy + arm),
+        plusPaint,
       );
     }
     if (wallTrimSpan != null) {

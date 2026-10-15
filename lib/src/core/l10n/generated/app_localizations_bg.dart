@@ -5163,4 +5163,20 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectWallOvershootTooltip =>
       'Изчистване на изскачащия край до ъгъла';
+
+  @override
+  String get architectRadialJoin => 'Съединяване';
+
+  @override
+  String get architectWallJoinTooltip => 'Съединяване на стени (Join)';
+
+  @override
+  String get architectWallJoinSelectSecond =>
+      'Изберете втора стена за съединяване';
+
+  @override
+  String get architectWallJoinSuccess => 'Стените са съединени';
+
+  @override
+  String get architectWallJoinIncompatible => 'Стените не могат да се съединят';
 }

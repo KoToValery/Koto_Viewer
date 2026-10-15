@@ -5146,4 +5146,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectWallOvershootTooltip =>
       'Trim protruding wall stub to corner';
+
+  @override
+  String get architectRadialJoin => 'Join';
+
+  @override
+  String get architectWallJoinTooltip => 'Join walls';
+
+  @override
+  String get architectWallJoinSelectSecond => 'Select second wall to join';
+
+  @override
+  String get architectWallJoinSuccess => 'Walls joined';
+
+  @override
+  String get architectWallJoinIncompatible => 'Walls cannot be joined';
 }

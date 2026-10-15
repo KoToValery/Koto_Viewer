@@ -3592,5 +3592,25 @@
   "architectWallOvershootTooltip": "Trim protruding wall stub to corner",
   "@architectWallOvershootTooltip": {
     "description": "Tooltip for trimming wall overshoot"
+  },
+  "architectRadialJoin": "Join",
+  "@architectRadialJoin": {
+    "description": "Radial menu action to join two walls"
+  },
+  "architectWallJoinTooltip": "Join walls",
+  "@architectWallJoinTooltip": {
+    "description": "Tooltip for join walls action"
+  },
+  "architectWallJoinSelectSecond": "Select second wall to join",
+  "@architectWallJoinSelectSecond": {
+    "description": "Instruction message when picking second wall to join"
+  },
+  "architectWallJoinSuccess": "Walls joined",
+  "@architectWallJoinSuccess": {
+    "description": "Feedback message when walls are successfully joined"
+  },
+  "architectWallJoinIncompatible": "Walls cannot be joined",
+  "@architectWallJoinIncompatible": {
+    "description": "Error message when walls cannot be joined"
   }
 }

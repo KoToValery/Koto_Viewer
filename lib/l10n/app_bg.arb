@@ -1646,5 +1646,10 @@
   "architectWallOvershootTrim": "Изчисти",
   "architectWallOvershootDismiss": "Отказ",
   "architectWallOvershootTrimmed": "Изскачащият край е изчистен ({distance} cm)",
-  "architectWallOvershootTooltip": "Изчистване на изскачащия край до ъгъла"
+  "architectWallOvershootTooltip": "Изчистване на изскачащия край до ъгъла",
+  "architectRadialJoin": "Съединяване",
+  "architectWallJoinTooltip": "Съединяване на стени (Join)",
+  "architectWallJoinSelectSecond": "Изберете втора стена за съединяване",
+  "architectWallJoinSuccess": "Стените са съединени",
+  "architectWallJoinIncompatible": "Стените не могат да се съединят"
 }

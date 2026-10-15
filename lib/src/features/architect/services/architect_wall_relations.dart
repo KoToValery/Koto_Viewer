@@ -54,8 +54,9 @@ class ArchitectWallClearance {
   }
 
   /// Distances from connected endpoint junctions, along their supports, to
-  /// perpendicular reference walls. The junction remains on the same support
-  /// line when edited; the opposite endpoint is an independent fixed anchor.
+  /// perpendicular reference walls. The clearance is measured from the visual
+  /// intersection point of the inner/outer wall edge with the support face,
+  /// preserving clear room dimensions and visual edge corners.
   static List<ArchitectWallClearance> endpoints(
     ArchitectWall wall,
     List<ArchitectWall> walls, {
@@ -68,7 +69,7 @@ class ArchitectWallClearance {
     for (final atStart in [true, false]) {
       if (!(atStart ? wall.connectStart : wall.connectEnd)) continue;
       final point = atStart ? wall.startPoint : wall.endPoint;
-      ArchitectWallClearance? best;
+      final bestBySide = <int, ArchitectWallClearance>{};
       for (final support in ordered) {
         if (support.id == wall.id ||
             support.isDetached ||
@@ -90,6 +91,48 @@ class ArchitectWallClearance {
               along <= support.length + .001;
         });
         if (!onSupport) continue;
+
+        // Visual intersection logic:
+        // 1. Face of support where wall extends
+        final wallDir = atStart ? wall.unitVector : -wall.unitVector;
+        final supportNormalDot = dot(wallDir, support.normalVector);
+        final sOffset = dot(support.centerOffset, support.normalVector);
+        final supportFaceNormalOffset =
+            sOffset +
+            (supportNormalDot >= 0
+                ? support.thickness / 2
+                : -support.thickness / 2);
+        final supportFaceStart =
+            support.startPoint + support.normalVector * supportFaceNormalOffset;
+        final supportFaceEnd =
+            support.endPoint + support.normalVector * supportFaceNormalOffset;
+
+        // 2. Both finished face lines of wall (inner and outer edges)
+        final wOffset = dot(wall.centerOffset, wall.normalVector);
+        final wallFace1Start =
+            wall.startPoint +
+            wall.normalVector * (wOffset + wall.thickness / 2);
+        final wallFace1End =
+            wall.endPoint + wall.normalVector * (wOffset + wall.thickness / 2);
+        final wallFace2Start =
+            wall.startPoint +
+            wall.normalVector * (wOffset - wall.thickness / 2);
+        final wallFace2End =
+            wall.endPoint + wall.normalVector * (wOffset - wall.thickness / 2);
+
+        final inter1 = ArchitectWallNetwork.intersection(
+          supportFaceStart,
+          supportFaceEnd,
+          wallFace1Start,
+          wallFace1End,
+        );
+        final inter2 = ArchitectWallNetwork.intersection(
+          supportFaceStart,
+          supportFaceEnd,
+          wallFace2Start,
+          wallFace2End,
+        );
+
         for (final target in ordered) {
           if (target.id == wall.id ||
               target.id == support.id ||
@@ -102,29 +145,91 @@ class ArchitectWallClearance {
             target.centerStart - point,
             support.unitVector,
           );
-          final distance = math.max(
-            0.0,
-            axisDistance.abs() - target.thickness / 2,
-          );
           if (axisDistance.abs() < target.thickness / 2 - 1e-8) continue;
-          final direction = support.unitVector * axisDistance.sign;
-          final end = point + direction * distance;
-          final station = dot(end - target.centerStart, target.unitVector);
-          if (station < -.001 || station > target.length + .001) continue;
-          if (best != null && best.distance <= distance) continue;
-          best = ArchitectWallClearance(
+          final side = axisDistance.sign.toInt();
+          final direction = support.unitVector * side.toDouble();
+
+          // 3. Visual start: pick wall face edge facing target (furthest along direction)
+          Offset visualStart = point;
+          if (inter1 != null && inter2 != null) {
+            final along1 = dot(inter1 - point, direction);
+            final along2 = dot(inter2 - point, direction);
+            visualStart = along1 >= along2 ? inter1 : inter2;
+          } else if (inter1 != null) {
+            visualStart = inter1;
+          } else if (inter2 != null) {
+            visualStart = inter2;
+          }
+
+          // 4. Target faces (inner and outer edges of target meeting support face)
+          final tOffset = dot(target.centerOffset, target.normalVector);
+          final targetFace1Start =
+              target.startPoint +
+              target.normalVector * (tOffset + target.thickness / 2);
+          final targetFace1End =
+              target.endPoint +
+              target.normalVector * (tOffset + target.thickness / 2);
+          final targetFace2Start =
+              target.startPoint +
+              target.normalVector * (tOffset - target.thickness / 2);
+          final targetFace2End =
+              target.endPoint +
+              target.normalVector * (tOffset - target.thickness / 2);
+
+          final tInter1 = ArchitectWallNetwork.intersection(
+            supportFaceStart,
+            supportFaceEnd,
+            targetFace1Start,
+            targetFace1End,
+          );
+          final tInter2 = ArchitectWallNetwork.intersection(
+            supportFaceStart,
+            supportFaceEnd,
+            targetFace2Start,
+            targetFace2End,
+          );
+
+          Offset visualEnd =
+              point +
+              direction *
+                  math.max(0.0, axisDistance.abs() - target.thickness / 2);
+          if (tInter1 != null && tInter2 != null) {
+            final along1 = dot(tInter1 - point, direction);
+            final along2 = dot(tInter2 - point, direction);
+            visualEnd = along1 <= along2 ? tInter1 : tInter2;
+          } else if (tInter1 != null) {
+            visualEnd = tInter1;
+          } else if (tInter2 != null) {
+            visualEnd = tInter2;
+          }
+
+          final rawClearance = dot(visualEnd - visualStart, direction);
+          if (rawClearance < -1e-5) continue;
+          final clearDistance = math.max(0.0, rawClearance);
+
+          final station = dot(visualEnd - target.centerStart, target.unitVector);
+          if (station < -target.thickness / 2 - .01 ||
+              station > target.length + target.thickness / 2 + .01) {
+            continue;
+          }
+
+          if (bestBySide[side] != null &&
+              bestBySide[side]!.distance <= clearDistance) {
+            continue;
+          }
+          bestBySide[side] = ArchitectWallClearance(
             wallId: wall.id,
             neighborId: target.id,
-            side: axisDistance.sign.toInt(),
-            distance: distance,
-            start: point,
-            end: end,
+            side: side,
+            distance: clearDistance,
+            start: visualStart,
+            end: visualEnd,
             atStart: atStart,
             supportId: support.id,
           );
         }
       }
-      if (best != null) result.add(best);
+      result.addAll(bestBySide.values);
     }
     return result;
   }

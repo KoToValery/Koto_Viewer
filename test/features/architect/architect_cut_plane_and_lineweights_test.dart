@@ -1,11 +1,9 @@
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_column.dart';
 import 'package:kotoview/src/features/architect/models/architect_elements.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
-import 'package:kotoview/src/features/architect/models/architect_wall_type.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_canvas_palette.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_wall_layers.dart';

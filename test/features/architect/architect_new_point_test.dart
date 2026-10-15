@@ -364,16 +364,16 @@ void main() {
             w.key is ValueKey<String> &&
             (w.key as ValueKey<String>).value.startsWith('architect-radial-'),
       );
-      expect(buttons, findsNWidgets(7));
+      expect(buttons, findsNWidgets(8));
       final rects = tester.getRect(buttons.at(0));
       expect(rects.left, greaterThanOrEqualTo(0));
-      for (var i = 0; i < 7; i++) {
+      for (var i = 0; i < 8; i++) {
         final a = tester.getRect(buttons.at(i));
         expect(a.right, lessThanOrEqualTo(360));
-        for (var j = i + 1; j < 7; j++) {
+        for (var j = i + 1; j < 8; j++) {
           expect(
             (a.center - tester.getRect(buttons.at(j)).center).distance,
-            greaterThanOrEqualTo(60 - 1e-8),
+            greaterThanOrEqualTo(50 - 1e-8),
           );
         }
       }

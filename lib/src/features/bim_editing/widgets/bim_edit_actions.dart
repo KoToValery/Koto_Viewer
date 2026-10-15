@@ -14,6 +14,7 @@ enum BimEditAction {
   offset,
   newPoint,
   rename,
+  join,
 }
 
 class BimEditActions {
@@ -30,6 +31,7 @@ class BimEditActions {
         BimEditAction.offset => l.offsetAction,
         BimEditAction.newPoint => l.bimNewPoint,
         BimEditAction.rename => l.architectRadialRename,
+        BimEditAction.join => l.architectRadialJoin,
       };
   static IconData icon(BimEditAction action) => switch (action) {
     BimEditAction.move => Icons.open_with_rounded,
@@ -43,6 +45,7 @@ class BimEditActions {
     BimEditAction.offset => Icons.straighten_rounded,
     BimEditAction.newPoint => Icons.add_location_alt_outlined,
     BimEditAction.rename => Icons.drive_file_rename_outline_rounded,
+    BimEditAction.join => Icons.call_merge,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};
@@ -60,6 +63,7 @@ class BimEditActions {
         BimEditAction.edit,
       if (caps.contains(BimEditingCapability.offset)) BimEditAction.offset,
       if (caps.contains(BimEditingCapability.contour)) BimEditAction.newPoint,
+      if (caps.contains(BimEditingCapability.endpoints)) BimEditAction.join,
     };
   }
 }

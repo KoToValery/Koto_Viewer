@@ -452,7 +452,35 @@ class SetArchitectWallEndpointClearance extends ArchitectModelCommand {
     }
     final basis = storey.walls.firstWhere((w) => w.id == supportId);
     final direction = basis.unitVector * gap.side.toDouble();
-    final point = gap.end - direction * distance;
+    final currentPoint = atStart ? wall.startPoint : wall.endPoint;
+    final edgeOffset = gap.start - currentPoint;
+    var point = gap.end - direction * distance - edgeOffset;
+
+    // Refine point accounting for wall angle change during pivot
+    for (var iter = 0; iter < 5; iter++) {
+      final testWall = wall.copyWith(
+        startPoint: atStart ? point : null,
+        endPoint: atStart ? null : point,
+      );
+      final testGaps = ArchitectWallClearance.endpoints(
+        testWall,
+        storey.walls,
+        includeParallel: true,
+      );
+      final testGap = testGaps
+          .where(
+            (g) =>
+                g.atStart == atStart &&
+                g.neighborId == neighborId &&
+                g.supportId == supportId,
+          )
+          .firstOrNull;
+      if (testGap == null) break;
+      final err = testGap.distance - distance;
+      if (err.abs() < 1e-9) break;
+      point = point + direction * err;
+    }
+
     var updated = UpdateArchitectWall(
       storeyId: storeyId,
       fixedWallIds: {neighborId},

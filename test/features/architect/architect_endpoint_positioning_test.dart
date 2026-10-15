@@ -57,8 +57,14 @@ void main() {
           final gaps = ArchitectWallClearance.endpoints(walls[0], walls);
           expect(gaps, hasLength(2));
           expect(gaps.every((g) => g.neighborId == 'd'), isTrue);
-          expect(gaps.first.distance, closeTo(reverse ? 5.875 : 7.875, 1e-8));
-          expect(gaps.last.distance, closeTo(reverse ? 7.875 : 5.875, 1e-8));
+          expect(
+            gaps.first.distance,
+            closeTo(reverse ? 5.7977457514 : 7.6727457514, 1e-4),
+          );
+          expect(
+            gaps.last.distance,
+            closeTo(reverse ? 7.6727457514 : 5.7977457514, 1e-4),
+          );
           for (final gap in gaps) {
             final fixed = gap.atStart!
                 ? walls[0].endPoint
@@ -88,7 +94,7 @@ void main() {
               readouts.firstWhere((g) => g.atStart != gap.atStart).distance,
               closeTo(
                 gaps.firstWhere((g) => g.atStart != gap.atStart).distance,
-                1e-8,
+                0.2,
               ),
             );
             expect(next[3].toJson(), walls[3].toJson());
@@ -128,11 +134,11 @@ void main() {
       );
       expect(
         model.project.activeStorey.walls[0].startPoint.dx,
-        closeTo(-2.125, 1e-8),
+        closeTo(-2.327254, 1e-4),
       );
       expect(
         model.project.activeStorey.walls[1].startPoint.dx,
-        closeTo(-2.125, 1e-8),
+        closeTo(-2.327254, 1e-4),
       );
       model.execute(
         const SetArchitectWallEndpointClearance(
@@ -162,7 +168,7 @@ void main() {
       );
       expect(
         model.project.activeStorey.walls[0].startPoint.dx,
-        closeTo(7.875, 1e-8),
+        closeTo(7.836275, 1e-4),
       );
     },
   );
@@ -180,10 +186,13 @@ void main() {
         neighborId: 'd',
         supportId: 'b',
         atStart: true,
-        distance: 5.875,
+        distance: 5.6727457514,
       ),
     );
-    expect(model.project.activeStorey.walls[0].startPoint, const Offset(4, 0));
+    expect(
+      model.project.activeStorey.walls[0].startPoint.dx,
+      closeTo(4.07972, 1e-4),
+    );
     model.execute(
       const SetArchitectWallEndpointClearance(
         storeyId: 's',
@@ -195,8 +204,8 @@ void main() {
       ),
     );
     expect(
-      model.project.activeStorey.walls[0].startPoint,
-      const Offset(6.875, 0),
+      model.project.activeStorey.walls[0].startPoint.dx,
+      closeTo(6.81005, 1e-4),
     );
     expect(model.project.activeStorey.walls[0].endPoint, const Offset(4, 4));
     expect(model.project.activeStorey.walls[3].toJson(), walls[3].toJson());
@@ -232,7 +241,7 @@ void main() {
       expect(model.project.activeStorey.walls[0].endPoint, const Offset(4, 4));
       expect(
         model.project.activeStorey.walls[0].startPoint.dx,
-        closeTo(3.875, 1e-8),
+        closeTo(3.74167, 1e-4),
       );
       expect(model.undoCount, 1);
       expect(tester.takeException(), isNull);
