@@ -46,6 +46,11 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
 
   void update(ArchitectStairDesign next) {
     try {
+      next = ArchitectStairRules.resolveDesign(
+        widget.project,
+        widget.project.activeStorey,
+        next,
+      );
       next.validate();
       setState(() => stair = stair.copyWith(design: next));
     } on ArgumentError {
@@ -92,6 +97,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
             onEnd: () {
               final number = metric ? unit.fromUnit(draft) : draft;
               if (!number.isFinite ||
+                  number < minimum ||
                   number > maximum ||
                   (integer && number != number.roundToDouble())) {
                 invalid();
@@ -180,6 +186,8 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
           : d.rulesVersion,
       autoRisers: true,
       autoGoing: true,
+      autoWinderSteps: true,
+      autoWinderRadius: true,
       isDraft: false,
       landingDepth: d.use == StairUse.outdoorRoute ? 1.5 : 1.2,
     );
@@ -188,8 +196,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
             stair.width,
             next.use == StairUse.assembly
                 ? 1.6
-                : next.shape == StairShape.spiral &&
-                      next.evacuation == StairEvacuation.over50
+                : next.isSpiral && next.evacuation == StairEvacuation.over50
                 ? 1.5
                 : next.accessible ||
                       next.evacuation == StairEvacuation.from16To50
@@ -197,7 +204,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                 : 1.0,
           )
         : stair.width;
-    if (next.shape == StairShape.spiral) {
+    if (next.isSpiral) {
       final factor = 2 * math.sin(next.anglePerGoing / 2);
       var radius = math.max(.15, next.going / factor - width / 2);
       if (next.code == StairCode.bulgaria) {
@@ -232,12 +239,12 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
     final checks = ArchitectStairRules.check(stair);
     final targetMissing =
         d.followStoreys &&
-        d.upperStoreyId != null &&
-        !widget.project.storeys.any(
-          (s) =>
-              s.id == d.upperStoreyId &&
-              s.elevation > widget.project.activeStorey.elevation,
-        );
+        ArchitectStairRules.linkedRise(
+              widget.project,
+              widget.project.activeStorey,
+              d,
+            ) ==
+            null;
     if (targetMissing) {
       checks.insert(
         0,
@@ -260,7 +267,9 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
             children: [
               SizedBox(
                 height: 136,
-                child: CustomPaint(painter: _StairPreview(stair, widget.project)),
+                child: CustomPaint(
+                  painter: _StairPreview(stair, widget.project),
+                ),
               ),
               if (legacy)
                 Padding(
@@ -289,26 +298,97 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                   ),
                 ],
               ),
-              Wrap(spacing: 12, children: [
-                Tooltip(message: l.stairSmartRailingHelp, child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(l.stairRailing), Switch.adaptive(key: const ValueKey('stair-show-railing'),
-                    value: d.showRailing, onChanged: (v) => update(d.copyWith(showRailing: v))),
-                ])),
-                Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(l.stairLabel), Switch.adaptive(key: const ValueKey('stair-show-label'),
-                    value: d.showLabel, onChanged: (v) => update(d.copyWith(showLabel: v))),
-                ]),
-              ]),
-              OutlinedButton.icon(key: const ValueKey('stair-open-section'),
-                icon: const Icon(Icons.view_agenda_outlined), label: Text(l.stairSection),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) =>
-                  ArchitectStairSectionScreen(project: widget.project, stair: stair)))),
+              if (d.shape == StairShape.quarterTurn ||
+                  d.shape == StairShape.halfTurn)
+                Tooltip(
+                  message: l.stairWindersHelp,
+                  child: SwitchListTile.adaptive(
+                    key: const ValueKey('stair-winders'),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text(l.stairWinders),
+                    value: d.winderSteps,
+                    onChanged: (v) => update(d.copyWith(winderSteps: v)),
+                  ),
+                ),
+              if (d.shape == StairShape.spiralOverlap)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    l.stairOverlapHelp,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              Wrap(
+                spacing: 12,
+                children: [
+                  Tooltip(
+                    message: l.stairSmartRailingHelp,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(l.stairRailing),
+                        Switch.adaptive(
+                          key: const ValueKey('stair-show-railing'),
+                          value: d.showRailing,
+                          onChanged: (v) => update(d.copyWith(showRailing: v)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(l.stairLabel),
+                      Switch.adaptive(
+                        key: const ValueKey('stair-show-label'),
+                        value: d.showLabel,
+                        onChanged: (v) => update(d.copyWith(showLabel: v)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('stair-open-section'),
+                icon: const Icon(Icons.view_agenda_outlined),
+                label: Text(l.stairSection),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ArchitectStairSectionScreen(
+                      project: widget.project,
+                      stair: stair,
+                    ),
+                  ),
+                ),
+              ),
               number(
                 'width',
                 l.stairClearWidth,
                 stair.width,
                 (v) => setState(() => stair = stair.copyWith(width: v)),
                 maximum: 10,
+              ),
+              Tooltip(
+                message: l.stairHeightModeHelp,
+                child: dropdown<bool>(
+                  'height-mode',
+                  l.stairHeightMode,
+                  d.followStoreys,
+                  const [true, false],
+                  (v) => v ? l.stairFollowStoreys : l.stairHeightManual,
+                  (v) => update(d.copyWith(followStoreys: v)),
+                ),
+              ),
+              Tooltip(
+                message: l.stairStartOffsetHelp,
+                child: number(
+                  'start-offset',
+                  l.stairStartOffset,
+                  d.startOffset,
+                  (v) => update(d.copyWith(startOffset: v)),
+                  minimum: -100,
+                ),
               ),
               number(
                 'rise',
@@ -318,20 +398,14 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                 enabled: !d.followStoreys,
                 maximum: 30,
               ),
-              SwitchListTile.adaptive(
-                key: const ValueKey('stair-follow-storeys'),
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: Text(l.stairFollowStoreys),
-                value: d.followStoreys,
-                onChanged: (v) => update(
-                  ArchitectStairRules.resolveDesign(
-                    widget.project,
-                    widget.project.activeStorey,
-                    d.copyWith(followStoreys: v),
-                  ),
+              if (d.shape == StairShape.spiralOverlap)
+                number(
+                  'overlap-headroom',
+                  l.stairCheckHeadroom,
+                  d.overlapHeadroom,
+                  (_) {},
+                  enabled: false,
                 ),
-              ),
               if (d.followStoreys)
                 dropdown<String>(
                   'target',
@@ -434,7 +508,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                       ),
                     ),
                   ),
-                  if (d.shape != StairShape.spiral) ...[
+                  if (!d.isSpiral) ...[
                     number(
                       'going',
                       l.stairGoing,
@@ -454,7 +528,74 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                         ),
                       ),
                     ),
-                    if (d.flightCount > 1)
+                    if (d.hasWinders) ...[
+                      Tooltip(
+                        message: l.stairWinderCornerHelp,
+                        child: dropdown<bool>(
+                          'corner',
+                          l.stairWinderCorner,
+                          d.cornerRiser,
+                          const [false, true],
+                          (v) => v
+                              ? l.stairWinderCornerRiser
+                              : l.stairWinderCornerTread,
+                          (v) => update(
+                            d.copyWith(cornerRiser: v, autoWinderSteps: true),
+                          ),
+                        ),
+                      ),
+                      number(
+                        'winder-count',
+                        l.stairWinderCount,
+                        d.winderLayout(stair.width).perQuarter.toDouble(),
+                        (v) => update(
+                          d.copyWith(
+                            manualWinderSteps: v.toInt(),
+                            cornerRiser: v.toInt().isEven,
+                          ),
+                        ),
+                        metric: false,
+                        integer: true,
+                        minimum: 1,
+                        maximum: 24,
+                      ),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(l.stairWinderCountAuto),
+                        value: d.manualWinderSteps == null,
+                        onChanged: (v) => update(
+                          d.copyWith(
+                            autoWinderSteps: v,
+                            manualWinderSteps: v
+                                ? null
+                                : d.winderLayout(stair.width).perQuarter,
+                          ),
+                        ),
+                      ),
+                      number(
+                        'winder-radius',
+                        l.stairInnerRadius,
+                        d.winderLayout(stair.width).radius,
+                        (v) => update(d.copyWith(manualWinderRadius: v)),
+                        maximum: 20,
+                      ),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(l.stairWinderRadiusAuto),
+                        value: d.manualWinderRadius == null,
+                        onChanged: (v) => update(
+                          d.copyWith(
+                            autoWinderRadius: v,
+                            manualWinderRadius: v
+                                ? null
+                                : d.winderLayout(stair.width).radius,
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (d.flightCount > 1 && !d.hasWinders)
                       number(
                         'landing',
                         l.stairLanding,
@@ -476,8 +617,10 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                       d.sweepDegrees,
                       (v) => update(d.copyWith(sweepDegrees: v)),
                       metric: false,
-                      minimum: 30,
-                      maximum: 360,
+                      minimum: d.shape == StairShape.spiralOverlap
+                          ? 360.001
+                          : 30,
+                      maximum: d.shape == StairShape.spiralOverlap ? 1080 : 360,
                     ),
                   ],
                   Text(
@@ -486,20 +629,57 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                   ),
                 ],
               ),
-              ExpansionTile(key: const ValueKey('stair-details'), tilePadding: EdgeInsets.zero,
-                title: Text(l.stairDetails), children: [
-                  number('guard-height', l.stairGuardHeight, d.guardHeight,
-                    (v) => update(d.copyWith(guardHeight: v)), minimum: .1, maximum: 2),
-                  number('handrail-height', l.stairHandrailHeight, d.handrailHeight,
-                    (v) => update(d.copyWith(handrailHeight: v)), minimum: .1, maximum: 2),
-                  number('concrete', l.stairConcreteThickness, d.concreteThickness,
-                    (v) => update(d.copyWith(concreteThickness: v)), minimum: .01, maximum: 1),
-                  number('finish', l.stairFinishThickness, d.finishThickness,
-                    (v) => update(d.copyWith(finishThickness: v)), minimum: 0, maximum: .15),
-                  number('nosing', l.stairNosing, d.nosingProjection,
-                    (v) => update(d.copyWith(nosingProjection: v)), minimum: 0, maximum: .1),
-                  Text(l.stairDetailsHelp, style: Theme.of(context).textTheme.bodySmall),
-                ]),
+              ExpansionTile(
+                key: const ValueKey('stair-details'),
+                tilePadding: EdgeInsets.zero,
+                title: Text(l.stairDetails),
+                children: [
+                  number(
+                    'guard-height',
+                    l.stairGuardHeight,
+                    d.guardHeight,
+                    (v) => update(d.copyWith(guardHeight: v)),
+                    minimum: .1,
+                    maximum: 2,
+                  ),
+                  number(
+                    'handrail-height',
+                    l.stairHandrailHeight,
+                    d.handrailHeight,
+                    (v) => update(d.copyWith(handrailHeight: v)),
+                    minimum: .1,
+                    maximum: 2,
+                  ),
+                  number(
+                    'concrete',
+                    l.stairConcreteThickness,
+                    d.concreteThickness,
+                    (v) => update(d.copyWith(concreteThickness: v)),
+                    minimum: .01,
+                    maximum: 1,
+                  ),
+                  number(
+                    'finish',
+                    l.stairFinishThickness,
+                    d.finishThickness,
+                    (v) => update(d.copyWith(finishThickness: v)),
+                    minimum: 0,
+                    maximum: .15,
+                  ),
+                  number(
+                    'nosing',
+                    l.stairNosing,
+                    d.nosingProjection,
+                    (v) => update(d.copyWith(nosingProjection: v)),
+                    minimum: 0,
+                    maximum: .1,
+                  ),
+                  Text(
+                    l.stairDetailsHelp,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
               ExpansionTile(
                 key: ValueKey('stair-checks-$errors'),
                 tilePadding: EdgeInsets.zero,
@@ -625,13 +805,16 @@ class _StairPreview extends CustomPainter {
       canvas: canvas,
       stair: stair,
       zoomScale: scale,
-      storey: project.activeStorey, project: project,
-      cutHeight: project.activeStorey.cutPlaneHeight, labels: false,
+      storey: project.activeStorey,
+      project: project,
+      cutHeight: project.activeStorey.cutPlaneHeight,
+      labels: false,
       color: stair.design?.isDraft == true ? Colors.red : Colors.teal,
     );
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_StairPreview old) => old.stair != stair;
+  bool shouldRepaint(_StairPreview old) =>
+      old.stair != stair || old.project != project;
 }

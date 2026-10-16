@@ -369,6 +369,14 @@ class ArchitectStair {
   }
 
   static final _plans = Expando<ArchitectStairPlan>();
+  /// Includes the caption for framing/culling, without enlarging the pick area.
+  Rect get displayBounds {
+    final bounds = plan.bounds;
+    if (design?.showLabel != true) return bounds.inflate(.08);
+    final label = Rect.fromCenter(center: bounds.bottomCenter + const Offset(0, .4),
+      width: 5, height: .8);
+    return bounds.inflate(.08).expandToInclude(label);
+  }
   ArchitectStairPlan get plan => _plans[this] ??= design == null
       ? ArchitectStairPlan(
           [polygonCorners],

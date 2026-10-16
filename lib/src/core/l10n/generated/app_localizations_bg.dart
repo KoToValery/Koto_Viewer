@@ -4952,6 +4952,42 @@ class AppLocalizationsBg extends AppLocalizations {
   String get stairSpiral => 'Вито';
 
   @override
+  String get stairSpiralOverlap => 'Вито с припокриване';
+
+  @override
+  String get stairWinders => 'Забежни стъпала';
+
+  @override
+  String get stairWindersHelp =>
+      'Заменя площадката със стъпала в завоя. Броят и светлият вътрешен радиус се подбират автоматично, с минимум 23 cm по линията на 30 cm от тесния край като проектна цел. Нормативната приложимост зависи от предназначението и евакуацията. Завоят не заменя задължителната площадка по височина.';
+
+  @override
+  String get stairWinderCorner => 'В ъгъла';
+
+  @override
+  String get stairWinderCornerTread => 'Стъпало';
+
+  @override
+  String get stairWinderCornerRiser => 'Чело';
+
+  @override
+  String get stairWinderCornerHelp =>
+      'Стъпало: едно стъпало преминава през външния ъгъл. Чело: границата между две стъпала е по ъглополовящата. И двата варианта имат светъл вътрешен радиус; опирането и армировката се проектират отделно.';
+
+  @override
+  String get stairWinderCount => 'Стъпала на 90°';
+
+  @override
+  String get stairWinderCountAuto => 'Автоматичен брой в завоя';
+
+  @override
+  String get stairWinderRadiusAuto => 'Автоматичен радиус в завоя';
+
+  @override
+  String get stairOverlapHelp =>
+      'Повече от един оборот. Светлата височина се проверява между застъпващите се части с отчитане на бетона и настилката.';
+
+  @override
   String get stairTurnLeft => 'Завой наляво';
 
   @override
@@ -5007,10 +5043,27 @@ class AppLocalizationsBg extends AppLocalizations {
   String get stairOver50 => 'Над 50 души';
 
   @override
-  String get stairRise => 'Между коти';
+  String get stairRise => 'Изкачване';
 
   @override
-  String get stairFollowStoreys => 'От котите';
+  String get stairFollowStoreys => 'От етажите';
+
+  @override
+  String get stairHeightMode => 'Височина';
+
+  @override
+  String get stairHeightManual => 'Ръчно';
+
+  @override
+  String get stairHeightModeHelp =>
+      'От етажите: изкачването се изчислява до горния етаж от зададеното начало. Ръчно: въвеждате общото изкачване и то се запазва при промяна на етажите.';
+
+  @override
+  String get stairStartOffset => 'Начало от кота';
+
+  @override
+  String get stairStartOffsetHelp =>
+      'Височина на началото спрямо етажната кота. 0 е на етажа, положителна стойност е над него, отрицателна — под него. Изкачването се измерва от това начало.';
 
   @override
   String get stairUpperStorey => 'Горен етаж';
@@ -5118,7 +5171,8 @@ class AppLocalizationsBg extends AppLocalizations {
   String get stairCheckVersion => 'Непозната версия на нормите';
 
   @override
-  String get stairCheckUpperStorey => 'Горният етаж липсва или е под началото';
+  String get stairCheckUpperStorey =>
+      'Проверете горната кота: липсва етаж или изкачването е извън 0–30 м';
 
   @override
   String get stairRulesSources => 'Нормативни източници';
@@ -5220,24 +5274,24 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get stairDetailsHelp =>
-      'Размери за изчертаване; проверете конструктивната дебелина, светлата широчина между ръкохватките и приложимите изисквания.';
+      'Дебелината на плочата е вертикална. Размерите са за изчертаване; проверете конструктивната дебелина, светлата широчина между ръкохватките и приложимите изисквания.';
 
   @override
-  String get stairSection => 'Срез';
+  String get stairSection => 'Разрез';
 
   @override
   String get stairSectionHint =>
-      'Посочи две точки в плана, за да преместиш и завъртиш среза.';
+      'Посочи две точки в плана, за да преместиш и завъртиш разреза.';
 
   @override
-  String get stairSectionReset => 'Начален срез';
+  String get stairSectionReset => 'Начален разрез';
 
   @override
   String get stairSectionEmpty =>
-      'Срезът не пресича стълбата. Посочи две нови точки в плана.';
+      'Разрезът не пресича стълбата. Посочи две нови точки в плана.';
 
   @override
-  String get stairSectionPlan => 'Срез в плана';
+  String get stairSectionPlan => 'Разрез в плана';
 
   @override
   String get stairSectionCutHeight => 'Хоризонтален срез';

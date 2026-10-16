@@ -8573,6 +8573,72 @@ abstract class AppLocalizations {
   /// **'Spiral'**
   String get stairSpiral;
 
+  /// No description provided for @stairSpiralOverlap.
+  ///
+  /// In en, this message translates to:
+  /// **'Overlapping spiral'**
+  String get stairSpiralOverlap;
+
+  /// No description provided for @stairWinders.
+  ///
+  /// In en, this message translates to:
+  /// **'Winder treads'**
+  String get stairWinders;
+
+  /// No description provided for @stairWindersHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace the landing with winding treads. Automatically select the count and clear inner radius, targeting at least 23 cm on the line 30 cm from the narrow end. Code applicability depends on use and evacuation. Winders do not replace a landing required by flight rise.'**
+  String get stairWindersHelp;
+
+  /// No description provided for @stairWinderCorner.
+  ///
+  /// In en, this message translates to:
+  /// **'At corner'**
+  String get stairWinderCorner;
+
+  /// No description provided for @stairWinderCornerTread.
+  ///
+  /// In en, this message translates to:
+  /// **'Tread'**
+  String get stairWinderCornerTread;
+
+  /// No description provided for @stairWinderCornerRiser.
+  ///
+  /// In en, this message translates to:
+  /// **'Riser'**
+  String get stairWinderCornerRiser;
+
+  /// No description provided for @stairWinderCornerHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Tread: one tread spans the outer corner. Riser: the boundary between two treads follows the angle bisector. Both layouts have a clear inner radius; supports and reinforcement require separate design.'**
+  String get stairWinderCornerHelp;
+
+  /// No description provided for @stairWinderCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Treads per 90°'**
+  String get stairWinderCount;
+
+  /// No description provided for @stairWinderCountAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic winder count'**
+  String get stairWinderCountAuto;
+
+  /// No description provided for @stairWinderRadiusAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic winder radius'**
+  String get stairWinderRadiusAuto;
+
+  /// No description provided for @stairOverlapHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'More than one revolution. Head clearance between overlapping parts accounts for concrete and finish thickness.'**
+  String get stairOverlapHelp;
+
   /// No description provided for @stairTurnLeft.
   ///
   /// In en, this message translates to:
@@ -8684,7 +8750,7 @@ abstract class AppLocalizations {
   /// No description provided for @stairRise.
   ///
   /// In en, this message translates to:
-  /// **'Floor rise'**
+  /// **'Total rise'**
   String get stairRise;
 
   /// No description provided for @stairFollowStoreys.
@@ -8692,6 +8758,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'From floor levels'**
   String get stairFollowStoreys;
+
+  /// No description provided for @stairHeightMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get stairHeightMode;
+
+  /// No description provided for @stairHeightManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get stairHeightManual;
+
+  /// No description provided for @stairHeightModeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'From floor levels: calculate the rise from the specified start to the upper floor. Manual: enter the total rise; it stays fixed when floor levels change.'**
+  String get stairHeightModeHelp;
+
+  /// No description provided for @stairStartOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Start offset'**
+  String get stairStartOffset;
+
+  /// No description provided for @stairStartOffsetHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting height relative to the floor level. 0 starts on the floor, positive values above it and negative values below it. Total rise is measured from this start.'**
+  String get stairStartOffsetHelp;
 
   /// No description provided for @stairUpperStorey.
   ///
@@ -8900,7 +8996,7 @@ abstract class AppLocalizations {
   /// No description provided for @stairCheckUpperStorey.
   ///
   /// In en, this message translates to:
-  /// **'Upper floor missing or below start'**
+  /// **'Check upper level: missing floor or rise outside 0–30 m'**
   String get stairCheckUpperStorey;
 
   /// No description provided for @stairRulesSources.
@@ -9074,7 +9170,7 @@ abstract class AppLocalizations {
   /// No description provided for @stairDetailsHelp.
   ///
   /// In en, this message translates to:
-  /// **'Drawing dimensions only; verify structural thickness, handrail clear width and the applicable regulations.'**
+  /// **'Waist thickness is vertical. Drawing dimensions only; verify structural thickness, handrail clear width and the applicable regulations.'**
   String get stairDetailsHelp;
 
   /// No description provided for @stairSection.

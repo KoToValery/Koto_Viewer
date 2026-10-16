@@ -7,7 +7,16 @@ String stairPlanLabel(AppLocalizations l, ArchitectStair stair) {
   final d = stair.design;
   if (d == null) return '';
   final cm = NumberFormat('0.##', l.localeName);
-  return '${l.stairPlanStepsLabel(d.risers, cm.format(d.walkingGoing(stair.width) * 100), cm.format(d.riser * 100))}\n'
+  var going = cm.format(d.walkingGoing(stair.width) * 100);
+  if (d.hasWinders) {
+    final winderGoing = d.winderGoingAt(stair.width, stair.width / 2);
+    if ((winderGoing - d.going).abs() > .0001) {
+      final values = [d.going, winderGoing]..sort();
+      going =
+          '${cm.format(values.first * 100)}–${cm.format(values.last * 100)}';
+    }
+  }
+  return '${l.stairPlanStepsLabel(d.risers, going, cm.format(d.riser * 100))}\n'
       '${l.stairPlanRiseLabel(NumberFormat('0.00', l.localeName).format(d.rise))}';
 }
 
@@ -16,6 +25,7 @@ String stairShapeLabel(AppLocalizations l, StairShape shape) => switch (shape) {
   StairShape.quarterTurn => l.stairQuarterTurn,
   StairShape.halfTurn => l.stairHalfTurn,
   StairShape.spiral => l.stairSpiral,
+  StairShape.spiralOverlap => l.stairSpiralOverlap,
 };
 String stairUseLabel(AppLocalizations l, StairUse use) => switch (use) {
   StairUse.private => l.stairUsePrivate,

@@ -4934,6 +4934,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stairSpiral => 'Spiral';
 
   @override
+  String get stairSpiralOverlap => 'Overlapping spiral';
+
+  @override
+  String get stairWinders => 'Winder treads';
+
+  @override
+  String get stairWindersHelp =>
+      'Replace the landing with winding treads. Automatically select the count and clear inner radius, targeting at least 23 cm on the line 30 cm from the narrow end. Code applicability depends on use and evacuation. Winders do not replace a landing required by flight rise.';
+
+  @override
+  String get stairWinderCorner => 'At corner';
+
+  @override
+  String get stairWinderCornerTread => 'Tread';
+
+  @override
+  String get stairWinderCornerRiser => 'Riser';
+
+  @override
+  String get stairWinderCornerHelp =>
+      'Tread: one tread spans the outer corner. Riser: the boundary between two treads follows the angle bisector. Both layouts have a clear inner radius; supports and reinforcement require separate design.';
+
+  @override
+  String get stairWinderCount => 'Treads per 90°';
+
+  @override
+  String get stairWinderCountAuto => 'Automatic winder count';
+
+  @override
+  String get stairWinderRadiusAuto => 'Automatic winder radius';
+
+  @override
+  String get stairOverlapHelp =>
+      'More than one revolution. Head clearance between overlapping parts accounts for concrete and finish thickness.';
+
+  @override
   String get stairTurnLeft => 'Turn left';
 
   @override
@@ -4989,10 +5025,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stairOver50 => 'Over 50 people';
 
   @override
-  String get stairRise => 'Floor rise';
+  String get stairRise => 'Total rise';
 
   @override
   String get stairFollowStoreys => 'From floor levels';
+
+  @override
+  String get stairHeightMode => 'Height';
+
+  @override
+  String get stairHeightManual => 'Manual';
+
+  @override
+  String get stairHeightModeHelp =>
+      'From floor levels: calculate the rise from the specified start to the upper floor. Manual: enter the total rise; it stays fixed when floor levels change.';
+
+  @override
+  String get stairStartOffset => 'Start offset';
+
+  @override
+  String get stairStartOffsetHelp =>
+      'Starting height relative to the floor level. 0 starts on the floor, positive values above it and negative values below it. Total rise is measured from this start.';
 
   @override
   String get stairUpperStorey => 'Upper floor';
@@ -5100,7 +5153,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stairCheckVersion => 'Unrecognised rules version';
 
   @override
-  String get stairCheckUpperStorey => 'Upper floor missing or below start';
+  String get stairCheckUpperStorey =>
+      'Check upper level: missing floor or rise outside 0–30 m';
 
   @override
   String get stairRulesSources => 'Regulatory sources';
@@ -5202,7 +5256,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stairDetailsHelp =>
-      'Drawing dimensions only; verify structural thickness, handrail clear width and the applicable regulations.';
+      'Waist thickness is vertical. Drawing dimensions only; verify structural thickness, handrail clear width and the applicable regulations.';
 
   @override
   String get stairSection => 'Section';

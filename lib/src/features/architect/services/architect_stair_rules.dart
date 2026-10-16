@@ -91,6 +91,14 @@ class ArchitectStairRules {
       article: '2h + b',
       advisory: true,
     );
+    if (d.shape == StairShape.spiralOverlap && d.overlapHeadroom < .001) {
+      range(
+        StairCheckKind.headroom,
+        d.overlapHeadroom,
+        min: .001,
+        article: '3D',
+      );
+    }
     if (d.code == StairCode.geometryOnly) {
       result.add(
         const StairCheck(StairCheckKind.scope, StairCheckState.review),
@@ -102,6 +110,62 @@ class ArchitectStairRules {
         const StairCheck(StairCheckKind.version, StairCheckState.review),
       );
       return result;
+    }
+    if (d.hasWinders) {
+      range(
+        StairCheckKind.innerGoing30,
+        d.winderGoingAt(stair.width, .30),
+        min: .23,
+        article: d.evacuation == StairEvacuation.from16To50
+            ? '52(4)1'
+            : '30 cm',
+        advisory: d.evacuation != StairEvacuation.from16To50,
+      );
+      range(
+        StairCheckKind.innerGoing,
+        d.winderGoingAt(stair.width, 0),
+        min: .05,
+        article: 'BWF 2017',
+        advisory: true,
+      );
+      if (d.evacuation == StairEvacuation.from16To50) {
+        range(StairCheckKind.width, stair.width, min: 1.2, article: '52(4)2');
+      }
+      if (d.evacuation == StairEvacuation.over50) {
+        result.add(
+          const StairCheck(
+            StairCheckKind.scope,
+            StairCheckState.review,
+            article: '52(4)',
+          ),
+        );
+      }
+      if (d.accessible) {
+        range(
+          StairCheckKind.going,
+          d.winderGoingAt(stair.width, stair.width / 2),
+          min: d.use == StairUse.outdoorRoute ? .32 : .28,
+          max: d.use == StairUse.outdoorRoute ? null : .35,
+          article: d.use == StairUse.outdoorRoute ? '18(1)' : '55(1)',
+        );
+        result.add(
+          const StairCheck(
+            StairCheckKind.accessibility,
+            StairCheckState.review,
+            article: '55',
+          ),
+        );
+      }
+    }
+    if (d.shape == StairShape.spiralOverlap) {
+      final indoorAccessible = d.accessible && d.use != StairUse.outdoorRoute;
+      range(
+        StairCheckKind.headroom,
+        d.overlapHeadroom,
+        min: 2.1,
+        article: indoorAccessible ? '55(1)5' : '2.10 m',
+        advisory: !indoorAccessible,
+      );
     }
     if (d.accessible) {
       final outdoor = d.use == StairUse.outdoorRoute;
@@ -124,7 +188,7 @@ class ArchitectStairRules {
         max: outdoor ? 1.2 : 2.5,
         article: article,
       );
-      if (d.shape != StairShape.spiral) {
+      if (!d.isSpiral) {
         range(
           StairCheckKind.going,
           d.going,
@@ -204,7 +268,7 @@ class ArchitectStairRules {
         );
       } else {
         range(StairCheckKind.riser, d.riser, max: .22, article: '47(4)');
-        if (d.shape != StairShape.spiral) {
+        if (!d.isSpiral) {
           range(StairCheckKind.going, d.going, min: .25, article: '47(4)');
           range(
             StairCheckKind.slope,
@@ -212,6 +276,16 @@ class ArchitectStairRules {
             max: 1 / 1.5,
             article: '47(4)',
           );
+          if (d.hasWinders) {
+            final going = d.winderGoingAt(stair.width, stair.width / 2);
+            range(StairCheckKind.going, going, min: .25, article: '47(4)');
+            range(
+              StairCheckKind.slope,
+              d.riser / going,
+              max: 1 / 1.5,
+              article: '47(4)',
+            );
+          }
           if (d.flightCount > 1) {
             range(
               StairCheckKind.landing,
@@ -222,7 +296,7 @@ class ArchitectStairRules {
           }
         }
       }
-      if (d.shape == StairShape.spiral) {
+      if (d.isSpiral) {
         if (d.evacuation == StairEvacuation.from16To50) {
           range(
             StairCheckKind.innerGoing30,
@@ -269,6 +343,10 @@ class ArchitectStairRules {
     ArchitectStairDesign design,
   ) {
     if (!design.followStoreys) return design;
+    final rise = linkedRise(project, floor, design);
+    // Keep valid preview geometry while an invalid target is corrected or
+    // explicitly saved as a draft. Never generate a zero/negative stair.
+    if (rise == null) return design;
     final higher =
         project.storeys
             .where((s) => s.elevation > floor.elevation + 1e-6)
@@ -284,10 +362,31 @@ class ArchitectStairRules {
               )
               .firstOrNull;
     if (design.upperStoreyId != null && target == null) return design;
-    return design.copyWith(
-      rise: target == null ? floor.height : target.elevation - floor.elevation,
-      upperStoreyId: target?.id,
-    );
+    return design.copyWith(rise: rise, upperStoreyId: target?.id);
+  }
+
+  /// Null means the selected landing is missing, at/below the start or beyond
+  /// the supported rise. Resolve against the owning floor, without silently
+  /// switching to a different upper floor when the starting level changes.
+  static double? linkedRise(
+    ArchitectProject project,
+    ArchitectStorey floor,
+    ArchitectStairDesign design,
+  ) {
+    final higher =
+        project.storeys
+            .where((s) => s.elevation > floor.elevation + 1e-6)
+            .toList()
+          ..sort((a, b) => a.elevation.compareTo(b.elevation));
+    final target = design.upperStoreyId == null
+        ? higher.firstOrNull
+        : higher.where((s) => s.id == design.upperStoreyId).firstOrNull;
+    if (design.upperStoreyId != null && target == null) return null;
+    final rise =
+        (target?.elevation ?? floor.elevation + floor.height) -
+        floor.elevation -
+        design.startOffset;
+    return rise.isFinite && rise > 1e-6 && rise <= 30 ? rise : null;
   }
 
   static ArchitectProject resolve(ArchitectProject project) {
@@ -302,12 +401,7 @@ class ArchitectStairRules {
                 var next = resolveDesign(project, floor, stair.design!);
                 final missingTarget =
                     next.followStoreys &&
-                    next.upperStoreyId != null &&
-                    !project.storeys.any(
-                      (s) =>
-                          s.id == next.upperStoreyId &&
-                          s.elevation > floor.elevation,
-                    );
+                    linkedRise(project, floor, next) == null;
                 if (!next.isDraft &&
                     (missingTarget ||
                         check(
@@ -362,13 +456,11 @@ class PutArchitectStair extends ArchitectModelCommand {
             ),
           );
     final d = resolved.design;
+    d?.validate();
     if (d != null &&
         !d.isDraft &&
         d.followStoreys &&
-        d.upperStoreyId != null &&
-        !project.storeys.any(
-          (s) => s.id == d.upperStoreyId && s.elevation > floor.elevation,
-        )) {
+        ArchitectStairRules.linkedRise(project, floor, d) == null) {
       throw ArgumentError('Upper floor is missing or below the start');
     }
     if (resolved.design != null &&
