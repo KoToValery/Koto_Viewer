@@ -1,3 +1,5 @@
+import 'architect_slab_assembly.dart';
+import 'architect_section.dart';
 import '../../bim_editing/properties/bim_distance_unit.dart';
 export '../../bim_editing/properties/bim_distance_unit.dart';
 import 'dart:ui';
@@ -34,7 +36,8 @@ class ArchitectStorey {
   final String name;
   final double elevation; // in meters (кота готов под)
   final double height; // clear floor-to-floor height in meters
-  final double cutPlaneHeight; // floor plan cut plane height above storey elevation (default 1.20 m)
+  final double
+  cutPlaneHeight; // floor plan cut plane height above storey elevation (default 1.20 m)
   final double floorFinishThickness; // default 0.05 m
   final List<ArchitectWall> walls;
   final List<ArchitectZone> zones;
@@ -235,6 +238,9 @@ class ArchitectProject {
   final List<StructuralGridAxis> gridAxes;
   final List<ArchitectWallType> wallTypes;
   final List<ArchitectFenestrationStyle> openingStyles;
+  final List<ArchitectSlabAssembly> slabAssemblies;
+  final List<ArchitectSection> sections;
+  final Map<String, int> slabCompositionNumbers;
 
   const ArchitectProject({
     required this.id,
@@ -248,6 +254,9 @@ class ArchitectProject {
     this.gridAxes = const [],
     this.wallTypes = const [],
     this.openingStyles = const [],
+    this.slabAssemblies = const [],
+    this.sections = const [],
+    this.slabCompositionNumbers = const {},
   });
 
   ArchitectStorey get activeStorey => storeys.firstWhere(
@@ -284,6 +293,9 @@ class ArchitectProject {
     List<StructuralGridAxis>? gridAxes,
     List<ArchitectWallType>? wallTypes,
     List<ArchitectFenestrationStyle>? openingStyles,
+    List<ArchitectSlabAssembly>? slabAssemblies,
+    List<ArchitectSection>? sections,
+    Map<String, int>? slabCompositionNumbers,
   }) => ArchitectProject(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -296,6 +308,10 @@ class ArchitectProject {
     gridAxes: gridAxes ?? this.gridAxes,
     wallTypes: wallTypes ?? this.wallTypes,
     openingStyles: openingStyles ?? this.openingStyles,
+    slabAssemblies: slabAssemblies ?? this.slabAssemblies,
+    sections: sections ?? this.sections,
+    slabCompositionNumbers:
+        slabCompositionNumbers ?? this.slabCompositionNumbers,
   );
 
   Map<String, dynamic> toJson() => {
@@ -310,6 +326,9 @@ class ArchitectProject {
     'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
     'wallTypes': wallTypes.map((w) => w.toJson()).toList(),
     'openingStyles': openingStyles.map((o) => o.toJson()).toList(),
+    'slabAssemblies': slabAssemblies.map((a) => a.toJson()).toList(),
+    'sections': sections.map((a) => a.toJson()).toList(),
+    'slabCompositionNumbers': slabCompositionNumbers,
   };
 
   factory ArchitectProject.fromJson(
@@ -335,6 +354,21 @@ class ArchitectProject {
             .toList() ??
         const [],
     activeStoreyId: json['activeStoreyId'] as String? ?? '',
+    slabAssemblies: (json['slabAssemblies'] as List? ?? [])
+        .map(
+          (a) => ArchitectSlabAssembly.fromJson(
+            Map<String, dynamic>.from(a as Map),
+          ),
+        )
+        .toList(),
+    sections: (json['sections'] as List? ?? [])
+        .map(
+          (a) => ArchitectSection.fromJson(Map<String, dynamic>.from(a as Map)),
+        )
+        .toList(),
+    slabCompositionNumbers: (json['slabCompositionNumbers'] as Map? ?? {}).map(
+      (k, v) => MapEntry(k as String, (v as num).toInt()),
+    ),
     gridAxes:
         (json['gridAxes'] as List<dynamic>?)
             ?.map((a) => StructuralGridAxis.fromJson(a as Map<String, dynamic>))

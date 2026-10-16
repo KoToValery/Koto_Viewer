@@ -1,3 +1,4 @@
+import '../services/architect_slab_geometry.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
@@ -71,14 +72,30 @@ class Architect3dBuilder {
 
       // The same material solids are used by actual vertical stair sections.
       for (final stair in storey.stairs) {
-        final solids = [...ArchitectStairMesh.body(stair),
-          ...ArchitectStairMesh.railings(stair, storey: storey, project: project)];
+        final solids = [
+          ...ArchitectStairMesh.body(stair),
+          ...ArchitectStairMesh.railings(
+            stair,
+            storey: storey,
+            project: project,
+          ),
+        ];
         for (final solid in solids) {
           for (final triangle in solid.triangles) {
-            Vector3 point(Vector3 p) => Vector3(p.x, p.y, p.z + storey.elevation);
-            allTris.add(Triangle3D(v0: point(triangle.v0), v1: point(triangle.v1),
-              v2: point(triangle.v2), normal: triangle.normal, isDoubleSided: triangle.isDoubleSided,
-              color: stair.design?.isDraft == true ? const Color(0xFFD32F2F) : triangle.color));
+            Vector3 point(Vector3 p) =>
+                Vector3(p.x, p.y, p.z + storey.elevation);
+            allTris.add(
+              Triangle3D(
+                v0: point(triangle.v0),
+                v1: point(triangle.v1),
+                v2: point(triangle.v2),
+                normal: triangle.normal,
+                isDoubleSided: triangle.isDoubleSided,
+                color: stair.design?.isDraft == true
+                    ? const Color(0xFFD32F2F)
+                    : triangle.color,
+              ),
+            );
           }
         }
       }
@@ -96,8 +113,8 @@ class Architect3dBuilder {
       // Add 3D beams
       for (final beam in storey.beams) {
         final corners = beam.polygonCorners;
-        final zTop = storey.elevation + storey.height;
-        final zBot = zTop - beam.depth;
+        final zBot = storey.elevation + beam.baseOffset;
+        final zTop = zBot + beam.depth;
         const beamColor = Color(0xFF90A4AE);
         final b1 = Vector3(corners[0].dx, corners[0].dy, zBot);
         final b2 = Vector3(corners[1].dx, corners[1].dy, zBot);
@@ -134,8 +151,14 @@ class Architect3dBuilder {
         }
       }
 
+      for (final slab in storey.slabs) {
+        allTris.addAll(ArchitectSlabGeometry.mesh(project, storey, slab));
+      }
+
+      // Compatibility preview for storeys with no explicitly drawn slabs.
+      // Never used by the section engine.
       // Add a base concrete slab plate under the storey
-      if (hasWalls) {
+      if (hasWalls && storey.slabs.isEmpty) {
         const margin = 1.0; // 1m slab overhang around building
         final sMinX = minX - margin;
         final sMaxX = maxX + margin;

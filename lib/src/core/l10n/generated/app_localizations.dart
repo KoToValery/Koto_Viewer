@@ -9232,6 +9232,600 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Plan cut height'**
   String get stairSectionCutHeight;
+
+  /// No description provided for @slabLayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Layers'**
+  String get slabLayers;
+
+  /// No description provided for @slabAssembly.
+  ///
+  /// In en, this message translates to:
+  /// **'Assembly'**
+  String get slabAssembly;
+
+  /// No description provided for @slabAbove.
+  ///
+  /// In en, this message translates to:
+  /// **'Above concrete'**
+  String get slabAbove;
+
+  /// No description provided for @slabBelow.
+  ///
+  /// In en, this message translates to:
+  /// **'Below concrete'**
+  String get slabBelow;
+
+  /// No description provided for @slabCore.
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete'**
+  String get slabCore;
+
+  /// No description provided for @slabCoreOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete top offset'**
+  String get slabCoreOffset;
+
+  /// No description provided for @slabFinishedLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished level'**
+  String get slabFinishedLevel;
+
+  /// No description provided for @slabBottomLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom level'**
+  String get slabBottomLevel;
+
+  /// No description provided for @slabPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Load assembly'**
+  String get slabPreset;
+
+  /// No description provided for @slabAllUsages.
+  ///
+  /// In en, this message translates to:
+  /// **'All uses'**
+  String get slabAllUsages;
+
+  /// No description provided for @slabOnlyThis.
+  ///
+  /// In en, this message translates to:
+  /// **'Only this slab'**
+  String get slabOnlyThis;
+
+  /// No description provided for @slabShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit shared type'**
+  String get slabShared;
+
+  /// No description provided for @slabSharedHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving updates every slab using this type. Choose Only this slab to detach a copy.'**
+  String get slabSharedHelp;
+
+  /// No description provided for @slabNewType.
+  ///
+  /// In en, this message translates to:
+  /// **'New assembly'**
+  String get slabNewType;
+
+  /// No description provided for @slabLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal library'**
+  String get slabLibrary;
+
+  /// No description provided for @slabLibrarySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Assembly saved to library.'**
+  String get slabLibrarySaved;
+
+  /// No description provided for @slabSaveLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to library'**
+  String get slabSaveLibrary;
+
+  /// No description provided for @slabLibraryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the library.'**
+  String get slabLibraryFailed;
+
+  /// No description provided for @slabPresetHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Editable starting dimensions, not a calculation for this building. Foundation: waterproofing below concrete; ground floor: waterproofing above concrete. Cold attic: non-walkable insulation. Ceiling insulation: suspended lining. Roof and terrace presets include one slope field; junctions and drainage need separate detailing.'**
+  String get slabPresetHelp;
+
+  /// No description provided for @slabAddLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Add layer'**
+  String get slabAddLayer;
+
+  /// No description provided for @slabEditLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Layer'**
+  String get slabEditLayer;
+
+  /// No description provided for @slabMaterial.
+  ///
+  /// In en, this message translates to:
+  /// **'Material'**
+  String get slabMaterial;
+
+  /// No description provided for @slabRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Function'**
+  String get slabRole;
+
+  /// No description provided for @slabThicknessMm.
+  ///
+  /// In en, this message translates to:
+  /// **'Thickness (mm)'**
+  String get slabThicknessMm;
+
+  /// No description provided for @slabSlope.
+  ///
+  /// In en, this message translates to:
+  /// **'Slope (%)'**
+  String get slabSlope;
+
+  /// No description provided for @slabDirection.
+  ///
+  /// In en, this message translates to:
+  /// **'Fall direction'**
+  String get slabDirection;
+
+  /// No description provided for @slabDirectionHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap two points in the plan preview, from high to low.'**
+  String get slabDirectionHelp;
+
+  /// No description provided for @slabDirectionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Set a fall direction in the preview.'**
+  String get slabDirectionRequired;
+
+  /// No description provided for @slabInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Check dimensions, names and slope. Only one upper layer may have a slope.'**
+  String get slabInvalid;
+
+  /// No description provided for @slabDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate layer'**
+  String get slabDuplicate;
+
+  /// No description provided for @slabMoveUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get slabMoveUp;
+
+  /// No description provided for @slabMoveDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get slabMoveDown;
+
+  /// No description provided for @slabFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get slabFinish;
+
+  /// No description provided for @slabFinishTile.
+  ///
+  /// In en, this message translates to:
+  /// **'Tiles'**
+  String get slabFinishTile;
+
+  /// No description provided for @slabFinishParquet.
+  ///
+  /// In en, this message translates to:
+  /// **'Parquet'**
+  String get slabFinishParquet;
+
+  /// No description provided for @slabFinishWet.
+  ///
+  /// In en, this message translates to:
+  /// **'Wet room'**
+  String get slabFinishWet;
+
+  /// No description provided for @slabNaturalGround.
+  ///
+  /// In en, this message translates to:
+  /// **'Natural ground'**
+  String get slabNaturalGround;
+
+  /// No description provided for @buildingSections.
+  ///
+  /// In en, this message translates to:
+  /// **'Sections'**
+  String get buildingSections;
+
+  /// No description provided for @buildingSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Section'**
+  String get buildingSection;
+
+  /// No description provided for @buildingSectionNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New section'**
+  String get buildingSectionNew;
+
+  /// No description provided for @buildingSectionCut.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit cut'**
+  String get buildingSectionCut;
+
+  /// No description provided for @buildingSectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose two points in plan to define the section.'**
+  String get buildingSectionHint;
+
+  /// No description provided for @buildingSectionEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No elements intersect this cut.'**
+  String get buildingSectionEmpty;
+
+  /// No description provided for @slabDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Floor detail'**
+  String get slabDetail;
+
+  /// No description provided for @slabDetailPick.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a slab, then place its labels.'**
+  String get slabDetailPick;
+
+  /// No description provided for @slabDetailMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to place the labels.'**
+  String get slabDetailMove;
+
+  /// No description provided for @slabDetailLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost link'**
+  String get slabDetailLost;
+
+  /// No description provided for @slabDetailReattach.
+  ///
+  /// In en, this message translates to:
+  /// **'Reattach'**
+  String get slabDetailReattach;
+
+  /// No description provided for @slabDetailHere.
+  ///
+  /// In en, this message translates to:
+  /// **'here'**
+  String get slabDetailHere;
+
+  /// No description provided for @slabDetailSide.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip labels'**
+  String get slabDetailSide;
+
+  /// No description provided for @slabDetailRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove detail'**
+  String get slabDetailRemove;
+
+  /// No description provided for @slabSectionDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete section'**
+  String get slabSectionDelete;
+
+  /// No description provided for @slabMatConcrete.
+  ///
+  /// In en, this message translates to:
+  /// **'Reinforced concrete'**
+  String get slabMatConcrete;
+
+  /// No description provided for @slabMatTile.
+  ///
+  /// In en, this message translates to:
+  /// **'Tiles'**
+  String get slabMatTile;
+
+  /// No description provided for @slabMatTileAdhesive.
+  ///
+  /// In en, this message translates to:
+  /// **'Tile adhesive'**
+  String get slabMatTileAdhesive;
+
+  /// No description provided for @slabMatParquet.
+  ///
+  /// In en, this message translates to:
+  /// **'Parquet'**
+  String get slabMatParquet;
+
+  /// No description provided for @slabMatUnderlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Parquet underlay'**
+  String get slabMatUnderlay;
+
+  /// No description provided for @slabMatScreed.
+  ///
+  /// In en, this message translates to:
+  /// **'Cement screed'**
+  String get slabMatScreed;
+
+  /// No description provided for @slabMatPeFoil.
+  ///
+  /// In en, this message translates to:
+  /// **'PE separating foil'**
+  String get slabMatPeFoil;
+
+  /// No description provided for @slabMatXps.
+  ///
+  /// In en, this message translates to:
+  /// **'XPS'**
+  String get slabMatXps;
+
+  /// No description provided for @slabMatFloorInsulation.
+  ///
+  /// In en, this message translates to:
+  /// **'Rigid floor insulation'**
+  String get slabMatFloorInsulation;
+
+  /// No description provided for @slabMatAcousticWool.
+  ///
+  /// In en, this message translates to:
+  /// **'Impact sound insulation'**
+  String get slabMatAcousticWool;
+
+  /// No description provided for @slabMatMineralWool.
+  ///
+  /// In en, this message translates to:
+  /// **'Mineral wool'**
+  String get slabMatMineralWool;
+
+  /// No description provided for @slabMatRoofInsulation.
+  ///
+  /// In en, this message translates to:
+  /// **'Rigid roof insulation'**
+  String get slabMatRoofInsulation;
+
+  /// No description provided for @slabMatWaterproofing.
+  ///
+  /// In en, this message translates to:
+  /// **'Waterproofing'**
+  String get slabMatWaterproofing;
+
+  /// No description provided for @slabMatVapourBarrier.
+  ///
+  /// In en, this message translates to:
+  /// **'Vapour control layer'**
+  String get slabMatVapourBarrier;
+
+  /// No description provided for @slabMatBreathableMembrane.
+  ///
+  /// In en, this message translates to:
+  /// **'Breathable protection'**
+  String get slabMatBreathableMembrane;
+
+  /// No description provided for @slabMatGeotextile.
+  ///
+  /// In en, this message translates to:
+  /// **'Geotextile'**
+  String get slabMatGeotextile;
+
+  /// No description provided for @slabMatGravel.
+  ///
+  /// In en, this message translates to:
+  /// **'Gravel ballast'**
+  String get slabMatGravel;
+
+  /// No description provided for @slabMatBallast.
+  ///
+  /// In en, this message translates to:
+  /// **'Compacted aggregate'**
+  String get slabMatBallast;
+
+  /// No description provided for @slabMatCompactedFill.
+  ///
+  /// In en, this message translates to:
+  /// **'Compacted fill'**
+  String get slabMatCompactedFill;
+
+  /// No description provided for @slabMatBlindingConcrete.
+  ///
+  /// In en, this message translates to:
+  /// **'Blinding concrete'**
+  String get slabMatBlindingConcrete;
+
+  /// No description provided for @slabMatPlaster.
+  ///
+  /// In en, this message translates to:
+  /// **'Ceiling plaster'**
+  String get slabMatPlaster;
+
+  /// No description provided for @slabMatProtectiveRender.
+  ///
+  /// In en, this message translates to:
+  /// **'Reinforced protective render'**
+  String get slabMatProtectiveRender;
+
+  /// No description provided for @slabMatPlasterboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Plasterboard lining'**
+  String get slabMatPlasterboard;
+
+  /// No description provided for @slabMatAdhesive.
+  ///
+  /// In en, this message translates to:
+  /// **'Insulation adhesive'**
+  String get slabMatAdhesive;
+
+  /// No description provided for @slabMatCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom material'**
+  String get slabMatCustom;
+
+  /// No description provided for @slabUseFoundation.
+  ///
+  /// In en, this message translates to:
+  /// **'Foundation slab'**
+  String get slabUseFoundation;
+
+  /// No description provided for @slabUseGround.
+  ///
+  /// In en, this message translates to:
+  /// **'Ground-bearing floor'**
+  String get slabUseGround;
+
+  /// No description provided for @slabUseBasement.
+  ///
+  /// In en, this message translates to:
+  /// **'Above basement'**
+  String get slabUseBasement;
+
+  /// No description provided for @slabUseIntermediate.
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate floor'**
+  String get slabUseIntermediate;
+
+  /// No description provided for @slabUseColdAttic.
+  ///
+  /// In en, this message translates to:
+  /// **'Below cold attic'**
+  String get slabUseColdAttic;
+
+  /// No description provided for @slabUseInsulatedCeiling.
+  ///
+  /// In en, this message translates to:
+  /// **'Insulation below slab'**
+  String get slabUseInsulatedCeiling;
+
+  /// No description provided for @slabUseWarmRoof.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm flat roof'**
+  String get slabUseWarmRoof;
+
+  /// No description provided for @slabUseInvertedRoof.
+  ///
+  /// In en, this message translates to:
+  /// **'Inverted flat roof'**
+  String get slabUseInvertedRoof;
+
+  /// No description provided for @slabUseTerrace.
+  ///
+  /// In en, this message translates to:
+  /// **'Terrace above heated space'**
+  String get slabUseTerrace;
+
+  /// No description provided for @slabRoleFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get slabRoleFinish;
+
+  /// No description provided for @slabRoleAdhesive.
+  ///
+  /// In en, this message translates to:
+  /// **'Bonding'**
+  String get slabRoleAdhesive;
+
+  /// No description provided for @slabRoleScreed.
+  ///
+  /// In en, this message translates to:
+  /// **'Screed'**
+  String get slabRoleScreed;
+
+  /// No description provided for @slabRoleSeparation.
+  ///
+  /// In en, this message translates to:
+  /// **'Separation'**
+  String get slabRoleSeparation;
+
+  /// No description provided for @slabRoleInsulation.
+  ///
+  /// In en, this message translates to:
+  /// **'Thermal insulation'**
+  String get slabRoleInsulation;
+
+  /// No description provided for @slabRoleAcoustic.
+  ///
+  /// In en, this message translates to:
+  /// **'Sound insulation'**
+  String get slabRoleAcoustic;
+
+  /// No description provided for @slabRoleWaterproofing.
+  ///
+  /// In en, this message translates to:
+  /// **'Waterproofing'**
+  String get slabRoleWaterproofing;
+
+  /// No description provided for @slabRoleVapourControl.
+  ///
+  /// In en, this message translates to:
+  /// **'Vapour control'**
+  String get slabRoleVapourControl;
+
+  /// No description provided for @slabRoleSlope.
+  ///
+  /// In en, this message translates to:
+  /// **'Slope'**
+  String get slabRoleSlope;
+
+  /// No description provided for @slabRoleCeiling.
+  ///
+  /// In en, this message translates to:
+  /// **'Ceiling finish'**
+  String get slabRoleCeiling;
+
+  /// No description provided for @slabRoleBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Base'**
+  String get slabRoleBase;
+
+  /// No description provided for @slabRoleFill.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill'**
+  String get slabRoleFill;
+
+  /// No description provided for @slabRoleProtection.
+  ///
+  /// In en, this message translates to:
+  /// **'Protection'**
+  String get slabRoleProtection;
 }
 
 class _AppLocalizationsDelegate

@@ -1,3 +1,4 @@
+import 'architect_slab_assemblies.dart';
 import 'dart:ui';
 import '../adapters/architect_element_adapters.dart';
 import '../../bim_editing/commands/bim_edit_history.dart';
@@ -1499,7 +1500,7 @@ class ArchitectCommandController
   static const historyLimit = 100;
   ArchitectCommandController(ArchitectProject project)
     : super(
-        ArchitectStairRules.resolve(project),
+        ArchitectSlabAssemblies.resolve(ArchitectStairRules.resolve(project)),
         historyLimit: historyLimit,
         equivalent: _sameModel,
         restoreView: _retainViewedStorey,
@@ -1507,8 +1508,15 @@ class ArchitectCommandController
   ArchitectProject get project => value;
 
   @override
-  void commit(ArchitectProject next) =>
-      super.commit(ArchitectDimensionChain.resolve(ArchitectStairRules.resolve(next)));
+  void restore(ArchitectProject next) =>
+      super.restore(ArchitectSlabAssemblies.resolve(next));
+
+  @override
+  void commit(ArchitectProject next) => super.commit(
+    ArchitectSlabAssemblies.resolve(
+      ArchitectDimensionChain.resolve(ArchitectStairRules.resolve(next)),
+    ),
+  );
 
   static bool _sameModel(ArchitectProject a, ArchitectProject b) {
     if (identical(a, b)) return true;

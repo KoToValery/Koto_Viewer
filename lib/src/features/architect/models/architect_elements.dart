@@ -41,7 +41,8 @@ class ArchitectBeam {
   final Offset endPoint;
   final double width; // in meters (default 0.25 m = 25 cm)
   final double depth; // in meters (default 0.50 m = 50 cm)
-  final double baseOffset; // in meters relative to storey elevation (default 2.20 m)
+  final double
+  baseOffset; // in meters relative to storey elevation (default 2.20 m)
   final ArchitectCutDisplayMode cutDisplayMode;
   final String label;
 
@@ -166,12 +167,18 @@ class ArchitectSlab {
   final List<Offset> polygon;
   final double thickness; // in meters (default 0.20 m = 20 cm)
   final String label;
+  final String? assemblyId;
+  final double coreTopOffset;
+  final double? slopeDirection; // radians; arrow points downhill
 
   const ArchitectSlab({
     required this.id,
     required this.polygon,
     this.thickness = 0.20,
     this.label = 'Slab d=20cm',
+    this.assemblyId,
+    this.coreTopOffset = 0,
+    this.slopeDirection,
   });
 
   double get area {
@@ -200,11 +207,18 @@ class ArchitectSlab {
     List<Offset>? polygon,
     double? thickness,
     String? label,
+    String? assemblyId,
+    bool clearAssembly = false,
+    double? coreTopOffset,
+    double? slopeDirection,
   }) => ArchitectSlab(
     id: id ?? this.id,
     polygon: polygon ?? this.polygon,
     thickness: thickness ?? this.thickness,
     label: label ?? this.label,
+    assemblyId: clearAssembly ? null : assemblyId ?? this.assemblyId,
+    coreTopOffset: coreTopOffset ?? this.coreTopOffset,
+    slopeDirection: slopeDirection ?? this.slopeDirection,
   );
 
   Map<String, dynamic> toJson() => {
@@ -212,6 +226,9 @@ class ArchitectSlab {
     'polygon': polygon.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
     'thickness': thickness,
     'label': label,
+    'assemblyId': assemblyId,
+    'coreTopOffset': coreTopOffset,
+    'slopeDirection': slopeDirection,
   };
 
   factory ArchitectSlab.fromJson(Map<String, dynamic> json) => ArchitectSlab(
@@ -228,6 +245,9 @@ class ArchitectSlab {
         const [],
     thickness: (json['thickness'] as num?)?.toDouble() ?? 0.20,
     label: json['label'] as String? ?? 'Slab d=20cm',
+    assemblyId: json['assemblyId'] as String?,
+    coreTopOffset: (json['coreTopOffset'] as num?)?.toDouble() ?? 0,
+    slopeDirection: (json['slopeDirection'] as num?)?.toDouble(),
   );
 
   bool containsPoint(Offset pt) {
@@ -339,7 +359,8 @@ class ArchitectStair {
     int stepCount = 16,
     bool hasLanding = false,
     this.design,
-  }) : _stepCount = stepCount, _hasLanding = hasLanding;
+  }) : _stepCount = stepCount,
+       _hasLanding = hasLanding;
 
   double get length => (endPoint - startPoint).distance;
 
@@ -369,14 +390,19 @@ class ArchitectStair {
   }
 
   static final _plans = Expando<ArchitectStairPlan>();
+
   /// Includes the caption for framing/culling, without enlarging the pick area.
   Rect get displayBounds {
     final bounds = plan.bounds;
     if (design?.showLabel != true) return bounds.inflate(.08);
-    final label = Rect.fromCenter(center: bounds.bottomCenter + const Offset(0, .4),
-      width: 5, height: .8);
+    final label = Rect.fromCenter(
+      center: bounds.bottomCenter + const Offset(0, .4),
+      width: 5,
+      height: .8,
+    );
     return bounds.inflate(.08).expandToInclude(label);
   }
+
   ArchitectStairPlan get plan => _plans[this] ??= design == null
       ? ArchitectStairPlan(
           [polygonCorners],

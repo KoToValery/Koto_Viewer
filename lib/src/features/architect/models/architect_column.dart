@@ -16,7 +16,8 @@ class ArchitectColumn {
   final double depth; // in meters (default 0.25 m = 25 cm)
   final double rotationDeg;
   final double? height;
-  final double baseOffset; // in meters relative to storey elevation (default 0.0 m)
+  final double
+  baseOffset; // in meters relative to storey elevation (default 0.0 m)
   final ArchitectCutDisplayMode cutDisplayMode;
   final String label;
 
@@ -142,8 +143,8 @@ class ArchitectColumn {
     final strokeWidth = isSelected
         ? 2.5
         : (isCut
-            ? ArchitectLineWeights.cutHeavy
-            : ArchitectLineWeights.projection);
+              ? ArchitectLineWeights.cutHeavy
+              : ArchitectLineWeights.projection);
 
     final borderPaint = Paint()
       ..color = isSelected
@@ -261,10 +262,17 @@ class ArchitectColumn {
     } else {
       final halfW = width / 2.0;
       final halfD = depth / 2.0;
-      final p1 = position + Offset(-halfW, -halfD);
-      final p2 = position + Offset(halfW, -halfD);
-      final p3 = position + Offset(halfW, halfD);
-      final p4 = position + Offset(-halfW, halfD);
+      final angle = rotationDeg * math.pi / 180;
+      Offset corner(double x, double y) =>
+          position +
+          Offset(
+            x * math.cos(angle) - y * math.sin(angle),
+            x * math.sin(angle) + y * math.cos(angle),
+          );
+      final p1 = corner(-halfW, -halfD);
+      final p2 = corner(halfW, -halfD);
+      final p3 = corner(halfW, halfD);
+      final p4 = corner(-halfW, halfD);
 
       final v1B = Vector3(p1.dx, p1.dy, zMin);
       final v2B = Vector3(p2.dx, p2.dy, zMin);

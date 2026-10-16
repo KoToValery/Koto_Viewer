@@ -5290,4 +5290,306 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stairSectionCutHeight => 'Plan cut height';
+
+  @override
+  String get slabLayers => 'Layers';
+
+  @override
+  String get slabAssembly => 'Assembly';
+
+  @override
+  String get slabAbove => 'Above concrete';
+
+  @override
+  String get slabBelow => 'Below concrete';
+
+  @override
+  String get slabCore => 'Concrete';
+
+  @override
+  String get slabCoreOffset => 'Concrete top offset';
+
+  @override
+  String get slabFinishedLevel => 'Finished level';
+
+  @override
+  String get slabBottomLevel => 'Bottom level';
+
+  @override
+  String get slabPreset => 'Load assembly';
+
+  @override
+  String get slabAllUsages => 'All uses';
+
+  @override
+  String get slabOnlyThis => 'Only this slab';
+
+  @override
+  String get slabShared => 'Edit shared type';
+
+  @override
+  String get slabSharedHelp =>
+      'Saving updates every slab using this type. Choose Only this slab to detach a copy.';
+
+  @override
+  String get slabNewType => 'New assembly';
+
+  @override
+  String get slabLibrary => 'Personal library';
+
+  @override
+  String get slabLibrarySaved => 'Assembly saved to library.';
+
+  @override
+  String get slabSaveLibrary => 'Save to library';
+
+  @override
+  String get slabLibraryFailed => 'Could not save the library.';
+
+  @override
+  String get slabPresetHelp =>
+      'Editable starting dimensions, not a calculation for this building. Foundation: waterproofing below concrete; ground floor: waterproofing above concrete. Cold attic: non-walkable insulation. Ceiling insulation: suspended lining. Roof and terrace presets include one slope field; junctions and drainage need separate detailing.';
+
+  @override
+  String get slabAddLayer => 'Add layer';
+
+  @override
+  String get slabEditLayer => 'Layer';
+
+  @override
+  String get slabMaterial => 'Material';
+
+  @override
+  String get slabRole => 'Function';
+
+  @override
+  String get slabThicknessMm => 'Thickness (mm)';
+
+  @override
+  String get slabSlope => 'Slope (%)';
+
+  @override
+  String get slabDirection => 'Fall direction';
+
+  @override
+  String get slabDirectionHelp =>
+      'Tap two points in the plan preview, from high to low.';
+
+  @override
+  String get slabDirectionRequired => 'Set a fall direction in the preview.';
+
+  @override
+  String get slabInvalid =>
+      'Check dimensions, names and slope. Only one upper layer may have a slope.';
+
+  @override
+  String get slabDuplicate => 'Duplicate layer';
+
+  @override
+  String get slabMoveUp => 'Move up';
+
+  @override
+  String get slabMoveDown => 'Move down';
+
+  @override
+  String get slabFinish => 'Finish';
+
+  @override
+  String get slabFinishTile => 'Tiles';
+
+  @override
+  String get slabFinishParquet => 'Parquet';
+
+  @override
+  String get slabFinishWet => 'Wet room';
+
+  @override
+  String get slabNaturalGround => 'Natural ground';
+
+  @override
+  String get buildingSections => 'Sections';
+
+  @override
+  String get buildingSection => 'Section';
+
+  @override
+  String get buildingSectionNew => 'New section';
+
+  @override
+  String get buildingSectionCut => 'Edit cut';
+
+  @override
+  String get buildingSectionHint =>
+      'Choose two points in plan to define the section.';
+
+  @override
+  String get buildingSectionEmpty => 'No elements intersect this cut.';
+
+  @override
+  String get slabDetail => 'Floor detail';
+
+  @override
+  String get slabDetailPick => 'Pick a slab, then place its labels.';
+
+  @override
+  String get slabDetailMove => 'Tap to place the labels.';
+
+  @override
+  String get slabDetailLost => 'Lost link';
+
+  @override
+  String get slabDetailReattach => 'Reattach';
+
+  @override
+  String get slabDetailHere => 'here';
+
+  @override
+  String get slabDetailSide => 'Flip labels';
+
+  @override
+  String get slabDetailRemove => 'Remove detail';
+
+  @override
+  String get slabSectionDelete => 'Delete section';
+
+  @override
+  String get slabMatConcrete => 'Reinforced concrete';
+
+  @override
+  String get slabMatTile => 'Tiles';
+
+  @override
+  String get slabMatTileAdhesive => 'Tile adhesive';
+
+  @override
+  String get slabMatParquet => 'Parquet';
+
+  @override
+  String get slabMatUnderlay => 'Parquet underlay';
+
+  @override
+  String get slabMatScreed => 'Cement screed';
+
+  @override
+  String get slabMatPeFoil => 'PE separating foil';
+
+  @override
+  String get slabMatXps => 'XPS';
+
+  @override
+  String get slabMatFloorInsulation => 'Rigid floor insulation';
+
+  @override
+  String get slabMatAcousticWool => 'Impact sound insulation';
+
+  @override
+  String get slabMatMineralWool => 'Mineral wool';
+
+  @override
+  String get slabMatRoofInsulation => 'Rigid roof insulation';
+
+  @override
+  String get slabMatWaterproofing => 'Waterproofing';
+
+  @override
+  String get slabMatVapourBarrier => 'Vapour control layer';
+
+  @override
+  String get slabMatBreathableMembrane => 'Breathable protection';
+
+  @override
+  String get slabMatGeotextile => 'Geotextile';
+
+  @override
+  String get slabMatGravel => 'Gravel ballast';
+
+  @override
+  String get slabMatBallast => 'Compacted aggregate';
+
+  @override
+  String get slabMatCompactedFill => 'Compacted fill';
+
+  @override
+  String get slabMatBlindingConcrete => 'Blinding concrete';
+
+  @override
+  String get slabMatPlaster => 'Ceiling plaster';
+
+  @override
+  String get slabMatProtectiveRender => 'Reinforced protective render';
+
+  @override
+  String get slabMatPlasterboard => 'Plasterboard lining';
+
+  @override
+  String get slabMatAdhesive => 'Insulation adhesive';
+
+  @override
+  String get slabMatCustom => 'Custom material';
+
+  @override
+  String get slabUseFoundation => 'Foundation slab';
+
+  @override
+  String get slabUseGround => 'Ground-bearing floor';
+
+  @override
+  String get slabUseBasement => 'Above basement';
+
+  @override
+  String get slabUseIntermediate => 'Intermediate floor';
+
+  @override
+  String get slabUseColdAttic => 'Below cold attic';
+
+  @override
+  String get slabUseInsulatedCeiling => 'Insulation below slab';
+
+  @override
+  String get slabUseWarmRoof => 'Warm flat roof';
+
+  @override
+  String get slabUseInvertedRoof => 'Inverted flat roof';
+
+  @override
+  String get slabUseTerrace => 'Terrace above heated space';
+
+  @override
+  String get slabRoleFinish => 'Finish';
+
+  @override
+  String get slabRoleAdhesive => 'Bonding';
+
+  @override
+  String get slabRoleScreed => 'Screed';
+
+  @override
+  String get slabRoleSeparation => 'Separation';
+
+  @override
+  String get slabRoleInsulation => 'Thermal insulation';
+
+  @override
+  String get slabRoleAcoustic => 'Sound insulation';
+
+  @override
+  String get slabRoleWaterproofing => 'Waterproofing';
+
+  @override
+  String get slabRoleVapourControl => 'Vapour control';
+
+  @override
+  String get slabRoleSlope => 'Slope';
+
+  @override
+  String get slabRoleCeiling => 'Ceiling finish';
+
+  @override
+  String get slabRoleBase => 'Base';
+
+  @override
+  String get slabRoleFill => 'Fill';
+
+  @override
+  String get slabRoleProtection => 'Protection';
 }

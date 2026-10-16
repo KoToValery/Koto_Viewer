@@ -1,3 +1,5 @@
+import '../widgets/architect_slab_layers_dialog.dart';
+import '../widgets/architect_building_sections_screen.dart';
 import '../../bim_editing/widgets/bim_edit_actions.dart';
 import '../../bim_editing/geometry/bim_contour_drafting_geometry.dart';
 import 'dart:math' as math;
@@ -5196,7 +5198,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final ids = _effectiveSelection;
     if (ids.isEmpty) return;
     if (ids.length == 1) {
-      final stairs = _project.activeStorey.stairs.where((s) => ids.contains(s.id));
+      final stairs = _project.activeStorey.stairs.where(
+        (s) => ids.contains(s.id),
+      );
       if (stairs.isNotEmpty) {
         _showStairProperties(stair: stairs.first);
         return;
@@ -5207,6 +5211,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       builder: (_) => ArchitectElementPropertiesDialog(
         project: _project,
         elementIds: ids,
+        onSlabLayers: ids.length == 1 && _project.activeStorey.slabs.any((s) => ids.contains(s.id))
+            ? () {
+                Navigator.pop(context);
+                final slab = _project.activeStorey.slabs.firstWhere((s) => ids.contains(s.id));
+                showDialog<void>(context: context, builder: (_) => ArchitectSlabLayersDialog(
+                  project: _project, slab: slab, onApply: (next) {
+                    _commands.commit(next); return true;
+                  }));
+              }
+            : null,
         onApply: (values, texts) {
           try {
             _commands.execute(
@@ -6323,6 +6337,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             () => _showDrawingGrid = !_showDrawingGrid,
                           ),
                         ),
+                      IconButton(
+                        key: const ValueKey('architect-building-sections'),
+                        tooltip: l10n.buildingSections,
+                        icon: const Icon(
+                          Icons.vertical_split_outlined,
+                          color: Colors.white,
+                        ),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ArchitectBuildingSectionsScreen(
+                              controller: _commands,
+                            ),
+                          ),
+                        ),
+                      ),
                       IconButton(
                         key: const ValueKey('architect-settings'),
                         tooltip: l10n.architectSettings,

@@ -769,7 +769,10 @@ class ArchitectElementTool extends ChangeNotifier {
           return center + Offset(-rel.dy, rel.dx);
         }).toList();
         final newSlabs = List<ArchitectSlab>.from(storey.slabs);
-        newSlabs[slabIndex] = slab.copyWith(polygon: rotatedPoly);
+        newSlabs[slabIndex] = slab.copyWith(
+          polygon: rotatedPoly,
+          slopeDirection: slab.slopeDirection == null ? null : slab.slopeDirection! + math.pi / 2,
+        );
         return storey.copyWith(slabs: newSlabs);
       }
     }

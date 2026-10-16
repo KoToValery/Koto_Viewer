@@ -432,6 +432,8 @@ class ArchitectWall {
       // Top & Bottom caps
       tris.add(Triangle3D(v0: v1T, v1: v2T, v2: v3T, color: wallColor));
       tris.add(Triangle3D(v0: v1T, v1: v3T, v2: v4T, color: wallColor));
+      tris.add(Triangle3D(v0: v1B, v1: v3B, v2: v2B, color: wallColor));
+      tris.add(Triangle3D(v0: v1B, v1: v4B, v2: v3B, color: wallColor));
     }
 
     if (doors.isEmpty && windows.isEmpty) {

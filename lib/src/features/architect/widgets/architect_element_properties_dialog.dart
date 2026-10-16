@@ -12,12 +12,14 @@ import 'architect_wall_drafting_panel.dart';
 class ArchitectElementPropertiesDialog extends StatefulWidget {
   final ArchitectProject project;
   final Set<String> elementIds;
+  final VoidCallback? onSlabLayers;
   final bool Function(Map<String, double>, Map<String, String>) onApply;
   const ArchitectElementPropertiesDialog({
     super.key,
     required this.project,
     required this.elementIds,
     required this.onApply,
+    this.onSlabLayers,
   });
   @override
   State<ArchitectElementPropertiesDialog> createState() =>
@@ -239,6 +241,13 @@ class _ArchitectElementPropertiesDialogState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (widget.onSlabLayers != null)
+                OutlinedButton.icon(
+                  key: const ValueKey('architect-property-slab-layers'),
+                  onPressed: widget.onSlabLayers,
+                  icon: const Icon(Icons.layers_outlined),
+                  label: Text(l.slabLayers),
+                ),
               if (isDoor || isWindow) ...[
                 DropdownButtonFormField<String>(
                   key: const ValueKey('architect-property-styleId'),

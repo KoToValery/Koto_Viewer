@@ -5308,4 +5308,306 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get stairSectionCutHeight => 'Хоризонтален срез';
+
+  @override
+  String get slabLayers => 'Слоеве';
+
+  @override
+  String get slabAssembly => 'Състав';
+
+  @override
+  String get slabAbove => 'Над бетона';
+
+  @override
+  String get slabBelow => 'Под бетона';
+
+  @override
+  String get slabCore => 'Бетон';
+
+  @override
+  String get slabCoreOffset => 'Отместване бетон';
+
+  @override
+  String get slabFinishedLevel => 'Готов под';
+
+  @override
+  String get slabBottomLevel => 'Долна кота';
+
+  @override
+  String get slabPreset => 'Зареди състав';
+
+  @override
+  String get slabAllUsages => 'Всички';
+
+  @override
+  String get slabOnlyThis => 'Само тази';
+
+  @override
+  String get slabShared => 'Промени общия тип';
+
+  @override
+  String get slabSharedHelp =>
+      'Записът обновява всички плочи с този тип. Избери „Само тази“ за отделен вариант.';
+
+  @override
+  String get slabNewType => 'Нов състав';
+
+  @override
+  String get slabLibrary => 'Лична библиотека';
+
+  @override
+  String get slabLibrarySaved => 'Съставът е запазен в библиотеката.';
+
+  @override
+  String get slabSaveLibrary => 'Запази в библиотеката';
+
+  @override
+  String get slabLibraryFailed => 'Библиотеката не е записана.';
+
+  @override
+  String get slabPresetHelp =>
+      'Редактируеми начални дебелини, без изчисление за сградата. Фундамент: хидроизолация под бетона; под върху терен: над бетона. Студен таван: непроходима изолация. Изолиран таван: окачена облицовка. Покривите и терасите имат едно поле за наклон; връзките и отводняването се детайлират отделно.';
+
+  @override
+  String get slabAddLayer => 'Добави слой';
+
+  @override
+  String get slabEditLayer => 'Слой';
+
+  @override
+  String get slabMaterial => 'Материал';
+
+  @override
+  String get slabRole => 'Функция';
+
+  @override
+  String get slabThicknessMm => 'Дебелина (mm)';
+
+  @override
+  String get slabSlope => 'Наклон (%)';
+
+  @override
+  String get slabDirection => 'Посока на оттичане';
+
+  @override
+  String get slabDirectionHelp =>
+      'Посочи две точки в плана — от високото към ниското.';
+
+  @override
+  String get slabDirectionRequired => 'Задай посока на оттичане в прегледа.';
+
+  @override
+  String get slabInvalid =>
+      'Провери дебелините, имената и наклона. Само един горен слой може да е с наклон.';
+
+  @override
+  String get slabDuplicate => 'Дублирай слой';
+
+  @override
+  String get slabMoveUp => 'Нагоре';
+
+  @override
+  String get slabMoveDown => 'Надолу';
+
+  @override
+  String get slabFinish => 'Покритие';
+
+  @override
+  String get slabFinishTile => 'Плочки';
+
+  @override
+  String get slabFinishParquet => 'Паркет';
+
+  @override
+  String get slabFinishWet => 'Мокро';
+
+  @override
+  String get slabNaturalGround => 'Естествен терен';
+
+  @override
+  String get buildingSections => 'Разрези';
+
+  @override
+  String get buildingSection => 'Разрез';
+
+  @override
+  String get buildingSectionNew => 'Нов разрез';
+
+  @override
+  String get buildingSectionCut => 'Промени сечението';
+
+  @override
+  String get buildingSectionHint =>
+      'Посочи две точки в плана за линия на разреза.';
+
+  @override
+  String get buildingSectionEmpty => 'Няма пресечени елементи.';
+
+  @override
+  String get slabDetail => 'Детайл — настилки';
+
+  @override
+  String get slabDetailPick => 'Посочи плоча, после постави надписите.';
+
+  @override
+  String get slabDetailMove => 'Посочи място за надписите.';
+
+  @override
+  String get slabDetailLost => 'Загубена връзка';
+
+  @override
+  String get slabDetailReattach => 'Свържи отново';
+
+  @override
+  String get slabDetailHere => 'тук';
+
+  @override
+  String get slabDetailSide => 'Обърни надписите';
+
+  @override
+  String get slabDetailRemove => 'Премахни детайла';
+
+  @override
+  String get slabSectionDelete => 'Изтрий разреза';
+
+  @override
+  String get slabMatConcrete => 'Стоманобетон';
+
+  @override
+  String get slabMatTile => 'Плочки';
+
+  @override
+  String get slabMatTileAdhesive => 'Лепило за плочки';
+
+  @override
+  String get slabMatParquet => 'Паркет';
+
+  @override
+  String get slabMatUnderlay => 'Подложка за паркет';
+
+  @override
+  String get slabMatScreed => 'Циментова замазка';
+
+  @override
+  String get slabMatPeFoil => 'Разделително PE фолио';
+
+  @override
+  String get slabMatXps => 'XPS';
+
+  @override
+  String get slabMatFloorInsulation => 'Твърда подова топлоизолация';
+
+  @override
+  String get slabMatAcousticWool => 'Ударна шумоизолация';
+
+  @override
+  String get slabMatMineralWool => 'Минерална вата';
+
+  @override
+  String get slabMatRoofInsulation => 'Твърда покривна топлоизолация';
+
+  @override
+  String get slabMatWaterproofing => 'Хидроизолация';
+
+  @override
+  String get slabMatVapourBarrier => 'Пароизолация';
+
+  @override
+  String get slabMatBreathableMembrane => 'Паропропусклива защита';
+
+  @override
+  String get slabMatGeotextile => 'Геотекстил';
+
+  @override
+  String get slabMatGravel => 'Чакъл';
+
+  @override
+  String get slabMatBallast => 'Баластра';
+
+  @override
+  String get slabMatCompactedFill => 'Уплътнен насип';
+
+  @override
+  String get slabMatBlindingConcrete => 'Подложен бетон';
+
+  @override
+  String get slabMatPlaster => 'Таванска мазилка';
+
+  @override
+  String get slabMatProtectiveRender => 'Защитна армирана шпакловка';
+
+  @override
+  String get slabMatPlasterboard => 'Гипсокартонена облицовка';
+
+  @override
+  String get slabMatAdhesive => 'Лепило за изолация';
+
+  @override
+  String get slabMatCustom => 'Друг материал';
+
+  @override
+  String get slabUseFoundation => 'Фундаментна';
+
+  @override
+  String get slabUseGround => 'Върху терен';
+
+  @override
+  String get slabUseBasement => 'Над сутерен';
+
+  @override
+  String get slabUseIntermediate => 'Междуетажна';
+
+  @override
+  String get slabUseColdAttic => 'Под студен таван';
+
+  @override
+  String get slabUseInsulatedCeiling => 'Изолация отдолу';
+
+  @override
+  String get slabUseWarmRoof => 'Класически покрив';
+
+  @override
+  String get slabUseInvertedRoof => 'Обърнат покрив';
+
+  @override
+  String get slabUseTerrace => 'Тераса над отопляем обем';
+
+  @override
+  String get slabRoleFinish => 'Покритие';
+
+  @override
+  String get slabRoleAdhesive => 'Залепване';
+
+  @override
+  String get slabRoleScreed => 'Замазка';
+
+  @override
+  String get slabRoleSeparation => 'Разделяне';
+
+  @override
+  String get slabRoleInsulation => 'Топлоизолация';
+
+  @override
+  String get slabRoleAcoustic => 'Шумоизолация';
+
+  @override
+  String get slabRoleWaterproofing => 'Хидроизолация';
+
+  @override
+  String get slabRoleVapourControl => 'Пароконтрол';
+
+  @override
+  String get slabRoleSlope => 'Наклон';
+
+  @override
+  String get slabRoleCeiling => 'Таван';
+
+  @override
+  String get slabRoleBase => 'Основа';
+
+  @override
+  String get slabRoleFill => 'Насип';
+
+  @override
+  String get slabRoleProtection => 'Защита';
 }
