@@ -8183,6 +8183,30 @@ abstract class AppLocalizations {
   /// **'Ghost storeys'**
   String get architectGhostStoreys;
 
+  /// Toggle to display erkers and balconies from the floor above with dashed lines on active storey
+  ///
+  /// In en, this message translates to:
+  /// **'Upper floor erkers & balconies'**
+  String get architectUpperOverhangs;
+
+  /// Tooltip or help text for upper overhangs setting
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically display erkers and balconies from the floor above as dashed lines'**
+  String get architectUpperOverhangsHelp;
+
+  /// Short label for cantilevered erker projection from floor above
+  ///
+  /// In en, this message translates to:
+  /// **'Erker'**
+  String get architectOverhangErker;
+
+  /// Short label for balcony projection from floor above
+  ///
+  /// In en, this message translates to:
+  /// **'Balcony'**
+  String get architectOverhangBalcony;
+
   /// No description provided for @architectDrawingGrid.
   ///
   /// In en, this message translates to:

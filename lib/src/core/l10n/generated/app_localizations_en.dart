@@ -4675,6 +4675,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectGhostStoreys => 'Ghost storeys';
 
   @override
+  String get architectUpperOverhangs => 'Upper floor erkers & balconies';
+
+  @override
+  String get architectUpperOverhangsHelp =>
+      'Automatically display erkers and balconies from the floor above as dashed lines';
+
+  @override
+  String get architectOverhangErker => 'Erker';
+
+  @override
+  String get architectOverhangBalcony => 'Balcony';
+
+  @override
   String get architectDrawingGrid => 'Grid';
 
   @override

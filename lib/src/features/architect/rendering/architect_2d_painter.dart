@@ -22,6 +22,9 @@ import 'architect_dimension_layout.dart';
 import '../services/architect_selection.dart';
 import '../services/architect_wall_relations.dart';
 import '../services/architect_wall_overshoot_detector.dart';
+import '../models/architect_overhang.dart';
+import '../services/architect_overhang_detector.dart';
+import 'architect_overhang_painter_helper.dart';
 
 enum ArchitectPaintLayer { all, model, interaction }
 
@@ -135,6 +138,8 @@ class Architect2dPainter extends CustomPainter {
   final bool polygonEditInvalid;
   final (Offset, Offset)? polygonLeaderLine;
   final ArchitectWallOvershoot? activeOvershoot;
+  final List<ArchitectOverhang>? upperOverhangs;
+  final bool showUpperOverhangs;
 
   Architect2dPainter({
     required ArchitectProject project,
@@ -144,6 +149,8 @@ class Architect2dPainter extends CustomPainter {
     this.paintGrid = true,
     this.palette = const ArchitectCanvasPalette.light(),
     this.activeOvershoot,
+    this.upperOverhangs,
+    this.showUpperOverhangs = true,
     required this.activeTool,
     this.activeDraftStart,
     this.activeDraftEnd,
@@ -249,6 +256,17 @@ class Architect2dPainter extends CustomPainter {
         selectedElementId: selectedElementId,
       );
       _drawZones(canvas);
+      if (showUpperOverhangs) {
+        ArchitectOverhangPainterHelper.drawOverhangs(
+          canvas: canvas,
+          palette: palette,
+          overhangs:
+              upperOverhangs ?? ArchitectOverhangDetector.forProject(_project),
+          zoomScale: zoomScale,
+          l10n: l10n,
+          selectedElementId: selectedElementId,
+        );
+      }
       ArchitectElementsPainterHelper.drawBeams(
         palette: palette,
         canvas: canvas,
@@ -1108,6 +1126,8 @@ class Architect2dPainter extends CustomPainter {
       wallCutAnchor != oldDelegate.wallCutAnchor ||
       wallCutLine != oldDelegate.wallCutLine ||
       activeOvershoot != oldDelegate.activeOvershoot ||
+      showUpperOverhangs != oldDelegate.showUpperOverhangs ||
+      upperOverhangs != oldDelegate.upperOverhangs ||
       _zoomScale != oldDelegate._zoomScale ||
       underlayDoc != oldDelegate.underlayDoc;
 }

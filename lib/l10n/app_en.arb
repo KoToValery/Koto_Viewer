@@ -3380,6 +3380,22 @@
   "architectInsulationStoneWool": "Stone wool",
   "architectSettings": "Settings",
   "architectGhostStoreys": "Ghost storeys",
+  "architectUpperOverhangs": "Upper floor erkers & balconies",
+  "@architectUpperOverhangs": {
+    "description": "Toggle to display erkers and balconies from the floor above with dashed lines on active storey"
+  },
+  "architectUpperOverhangsHelp": "Automatically display erkers and balconies from the floor above as dashed lines",
+  "@architectUpperOverhangsHelp": {
+    "description": "Tooltip or help text for upper overhangs setting"
+  },
+  "architectOverhangErker": "Erker",
+  "@architectOverhangErker": {
+    "description": "Short label for cantilevered erker projection from floor above"
+  },
+  "architectOverhangBalcony": "Balcony",
+  "@architectOverhangBalcony": {
+    "description": "Short label for balcony projection from floor above"
+  },
   "architectDrawingGrid": "Grid",
   "architectSnap": "Snap",
   "architectAxesWallThickness": "Wall core for axes",

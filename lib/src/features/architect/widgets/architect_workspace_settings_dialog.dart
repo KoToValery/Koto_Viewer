@@ -6,12 +6,13 @@ import 'architect_wall_drafting_panel.dart';
 class ArchitectWorkspaceSettings {
   final ArchitectUnit units;
   final ArchitectDimensionScale dimensionScale;
-  final bool ghostStoreys, grid, magnetic, underlay, darkCanvas;
+  final bool ghostStoreys, upperOverhangs, grid, magnetic, underlay, darkCanvas;
   final double axisCoreThickness;
   const ArchitectWorkspaceSettings({
     required this.units,
     this.dimensionScale = ArchitectDimensionScale.scale100,
     required this.ghostStoreys,
+    this.upperOverhangs = true,
     required this.grid,
     required this.magnetic,
     required this.underlay,
@@ -38,6 +39,7 @@ class _ArchitectWorkspaceSettingsDialogState
   late ArchitectUnit units = widget.settings.units;
   late ArchitectDimensionScale dimensionScale = widget.settings.dimensionScale;
   late bool ghost = widget.settings.ghostStoreys,
+      upperOverhangs = widget.settings.upperOverhangs,
       grid = widget.settings.grid,
       magnetic = widget.settings.magnetic,
       underlay = widget.settings.underlay,
@@ -119,6 +121,14 @@ class _ArchitectWorkspaceSettingsDialogState
                 onChanged: (value) => setState(() => ghost = value),
               ),
               SwitchListTile(
+                key: const ValueKey('architect-settings-upper-overhangs'),
+                contentPadding: EdgeInsets.zero,
+                title: Text(l.architectUpperOverhangs),
+                subtitle: Text(l.architectUpperOverhangsHelp),
+                value: upperOverhangs,
+                onChanged: (value) => setState(() => upperOverhangs = value),
+              ),
+              SwitchListTile(
                 key: const ValueKey('architect-settings-grid'),
                 contentPadding: EdgeInsets.zero,
                 title: Text(l.architectDrawingGrid),
@@ -175,6 +185,7 @@ class _ArchitectWorkspaceSettingsDialogState
               units: units,
               dimensionScale: dimensionScale,
               ghostStoreys: ghost,
+              upperOverhangs: upperOverhangs,
               grid: grid,
               magnetic: magnetic,
               underlay: underlay,

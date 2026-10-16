@@ -4692,6 +4692,19 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectGhostStoreys => 'Съседни етажи';
 
   @override
+  String get architectUpperOverhangs => 'Еркери и балкони от горен етаж';
+
+  @override
+  String get architectUpperOverhangsHelp =>
+      'Автоматично показване на еркери и балкони от горния етаж с пунктирана линия';
+
+  @override
+  String get architectOverhangErker => 'Еркер';
+
+  @override
+  String get architectOverhangBalcony => 'Балкон';
+
+  @override
   String get architectDrawingGrid => 'Мрежа';
 
   @override

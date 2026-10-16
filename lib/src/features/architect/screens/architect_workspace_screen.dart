@@ -636,6 +636,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   static const _darkCanvasPreference = 'architect_dark_canvas';
   bool _canvasPreferenceChanged = false;
   bool _showGhostStoreys = false;
+  bool _showUpperOverhangs = true;
   bool _showDrawingGrid = true;
   double _axisWallCoreThickness = .25;
   bool _viewPreferencesChanged = false;
@@ -647,6 +648,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       setState(() {
         _showGhostStoreys =
             preferences.getBool('architect_ghost_storeys') ?? false;
+        _showUpperOverhangs =
+            preferences.getBool('architect_upper_overhangs') ?? true;
         _showDrawingGrid =
             preferences.getBool('architect_drawing_grid') ?? true;
         _magnetEnabled = preferences.getBool('architect_magnetic_snap') ?? true;
@@ -672,6 +675,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     try {
       final preferences = await SharedPreferences.getInstance();
       await preferences.setBool('architect_ghost_storeys', _showGhostStoreys);
+      await preferences.setBool(
+        'architect_upper_overhangs',
+        _showUpperOverhangs,
+      );
       await preferences.setBool('architect_drawing_grid', _showDrawingGrid);
       await preferences.setBool('architect_magnetic_snap', _magnetEnabled);
       await preferences.setBool('architect_show_underlay', _showUnderlay);
@@ -710,6 +717,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           units: _project.units,
           dimensionScale: _project.dimensionScale,
           ghostStoreys: _showGhostStoreys,
+          upperOverhangs: _showUpperOverhangs,
           grid: _showDrawingGrid,
           magnetic: _magnetEnabled,
           underlay: _showUnderlay,
@@ -724,6 +732,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _commands.setDimensionScale(result.dimensionScale);
     _changeViewPreference(() {
       _showGhostStoreys = result.ghostStoreys;
+      _showUpperOverhangs = result.upperOverhangs;
       _showDrawingGrid = result.grid;
       _magnetEnabled = result.magnetic;
       _showUnderlay = result.underlay;
@@ -7825,6 +7834,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         l10n: context.l10n,
         palette: _canvasPalette,
         paintGrid: _showDrawingGrid,
+        showUpperOverhangs: _showUpperOverhangs,
         project: _drawingProject,
         viewport: _viewport,
         layer: layer,
