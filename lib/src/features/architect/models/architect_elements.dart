@@ -326,9 +326,10 @@ class ArchitectStair {
   final Offset endPoint;
   final double width; // flight width in meters (default 1.10 m)
   final int _stepCount;
-  final bool hasLanding;
+  final bool _hasLanding;
   final ArchitectStairDesign? design;
   int get stepCount => design?.risers ?? _stepCount;
+  bool get hasLanding => design == null ? _hasLanding : design!.flightCount > 1;
 
   const ArchitectStair({
     required this.id,
@@ -336,9 +337,9 @@ class ArchitectStair {
     required this.endPoint,
     this.width = 1.10,
     int stepCount = 16,
-    this.hasLanding = false,
+    bool hasLanding = false,
     this.design,
-  }) : _stepCount = stepCount;
+  }) : _stepCount = stepCount, _hasLanding = hasLanding;
 
   double get length => (endPoint - startPoint).distance;
 

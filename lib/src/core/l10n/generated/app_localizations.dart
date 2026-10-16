@@ -8624,7 +8624,7 @@ abstract class AppLocalizations {
   /// No description provided for @stairUseCommon.
   ///
   /// In en, this message translates to:
-  /// **'New shared residential'**
+  /// **'New multifamily'**
   String get stairUseCommon;
 
   /// No description provided for @stairUsePublic.
@@ -8930,7 +8930,7 @@ abstract class AppLocalizations {
   /// No description provided for @stairUnsupported.
   ///
   /// In en, this message translates to:
-  /// **'This combination cannot be drawn. Adjust the height or riser count.'**
+  /// **'Invalid stair dimensions. Check the entered values.'**
   String get stairUnsupported;
 
   /// No description provided for @stairLegacy.
@@ -9004,6 +9004,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Walls cannot be joined'**
   String get architectWallJoinIncompatible;
+
+  /// No description provided for @stairRailing.
+  ///
+  /// In en, this message translates to:
+  /// **'Railing'**
+  String get stairRailing;
+
+  /// No description provided for @stairSmartRailingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Guard on open sides, handrail beside a full-height wall. Doors, windows and low walls keep the guard.'**
+  String get stairSmartRailingHelp;
+
+  /// No description provided for @stairLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Label'**
+  String get stairLabel;
+
+  /// Count is the number of equal risers. Going and riser are formatted centimetres.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}R {going}/{riser} cm'**
+  String stairPlanStepsLabel(int count, String going, String riser);
+
+  /// No description provided for @stairPlanRiseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'H={height} m'**
+  String stairPlanRiseLabel(String height);
+
+  /// No description provided for @stairDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Detail'**
+  String get stairDetails;
+
+  /// No description provided for @stairGuardHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Guard height'**
+  String get stairGuardHeight;
+
+  /// No description provided for @stairHandrailHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Handrail height'**
+  String get stairHandrailHeight;
+
+  /// No description provided for @stairConcreteThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete waist'**
+  String get stairConcreteThickness;
+
+  /// No description provided for @stairFinishThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get stairFinishThickness;
+
+  /// No description provided for @stairNosing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nosing'**
+  String get stairNosing;
+
+  /// No description provided for @stairDetailsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Drawing dimensions only; verify structural thickness, handrail clear width and the applicable regulations.'**
+  String get stairDetailsHelp;
+
+  /// No description provided for @stairSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Section'**
+  String get stairSection;
+
+  /// No description provided for @stairSectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick two points in the plan to move and turn the section.'**
+  String get stairSectionHint;
+
+  /// No description provided for @stairSectionReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset section'**
+  String get stairSectionReset;
+
+  /// No description provided for @stairSectionEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'The section misses the stair. Pick two new points in the plan.'**
+  String get stairSectionEmpty;
+
+  /// No description provided for @stairSectionPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Section in plan'**
+  String get stairSectionPlan;
+
+  /// No description provided for @stairSectionCutHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan cut height'**
+  String get stairSectionCutHeight;
 }
 
 class _AppLocalizationsDelegate

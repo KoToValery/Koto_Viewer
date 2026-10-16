@@ -29,6 +29,13 @@ class ArchitectStairDesign {
   final double sweepDegrees;
   final bool turnLeft;
   final bool isDraft;
+  final bool showRailing;
+  final bool showLabel;
+  final double guardHeight;
+  final double handrailHeight;
+  final double concreteThickness;
+  final double finishThickness;
+  final double nosingProjection;
 
   const ArchitectStairDesign({
     this.rulesVersion = currentRules,
@@ -46,6 +53,13 @@ class ArchitectStairDesign {
     this.sweepDegrees = 270,
     this.turnLeft = false,
     this.isDraft = false,
+    this.showRailing = true,
+    this.showLabel = true,
+    this.guardHeight = 1.2,
+    this.handrailHeight = .9,
+    this.concreteThickness = .15,
+    this.finishThickness = .02,
+    this.nosingProjection = .03,
   });
 
   bool get accessible => code == StairCode.bulgaria && use != StairUse.private;
@@ -54,11 +68,32 @@ class ArchitectStairDesign {
       evacuation != StairEvacuation.unspecified;
   double get preferredMaxRiser =>
       accessible ? (use == StairUse.outdoorRoute ? .15 : .17) : .18;
-  int get risers =>
-      manualRisers ?? math.max(
-        (isEvacuation ? 3 : 2) *
-            (shape == StairShape.quarterTurn || shape == StairShape.halfTurn ? 2 : 1),
-        (rise / preferredMaxRiser - 1e-9).ceil());
+  int get risers {
+    if (manualRisers != null) return manualRisers!;
+    var count = math.max(
+      (isEvacuation ? 3 : 2) *
+          (shape == StairShape.quarterTurn || shape == StairShape.halfTurn
+              ? 2
+              : 1),
+      (rise / preferredMaxRiser - 1e-9).ceil(),
+    );
+    if (accessible && shape != StairShape.spiral) {
+      final flights = shape == StairShape.straight
+          ? math.max(1, (rise / maximumFlightRise - 1e-9).ceil())
+          : 2;
+      if (rise <= flights * maximumFlightRise + 1e-9) {
+        // Balance integer counts, rather than rejecting a feasible stair.
+        // E.g. 4.90 m / 29 gives a 2.534 m flight; 30 gives two at 2.45 m.
+        while (count <= 500 &&
+            (count / flights).ceil() * rise / count >
+                maximumFlightRise + 1e-9) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
   double get riser => rise / risers;
   double get going =>
       manualGoing ??
@@ -70,7 +105,11 @@ class ArchitectStairDesign {
       use == StairUse.outdoorRoute && accessible ? 1.2 : 2.5;
   int get flightCount => shape == StairShape.spiral
       ? 1
-      : shape != StairShape.straight ? 2 : !accessible ? 1 : math.max(
+      : shape != StairShape.straight
+      ? 2
+      : !accessible
+      ? 1
+      : math.max(
           1,
           (risers / math.max(2, (maximumFlightRise / riser + 1e-9).floor()))
               .ceil(),
@@ -97,10 +136,20 @@ class ArchitectStairDesign {
       innerRadius,
       sweepDegrees,
       ?manualGoing,
+      guardHeight,
+      handrailHeight,
+      concreteThickness,
     ]) {
       if (!value.isFinite || value <= 0) {
         throw ArgumentError('Invalid stair dimension');
       }
+    }
+    if (!finishThickness.isFinite || !nosingProjection.isFinite ||
+        finishThickness < 0 || finishThickness > .15 ||
+        nosingProjection < 0 || nosingProjection > .1 ||
+        concreteThickness > 1 || guardHeight > 2 ||
+        handrailHeight > guardHeight) {
+      throw ArgumentError('Invalid stair detailing');
     }
     if (rise > 30 ||
         risers < 2 ||
@@ -113,6 +162,7 @@ class ArchitectStairDesign {
   }
 
   ArchitectStairDesign copyWith({
+    String? rulesVersion,
     StairShape? shape,
     StairCode? code,
     StairUse? use,
@@ -130,8 +180,15 @@ class ArchitectStairDesign {
     double? sweepDegrees,
     bool? turnLeft,
     bool? isDraft,
+    bool? showRailing,
+    bool? showLabel,
+    double? guardHeight,
+    double? handrailHeight,
+    double? concreteThickness,
+    double? finishThickness,
+    double? nosingProjection,
   }) => ArchitectStairDesign(
-    rulesVersion: rulesVersion,
+    rulesVersion: rulesVersion ?? this.rulesVersion,
     shape: shape ?? this.shape,
     code: code ?? this.code,
     use: use ?? this.use,
@@ -148,6 +205,13 @@ class ArchitectStairDesign {
     sweepDegrees: sweepDegrees ?? this.sweepDegrees,
     turnLeft: turnLeft ?? this.turnLeft,
     isDraft: isDraft ?? this.isDraft,
+    showRailing: showRailing ?? this.showRailing,
+    showLabel: showLabel ?? this.showLabel,
+    guardHeight: guardHeight ?? this.guardHeight,
+    handrailHeight: handrailHeight ?? this.handrailHeight,
+    concreteThickness: concreteThickness ?? this.concreteThickness,
+    finishThickness: finishThickness ?? this.finishThickness,
+    nosingProjection: nosingProjection ?? this.nosingProjection,
   );
 
   Map<String, dynamic> toJson() => {
@@ -166,6 +230,13 @@ class ArchitectStairDesign {
     'sweepDegrees': sweepDegrees,
     'turnLeft': turnLeft,
     'isDraft': isDraft,
+    'showRailing': showRailing,
+    'showLabel': showLabel,
+    'guardHeight': guardHeight,
+    'handrailHeight': handrailHeight,
+    'concreteThickness': concreteThickness,
+    'finishThickness': finishThickness,
+    'nosingProjection': nosingProjection,
   };
   factory ArchitectStairDesign.fromJson(Map<String, dynamic> json) {
     T readEnum<T extends Enum>(List<T> values, String key, T fallback) =>
@@ -190,6 +261,13 @@ class ArchitectStairDesign {
       sweepDegrees: (json['sweepDegrees'] as num?)?.toDouble() ?? 270,
       turnLeft: json['turnLeft'] as bool? ?? false,
       isDraft: json['isDraft'] as bool? ?? false,
+      showRailing: json['showRailing'] as bool? ?? true,
+      showLabel: json['showLabel'] as bool? ?? true,
+      guardHeight: (json['guardHeight'] as num?)?.toDouble() ?? 1.2,
+      handrailHeight: (json['handrailHeight'] as num?)?.toDouble() ?? .9,
+      concreteThickness: (json['concreteThickness'] as num?)?.toDouble() ?? .15,
+      finishThickness: (json['finishThickness'] as num?)?.toDouble() ?? .02,
+      nosingProjection: (json['nosingProjection'] as num?)?.toDouble() ?? .03,
     );
     result.validate();
     return result;
@@ -208,8 +286,12 @@ class ArchitectStairPlan {
   final List<(Offset, Offset)> nosings;
   final List<Offset> walkingLine;
   final List<ArchitectStairSurface> surfaces;
-  ArchitectStairPlan(this.footprints, this.nosings, this.walkingLine,
-      [this.surfaces = const []]);
+  ArchitectStairPlan(
+    this.footprints,
+    this.nosings,
+    this.walkingLine, [
+    this.surfaces = const [],
+  ]);
   late final Path path = _path();
   Path _path() {
     var result = Path();
@@ -226,11 +308,14 @@ class ArchitectStairPlan {
   late final Rect bounds = _bounds();
   Rect _bounds() {
     final points = footprints.expand((p) => p).toList();
-    return Rect.fromLTRB(points.map((p) => p.dx).reduce(math.min),
+    return Rect.fromLTRB(
+      points.map((p) => p.dx).reduce(math.min),
       points.map((p) => p.dy).reduce(math.min),
       points.map((p) => p.dx).reduce(math.max),
-      points.map((p) => p.dy).reduce(math.max));
+      points.map((p) => p.dy).reduce(math.max),
+    );
   }
+
   bool contains(Offset point, double tolerance) {
     if (path.contains(point)) return true;
     for (final polygon in footprints) {
@@ -265,8 +350,9 @@ class ArchitectStairPlan {
         nosings = <(Offset, Offset)>[],
         walk = <Offset>[];
     final surfaces = <ArchitectStairSurface>[];
-    void surface(List<Offset> points, double elevation) =>
-      surfaces.add(ArchitectStairSurface(points.map(world).toList(), elevation));
+    void surface(List<Offset> points, double elevation) => surfaces.add(
+      ArchitectStairSurface(points.map(world).toList(), elevation),
+    );
     void polygon(List<Offset> points) =>
         footprints.add(points.map(world).toList());
     void line(Offset a, Offset b) => nosings.add((world(a), world(b)));
@@ -293,8 +379,12 @@ class ArchitectStairPlan {
           for (var s = 0; s < slices; s++) {
             final a = design.anglePerGoing * (i + s / slices);
             final b = design.anglePerGoing * (i + (s + 1) / slices);
-            surface([radial(inner, a), radial(outer, a),
-              radial(outer, b), radial(inner, b)], (i + 1) * design.riser);
+            surface([
+              radial(inner, a),
+              radial(outer, a),
+              radial(outer, b),
+              radial(inner, b),
+            ], (i + 1) * design.riser);
           }
         }
       }
@@ -310,6 +400,7 @@ class ArchitectStairPlan {
         polygon(points);
         surface(points, climbed * design.riser);
       }
+
       for (var f = 0; f < flights.length; f++) {
         final normal = Offset(-axis.dy, axis.dx);
         final run = (flights[f] - 1) * design.going;
@@ -325,9 +416,12 @@ class ArchitectStairPlan {
           line(p - normal * width / 2, p + normal * width / 2);
           if (i < flights[f] - 1) {
             final next = p + axis * design.going;
-            surface([p - normal * width / 2, next - normal * width / 2,
-              next + normal * width / 2, p + normal * width / 2],
-              (climbed + i + 1) * design.riser);
+            surface([
+              p - normal * width / 2,
+              next - normal * width / 2,
+              next + normal * width / 2,
+              p + normal * width / 2,
+            ], (climbed + i + 1) * design.riser);
           }
         }
         climbed += flights[f];

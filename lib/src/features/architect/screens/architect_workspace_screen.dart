@@ -470,18 +470,38 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (openingId != null) break;
     }
 
-    final wall = _project.activeStorey.walls
-        .where((w) => ids.contains(w.id))
-        .firstOrNull;
     final snap = _snapElement(raw);
     final anchors = <ArchitectDimensionAnchor>[];
+
+    final isCornerSnap = snap.snapLabel != null &&
+        (snap.snapLabel == 'Vertex' ||
+            snap.snapLabel == 'Endpoint' ||
+            snap.snapLabel == 'Intersection' ||
+            snap.snapLabel == 'Axis intersection' ||
+            snap.snapLabel == 'Center' ||
+            snap.snapLabel == 'Corner') &&
+        (snap.point - raw).distance <= 20 / _currentScale;
 
     if (openingId != null && openingHostWall != null) {
       _dimensionDirection ??= openingHostWall.unitVector;
       anchors.addAll(
         ArchitectDimensionChain.openingAnchors(openingHostWall, openingId),
       );
-    } else if (wall != null) {
+    } else if (isCornerSnap && _dimensionAnchors.isNotEmpty) {
+      final cornerWall = _project.activeStorey.walls
+          .where((w) => w.containsPoint(snap.point, tolerance: 0.05))
+          .firstOrNull;
+      anchors.add(
+        ArchitectDimensionAnchor(
+          point: snap.point,
+          elementId: cornerWall?.id,
+          feature: 'vertex',
+        ),
+      );
+    } else {
+      final candidateWalls = _project.activeStorey.walls
+          .where((w) => ids.contains(w.id))
+          .toList();
       final previousWall = _project.activeStorey.walls
           .where(
             (w) => _dimensionAnchors.any(
@@ -489,36 +509,70 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           )
           .firstOrNull;
-      if (previousWall != null &&
-          BimLineGeometry.cross(
-                wall.unitVector,
-                previousWall.unitVector,
-              ).abs() >
-              .01) {
-        _operationError();
-        return;
+
+      ArchitectWall? wall;
+      if (previousWall != null) {
+        wall = candidateWalls
+            .where(
+              (w) =>
+                  BimLineGeometry.cross(
+                    w.unitVector,
+                    previousWall.unitVector,
+                  ).abs() <=
+                  .01,
+            )
+            .firstOrNull;
       }
-      _dimensionDirection ??= wall.normalVector;
-      anchors.addAll(ArchitectDimensionChain.wallFaces(wall, raw));
-    } else {
-      for (final id in ids) {
-        final anchor = ArchitectDimensionChain.pickElement(
-          _project,
-          id,
-          snap.point,
-        );
-        if (anchor != null) {
-          anchors.add(anchor);
-          break;
+      wall ??= candidateWalls.firstOrNull;
+
+      if (wall != null) {
+        if (previousWall != null &&
+            BimLineGeometry.cross(
+                  wall.unitVector,
+                  previousWall.unitVector,
+                ).abs() >
+                .01) {
+          // If tapping near the end of a perpendicular wall (e.g. wall junction or step corner),
+          // treat as a vertex corner anchor instead of failing.
+          final nearestEnd =
+              (raw - wall.startPoint).distance < (raw - wall.endPoint).distance
+                  ? wall.startPoint
+                  : wall.endPoint;
+          if ((raw - nearestEnd).distance <= 24 / _currentScale) {
+            anchors.add(
+              ArchitectDimensionAnchor(
+                point: nearestEnd,
+                elementId: wall.id,
+                feature: 'vertex',
+              ),
+            );
+          } else {
+            _operationError();
+            return;
+          }
+        } else {
+          _dimensionDirection ??= wall.normalVector;
+          anchors.addAll(ArchitectDimensionChain.wallFaces(wall, raw));
         }
-      }
-      if (anchors.isEmpty) {
-        if (_dimensionAnchors.isNotEmpty &&
-            !_dimensionAllowPoint) {
-          _askDimensionFinish();
-          return;
+      } else {
+        for (final id in ids) {
+          final anchor = ArchitectDimensionChain.pickElement(
+            _project,
+            id,
+            snap.point,
+          );
+          if (anchor != null) {
+            anchors.add(anchor);
+            break;
+          }
         }
-        anchors.add(ArchitectDimensionAnchor(point: snap.point));
+        if (anchors.isEmpty) {
+          if (_dimensionAnchors.isNotEmpty && !_dimensionAllowPoint) {
+            _askDimensionFinish();
+            return;
+          }
+          anchors.add(ArchitectDimensionAnchor(point: snap.point));
+        }
       }
     }
     setState(() {
@@ -4662,6 +4716,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       items.add(
         _radialItem(
+          action: ArchitectRadialAction.newPoint,
+
+          color: const Color(0xFF80CBC4),
+        ),
+      );
+
+      items.add(
+        _radialItem(
           action: ArchitectRadialAction.move,
 
           color: const Color(0xFFFFB300),
@@ -4768,7 +4830,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
     }
 
-    if (InsertArchitectElementPoint.pathOf(storey, elementId) != null) {
+    if (!items.any((it) => it.action == ArchitectRadialAction.newPoint) &&
+        InsertArchitectElementPoint.pathOf(storey, elementId) != null) {
       items.add(
         _radialItem(
           action: ArchitectRadialAction.newPoint,
@@ -5272,6 +5335,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
             if (wallIds.length == 1) ...[
               IconButton(
+                key: const ValueKey('architect-wall-new-point'),
+                tooltip: l.bimNewPoint,
+                icon: const Icon(
+                  Icons.add_location_alt_outlined,
+                  color: Color(0xFF80CBC4),
+                ),
+                onPressed: () {
+                  _cancelActiveDrags();
+                  _insertMidpoint(wallIds.single);
+                },
+              ),
+              IconButton(
                 key: const ValueKey('architect-wall-extend'),
                 tooltip: l.architectWallExtend,
                 icon: Icon(
@@ -5769,6 +5844,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             .every((w) => w.isDetached),
                       ),
                     ),
+                  ),
+                if (ids.length == 1 &&
+                    InsertArchitectElementPoint.pathOf(
+                          _project.activeStorey,
+                          ids.single,
+                        ) !=
+                        null)
+                  IconButton(
+                    key: const ValueKey('architect-selection-new-point'),
+                    constraints: const BoxConstraints.tightFor(
+                      width: 26,
+                      height: 40,
+                    ),
+                    padding: EdgeInsets.zero,
+                    tooltip: l.bimNewPoint,
+                    icon: const Icon(
+                      Icons.add_location_alt_outlined,
+                      color: Color(0xFF80CBC4),
+                      size: 18,
+                    ),
+                    onPressed: () {
+                      _cancelActiveDrags();
+                      _insertMidpoint(ids.single);
+                    },
                   ),
                 if (wallIds.isNotEmpty)
                   PopupMenuButton<String>(
@@ -7723,6 +7822,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Architect2dPainter _makePainter(ArchitectPaintLayer layer) =>
       Architect2dPainter(
+        l10n: context.l10n,
         palette: _canvasPalette,
         paintGrid: _showDrawingGrid,
         project: _drawingProject,

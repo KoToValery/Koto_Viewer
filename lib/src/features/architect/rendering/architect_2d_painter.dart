@@ -1,3 +1,4 @@
+import '../../../core/l10n/l10n_extensions.dart';
 import 'architect_canvas_palette.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -56,6 +57,7 @@ class Architect2dPainter extends CustomPainter {
   final ArchitectPaintLayer layer;
   final bool paintGrid;
   final ArchitectCanvasPalette palette;
+  final AppLocalizations? l10n;
   final ArchitectTool activeTool;
   final Offset? activeDraftStart;
   final Offset? activeDraftEnd;
@@ -137,6 +139,7 @@ class Architect2dPainter extends CustomPainter {
   Architect2dPainter({
     required ArchitectProject project,
     this.viewport,
+    this.l10n,
     this.layer = ArchitectPaintLayer.all,
     this.paintGrid = true,
     this.palette = const ArchitectCanvasPalette.light(),
@@ -274,6 +277,7 @@ class Architect2dPainter extends CustomPainter {
         storey: _elementLayerStorey,
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
+        project: _project, l10n: l10n, dimensionScale: _project.dimensionScale,
       );
       ArchitectElementsPainterHelper.drawCadPrimitives(
         palette: palette,
@@ -306,6 +310,7 @@ class Architect2dPainter extends CustomPainter {
         draftStart: activeDraftStart,
         draftEnd: activeDraftEnd,
         stairPreview: stairPreview,
+        stairStorey: _project.activeStorey, stairProject: _project,
         zoomScale: zoomScale,
         unit: _project.units,
       );
@@ -928,12 +933,24 @@ class Architect2dPainter extends CustomPainter {
           ..strokeWidth = 1.5 / zoomScale,
       );
     }
-    if (activeTool == ArchitectTool.wall && cursorPosition != null) {
+    if (cursorPosition != null &&
+        (activeTool == ArchitectTool.wall ||
+            activeTool == ArchitectTool.select ||
+            activeTool == ArchitectTool.dimension)) {
       // Exact aim point sits at the tip, ahead of the offset pointer/ruler.
+      final aim = activeDraftEnd ?? cursorPosition!;
       canvas.drawCircle(
-        activeDraftEnd ?? cursorPosition!,
-        2 / zoomScale,
-        Paint()..color = Colors.cyanAccent,
+        aim,
+        3.5 / zoomScale,
+        Paint()..color = const Color(0xFF00E5FF),
+      );
+      canvas.drawCircle(
+        aim,
+        3.5 / zoomScale,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0 / zoomScale,
       );
     }
     if (activeTool == ArchitectTool.wall && activeDraftStart != null) {
@@ -1077,6 +1094,7 @@ class Architect2dPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant Architect2dPainter oldDelegate) =>
+      l10n != oldDelegate.l10n ||
       palette.isDark != oldDelegate.palette.isDark ||
       layer != oldDelegate.layer ||
       layer != ArchitectPaintLayer.model ||

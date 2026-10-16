@@ -1,6 +1,15 @@
 import '../../../core/l10n/l10n_extensions.dart';
-import '../models/architect_stair_design.dart';
+import 'package:intl/intl.dart';
+import '../models/architect_elements.dart';
 import '../services/architect_stair_rules.dart';
+
+String stairPlanLabel(AppLocalizations l, ArchitectStair stair) {
+  final d = stair.design;
+  if (d == null) return '';
+  final cm = NumberFormat('0.##', l.localeName);
+  return '${l.stairPlanStepsLabel(d.risers, cm.format(d.walkingGoing(stair.width) * 100), cm.format(d.riser * 100))}\n'
+      '${l.stairPlanRiseLabel(NumberFormat('0.00', l.localeName).format(d.rise))}';
+}
 
 String stairShapeLabel(AppLocalizations l, StairShape shape) => switch (shape) {
   StairShape.straight => l.stairStraight,
@@ -44,7 +53,7 @@ String stairCheckLabel(AppLocalizations l, StairCheckKind kind) =>
       StairCheckKind.scope => l.stairCheckScope,
       StairCheckKind.version => l.stairCheckVersion,
       StairCheckKind.upperStorey => l.stairCheckUpperStorey,
-  StairCheckKind.groupSteps => l.stairCheckGroupSteps,
+      StairCheckKind.groupSteps => l.stairCheckGroupSteps,
     };
 String stairStateLabel(AppLocalizations l, StairCheckState state) =>
     switch (state) {

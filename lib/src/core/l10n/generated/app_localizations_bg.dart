@@ -4977,7 +4977,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get stairUsePrivate => 'В жилище';
 
   @override
-  String get stairUseCommon => 'Ново общо жилищно';
+  String get stairUseCommon => 'Нова многофамилна';
 
   @override
   String get stairUsePublic => 'Обществена сграда';
@@ -5135,7 +5135,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get stairUnsupported =>
-      'Тази комбинация не може да се изчертае. Промени височината или броя подстъпи.';
+      'Невалидни размери на стълбата. Проверете въведените стойности.';
 
   @override
   String get stairLegacy =>
@@ -5179,4 +5179,66 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectWallJoinIncompatible => 'Стените не могат да се съединят';
+
+  @override
+  String get stairRailing => 'Парапет';
+
+  @override
+  String get stairSmartRailingHelp =>
+      'Парапет при отворени страни, ръкохватка до висока стена. При врати, прозорци и ниски стени се запазва парапетът.';
+
+  @override
+  String get stairLabel => 'Надпис';
+
+  @override
+  String stairPlanStepsLabel(int count, String going, String riser) {
+    return '$count ст. $going/$riser см';
+  }
+
+  @override
+  String stairPlanRiseLabel(String height) {
+    return 'H=$height м';
+  }
+
+  @override
+  String get stairDetails => 'Детайл';
+
+  @override
+  String get stairGuardHeight => 'Височина на парапета';
+
+  @override
+  String get stairHandrailHeight => 'Височина на ръкохватката';
+
+  @override
+  String get stairConcreteThickness => 'Бетонна плоча';
+
+  @override
+  String get stairFinishThickness => 'Настилка';
+
+  @override
+  String get stairNosing => 'Издаване на ръба';
+
+  @override
+  String get stairDetailsHelp =>
+      'Размери за изчертаване; проверете конструктивната дебелина, светлата широчина между ръкохватките и приложимите изисквания.';
+
+  @override
+  String get stairSection => 'Срез';
+
+  @override
+  String get stairSectionHint =>
+      'Посочи две точки в плана, за да преместиш и завъртиш среза.';
+
+  @override
+  String get stairSectionReset => 'Начален срез';
+
+  @override
+  String get stairSectionEmpty =>
+      'Срезът не пресича стълбата. Посочи две нови точки в плана.';
+
+  @override
+  String get stairSectionPlan => 'Срез в плана';
+
+  @override
+  String get stairSectionCutHeight => 'Хоризонтален срез';
 }

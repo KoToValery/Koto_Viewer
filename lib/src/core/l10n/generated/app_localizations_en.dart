@@ -4959,7 +4959,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stairUsePrivate => 'Within a dwelling';
 
   @override
-  String get stairUseCommon => 'New shared residential';
+  String get stairUseCommon => 'New multifamily';
 
   @override
   String get stairUsePublic => 'Public building';
@@ -5118,7 +5118,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stairUnsupported =>
-      'This combination cannot be drawn. Adjust the height or riser count.';
+      'Invalid stair dimensions. Check the entered values.';
 
   @override
   String get stairLegacy =>
@@ -5161,4 +5161,66 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectWallJoinIncompatible => 'Walls cannot be joined';
+
+  @override
+  String get stairRailing => 'Railing';
+
+  @override
+  String get stairSmartRailingHelp =>
+      'Guard on open sides, handrail beside a full-height wall. Doors, windows and low walls keep the guard.';
+
+  @override
+  String get stairLabel => 'Label';
+
+  @override
+  String stairPlanStepsLabel(int count, String going, String riser) {
+    return '${count}R $going/$riser cm';
+  }
+
+  @override
+  String stairPlanRiseLabel(String height) {
+    return 'H=$height m';
+  }
+
+  @override
+  String get stairDetails => 'Detail';
+
+  @override
+  String get stairGuardHeight => 'Guard height';
+
+  @override
+  String get stairHandrailHeight => 'Handrail height';
+
+  @override
+  String get stairConcreteThickness => 'Concrete waist';
+
+  @override
+  String get stairFinishThickness => 'Finish';
+
+  @override
+  String get stairNosing => 'Nosing';
+
+  @override
+  String get stairDetailsHelp =>
+      'Drawing dimensions only; verify structural thickness, handrail clear width and the applicable regulations.';
+
+  @override
+  String get stairSection => 'Section';
+
+  @override
+  String get stairSectionHint =>
+      'Pick two points in the plan to move and turn the section.';
+
+  @override
+  String get stairSectionReset => 'Reset section';
+
+  @override
+  String get stairSectionEmpty =>
+      'The section misses the stair. Pick two new points in the plan.';
+
+  @override
+  String get stairSectionPlan => 'Section in plan';
+
+  @override
+  String get stairSectionCutHeight => 'Plan cut height';
 }

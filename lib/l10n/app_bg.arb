@@ -1588,7 +1588,7 @@
   "stairCodeGeometry": "Само геометрия",
   "stairUse": "Предназначение",
   "stairUsePrivate": "В жилище",
-  "stairUseCommon": "Ново общо жилищно",
+  "stairUseCommon": "Нова многофамилна",
   "stairUsePublic": "Обществена сграда",
   "stairUseAssembly": "Обществено, над 200 души",
   "stairUseOutdoor": "Нов градски маршрут",
@@ -1639,7 +1639,7 @@
   "stairFireSource": "Пожарна безопасност · Iз-1971, редакция 2025",
   "stairAccessSource": "Достъпност · РД-02-20-2/2021, чл. 18 и 55",
   "stairClearDimensionsHelp": "Размерите са светли, между ограничаващите проекции на ръкохватките. Вътрешният радиус започва от ограничаващия вътрешен ръб или проекцията на парапета.",
-  "stairUnsupported": "Тази комбинация не може да се изчертае. Промени височината или броя подстъпи.",
+  "stairUnsupported": "Невалидни размери на стълбата. Проверете въведените стойности.",
   "stairLegacy": "Схематично стълбище. Преизчисли, за да го превърнеш в параметрично.",
   "stairCheckGroupSteps": "Подстъпи в група",
   "architectWallOvershootDetected": "Изскачащ край: {distance} cm",
@@ -1651,5 +1651,44 @@
   "architectWallJoinTooltip": "Съединяване на стени (Join)",
   "architectWallJoinSelectSecond": "Изберете втора стена за съединяване",
   "architectWallJoinSuccess": "Стените са съединени",
-  "architectWallJoinIncompatible": "Стените не могат да се съединят"
+  "architectWallJoinIncompatible": "Стените не могат да се съединят",
+  "stairRailing": "Парапет",
+  "stairSmartRailingHelp": "Парапет при отворени страни, ръкохватка до висока стена. При врати, прозорци и ниски стени се запазва парапетът.",
+  "stairLabel": "Надпис",
+  "stairPlanStepsLabel": "{count} ст. {going}/{riser} см",
+  "stairPlanRiseLabel": "H={height} м",
+  "stairDetails": "Детайл",
+  "stairGuardHeight": "Височина на парапета",
+  "stairHandrailHeight": "Височина на ръкохватката",
+  "stairConcreteThickness": "Бетонна плоча",
+  "stairFinishThickness": "Настилка",
+  "stairNosing": "Издаване на ръба",
+  "stairDetailsHelp": "Размери за изчертаване; проверете конструктивната дебелина, светлата широчина между ръкохватките и приложимите изисквания.",
+  "stairSection": "Срез",
+  "stairSectionHint": "Посочи две точки в плана, за да преместиш и завъртиш среза.",
+  "stairSectionReset": "Начален срез",
+  "stairSectionEmpty": "Срезът не пресича стълбата. Посочи две нови точки в плана.",
+  "stairSectionPlan": "Срез в плана",
+  "stairSectionCutHeight": "Хоризонтален срез",
+  "@stairPlanStepsLabel": {
+    "description": "Count is the number of equal risers. Going and riser are formatted centimetres.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "going": {
+        "type": "String"
+      },
+      "riser": {
+        "type": "String"
+      }
+    }
+  },
+  "@stairPlanRiseLabel": {
+    "placeholders": {
+      "height": {
+        "type": "String"
+      }
+    }
+  }
 }

@@ -1,3 +1,5 @@
+import '../../../core/l10n/l10n_extensions.dart';
+import 'architect_stair_plan_painter.dart';
 import 'architect_canvas_palette.dart';
 // === SECTION: ARCHITECTURAL ELEMENTS PAINTER HELPER ===
 import 'dart:math' as math;
@@ -341,59 +343,30 @@ class ArchitectElementsPainterHelper {
 
   static void drawStairs({
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
-    required Canvas canvas,
-    required ArchitectStorey storey,
-    required double zoomScale,
-    String? selectedElementId,
+    required Canvas canvas, required ArchitectStorey storey,
+    required double zoomScale, String? selectedElementId,
+    ArchitectProject? project, AppLocalizations? l10n,
+    ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
   }) {
     for (final stair in storey.stairs) {
-      drawStair(
-        canvas: canvas,
-        stair: stair,
-        zoomScale: zoomScale,
-        color: stair.id == selectedElementId
-            ? const Color(0xFF00E5FF)
-            : stair.design?.isDraft == true
-            ? const Color(0xFFD32F2F)
-            : palette.foreground(const Color(0xFF1B5E20)),
-      );
+      drawStair(canvas: canvas, stair: stair, zoomScale: zoomScale,
+        storey: storey, project: project, cutHeight: storey.cutPlaneHeight,
+        l10n: l10n, dimensionScale: dimensionScale, background: palette.background,
+        color: stair.id == selectedElementId ? const Color(0xFF00E5FF) :
+          stair.design?.isDraft == true ? const Color(0xFFD32F2F) :
+          palette.foreground(const Color(0xFF1B5E20)));
     }
   }
 
-  static void drawStair({
-    required Canvas canvas,
-    required ArchitectStair stair,
-    required double zoomScale,
-    Color color = const Color(0xFF1B5E20),
-  }) {
-    final plan = stair.plan;
-    final stroke = Paint()
-      ..color = color
-      ..strokeWidth = 1.4 / zoomScale
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(plan.path, Paint()..color = color.withValues(alpha: .08));
-    canvas.drawPath(plan.path, stroke);
-    final tread = Paint()
-      ..color = color
-      ..strokeWidth = .9 / zoomScale;
-    for (final line in plan.nosings) {
-      canvas.drawLine(line.$1, line.$2, tread);
-    }
-    final points = plan.walkingLine;
-    if (points.length < 2) return;
-    final arrow = Path()..moveTo(points.first.dx, points.first.dy);
-    for (final p in points.skip(1)) {
-      arrow.lineTo(p.dx, p.dy);
-    }
-    canvas.drawPath(arrow, stroke);
-    canvas.drawCircle(points.first, 2.5 / zoomScale, Paint()..color = color);
-    final end = points.last, delta = end - points[points.length - 2];
-    if (delta.distance < 1e-8) return;
-    final u = delta / delta.distance, n = Offset(-u.dy, u.dx);
-    final size = math.min(.18, stair.width * .18);
-    canvas.drawLine(end, end - u * size + n * size / 2, stroke);
-    canvas.drawLine(end, end - u * size - n * size / 2, stroke);
-  }
+  static void drawStair({required Canvas canvas, required ArchitectStair stair,
+    required double zoomScale, Color color = const Color(0xFF1B5E20),
+    Color background = Colors.white, double? cutHeight,
+    ArchitectStorey? storey, ArchitectProject? project, AppLocalizations? l10n,
+    bool labels = true,
+    ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
+  }) => ArchitectStairPlanPainter.draw(canvas: canvas, stair: stair,
+    scale: zoomScale, color: color, background: background, cutHeight: cutHeight,
+    storey: storey, project: project, l10n: l10n, labels: labels, dimensionScale: dimensionScale);
 
   // ===========================================================================
   // 7. DIMENSIONS
@@ -643,6 +616,8 @@ class ArchitectElementsPainterHelper {
     required double zoomScale,
     ArchitectUnit unit = ArchitectUnit.meters,
     ArchitectStair? stairPreview,
+    ArchitectStorey? stairStorey,
+    ArchitectProject? stairProject,
   }) {
     if (draftStart == null || draftEnd == null) return;
     final p1 = draftStart;
@@ -688,6 +663,7 @@ class ArchitectElementsPainterHelper {
         drawStair(
           canvas: canvas,
           stair: stairPreview,
+        storey: stairStorey, project: stairProject, cutHeight: stairStorey?.cutPlaneHeight, labels: false,
           zoomScale: zoomScale,
           color: const Color(0xFF00897B),
         );

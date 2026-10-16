@@ -189,6 +189,30 @@ class ArchitectDimensionChain {
     ];
   }
 
+  /// Selecting a single face of a wall closer to the user pick (e.g. inner face of a step or recess).
+  static ArchitectDimensionAnchor wallFaceAt(
+    ArchitectWall wall,
+    Offset pick,
+  ) {
+    final ratio =
+        (dot(pick - wall.coreCenterStart, wall.unitVector) / wall.length).clamp(
+          0.0,
+          1.0,
+        );
+    final side =
+        dot(pick - wall.coreCenterStart, wall.normalVector) < 0 ? -.5 : .5;
+    return ArchitectDimensionAnchor(
+      point:
+          wall.coreCenterStart +
+          (wall.coreCenterEnd - wall.coreCenterStart) * ratio +
+          wall.normalVector * (wall.coreThickness * side),
+      elementId: wall.id,
+      feature: 'wallFace',
+      ratio: ratio,
+      side: side,
+    );
+  }
+
   /// Selecting an opening (door/window) provides anchors for both jambs.
   static List<ArchitectDimensionAnchor> openingAnchors(
     ArchitectWall wall,
@@ -341,10 +365,21 @@ class ArchitectDimensionChain {
   ) {
     if (anchor.elementId == null) return anchor.point;
     for (final wall in storey.walls) {
-      if (anchor.feature == 'wallFace' && wall.id == anchor.elementId) {
-        return wall.coreCenterStart +
-            (wall.coreCenterEnd - wall.coreCenterStart) * anchor.ratio +
-            wall.normalVector * (wall.coreThickness * anchor.side);
+      if (wall.id == anchor.elementId) {
+        if (anchor.feature == 'wallFace') {
+          return wall.coreCenterStart +
+              (wall.coreCenterEnd - wall.coreCenterStart) * anchor.ratio +
+              wall.normalVector * (wall.coreThickness * anchor.side);
+        }
+        if (anchor.feature == 'vertex') {
+          if ((anchor.point - wall.startPoint).distance < 1e-4) {
+            return wall.startPoint;
+          }
+          if ((anchor.point - wall.endPoint).distance < 1e-4) {
+            return wall.endPoint;
+          }
+          return anchor.point;
+        }
       }
       if (anchor.feature == 'opening') {
         for (final o in [

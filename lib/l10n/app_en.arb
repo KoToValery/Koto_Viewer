@@ -3513,7 +3513,7 @@
   "stairCodeGeometry": "Geometry only",
   "stairUse": "Use",
   "stairUsePrivate": "Within a dwelling",
-  "stairUseCommon": "New shared residential",
+  "stairUseCommon": "New multifamily",
   "stairUsePublic": "Public building",
   "stairUseAssembly": "Public, over 200 people",
   "stairUseOutdoor": "New urban route",
@@ -3564,7 +3564,7 @@
   "stairFireSource": "Fire safety · Iз-1971, consolidated 2025",
   "stairAccessSource": "Accessibility · РД-02-20-2/2021, Articles 18 and 55",
   "stairClearDimensionsHelp": "Use finished clear widths between limiting handrail projections. For a spiral, the inner radius starts at the limiting inner edge or handrail projection.",
-  "stairUnsupported": "This combination cannot be drawn. Adjust the height or riser count.",
+  "stairUnsupported": "Invalid stair dimensions. Check the entered values.",
   "stairLegacy": "Schematic stair. Recalculate to convert it to a parametric stair.",
   "stairCheckGroupSteps": "Risers per group",
   "architectWallOvershootDetected": "Wall overshoot: {distance} cm",
@@ -3612,5 +3612,44 @@
   "architectWallJoinIncompatible": "Walls cannot be joined",
   "@architectWallJoinIncompatible": {
     "description": "Error message when walls cannot be joined"
+  },
+  "stairRailing": "Railing",
+  "stairSmartRailingHelp": "Guard on open sides, handrail beside a full-height wall. Doors, windows and low walls keep the guard.",
+  "stairLabel": "Label",
+  "stairPlanStepsLabel": "{count}R {going}/{riser} cm",
+  "stairPlanRiseLabel": "H={height} m",
+  "stairDetails": "Detail",
+  "stairGuardHeight": "Guard height",
+  "stairHandrailHeight": "Handrail height",
+  "stairConcreteThickness": "Concrete waist",
+  "stairFinishThickness": "Finish",
+  "stairNosing": "Nosing",
+  "stairDetailsHelp": "Drawing dimensions only; verify structural thickness, handrail clear width and the applicable regulations.",
+  "stairSection": "Section",
+  "stairSectionHint": "Pick two points in the plan to move and turn the section.",
+  "stairSectionReset": "Reset section",
+  "stairSectionEmpty": "The section misses the stair. Pick two new points in the plan.",
+  "stairSectionPlan": "Section in plan",
+  "stairSectionCutHeight": "Plan cut height",
+  "@stairPlanStepsLabel": {
+    "description": "Count is the number of equal risers. Going and riser are formatted centimetres.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "going": {
+        "type": "String"
+      },
+      "riser": {
+        "type": "String"
+      }
+    }
+  },
+  "@stairPlanRiseLabel": {
+    "placeholders": {
+      "height": {
+        "type": "String"
+      }
+    }
   }
 }

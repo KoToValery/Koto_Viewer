@@ -50,6 +50,21 @@ class BimPointerMarks {
       ..lineTo(guideConnectionPoint.dx, guideConnectionPoint.dy);
 
     canvas.drawPath(stemPath, stemPaint);
+
+    // Aim point / dot directly in front of the selection line
+    canvas.drawCircle(
+      guideConnectionPoint,
+      4.0,
+      Paint()..color = themeColor,
+    );
+    canvas.drawCircle(
+      guideConnectionPoint,
+      4.0,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4,
+    );
   }
 
   /// Unified offset leader handle: element target point, connecting leader stem,

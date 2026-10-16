@@ -7,6 +7,7 @@ import '../models/architect_project.dart';
 import '../rendering/architect_elements_painter_helper.dart';
 import '../services/architect_stair_rules.dart';
 import 'architect_stair_labels.dart';
+import 'architect_stair_section_screen.dart';
 import 'architect_wall_drafting_panel.dart';
 
 class ArchitectStairPropertiesDialog extends StatefulWidget {
@@ -174,6 +175,9 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
 
   void fit() {
     var next = d.copyWith(
+      rulesVersion: d.code == StairCode.bulgaria
+          ? ArchitectStairDesign.currentRules
+          : d.rulesVersion,
       autoRisers: true,
       autoGoing: true,
       isDraft: false,
@@ -256,7 +260,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
             children: [
               SizedBox(
                 height: 136,
-                child: CustomPaint(painter: _StairPreview(stair)),
+                child: CustomPaint(painter: _StairPreview(stair, widget.project)),
               ),
               if (legacy)
                 Padding(
@@ -285,6 +289,20 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                   ),
                 ],
               ),
+              Wrap(spacing: 12, children: [
+                Tooltip(message: l.stairSmartRailingHelp, child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(l.stairRailing), Switch.adaptive(key: const ValueKey('stair-show-railing'),
+                    value: d.showRailing, onChanged: (v) => update(d.copyWith(showRailing: v))),
+                ])),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(l.stairLabel), Switch.adaptive(key: const ValueKey('stair-show-label'),
+                    value: d.showLabel, onChanged: (v) => update(d.copyWith(showLabel: v))),
+                ]),
+              ]),
+              OutlinedButton.icon(key: const ValueKey('stair-open-section'),
+                icon: const Icon(Icons.view_agenda_outlined), label: Text(l.stairSection),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) =>
+                  ArchitectStairSectionScreen(project: widget.project, stair: stair)))),
               number(
                 'width',
                 l.stairClearWidth,
@@ -468,6 +486,20 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                   ),
                 ],
               ),
+              ExpansionTile(key: const ValueKey('stair-details'), tilePadding: EdgeInsets.zero,
+                title: Text(l.stairDetails), children: [
+                  number('guard-height', l.stairGuardHeight, d.guardHeight,
+                    (v) => update(d.copyWith(guardHeight: v)), minimum: .1, maximum: 2),
+                  number('handrail-height', l.stairHandrailHeight, d.handrailHeight,
+                    (v) => update(d.copyWith(handrailHeight: v)), minimum: .1, maximum: 2),
+                  number('concrete', l.stairConcreteThickness, d.concreteThickness,
+                    (v) => update(d.copyWith(concreteThickness: v)), minimum: .01, maximum: 1),
+                  number('finish', l.stairFinishThickness, d.finishThickness,
+                    (v) => update(d.copyWith(finishThickness: v)), minimum: 0, maximum: .15),
+                  number('nosing', l.stairNosing, d.nosingProjection,
+                    (v) => update(d.copyWith(nosingProjection: v)), minimum: 0, maximum: .1),
+                  Text(l.stairDetailsHelp, style: Theme.of(context).textTheme.bodySmall),
+                ]),
               ExpansionTile(
                 key: ValueKey('stair-checks-$errors'),
                 tilePadding: EdgeInsets.zero,
@@ -534,9 +566,11 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
 
   Widget checkTile(StairCheck check) {
     final l = context.l10n;
-    String value(double v) =>
-        check.kind == StairCheckKind.groupSteps ? '${v.round()}' :
-        check.kind == StairCheckKind.slope ? v.toStringAsFixed(3) : length(v);
+    String value(double v) => check.kind == StairCheckKind.groupSteps
+        ? '${v.round()}'
+        : check.kind == StairCheckKind.slope
+        ? v.toStringAsFixed(3)
+        : length(v);
     final range = [
       if (check.minimum != null) '≥ ${value(check.minimum!)}',
       if (check.maximum != null) '≤ ${value(check.maximum!)}',
@@ -574,7 +608,8 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
 
 class _StairPreview extends CustomPainter {
   final ArchitectStair stair;
-  _StairPreview(this.stair);
+  final ArchitectProject project;
+  _StairPreview(this.stair, this.project);
   @override
   void paint(Canvas canvas, Size size) {
     final bounds = stair.plan.bounds.inflate(.2);
@@ -590,6 +625,8 @@ class _StairPreview extends CustomPainter {
       canvas: canvas,
       stair: stair,
       zoomScale: scale,
+      storey: project.activeStorey, project: project,
+      cutHeight: project.activeStorey.cutPlaneHeight, labels: false,
       color: stair.design?.isDraft == true ? Colors.red : Colors.teal,
     );
     canvas.restore();

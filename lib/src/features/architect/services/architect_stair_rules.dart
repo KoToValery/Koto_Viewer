@@ -118,9 +118,12 @@ class ArchitectStairRules {
         max: outdoor ? .15 : .17,
         article: article,
       );
-      range(StairCheckKind.flightRise,
+      range(
+        StairCheckKind.flightRise,
         d.flightRisers.reduce(math.max) * d.riser,
-        max: outdoor ? 1.2 : 2.5, article: article);
+        max: outdoor ? 1.2 : 2.5,
+        article: article,
+      );
       if (d.shape != StairShape.spiral) {
         range(
           StairCheckKind.going,
@@ -174,8 +177,12 @@ class ArchitectStairRules {
         const StairCheck(StairCheckKind.evacuation, StairCheckState.review),
       );
     } else if (d.isEvacuation) {
-      range(StairCheckKind.groupSteps, d.flightRisers.reduce(math.min).toDouble(),
-        min: 3, article: '54(3)');
+      range(
+        StairCheckKind.groupSteps,
+        d.flightRisers.reduce(math.min).toDouble(),
+        min: 3,
+        article: '54(3)',
+      );
       // Occupant bands suffice for Art. 52, but cannot size the complete
       // evacuation route under Art. 45 or check functional fire subclasses.
       result.add(
@@ -293,10 +300,19 @@ class ArchitectStairRules {
               () {
                 if (stair.design == null) return stair;
                 var next = resolveDesign(project, floor, stair.design!);
-                final missingTarget = next.followStoreys && next.upperStoreyId != null &&
-                    !project.storeys.any((s) => s.id == next.upperStoreyId && s.elevation > floor.elevation);
-                if (!next.isDraft && (missingTarget ||
-                    check(stair.copyWith(design: next)).any((c) => c.state == StairCheckState.error))) {
+                final missingTarget =
+                    next.followStoreys &&
+                    next.upperStoreyId != null &&
+                    !project.storeys.any(
+                      (s) =>
+                          s.id == next.upperStoreyId &&
+                          s.elevation > floor.elevation,
+                    );
+                if (!next.isDraft &&
+                    (missingTarget ||
+                        check(
+                          stair.copyWith(design: next),
+                        ).any((c) => c.state == StairCheckState.error))) {
                   next = next.copyWith(isDraft: true);
                 }
                 if (next.rise == stair.design!.rise &&
@@ -346,8 +362,13 @@ class PutArchitectStair extends ArchitectModelCommand {
             ),
           );
     final d = resolved.design;
-    if (d != null && !d.isDraft && d.followStoreys && d.upperStoreyId != null &&
-        !project.storeys.any((s) => s.id == d.upperStoreyId && s.elevation > floor.elevation)) {
+    if (d != null &&
+        !d.isDraft &&
+        d.followStoreys &&
+        d.upperStoreyId != null &&
+        !project.storeys.any(
+          (s) => s.id == d.upperStoreyId && s.elevation > floor.elevation,
+        )) {
       throw ArgumentError('Upper floor is missing or below the start');
     }
     if (resolved.design != null &&
