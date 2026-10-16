@@ -1,5 +1,6 @@
 import 'architect_slab_assembly.dart';
 import 'architect_section.dart';
+import 'architect_elevation.dart';
 import '../../bim_editing/properties/bim_distance_unit.dart';
 export '../../bim_editing/properties/bim_distance_unit.dart';
 import 'dart:ui';
@@ -240,6 +241,8 @@ class ArchitectProject {
   final List<ArchitectFenestrationStyle> openingStyles;
   final List<ArchitectSlabAssembly> slabAssemblies;
   final List<ArchitectSection> sections;
+  final List<ArchitectElevation> elevations;
+  final ArchitectNorthSymbol? northSymbol;
   final Map<String, int> slabCompositionNumbers;
 
   const ArchitectProject({
@@ -256,6 +259,8 @@ class ArchitectProject {
     this.openingStyles = const [],
     this.slabAssemblies = const [],
     this.sections = const [],
+    this.elevations = const [],
+    this.northSymbol,
     this.slabCompositionNumbers = const {},
   });
 
@@ -295,6 +300,8 @@ class ArchitectProject {
     List<ArchitectFenestrationStyle>? openingStyles,
     List<ArchitectSlabAssembly>? slabAssemblies,
     List<ArchitectSection>? sections,
+    List<ArchitectElevation>? elevations,
+    ArchitectNorthSymbol? northSymbol,
     Map<String, int>? slabCompositionNumbers,
   }) => ArchitectProject(
     id: id ?? this.id,
@@ -310,6 +317,8 @@ class ArchitectProject {
     openingStyles: openingStyles ?? this.openingStyles,
     slabAssemblies: slabAssemblies ?? this.slabAssemblies,
     sections: sections ?? this.sections,
+    elevations: elevations ?? this.elevations,
+    northSymbol: northSymbol ?? this.northSymbol,
     slabCompositionNumbers:
         slabCompositionNumbers ?? this.slabCompositionNumbers,
   );
@@ -328,6 +337,8 @@ class ArchitectProject {
     'openingStyles': openingStyles.map((o) => o.toJson()).toList(),
     'slabAssemblies': slabAssemblies.map((a) => a.toJson()).toList(),
     'sections': sections.map((a) => a.toJson()).toList(),
+    'elevations': elevations.map((a) => a.toJson()).toList(),
+    if (northSymbol != null) 'northSymbol': northSymbol!.toJson(),
     'slabCompositionNumbers': slabCompositionNumbers,
   };
 
@@ -366,6 +377,17 @@ class ArchitectProject {
           (a) => ArchitectSection.fromJson(Map<String, dynamic>.from(a as Map)),
         )
         .toList(),
+    elevations: (json['elevations'] as List? ?? [])
+        .map(
+          (a) =>
+              ArchitectElevation.fromJson(Map<String, dynamic>.from(a as Map)),
+        )
+        .toList(),
+    northSymbol: json['northSymbol'] == null
+        ? null
+        : ArchitectNorthSymbol.fromJson(
+            Map<String, dynamic>.from(json['northSymbol'] as Map),
+          ),
     slabCompositionNumbers: (json['slabCompositionNumbers'] as Map? ?? {}).map(
       (k, v) => MapEntry(k as String, (v as num).toInt()),
     ),

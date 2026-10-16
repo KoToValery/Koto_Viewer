@@ -20,6 +20,8 @@ class ArchitectSceneGeometry {
   }
 
   static Rect projectBounds(ArchitectProject project) => boundsOf([
+    for (final e in project.elevations) ...[e.start, e.end],
+    if (project.northSymbol != null) project.northSymbol!.position,
     for (final a in project.gridAxes) ...[a.start, a.end],
     for (final s in project.storeys) ...[
       for (final w in s.walls) ...w.polygonCorners,

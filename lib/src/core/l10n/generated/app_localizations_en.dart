@@ -5592,4 +5592,90 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get slabRoleProtection => 'Protection';
+
+  @override
+  String get architectFacades => 'Elevations';
+
+  @override
+  String get architectFacade => 'Elevation';
+
+  @override
+  String get architectFacadeNew => 'New elevation';
+
+  @override
+  String get architectFacadeEdit => 'Edit marker';
+
+  @override
+  String get architectFacadeReverse => 'Reverse view';
+
+  @override
+  String get architectFacadePlan => 'Plan';
+
+  @override
+  String get architectFacadeStartHint =>
+      'Choose the first marker point outside the building.';
+
+  @override
+  String get architectFacadeEndHint =>
+      'Choose the second point, parallel to the facade.';
+
+  @override
+  String get architectFacadeSideHint =>
+      'Tap on the building side to set the viewing direction.';
+
+  @override
+  String get architectFacadeEmpty =>
+      'No building elements in this view. Check the marker span and direction.';
+
+  @override
+  String get architectNorth => 'North';
+
+  @override
+  String get architectNorthPlace => 'Place north';
+
+  @override
+  String get architectNorthHelp =>
+      'Rotate the symbol to set north. Elevation names update automatically.';
+
+  @override
+  String get architectNorthAngle => 'Angle';
+
+  @override
+  String get architectNorthAngleHelp => 'Clockwise angle from plan-up (0°).';
+
+  @override
+  String get architectNorthInvalidAngle => 'Enter a valid angle.';
+
+  @override
+  String get architectNorthPositionHint => 'Choose the north symbol position.';
+
+  @override
+  String get architectNorthDirectionHint => 'Choose a point towards north.';
+
+  @override
+  String get architectNorthSymbolLetter => 'N';
+
+  @override
+  String get architectFacadeNorth => 'North';
+
+  @override
+  String get architectFacadeNorthEast => 'Northeast';
+
+  @override
+  String get architectFacadeEast => 'East';
+
+  @override
+  String get architectFacadeSouthEast => 'Southeast';
+
+  @override
+  String get architectFacadeSouth => 'South';
+
+  @override
+  String get architectFacadeSouthWest => 'Southwest';
+
+  @override
+  String get architectFacadeWest => 'West';
+
+  @override
+  String get architectFacadeNorthWest => 'Northwest';
 }

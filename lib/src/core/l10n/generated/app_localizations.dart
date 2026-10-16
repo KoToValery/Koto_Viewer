@@ -9826,6 +9826,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Protection'**
   String get slabRoleProtection;
+
+  /// No description provided for @architectFacades.
+  ///
+  /// In en, this message translates to:
+  /// **'Elevations'**
+  String get architectFacades;
+
+  /// No description provided for @architectFacade.
+  ///
+  /// In en, this message translates to:
+  /// **'Elevation'**
+  String get architectFacade;
+
+  /// No description provided for @architectFacadeNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New elevation'**
+  String get architectFacadeNew;
+
+  /// No description provided for @architectFacadeEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit marker'**
+  String get architectFacadeEdit;
+
+  /// No description provided for @architectFacadeReverse.
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse view'**
+  String get architectFacadeReverse;
+
+  /// No description provided for @architectFacadePlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan'**
+  String get architectFacadePlan;
+
+  /// No description provided for @architectFacadeStartHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the first marker point outside the building.'**
+  String get architectFacadeStartHint;
+
+  /// No description provided for @architectFacadeEndHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the second point, parallel to the facade.'**
+  String get architectFacadeEndHint;
+
+  /// No description provided for @architectFacadeSideHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap on the building side to set the viewing direction.'**
+  String get architectFacadeSideHint;
+
+  /// No description provided for @architectFacadeEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No building elements in this view. Check the marker span and direction.'**
+  String get architectFacadeEmpty;
+
+  /// No description provided for @architectNorth.
+  ///
+  /// In en, this message translates to:
+  /// **'North'**
+  String get architectNorth;
+
+  /// No description provided for @architectNorthPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Place north'**
+  String get architectNorthPlace;
+
+  /// No description provided for @architectNorthHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate the symbol to set north. Elevation names update automatically.'**
+  String get architectNorthHelp;
+
+  /// No description provided for @architectNorthAngle.
+  ///
+  /// In en, this message translates to:
+  /// **'Angle'**
+  String get architectNorthAngle;
+
+  /// No description provided for @architectNorthAngleHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Clockwise angle from plan-up (0°).'**
+  String get architectNorthAngleHelp;
+
+  /// No description provided for @architectNorthInvalidAngle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid angle.'**
+  String get architectNorthInvalidAngle;
+
+  /// No description provided for @architectNorthPositionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the north symbol position.'**
+  String get architectNorthPositionHint;
+
+  /// No description provided for @architectNorthDirectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a point towards north.'**
+  String get architectNorthDirectionHint;
+
+  /// No description provided for @architectNorthSymbolLetter.
+  ///
+  /// In en, this message translates to:
+  /// **'N'**
+  String get architectNorthSymbolLetter;
+
+  /// No description provided for @architectFacadeNorth.
+  ///
+  /// In en, this message translates to:
+  /// **'North'**
+  String get architectFacadeNorth;
+
+  /// No description provided for @architectFacadeNorthEast.
+  ///
+  /// In en, this message translates to:
+  /// **'Northeast'**
+  String get architectFacadeNorthEast;
+
+  /// No description provided for @architectFacadeEast.
+  ///
+  /// In en, this message translates to:
+  /// **'East'**
+  String get architectFacadeEast;
+
+  /// No description provided for @architectFacadeSouthEast.
+  ///
+  /// In en, this message translates to:
+  /// **'Southeast'**
+  String get architectFacadeSouthEast;
+
+  /// No description provided for @architectFacadeSouth.
+  ///
+  /// In en, this message translates to:
+  /// **'South'**
+  String get architectFacadeSouth;
+
+  /// No description provided for @architectFacadeSouthWest.
+  ///
+  /// In en, this message translates to:
+  /// **'Southwest'**
+  String get architectFacadeSouthWest;
+
+  /// No description provided for @architectFacadeWest.
+  ///
+  /// In en, this message translates to:
+  /// **'West'**
+  String get architectFacadeWest;
+
+  /// No description provided for @architectFacadeNorthWest.
+  ///
+  /// In en, this message translates to:
+  /// **'Northwest'**
+  String get architectFacadeNorthWest;
 }
 
 class _AppLocalizationsDelegate

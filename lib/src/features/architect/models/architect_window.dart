@@ -362,6 +362,24 @@ class ArchitectWindow {
     final rp4 = (centerPos + u * (halfW - jWidth)) + n * halfThick;
     _addBox3D(tris, rp1, p2, p3, rp4, zBottom, zTop, frameColor);
 
+    // Complete the legacy frame in elevation, including its pane divisions.
+    _addBox3D(tris, lp2, rp1, rp4, lp3, zBottom, zBottom + jWidth, frameColor);
+    _addBox3D(tris, lp2, rp1, rp4, lp3, zTop - jWidth, zTop, frameColor);
+    for (var i = 1; i < panesCount; i++) {
+      final centre = centerPos + u * (width * (i / panesCount - .5));
+      final left = centre - u * (jWidth / 2), right = centre + u * (jWidth / 2);
+      _addBox3D(
+        tris,
+        left - n * halfThick,
+        right - n * halfThick,
+        right + n * halfThick,
+        left + n * halfThick,
+        zBottom + jWidth,
+        zTop - jWidth,
+        frameColor,
+      );
+    }
+
     // Glass pane in the center
     final gp1 = (centerPos - u * (halfW - jWidth)) - n * 0.01;
     final gp2 = (centerPos + u * (halfW - jWidth)) - n * 0.01;
@@ -373,8 +391,8 @@ class ArchitectWindow {
       gp2,
       gp3,
       gp4,
-      zBottom + 0.04,
-      zTop - 0.04,
+      zBottom + jWidth,
+      zTop - jWidth,
       glassColor,
     );
 

@@ -1,5 +1,6 @@
 import '../../../core/l10n/l10n_extensions.dart';
 import 'architect_canvas_palette.dart';
+import 'architect_elevation_markers.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../bim_projects/controllers/bim_viewport_controller.dart';
@@ -360,6 +361,9 @@ class Architect2dPainter extends CustomPainter {
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
       );
+      if (l10n != null) {
+        drawArchitectElevationMarkers(canvas, _project, zoomScale, palette.foreground(Colors.black87), l10n!);
+      }
     }
     if (layer != ArchitectPaintLayer.model) {
       ArchitectGridAxisPainterHelper.drawNeighborDistances(

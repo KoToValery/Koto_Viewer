@@ -5610,4 +5610,91 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get slabRoleProtection => 'Защита';
+
+  @override
+  String get architectFacades => 'Фасади';
+
+  @override
+  String get architectFacade => 'Фасада';
+
+  @override
+  String get architectFacadeNew => 'Нова фасада';
+
+  @override
+  String get architectFacadeEdit => 'Редактирай маркера';
+
+  @override
+  String get architectFacadeReverse => 'Обърни изгледа';
+
+  @override
+  String get architectFacadePlan => 'План';
+
+  @override
+  String get architectFacadeStartHint =>
+      'Посочи първата точка на маркера извън сградата.';
+
+  @override
+  String get architectFacadeEndHint =>
+      'Посочи втората точка, успоредно на фасадата.';
+
+  @override
+  String get architectFacadeSideHint =>
+      'Посочи страната към сградата за посока на гледане.';
+
+  @override
+  String get architectFacadeEmpty =>
+      'Няма елементи в изгледа. Провери обхвата и посоката на маркера.';
+
+  @override
+  String get architectNorth => 'Север';
+
+  @override
+  String get architectNorthPlace => 'Постави север';
+
+  @override
+  String get architectNorthHelp =>
+      'Завърти знака, за да зададеш север. Имената на фасадите се обновяват автоматично.';
+
+  @override
+  String get architectNorthAngle => 'Ъгъл';
+
+  @override
+  String get architectNorthAngleHelp =>
+      'Ъгъл по часовника от горната посока на плана (0°).';
+
+  @override
+  String get architectNorthInvalidAngle => 'Въведи валиден ъгъл.';
+
+  @override
+  String get architectNorthPositionHint => 'Посочи мястото на знака за север.';
+
+  @override
+  String get architectNorthDirectionHint => 'Посочи точка към север.';
+
+  @override
+  String get architectNorthSymbolLetter => 'С';
+
+  @override
+  String get architectFacadeNorth => 'Север';
+
+  @override
+  String get architectFacadeNorthEast => 'Североизток';
+
+  @override
+  String get architectFacadeEast => 'Изток';
+
+  @override
+  String get architectFacadeSouthEast => 'Югоизток';
+
+  @override
+  String get architectFacadeSouth => 'Юг';
+
+  @override
+  String get architectFacadeSouthWest => 'Югозапад';
+
+  @override
+  String get architectFacadeWest => 'Запад';
+
+  @override
+  String get architectFacadeNorthWest => 'Северозапад';
 }

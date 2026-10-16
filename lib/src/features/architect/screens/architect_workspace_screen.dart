@@ -1,5 +1,6 @@
 import '../widgets/architect_slab_layers_dialog.dart';
 import '../widgets/architect_building_sections_screen.dart';
+import '../widgets/architect_elevations_screen.dart';
 import '../../bim_editing/widgets/bim_edit_actions.dart';
 import '../../bim_editing/geometry/bim_contour_drafting_geometry.dart';
 import 'dart:math' as math;
@@ -6351,6 +6352,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             ),
                           ),
                         ),
+                      ),
+                      IconButton(
+                        key: const ValueKey('architect-building-elevations'),
+                        tooltip: l10n.architectFacades,
+                        icon: const Icon(Icons.home_work_outlined, color: Colors.white),
+                        onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                          builder: (_) => ArchitectElevationsScreen(controller: _commands),
+                        )),
                       ),
                       IconButton(
                         key: const ValueKey('architect-settings'),

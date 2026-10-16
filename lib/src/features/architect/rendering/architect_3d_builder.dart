@@ -9,7 +9,10 @@ import 'architect_stair_mesh.dart';
 /// Real-time 3D solid mesh builder for architectural projects.
 class Architect3dBuilder {
   /// Builds a complete [Mesh3D] from an [ArchitectProject].
-  static Mesh3D buildProjectMesh(ArchitectProject project) {
+  static Mesh3D buildProjectMesh(
+    ArchitectProject project, {
+    bool previewGeometry = true,
+  }) {
     final List<Triangle3D> allTris = [];
 
     // Collect all wall points to find bounding footprint for floor slabs
@@ -112,29 +115,19 @@ class Architect3dBuilder {
 
       // Add 3D beams
       for (final beam in storey.beams) {
-        final corners = beam.polygonCorners;
-        final zBot = storey.elevation + beam.baseOffset;
-        final zTop = zBot + beam.depth;
-        const beamColor = Color(0xFF90A4AE);
-        final b1 = Vector3(corners[0].dx, corners[0].dy, zBot);
-        final b2 = Vector3(corners[1].dx, corners[1].dy, zBot);
-        final b3 = Vector3(corners[2].dx, corners[2].dy, zBot);
-        final b4 = Vector3(corners[3].dx, corners[3].dy, zBot);
-        final t1 = Vector3(corners[0].dx, corners[0].dy, zTop);
-        final t2 = Vector3(corners[1].dx, corners[1].dy, zTop);
-        final t3 = Vector3(corners[2].dx, corners[2].dy, zTop);
-        final t4 = Vector3(corners[3].dx, corners[3].dy, zTop);
-        // Bottom & Sides
-        allTris.add(Triangle3D(v0: b1, v1: b2, v2: b3, color: beamColor));
-        allTris.add(Triangle3D(v0: b1, v1: b3, v2: b4, color: beamColor));
-        allTris.add(Triangle3D(v0: b1, v1: t1, v2: t2, color: beamColor));
-        allTris.add(Triangle3D(v0: b1, v1: t2, v2: b2, color: beamColor));
-        allTris.add(Triangle3D(v0: b3, v1: t3, v2: t4, color: beamColor));
-        allTris.add(Triangle3D(v0: b3, v1: t4, v2: b4, color: beamColor));
+        allTris.addAll(
+          ArchitectStairMesh.verticalPrism(
+            beam.polygonCorners,
+            storey.elevation + beam.baseOffset,
+            storey.elevation + beam.baseOffset + beam.depth,
+            StairSolidMaterial.concrete,
+          ).triangles,
+        );
       }
 
       // Add 3D floor tiles for functional zones
       for (final zone in storey.zones) {
+        if (!previewGeometry) continue;
         if (zone.polygon.length >= 3) {
           final c = zone.centroid;
           final z = storey.elevation + 0.005; // slightly above floor slab
@@ -158,7 +151,7 @@ class Architect3dBuilder {
       // Compatibility preview for storeys with no explicitly drawn slabs.
       // Never used by the section engine.
       // Add a base concrete slab plate under the storey
-      if (hasWalls && storey.slabs.isEmpty) {
+      if (previewGeometry && hasWalls && storey.slabs.isEmpty) {
         const margin = 1.0; // 1m slab overhang around building
         final sMinX = minX - margin;
         final sMaxX = maxX + margin;
@@ -202,7 +195,7 @@ class Architect3dBuilder {
       }
     }
 
-    if (allTris.isEmpty) {
+    if (previewGeometry && allTris.isEmpty) {
       // Fallback ground grid plate if no walls exist yet
       const fallbackColor = Color(0xFFCFD8DC);
       const s = 10.0;
