@@ -228,37 +228,29 @@ class ArchitectDoor {
       ..color = palette.background
       ..style = PaintingStyle.fill;
 
-    final frameFillPaint = Paint()
-      ..color = const Color(0xFFECEFF1)
-      ..style = PaintingStyle.fill;
-
     final frameStrokePaint = Paint()
       ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF263238))
-      ..strokeWidth = (isSelected ? 2.2 : 1.3) / zoomScale
+      ..strokeWidth = (isSelected ? 1.6 : 1.0) / zoomScale
       ..style = PaintingStyle.stroke;
 
     final wallCutEdgePaint = Paint()
       ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black87)
-      ..strokeWidth = (isSelected ? 2.0 : 1.2) / zoomScale
+      ..strokeWidth = (isSelected ? 1.6 : 1.0) / zoomScale
       ..style = PaintingStyle.stroke;
 
-    final leafFillPaint = Paint()
-      ..color = const Color(0xFFEFEBE9)
-      ..style = PaintingStyle.fill;
-
     final leafStrokePaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF3E2723))
-      ..strokeWidth = (isSelected ? 2.0 : 1.2) / zoomScale
+      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF37474F))
+      ..strokeWidth = (isSelected ? 1.6 : 1.0) / zoomScale
       ..style = PaintingStyle.stroke;
 
     final swingArcPaint = Paint()
       ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black87)
-      ..strokeWidth = (isSelected ? 1.5 : 1.0) / zoomScale
+      ..strokeWidth = (isSelected ? 1.2 : 0.8) / zoomScale
       ..style = PaintingStyle.stroke;
 
     final dimLinePaint = Paint()
       ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black87)
-      ..strokeWidth = 1.0 / zoomScale
+      ..strokeWidth = 0.8 / zoomScale
       ..style = PaintingStyle.stroke;
 
     // 1. Cut rough wall opening through wall body (mask background)
@@ -275,6 +267,7 @@ class ArchitectDoor {
     canvas.drawLine(pRightBase - n * halfThick, pRightBase + n * halfThick, wallCutEdgePaint);
 
     // 3. Draw 2 Door Frame Jambs (Каси: frameThickness x wallThickness, matching door.dxf New_ramka)
+    // Transparent interior, thin stroke outline only (no solid hatch)
     void drawJamb(Offset baseCorner, bool isLeft) {
       final p1 = baseCorner - n * halfThick;
       final p2 = baseCorner + n * halfThick;
@@ -289,7 +282,6 @@ class ArchitectDoor {
         ..lineTo(p4.dx, p4.dy)
         ..close();
 
-      canvas.drawPath(path, frameFillPaint);
       canvas.drawPath(path, frameStrokePaint);
     }
 
@@ -301,14 +293,12 @@ class ArchitectDoor {
         ? pLeftBase + u * frameThickness
         : pRightBase - u * frameThickness;
 
-    final swingSign = openInward ? 1.0 : -1.0;
-    final hingePos = hingeJambBase + n * (swingSign * halfThick);
+    final hingePos = hingeJambBase + n * halfThick;
     final leafLen = clearWidth;
 
     // 5. Door Leaf (matching door.dxf ploskost_vrata)
+    // Transparent interior, thin stroke outline only (no solid hatch)
     final angleRad = openAngleDeg * math.pi / 180.0;
-    final swingDir = isHingeLeft ? 1.0 : -1.0;
-
     final baseAngle = math.atan2(u.dy, u.dx);
     final rotAngle = baseAngle +
         (isHingeLeft
@@ -316,7 +306,7 @@ class ArchitectDoor {
             : (openInward ? math.pi - angleRad : math.pi + angleRad));
 
     final leafU = Offset(math.cos(rotAngle), math.sin(rotAngle));
-    final leafN = Offset(-leafU.dy, leafU.dx) * (swingSign * swingDir);
+    final leafN = Offset(-leafU.dy, leafU.dx) * (isHingeLeft ? -1.0 : 1.0);
 
     final leafP1 = hingePos;
     final leafP2 = hingePos + leafU * leafLen;
@@ -330,7 +320,6 @@ class ArchitectDoor {
       ..lineTo(leafP4.dx, leafP4.dy)
       ..close();
 
-    canvas.drawPath(leafPath, leafFillPaint);
     canvas.drawPath(leafPath, leafStrokePaint);
 
     // 6. Dashed Swing Arc (matching door.dxf New_otvarqemost)
@@ -357,11 +346,9 @@ class ArchitectDoor {
 
     // 7. Dimension Line & Text Tag (matching door.dxf New_razmer)
     // Transverse dimension line passing perpendicularly through center of opening
-    const badgeR = 0.15; // 15 cm radius circle matching door.dxf
-    // Dynamic extension distance: clear leaf swings outward by up to width.
-    // Margin of at least 18 cm beyond leaf swing ensures leader line & badge sit outside the swing zone.
-    final extDist = halfThick + math.max(0.42, width + 0.18);
-    final dimStart = centerPos - n * (halfThick + 0.12);
+    const badgeR = 0.16; // 16 cm static radius circle (32 cm diameter, matching door.dxf)
+    final extDist = halfThick + 0.22; // 22 cm compact extension past wall face (matching door.dxf)
+    final dimStart = centerPos - n * (halfThick + 0.08);
     final dimEnd = centerPos + n * extDist;
     canvas.drawLine(dimStart, dimEnd, dimLinePaint);
 
@@ -370,18 +357,7 @@ class ArchitectDoor {
     final sillCm = (sillHeight * 100).round();
 
     // Paint dimension numbers on both sides of the transverse line, parallel to the line
-    canvas.save();
-    canvas.translate(centerPos.dx, centerPos.dy);
-    double dimAngle = math.atan2(n.dy, n.dx);
-    if (dimAngle > math.pi / 2) {
-      dimAngle -= math.pi;
-    } else if (dimAngle <= -math.pi / 2) {
-      dimAngle += math.pi;
-    }
-    canvas.rotate(dimAngle);
-    canvas.scale(1.0 / zoomScale);
-
-    // Text: Width (e.g. 90) on one side, Height (e.g. 200) on the other
+    // Static architectural size in model space: does not balloon up upon zoom-out
     final textStyle = TextStyle(
       color: isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black),
       fontSize: 10.0,
@@ -400,7 +376,21 @@ class ArchitectDoor {
       textDirection: TextDirection.ltr,
     )..layout();
 
-    // Position parallel above and below the dimension line
+    // Static model height ~0.10m (10 cm text height)
+    final dimTextScale = 0.10 / tpWidth.height;
+
+    canvas.save();
+    canvas.translate(centerPos.dx, centerPos.dy);
+    double dimAngle = math.atan2(n.dy, n.dx);
+    if (dimAngle > math.pi / 2) {
+      dimAngle -= math.pi;
+    } else if (dimAngle <= -math.pi / 2) {
+      dimAngle += math.pi;
+    }
+    canvas.rotate(dimAngle);
+    canvas.scale(dimTextScale);
+
+    // Position above and below the dimension line
     tpWidth.paint(canvas, Offset(-tpWidth.width / 2.0, -tpWidth.height - 2.0));
     tpHeight.paint(canvas, Offset(-tpHeight.width / 2.0, 3.0));
 
@@ -424,27 +414,27 @@ class ArchitectDoor {
 
     // 8. Door ID Circle Badge (matching door.dxf New_ID)
     // Positioned at the end of the extended dimension line touching circumference.
-    // Circle interior is transparent (outline only) so underlying lines/elements are not masked.
-    final badgeRadiusScreen = math.max(badgeR, 12.0 / zoomScale);
-    final badgeCenter = centerPos + n * (extDist + badgeRadiusScreen);
+    // Static in model coordinates: never balloons up upon zoom-out.
+    // Circle interior is transparent (outline only, no solid hatch).
+    final badgeCenter = centerPos + n * (extDist + badgeR);
 
     // Circle border (outline only, transparent interior)
     canvas.drawCircle(
       badgeCenter,
-      badgeRadiusScreen,
+      badgeR,
       Paint()
         ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF263238))
         ..style = PaintingStyle.stroke
-        ..strokeWidth = (isSelected ? 1.8 : 1.2) / zoomScale,
+        ..strokeWidth = (isSelected ? 1.6 : 1.0) / zoomScale,
     );
 
-    // Text ID inside circle
+    // Text ID inside circle (static ~0.14m height)
     final idPainter = TextPainter(
       text: TextSpan(
         text: specId,
         style: TextStyle(
           color: isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black),
-          fontSize: 10.0,
+          fontSize: 14.0,
           fontWeight: FontWeight.bold,
           fontFamily: 'Arial',
         ),
@@ -452,9 +442,10 @@ class ArchitectDoor {
       textDirection: TextDirection.ltr,
     )..layout();
 
+    final idScale = 0.14 / idPainter.height;
     canvas.save();
     canvas.translate(badgeCenter.dx, badgeCenter.dy);
-    canvas.scale(1.0 / zoomScale);
+    canvas.scale(idScale);
     idPainter.paint(
       canvas,
       Offset(-idPainter.width / 2.0, -idPainter.height / 2.0),
@@ -462,7 +453,7 @@ class ArchitectDoor {
     canvas.restore();
   }
 
-  // ===========================================================================
+  // == // ===========================================================================
   // 3D SOLID MESH GENERATION (TRIANGLES)
   // ===========================================================================
 
