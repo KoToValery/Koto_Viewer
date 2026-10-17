@@ -53,7 +53,7 @@ class ArchitectZoneSnap {
       0.25,
     ], // standard wall thicknesses
   }) {
-    tolerance = tolerance.clamp(0.0, .20);
+    tolerance = tolerance.clamp(0.0, .60);
     if (!magnetic) {
       return ArchitectZoneSnapResult(
         point: ArchitectSnapHelper.precision(project).inputPoint(raw),

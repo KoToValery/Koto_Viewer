@@ -104,11 +104,11 @@ class ArchitectSelection {
     final e = record(project, id);
     Offset point(dynamic json) =>
         Offset((json['x'] as num).toDouble(), (json['y'] as num).toDouble());
-    if (e['polygon'] is List || e['boundary'] is List) {
+    if (e['polygon'] is List || e['boundary'] is List || e['points'] is List) {
       return ArchitectSceneGeometry.boundsOf(
-        (e['polygon'] ?? e['boundary'] as List).cast<dynamic>().map<Offset>(
-          point,
-        ),
+        (e['polygon'] ?? e['boundary'] ?? e['points'] as List)
+            .cast<dynamic>()
+            .map<Offset>(point),
       );
     }
     if (e['position'] != null) {
@@ -184,6 +184,9 @@ class ArchitectSelection {
     for (final slab in s.slabs) {
       if (slab.id == id) return path..addPolygon(slab.polygon, true);
     }
+    for (final roof in s.roofs) {
+      if (roof.id == id) return path..addPolygon(roof.points, true);
+    }
     for (final zone in s.zones) {
       if (zone.id == id) return path..addPolygon(zone.polygon, true);
     }
@@ -222,6 +225,7 @@ class ArchitectSelection {
     final colCount = s.columns.where((c) => ids.contains(c.id)).length;
     final beamCount = s.beams.where((b) => ids.contains(b.id)).length;
     final slabCount = s.slabs.where((b) => ids.contains(b.id)).length;
+    final roofCount = s.roofs.where((r) => ids.contains(r.id)).length;
     final zoneCount = s.zones.where((z) => ids.contains(z.id)).length;
     final doorCount = s.walls
         .expand((w) => w.doors)
@@ -239,6 +243,7 @@ class ArchitectSelection {
     if (colCount > 0) parts.add(l.architectSelectionColumnsCount(colCount));
     if (beamCount > 0) parts.add(l.architectSelectionBeamsCount(beamCount));
     if (slabCount > 0) parts.add(l.architectSelectionSlabsCount(slabCount));
+    if (roofCount > 0) parts.add('${l.architectRoofs}: $roofCount');
     if (doorCount > 0) parts.add(l.architectSelectionDoorsCount(doorCount));
     if (winCount > 0) parts.add(l.architectSelectionWindowsCount(winCount));
     if (zoneCount > 0) parts.add(l.architectSelectionZonesCount(zoneCount));

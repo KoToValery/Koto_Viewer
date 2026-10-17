@@ -35,7 +35,8 @@ enum ArchitectToolCategory {
     ArchitectTool.stair => build,
     ArchitectTool.column ||
     ArchitectTool.beam ||
-    ArchitectTool.slab => structure,
+    ArchitectTool.slab ||
+    ArchitectTool.roof => structure,
     ArchitectTool.dimension ||
     ArchitectTool.level ||
     ArchitectTool.text ||
@@ -405,6 +406,13 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                               tool: ArchitectTool.slab,
                               icon: Icons.layers_rounded,
                               label: l10n.architectToolSlab,
+                            ),
+                          if (category ==
+                              ArchitectToolCategory.of(ArchitectTool.roof))
+                            _buildToolButton(
+                              tool: ArchitectTool.roof,
+                              icon: Icons.roofing_rounded,
+                              label: l10n.architectToolRoof,
                             ),
                           if (category ==
                               ArchitectToolCategory.of(ArchitectTool.opening))

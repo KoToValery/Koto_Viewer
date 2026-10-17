@@ -45,11 +45,31 @@ class BimPointerMarks {
       ..strokeWidth = 1.2
       ..isAntiAlias = true;
 
-    final stemPath = Path()
-      ..moveTo(touchPos.dx, touchPos.dy - 18)
-      ..lineTo(guideConnectionPoint.dx, guideConnectionPoint.dy);
+    final delta = guideConnectionPoint - touchPos;
+    final dist = delta.distance;
+    if (dist > 18.0) {
+      final startPt = touchPos + delta * (18.0 / dist);
+      final stemPath = Path()
+        ..moveTo(startPt.dx, startPt.dy)
+        ..lineTo(guideConnectionPoint.dx, guideConnectionPoint.dy);
+      canvas.drawPath(stemPath, stemPaint);
+    }
 
-    canvas.drawPath(stemPath, stemPaint);
+    // Subtle precision crosshair at the offset aim point
+    final crossPaint = Paint()
+      ..color = themeColor.withValues(alpha: 0.75)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1;
+    canvas.drawLine(
+      guideConnectionPoint.translate(-9, 0),
+      guideConnectionPoint.translate(9, 0),
+      crossPaint,
+    );
+    canvas.drawLine(
+      guideConnectionPoint.translate(0, -9),
+      guideConnectionPoint.translate(0, 9),
+      crossPaint,
+    );
 
     // Aim point / dot directly in front of the selection line
     canvas.drawCircle(

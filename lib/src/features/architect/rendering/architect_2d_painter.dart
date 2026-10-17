@@ -26,6 +26,8 @@ import '../services/architect_wall_overshoot_detector.dart';
 import '../models/architect_overhang.dart';
 import '../services/architect_overhang_detector.dart';
 import 'architect_overhang_painter_helper.dart';
+import '../services/architect_roof_tool.dart';
+import 'architect_roof_painter_helper.dart';
 
 enum ArchitectPaintLayer { all, model, interaction }
 
@@ -39,6 +41,7 @@ enum ArchitectTool {
   column,
   beam,
   slab,
+  roof,
   opening,
   stair,
   dimension,
@@ -136,6 +139,7 @@ class Architect2dPainter extends CustomPainter {
   // Slab drafting state
   final List<Offset> slabDraftPoints;
   final Offset? slabCandidatePoint;
+  final ArchitectRoofTool? roofTool;
   final bool polygonEditInvalid;
   final (Offset, Offset)? polygonLeaderLine;
   final ArchitectWallOvershoot? activeOvershoot;
@@ -214,6 +218,7 @@ class Architect2dPainter extends CustomPainter {
     this.underlayLayerVisibility = const {},
     this.slabDraftPoints = const [],
     this.slabCandidatePoint,
+    this.roofTool,
     this.polygonEditInvalid = false,
     this.polygonLeaderLine,
   }) : _project = project,
@@ -298,6 +303,15 @@ class Architect2dPainter extends CustomPainter {
         selectedElementId: selectedElementId,
         project: _project, l10n: l10n, dimensionScale: _project.dimensionScale,
       );
+      ArchitectRoofPainterHelper.paintRoofs(
+        canvas: canvas,
+        storey: _elementLayerStorey,
+        scale: zoomScale,
+        selectedIds: {
+          ...selectedElementIds,
+          ?selectedElementId,
+        },
+      );
       ArchitectElementsPainterHelper.drawCadPrimitives(
         palette: palette,
         canvas: canvas,
@@ -380,6 +394,14 @@ class Architect2dPainter extends CustomPainter {
         candidatePoint: slabCandidatePoint,
         zoomScale: zoomScale,
       );
+      if (roofTool != null) {
+        ArchitectRoofPainterHelper.paintDraftRoof(
+          canvas: canvas,
+          roofTool: roofTool!,
+          scale: zoomScale,
+          units: _project.units,
+        );
+      }
       _drawZoneDrafting(canvas);
       _drawZoneExtrudePreview(canvas);
       ArchitectZonePainterHelper.drawMagneticGuides(
@@ -409,6 +431,7 @@ class Architect2dPainter extends CustomPainter {
       columns: storey.columns.where((e) => keep(e.id)).toList(),
       beams: storey.beams.where((e) => keep(e.id)).toList(),
       slabs: storey.slabs.where((e) => keep(e.id)).toList(),
+      roofs: storey.roofs.where((e) => keep(e.id)).toList(),
       openings: storey.openings.where((e) => keep(e.id)).toList(),
       stairs: storey.stairs.where((e) => keep(e.id)).toList(),
       dimensions: storey.dimensions.where((e) => keep(e.id)).toList(),
@@ -451,6 +474,15 @@ class Architect2dPainter extends CustomPainter {
       );
       return;
     }
+    if (selected.roofs.isNotEmpty) {
+      ArchitectRoofPainterHelper.paintRoofs(
+        canvas: canvas,
+        storey: selected,
+        scale: zoomScale,
+        selectedIds: {selectedElementId!},
+      );
+      return;
+    }
     if (selected.cadPrimitives.any((p) => p.type == CadPrimitiveType.rect)) {
       ArchitectElementsPainterHelper.drawCadPrimitives(
         palette: palette,
@@ -483,6 +515,9 @@ class Architect2dPainter extends CustomPainter {
     }
     for (final slab in _project.activeStorey.slabs) {
       if (slab.id == selectedElementId) polygon = slab.polygon;
+    }
+    for (final roof in _project.activeStorey.roofs) {
+      if (roof.id == selectedElementId) polygon = roof.points;
     }
     for (final opening in _project.activeStorey.openings) {
       if (opening.id == selectedElementId) polygon = opening.boundary;

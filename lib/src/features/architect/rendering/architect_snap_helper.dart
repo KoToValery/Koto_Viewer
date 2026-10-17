@@ -49,7 +49,7 @@ class ArchitectSnapHelper {
     raw: rawPoint,
     anchor: anchor,
     project: project,
-    radius: tolerance.clamp(0.0, .20),
+    radius: tolerance.clamp(0.0, .60),
     magnetic: magnetic,
     alignment: alignment,
     excludedIds: excludedIds,
@@ -71,7 +71,7 @@ class ArchitectSnapHelper {
   }) => _resolve(
     raw: rawPoint,
     project: project,
-    radius: tolerance.clamp(0.0, .20),
+    radius: tolerance.clamp(0.0, .60),
     magnetic: magnetic,
     alignment: alignment,
     excludedIds: excludedIds,
@@ -208,7 +208,9 @@ class ArchitectSnapHelper {
     for (final edge in nearby) {
       consider(edge.$1, 'Endpoint');
       consider(edge.$2, 'Endpoint');
-      consider((edge.$1 + edge.$2) / 2, 'Midpoint');
+      if ((edge.$2 - edge.$1).distance > 0.45) {
+        consider((edge.$1 + edge.$2) / 2, 'Midpoint');
+      }
       consider(BimLineGeometry.closest(raw, edge.$1, edge.$2), 'Edge');
       if (anchor != null) {
         final u = edge.$2 - edge.$1;

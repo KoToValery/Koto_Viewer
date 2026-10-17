@@ -1,4 +1,6 @@
 import 'architect_slab_assembly.dart';
+import 'architect_roof.dart';
+export 'architect_roof.dart';
 import 'architect_section.dart';
 import 'architect_elevation.dart';
 import '../../bim_editing/properties/bim_distance_unit.dart';
@@ -45,6 +47,7 @@ class ArchitectStorey {
   final List<ArchitectColumn> columns;
   final List<ArchitectBeam> beams;
   final List<ArchitectSlab> slabs;
+  final List<ArchitectRoofPlane> roofs;
   final List<ArchitectOpening> openings;
   final List<ArchitectStair> stairs;
   final List<ArchitectDimension> dimensions;
@@ -64,6 +67,7 @@ class ArchitectStorey {
     this.columns = const [],
     this.beams = const [],
     this.slabs = const [],
+    this.roofs = const [],
     this.openings = const [],
     this.stairs = const [],
     this.dimensions = const [],
@@ -90,6 +94,7 @@ class ArchitectStorey {
     List<ArchitectColumn>? columns,
     List<ArchitectBeam>? beams,
     List<ArchitectSlab>? slabs,
+    List<ArchitectRoofPlane>? roofs,
     List<ArchitectOpening>? openings,
     List<ArchitectStair>? stairs,
     List<ArchitectDimension>? dimensions,
@@ -113,6 +118,7 @@ class ArchitectStorey {
     columns: columns ?? this.columns,
     beams: beams ?? this.beams,
     slabs: slabs ?? this.slabs,
+    roofs: roofs ?? this.roofs,
     openings: openings ?? this.openings,
     stairs: stairs ?? this.stairs,
     dimensions: dimensions ?? this.dimensions,
@@ -135,6 +141,7 @@ class ArchitectStorey {
     'columns': columns.map((c) => c.toJson()).toList(),
     'beams': beams.map((b) => b.toJson()).toList(),
     'slabs': slabs.map((s) => s.toJson()).toList(),
+    'roofs': roofs.map((r) => r.toJson()).toList(),
     'openings': openings.map((o) => o.toJson()).toList(),
     'stairs': stairs.map((st) => st.toJson()).toList(),
     'dimensions': dimensions.map((d) => d.toJson()).toList(),
@@ -184,6 +191,13 @@ class ArchitectStorey {
     slabs:
         (json['slabs'] as List<dynamic>?)
             ?.map((s) => ArchitectSlab.fromJson(s as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    roofs:
+        (json['roofs'] as List<dynamic>?)
+            ?.map(
+              (r) => ArchitectRoofPlane.fromJson(r as Map<String, dynamic>),
+            )
             .toList() ??
         const [],
     openings:

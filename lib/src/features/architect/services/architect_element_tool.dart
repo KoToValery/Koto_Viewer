@@ -577,6 +577,13 @@ class ArchitectElementTool extends ChangeNotifier {
       }
     }
 
+    // Check Roofs
+    for (final roof in storey.roofs.reversed) {
+      if (roof.containsPoint(point)) {
+        yield roof.id;
+      }
+    }
+
     // Check Slabs
     for (final slab in storey.slabs) {
       if (slab.containsPoint(point)) {
@@ -603,6 +610,7 @@ class ArchitectElementTool extends ChangeNotifier {
       columns: storey.columns.where((c) => c.id != elementId).toList(),
       beams: storey.beams.where((b) => b.id != elementId).toList(),
       slabs: storey.slabs.where((s) => s.id != elementId).toList(),
+      roofs: storey.roofs.where((r) => r.id != elementId).toList(),
       openings: storey.openings.where((o) => o.id != elementId).toList(),
       stairs: storey.stairs.where((s) => s.id != elementId).toList(),
       dimensions: storey.dimensions.where((d) => d.id != elementId).toList(),
@@ -677,6 +685,17 @@ class ArchitectElementTool extends ChangeNotifier {
         offset,
       );
       return (storey.copyWith(slabs: [...storey.slabs, newSlab]), newId);
+    }
+
+    // 3b. Roof
+    final roofIndex = storey.roofs.indexWhere((r) => r.id == elementId);
+    if (roofIndex != -1) {
+      final roof = storey.roofs[roofIndex];
+      final newRoof = const ArchitectRoofEditingAdapter().translate(
+        roof.copyWith(id: newId),
+        offset,
+      );
+      return (storey.copyWith(roofs: [...storey.roofs, newRoof]), newId);
     }
 
     // 4. CAD Primitive
@@ -774,6 +793,22 @@ class ArchitectElementTool extends ChangeNotifier {
           slopeDirection: slab.slopeDirection == null ? null : slab.slopeDirection! + math.pi / 2,
         );
         return storey.copyWith(slabs: newSlabs);
+      }
+    }
+
+    // 3b. Roof (rotate 90 degrees around centroid)
+    final roofIndex = storey.roofs.indexWhere((r) => r.id == elementId);
+    if (roofIndex != -1) {
+      final roof = storey.roofs[roofIndex];
+      if (roof.points.isNotEmpty) {
+        final center = roof.centroid;
+        final rotatedPts = roof.points.map((p) {
+          final rel = p - center;
+          return center + Offset(-rel.dy, rel.dx);
+        }).toList();
+        final newRoofs = List<ArchitectRoofPlane>.from(storey.roofs);
+        newRoofs[roofIndex] = roof.copyWith(points: rotatedPts);
+        return storey.copyWith(roofs: newRoofs);
       }
     }
 

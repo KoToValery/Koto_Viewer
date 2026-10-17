@@ -174,19 +174,31 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
           value,
           candidate,
         );
-        if (source == null) {
+        final roofSource = source == null
+            ? ArchitectBuildingSection.roofSource(project, value, candidate)
+            : null;
+        if (source == null && roofSource == null) {
           setState(() => picked = null);
           return;
         }
-        final surfaces = ArchitectSlabGeometry.surfaces(
-          project,
-          source.storey,
-          source.slab,
-        );
-        final anchor = Offset(
-          pick.station,
-          surfaces.first.topAt(value.pointAt(pick.station)),
-        );
+        final Offset anchor;
+        if (source != null) {
+          final surfaces = ArchitectSlabGeometry.surfaces(
+            project,
+            source.storey,
+            source.slab,
+          );
+          anchor = Offset(
+            pick.station,
+            surfaces.first.topAt(value.pointAt(pick.station)),
+          );
+        } else {
+          final r = roofSource!;
+          anchor = Offset(
+            pick.station,
+            r.storey.elevation + r.roof.topElevationAt(value.pointAt(pick.station)),
+          );
+        }
         final old = value.details
             .where((d) => d.id == selectedDetail)
             .firstOrNull;
@@ -598,13 +610,27 @@ class _SectionDrawing {
   double get textHeight => project.dimensionScale.textHeight;
   _DetailLayout detailLayout(ArchitectSlabDetail detail) {
     final source = ArchitectBuildingSection.source(project, cut, detail);
+    final roofSource = source == null
+        ? ArchitectBuildingSection.roofSource(project, cut, detail)
+        : null;
     final point = cut.pointAt(detail.station);
     final surfaces = source == null
         ? <SlabLayerSurface>[]
         : ArchitectSlabGeometry.surfaces(project, source.storey, source.slab);
-    final z = surfaces.isEmpty
-        ? detail.fallbackElevation
-        : surfaces.first.topAt(point);
+    final double z;
+    final double bottomZ;
+    if (surfaces.isNotEmpty) {
+      z = surfaces.first.topAt(point);
+      bottomZ = surfaces.last.bottomAt(point);
+    } else if (roofSource != null) {
+      z = roofSource.storey.elevation + roofSource.roof.topElevationAt(point);
+      bottomZ =
+          roofSource.storey.elevation +
+          roofSource.roof.undersideElevationAt(point);
+    } else {
+      z = detail.fallbackElevation;
+      bottomZ = z;
+    }
     final anchor = Offset(detail.station, z);
     var text = anchor + detail.textOffset;
     final rows = <String>[];
@@ -620,7 +646,32 @@ class _SectionDrawing {
       }
       rows.add('${layer.label(l)} — $value');
     }
-    if (source == null) rows.add(l.slabDetailLost);
+    if (roofSource != null) {
+      final roof = roofSource.roof;
+      final timber = roof.assembly.timber;
+      for (final layer in roof.assembly.layers) {
+        if (layer.role == ArchitectRoofLayerRole.battens && timber.hasBattens) {
+          rows.add(
+            '${l.architectRoofBattensLabel} ${(timber.battenWidth * 100).round()}×${(timber.battenHeight * 100).round()} cm @ ${(timber.battenSpacing * 100).round()} cm',
+          );
+        } else if (layer.role == ArchitectRoofLayerRole.counterBattens &&
+            timber.hasCounterBattens) {
+          rows.add(
+            '${l.architectRoofCounterBattensLabel} ${(timber.counterBattenWidth * 100).round()}×${(timber.counterBattenHeight * 100).round()} cm',
+          );
+        } else if (layer.role == ArchitectRoofLayerRole.rafters &&
+            timber.hasRafters) {
+          rows.add(
+            '${l.architectRoofRaftersLabel} ${(timber.rafterWidth * 100).round()}×${(timber.rafterHeight * 100).round()} cm @ ${(timber.rafterSpacing * 100).round()} cm',
+          );
+        } else {
+          rows.add(
+            '${layer.material.label(l)} — ${formatSlabThickness(layer.thickness)}',
+          );
+        }
+      }
+    }
+    if (source == null && roofSource == null) rows.add(l.slabDetailLost);
     final row = textHeight * 1.65;
     if (text.dy >= anchor.dy && text.dy - rows.length * row < anchor.dy) {
       text = Offset(text.dx, anchor.dy + rows.length * row);
@@ -639,11 +690,7 @@ class _SectionDrawing {
     final left = detail.textOffset.dx >= 0 ? text.dx : text.dx - width;
     final bounds = Rect.fromLTRB(
       math.min(left, anchor.dx) - row,
-      math.min(
-            surfaces.isEmpty ? z : surfaces.last.bottomAt(point),
-            text.dy - rows.length * row,
-          ) -
-          row,
+      math.min(bottomZ, text.dy - rows.length * row) - row,
       math.max(left + width, anchor.dx) + row,
       math.max(z, text.dy) + row * 2,
     );
@@ -652,13 +699,13 @@ class _SectionDrawing {
       Offset(left, text.dy),
       rows,
       bounds,
-      source == null,
-      source == null
-          ? null
-          : ArchitectSlabAssemblies.number(project, source.slab),
+      source == null && roofSource == null,
+      source != null
+          ? ArchitectSlabAssemblies.number(project, source.slab)
+          : (roofSource != null ? 1 : null),
       row,
       textHeight,
-      surfaces.isEmpty ? z : surfaces.last.bottomAt(point),
+      bottomZ,
     );
   }
 
@@ -692,21 +739,33 @@ class _BuildingSectionPainter extends CustomPainter {
     canvas.clipRect(Offset.zero & size);
     for (final region in drawing.data.regions) {
       final path = region.path.transform(matrix.storage);
+      final fillColor =
+          region.customFillColor ??
+          ArchitectSlabGeometry.materialColor(region.material);
       canvas.drawPath(
         path,
-        Paint()
-          ..color = ArchitectSlabGeometry.materialColor(
-            region.material,
-          ).withValues(alpha: .65),
+        Paint()..color = fillColor.withValues(alpha: .72),
       );
       canvas.drawPath(
         path,
         Paint()
           ..color = color
           ..style = PaintingStyle.stroke
-          ..strokeWidth = region.material == SlabMaterial.concrete ? 1.3 : .6,
+          ..strokeWidth =
+              region.material == SlabMaterial.concrete ||
+                  region.timberCrossSectionPolygon != null
+              ? 1.1
+              : .65,
       );
-      if (region.path.getBounds().height * scale > 4) {
+      if (region.timberCrossSectionPolygon != null &&
+          region.timberCrossSectionPolygon!.length == 4) {
+        final pts = region.timberCrossSectionPolygon!.map(p).toList();
+        final diagPaint = Paint()
+          ..color = color.withValues(alpha: 0.65)
+          ..strokeWidth = 0.65;
+        canvas.drawLine(pts[0], pts[2], diagPaint);
+        canvas.drawLine(pts[1], pts[3], diagPaint);
+      } else if (region.path.getBounds().height * scale > 4) {
         canvas.save();
         canvas.clipPath(path);
         final b = path.getBounds();
@@ -868,6 +927,19 @@ class _BuildingPlan extends CustomPainter {
           path,
           Paint()
             ..color = colors.onSurface.withValues(alpha: .35)
+            ..style = PaintingStyle.stroke,
+        );
+      }
+      for (final roof in floor.roofs) {
+        final path = Path()..addPolygon(roof.points.map(p).toList(), true);
+        canvas.drawPath(
+          path,
+          Paint()..color = const Color(0xFFC85A32).withValues(alpha: .15),
+        );
+        canvas.drawPath(
+          path,
+          Paint()
+            ..color = const Color(0xFFC85A32).withValues(alpha: .6)
             ..style = PaintingStyle.stroke,
         );
       }

@@ -5678,4 +5678,203 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectFacadeNorthWest => 'Northwest';
+
+  @override
+  String get architectToolRoof => 'Roof';
+
+  @override
+  String get architectRoofs => 'Roofs';
+
+  @override
+  String get architectRoofPlane => 'Roof plane';
+
+  @override
+  String get architectRoofDrawRect => 'Rect';
+
+  @override
+  String get architectRoofDrawPoly => 'Poly';
+
+  @override
+  String get architectRoofAuto => 'Auto roof';
+
+  @override
+  String get architectRoofAutoGable => 'Gable';
+
+  @override
+  String get architectRoofAutoHip => 'Hip';
+
+  @override
+  String get architectRoofAutoShed => 'Shed';
+
+  @override
+  String get architectRoofAutoFlat => 'Flat';
+
+  @override
+  String architectRoofAutoCreated(int count) {
+    return 'Generated $count roof planes';
+  }
+
+  @override
+  String get architectRoofAutoNoWalls =>
+      'Draw exterior walls first to generate an automatic roof.';
+
+  @override
+  String get architectRoofSlope => 'Slope';
+
+  @override
+  String get architectRoofOverhang => 'Eaves';
+
+  @override
+  String get architectRoofBaseElev => 'Eaves Z';
+
+  @override
+  String get architectRoofRidgeElev => 'Ridge Z';
+
+  @override
+  String get architectRoofSwitchEaves => 'Next eaves';
+
+  @override
+  String get architectRoofSwitchEavesTooltip =>
+      'Switch which edge is the lower eaves edge (or tap an edge on canvas)';
+
+  @override
+  String get architectRoofLayers => 'Layers & Timber';
+
+  @override
+  String get architectRoofLayersShort => 'Structure';
+
+  @override
+  String get architectRoofPresetPitchedTiles => 'Timber roof with clay tiles';
+
+  @override
+  String get architectRoofPresetWarmPitched => 'Insulated warm pitched roof';
+
+  @override
+  String get architectRoofPresetStandingSeam => 'Standing seam metal roof';
+
+  @override
+  String get architectRoofPresetFlatWarm => 'Warm flat RC roof';
+
+  @override
+  String get architectRoofPresetCustom => 'Custom roof assembly';
+
+  @override
+  String get architectRoofRoleCovering => 'Covering';
+
+  @override
+  String get architectRoofRoleBattens => 'Battens';
+
+  @override
+  String get architectRoofRoleCounterBattens => 'Counter-battens';
+
+  @override
+  String get architectRoofRoleUnderlayment => 'Breathable membrane';
+
+  @override
+  String get architectRoofRoleBoarding => 'Boarding / sheathing';
+
+  @override
+  String get architectRoofRoleRafters => 'Rafters';
+
+  @override
+  String get architectRoofRoleInsulation => 'Thermal insulation';
+
+  @override
+  String get architectRoofRoleVapourBarrier => 'Vapour barrier';
+
+  @override
+  String get architectRoofRoleStructure => 'Structural deck';
+
+  @override
+  String get architectRoofRoleInterior => 'Ceiling lining';
+
+  @override
+  String get architectRoofMatClayTiles => 'Clay roof tiles';
+
+  @override
+  String get architectRoofMatConcreteTiles => 'Concrete tiles';
+
+  @override
+  String get architectRoofMatMetalSeam => 'Standing seam metal';
+
+  @override
+  String get architectRoofMatBitumenShingles => 'Bitumen shingles';
+
+  @override
+  String get architectRoofMatTimberBoarding => 'Timber boarding';
+
+  @override
+  String get architectRoofMatOsb => 'OSB sheathing';
+
+  @override
+  String get architectRoofMatBreathableMembrane => 'Breathable membrane';
+
+  @override
+  String get architectRoofMatVapourBarrier => 'Vapour barrier foil';
+
+  @override
+  String get architectRoofMatMineralWool => 'Mineral wool';
+
+  @override
+  String get architectRoofMatXps => 'XPS insulation';
+
+  @override
+  String get architectRoofMatWaterproofing => 'Waterproofing membrane';
+
+  @override
+  String get architectRoofMatSlopeScreed => 'Slope screed';
+
+  @override
+  String get architectRoofMatRcSlab => 'Reinforced concrete';
+
+  @override
+  String get architectRoofMatPlasterboard => 'Gypsum plasterboard';
+
+  @override
+  String get architectRoofTimberSection => 'Timber carpentry & framing';
+
+  @override
+  String get architectRoofBattensLabel => 'Battens';
+
+  @override
+  String get architectRoofCounterBattensLabel => 'Counter-battens';
+
+  @override
+  String get architectRoofRaftersLabel => 'Rafters';
+
+  @override
+  String get architectRoofWallPlateLabel => 'Wall plate (Mauerlat)';
+
+  @override
+  String get architectRoofRidgePurlinLabel => 'Ridge purlin';
+
+  @override
+  String get architectRoofFasciaLabel => 'Fascia board at eaves';
+
+  @override
+  String get architectRoofEavesCutLabel => 'Eaves cut style';
+
+  @override
+  String get architectRoofEavesCutPlumb => 'Vertical (plumb)';
+
+  @override
+  String get architectRoofEavesCutSquare => 'Square to slope';
+
+  @override
+  String get architectRoofEavesCutBox => 'Boxed soffit';
+
+  @override
+  String get architectRoofStepLabel => 'Step';
+
+  @override
+  String get architectRoofHintStart =>
+      'Hold and drag to pick first roof corner, or use Auto roof.';
+
+  @override
+  String architectRoofHintNext(int count) {
+    return 'Pick next corner ($count pts). Tap Finish to close.';
+  }
+
+  @override
+  String get architectRoofSectionDetailTitle => 'Roof assembly';
 }

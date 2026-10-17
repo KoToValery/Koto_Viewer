@@ -148,6 +148,10 @@ class Architect3dBuilder {
         allTris.addAll(ArchitectSlabGeometry.mesh(project, storey, slab));
       }
 
+      for (final roof in storey.roofs) {
+        allTris.addAll(_buildRoofMesh(storey, roof));
+      }
+
       // Compatibility preview for storeys with no explicitly drawn slabs.
       // Never used by the section engine.
       // Add a base concrete slab plate under the storey
@@ -208,5 +212,85 @@ class Architect3dBuilder {
     }
 
     return Mesh3D(name: project.name, triangles: allTris);
+  }
+
+  static List<Triangle3D> _buildRoofMesh(
+    ArchitectStorey storey,
+    ArchitectRoofPlane roof,
+  ) {
+    final pts = roof.points;
+    if (pts.length < 3) return const [];
+    final tris = <Triangle3D>[];
+
+    final topMat = roof.assembly.layers.firstOrNull?.material;
+    final topColor = switch (topMat) {
+      ArchitectRoofMaterial.clayTiles => const Color(0xFFC85A32),
+      ArchitectRoofMaterial.concreteTiles => const Color(0xFF78909C),
+      ArchitectRoofMaterial.metalSeam => const Color(0xFF546E7A),
+      ArchitectRoofMaterial.bitumenShingles => const Color(0xFF5D4037),
+      ArchitectRoofMaterial.waterproofing => const Color(0xFF455A64),
+      _ => const Color(0xFFC85A32),
+    };
+    const fasciaColor = Color(0xFFCFA16B);
+
+    Vector3 topAt(Offset p) =>
+        Vector3(p.dx, p.dy, storey.elevation + roof.topElevationAt(p));
+    Vector3 botAt(Offset p) =>
+        Vector3(p.dx, p.dy, storey.elevation + roof.undersideElevationAt(p));
+
+    final v0T = topAt(pts[0]);
+    final v0B = botAt(pts[0]);
+    for (var i = 1; i < pts.length - 1; i++) {
+      final v1T = topAt(pts[i]);
+      final v2T = topAt(pts[i + 1]);
+      tris.add(
+        Triangle3D(
+          v0: v0T,
+          v1: v1T,
+          v2: v2T,
+          color: topColor,
+          isDoubleSided: true,
+        ),
+      );
+
+      final v1B = botAt(pts[i]);
+      final v2B = botAt(pts[i + 1]);
+      tris.add(
+        Triangle3D(
+          v0: v0B,
+          v1: v2B,
+          v2: v1B,
+          color: fasciaColor,
+          isDoubleSided: true,
+        ),
+      );
+    }
+
+    for (var i = 0; i < pts.length; i++) {
+      final a = pts[i];
+      final b = pts[(i + 1) % pts.length];
+      final aT = topAt(a), bT = topAt(b);
+      final aB = botAt(a), bB = botAt(b);
+      tris.add(
+        Triangle3D(
+          v0: aB,
+          v1: bB,
+          v2: bT,
+          color: fasciaColor,
+          isDoubleSided: true,
+        ),
+      );
+      tris.add(
+        Triangle3D(
+          v0: aB,
+          v1: bT,
+          v2: aT,
+          color: fasciaColor,
+          isDoubleSided: true,
+        ),
+      );
+    }
+
+    return tris;
   }
 }

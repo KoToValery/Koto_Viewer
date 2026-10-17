@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_elements.dart';
@@ -5,6 +6,7 @@ import '../models/architect_project.dart';
 import '../models/architect_section.dart';
 import '../models/architect_slab_assembly.dart';
 import '../rendering/architect_stair_mesh.dart';
+import 'architect_roof_geometry.dart';
 import 'architect_slab_geometry.dart';
 import 'architect_stair_section.dart';
 
@@ -13,11 +15,18 @@ class ArchitectSectionRegion {
   final SlabMaterial material;
   final Path path;
   final bool slab;
+  final bool roof;
+  final List<Offset>? timberCrossSectionPolygon;
+  final Color? customFillColor;
+
   const ArchitectSectionRegion(
     this.sourceId,
     this.material,
     this.path, {
     this.slab = false,
+    this.roof = false,
+    this.timberCrossSectionPolygon,
+    this.customFillColor,
   });
 }
 
@@ -26,29 +35,72 @@ class ArchitectBuildingSection {
   final Rect bounds;
   const ArchitectBuildingSection(this.regions, this.bounds);
 
+  static SlabMaterial _mapRoofMaterial(ArchitectRoofMaterial? mat) =>
+      switch (mat) {
+        ArchitectRoofMaterial.clayTiles ||
+        ArchitectRoofMaterial.concreteTiles ||
+        ArchitectRoofMaterial.bitumenShingles ||
+        ArchitectRoofMaterial.metalSeam => SlabMaterial.tile,
+        ArchitectRoofMaterial.timberBoarding ||
+        ArchitectRoofMaterial.osb => SlabMaterial.parquet,
+        ArchitectRoofMaterial.breathableMembrane =>
+          SlabMaterial.breathableMembrane,
+        ArchitectRoofMaterial.vapourBarrier => SlabMaterial.vapourBarrier,
+        ArchitectRoofMaterial.mineralWool => SlabMaterial.mineralWool,
+        ArchitectRoofMaterial.xps => SlabMaterial.xps,
+        ArchitectRoofMaterial.waterproofing => SlabMaterial.waterproofing,
+        ArchitectRoofMaterial.slopeScreed => SlabMaterial.screed,
+        ArchitectRoofMaterial.rcSlab => SlabMaterial.concrete,
+        ArchitectRoofMaterial.plasterboard => SlabMaterial.plasterboard,
+        null => SlabMaterial.parquet,
+      };
+
+  static Color? _roofMemberColor(ArchitectRoofSectionMember member) {
+    if (member.drawTimberDiagonals) {
+      return const Color(0xFFD7A86E);
+    }
+    return switch (member.material) {
+      ArchitectRoofMaterial.clayTiles => const Color(0xFFC85A32),
+      ArchitectRoofMaterial.concreteTiles => const Color(0xFF7E848C),
+      ArchitectRoofMaterial.metalSeam => const Color(0xFF607D8B),
+      ArchitectRoofMaterial.bitumenShingles => const Color(0xFF5D4037),
+      ArchitectRoofMaterial.timberBoarding ||
+      ArchitectRoofMaterial.osb => const Color(0xFFCFA16B),
+      ArchitectRoofMaterial.breathableMembrane => const Color(0xFF29B6F6),
+      ArchitectRoofMaterial.vapourBarrier => const Color(0xFFFFB300),
+      ArchitectRoofMaterial.mineralWool => const Color(0xFFAED581),
+      ArchitectRoofMaterial.xps => const Color(0xFF80DEEA),
+      ArchitectRoofMaterial.waterproofing => const Color(0xFF37474F),
+      ArchitectRoofMaterial.slopeScreed => const Color(0xFFB0BEC5),
+      ArchitectRoofMaterial.rcSlab => null,
+      ArchitectRoofMaterial.plasterboard => const Color(0xFFECEFF1),
+      null => null,
+    };
+  }
+
   static ArchitectBuildingSection build(
     ArchitectProject project,
     ArchitectSection cut,
   ) {
     final regions = <ArchitectSectionRegion>[];
-    void mesh(String id, List<Triangle3D> tris, SlabMaterial material) {
-      final section = ArchitectStairSection.build(
-        [StairSolid(StairSolidMaterial.concrete, tris)],
-        cut.start,
-        cut.axis,
+    final highPriorityCutouts = <Path>[];
+
+    // 1. Pre-build roof section slices per storey
+    final storeyRoofSlices = <String, List<ArchitectRoofSectionSlice>>{};
+    for (final floor in project.storeys) {
+      final slices = ArchitectRoofGeometry.buildSectionSlices(
+        storey: floor,
+        sectionLine: cut,
       );
-      final path = section.regions[StairSolidMaterial.concrete];
-      if (path == null) return;
-      final clipped = Path.combine(
-        PathOperation.intersect,
-        path,
-        Path()..addRect(Rect.fromLTRB(0, -1e6, cut.length, 1e6)),
-      );
-      if (!clipped.getBounds().isEmpty) {
-        regions.add(ArchitectSectionRegion(id, material, clipped));
+      if (slices.isNotEmpty) {
+        storeyRoofSlices[floor.id] = slices;
+        for (final s in slices) {
+          highPriorityCutouts.add(s.envelopePath);
+        }
       }
     }
 
+    // 2. Build Slab regions first and register their envelopes as high-priority cutouts for walls
     for (final floor in project.storeys) {
       for (final slab in floor.slabs) {
         final spans = ArchitectSlabGeometry.intervals(floor, slab, cut);
@@ -68,6 +120,7 @@ class ArchitectBuildingSection {
             ], true);
           }
           if (spans.isNotEmpty) {
+            highPriorityCutouts.add(path);
             regions.add(
               ArchitectSectionRegion(
                 slab.id,
@@ -79,37 +132,160 @@ class ArchitectBuildingSection {
           }
         }
       }
-      for (final wall in floor.walls) {
-        mesh(
-          wall.id,
-          wall
-              .copyWith(height: wall.effectiveHeight(floor.height))
-              .build3D(storeyElevation: floor.elevation),
-          SlabMaterial.plaster,
-        );
+    }
+
+    Path? sliceMesh(List<Triangle3D> tris) {
+      final section = ArchitectStairSection.build(
+        [StairSolid(StairSolidMaterial.concrete, tris)],
+        cut.start,
+        cut.axis,
+      );
+      final path = section.regions[StairSolidMaterial.concrete];
+      if (path == null) return null;
+      final clipped = Path.combine(
+        PathOperation.intersect,
+        path,
+        Path()..addRect(Rect.fromLTRB(0, -1e6, cut.length, 1e6)),
+      );
+      return clipped.getBounds().isEmpty ? null : clipped;
+    }
+
+    // 3. Build Walls, Columns, Beams, Stairs — trimming walls against roofs and slabs
+    for (var fIdx = 0; fIdx < project.storeys.length; fIdx++) {
+      final floor = project.storeys[fIdx];
+      // Check if this floor has pitched roofs (or if a dedicated roof-only storey sits directly above it)
+      var activeRoofSlices = storeyRoofSlices[floor.id] ?? const [];
+      if (activeRoofSlices.isEmpty && fIdx + 1 < project.storeys.length) {
+        final upper = project.storeys[fIdx + 1];
+        if (upper.walls.isEmpty && upper.roofs.isNotEmpty) {
+          activeRoofSlices = storeyRoofSlices[upper.id] ?? const [];
+        }
       }
+
+      // Compute max roof underside height on this floor so gable walls can rise to meet the roof underside
+      var maxRoofHeightAboveFloor = floor.height;
+      for (final slice in activeRoofSlices) {
+        for (final pt in slice.bottomProfile) {
+          final h = pt.dy - floor.elevation;
+          if (h > maxRoofHeightAboveFloor) {
+            maxRoofHeightAboveFloor = h;
+          }
+        }
+      }
+
+      for (final wall in floor.walls) {
+        final baseWallHeight = wall.effectiveHeight(floor.height);
+        final canExtendToRoof =
+            activeRoofSlices.isNotEmpty &&
+            !wall.isParapet &&
+            wall.followStoreyHeight &&
+            maxRoofHeightAboveFloor > baseWallHeight;
+        final prismHeight = canExtendToRoof
+            ? maxRoofHeightAboveFloor
+            : baseWallHeight;
+
+        var wallPath = sliceMesh(
+          wall
+              .copyWith(height: prismHeight)
+              .build3D(storeyElevation: floor.elevation),
+        );
+        if (wallPath == null) continue;
+
+        // If extended to meet a sloped roof, clip the wall top to the underside of the roof slices
+        // (and to normal storey height outside the roof footprint)
+        if (activeRoofSlices.isNotEmpty && !wall.isParapet) {
+          final ceilingClip = Path();
+          var cursor = 0.0;
+          final normalTop = floor.elevation + baseWallHeight;
+          for (final slice in activeRoofSlices) {
+            if (slice.fromS > cursor + 1e-4) {
+              ceilingClip.addRect(
+                Rect.fromLTRB(
+                  cursor,
+                  floor.elevation - 1.0,
+                  slice.fromS,
+                  normalTop,
+                ),
+              );
+            }
+            final p0 = slice.bottomProfile.first;
+            final p1 = slice.bottomProfile.last;
+            ceilingClip.addPolygon([
+              Offset(slice.fromS, floor.elevation - 1.0),
+              Offset(slice.toS, floor.elevation - 1.0),
+              Offset(p1.dx, p1.dy),
+              Offset(p0.dx, p0.dy),
+            ], true);
+            cursor = math.max(cursor, slice.toS);
+          }
+          if (cursor < cut.length - 1e-4) {
+            ceilingClip.addRect(
+              Rect.fromLTRB(
+                cursor,
+                floor.elevation - 1.0,
+                cut.length + 1.0,
+                normalTop,
+              ),
+            );
+          }
+          try {
+            wallPath = Path.combine(
+              PathOperation.intersect,
+              wallPath,
+              ceilingClip,
+            );
+          } catch (_) {}
+        }
+
+        // Boolean-subtract overlapping roof envelopes (including Mauerlat & Ridge Purlin) and slabs
+        // so zero redundant lines appear at wall-to-roof and wall-to-slab junctions!
+        for (final cutout in highPriorityCutouts) {
+          try {
+            wallPath = Path.combine(
+              PathOperation.difference,
+              wallPath!,
+              cutout,
+            );
+          } catch (_) {}
+        }
+
+        if (!wallPath!.getBounds().isEmpty) {
+          regions.add(
+            ArchitectSectionRegion(wall.id, SlabMaterial.plaster, wallPath),
+          );
+        }
+      }
+
       for (final col in floor.columns) {
-        mesh(
-          col.id,
+        final colPath = sliceMesh(
           col.build3D(
             storeyElevation: floor.elevation,
             storeyHeight: floor.height,
           ),
-          SlabMaterial.concrete,
         );
+        if (colPath != null) {
+          regions.add(
+            ArchitectSectionRegion(col.id, SlabMaterial.concrete, colPath),
+          );
+        }
       }
+
       for (final beam in floor.beams) {
-        mesh(
-          beam.id,
+        final beamPath = sliceMesh(
           ArchitectStairMesh.verticalPrism(
             beam.polygonCorners,
             floor.elevation + beam.baseOffset,
             floor.elevation + beam.baseOffset + beam.depth,
             StairSolidMaterial.concrete,
           ).triangles,
-          SlabMaterial.concrete,
         );
+        if (beamPath != null) {
+          regions.add(
+            ArchitectSectionRegion(beam.id, SlabMaterial.concrete, beamPath),
+          );
+        }
       }
+
       for (final stair in floor.stairs) {
         for (final solid in [
           ...ArchitectStairMesh.body(stair),
@@ -119,23 +295,50 @@ class ArchitectBuildingSection {
             project: project,
           ),
         ]) {
-          mesh(
-            stair.id,
-            [
-              for (final t in solid.triangles)
-                Triangle3D(
-                  v0: t.v0 + Vector3(0, 0, floor.elevation),
-                  v1: t.v1 + Vector3(0, 0, floor.elevation),
-                  v2: t.v2 + Vector3(0, 0, floor.elevation),
-                ),
-            ],
-            solid.material == StairSolidMaterial.concrete
-                ? SlabMaterial.concrete
-                : SlabMaterial.tile,
+          final stairPath = sliceMesh([
+            for (final t in solid.triangles)
+              Triangle3D(
+                v0: t.v0 + Vector3(0, 0, floor.elevation),
+                v1: t.v1 + Vector3(0, 0, floor.elevation),
+                v2: t.v2 + Vector3(0, 0, floor.elevation),
+              ),
+          ]);
+          if (stairPath != null) {
+            regions.add(
+              ArchitectSectionRegion(
+                stair.id,
+                solid.material == StairSolidMaterial.concrete
+                    ? SlabMaterial.concrete
+                    : SlabMaterial.tile,
+                stairPath,
+              ),
+            );
+          }
+        }
+      }
+
+      // 4. Add all detailed roof members (layers, battens, counter-battens, rafters, Mauerlat, purlins, fascia)
+      final floorSlices = storeyRoofSlices[floor.id] ?? const [];
+      for (final slice in floorSlices) {
+        for (final member in slice.members) {
+          if (member.path.getBounds().isEmpty) continue;
+          regions.add(
+            ArchitectSectionRegion(
+              member.roofId,
+              _mapRoofMaterial(member.material),
+              member.path,
+              slab: true,
+              roof: true,
+              timberCrossSectionPolygon: member.drawTimberDiagonals
+                  ? member.polygon
+                  : null,
+              customFillColor: _roofMemberColor(member),
+            ),
           );
         }
       }
     }
+
     Rect? bounds;
     for (final r in regions) {
       bounds =
@@ -161,6 +364,20 @@ class ArchitectBuildingSection {
         )) {
           return (storey: floor, slab: slab);
         }
+      }
+    }
+    return null;
+  }
+
+  static ({ArchitectStorey storey, ArchitectRoofPlane roof})? roofSource(
+    ArchitectProject project,
+    ArchitectSection cut,
+    ArchitectSlabDetail detail,
+  ) {
+    if (detail.station < 0 || detail.station > cut.length) return null;
+    for (final floor in project.storeys) {
+      for (final roof in floor.roofs.where((r) => r.id == detail.slabId)) {
+        return (storey: floor, roof: roof);
       }
     }
     return null;

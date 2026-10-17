@@ -56,6 +56,7 @@ abstract class ArchitectModelCommand {
             ...s.columns.map((e) => e.id),
             ...s.beams.map((e) => e.id),
             ...s.slabs.map((e) => e.id),
+            ...s.roofs.map((e) => e.id),
             ...s.openings.map((e) => e.id),
             ...s.stairs.map((e) => e.id),
             ...s.dimensions.map((e) => e.id),
@@ -718,6 +719,12 @@ class MoveArchitectElement extends ArchitectModelCommand {
               ? const ArchitectSlabEditingAdapter().translate(e, delta)
               : e,
       ],
+      roofs: [
+        for (final e in s.roofs)
+          matches(e.id)
+              ? const ArchitectRoofEditingAdapter().translate(e, delta)
+              : e,
+      ],
       openings: [
         for (final e in s.openings)
           matches(e.id)
@@ -1313,6 +1320,59 @@ class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
   }
 }
 
+class CreateArchitectRoofPlane extends ArchitectModelCommand {
+  final String storeyId;
+  final ArchitectRoofPlane roof;
+  const CreateArchitectRoofPlane({required this.storeyId, required this.roof});
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    if (!ArchitectPolygonGeometry.valid(roof.points)) {
+      throw ArgumentError('Invalid roof contour');
+    }
+    ArchitectModelCommand.newId(project, roof.id);
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(roofs: [...floor.roofs, roof]),
+    );
+  }
+}
+
+class UpdateArchitectRoofPlane extends ArchitectModelCommand {
+  final String storeyId;
+  final ArchitectRoofPlane roof;
+  const UpdateArchitectRoofPlane({required this.storeyId, required this.roof});
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    if (!ArchitectPolygonGeometry.valid(roof.points)) {
+      throw ArgumentError('Invalid roof contour');
+    }
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(
+        roofs: [
+          for (final r in floor.roofs) r.id == roof.id ? roof : r,
+        ],
+      ),
+    );
+  }
+}
+
+class ReplaceStoreyRoofs extends ArchitectModelCommand {
+  final String storeyId;
+  final List<ArchitectRoofPlane> roofs;
+  const ReplaceStoreyRoofs({required this.storeyId, required this.roofs});
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(roofs: roofs),
+    );
+  }
+}
+
 class UpdateArchitectPolygon extends ArchitectModelCommand {
   final String storeyId, elementId;
   final List<Offset> polygon;
@@ -1328,12 +1388,13 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
     }
     final floor = ArchitectModelCommand.storey(project, storeyId);
     final slab = floor.slabs.any((s) => s.id == elementId);
+    final roof = floor.roofs.any((r) => r.id == elementId);
     final rect = floor.cadPrimitives.any(
       (s) => s.id == elementId && s.type == CadPrimitiveType.rect,
     );
     final zone = floor.zones.any((z) => z.id == elementId);
     final opening = floor.openings.any((o) => o.id == elementId);
-    if (!slab && !rect && !zone && !opening) {
+    if (!slab && !roof && !rect && !zone && !opening) {
       throw ArgumentError('Unknown polygon element');
     }
     final points = List<Offset>.unmodifiable(polygon);
@@ -1344,6 +1405,18 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
         slabs: [
           for (final s in floor.slabs)
             s.id == elementId ? s.copyWith(polygon: points) : s,
+        ],
+        roofs: [
+          for (final r in floor.roofs)
+            r.id == elementId
+                ? r.copyWith(
+                    points: points,
+                    eavesEdgeIndex: r.eavesEdgeIndex.clamp(
+                      0,
+                      points.length - 1,
+                    ),
+                  )
+                : r,
         ],
         cadPrimitives: [
           for (final p in floor.cadPrimitives)
@@ -1416,6 +1489,9 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     }
     for (final s in storey.slabs) {
       if (s.id == id) return (points: s.polygon, closed: true, width: 0);
+    }
+    for (final r in storey.roofs) {
+      if (r.id == id) return (points: r.points, closed: true, width: 0);
     }
     for (final z in storey.zones) {
       if (z.id == id) return (points: z.polygon, closed: true, width: 0);

@@ -5697,4 +5697,206 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectFacadeNorthWest => 'Северозапад';
+
+  @override
+  String get architectToolRoof => 'Покрив';
+
+  @override
+  String get architectRoofs => 'Покриви';
+
+  @override
+  String get architectRoofPlane => 'Покривен скат';
+
+  @override
+  String get architectRoofDrawRect => 'Правоъг.';
+
+  @override
+  String get architectRoofDrawPoly => 'Полигон';
+
+  @override
+  String get architectRoofAuto => 'Авто-покрив';
+
+  @override
+  String get architectRoofAutoGable => 'Двускатен';
+
+  @override
+  String get architectRoofAutoHip => 'Четирискатен';
+
+  @override
+  String get architectRoofAutoShed => 'Едноскатен';
+
+  @override
+  String get architectRoofAutoFlat => 'Плосък';
+
+  @override
+  String architectRoofAutoCreated(int count) {
+    return 'Генерирани са $count покривни ската';
+  }
+
+  @override
+  String get architectRoofAutoNoWalls =>
+      'Първо начертай външни стени за автоматичен покрив.';
+
+  @override
+  String get architectRoofSlope => 'Наклон';
+
+  @override
+  String get architectRoofOverhang => 'Стреха';
+
+  @override
+  String get architectRoofBaseElev => 'Кота стреха';
+
+  @override
+  String get architectRoofRidgeElev => 'Кота било';
+
+  @override
+  String get architectRoofSwitchEaves => 'Смени стреха';
+
+  @override
+  String get architectRoofSwitchEavesTooltip =>
+      'Смени кой ръб е долната стреха (или докосни ръб в чертежа)';
+
+  @override
+  String get architectRoofLayers => 'Пластове и дърво';
+
+  @override
+  String get architectRoofLayersShort => 'Детайл';
+
+  @override
+  String get architectRoofPresetPitchedTiles =>
+      'Класически дървен покрив с керемиди';
+
+  @override
+  String get architectRoofPresetWarmPitched => 'Топъл скатен покрив (обитаем)';
+
+  @override
+  String get architectRoofPresetStandingSeam =>
+      'Скатен покрив с фалцова ламарина';
+
+  @override
+  String get architectRoofPresetFlatWarm =>
+      'Плосък топъл стоманобетонен покрив';
+
+  @override
+  String get architectRoofPresetCustom => 'Потребителски покривен пакет';
+
+  @override
+  String get architectRoofRoleCovering => 'Покритие';
+
+  @override
+  String get architectRoofRoleBattens => 'Летви';
+
+  @override
+  String get architectRoofRoleCounterBattens => 'Контралетви';
+
+  @override
+  String get architectRoofRoleUnderlayment => 'Дишаща мембрана';
+
+  @override
+  String get architectRoofRoleBoarding => 'Дъсчена обшивка';
+
+  @override
+  String get architectRoofRoleRafters => 'Ребра';
+
+  @override
+  String get architectRoofRoleInsulation => 'Топлоизолация';
+
+  @override
+  String get architectRoofRoleVapourBarrier => 'Пароизолация';
+
+  @override
+  String get architectRoofRoleStructure => 'Носеща плоча';
+
+  @override
+  String get architectRoofRoleInterior => 'Вътрешна обшивка';
+
+  @override
+  String get architectRoofMatClayTiles => 'Керемиди';
+
+  @override
+  String get architectRoofMatConcreteTiles => 'Бетонни керемиди';
+
+  @override
+  String get architectRoofMatMetalSeam => 'Фалцова ламарина';
+
+  @override
+  String get architectRoofMatBitumenShingles => 'Битумни керемиди';
+
+  @override
+  String get architectRoofMatTimberBoarding => 'Дъсчена обшивка';
+
+  @override
+  String get architectRoofMatOsb => 'OSB плоскост';
+
+  @override
+  String get architectRoofMatBreathableMembrane => 'Паропропусклива мембрана';
+
+  @override
+  String get architectRoofMatVapourBarrier => 'Пароизолационно фолио';
+
+  @override
+  String get architectRoofMatMineralWool => 'Минерална вата';
+
+  @override
+  String get architectRoofMatXps => 'Екструдиран полистирен XPS';
+
+  @override
+  String get architectRoofMatWaterproofing => 'Хидроизолационна мембрана';
+
+  @override
+  String get architectRoofMatSlopeScreed => 'Замазка за наклон';
+
+  @override
+  String get architectRoofMatRcSlab => 'Стоманобетон';
+
+  @override
+  String get architectRoofMatPlasterboard => 'Гипсокартон';
+
+  @override
+  String get architectRoofTimberSection => 'Дървена конструкция и сечения';
+
+  @override
+  String get architectRoofBattensLabel => 'Летви';
+
+  @override
+  String get architectRoofCounterBattensLabel => 'Контралетви';
+
+  @override
+  String get architectRoofRaftersLabel => 'Ребра';
+
+  @override
+  String get architectRoofWallPlateLabel => 'Мауерлат';
+
+  @override
+  String get architectRoofRidgePurlinLabel => 'Билова столица';
+
+  @override
+  String get architectRoofFasciaLabel => 'Челна дъска при стрехата';
+
+  @override
+  String get architectRoofEavesCutLabel => 'Оформление на стрехата';
+
+  @override
+  String get architectRoofEavesCutPlumb => 'Вертикален срез';
+
+  @override
+  String get architectRoofEavesCutSquare => 'Перпендикулярен';
+
+  @override
+  String get architectRoofEavesCutBox => 'Хоризонтален сачак';
+
+  @override
+  String get architectRoofStepLabel => 'Стъпка';
+
+  @override
+  String get architectRoofHintStart =>
+      'Задръж и плъзни за първи ъгъл на ската или избери Авто-покрив.';
+
+  @override
+  String architectRoofHintNext(int count) {
+    return 'Избери следващ ъгъл ($count т.). Натисни Готово за затваряне.';
+  }
+
+  @override
+  String get architectRoofSectionDetailTitle => 'Покривен детайл';
 }

@@ -32,17 +32,37 @@ class ArchitectSnapGeometry {
       if (label != 'Midpoint') alignmentPoints.add(value);
     }
 
-    void edge(Offset a, Offset b, String owner) {
+    void edge(
+      Offset a,
+      Offset b,
+      String owner, {
+      bool includeMidpoint = true,
+    }) {
       if ((b - a).distanceSquared < 1e-16) return;
       edges.add((a: a, b: b, owner: owner));
       point(a, 'Endpoint', owner);
       point(b, 'Endpoint', owner);
-      point((a + b) / 2, 'Midpoint', owner);
+      if (includeMidpoint && (b - a).distance > 0.45) {
+        point((a + b) / 2, 'Midpoint', owner);
+      }
     }
 
     void polygon(List<Offset> vertices, String owner) {
       for (var i = 0; i < vertices.length; i++) {
         edge(vertices[i], vertices[(i + 1) % vertices.length], owner);
+      }
+    }
+
+    void wallBox(List<Offset> corners, String owner) {
+      for (var i = 0; i < corners.length; i++) {
+        // Indices 1 and 3 are short wall end-caps whose center is already the wall axis Endpoint.
+        final isEndCap = corners.length == 4 && (i == 1 || i == 3);
+        edge(
+          corners[i],
+          corners[(i + 1) % corners.length],
+          owner,
+          includeMidpoint: !isEndCap,
+        );
       }
     }
 
@@ -61,11 +81,16 @@ class ArchitectSnapGeometry {
     }
 
     final floor = project.activeStorey;
-    for (final wall in floor.walls) {
+    final activeIdx = project.storeys.indexWhere((s) => s.id == floor.id);
+    final referenceWalls = floor.walls.isNotEmpty
+        ? floor.walls
+        : (activeIdx > 0 ? project.storeys[activeIdx - 1].walls : floor.walls);
+
+    for (final wall in referenceWalls) {
       edge(wall.startPoint, wall.endPoint, wall.id);
       edge(wall.coreCenterStart, wall.coreCenterEnd, wall.id);
-      polygon(wall.polygonCorners, wall.id);
-      polygon(wall.coreCorners, wall.id);
+      wallBox(wall.polygonCorners, wall.id);
+      wallBox(wall.coreCorners, wall.id);
       for (final opening in [
         for (final d in wall.doors) (d.id, d.offsetRatio, d.width),
         for (final w in wall.windows) (w.id, w.offsetRatio, w.width),
@@ -75,7 +100,7 @@ class ArchitectSnapGeometry {
         point(center, 'Center', opening.$1);
         final along = wall.unitVector * opening.$3 / 2;
         final across = wall.normalVector * wall.thickness / 2;
-        polygon([
+        wallBox([
           center - along - across,
           center + along - across,
           center + along + across,
@@ -84,7 +109,7 @@ class ArchitectSnapGeometry {
       }
     }
     // Joined material corners can extend beyond the individual rectangles.
-    final joined = ArchitectWallGeometry.of(floor.walls);
+    final joined = ArchitectWallGeometry.of(referenceWalls);
     for (final p in joined.corners) {
       point(p, 'Vertex', '@wall-joints');
     }
@@ -96,6 +121,9 @@ class ArchitectSnapGeometry {
     }
     for (final slab in floor.slabs) {
       polygon(slab.polygon, slab.id);
+    }
+    for (final roof in floor.roofs) {
+      polygon(roof.points, roof.id);
     }
     for (final opening in floor.openings) {
       polygon(opening.boundary, opening.id);

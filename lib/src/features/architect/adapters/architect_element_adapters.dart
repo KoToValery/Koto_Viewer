@@ -4,6 +4,7 @@ import '../../bim_editing/geometry/bim_transform_2d.dart';
 import '../../bim_editing/scene/bim_element_adapter.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
+import '../models/architect_roof.dart';
 import '../models/architect_zone.dart';
 import '../models/architect_wall.dart';
 import '../../bim_editing/scene/bim_path_editing_adapter.dart';
@@ -125,6 +126,36 @@ class ArchitectSlabEditingAdapter extends BimElementAdapter<ArchitectSlab> {
     kind: BimEditingGeometryKind.contour,
     anchor: source.centroid,
     outline: source.polygon,
+    capabilities: {
+      BimEditingCapability.translate,
+      BimEditingCapability.contour,
+    },
+    revision: revision,
+    readOnly: readOnly,
+  );
+}
+
+class ArchitectRoofEditingAdapter
+    extends BimElementAdapter<ArchitectRoofPlane> {
+  const ArchitectRoofEditingAdapter();
+  @override
+  ArchitectRoofPlane translate(ArchitectRoofPlane source, Offset deltaMetres) =>
+      deltaMetres == Offset.zero
+      ? source
+      : source.copyWith(
+          points: translatedContour(source.points, deltaMetres),
+        );
+  @override
+  BimElementSnapshot describe(
+    ArchitectRoofPlane source,
+    BimElementRef reference, {
+    Object? revision,
+    bool readOnly = false,
+  }) => BimElementSnapshot(
+    reference: reference,
+    kind: BimEditingGeometryKind.contour,
+    anchor: source.centroid,
+    outline: source.points,
     capabilities: {
       BimEditingCapability.translate,
       BimEditingCapability.contour,

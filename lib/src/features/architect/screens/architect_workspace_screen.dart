@@ -1,4 +1,7 @@
 import '../widgets/architect_slab_layers_dialog.dart';
+import '../widgets/architect_roof_layers_dialog.dart';
+import '../widgets/architect_roof_bar.dart';
+import '../services/architect_roof_tool.dart';
 import '../widgets/architect_building_sections_screen.dart';
 import '../widgets/architect_elevations_screen.dart';
 import '../../bim_editing/widgets/bim_edit_actions.dart';
@@ -626,6 +629,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _elementTool.stairWidth,
       _elementTool.stairDesign,
       _elementTool.openingType,
+      _roofTool.drawMode,
+      _roofTool.slopeDegrees,
+      _roofTool.eavesOverhang,
+      _roofTool.draftPoints.length,
     );
     if (state != _toolUiState && mounted) {
       _toolUiState = state;
@@ -836,6 +843,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // Unified tool controller for architectural elements (windows, columns, beams, slabs, etc.)
   late final ArchitectElementTool _elementTool;
 
+  // Unified tool controller for roof planes, auto-roof generation, and carpentry
+  late final ArchitectRoofTool _roofTool;
+
   // Underlays
   Map<String, DxfDocument> _underlaysByStorey = {};
   final Map<String, bool> _underlayLayerVisibility = {};
@@ -948,6 +958,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _zoneTool.cancelAll();
     _axisTool.cancelAll();
     _elementTool.cancelSlabDrafting();
+    _roofTool.clearDraft();
     setState(() {
       _draftStart = null;
       _draftEnd = null;
@@ -1362,6 +1373,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _axisTool = ArchitectGridAxisTool()..addListener(_repaintPreview);
 
     _elementTool = ArchitectElementTool()..addListener(_repaintPreview);
+
+    _roofTool = ArchitectRoofTool()..addListener(_repaintPreview);
     FenestrationLibraryService.instance.init().then((_) {
       if (mounted) {
         _elementTool.activeWindowStyle ??=
@@ -1447,6 +1460,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _zoneTool.dispose();
     _axisTool.dispose();
     _elementTool.dispose();
+    _roofTool.dispose();
     _viewport.dispose();
     _previewRevision.dispose();
     super.dispose();
@@ -2020,6 +2034,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return snap.point;
   }
 
+  ArchitectRoofPlane? get _selectedRoof {
+    final id = _selectedElementId;
+    if (id == null || _effectiveSelection.length > 1) return null;
+    for (final roof in _project.activeStorey.roofs) {
+      if (roof.id == id) return roof;
+    }
+    return null;
+  }
+
   List<Offset>? get _selectedPolygon {
     final id = _selectedElementId ?? _selectedZoneId;
     if (id == null) return null;
@@ -2030,6 +2053,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     for (final slab in _project.activeStorey.slabs) {
       if (slab.id == id) return slab.polygon;
+    }
+    for (final roof in _project.activeStorey.roofs) {
+      if (roof.id == id) return roof.points;
     }
     for (final zone in _project.activeStorey.zones) {
       if (zone.id == id) return zone.polygon;
@@ -2385,11 +2411,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // 7. Slab drafting candidate
+    // 7. Slab or Roof drafting candidate
     if (_activeTool == ArchitectTool.slab &&
         _elementTool.slabDraftPoints.isNotEmpty) {
       _elementTool.updateSlabCandidate(_resolveSlabPoint(rawModel));
       _cursorModel = _elementTool.slabCandidatePoint;
+    } else if (_activeTool == ArchitectTool.roof) {
+      final pt = _resolveRoofPoint(rawModel);
+      _roofTool.updateCandidate(
+        pt,
+        snapLabel: _activeSnapLabel,
+        magneticGuides: _activeMagneticGuides,
+      );
+      _cursorModel = pt;
     } else if (_canPlaceWithMarker &&
         _activeTool != ArchitectTool.door &&
         _activeTool != ArchitectTool.window) {
@@ -2401,6 +2435,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _wallJoinPointer = rawModel;
     }
     _repaintPreview();
+  }
+
+  Offset _resolveRoofPoint(Offset raw) {
+    final points = _roofTool.draftPoints;
+    if (_roofTool.drawMode == RoofDrawMode.polygon && points.length >= 3) {
+      if ((raw - points.first).distance <= math.min(18 / _currentScale, 0.35)) {
+        _activeSnapLabel = context.l10n.architectZonePointSnapStart;
+        _activeMagneticGuides = [];
+        return points.first;
+      }
+      final closure =
+          BimContourDraftingGeometry.calculatePolygonClosureOrthoSnap(
+            points: points,
+            raw: raw,
+            tolerance: math.max(16 / _currentScale, 0.30),
+          );
+      if (closure.isSnapped) {
+        _activeSnapLabel = context.l10n.snapAlignPoint1;
+        _activeMagneticGuides = closure.magneticGuides;
+        return closure.point;
+      }
+    }
+    final anchor = _roofTool.drawMode == RoofDrawMode.polygon
+        ? points.lastOrNull
+        : null;
+    final snap = _snapElement(raw, anchor: anchor);
+    _activeSnapLabel = snap.snapLabel;
+    _activeMagneticGuides = snap.magneticGuides;
+    return snap.point;
   }
 
   Offset _resolveSlabPoint(Offset raw) {
@@ -2859,6 +2922,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           });
           HapticFeedback.mediumImpact();
           return;
+        } else if (storey.roofs.any((r) => r.id == hitId)) {
+          setState(() {
+            _selectionIds
+              ..clear()
+              ..addAll(storey.roofs.map((r) => r.id));
+            _selectedElementId = hitId;
+            _selectedZoneId = null;
+            _multiSelect = true;
+          });
+          HapticFeedback.mediumImpact();
+          return;
         }
       }
     }
@@ -3021,6 +3095,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_draftStart == null &&
         !_axisTool.isDrafting &&
         !_zoneTool.isDrafting &&
+        !_roofTool.isDrafting &&
         _elementTool.slabDraftPoints.isEmpty &&
         !(_touchInput && _placingWithHold) &&
         _effectiveSelection.isEmpty &&
@@ -3185,6 +3260,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // Active selection tap handling: toggle in multi-select or select tool, replace in single-select, or cancel on empty space
     if (_effectiveSelection.isNotEmpty) {
+      // If a single roof plane is selected and the user taps near one of its edges,
+      // switch its eaves edge directly with 1 tap!
+      final selectedRoof = _selectedRoof;
+      if (selectedRoof != null && !_multiSelect) {
+        final edgeIdx = ArchitectRoofTool.hitTestEdgeIndex(
+          selectedRoof,
+          rawModel,
+          tolerance: math.min(18.0 / _currentScale, 0.35),
+        );
+        if (edgeIdx != null && edgeIdx != selectedRoof.safeEavesEdgeIndex) {
+          _commands.execute(
+            UpdateArchitectRoofPlane(
+              storeyId: _project.activeStoreyId,
+              roof: selectedRoof.copyWith(eavesEdgeIndex: edgeIdx),
+            ),
+          );
+          _saveBiMProjectIfAttached();
+          HapticFeedback.selectionClick();
+          return;
+        }
+      }
+
       final shouldToggle = _multiSelect ||
           _activeTool == ArchitectTool.select ||
           HardwareKeyboard.instance.isShiftPressed ||
@@ -3354,6 +3451,37 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }
       } else {
         _elementTool.addSlabPoint(pt);
+        HapticFeedback.lightImpact();
+      }
+      return;
+    }
+
+    // 9b. In Roof tool
+    if (_activeTool == ArchitectTool.roof) {
+      final pt = _resolveRoofPoint(rawModel);
+      final created = _roofTool.addDraftPoint(
+        pt,
+        storey: _project.activeStorey,
+        closeRadius: math.min(18.0 / _currentScale, 0.35),
+      );
+      if (created != null) {
+        setState(() {
+          _commands.execute(
+            CreateArchitectRoofPlane(
+              storeyId: _project.activeStoreyId,
+              roof: created,
+            ),
+          );
+          _selectionIds
+            ..clear()
+            ..add(created.id);
+          _selectedElementId = created.id;
+          _activeMagneticGuides = [];
+          _activeSnapLabel = null;
+        });
+        _saveBiMProjectIfAttached();
+        HapticFeedback.mediumImpact();
+      } else {
         HapticFeedback.lightImpact();
       }
       return;
@@ -3980,6 +4108,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     for (final slab in storey.slabs) {
       if (slab.id == _polygonEditId) return slab.polygon;
     }
+    for (final roof in storey.roofs) {
+      if (roof.id == _polygonEditId) return roof.points;
+    }
     for (final primitive in storey.cadPrimitives) {
       if (primitive.id == _polygonEditId &&
           primitive.type == CadPrimitiveType.rect) {
@@ -4526,6 +4657,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _wallDirectionLocked ||
         _zoneTool.isDrafting ||
         _axisTool.isDrafting ||
+        _roofTool.isDrafting ||
         _elementTool.slabDraftPoints.isNotEmpty) {
       return false;
     }
@@ -4544,6 +4676,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _wallDirectionLocked ||
         _zoneTool.isDrafting ||
         _axisTool.isDrafting ||
+        _roofTool.isDrafting ||
         _elementTool.slabDraftPoints.isNotEmpty) {
       return false;
     }
@@ -4676,6 +4809,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       (w) => w.windows.any((win) => win.id == elementId),
     );
     final isSlab = storey.slabs.any((s) => s.id == elementId);
+    final isRoof = storey.roofs.any((r) => r.id == elementId);
     final isCadPrim = storey.cadPrimitives.any((c) => c.id == elementId);
     final isZone = storey.zones.any((z) => z.id == elementId);
     final isAxis = _project.gridAxes.any((a) => a.id == elementId);
@@ -4786,7 +4920,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           color: const Color(0xFFB388FF),
         ),
       );
-    } else if (isSlab || isCadPrim || isZone) {
+    } else if (isSlab || isRoof || isCadPrim || isZone) {
       items.add(
         _radialItem(
           action: ArchitectRadialAction.edit,
@@ -5195,6 +5329,87 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
+  Future<void> _openRoofLayersDialog({ArchitectRoofPlane? roof}) async {
+    final target = roof ?? _selectedRoof;
+    final initialAssembly = target?.assembly ?? _roofTool.activeAssembly;
+    final initialSlope = target?.slopeDegrees ?? _roofTool.slopeDegrees;
+    final initialOverhang = target?.eavesOverhang ?? _roofTool.eavesOverhang;
+    final initialEavesCut = target?.eavesCut ?? _roofTool.eavesCut;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => ArchitectRoofLayersDialog(
+        initialAssembly: initialAssembly,
+        initialSlopeDegrees: initialSlope,
+        initialEavesOverhang: initialOverhang,
+        initialEavesCut: initialEavesCut,
+        initialBaseElevationOffset: target?.baseElevationOffset,
+        onApply: (result) {
+          setState(() {
+            _roofTool.setAssembly(result.assembly);
+            _roofTool.setSlopeDegrees(result.slopeDegrees);
+            _roofTool.setEavesOverhang(result.eavesOverhang);
+            _roofTool.setEavesCut(result.eavesCut);
+            if (target != null) {
+              _commands.execute(
+                UpdateArchitectRoofPlane(
+                  storeyId: _project.activeStoreyId,
+                  roof: target.copyWith(
+                    assembly: result.assembly,
+                    slopeDegrees: result.slopeDegrees,
+                    eavesOverhang: result.eavesOverhang,
+                    eavesCut: result.eavesCut,
+                    baseElevationOffset: result.baseElevationOffset,
+                  ),
+                ),
+              );
+              _saveBiMProjectIfAttached();
+            }
+          });
+          HapticFeedback.lightImpact();
+        },
+      ),
+    );
+  }
+
+  void _handleAutoRoof(AutoRoofType type) {
+    final generated = ArchitectRoofTool.generateAutoRoof(
+      project: _project,
+      type: type,
+      tool: _roofTool,
+    );
+    if (generated.isEmpty) {
+      HapticFeedback.heavyImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectRoofAutoNoWalls),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _commands.execute(
+        ReplaceStoreyRoofs(
+          storeyId: _project.activeStoreyId,
+          roofs: generated,
+        ),
+      );
+      _selectionIds
+        ..clear()
+        ..add(generated.first.id);
+      _selectedElementId = generated.first.id;
+      _multiSelect = false;
+    });
+    _saveBiMProjectIfAttached();
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.architectRoofAutoCreated(generated.length)),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
   void _showProperties() {
     final ids = _effectiveSelection;
     if (ids.isEmpty) return;
@@ -5204,6 +5419,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
       if (stairs.isNotEmpty) {
         _showStairProperties(stair: stairs.first);
+        return;
+      }
+      final roofs = _project.activeStorey.roofs.where(
+        (r) => ids.contains(r.id),
+      );
+      if (roofs.isNotEmpty) {
+        _openRoofLayersDialog(roof: roofs.first);
         return;
       }
     }
@@ -5496,6 +5718,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final hasCols = storey.columns.any((c) => sel.contains(c.id));
     final hasBeams = storey.beams.any((b) => sel.contains(b.id));
     final hasSlabs = storey.slabs.any((s) => sel.contains(s.id));
+    final hasRoofs = storey.roofs.any((r) => sel.contains(r.id));
     final hasZones = storey.zones.any((z) => sel.contains(z.id));
     final hasAxes = _project.gridAxes.any((a) => sel.contains(a.id));
 
@@ -5503,6 +5726,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (hasCols) targetIds.addAll(storey.columns.map((c) => c.id));
     if (hasBeams) targetIds.addAll(storey.beams.map((b) => b.id));
     if (hasSlabs) targetIds.addAll(storey.slabs.map((s) => s.id));
+    if (hasRoofs) targetIds.addAll(storey.roofs.map((r) => r.id));
     if (hasZones) targetIds.addAll(storey.zones.map((z) => z.id));
     if (hasAxes) targetIds.addAll(_project.gridAxes.map((a) => a.id));
 
@@ -6029,6 +6253,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ...storey.columns.map((e) => e.id),
       ...storey.beams.map((e) => e.id),
       ...storey.slabs.map((e) => e.id),
+      ...storey.roofs.map((e) => e.id),
       ...storey.openings.map((e) => e.id),
       ...storey.stairs.map((e) => e.id),
       ...storey.dimensions.map((e) => e.id),
@@ -6587,6 +6812,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _zoneTool.cancelAll();
                     _axisTool.cancelAll();
                     _elementTool.cancelSlabDrafting();
+                    _roofTool.clearDraft();
                     _selectedZoneId = null;
                     _selectedElementId = null;
                     _wallParallelMove = false;
@@ -6741,6 +6967,96 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           onResequence: _handleResequenceAxes,
                           onAlignAll: _handleAlignAllAxes,
                           onGenerateFromWalls: _generateAxesFromWalls,
+                        ),
+                      ),
+                    if ((_activeTool == ArchitectTool.roof ||
+                            _selectedRoof != null) &&
+                        !_is3DView &&
+                        _polygonEditId == null)
+                      Positioned(
+                        top: 10,
+                        left: 8,
+                        right: 8,
+                        child: ArchitectRoofBar(
+                          tool: _roofTool,
+                          selectedRoof: _selectedRoof,
+                          onAutoRoof: _handleAutoRoof,
+                          onOpenLayersDialog: () =>
+                              _openRoofLayersDialog(roof: _selectedRoof),
+                          onSwitchEavesEdge: () {
+                            final sel = _selectedRoof;
+                            if (sel == null || sel.points.length < 3) return;
+                            final nextEdge =
+                                (sel.safeEavesEdgeIndex + 1) %
+                                sel.points.length;
+                            setState(() {
+                              _commands.execute(
+                                UpdateArchitectRoofPlane(
+                                  storeyId: _project.activeStoreyId,
+                                  roof: sel.copyWith(eavesEdgeIndex: nextEdge),
+                                ),
+                              );
+                            });
+                            _saveBiMProjectIfAttached();
+                            HapticFeedback.selectionClick();
+                          },
+                          onSelectedRoofSlopeChanged: (slopeDeg) {
+                            setState(() {
+                              _roofTool.setSlopeDegrees(slopeDeg);
+                              final sel = _selectedRoof;
+                              if (sel != null) {
+                                _commands.execute(
+                                  UpdateArchitectRoofPlane(
+                                    storeyId: _project.activeStoreyId,
+                                    roof: sel.copyWith(slopeDegrees: slopeDeg),
+                                  ),
+                                );
+                                _saveBiMProjectIfAttached();
+                              }
+                            });
+                            HapticFeedback.selectionClick();
+                          },
+                          onSelectedRoofOverhangChanged: (overhang) {
+                            setState(() {
+                              _roofTool.setEavesOverhang(overhang);
+                              final sel = _selectedRoof;
+                              if (sel != null) {
+                                _commands.execute(
+                                  UpdateArchitectRoofPlane(
+                                    storeyId: _project.activeStoreyId,
+                                    roof: sel.copyWith(eavesOverhang: overhang),
+                                  ),
+                                );
+                                _saveBiMProjectIfAttached();
+                              }
+                            });
+                            HapticFeedback.selectionClick();
+                          },
+                          onFinishPolygon: () {
+                            final created = _roofTool.finishPolygonDraft(
+                              storey: _project.activeStorey,
+                            );
+                            if (created != null) {
+                              setState(() {
+                                _commands.execute(
+                                  CreateArchitectRoofPlane(
+                                    storeyId: _project.activeStoreyId,
+                                    roof: created,
+                                  ),
+                                );
+                                _selectionIds
+                                  ..clear()
+                                  ..add(created.id);
+                                _selectedElementId = created.id;
+                              });
+                              _saveBiMProjectIfAttached();
+                              HapticFeedback.mediumImpact();
+                            }
+                          },
+                          onUndoDraftPoint: () =>
+                              setState(() => _roofTool.undoLastDraftPoint()),
+                          onCancelDraft: () =>
+                              setState(() => _roofTool.clearDraft()),
                         ),
                       ),
                     // Floating Overshoot Notice Banner
@@ -6977,7 +7293,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _draftStart ??
       _axisTool.draftStart ??
       _zoneTool.draftPoints.firstOrNull ??
-      _elementTool.slabDraftPoints.firstOrNull;
+      _elementTool.slabDraftPoints.firstOrNull ??
+      _roofTool.draftPoints.firstOrNull;
   int? _draftCancelPointer;
   Rect? _renderedDraftCancelRect, _renderedDraftConfirmRect;
   List<ArchitectDimensionEditHandle> _renderedDimensionEditHandles = [];
@@ -7226,6 +7543,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                 DxfSnapType.perpendicular,
                               _ => DxfSnapType.nearest,
                             };
+                      final lastAnchor = _draftStart ??
+                          _axisTool.draftStart ??
+                          _zoneTool.draftPoints.lastOrNull ??
+                          _elementTool.slabDraftPoints.lastOrNull ??
+                          _roofTool.draftPoints.lastOrNull;
+                      final liveDim = lastAnchor != null &&
+                              (target - lastAnchor).distance > 0.01
+                          ? _project.units.format(
+                              (target - lastAnchor).distance,
+                              decimals: 2,
+                            )
+                          : null;
                       return CustomPaint(
                         key: ValueKey(
                           _activeTool == ArchitectTool.wall
@@ -7243,6 +7572,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           snappedPos: type == null ? null : tip,
                           snapType: type,
                           activeTool: StructuralDrawTool.beam,
+                          liveDimensionText: liveDim,
+                          l10n: context.l10n,
                         ),
                       );
                     },
@@ -7988,6 +8319,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         underlayLayerVisibility: _underlayLayerVisibility,
         slabDraftPoints: _elementTool.slabDraftPoints,
         slabCandidatePoint: _elementTool.slabCandidatePoint,
+        roofTool: _roofTool,
         polygonEditInvalid: _polygonEditor.invalid,
         polygonLeaderLine: _polygonEditor.leaderLine,
         wallJoinLeaderLine: _wallJoinLeaderLine,

@@ -9988,6 +9988,390 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Northwest'**
   String get architectFacadeNorthWest;
+
+  /// No description provided for @architectToolRoof.
+  ///
+  /// In en, this message translates to:
+  /// **'Roof'**
+  String get architectToolRoof;
+
+  /// No description provided for @architectRoofs.
+  ///
+  /// In en, this message translates to:
+  /// **'Roofs'**
+  String get architectRoofs;
+
+  /// No description provided for @architectRoofPlane.
+  ///
+  /// In en, this message translates to:
+  /// **'Roof plane'**
+  String get architectRoofPlane;
+
+  /// No description provided for @architectRoofDrawRect.
+  ///
+  /// In en, this message translates to:
+  /// **'Rect'**
+  String get architectRoofDrawRect;
+
+  /// No description provided for @architectRoofDrawPoly.
+  ///
+  /// In en, this message translates to:
+  /// **'Poly'**
+  String get architectRoofDrawPoly;
+
+  /// No description provided for @architectRoofAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto roof'**
+  String get architectRoofAuto;
+
+  /// No description provided for @architectRoofAutoGable.
+  ///
+  /// In en, this message translates to:
+  /// **'Gable'**
+  String get architectRoofAutoGable;
+
+  /// No description provided for @architectRoofAutoHip.
+  ///
+  /// In en, this message translates to:
+  /// **'Hip'**
+  String get architectRoofAutoHip;
+
+  /// No description provided for @architectRoofAutoShed.
+  ///
+  /// In en, this message translates to:
+  /// **'Shed'**
+  String get architectRoofAutoShed;
+
+  /// No description provided for @architectRoofAutoFlat.
+  ///
+  /// In en, this message translates to:
+  /// **'Flat'**
+  String get architectRoofAutoFlat;
+
+  /// No description provided for @architectRoofAutoCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated {count} roof planes'**
+  String architectRoofAutoCreated(int count);
+
+  /// No description provided for @architectRoofAutoNoWalls.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw exterior walls first to generate an automatic roof.'**
+  String get architectRoofAutoNoWalls;
+
+  /// No description provided for @architectRoofSlope.
+  ///
+  /// In en, this message translates to:
+  /// **'Slope'**
+  String get architectRoofSlope;
+
+  /// No description provided for @architectRoofOverhang.
+  ///
+  /// In en, this message translates to:
+  /// **'Eaves'**
+  String get architectRoofOverhang;
+
+  /// No description provided for @architectRoofBaseElev.
+  ///
+  /// In en, this message translates to:
+  /// **'Eaves Z'**
+  String get architectRoofBaseElev;
+
+  /// No description provided for @architectRoofRidgeElev.
+  ///
+  /// In en, this message translates to:
+  /// **'Ridge Z'**
+  String get architectRoofRidgeElev;
+
+  /// No description provided for @architectRoofSwitchEaves.
+  ///
+  /// In en, this message translates to:
+  /// **'Next eaves'**
+  String get architectRoofSwitchEaves;
+
+  /// No description provided for @architectRoofSwitchEavesTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch which edge is the lower eaves edge (or tap an edge on canvas)'**
+  String get architectRoofSwitchEavesTooltip;
+
+  /// No description provided for @architectRoofLayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Layers & Timber'**
+  String get architectRoofLayers;
+
+  /// No description provided for @architectRoofLayersShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Structure'**
+  String get architectRoofLayersShort;
+
+  /// No description provided for @architectRoofPresetPitchedTiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Timber roof with clay tiles'**
+  String get architectRoofPresetPitchedTiles;
+
+  /// No description provided for @architectRoofPresetWarmPitched.
+  ///
+  /// In en, this message translates to:
+  /// **'Insulated warm pitched roof'**
+  String get architectRoofPresetWarmPitched;
+
+  /// No description provided for @architectRoofPresetStandingSeam.
+  ///
+  /// In en, this message translates to:
+  /// **'Standing seam metal roof'**
+  String get architectRoofPresetStandingSeam;
+
+  /// No description provided for @architectRoofPresetFlatWarm.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm flat RC roof'**
+  String get architectRoofPresetFlatWarm;
+
+  /// No description provided for @architectRoofPresetCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom roof assembly'**
+  String get architectRoofPresetCustom;
+
+  /// No description provided for @architectRoofRoleCovering.
+  ///
+  /// In en, this message translates to:
+  /// **'Covering'**
+  String get architectRoofRoleCovering;
+
+  /// No description provided for @architectRoofRoleBattens.
+  ///
+  /// In en, this message translates to:
+  /// **'Battens'**
+  String get architectRoofRoleBattens;
+
+  /// No description provided for @architectRoofRoleCounterBattens.
+  ///
+  /// In en, this message translates to:
+  /// **'Counter-battens'**
+  String get architectRoofRoleCounterBattens;
+
+  /// No description provided for @architectRoofRoleUnderlayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Breathable membrane'**
+  String get architectRoofRoleUnderlayment;
+
+  /// No description provided for @architectRoofRoleBoarding.
+  ///
+  /// In en, this message translates to:
+  /// **'Boarding / sheathing'**
+  String get architectRoofRoleBoarding;
+
+  /// No description provided for @architectRoofRoleRafters.
+  ///
+  /// In en, this message translates to:
+  /// **'Rafters'**
+  String get architectRoofRoleRafters;
+
+  /// No description provided for @architectRoofRoleInsulation.
+  ///
+  /// In en, this message translates to:
+  /// **'Thermal insulation'**
+  String get architectRoofRoleInsulation;
+
+  /// No description provided for @architectRoofRoleVapourBarrier.
+  ///
+  /// In en, this message translates to:
+  /// **'Vapour barrier'**
+  String get architectRoofRoleVapourBarrier;
+
+  /// No description provided for @architectRoofRoleStructure.
+  ///
+  /// In en, this message translates to:
+  /// **'Structural deck'**
+  String get architectRoofRoleStructure;
+
+  /// No description provided for @architectRoofRoleInterior.
+  ///
+  /// In en, this message translates to:
+  /// **'Ceiling lining'**
+  String get architectRoofRoleInterior;
+
+  /// No description provided for @architectRoofMatClayTiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Clay roof tiles'**
+  String get architectRoofMatClayTiles;
+
+  /// No description provided for @architectRoofMatConcreteTiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete tiles'**
+  String get architectRoofMatConcreteTiles;
+
+  /// No description provided for @architectRoofMatMetalSeam.
+  ///
+  /// In en, this message translates to:
+  /// **'Standing seam metal'**
+  String get architectRoofMatMetalSeam;
+
+  /// No description provided for @architectRoofMatBitumenShingles.
+  ///
+  /// In en, this message translates to:
+  /// **'Bitumen shingles'**
+  String get architectRoofMatBitumenShingles;
+
+  /// No description provided for @architectRoofMatTimberBoarding.
+  ///
+  /// In en, this message translates to:
+  /// **'Timber boarding'**
+  String get architectRoofMatTimberBoarding;
+
+  /// No description provided for @architectRoofMatOsb.
+  ///
+  /// In en, this message translates to:
+  /// **'OSB sheathing'**
+  String get architectRoofMatOsb;
+
+  /// No description provided for @architectRoofMatBreathableMembrane.
+  ///
+  /// In en, this message translates to:
+  /// **'Breathable membrane'**
+  String get architectRoofMatBreathableMembrane;
+
+  /// No description provided for @architectRoofMatVapourBarrier.
+  ///
+  /// In en, this message translates to:
+  /// **'Vapour barrier foil'**
+  String get architectRoofMatVapourBarrier;
+
+  /// No description provided for @architectRoofMatMineralWool.
+  ///
+  /// In en, this message translates to:
+  /// **'Mineral wool'**
+  String get architectRoofMatMineralWool;
+
+  /// No description provided for @architectRoofMatXps.
+  ///
+  /// In en, this message translates to:
+  /// **'XPS insulation'**
+  String get architectRoofMatXps;
+
+  /// No description provided for @architectRoofMatWaterproofing.
+  ///
+  /// In en, this message translates to:
+  /// **'Waterproofing membrane'**
+  String get architectRoofMatWaterproofing;
+
+  /// No description provided for @architectRoofMatSlopeScreed.
+  ///
+  /// In en, this message translates to:
+  /// **'Slope screed'**
+  String get architectRoofMatSlopeScreed;
+
+  /// No description provided for @architectRoofMatRcSlab.
+  ///
+  /// In en, this message translates to:
+  /// **'Reinforced concrete'**
+  String get architectRoofMatRcSlab;
+
+  /// No description provided for @architectRoofMatPlasterboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Gypsum plasterboard'**
+  String get architectRoofMatPlasterboard;
+
+  /// No description provided for @architectRoofTimberSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Timber carpentry & framing'**
+  String get architectRoofTimberSection;
+
+  /// No description provided for @architectRoofBattensLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Battens'**
+  String get architectRoofBattensLabel;
+
+  /// No description provided for @architectRoofCounterBattensLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Counter-battens'**
+  String get architectRoofCounterBattensLabel;
+
+  /// No description provided for @architectRoofRaftersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Rafters'**
+  String get architectRoofRaftersLabel;
+
+  /// No description provided for @architectRoofWallPlateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall plate (Mauerlat)'**
+  String get architectRoofWallPlateLabel;
+
+  /// No description provided for @architectRoofRidgePurlinLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Ridge purlin'**
+  String get architectRoofRidgePurlinLabel;
+
+  /// No description provided for @architectRoofFasciaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Fascia board at eaves'**
+  String get architectRoofFasciaLabel;
+
+  /// No description provided for @architectRoofEavesCutLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Eaves cut style'**
+  String get architectRoofEavesCutLabel;
+
+  /// No description provided for @architectRoofEavesCutPlumb.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical (plumb)'**
+  String get architectRoofEavesCutPlumb;
+
+  /// No description provided for @architectRoofEavesCutSquare.
+  ///
+  /// In en, this message translates to:
+  /// **'Square to slope'**
+  String get architectRoofEavesCutSquare;
+
+  /// No description provided for @architectRoofEavesCutBox.
+  ///
+  /// In en, this message translates to:
+  /// **'Boxed soffit'**
+  String get architectRoofEavesCutBox;
+
+  /// No description provided for @architectRoofStepLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Step'**
+  String get architectRoofStepLabel;
+
+  /// No description provided for @architectRoofHintStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold and drag to pick first roof corner, or use Auto roof.'**
+  String get architectRoofHintStart;
+
+  /// No description provided for @architectRoofHintNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick next corner ({count} pts). Tap Finish to close.'**
+  String architectRoofHintNext(int count);
+
+  /// No description provided for @architectRoofSectionDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Roof assembly'**
+  String get architectRoofSectionDetailTitle;
 }
 
 class _AppLocalizationsDelegate
