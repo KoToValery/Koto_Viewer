@@ -10426,6 +10426,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose or create a view from the menu.'**
   String get architectViewDrawingEmpty;
+
+  /// Dynamic clearance dimension from door or window jamb to adjacent opening or wall
+  ///
+  /// In en, this message translates to:
+  /// **'Opening clearance'**
+  String get architectOpeningClearance;
+
+  /// Snap label when door or window position snaps to a masonry multiple of wall core thickness
+  ///
+  /// In en, this message translates to:
+  /// **'Modular step ({step} cm)'**
+  String architectOpeningModularSnap(int step);
 }
 
 class _AppLocalizationsDelegate

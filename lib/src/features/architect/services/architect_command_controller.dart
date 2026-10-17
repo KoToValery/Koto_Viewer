@@ -517,6 +517,84 @@ class SetArchitectWallEndpointClearance extends ArchitectModelCommand {
   }
 }
 
+/// Edit the clear distance from a hosted door or window jamb to the adjacent
+/// opening, intersecting wall, or wall endpoint.
+class SetArchitectOpeningClearance extends ArchitectModelCommand {
+  final String storeyId;
+  final String wallId;
+  final String openingId;
+  final bool isLeft;
+  final double distance;
+
+  const SetArchitectOpeningClearance({
+    required this.storeyId,
+    required this.wallId,
+    required this.openingId,
+    required this.isLeft,
+    required this.distance,
+  });
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    if (!distance.isFinite || distance < 0) {
+      throw ArgumentError('Invalid clearance');
+    }
+    final storey = ArchitectModelCommand.storey(project, storeyId);
+    final wall = storey.walls.firstWhere(
+      (w) => w.id == wallId,
+      orElse: () => throw ArgumentError('Unknown wall: $wallId'),
+    );
+    final door = wall.doors.where((d) => d.id == openingId).firstOrNull;
+    final window = wall.windows.where((w) => w.id == openingId).firstOrNull;
+    if (door == null && window == null) {
+      throw ArgumentError('Unknown opening: $openingId');
+    }
+    final width = door?.width ?? window!.width;
+    final currentRatio = door?.offsetRatio ?? window!.offsetRatio;
+    final span = ArchitectOpeningPlacement.findFreeSpan(
+      wall: wall,
+      walls: storey.walls,
+      targetAlong: currentRatio * wall.length,
+      openingWidth: width,
+      excludeOpeningId: openingId,
+    );
+    if (span == null) {
+      throw ArgumentError('Opening does not fit in span');
+    }
+    final newCenterAlong = isLeft
+        ? span.leftStation + distance + width / 2.0
+        : span.rightStation - distance - width / 2.0;
+    if (newCenterAlong - width / 2.0 < span.leftStation - 1e-5 ||
+        newCenterAlong + width / 2.0 > span.rightStation + 1e-5) {
+      throw ArgumentError('Opening would overlap or leave its span');
+    }
+    final newRatio = (newCenterAlong / wall.length).clamp(0.0, 1.0);
+    if (!BimLineGeometry.hostedFits(
+      length: wall.length,
+      width: width,
+      ratio: newRatio,
+    )) {
+      throw ArgumentError('Opening would leave its host');
+    }
+    final nextWall = wall.copyWith(
+      doors: [
+        for (final d in wall.doors)
+          d.id == openingId ? d.copyWith(offsetRatio: newRatio) : d,
+      ],
+      windows: [
+        for (final w in wall.windows)
+          w.id == openingId ? w.copyWith(offsetRatio: newRatio) : w,
+      ],
+    );
+    return ArchitectModelCommand.replace(
+      project,
+      storey.copyWith(
+        walls: [for (final w in storey.walls) w.id == wall.id ? nextWall : w],
+      ),
+    );
+  }
+}
+
 class SetArchitectWallConnection extends ArchitectModelCommand {
   final String storeyId;
   final Set<String> wallIds;

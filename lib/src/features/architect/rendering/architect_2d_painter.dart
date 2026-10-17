@@ -19,6 +19,8 @@ import 'architect_wall_network.dart';
 import 'architect_wall_layers.dart';
 import 'architect_wall_hatch.dart';
 import '../models/architect_wall.dart';
+import '../models/architect_door.dart';
+import '../models/architect_window.dart';
 import 'architect_dimension_layout.dart';
 import '../services/architect_selection.dart';
 import '../services/architect_wall_relations.dart';
@@ -81,6 +83,10 @@ class Architect2dPainter extends CustomPainter {
   final (Offset, Offset)? wallJoinLeaderLine;
   final ArchitectWallTrimSpan? wallTrimSpan;
   final List<ArchitectWallClearance> wallClearances;
+  final List<ArchitectOpeningClearance> openingClearances;
+  final bool showOpeningClearanceBadges;
+  final ArchitectDoor? doorPreview;
+  final ArchitectWindow? windowPreview;
   final Set<String> selectedElementIds;
   final Path? dimensionWallObstacles;
   final String? activeSnapLabel;
@@ -172,6 +178,10 @@ class Architect2dPainter extends CustomPainter {
     this.wallJoinLeaderLine,
     this.wallTrimSpan,
     this.wallClearances = const [],
+    this.openingClearances = const [],
+    this.showOpeningClearanceBadges = false,
+    this.doorPreview,
+    this.windowPreview,
     this.selectedElementIds = const {},
     this.dimensionWallObstacles,
     this.activeSnapLabel,
@@ -846,6 +856,115 @@ class Architect2dPainter extends CustomPainter {
         );
       }
     }
+
+    if (doorPreview != null) {
+      final hostWall = _project.activeStorey.walls
+          .where((w) => w.id == doorPreview!.wallId)
+          .firstOrNull;
+      if (hostWall != null) {
+        doorPreview!.paint2D(
+          palette: palette,
+          canvas: canvas,
+          wallStart: hostWall.centerStart,
+          wallEnd: hostWall.centerEnd,
+          wallThickness: hostWall.thickness,
+          coreThickness: hostWall.coreThickness,
+          insulationThickness: hostWall.insulationThickness,
+          exteriorSign: hostWall.exteriorSign.toDouble(),
+          zoomScale: zoomScale,
+          isSelected: true,
+        );
+      }
+    }
+    if (windowPreview != null) {
+      final hostWall = _project.activeStorey.walls
+          .where((w) => w.id == windowPreview!.wallId)
+          .firstOrNull;
+      if (hostWall != null) {
+        windowPreview!.paint2D(
+          palette: palette,
+          canvas: canvas,
+          wallStart: hostWall.centerStart,
+          wallEnd: hostWall.centerEnd,
+          wallThickness: hostWall.thickness,
+          coreThickness: hostWall.coreThickness,
+          insulationThickness: hostWall.insulationThickness,
+          exteriorSign: hostWall.exteriorSign.toDouble(),
+          zoomScale: zoomScale,
+          isSelected: true,
+        );
+      }
+    }
+
+    for (final gap in openingClearances) {
+      final hostWall = _project.activeStorey.walls
+          .where((w) => w.id == gap.wallId)
+          .firstOrNull;
+      if (hostWall == null) continue;
+      final lineColor = gap.isModularSnap
+          ? palette.foreground(const Color(0xFF00A86B))
+          : palette.foreground(const Color(0xFF008C9E));
+      final witnessPaint = Paint()
+        ..color = lineColor.withValues(alpha: 0.55)
+        ..strokeWidth = 0.85 / zoomScale;
+      canvas.drawLine(gap.referencePoint, gap.start, witnessPaint);
+      canvas.drawLine(gap.jambPoint, gap.end, witnessPaint);
+
+      final direction = gap.end - gap.start;
+      final tick =
+          (direction.distance < 1e-8
+              ? hostWall.normalVector
+              : Offset(-direction.dy, direction.dx) / direction.distance) *
+          (4 / zoomScale);
+      final dimPaint = Paint()
+        ..color = lineColor
+        ..strokeWidth = (gap.isModularSnap ? 1.5 : 1.1) / zoomScale;
+      canvas.drawLine(gap.start, gap.end, dimPaint);
+      for (final point in [gap.start, gap.end]) {
+        canvas.drawLine(point - tick, point + tick, dimPaint);
+      }
+      if (showOpeningClearanceBadges && gap.distance >= 0.01) {
+        final tp = TextPainter(
+          text: TextSpan(
+            text: _project.units.format(gap.distance),
+            style: TextStyle(
+              color: Colors.white,
+              fontFamily: 'Roboto',
+              fontSize: 11.0,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        canvas.save();
+        canvas.translate(gap.midpoint.dx, gap.midpoint.dy);
+        canvas.scale(1.0 / zoomScale);
+        final rect = Rect.fromCenter(
+          center: Offset.zero,
+          width: tp.width + 12,
+          height: tp.height + 6,
+        );
+        final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(6));
+        canvas.drawRRect(
+          rrect,
+          Paint()
+            ..color = gap.isModularSnap
+                ? const Color(0xEE00796B)
+                : const Color(0xDD1E293B),
+        );
+        canvas.drawRRect(
+          rrect,
+          Paint()
+            ..color = gap.isModularSnap
+                ? const Color(0xFF64FFDA)
+                : const Color(0xFF38BDF8)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.0,
+        );
+        tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+        canvas.restore();
+      }
+    }
     if (activeOvershoot != null) {
       final stubStart = activeOvershoot!.intersectionPoint;
       final stubEnd = activeOvershoot!.stubPoint;
@@ -1160,6 +1279,10 @@ class Architect2dPainter extends CustomPainter {
       selectedZoneId != oldDelegate.selectedZoneId ||
       selectedAxisId != oldDelegate.selectedAxisId ||
       selectedElementId != oldDelegate.selectedElementId ||
+      doorPreview != oldDelegate.doorPreview ||
+      windowPreview != oldDelegate.windowPreview ||
+      openingClearances != oldDelegate.openingClearances ||
+      showOpeningClearanceBadges != oldDelegate.showOpeningClearanceBadges ||
       polygonLeaderLine != oldDelegate.polygonLeaderLine ||
       wallCutGuideLine != oldDelegate.wallCutGuideLine ||
       wallCutAnchor != oldDelegate.wallCutAnchor ||

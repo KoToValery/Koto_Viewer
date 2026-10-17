@@ -26,6 +26,7 @@ import '../../structural_designer/rendering/structural_pointer_painter.dart';
 import '../../dxf_viewer/rendering/dxf_snap_helper.dart';
 import '../../bim_projects/services/bim_project_library_service.dart';
 import '../models/architect_door.dart';
+import '../models/architect_window.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_grid_axis.dart';
@@ -2070,24 +2071,77 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _polygonEditId == null &&
       _pendingShape == null;
 
+  ArchitectOpeningPlacementResult? get _openingPlacementPreview {
+    final raw = _cursorModel;
+    if (raw == null ||
+        _effectiveSelection.isNotEmpty ||
+        _isActivelyDraggingHandle ||
+        (_activeTool != ArchitectTool.door &&
+            _activeTool != ArchitectTool.window)) {
+      return null;
+    }
+    final width = _activeTool == ArchitectTool.door
+        ? _doorWidth
+        : _elementTool.windowWidth;
+    return ArchitectOpeningPlacement.resolve(
+      walls: _project.activeStorey.walls,
+      rawPoint: raw,
+      openingWidth: width,
+      magnetic: _magnetEnabled,
+    );
+  }
+
+  ArchitectDoor? get _doorPreview {
+    if (_activeTool != ArchitectTool.door) return null;
+    final preview = _openingPlacementPreview;
+    if (preview == null) return null;
+    final activeStyle =
+        _elementTool.activeDoorStyle ??
+        FenestrationLibraryService.instance.activeDoorStyle;
+    return ArchitectDoor(
+      id: 'preview_door',
+      wallId: preview.wall.id,
+      offsetRatio: preview.offsetRatio,
+      width: _doorWidth,
+      height: _doorHeight,
+      sillHeight: _doorSill,
+      isHingeLeft: _isHingeLeft,
+      openInward: preview.openInward,
+      specId: '$_doorSpecCounter',
+      uuid: 'preview_door',
+      styleId: activeStyle.id,
+      style: activeStyle,
+    );
+  }
+
+  ArchitectWindow? get _windowPreview {
+    if (_activeTool != ArchitectTool.window) return null;
+    final preview = _openingPlacementPreview;
+    if (preview == null) return null;
+    final activeStyle =
+        _elementTool.activeWindowStyle ??
+        FenestrationLibraryService.instance.activeWindowStyle;
+    return ArchitectWindow(
+      id: 'preview_window',
+      wallId: preview.wall.id,
+      offsetRatio: preview.offsetRatio,
+      width: _elementTool.windowWidth,
+      height: _elementTool.windowHeight,
+      sillHeight: _elementTool.windowSill,
+      specId: 'W',
+      uuid: 'preview_window',
+      styleId: activeStyle.id,
+      style: activeStyle,
+    );
+  }
+
   Offset? get _placementPreviewTarget {
     final raw = _cursorModel;
     if (raw != null &&
         (_activeTool == ArchitectTool.door ||
             _activeTool == ArchitectTool.window)) {
-      ArchitectWall? host;
-      var best = double.infinity;
-      for (final wall in _project.activeStorey.walls) {
-        final (_, distance) = wall.projectPoint(raw);
-        if (distance <= wall.thickness / 2 + .30 && distance < best) {
-          host = wall;
-          best = distance;
-        }
-      }
-      if (host != null) {
-        final (ratio, _) = host.projectPoint(raw);
-        return host.centerStart + (host.centerEnd - host.centerStart) * ratio;
-      }
+      final preview = _openingPlacementPreview;
+      if (preview != null) return preview.centerPoint;
     }
     return _draftEnd ?? raw;
   }
@@ -2532,6 +2586,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _project,
       ).inputPoint(rawModel - _elementMoveStart!);
       final selectedWall = _selectedWall;
+      ArchitectWall? hostedOpeningWall;
+      double? hostedOpeningRatio;
+      double? hostedOpeningWidth;
+      if (selectedWall == null) {
+        for (final w in _elementMoveOriginal!.activeStorey.walls) {
+          for (final d in w.doors) {
+            if (d.id == _draggingElementId) {
+              hostedOpeningWall = w;
+              hostedOpeningRatio = d.offsetRatio;
+              hostedOpeningWidth = d.width;
+              break;
+            }
+          }
+          if (hostedOpeningWall != null) break;
+          for (final win in w.windows) {
+            if (win.id == _draggingElementId) {
+              hostedOpeningWall = w;
+              hostedOpeningRatio = win.offsetRatio;
+              hostedOpeningWidth = win.width;
+              break;
+            }
+          }
+          if (hostedOpeningWall != null) break;
+        }
+      }
       if (selectedWall != null && _wallParallelMove) {
         final n = selectedWall.normalVector;
         delta = n * (delta.dx * n.dx + delta.dy * n.dy);
@@ -2550,6 +2629,34 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           delta = snapDelta;
         } else {
           _activeMagneticGuides = [..._activeMagneticGuides, ...alignment.$2];
+        }
+      } else if (hostedOpeningWall != null) {
+        if ((rawModel - _elementMoveStart!).distance < 1e-6) {
+          delta = Offset.zero;
+          _activeSnapLabel = null;
+          _activeMagneticGuides = [];
+        } else {
+          final origCenter =
+              hostedOpeningWall.centerStart +
+              (hostedOpeningWall.centerEnd - hostedOpeningWall.centerStart) *
+                  hostedOpeningRatio!;
+          final placement = ArchitectOpeningPlacement.resolve(
+            walls: _elementMoveOriginal!.activeStorey.walls,
+            rawPoint: origCenter + (rawModel - _elementMoveStart!),
+            openingWidth: hostedOpeningWidth!,
+            excludeOpeningId: _draggingElementId,
+            fixedHostWall: hostedOpeningWall,
+            magnetic: _magnetEnabled,
+          );
+          if (placement != null) {
+            delta = placement.centerPoint - origCenter;
+            _activeSnapLabel = placement.isModularSnap
+                ? context.l10n.architectOpeningModularSnap(
+                    (placement.stepMeters * 100).round(),
+                  )
+                : placement.snapLabel;
+          }
+          _activeMagneticGuides = [];
         }
       } else {
         delta = _snapMovingElements(delta, {_draggingElementId!});
@@ -2585,11 +2692,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _activeSnapLabel = snap.label;
           _activeMagneticGuides = snap.guides;
         }
-        _elementMovePreview = MoveArchitectElement(
-          storeyId: _project.activeStorey.id,
-          elementId: _draggingElementId!,
-          delta: delta,
-        ).apply(_elementMoveOriginal!);
+        try {
+          _elementMovePreview = MoveArchitectElement(
+            storeyId: _project.activeStorey.id,
+            elementId: _draggingElementId!,
+            delta: delta,
+          ).apply(_elementMoveOriginal!);
+        } on ArgumentError {
+          _elementMoveDelta = null;
+        }
       }
       _repaintPreview();
       return;
@@ -2740,9 +2851,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         magneticGuides: _activeMagneticGuides,
       );
       _cursorModel = pt;
-    } else if (_canPlaceWithMarker &&
-        _activeTool != ArchitectTool.door &&
-        _activeTool != ArchitectTool.window) {
+    } else if (_activeTool == ArchitectTool.door ||
+        _activeTool == ArchitectTool.window) {
+      final preview = _openingPlacementPreview;
+      _activeSnapLabel = preview == null
+          ? null
+          : preview.isModularSnap
+          ? context.l10n.architectOpeningModularSnap(
+              (preview.stepMeters * 100).round(),
+            )
+          : preview.snapLabel;
+      _activeMagneticGuides = [];
+    } else if (_canPlaceWithMarker) {
       final snap = _snapElement(rawModel);
       _cursorModel = snap.point;
       _activeSnapLabel = snap.snapLabel;
@@ -3656,6 +3776,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final res = _elementTool.placeWindow(
         storey: _project.activeStorey,
         point: rawModel,
+        magnetic: _magnetEnabled,
       );
       if (res != null) {
         final (updatedStorey, newWin) = res;
@@ -4296,12 +4417,63 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         .toList();
   }
 
+  List<ArchitectOpeningClearance> get _selectedOpeningClearances {
+    final ids = _effectiveSelection;
+    if (ids.length != 1 || _wallCutIds.isNotEmpty || _wallExtendId != null) {
+      return const [];
+    }
+    final targetId = ids.single;
+    final walls = (_elementMovePreview ?? _project).activeStorey.walls;
+    for (final wall in walls) {
+      for (final door in wall.doors) {
+        if (door.id == targetId) {
+          return ArchitectOpeningClearance.forOpening(
+            wall: wall,
+            walls: walls,
+            openingId: door.id,
+            offsetRatio: door.offsetRatio,
+            openingWidth: door.width,
+          );
+        }
+      }
+      for (final window in wall.windows) {
+        if (window.id == targetId) {
+          return ArchitectOpeningClearance.forOpening(
+            wall: wall,
+            walls: walls,
+            openingId: window.id,
+            offsetRatio: window.offsetRatio,
+            openingWidth: window.width,
+          );
+        }
+      }
+    }
+    return const [];
+  }
+
+  List<ArchitectOpeningClearance> get _openingClearances {
+    final selected = _selectedOpeningClearances;
+    if (selected.isNotEmpty) return selected;
+    final preview = _openingPlacementPreview;
+    if (preview != null) return preview.clearances;
+    return const [];
+  }
+
+  bool get _showOpeningClearanceBadges =>
+      _openingPlacementPreview != null ||
+      (_draggingElementId != null && _selectedOpeningClearances.isNotEmpty);
+
   Widget _buildWallClearanceOverlay() => Positioned.fill(
     child: AnimatedBuilder(
       animation: Listenable.merge([_viewport, _previewRevision]),
       builder: (context, child) {
         final clearances = _wallClearances;
-        if (clearances.isEmpty) return const SizedBox.shrink();
+        final openingClearances = _draggingElementId == null
+            ? _selectedOpeningClearances
+            : const <ArchitectOpeningClearance>[];
+        if (clearances.isEmpty && openingClearances.isEmpty) {
+          return const SizedBox.shrink();
+        }
         final walls = (_elementMovePreview ?? _project).activeStorey.walls;
         final body = ArchitectWallNetwork.body(walls);
         if (_viewport.size.width < 104 || _viewport.size.height < 180) {
@@ -4324,6 +4496,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ];
         final placements = <String, Rect>{};
         for (final gap in clearances) {
+          final start = _viewport.toScreen(gap.start),
+              end = _viewport.toScreen(gap.end);
+          final segment = BimLineGeometry.visibleSegment(start, end, available);
+          final preferred = segment == null
+              ? (start + end) / 2
+              : (segment.$1 + segment.$2) / 2;
+          final rect = ArchitectClearanceBadgeLayout.place(
+            preferred: preferred,
+            available: available,
+            excluded: excluded,
+            intersectsWall: (rect) {
+              final modelRect = Rect.fromPoints(
+                _viewport.toModel(rect.topLeft),
+                _viewport.toModel(rect.bottomRight),
+              );
+              return Path.combine(
+                PathOperation.intersect,
+                body,
+                Path()..addRect(modelRect),
+              ).computeMetrics().isNotEmpty;
+            },
+          );
+          placements[gap.key] = rect;
+          excluded.add(rect);
+        }
+        for (final gap in openingClearances) {
           final start = _viewport.toScreen(gap.start),
               end = _viewport.toScreen(gap.end);
           final segment = BimLineGeometry.visibleSegment(start, end, available);
@@ -4400,6 +4598,60 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                       ? Colors.cyanAccent
                                       : const Color(0xFFFFB74D),
                                   fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            for (final gap in openingClearances)
+              Builder(
+                builder: (context) {
+                  final rect = placements[gap.key]!;
+                  return Positioned.fromRect(
+                    rect: rect,
+                    child: IgnorePointer(
+                      ignoring: _radialMenuScreenPosition != null,
+                      child: Tooltip(
+                        message: context.l10n.architectOpeningClearance,
+                        child: Material(
+                          color: gap.isModularSnap
+                              ? const Color(0xEE004D40)
+                              : const Color(0xEE1E242C),
+                          elevation: 3,
+                          shadowColor: Colors.black54,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            side: BorderSide(
+                              color: gap.isModularSnap
+                                  ? const Color(0xFF64FFDA)
+                                  : Colors.white24,
+                            ),
+                          ),
+                          child: InkWell(
+                            key: ValueKey('opening-clearance-${gap.key}'),
+                            onTap: () {
+                              setState(() => _radialMenuScreenPosition = null);
+                              _editOpeningClearance(gap);
+                            },
+                            child: Center(
+                              child: Text(
+                                _project.units.format(
+                                  gap.distance,
+                                  decimals: 3,
+                                ),
+                                style: TextStyle(
+                                  color: gap.isModularSnap
+                                      ? const Color(0xFF64FFDA)
+                                      : Colors.cyanAccent,
+                                  fontSize: 12,
+                                  fontWeight: gap.isModularSnap
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
                                 ),
                               ),
                             ),
@@ -4771,6 +5023,46 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
+  void _editOpeningClearance(ArchitectOpeningClearance gap) {
+    var distance = gap.distance;
+    final storeyId = _project.activeStoreyId;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: SizedBox(
+          width: 220,
+          child: ArchitectWallDraftingPanel(
+            title: context.l10n.architectOpeningClearance,
+            endLabel: context.l10n.save,
+            length: _project.units.toUnit(distance),
+            unit: _project.units.symbol,
+            minimumLength: 0,
+            keypadInitiallyOpen: true,
+            showContinue: false,
+            showDirection: false,
+            onLength: (value) => distance = _project.units.fromUnit(value),
+            onEnd: () {
+              Navigator.of(dialogContext).pop();
+              _executeWallEdit(
+                SetArchitectOpeningClearance(
+                  storeyId: storeyId,
+                  wallId: gap.wallId,
+                  openingId: gap.openingId,
+                  isLeft: gap.isLeft,
+                  distance: distance,
+                ),
+              );
+              _saveBiMProjectIfAttached();
+            },
+            onCancel: () => Navigator.of(dialogContext).pop(),
+            onUnlock: () {},
+            onContinue: () {},
+          ),
+        ),
+      ),
+    );
+  }
+
   void _chooseWallDimension() {
     if (_wallDirectionLocked) return;
     setState(() {
@@ -4838,20 +5130,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _tryPlaceDoorAt(Offset point) {
     final activeStorey = _project.activeStorey;
-    ArchitectWall? targetWall;
-    double bestDist = double.infinity;
+    final placement = ArchitectOpeningPlacement.resolve(
+      walls: activeStorey.walls,
+      rawPoint: point,
+      openingWidth: _doorWidth,
+      magnetic: _magnetEnabled,
+    );
+    if (placement == null) return;
 
-    for (final wall in activeStorey.walls) {
-      final (_, dist) = wall.projectPoint(point);
-      if (dist <= wall.thickness / 2.0 + 0.30 && dist < bestDist) {
-        bestDist = dist;
-        targetWall = wall;
-      }
-    }
-
-    if (targetWall == null) return;
-
-    final (ratio, _) = targetWall.projectPoint(point);
+    final targetWall = placement.wall;
+    final ratio = placement.offsetRatio;
     final now = ArchitectElementId.next('element');
 
     final activeStyle =
@@ -8603,6 +8891,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         activeWallExteriorSide: _wallExteriorSide,
         showWallCursor: !_placingWithHold,
         wallClearances: _wallClearances,
+        openingClearances: _openingClearances,
+        showOpeningClearanceBadges: _showOpeningClearanceBadges,
+        doorPreview: _doorPreview,
+        windowPreview: _windowPreview,
         wallTrimSpan:
             _wallCutIds.isNotEmpty && !_wallCutStroke && _cursorModel != null
             ? _trimSpanAt(_cursorModel!)

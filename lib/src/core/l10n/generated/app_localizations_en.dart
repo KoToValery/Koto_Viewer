@@ -5908,4 +5908,12 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectViewDrawingEmpty =>
       'Choose or create a view from the menu.';
+
+  @override
+  String get architectOpeningClearance => 'Opening clearance';
+
+  @override
+  String architectOpeningModularSnap(int step) {
+    return 'Modular step ($step cm)';
+  }
 }

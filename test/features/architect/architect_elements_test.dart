@@ -4,7 +4,9 @@ import 'package:kotoview/src/features/architect/models/architect_elements.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/models/architect_window.dart';
+import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/services/architect_element_tool.dart';
+import 'package:kotoview/src/features/architect/services/architect_wall_relations.dart';
 import 'package:kotoview/src/features/bim_projects/models/bim_work_project.dart';
 
 void main() {
@@ -250,6 +252,149 @@ void main() {
       expect(res!.$1.slabs.length, 1);
       expect(res.$1.slabs.first.polygon.length, 4);
       expect(tool.slabDraftPoints.isEmpty, isTrue);
+    });
+  });
+
+  group('Constructive Modular Snapping & Opening Clearances Tests', () {
+    test('snaps window placement to multiples of wall coreThickness (25/50/150 cm)', () {
+      // Wall with 25 cm brick core + 12 cm EPS insulation (total 37 cm)
+      const wall = ArchitectWall(
+        id: 'w_ext',
+        startPoint: Offset(0, 0),
+        endPoint: Offset(8, 0),
+        thickness: 0.37,
+        insulationThicknessOverride: 0.12,
+      );
+      expect(wall.coreThickness, closeTo(0.25, 1e-6));
+      expect(ArchitectOpeningPlacement.modularStepForWall(wall), closeTo(0.25, 1e-6));
+
+      // Place a 1.20 m window near 31 cm from wall start -> snaps left clearance to 25 cm (0.25 m)
+      // Left jamb = 0.25 m => center = 0.25 + 0.60 = 0.85 m
+      final p25 = ArchitectOpeningPlacement.resolve(
+        rawPoint: const Offset(0.91, 0.0),
+        walls: [wall],
+        openingWidth: 1.20,
+      );
+      expect(p25, isNotNull);
+      expect(p25!.isModularSnap, isTrue);
+      expect(p25.clearances.first.isLeft, isTrue);
+      expect(p25.clearances.first.distance, closeTo(0.25, 1e-5));
+      expect(p25.clearances.first.isModularSnap, isTrue);
+
+      // Place asecond 1.20 m window to the right of the first window ([0.25 .. 1.45]):
+      // Suppose cursor aims for ~1.48 m clear distance from first window -> snaps to 1.50 m (150 cm = 6 x 25 cm)
+      final wallWithFirst = wall.addWindow(
+        ArchitectWindow(
+          id: 'win_1',
+          wallId: wall.id,
+          offsetRatio: p25.offsetRatio,
+          width: 1.20,
+          uuid: 'u1',
+        ),
+      );
+      // Right jamb of win_1 is at 1.45 m. For 1.50 m clearance, left jamb of win_2 = 2.95 m => center = 3.55 m.
+      final p150 = ArchitectOpeningPlacement.resolve(
+        rawPoint: const Offset(3.52, 0.0),
+        walls: [wallWithFirst],
+        openingWidth: 1.20,
+      );
+      expect(p150, isNotNull);
+      expect(p150!.isModularSnap, isTrue);
+      final leftToFirstWin = p150.clearances.firstWhere((c) => c.isLeft);
+      expect(
+        leftToFirstWin.boundaryKind,
+        ArchitectOpeningBoundaryKind.neighborOpening,
+      );
+      expect(leftToFirstWin.referenceElementId, 'win_1');
+      expect(leftToFirstWin.distance, closeTo(1.50, 1e-5));
+      expect(leftToFirstWin.isModularSnap, isTrue);
+    });
+
+    test('computes clearance to intersecting cross wall and edits via SetArchitectOpeningClearance', () {
+      const hostWall = ArchitectWall(
+        id: 'w_host',
+        startPoint: Offset(0, 0),
+        endPoint: Offset(8, 0),
+        thickness: 0.25,
+      );
+      // Cross wall at x = 4.0 with 0.25 m thickness (occupies [3.875 .. 4.125] along w_host)
+      const crossWall = ArchitectWall(
+        id: 'w_cross',
+        startPoint: Offset(4, 0),
+        endPoint: Offset(4, 4),
+        thickness: 0.25,
+      );
+      final win = const ArchitectWindow(
+        id: 'win_edit',
+        wallId: 'w_host',
+        offsetRatio: 1.10 / 8.0, // center at 1.10 m, width 1.20 m => [0.50 .. 1.70]
+        width: 1.20,
+        uuid: 'u_edit',
+      );
+      final storey = ArchitectStorey(
+        id: 's1',
+        name: 'Storey 1',
+        elevation: 0,
+        height: 3.0,
+        walls: [hostWall.addWindow(win), crossWall],
+      );
+      final project = ArchitectProject(
+        id: 'p1',
+        name: 'Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: [storey],
+        activeStoreyId: 's1',
+      );
+
+      final clearances = ArchitectOpeningClearance.forOpening(
+        wall: storey.walls.first,
+        walls: storey.walls,
+        openingId: 'win_edit',
+        offsetRatio: win.offsetRatio,
+        openingWidth: win.width,
+      );
+      expect(clearances.length, 2);
+      final leftGap = clearances.firstWhere((c) => c.isLeft);
+      final rightGap = clearances.firstWhere((c) => !c.isLeft);
+      expect(leftGap.distance, closeTo(0.50, 1e-4));
+      expect(
+        rightGap.boundaryKind,
+        ArchitectOpeningBoundaryKind.intersectingWall,
+      );
+      // Right jamb at 1.70 m, cross wall left core face at 4.0 - 0.125 = 3.875 m => distance = 2.175 m
+      expect(rightGap.distance, closeTo(2.175, 1e-4));
+
+      // Edit right clearance to cross wall to 0.75 m (75 cm = 3 bricks)
+      final controller = ArchitectCommandController(project);
+      controller.execute(
+        const SetArchitectOpeningClearance(
+          storeyId: 's1',
+          wallId: 'w_host',
+          openingId: 'win_edit',
+          isLeft: false,
+          distance: 0.75,
+        ),
+      );
+      final updatedWin = controller.project.activeStorey.walls.first.windows.single;
+      final updatedClearances = ArchitectOpeningClearance.forOpening(
+        wall: controller.project.activeStorey.walls.first,
+        walls: controller.project.activeStorey.walls,
+        openingId: 'win_edit',
+        offsetRatio: updatedWin.offsetRatio,
+        openingWidth: updatedWin.width,
+      );
+      expect(
+        updatedClearances.firstWhere((c) => !c.isLeft).distance,
+        closeTo(0.75, 1e-4),
+      );
+
+      // Undo restores original 0.50 m left clearance
+      controller.undo();
+      expect(
+        controller.project.activeStorey.walls.first.windows.single.offsetRatio,
+        closeTo(win.offsetRatio, 1e-6),
+      );
     });
   });
 }

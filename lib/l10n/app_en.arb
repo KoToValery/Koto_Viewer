@@ -3902,6 +3902,19 @@
         "type": "int"
       }
     }
+  },
+  "architectOpeningClearance": "Opening clearance",
+  "@architectOpeningClearance": {
+    "description": "Dynamic clearance dimension from door or window jamb to adjacent opening or wall"
+  },
+  "architectOpeningModularSnap": "Modular step ({step} cm)",
+  "@architectOpeningModularSnap": {
+    "description": "Snap label when door or window position snaps to a masonry multiple of wall core thickness",
+    "placeholders": {
+      "step": {
+        "type": "int"
+      }
+    }
   }
 
 }

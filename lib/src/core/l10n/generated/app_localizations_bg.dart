@@ -5929,4 +5929,12 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectViewDrawingEmpty =>
       'Изберете или създайте изглед от менюто.';
+
+  @override
+  String get architectOpeningClearance => 'Чисто разстояние (простенок)';
+
+  @override
+  String architectOpeningModularSnap(int step) {
+    return 'Модулна стъпка ($step cm)';
+  }
 }

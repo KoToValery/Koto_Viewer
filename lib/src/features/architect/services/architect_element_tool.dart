@@ -12,6 +12,7 @@ import '../models/architect_wall.dart';
 import '../models/architect_window.dart';
 import '../models/architect_fenestration_style.dart';
 import '../rendering/architect_2d_painter.dart' show ArchitectTool;
+import 'architect_wall_relations.dart';
 
 /// Unified controller and interaction manager for specialized architectural drafting elements
 /// (windows, columns, beams, slabs, openings, stairs, dimensions, elevation markers, annotations, and CAD primitives).
@@ -104,27 +105,23 @@ class ArchitectElementTool extends ChangeNotifier {
   (ArchitectStorey, ArchitectWindow)? placeWindow({
     required ArchitectStorey storey,
     required Offset point,
+    bool magnetic = true,
   }) {
-    ArchitectWall? targetWall;
-    double bestDist = double.infinity;
+    final placement = ArchitectOpeningPlacement.resolve(
+      rawPoint: point,
+      walls: storey.walls,
+      openingWidth: windowWidth,
+      magnetic: magnetic,
+    );
+    if (placement == null) return null;
 
-    for (final wall in storey.walls) {
-      final (_, dist) = wall.projectPoint(point);
-      if (dist <= wall.thickness / 2.0 + 0.30 && dist < bestDist) {
-        bestDist = dist;
-        targetWall = wall;
-      }
-    }
-
-    if (targetWall == null) return null;
-
-    final (ratio, _) = targetWall.projectPoint(point);
+    final targetWall = placement.wall;
     final now = ArchitectElementId.next('element');
 
     final newWindow = ArchitectWindow(
       id: 'win_$now',
       wallId: targetWall.id,
-      offsetRatio: ratio,
+      offsetRatio: placement.offsetRatio,
       width: windowWidth,
       height: windowHeight,
       sillHeight: windowSill,
