@@ -5420,7 +5420,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get buildingSectionHint =>
-      'Choose two points in plan to define the section.';
+      'Set the cut line, then choose its viewing side.';
 
   @override
   String get buildingSectionEmpty => 'No elements intersect this cut.';
@@ -5877,4 +5877,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectRoofSectionDetailTitle => 'Roof assembly';
+
+  @override
+  String get architectSectionStartHint => 'Choose the start of the cut.';
+
+  @override
+  String get architectViewEndHint => 'Set the end using the alignment guides.';
+
+  @override
+  String get architectViewDirectionHint =>
+      'Choose the viewing side shown by the arrows.';
 }

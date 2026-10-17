@@ -7,6 +7,7 @@ import '../rendering/architect_elevation_markers.dart';
 import '../services/architect_building_elevation.dart';
 import '../services/architect_command_controller.dart';
 import 'architect_elevation_labels.dart';
+import 'architect_view_plan.dart';
 
 enum _Placement { none, elevation, north }
 
@@ -84,33 +85,6 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
     elevationTransform.value = Matrix4.identity();
   }
 
-  /// Snap the marker's angle to the closest wall when the drafted direction is
-  /// within 12 degrees. Its offset stays where the user placed it.
-  Offset parallelEnd(Offset a, Offset b) {
-    final walls = project.storeys
-        .expand((s) => s.walls)
-        .where((w) => w.length > .01)
-        .toList();
-    if (walls.isEmpty) return b;
-    double distanceToWall(int index) {
-      final wall = walls[index];
-      final delta = a - wall.startPoint;
-      final t = (delta.dx * wall.unitVector.dx + delta.dy * wall.unitVector.dy)
-          .clamp(0.0, wall.length)
-          .toDouble();
-      return (a - wall.startPoint - wall.unitVector * t).distance;
-    }
-
-    var nearest = 0;
-    for (var i = 1; i < walls.length; i++) {
-      if (distanceToWall(i) < distanceToWall(nearest)) nearest = i;
-    }
-    final axis = walls[nearest].unitVector, delta = b - a;
-    final along = delta.dx * axis.dx + delta.dy * axis.dy;
-    if (along.abs() / delta.distance < math.cos(math.pi / 15)) return b;
-    return a + axis * along;
-  }
-
   void planTap(Offset point, double scale) {
     if (placement == _Placement.none) {
       final north = project.northSymbol;
@@ -153,7 +127,7 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
       return;
     }
     if (second == null) {
-      final end = parallelEnd(first!, point);
+      final end = point;
       if ((end - first!).distance >= .01) setState(() => second = end);
       return;
     }
@@ -198,33 +172,9 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
     }
   }
 
-  Rect get planBounds {
-    final points = <Offset>[
-      for (final s in project.storeys) ...[
-        for (final w in s.walls) ...w.polygonCorners,
-        for (final slab in s.slabs) ...slab.polygon,
-        for (final column in s.columns) ...[
-          column.position - Offset(column.width, column.depth),
-          column.position + Offset(column.width, column.depth),
-        ],
-        for (final stair in s.stairs) ...[
-          stair.displayBounds.topLeft,
-          stair.displayBounds.bottomRight,
-        ],
-        for (final beam in s.beams) ...beam.polygonCorners,
-      ],
-      for (final e in project.elevations) ...[e.start, e.end],
-      if (project.northSymbol != null) project.northSymbol!.position,
-    ];
-    return points.isEmpty
-        ? const Rect.fromLTWH(-5, -5, 10, 10)
-        : (Path()..addPolygon(points, false)).getBounds().inflate(3);
-  }
-
   @override
   Widget build(BuildContext context) {
     final l = context.l10n, value = selected;
-    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: Text(l.architectFacades),
@@ -350,23 +300,26 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
             if (placement != _Placement.none)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        placement == _Placement.north
-                            ? (first == null
-                                  ? l.architectNorthPositionHint
-                                  : l.architectNorthDirectionHint)
-                            : first == null
-                            ? l.architectFacadeStartHint
-                            : second == null
-                            ? l.architectFacadeEndHint
-                            : l.architectFacadeSideHint,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 64),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          placement == _Placement.north
+                              ? (first == null
+                                    ? l.architectNorthPositionHint
+                                    : l.architectNorthDirectionHint)
+                              : first == null
+                              ? l.architectFacadeStartHint
+                              : second == null
+                              ? l.architectViewEndHint
+                              : l.architectViewDirectionHint,
+                        ),
                       ),
-                    ),
-                    TextButton(onPressed: cancel, child: Text(l.cancel)),
-                  ],
+                      TextButton(onPressed: cancel, child: Text(l.cancel)),
+                    ],
+                  ),
                 ),
               ),
             Expanded(
@@ -377,40 +330,25 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
                     constraints.maxHeight,
                   );
                   if (plan) {
-                    final bounds = planBounds;
+                    final bounds = ArchitectViewPlan.bounds(project);
                     final scale =
                         math.min(
                           size.width / bounds.width,
                           size.height / bounds.height,
                         ) *
                         .85;
-                    return InteractiveViewer(
-                      transformationController: planTransform,
-                      minScale: .25,
-                      maxScale: 20,
-                      child: GestureDetector(
-                        key: const ValueKey('architect-facade-plan'),
-                        behavior: HitTestBehavior.opaque,
-                        onTapUp: (d) => planTap(
-                          bounds.center +
-                              (d.localPosition - size.center(Offset.zero)) /
-                                  scale,
-                          scale * planTransform.value.getMaxScaleOnAxis(),
-                        ),
-                        child: CustomPaint(
-                          size: size,
-                          painter: _FacadePlan(
-                            project,
-                            bounds.center,
-                            scale,
-                            l,
-                            colors,
-                            selectedId,
-                            first,
-                            second,
-                            Theme.of(context).textTheme.bodyMedium?.fontFamily,
-                          ),
-                        ),
+                    return ArchitectViewPlan(
+                      project: project,
+                      surfaceKey: 'architect-facade-plan',
+                      transform: planTransform,
+                      first: first,
+                      second: second,
+                      placing: placement != _Placement.none,
+                      north: placement == _Placement.north,
+                      selectedElevation: selectedId,
+                      onPoint: (point) => planTap(
+                        point,
+                        scale * planTransform.value.getMaxScaleOnAxis(),
                       ),
                     );
                   }
@@ -505,107 +443,6 @@ class _FacadeDrawing extends CustomPainter {
       geometry != oldDelegate.geometry ||
       centre != oldDelegate.centre ||
       scale != oldDelegate.scale;
-}
-
-class _FacadePlan extends CustomPainter {
-  final ArchitectProject project;
-  final Offset centre;
-  final double scale;
-  final AppLocalizations l;
-  final ColorScheme colors;
-  final String? selected;
-  final Offset? first, second;
-  final String? fontFamily;
-  _FacadePlan(
-    this.project,
-    this.centre,
-    this.scale,
-    this.l,
-    this.colors,
-    this.selected,
-    this.first,
-    this.second,
-    this.fontFamily,
-  );
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.save();
-    canvas.clipRect(Offset.zero & size);
-    canvas.translate(
-      size.width / 2 - centre.dx * scale,
-      size.height / 2 - centre.dy * scale,
-    );
-    canvas.scale(scale);
-    for (final storey in project.storeys) {
-      for (final slab in storey.slabs) {
-        final path = Path()..addPolygon(slab.polygon, true);
-        canvas.drawPath(
-          path,
-          Paint()..color = colors.primary.withValues(alpha: .08),
-        );
-        canvas.drawPath(
-          path,
-          Paint()
-            ..color = colors.onSurface.withValues(alpha: .3)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1 / scale,
-        );
-      }
-      for (final polygon in [
-        for (final wall in storey.walls) wall.polygonCorners,
-        for (final beam in storey.beams) beam.polygonCorners,
-      ]) {
-        canvas.drawPath(
-          Path()..addPolygon(polygon, true),
-          Paint()..color = colors.onSurface.withValues(alpha: .3),
-        );
-      }
-    }
-    for (final storey in project.storeys) {
-      for (final column in storey.columns) {
-        column.paint2D(
-          canvas: canvas,
-          zoomScale: scale,
-          defaultStoreyHeight: storey.height,
-        );
-      }
-      for (final stair in storey.stairs) {
-        canvas.drawRect(
-          stair.displayBounds,
-          Paint()
-            ..color = colors.onSurface.withValues(alpha: .3)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1 / scale,
-        );
-      }
-    }
-    drawArchitectElevationMarkers(
-      canvas,
-      project,
-      scale,
-      colors.onSurface,
-      l,
-      selected: selected,
-      fontFamily: fontFamily,
-    );
-    if (first != null) {
-      canvas.drawCircle(first!, 5 / scale, Paint()..color = colors.primary);
-      if (second != null) {
-        canvas.drawLine(
-          first!,
-          second!,
-          Paint()
-            ..color = colors.primary
-            ..strokeWidth = 2 / scale,
-        );
-        canvas.drawCircle(second!, 5 / scale, Paint()..color = colors.primary);
-      }
-    }
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _FacadePlan oldDelegate) => true;
 }
 
 class _NorthPreview extends CustomPainter {

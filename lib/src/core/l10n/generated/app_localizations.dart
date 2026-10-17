@@ -9482,7 +9482,7 @@ abstract class AppLocalizations {
   /// No description provided for @buildingSectionHint.
   ///
   /// In en, this message translates to:
-  /// **'Choose two points in plan to define the section.'**
+  /// **'Set the cut line, then choose its viewing side.'**
   String get buildingSectionHint;
 
   /// No description provided for @buildingSectionEmpty.
@@ -10372,6 +10372,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Roof assembly'**
   String get architectRoofSectionDetailTitle;
+
+  /// No description provided for @architectSectionStartHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the start of the cut.'**
+  String get architectSectionStartHint;
+
+  /// No description provided for @architectViewEndHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the end using the alignment guides.'**
+  String get architectViewEndHint;
+
+  /// No description provided for @architectViewDirectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the viewing side shown by the arrows.'**
+  String get architectViewDirectionHint;
 }
 
 class _AppLocalizationsDelegate

@@ -61,6 +61,24 @@ class ArchitectSection {
   Offset get axis =>
       length > 1e-9 ? (end - start) / length : const Offset(1, 0);
   Offset pointAt(double station) => start + axis * station;
+
+  /// Looking left of the ordered cut line makes station increase to screen-right.
+  /// Endpoint order persists the viewing direction in existing project files.
+  Offset get viewDirection => Offset(-axis.dy, axis.dx);
+  ArchitectSection reversed() => copyWith(
+    start: end,
+    end: start,
+    details: [
+      for (final d in details)
+        ArchitectSlabDetail(
+          id: d.id,
+          slabId: d.slabId,
+          station: length - d.station,
+          fallbackElevation: d.fallbackElevation,
+          textOffset: Offset(-d.textOffset.dx, d.textOffset.dy),
+        ),
+    ],
+  );
   ArchitectSection copyWith({
     String? name,
     Offset? start,

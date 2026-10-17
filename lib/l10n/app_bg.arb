@@ -1752,7 +1752,7 @@
   "buildingSection": "Разрез",
   "buildingSectionNew": "Нов разрез",
   "buildingSectionCut": "Промени сечението",
-  "buildingSectionHint": "Посочи две точки в плана за линия на разреза.",
+  "buildingSectionHint": "Задай линията на разреза, после посоката на гледане.",
   "buildingSectionEmpty": "Няма пресечени елементи.",
   "slabDetail": "Детайл — настилки",
   "slabDetailPick": "Посочи плоча, после постави надписите.",
@@ -1900,5 +1900,8 @@
   "architectRoofStepLabel": "Стъпка",
   "architectRoofHintStart": "Задръж и плъзни за първи ъгъл на ската или избери Авто-покрив.",
   "architectRoofHintNext": "Избери следващ ъгъл ({count} т.). Натисни Готово за затваряне.",
-  "architectRoofSectionDetailTitle": "Покривен детайл"
+  "architectRoofSectionDetailTitle": "Покривен детайл",
+  "architectSectionStartHint": "Посочи началото на разреза.",
+  "architectViewEndHint": "Посочи края по водачите за подравняване.",
+  "architectViewDirectionHint": "Посочи накъде да сочат стрелките."
 }

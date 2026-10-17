@@ -3725,7 +3725,7 @@
   "buildingSection": "Section",
   "buildingSectionNew": "New section",
   "buildingSectionCut": "Edit cut",
-  "buildingSectionHint": "Choose two points in plan to define the section.",
+  "buildingSectionHint": "Set the cut line, then choose its viewing side.",
   "buildingSectionEmpty": "No elements intersect this cut.",
   "slabDetail": "Floor detail",
   "slabDetailPick": "Pick a slab, then place its labels.",
@@ -3883,5 +3883,8 @@
       "count": { "type": "int" }
     }
   },
-  "architectRoofSectionDetailTitle": "Roof assembly"
+  "architectRoofSectionDetailTitle": "Roof assembly",
+  "architectSectionStartHint": "Choose the start of the cut.",
+  "architectViewEndHint": "Set the end using the alignment guides.",
+  "architectViewDirectionHint": "Choose the viewing side shown by the arrows."
 }

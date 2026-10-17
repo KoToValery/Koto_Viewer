@@ -5438,7 +5438,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get buildingSectionHint =>
-      'Посочи две точки в плана за линия на разреза.';
+      'Задай линията на разреза, после посоката на гледане.';
 
   @override
   String get buildingSectionEmpty => 'Няма пресечени елементи.';
@@ -5899,4 +5899,13 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectRoofSectionDetailTitle => 'Покривен детайл';
+
+  @override
+  String get architectSectionStartHint => 'Посочи началото на разреза.';
+
+  @override
+  String get architectViewEndHint => 'Посочи края по водачите за подравняване.';
+
+  @override
+  String get architectViewDirectionHint => 'Посочи накъде да сочат стрелките.';
 }

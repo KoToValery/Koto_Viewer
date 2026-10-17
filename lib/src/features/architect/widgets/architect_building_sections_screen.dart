@@ -9,6 +9,7 @@ import '../services/architect_command_controller.dart';
 import '../services/architect_slab_assemblies.dart';
 import '../services/architect_slab_geometry.dart';
 import 'architect_slab_labels.dart';
+import 'architect_view_plan.dart';
 
 /// Uses the workspace controller so changes, autosave and history remain live.
 class ArchitectBuildingSectionsScreen extends StatefulWidget {
@@ -21,7 +22,7 @@ class ArchitectBuildingSectionsScreen extends StatefulWidget {
 
 class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
   String? sectionId, selectedDetail;
-  Offset? firstPoint;
+  Offset? firstPoint, secondPoint;
   bool editingCut = false,
       placingDetail = false,
       movingDetail = false,
@@ -95,6 +96,19 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
     selectedDetail = null;
   }
 
+  void historyAction({bool redo = false}) {
+    setState(() {
+      firstPoint = secondPoint = null;
+      editingCut = false;
+      resetModes();
+    });
+    if (redo) {
+      widget.controller.redo();
+    } else {
+      widget.controller.undo();
+    }
+  }
+
   void planTap(Offset point) {
     if (!editingCut) return;
     if (firstPoint == null) {
@@ -102,17 +116,27 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
       return;
     }
     if ((point - firstPoint!).distance < .01) return;
-    final next =
-        cut?.copyWith(start: firstPoint, end: point) ??
+    if (secondPoint == null) {
+      setState(() => secondPoint = point);
+      return;
+    }
+    final axis = secondPoint! - firstPoint!;
+    final normal = Offset(-axis.dy, axis.dx);
+    final side = point - (firstPoint! + secondPoint!) / 2;
+    final dot = normal.dx * side.dx + normal.dy * side.dy;
+    if (dot.abs() / axis.distance < .01) return;
+    var next =
+        cut?.copyWith(start: firstPoint, end: secondPoint) ??
         ArchitectSection(
           id: ArchitectElementId.next('section'),
           start: firstPoint!,
-          end: point,
+          end: secondPoint!,
         );
+    if (dot < 0) next = next.reversed();
     sectionId = next.id;
     update(next);
     setState(() {
-      firstPoint = null;
+      firstPoint = secondPoint = null;
       editingCut = false;
       resetModes();
       transform.value = Matrix4.identity();
@@ -196,7 +220,8 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
           final r = roofSource!;
           anchor = Offset(
             pick.station,
-            r.storey.elevation + r.roof.topElevationAt(value.pointAt(pick.station)),
+            r.storey.elevation +
+                r.roof.topElevationAt(value.pointAt(pick.station)),
           );
         }
         final old = value.details
@@ -260,6 +285,16 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
     if (mounted && result != null) update(value.copyWith(name: result));
   }
 
+  Widget planPreview() => ArchitectViewPlan(
+    project: project,
+    surfaceKey: 'building-section-plan',
+    first: firstPoint,
+    second: secondPoint,
+    placing: editingCut,
+    selectedSection: sectionId,
+    onPoint: planTap,
+  );
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n, value = cut;
@@ -270,15 +305,13 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
         actions: [
           IconButton(
             tooltip: l.architectZoneUndoAction,
-            onPressed: widget.controller.canUndo
-                ? widget.controller.undo
-                : null,
+            onPressed: widget.controller.canUndo ? historyAction : null,
             icon: const Icon(Icons.undo),
           ),
           IconButton(
             tooltip: l.architectZoneRedoAction,
             onPressed: widget.controller.canRedo
-                ? widget.controller.redo
+                ? () => historyAction(redo: true)
                 : null,
             icon: const Icon(Icons.redo),
           ),
@@ -288,18 +321,27 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                 setState(() {
                   sectionId = null;
                   editingCut = true;
-                  firstPoint = null;
+                  firstPoint = secondPoint = null;
                   resetModes();
                 });
               }
               if (action == 'cut') {
                 setState(() {
                   editingCut = true;
-                  firstPoint = null;
+                  firstPoint = secondPoint = null;
                   resetModes();
                 });
               }
               if (action == 'name') rename();
+              if (action == 'flip' && value != null) {
+                setState(() {
+                  firstPoint = secondPoint = null;
+                  editingCut = false;
+                  resetModes();
+                });
+                update(value.reversed());
+                transform.value = Matrix4.identity();
+              }
               if (action == 'delete' && value != null) {
                 widget.controller.commit(
                   project.copyWith(
@@ -310,6 +352,8 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                 );
                 setState(() {
                   sectionId = project.sections.firstOrNull?.id;
+                  firstPoint = secondPoint = null;
+                  editingCut = sectionId == null;
                   resetModes();
                 });
               }
@@ -317,6 +361,10 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
             itemBuilder: (_) => [
               PopupMenuItem(value: 'new', child: Text(l.buildingSectionNew)),
               if (value != null) ...[
+                PopupMenuItem(
+                  value: 'flip',
+                  child: Text(l.architectFacadeReverse),
+                ),
                 PopupMenuItem(value: 'cut', child: Text(l.buildingSectionCut)),
                 PopupMenuItem(
                   value: 'name',
@@ -355,7 +403,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                   onChanged: (id) => setState(() {
                     sectionId = id;
                     editingCut = false;
-                    firstPoint = null;
+                    firstPoint = secondPoint = null;
                     resetModes();
                     transform.value = Matrix4.identity();
                   }),
@@ -363,55 +411,40 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
               ),
             if (editingCut)
               Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(l.buildingSectionHint),
-              ),
-            SizedBox(
-              height: math.min(200, MediaQuery.sizeOf(context).height * .23),
-              child: LayoutBuilder(
-                builder: (_, c) {
-                  final points = [
-                    for (final s in project.storeys) ...[
-                      for (final slab in s.slabs) ...slab.polygon,
-                      for (final wall in s.walls) ...wall.polygonCorners,
-                    ],
-                    if (value != null) ...[value.start, value.end],
-                    ?firstPoint,
-                  ];
-                  final bounds = points.isEmpty
-                      ? const Rect.fromLTWH(-5, -5, 10, 10)
-                      : (Path()..addPolygon(points, false)).getBounds().inflate(
-                          1,
-                        );
-                  final scale = math.min(
-                    c.maxWidth / bounds.width,
-                    c.maxHeight / bounds.height,
-                  );
-                  return GestureDetector(
-                    key: const ValueKey('building-section-plan'),
-                    behavior: HitTestBehavior.opaque,
-                    onTapUp: (d) => planTap(
-                      bounds.center +
-                          (d.localPosition -
-                                  Offset(c.maxWidth / 2, c.maxHeight / 2)) /
-                              scale,
-                    ),
-                    child: CustomPaint(
-                      size: Size.infinite,
-                      painter: _BuildingPlan(
-                        project,
-                        value,
-                        firstPoint,
-                        bounds.center,
-                        scale,
-                        colors,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 64),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          firstPoint == null
+                              ? l.architectSectionStartHint
+                              : secondPoint == null
+                              ? l.architectViewEndHint
+                              : l.architectViewDirectionHint,
+                        ),
                       ),
-                    ),
-                  );
-                },
+                      TextButton(
+                        onPressed: () => setState(() {
+                          editingCut = false;
+                          firstPoint = secondPoint = null;
+                          sectionId ??= project.sections.firstOrNull?.id;
+                        }),
+                        child: Text(l.cancel),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            if (value != null)
+            if (editingCut)
+              Expanded(child: planPreview())
+            else
+              SizedBox(
+                height: math.min(220, MediaQuery.sizeOf(context).height * .25),
+                child: planPreview(),
+              ),
+            if (value != null && !editingCut)
               Wrap(
                 alignment: WrapAlignment.center,
                 spacing: 4,
@@ -510,59 +543,65 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                 ),
               ),
             const Divider(height: 1),
-            Expanded(
-              child: value == null
-                  ? Center(child: Text(l.buildingSectionHint))
-                  : LayoutBuilder(
-                      builder: (_, c) {
-                        final data = geometry(value);
-                        final drawing = _SectionDrawing(
-                          project,
-                          value,
-                          data,
-                          l,
-                          colors,
-                          selectedDetail,
-                          Theme.of(context).textTheme.bodyMedium?.fontFamily,
-                        );
-                        final bounds = drawing.bounds.inflate(.8);
-                        final scale = math.min(
-                          c.maxWidth / math.max(bounds.width, .1),
-                          c.maxHeight / math.max(bounds.height, .1),
-                        );
-                        final centre = Offset(c.maxWidth / 2, c.maxHeight / 2);
-                        return ColoredBox(
-                          color: colors.surface,
-                          child: InteractiveViewer(
-                            transformationController: transform,
-                            minScale: .5,
-                            maxScale: 16,
-                            child: GestureDetector(
-                              key: const ValueKey('building-section-view'),
-                              behavior: HitTestBehavior.opaque,
-                              onTapUp: (d) {
-                                final p =
-                                    bounds.center +
-                                    Offset(
-                                      (d.localPosition.dx - centre.dx) / scale,
-                                      -(d.localPosition.dy - centre.dy) / scale,
-                                    );
-                                sectionTap(p, scale, drawing);
-                              },
-                              child: CustomPaint(
-                                size: Size(c.maxWidth, c.maxHeight),
-                                painter: _BuildingSectionPainter(
-                                  drawing,
-                                  bounds.center,
-                                  scale,
+            if (!editingCut)
+              Expanded(
+                child: value == null
+                    ? Center(child: Text(l.buildingSectionHint))
+                    : LayoutBuilder(
+                        builder: (_, c) {
+                          final data = geometry(value);
+                          final drawing = _SectionDrawing(
+                            project,
+                            value,
+                            data,
+                            l,
+                            colors,
+                            selectedDetail,
+                            Theme.of(context).textTheme.bodyMedium?.fontFamily,
+                          );
+                          final bounds = drawing.bounds.inflate(.8);
+                          final scale = math.min(
+                            c.maxWidth / math.max(bounds.width, .1),
+                            c.maxHeight / math.max(bounds.height, .1),
+                          );
+                          final centre = Offset(
+                            c.maxWidth / 2,
+                            c.maxHeight / 2,
+                          );
+                          return ColoredBox(
+                            color: colors.surface,
+                            child: InteractiveViewer(
+                              transformationController: transform,
+                              minScale: .5,
+                              maxScale: 16,
+                              child: GestureDetector(
+                                key: const ValueKey('building-section-view'),
+                                behavior: HitTestBehavior.opaque,
+                                onTapUp: (d) {
+                                  final p =
+                                      bounds.center +
+                                      Offset(
+                                        (d.localPosition.dx - centre.dx) /
+                                            scale,
+                                        -(d.localPosition.dy - centre.dy) /
+                                            scale,
+                                      );
+                                  sectionTap(p, scale, drawing);
+                                },
+                                child: CustomPaint(
+                                  size: Size(c.maxWidth, c.maxHeight),
+                                  painter: _BuildingSectionPainter(
+                                    drawing,
+                                    bounds.center,
+                                    scale,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
+                          );
+                        },
+                      ),
+              ),
           ],
         ),
       ),
@@ -742,10 +781,7 @@ class _BuildingSectionPainter extends CustomPainter {
       final fillColor =
           region.customFillColor ??
           ArchitectSlabGeometry.materialColor(region.material);
-      canvas.drawPath(
-        path,
-        Paint()..color = fillColor.withValues(alpha: .72),
-      );
+      canvas.drawPath(path, Paint()..color = fillColor.withValues(alpha: .72));
       canvas.drawPath(
         path,
         Paint()
@@ -893,79 +929,4 @@ class _BuildingSectionPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BuildingSectionPainter oldDelegate) => true;
-}
-
-class _BuildingPlan extends CustomPainter {
-  final ArchitectProject project;
-  final ArchitectSection? cut;
-  final Offset? first;
-  final Offset centre;
-  final double scale;
-  final ColorScheme colors;
-  _BuildingPlan(
-    this.project,
-    this.cut,
-    this.first,
-    this.centre,
-    this.scale,
-    this.colors,
-  );
-  @override
-  void paint(Canvas canvas, Size size) {
-    Offset p(Offset v) =>
-        Offset(size.width / 2, size.height / 2) + (v - centre) * scale;
-    canvas.save();
-    canvas.clipRect(Offset.zero & size);
-    for (final floor in project.storeys) {
-      for (final slab in floor.slabs) {
-        final path = Path()..addPolygon(slab.polygon.map(p).toList(), true);
-        canvas.drawPath(
-          path,
-          Paint()..color = colors.primary.withValues(alpha: .08),
-        );
-        canvas.drawPath(
-          path,
-          Paint()
-            ..color = colors.onSurface.withValues(alpha: .35)
-            ..style = PaintingStyle.stroke,
-        );
-      }
-      for (final roof in floor.roofs) {
-        final path = Path()..addPolygon(roof.points.map(p).toList(), true);
-        canvas.drawPath(
-          path,
-          Paint()..color = const Color(0xFFC85A32).withValues(alpha: .15),
-        );
-        canvas.drawPath(
-          path,
-          Paint()
-            ..color = const Color(0xFFC85A32).withValues(alpha: .6)
-            ..style = PaintingStyle.stroke,
-        );
-      }
-      for (final wall in floor.walls) {
-        canvas.drawPath(
-          Path()..addPolygon(wall.polygonCorners.map(p).toList(), true),
-          Paint()..color = colors.onSurface.withValues(alpha: .2),
-        );
-      }
-    }
-    for (final section in project.sections) {
-      final paint = Paint()
-        ..color = section.id == cut?.id
-            ? colors.primary
-            : colors.onSurface.withValues(alpha: .2)
-        ..strokeWidth = 2;
-      canvas.drawLine(p(section.start), p(section.end), paint);
-      canvas.drawCircle(p(section.start), 3, paint);
-      canvas.drawCircle(p(section.end), 3, paint);
-    }
-    if (first != null) {
-      canvas.drawCircle(p(first!), 5, Paint()..color = Colors.orange);
-    }
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _BuildingPlan oldDelegate) => true;
 }

@@ -76,17 +76,19 @@ Future<void> tapPlan(
   await tester.pumpAndSettle();
 }
 
+Future<void> loadQaFonts() async {
+  final file = File('C:/Windows/Fonts/arial.ttf');
+  if (!Platform.isWindows || !file.existsSync()) return;
+  final loader = FontLoader('TestReadable')
+    ..addFont(Future.value(ByteData.sublistView(file.readAsBytesSync())));
+  await loader.load();
+  final icons = FontLoader('MaterialIcons')
+    ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+  await icons.load();
+}
+
 void main() {
-  setUpAll(() async {
-    final file = File('C:/Windows/Fonts/arial.ttf');
-    if (!Platform.isWindows || !file.existsSync()) return;
-    final loader = FontLoader('TestReadable')
-      ..addFont(Future.value(ByteData.sublistView(file.readAsBytesSync())));
-    await loader.load();
-    final icons = FontLoader('MaterialIcons')
-      ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
-    await icons.load();
-  });
+  setUpAll(loadQaFonts);
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets('workspace opens elevations using the shared project', (

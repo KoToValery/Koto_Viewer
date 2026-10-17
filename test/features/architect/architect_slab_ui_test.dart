@@ -197,7 +197,7 @@ void main() {
       },
     );
   }
-  testWidgets('two plan taps save a section and undo removes it', (
+  testWidgets('cut line and viewing side save a section and undo removes it', (
     tester,
   ) async {
     final controller = ArchitectCommandController(fixture.slabProject());
@@ -212,6 +212,9 @@ void main() {
     await tester.tapAt(bounds.centerLeft + const Offset(30, 0));
     await tester.pump();
     await tester.tapAt(bounds.centerRight - const Offset(30, 0));
+    await tester.pumpAndSettle();
+    expect(controller.project.sections, isEmpty);
+    await tester.tapAt(bounds.center + const Offset(0, 30));
     await tester.pumpAndSettle();
     expect(controller.project.sections, hasLength(1));
     expect(
