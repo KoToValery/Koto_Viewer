@@ -4792,6 +4792,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectDimensionOverall => 'Overall dimension';
 
   @override
+  String get architectDimensionSnap30cm => '30 cm';
+
+  @override
+  String get architectDimensionSnap40cm => '40 cm';
+
+  @override
+  String get architectDimensionNewPoint => 'New point';
+
+  @override
   String get architectStoreyGround => 'Ground Floor';
 
   @override
@@ -5887,4 +5896,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectViewDirectionHint =>
       'Choose the viewing side shown by the arrows.';
+
+  @override
+  String architectSectionNumber(int number) {
+    return 'Section $number';
+  }
+
+  @override
+  String get architectManageViews => 'Manage views';
+
+  @override
+  String get architectViewDrawingEmpty =>
+      'Choose or create a view from the menu.';
 }

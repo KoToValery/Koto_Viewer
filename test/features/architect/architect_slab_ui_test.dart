@@ -80,6 +80,8 @@ void main() {
     expect(controller.project.activeStorey.slabs.single.thickness, .2);
     controller.undo(); await tester.pumpAndSettle();
     expect(controller.project.activeStorey.slabs.single.assemblyId, isNull);
+    await tester.tap(find.byKey(const ValueKey('architect-view-section')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('architect-building-sections')));
     await tester.pumpAndSettle();
     expect(find.byType(ArchitectBuildingSectionsScreen), findsOneWidget);

@@ -3427,6 +3427,12 @@
   "architectDimensionPositionHint": "Tap to position the dimension line, or enter an exact offset.",
   "architectSelectionCycleHelp": "Tap to add or remove; repeated taps cycle overlaps. Hold for actions.",
   "architectDimensionOverall": "Overall dimension",
+  "architectDimensionSnap30cm": "30 cm",
+  "@architectDimensionSnap30cm": { "description": "Snap indicator label when dimension distance is 30 cm" },
+  "architectDimensionSnap40cm": "40 cm",
+  "@architectDimensionSnap40cm": { "description": "Snap indicator label when dimension distance is 40 cm" },
+  "architectDimensionNewPoint": "New point",
+  "@architectDimensionNewPoint": { "description": "Context menu action to add a new point to a dimension" },
   "architectDefaultProjectName": "Architectural Project",
   "@architectDefaultProjectName": { "description": "Default name for a new architectural project" },
   "architectStoreyGround": "Ground Floor",
@@ -3886,5 +3892,16 @@
   "architectRoofSectionDetailTitle": "Roof assembly",
   "architectSectionStartHint": "Choose the start of the cut.",
   "architectViewEndHint": "Set the end using the alignment guides.",
-  "architectViewDirectionHint": "Choose the viewing side shown by the arrows."
+  "architectViewDirectionHint": "Choose the viewing side shown by the arrows.",
+  "architectSectionNumber": "Section {number}",
+  "architectManageViews": "Manage views",
+  "architectViewDrawingEmpty": "Choose or create a view from the menu.",
+  "@architectSectionNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  }
+
 }

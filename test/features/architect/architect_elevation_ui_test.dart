@@ -97,6 +97,8 @@ void main() {
     final controller = ArchitectCommandController(fixture.elevationProject());
     addTearDown(controller.dispose);
     await workspace.open(tester, controller);
+    await tester.tap(find.byKey(const ValueKey('architect-view-elevation')));
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('architect-building-elevations')),
     );

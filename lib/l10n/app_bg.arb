@@ -1548,6 +1548,9 @@
   "architectDimensionPositionHint": "Посочи място за размерната линия или въведи точно отстояние.",
   "architectSelectionCycleHelp": "Тап добавя/изключва; повторен тап обхожда застъпванията. Задръж за меню.",
   "architectDimensionOverall": "Общ размер",
+  "architectDimensionSnap30cm": "30 см",
+  "architectDimensionSnap40cm": "40 см",
+  "architectDimensionNewPoint": "Нова точка",
   "architectDefaultProjectName": "Архитектурен проект",
   "architectStoreyGround": "Партер",
   "architectStoreyFloor": "Етаж",
@@ -1903,5 +1906,16 @@
   "architectRoofSectionDetailTitle": "Покривен детайл",
   "architectSectionStartHint": "Посочи началото на разреза.",
   "architectViewEndHint": "Посочи края по водачите за подравняване.",
-  "architectViewDirectionHint": "Посочи накъде да сочат стрелките."
+  "architectViewDirectionHint": "Посочи накъде да сочат стрелките.",
+  "architectSectionNumber": "Разрез {number}",
+  "architectManageViews": "Управление",
+  "architectViewDrawingEmpty": "Изберете или създайте изглед от менюто.",
+  "@architectSectionNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  }
+
 }

@@ -14,14 +14,22 @@ import 'architect_view_plan.dart';
 /// Uses the workspace controller so changes, autosave and history remain live.
 class ArchitectBuildingSectionsScreen extends StatefulWidget {
   final ArchitectCommandController controller;
-  const ArchitectBuildingSectionsScreen({super.key, required this.controller});
+  final String? initialSelectedId;
+  final ValueChanged<String?>? onViewSelected;
+  const ArchitectBuildingSectionsScreen({super.key, required this.controller, this.initialSelectedId, this.onViewSelected});
   @override
   State<ArchitectBuildingSectionsScreen> createState() =>
       _BuildingSectionsState();
 }
 
 class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
-  String? sectionId, selectedDetail;
+  String? _sectionId;
+  String? get sectionId => _sectionId;
+  set sectionId(String? value) {
+    _sectionId = value;
+    widget.onViewSelected?.call(value);
+  }
+  String? selectedDetail;
   Offset? firstPoint, secondPoint;
   bool editingCut = false,
       placingDetail = false,
@@ -39,7 +47,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
   @override
   void initState() {
     super.initState();
-    sectionId = project.sections.firstOrNull?.id;
+    sectionId = project.sections.where((e) => e.id == widget.initialSelectedId).firstOrNull?.id ?? project.sections.firstOrNull?.id;
     editingCut = sectionId == null;
     widget.controller.addListener(changed);
   }
@@ -143,13 +151,13 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
     });
   }
 
-  void sectionTap(Offset point, double scale, _SectionDrawing drawing) {
+  void sectionTap(Offset point, double scale, ArchitectSectionDrawing drawing) {
     final value = cut;
     if (value == null) return;
     final data = geometry(value);
     if (movingDetail && selectedDetail != null) {
       final detail = value.details.firstWhere((d) => d.id == selectedDetail);
-      final layout = drawing.detailLayout(detail);
+      final layout = drawing._detailLayout(detail);
       update(
         value.copyWith(
           details: [
@@ -249,7 +257,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
       return;
     }
     for (final d in value.details.reversed) {
-      if (drawing.detailLayout(d).bounds.inflate(8 / scale).contains(point)) {
+      if (drawing._detailLayout(d).bounds.inflate(8 / scale).contains(point)) {
         setState(() => selectedDetail = d.id);
         return;
       }
@@ -550,7 +558,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                     : LayoutBuilder(
                         builder: (_, c) {
                           final data = geometry(value);
-                          final drawing = _SectionDrawing(
+                          final drawing = ArchitectSectionDrawing(
                             project,
                             value,
                             data,
@@ -590,7 +598,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                                 },
                                 child: CustomPaint(
                                   size: Size(c.maxWidth, c.maxHeight),
-                                  painter: _BuildingSectionPainter(
+                                  painter: ArchitectBuildingSectionPainter(
                                     drawing,
                                     bounds.center,
                                     scale,
@@ -629,7 +637,7 @@ class _DetailLayout {
   );
 }
 
-class _SectionDrawing {
+class ArchitectSectionDrawing {
   final ArchitectProject project;
   final ArchitectSection cut;
   final ArchitectBuildingSection data;
@@ -637,7 +645,7 @@ class _SectionDrawing {
   final ColorScheme colors;
   final String? selected;
   final String? fontFamily;
-  _SectionDrawing(
+  ArchitectSectionDrawing(
     this.project,
     this.cut,
     this.data,
@@ -647,7 +655,7 @@ class _SectionDrawing {
     this.fontFamily,
   );
   double get textHeight => project.dimensionScale.textHeight;
-  _DetailLayout detailLayout(ArchitectSlabDetail detail) {
+  _DetailLayout _detailLayout(ArchitectSlabDetail detail) {
     final source = ArchitectBuildingSection.source(project, cut, detail);
     final roofSource = source == null
         ? ArchitectBuildingSection.roofSource(project, cut, detail)
@@ -751,17 +759,17 @@ class _SectionDrawing {
   Rect get bounds {
     var b = data.bounds;
     for (final d in cut.details) {
-      b = b.expandToInclude(detailLayout(d).bounds);
+      b = b.expandToInclude(_detailLayout(d).bounds);
     }
     return b;
   }
 }
 
-class _BuildingSectionPainter extends CustomPainter {
-  final _SectionDrawing drawing;
+class ArchitectBuildingSectionPainter extends CustomPainter {
+  final ArchitectSectionDrawing drawing;
   final Offset centre;
   final double scale;
-  _BuildingSectionPainter(this.drawing, this.centre, this.scale);
+  ArchitectBuildingSectionPainter(this.drawing, this.centre, this.scale);
   @override
   void paint(Canvas canvas, Size size) {
     final color = drawing.colors.onSurface;
@@ -871,7 +879,7 @@ class _BuildingSectionPainter extends CustomPainter {
       );
     }
     for (final detail in drawing.cut.details) {
-      final d = drawing.detailLayout(detail);
+      final d = drawing._detailLayout(detail);
       final c = d.lost
           ? drawing.colors.error
           : detail.id == drawing.selected
@@ -928,5 +936,5 @@ class _BuildingSectionPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _BuildingSectionPainter oldDelegate) => true;
+  bool shouldRepaint(covariant ArchitectBuildingSectionPainter oldDelegate) => true;
 }

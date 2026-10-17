@@ -50,6 +50,7 @@ enum ArchitectToolCategory {
 /// Responsive bottom bar for architectural drafting tools and contextual sub-options.
 class ArchitectToolPalette extends StatefulWidget {
   final ArchitectTool activeTool;
+  final bool drawingOnly;
   final ValueChanged<ArchitectTool> onToolChanged;
 
   // Fenestration (Window & Door Editor) options
@@ -123,6 +124,7 @@ class ArchitectToolPalette extends StatefulWidget {
   const ArchitectToolPalette({
     super.key,
     required this.activeTool,
+    this.drawingOnly = false,
     required this.onToolChanged,
     this.activeZoneCategory = ArchitectZoneCategory.living,
     required this.onZoneCategoryChanged,
@@ -181,12 +183,16 @@ class ArchitectToolPalette extends StatefulWidget {
 
 class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   late ArchitectToolCategory category = ArchitectToolCategory.of(
-    widget.activeTool,
+    widget.drawingOnly ? ArchitectTool.cadLine : widget.activeTool,
   );
 
   @override
   void didUpdateWidget(ArchitectToolPalette oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.drawingOnly && category != ArchitectToolCategory.annotations &&
+        category != ArchitectToolCategory.drawing) {
+      category = ArchitectToolCategory.drawing;
+    }
     if (widget.activeTool != oldWidget.activeTool &&
         widget.activeTool != ArchitectTool.select) {
       category = ArchitectToolCategory.of(widget.activeTool);
@@ -322,7 +328,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                     initialValue: category,
                     onSelected: (value) => setState(() => category = value),
                     itemBuilder: (_) => [
-                      for (final value in ArchitectToolCategory.values)
+                      for (final value in ArchitectToolCategory.values.where((c) => !widget.drawingOnly || c == ArchitectToolCategory.annotations || c == ArchitectToolCategory.drawing))
                         PopupMenuItem(
                           value: value,
                           key: ValueKey('architect-category-${value.name}'),

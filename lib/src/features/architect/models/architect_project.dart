@@ -316,6 +316,7 @@ class ArchitectProject {
     List<ArchitectSection>? sections,
     List<ArchitectElevation>? elevations,
     ArchitectNorthSymbol? northSymbol,
+    bool clearNorthSymbol = false,
     Map<String, int>? slabCompositionNumbers,
   }) => ArchitectProject(
     id: id ?? this.id,
@@ -332,7 +333,7 @@ class ArchitectProject {
     slabAssemblies: slabAssemblies ?? this.slabAssemblies,
     sections: sections ?? this.sections,
     elevations: elevations ?? this.elevations,
-    northSymbol: northSymbol ?? this.northSymbol,
+    northSymbol: clearNorthSymbol ? null : northSymbol ?? this.northSymbol,
     slabCompositionNumbers:
         slabCompositionNumbers ?? this.slabCompositionNumbers,
   );

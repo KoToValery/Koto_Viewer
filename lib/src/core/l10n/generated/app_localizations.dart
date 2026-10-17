@@ -8387,6 +8387,24 @@ abstract class AppLocalizations {
   /// **'Overall dimension'**
   String get architectDimensionOverall;
 
+  /// Snap indicator label when dimension distance is 30 cm
+  ///
+  /// In en, this message translates to:
+  /// **'30 cm'**
+  String get architectDimensionSnap30cm;
+
+  /// Snap indicator label when dimension distance is 40 cm
+  ///
+  /// In en, this message translates to:
+  /// **'40 cm'**
+  String get architectDimensionSnap40cm;
+
+  /// Context menu action to add a new point to a dimension
+  ///
+  /// In en, this message translates to:
+  /// **'New point'**
+  String get architectDimensionNewPoint;
+
   /// Default label for ground floor
   ///
   /// In en, this message translates to:
@@ -10390,6 +10408,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose the viewing side shown by the arrows.'**
   String get architectViewDirectionHint;
+
+  /// No description provided for @architectSectionNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Section {number}'**
+  String architectSectionNumber(int number);
+
+  /// No description provided for @architectManageViews.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage views'**
+  String get architectManageViews;
+
+  /// No description provided for @architectViewDrawingEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose or create a view from the menu.'**
+  String get architectViewDrawingEmpty;
 }
 
 class _AppLocalizationsDelegate

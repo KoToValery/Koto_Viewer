@@ -15,13 +15,20 @@ enum _Placement { none, elevation, north }
 /// project, not to individual storeys or to the 3D camera.
 class ArchitectElevationsScreen extends StatefulWidget {
   final ArchitectCommandController controller;
-  const ArchitectElevationsScreen({super.key, required this.controller});
+  final String? initialSelectedId;
+  final ValueChanged<String?>? onViewSelected;
+  const ArchitectElevationsScreen({super.key, required this.controller, this.initialSelectedId, this.onViewSelected});
   @override
   State<ArchitectElevationsScreen> createState() => _ElevationsState();
 }
 
 class _ElevationsState extends State<ArchitectElevationsScreen> {
-  String? selectedId;
+  String? _selectedId;
+  String? get selectedId => _selectedId;
+  set selectedId(String? value) {
+    _selectedId = value;
+    widget.onViewSelected?.call(value);
+  }
   bool plan = true;
   _Placement placement = _Placement.none;
   Offset? first, second;
@@ -38,7 +45,7 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
   @override
   void initState() {
     super.initState();
-    selectedId = project.elevations.firstOrNull?.id;
+    selectedId = project.elevations.where((e) => e.id == widget.initialSelectedId).firstOrNull?.id ?? project.elevations.firstOrNull?.id;
     if (selectedId == null) placement = _Placement.elevation;
     widget.controller.addListener(changed);
   }
@@ -388,7 +395,7 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
                             child: CustomPaint(
                               key: const ValueKey('architect-facade-drawing'),
                               size: size,
-                              painter: _FacadeDrawing(
+                              painter: ArchitectFacadePainter(
                                 geometry,
                                 bounds.center,
                                 scale,
@@ -406,11 +413,12 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
   }
 }
 
-class _FacadeDrawing extends CustomPainter {
+class ArchitectFacadePainter extends CustomPainter {
   final ArchitectBuildingElevation geometry;
   final Offset centre;
   final double scale;
-  _FacadeDrawing(this.geometry, this.centre, this.scale);
+  final Color fill, stroke;
+  ArchitectFacadePainter(this.geometry, this.centre, this.scale, {this.fill = const Color(0xfffafafa), this.stroke = const Color(0xff222222)});
   @override
   void paint(Canvas canvas, Size size) {
     final matrix = Matrix4.identity()
@@ -423,14 +431,14 @@ class _FacadeDrawing extends CustomPainter {
     for (final face in geometry.faces) {
       canvas.drawPath(
         face.transform(matrix.storage),
-        Paint()..color = const Color(0xfffafafa),
+        Paint()..color = fill,
       );
     }
     for (final face in geometry.faces) {
       canvas.drawPath(
         face.transform(matrix.storage),
         Paint()
-          ..color = const Color(0xff222222)
+          ..color = stroke
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.1
           ..strokeJoin = StrokeJoin.round,
@@ -439,8 +447,8 @@ class _FacadeDrawing extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _FacadeDrawing oldDelegate) =>
-      geometry != oldDelegate.geometry ||
+  bool shouldRepaint(covariant ArchitectFacadePainter oldDelegate) =>
+      fill != oldDelegate.fill || stroke != oldDelegate.stroke || geometry != oldDelegate.geometry ||
       centre != oldDelegate.centre ||
       scale != oldDelegate.scale;
 }

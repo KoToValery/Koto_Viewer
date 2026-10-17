@@ -1,3 +1,4 @@
+import 'architect_view_drawing.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'architect_section.dart';
@@ -36,11 +37,13 @@ class ArchitectElevation {
   final String id;
   final Offset start, end;
   final int viewSide;
+  final ArchitectViewDrawing drawing;
   const ArchitectElevation({
     required this.id,
     required this.start,
     required this.end,
     this.viewSide = 1,
+    this.drawing = const ArchitectViewDrawing(),
   });
   double get length => (end - start).distance;
   Offset get axis =>
@@ -55,18 +58,24 @@ class ArchitectElevation {
     return ArchitectCompassDirection.values[sector % 8];
   }
 
-  ArchitectElevation copyWith({Offset? start, Offset? end, int? viewSide}) =>
-      ArchitectElevation(
-        id: id,
-        start: start ?? this.start,
-        end: end ?? this.end,
-        viewSide: viewSide ?? this.viewSide,
-      );
+  ArchitectElevation copyWith({
+    Offset? start,
+    Offset? end,
+    int? viewSide,
+    ArchitectViewDrawing? drawing,
+  }) => ArchitectElevation(
+    id: id,
+    start: start ?? this.start,
+    end: end ?? this.end,
+    viewSide: viewSide ?? this.viewSide,
+    drawing: drawing ?? this.drawing,
+  );
   Map<String, dynamic> toJson() => {
     'id': id,
     'start': sectionPointJson(start),
     'end': sectionPointJson(end),
     'viewSide': viewSide,
+    'drawing': drawing.toJson(),
   };
   factory ArchitectElevation.fromJson(Map<String, dynamic> json) =>
       ArchitectElevation(
@@ -74,5 +83,8 @@ class ArchitectElevation {
         start: sectionPoint(json['start'] as Map),
         end: sectionPoint(json['end'] as Map),
         viewSide: json['viewSide'] == -1 ? -1 : 1,
+        drawing: ArchitectViewDrawing.fromJson(
+          Map<String, dynamic>.from(json['drawing'] as Map? ?? {}),
+        ),
       );
 }

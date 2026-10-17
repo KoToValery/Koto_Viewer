@@ -72,7 +72,10 @@ import '../widgets/architect_grid_axis_bar.dart';
 import '../widgets/architect_grid_axis_offset_dialog.dart';
 import '../widgets/architect_grid_axis_properties_card.dart';
 import '../widgets/architect_project_wizard_dialog.dart';
-import '../widgets/architect_storey_bar.dart';
+import '../widgets/architect_workspace_view_bar.dart';
+import '../services/architect_workspace_view_controller.dart';
+import '../services/architect_building_elevation.dart';
+import '../services/architect_building_section.dart';
 import '../widgets/architect_tool_palette.dart';
 import '../widgets/architect_zone_drafting_bar.dart';
 import '../widgets/architect_zone_properties_card.dart';
@@ -132,9 +135,136 @@ class _ArchitectSurfaceHit {
 
 // === SECTION: STATE & TOOL CONTROLLERS ===
 class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
-  late final ArchitectCommandController _commands;
+  late final ArchitectWorkspaceViewController _commands;
+  late final ArchitectCommandController _modelCommands;
   ArchitectProject get _project => _commands.project;
   set _project(ArchitectProject value) => _commands.commit(value);
+  final Map<ArchitectWorkspaceView, String> _lastViewIds = {};
+  final Map<String, ({double scale, Offset translation})> _viewCameras = {};
+  ArchitectProject? _projectionSource;
+  String? _projectionKey;
+  ArchitectBuildingElevation? _facadeGeometry;
+  ArchitectBuildingSection? _sectionGeometry;
+
+  String get _workspaceViewKey => _commands.isPlan
+      ? 'plan:${_modelCommands.project.activeStoreyId}'
+      : '${_commands.view.name}:${_commands.viewId}';
+
+  void _selectWorkspaceView(ArchitectWorkspaceView type, String? id) {
+    _cancelDrafting();
+    _clearSelection();
+    _viewCameras[_workspaceViewKey] = (
+      scale: _viewport.scale,
+      translation: _viewport.translation,
+    );
+    if (id != null) _lastViewIds[type] = id;
+    _commands.select(type, id);
+    if (type == ArchitectWorkspaceView.plan && id != null) {
+      _commands.activateStorey(id);
+    }
+    setState(() {
+      _is3DView = false;
+      _activeTool = ArchitectTool.select;
+      _interactionEpoch++;
+    });
+    final saved = _viewCameras[_workspaceViewKey];
+    if (saved == null) {
+      _initTransform();
+    } else {
+      _viewport.navigate(
+        previousFocal: Offset.zero,
+        focal: Offset.zero,
+        scaleFactor: saved.scale / _viewport.scale,
+      );
+      _viewport.panBy(saved.translation - _viewport.translation);
+    }
+  }
+
+  Future<void> _manageWorkspaceViews(ArchitectWorkspaceView type) async {
+    _cancelDrafting();
+    String? selected = _lastViewIds[type];
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => type == ArchitectWorkspaceView.elevation
+            ? ArchitectElevationsScreen(
+                controller: _modelCommands,
+                initialSelectedId: selected,
+                onViewSelected: (id) => selected = id,
+              )
+            : ArchitectBuildingSectionsScreen(
+                controller: _modelCommands,
+                initialSelectedId: selected,
+                onViewSelected: (id) => selected = id,
+              ),
+      ),
+    );
+    if (mounted) _selectWorkspaceView(type, selected);
+  }
+
+  void _cacheProjection() {
+    final original = _modelCommands.project;
+    if (identical(original, _projectionSource) &&
+        _projectionKey == _workspaceViewKey) {
+      return;
+    }
+    _projectionSource = original;
+    _projectionKey = _workspaceViewKey;
+    _facadeGeometry = null;
+    _sectionGeometry = null;
+    if (_commands.view == ArchitectWorkspaceView.elevation) {
+      final e = original.elevations
+          .where((e) => e.id == _commands.viewId).firstOrNull;
+      if (e != null) {
+        _facadeGeometry = ArchitectBuildingElevation.build(original, e);
+      }
+    } else if (_commands.view == ArchitectWorkspaceView.section) {
+      final s = original.sections
+          .where((e) => e.id == _commands.viewId).firstOrNull;
+      if (s != null) {
+        _sectionGeometry = ArchitectBuildingSection.build(original, s);
+      }
+    }
+  }
+
+  ArchitectSectionDrawing? get _workspaceSectionDrawing {
+    _cacheProjection();
+    final cut = _modelCommands.project.sections
+        .where((e) => e.id == _commands.viewId).firstOrNull;
+    if (cut == null || _sectionGeometry == null) return null;
+    return ArchitectSectionDrawing(
+      _modelCommands.project,
+      cut,
+      _sectionGeometry!,
+      context.l10n,
+      _canvasPalette.isDark ? const ColorScheme.dark() : const ColorScheme.light(),
+      null,
+      Theme.of(context).textTheme.bodyMedium?.fontFamily,
+    );
+  }
+
+  Rect? get _workspaceViewBounds {
+    if (_commands.isPlan) return null;
+    _cacheProjection();
+    final b = _facadeGeometry?.bounds ?? _workspaceSectionDrawing?.bounds;
+    return b == null ? null : Rect.fromLTRB(b.left, -b.bottom, b.right, -b.top);
+  }
+
+  CustomPainter? get _workspaceProjectionPainter {
+    _cacheProjection();
+    final centre = _viewport.visibleRect.center;
+    final upCentre = Offset(centre.dx, -centre.dy);
+    if (_facadeGeometry != null) {
+      return ArchitectFacadePainter(
+        _facadeGeometry!, upCentre, _viewport.scale,
+        fill: _canvasPalette.background,
+        stroke: _canvasPalette.foreground(Colors.black),
+      );
+    }
+    final drawing = _workspaceSectionDrawing;
+    return drawing == null
+        ? null
+        : ArchitectBuildingSectionPainter(drawing, upCentre, _viewport.scale);
+  }
   Timer? _saveTimer;
   final ValueNotifier<int> _previewRevision = ValueNotifier(0);
   Object? _toolUiState;
@@ -163,6 +293,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _dimensionPlacing = false;
     _dimensionChoosingDirection = false;
     _dimensionAllowPoint = false;
+    _activeMagneticGuides = [];
+    _activeSnapLabel = null;
   }
 
   ArchitectDimension? get _dimensionDraft {
@@ -450,10 +582,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_dimensionPlacing) {
       final draft = _dimensionDraft;
       if (draft == null) return;
-      _dimensionOffset = ArchitectDimensionChain.dot(
+      final rawOffset = ArchitectDimensionChain.dot(
         raw - draft.startPoint,
         draft.normal,
       );
+      final snap = _snapDimensionOffset(draft, rawOffset);
+      _dimensionOffset = snap.offset;
+      _activeSnapLabel = null;
+      _activeMagneticGuides = [];
       _commitDimensionDraft();
       return;
     }
@@ -476,7 +612,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (openingId != null) break;
     }
 
-    final snap = _snapElement(raw);
+    final snap = _snapDimensionPoint(raw);
     final anchors = <ArchitectDimensionAnchor>[];
 
     final isCornerSnap = snap.snapLabel != null &&
@@ -493,9 +629,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       anchors.addAll(
         ArchitectDimensionChain.openingAnchors(openingHostWall, openingId),
       );
-    } else if (isCornerSnap && _dimensionAnchors.isNotEmpty) {
+    } else if (isCornerSnap) {
       final cornerWall = _project.activeStorey.walls
-          .where((w) => w.containsPoint(snap.point, tolerance: 0.05))
+          .where((w) => w.containsPoint(snap.point, tolerance: 0.15))
           .firstOrNull;
       anchors.add(
         ArchitectDimensionAnchor(
@@ -504,6 +640,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           feature: 'vertex',
         ),
       );
+    } else if (_dimensionAllowPoint && snap.isSnapped) {
+      anchors.add(_dimensionPointAnchor(snap.point));
     } else {
       final candidateWalls = _project.activeStorey.walls
           .where((w) => ids.contains(w.id))
@@ -558,7 +696,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           }
         } else {
           _dimensionDirection ??= wall.normalVector;
-          anchors.addAll(ArchitectDimensionChain.wallFaces(wall, raw));
+          if (_dimensionAllowPoint) {
+            anchors.add(ArchitectDimensionChain.wallFaceAt(wall, snap.point));
+          } else {
+            anchors.addAll(ArchitectDimensionChain.wallFaces(wall, raw));
+          }
         }
       } else {
         for (final id in ids) {
@@ -776,6 +918,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _toggle3DView() {
     _cancelActiveDrags();
+    if (!_commands.isPlan) {
+      _selectWorkspaceView(ArchitectWorkspaceView.plan, _modelCommands.project.activeStoreyId);
+    }
     setState(() => _is3DView = !_is3DView);
   }
 
@@ -852,7 +997,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _showUnderlay = true;
 
   DxfDocument? get _currentUnderlayDoc {
-    if (!_showUnderlay) return null;
+    if (!_showUnderlay || !_commands.isPlan) return null;
     return _underlaysByStorey[_project.activeStorey.id];
   }
 
@@ -868,7 +1013,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (widget.bimProject == null) return;
     final saved = await BimProjectLibraryService.instance.saveArchitectProject(
       widget.bimProject!.id,
-      _project,
+      _modelCommands.project,
     );
     if (!saved && mounted) {
       ScaffoldMessenger.of(
@@ -1352,7 +1497,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void initState() {
     super.initState();
     unawaited(_loadCanvasPreference());
-    _commands =
+    _modelCommands =
         widget.commandController ??
         ArchitectCommandController(
           widget.initialProject ??
@@ -1362,6 +1507,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ),
         );
 
+    _commands = ArchitectWorkspaceViewController(_modelCommands);
     _commands.addListener(_onModelChanged);
     unawaited(_loadWorkspacePreferences());
 
@@ -1439,6 +1585,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _initTransform() {
     var bounds = ArchitectSceneGeometry.projectBounds(_project);
+    final viewBounds = _workspaceViewBounds;
+    if (viewBounds != null) {
+      bounds = bounds == Rect.zero ? viewBounds : bounds.expandToInclude(viewBounds);
+    }
     final underlay = _currentUnderlayDoc;
     if (underlay != null) {
       final source = widget.underlayFrame.rectToModel(underlay.bounds);
@@ -1456,7 +1606,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       unawaited(_flushSave());
     }
     _commands.removeListener(_onModelChanged);
-    if (widget.commandController == null) _commands.dispose();
+    _commands.dispose();
+    if (widget.commandController == null) _modelCommands.dispose();
     _zoneTool.dispose();
     _axisTool.dispose();
     _elementTool.dispose();
@@ -1990,6 +2141,138 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return snap;
   }
 
+  ArchitectSnapResult _snapDimensionPoint(Offset raw, {Offset? anchor}) {
+    final snap = anchor == null
+        ? ArchitectSnapHelper.snapFree(
+            rawPoint: raw,
+            project: _project,
+            tolerance: (_touchInput ? 14 : 10) / _currentScale,
+            magnetic: _magnetEnabled,
+            alignment: true,
+            excludeWallAxes: true,
+            underlay: _currentUnderlayDoc,
+            frame: widget.underlayFrame,
+            visibility: _underlayLayerVisibility,
+          )
+        : ArchitectSnapHelper.snapWithAnchor(
+            rawPoint: raw,
+            anchor: anchor,
+            project: _project,
+            tolerance: (_touchInput ? 14 : 10) / _currentScale,
+            magnetic: _magnetEnabled,
+            alignment: true,
+            excludeWallAxes: true,
+            underlay: _currentUnderlayDoc,
+            frame: widget.underlayFrame,
+            visibility: _underlayLayerVisibility,
+          );
+    _activeSnapLabel = snap.snapLabel;
+    _activeMagneticGuides = snap.magneticGuides;
+    return snap;
+  }
+
+  ({double offset, String? label, List<(Offset, Offset)> guides})
+      _snapDimensionOffset(
+    ArchitectDimension dimension,
+    double rawOffset, {
+    String? excludedId,
+  }) {
+    final u = dimension.unitVector;
+    final n = dimension.normal;
+    final p0 = dimension.startPoint;
+    final scale = _currentScale;
+    final tolerance = (14 / scale).clamp(0.04, 0.12);
+
+    final targets = <({double pos, String name})>[];
+
+    // 1. Baseline of this dimension (measured geometry):
+    targets.add((pos: 0.0, name: 'baseline'));
+
+    // 2. Parallel dimensions in the active storey:
+    for (final other in _project.activeStorey.dimensions) {
+      if (other.id == dimension.id || other.id == excludedId) continue;
+      final dotDir =
+          (other.unitVector.dx * u.dx + other.unitVector.dy * u.dy).abs();
+      if (dotDir > 0.98) {
+        final y = ArchitectDimensionChain.dot(other.lineStart - p0, n);
+        targets.add((pos: y, name: 'dimension'));
+      }
+    }
+
+    // 3. Parallel walls in the active storey:
+    for (final wall in _project.activeStorey.walls) {
+      final dotDir =
+          (wall.unitVector.dx * u.dx + wall.unitVector.dy * u.dy).abs();
+      if (dotDir > 0.98) {
+        final dStart = wall.startPoint - p0;
+        final alongStart = dStart.dx * u.dx + dStart.dy * u.dy;
+        final dEnd = wall.endPoint - p0;
+        final alongEnd = dEnd.dx * u.dx + dEnd.dy * u.dy;
+        final minAlong = math.min(alongStart, alongEnd);
+        final maxAlong = math.max(alongStart, alongEnd);
+        if (maxAlong < -2.0 || minAlong > dimension.length + 2.0) continue;
+
+        final nWall = wall.normalVector * (wall.thickness / 2);
+        final outer1 = wall.centerStart + nWall;
+        final outer2 = wall.centerStart - nWall;
+        targets.add((
+          pos: ArchitectDimensionChain.dot(outer1 - p0, n),
+          name: 'wall',
+        ));
+        targets.add((
+          pos: ArchitectDimensionChain.dot(outer2 - p0, n),
+          name: 'wall',
+        ));
+
+        if (wall.hasInsulation) {
+          final nCore = wall.normalVector * (wall.coreThickness / 2);
+          final core1 = wall.coreCenterStart + nCore;
+          final core2 = wall.coreCenterStart - nCore;
+          targets.add((
+            pos: ArchitectDimensionChain.dot(core1 - p0, n),
+            name: 'wallCore',
+          ));
+          targets.add((
+            pos: ArchitectDimensionChain.dot(core2 - p0, n),
+            name: 'wallCore',
+          ));
+        }
+      }
+    }
+
+    double? bestOffset;
+    double bestDiff = tolerance;
+    String? bestLabel;
+    List<(Offset, Offset)> bestGuides = [];
+
+    for (final target in targets) {
+      for (final dist in const [0.30, 0.40]) {
+        for (final sign in const [1.0, -1.0]) {
+          final candidate = target.pos + sign * dist;
+          final diff = (rawOffset - candidate).abs();
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            bestOffset = candidate;
+            final cm = (dist * 100).round();
+            bestLabel = '$cm cm';
+
+            final dimLinePt = p0 + n * candidate;
+            final targetLinePt = p0 + n * target.pos;
+            bestGuides = [
+              (targetLinePt, dimLinePt),
+              (dimLinePt, dimLinePt + u * dimension.length),
+            ];
+          }
+        }
+      }
+    }
+
+    if (bestOffset != null) {
+      return (offset: bestOffset, label: bestLabel, guides: bestGuides);
+    }
+    return (offset: rawOffset, label: null, guides: <(Offset, Offset)>[]);
+  }
+
   Offset _snapMovingElements(Offset delta, Set<String> ids) {
     if (_magnetEnabled &&
         ids.isNotEmpty &&
@@ -2080,10 +2363,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         !_isActivelyDraggingHandle) {
       final draft = _dimensionDraft;
       if (_dimensionPlacing && draft != null) {
-        _dimensionOffset = ArchitectDimensionChain.dot(
+        final rawOffset = ArchitectDimensionChain.dot(
           rawModel - draft.startPoint,
           draft.normal,
         );
+        final snap = _snapDimensionOffset(draft, rawOffset);
+        _dimensionOffset = snap.offset;
+        _activeSnapLabel = snap.label;
+        _activeMagneticGuides = snap.guides;
+      }
+      _repaintPreview();
+      return;
+    }
+    if (_activeTool == ArchitectTool.dimension && !_dimensionPlacing) {
+      final snap = _snapDimensionPoint(rawModel, anchor: _draftStart);
+      _cursorModel = snap.point;
+      _activeSnapLabel = snap.snapLabel;
+      _activeMagneticGuides = snap.magneticGuides;
+      if (_draftStart != null) {
+        _draftEnd = snap.point;
       }
       _repaintPreview();
       return;
@@ -2269,6 +2567,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _elementMoveDelta = null;
         }
       } else {
+        final dimension = _elementMoveOriginal!.activeStorey.dimensions
+            .where((d) => d.id == _draggingElementId)
+            .firstOrNull;
+        if (dimension != null) {
+          final dotDeltaNormal =
+              delta.dx * dimension.normal.dx + delta.dy * dimension.normal.dy;
+          final rawOffset = dimension.offsetDistance + dotDeltaNormal;
+          final snap = _snapDimensionOffset(
+            dimension,
+            rawOffset,
+            excludedId: dimension.id,
+          );
+          final snappedDelta =
+              dimension.normal * (snap.offset - dimension.offsetDistance);
+          delta = snappedDelta;
+          _activeSnapLabel = snap.label;
+          _activeMagneticGuides = snap.guides;
+        }
         _elementMovePreview = MoveArchitectElement(
           storeyId: _project.activeStorey.id,
           elementId: _draggingElementId!,
@@ -3567,14 +3883,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     // 12. In Dimension tool
     if (_activeTool == ArchitectTool.dimension) {
       if (_draftStart == null) {
-        final snap = _snapElement(rawModel);
+        final snap = _snapDimensionPoint(rawModel);
         setState(() {
           _singleDimensionStartAnchor = _dimensionPointAnchor(snap.point);
           _draftStart = snap.point;
           _draftEnd = snap.point;
         });
       } else {
-        final snap = _snapElement(rawModel);
+        final snap = _snapDimensionPoint(rawModel, anchor: _draftStart);
         if ((snap.point - _draftStart!).distance >= .001) {
           setState(() {
             _dimensionAnchors.addAll([
@@ -3598,10 +3914,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 13. In Level Marker tool
     if (_activeTool == ArchitectTool.level) {
+      final point = _snapElement(rawModel).point;
       final (updatedStorey, _) = _elementTool.placeElevationMarker(
         storey: _project.activeStorey,
-        point: _snapElement(rawModel).point,
-        elevation: _project.activeStorey.elevation,
+        point: point,
+        elevation: _commands.isPlan ? _project.activeStorey.elevation : -point.dy,
       );
       setState(() {
         _project = _project.updateActiveStorey(updatedStorey);
@@ -4813,6 +5130,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final isCadPrim = storey.cadPrimitives.any((c) => c.id == elementId);
     final isZone = storey.zones.any((z) => z.id == elementId);
     final isAxis = _project.gridAxes.any((a) => a.id == elementId);
+    final isDimension = storey.dimensions.any((d) => d.id == elementId);
 
     if (isCol || isBeam) {
       items.add(
@@ -4959,6 +5277,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ]) {
         items.add(_radialItem(action: action, color: const Color(0xFFFFB300)));
       }
+    } else if (isDimension) {
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.newPoint,
+          color: const Color(0xFF80CBC4),
+        ),
+      );
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.move,
+          color: const Color(0xFFFFB300),
+        ),
+      );
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.properties,
+          color: const Color(0xFFB388FF),
+        ),
+      );
     } else {
       items.add(
         _radialItem(
@@ -5149,6 +5486,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         break;
 
       case ArchitectRadialAction.newPoint:
+        final dimension = _project.activeStorey.dimensions
+            .where((d) => d.id == id)
+            .firstOrNull;
+        if (dimension != null) {
+          _addWallsToDimension(dimension);
+          setState(() {
+            _dimensionAllowPoint = true;
+            _dimensionPlacing = false;
+          });
+          break;
+        }
         _insertMidpoint(id, pick: pick);
         break;
 
@@ -5842,6 +6190,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     }),
                   ),
                 IconButton(
+                  key: const ValueKey('architect-dimension-new-point'),
+                  tooltip: l.architectDimensionNewPoint,
+                  icon: Icon(
+                    Icons.add_location_alt_outlined,
+                    color: _dimensionAllowPoint
+                        ? Colors.cyanAccent
+                        : Colors.white70,
+                  ),
+                  onPressed: () => setState(() {
+                    _dimensionAllowPoint = !_dimensionAllowPoint;
+                    if (_dimensionAllowPoint) {
+                      _dimensionPlacing = false;
+                      _dimensionChoosingDirection = false;
+                    }
+                  }),
+                ),
+                IconButton(
                   key: const ValueKey('architect-dimension-distance'),
                   tooltip: l.architectPropertyOffset,
                   icon: const Icon(Icons.space_bar, color: Colors.white70),
@@ -5905,17 +6270,34 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (dimension != null)
+                if (dimension != null) ...[
+                  IconButton(
+                    key: const ValueKey('architect-dimension-new-point'),
+                    tooltip: l.architectDimensionNewPoint,
+                    icon: const Icon(
+                      Icons.add_location_alt_outlined,
+                      color: Colors.cyanAccent,
+                      size: 18,
+                    ),
+                    onPressed: () {
+                      _addWallsToDimension(dimension);
+                      setState(() {
+                        _dimensionAllowPoint = true;
+                        _dimensionPlacing = false;
+                      });
+                    },
+                  ),
                   IconButton(
                     key: const ValueKey('architect-dimension-add-walls'),
                     tooltip: l.architectDimensionEditPoints,
                     icon: const Icon(
                       Icons.edit_location_alt_outlined,
-                      color: Colors.cyanAccent,
+                      color: Colors.white70,
                       size: 18,
                     ),
                     onPressed: () => _addWallsToDimension(dimension),
                   ),
+                ],
                 if (wallIds.isNotEmpty)
                   IconButton(
                     key: const ValueKey('architect-select-connected'),
@@ -6479,7 +6861,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
     if (newProj != null && mounted) {
       setState(() {
-        _project = newProj;
+        _commands.select(ArchitectWorkspaceView.plan, null);
+        _modelCommands.commit(newProj);
         _wallDirectionLocked = false;
         _restoreWallType();
         _draftStart = null;
@@ -6563,29 +6946,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             () => _showDrawingGrid = !_showDrawingGrid,
                           ),
                         ),
-                      IconButton(
-                        key: const ValueKey('architect-building-sections'),
-                        tooltip: l10n.buildingSections,
-                        icon: const Icon(
-                          Icons.vertical_split_outlined,
-                          color: Colors.white,
-                        ),
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => ArchitectBuildingSectionsScreen(
-                              controller: _commands,
-                            ),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        key: const ValueKey('architect-building-elevations'),
-                        tooltip: l10n.architectFacades,
-                        icon: const Icon(Icons.home_work_outlined, color: Colors.white),
-                        onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                          builder: (_) => ArchitectElevationsScreen(controller: _commands),
-                        )),
-                      ),
                       IconButton(
                         key: const ValueKey('architect-settings'),
                         tooltip: l10n.architectSettings,
@@ -6799,9 +7159,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     )
                     .toList(),
           ),
-          bottomNavigationBar: _is3DView
+          bottomNavigationBar: _is3DView || !_commands.hasView
               ? null
               : ArchitectToolPalette(
+                  drawingOnly: !_commands.isPlan,
                   activeTool: _activeTool,
                   onToolChanged: (tool) => setState(() {
                     _resetDimensionDraft();
@@ -6921,22 +7282,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 ),
           body: Column(
             children: [
-              // Storey Level Bar
-              ArchitectStoreyBar(
-                project: _project,
-                onStoreySelected: (sId) {
-                  _cancelDrafting();
-                  _commands.activateStorey(sId);
-                  _initTransform();
-                  _saveBiMProjectIfAttached();
-                },
+              ArchitectWorkspaceViewBar(
+                project: _modelCommands.project,
+                view: _commands.view,
+                viewId: _commands.viewId,
+                lastViewIds: _lastViewIds,
+                onSelected: _selectWorkspaceView,
+                onManage: _manageWorkspaceViews,
               ),
 
               // Main Viewport (2D Canvas or 3D Solid Model)
               Expanded(
                 child: Stack(
                   children: [
-                    _is3DView ? _build3DViewport() : _build2DCanvas(),
+                    _is3DView ? _build3DViewport() : !_commands.hasView
+                        ? Center(child: Text(l10n.architectViewDrawingEmpty))
+                        : _build2DCanvas(),
                     if (_activeTool == ArchitectTool.zone &&
                         _zoneTool.isDrafting &&
                         !_is3DView)
@@ -7496,7 +7857,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 ),
               ),
             ),
-            if (_showGhostStoreys)
+            if (_showGhostStoreys && _commands.isPlan)
               RepaintBoundary(
                 child: CustomPaint(
                   painter: ArchitectGhostStoreyPainter(
@@ -7506,6 +7867,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   ),
                 ),
               ),
+            if (!_commands.isPlan)
+              RepaintBoundary(child: AnimatedBuilder(
+                animation: _viewport,
+                builder: (context, _) => CustomPaint(
+                  key: const ValueKey('architect-workspace-projection'),
+                  painter: _workspaceProjectionPainter,
+                ),
+              )),
             RepaintBoundary(
               child: ValueListenableBuilder<int>(
                 valueListenable: _previewRevision,
@@ -8161,6 +8530,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       'Perpendicular' => l10n.snapPerpendicular,
       'Alignment' => l10n.architectWallAlign,
       'Alignment with Point 1' => l10n.snapAlignPoint1,
+      '30 cm' => l10n.architectDimensionSnap30cm,
+      '40 cm' => l10n.architectDimensionSnap40cm,
       _ => label,
     };
   }

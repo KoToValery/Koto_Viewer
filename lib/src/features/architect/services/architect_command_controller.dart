@@ -1499,6 +1499,11 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     for (final o in storey.openings) {
       if (o.id == id) return (points: o.boundary, closed: true, width: 0);
     }
+    for (final d in storey.dimensions) {
+      if (d.id == id) {
+        return (points: [d.lineStart, d.lineEnd], closed: false, width: 0);
+      }
+    }
     return null;
   }
 
@@ -1532,6 +1537,21 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
         elementId: elementId,
         polygon: points,
       ).apply(project);
+    }
+    if (storey.dimensions.any((d) => d.id == elementId)) {
+      final dim = storey.dimensions.firstWhere((d) => d.id == elementId);
+      final next = ArchitectDimensionChain.addAnchors(dim, [
+        ArchitectDimensionAnchor(point: insertion),
+      ]);
+      return ArchitectModelCommand.replace(
+        project,
+        storey.copyWith(
+          dimensions: [
+            for (final d in storey.dimensions)
+              if (d.id == elementId) next else d,
+          ],
+        ),
+      );
     }
     ArchitectModelCommand.newId(project, newElementId);
     if (storey.walls.any((w) => w.id == elementId)) {

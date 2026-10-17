@@ -5,6 +5,7 @@ import '../../bim_editing/scene/bim_bounds_index.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import 'architect_wall_geometry.dart';
 
 typedef ArchitectSnapPoint = ({Offset point, String label, String owner});
@@ -87,8 +88,8 @@ class ArchitectSnapGeometry {
         : (activeIdx > 0 ? project.storeys[activeIdx - 1].walls : floor.walls);
 
     for (final wall in referenceWalls) {
-      edge(wall.startPoint, wall.endPoint, wall.id);
-      edge(wall.coreCenterStart, wall.coreCenterEnd, wall.id);
+      edge(wall.startPoint, wall.endPoint, '@wall-axis:${wall.id}');
+      edge(wall.coreCenterStart, wall.coreCenterEnd, '@wall-axis:${wall.id}');
       wallBox(wall.polygonCorners, wall.id);
       wallBox(wall.coreCorners, wall.id);
       for (final opening in [
@@ -106,6 +107,49 @@ class ArchitectSnapGeometry {
           center + along + across,
           center - along + across,
         ], opening.$1);
+      }
+    }
+    // Intersections between wall faces (outer finish lines and core lines)
+    for (var i = 0; i < referenceWalls.length; i++) {
+      final a = referenceWalls[i];
+      if (a.length < 1e-4) continue;
+      for (final b in referenceWalls.skip(i + 1)) {
+        if (b.length < 1e-4) continue;
+        final cross = BimLineGeometry.cross(a.unitVector, b.unitVector);
+        if (cross.abs() < 1e-4) continue;
+
+        final facesA = [
+          (a.polygonCorners[0], a.polygonCorners[1]),
+          (a.polygonCorners[3], a.polygonCorners[2]),
+          if (a.hasInsulation) ...[
+            (a.coreCorners[0], a.coreCorners[1]),
+            (a.coreCorners[3], a.coreCorners[2]),
+          ],
+        ];
+        final facesB = [
+          (b.polygonCorners[0], b.polygonCorners[1]),
+          (b.polygonCorners[3], b.polygonCorners[2]),
+          if (b.hasInsulation) ...[
+            (b.coreCorners[0], b.coreCorners[1]),
+            (b.coreCorners[3], b.coreCorners[2]),
+          ],
+        ];
+
+        for (final fa in facesA) {
+          for (final fb in facesB) {
+            final pt = BimLineGeometry.intersection(fa.$1, fa.$2, fb.$1, fb.$2);
+            if (pt != null) {
+              final dA = pt - a.centerStart;
+              final alongA = dA.dx * a.unitVector.dx + dA.dy * a.unitVector.dy;
+              final dB = pt - b.centerStart;
+              final alongB = dB.dx * b.unitVector.dx + dB.dy * b.unitVector.dy;
+              if (alongA >= -a.thickness && alongA <= a.length + a.thickness &&
+                  alongB >= -b.thickness && alongB <= b.length + b.thickness) {
+                point(pt, 'Intersection', '@wall-face-joints');
+              }
+            }
+          }
+        }
       }
     }
     // Joined material corners can extend beyond the individual rectangles.

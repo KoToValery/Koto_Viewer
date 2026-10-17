@@ -41,6 +41,7 @@ class ArchitectSnapHelper {
     double tolerance = .20,
     bool magnetic = true,
     bool alignment = false,
+    bool excludeWallAxes = false,
     Set<String> excludedIds = const {},
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
@@ -52,6 +53,7 @@ class ArchitectSnapHelper {
     radius: tolerance.clamp(0.0, .60),
     magnetic: magnetic,
     alignment: alignment,
+    excludeWallAxes: excludeWallAxes,
     excludedIds: excludedIds,
     underlay: underlay,
     frame: frame,
@@ -64,6 +66,7 @@ class ArchitectSnapHelper {
     double tolerance = .20,
     bool magnetic = true,
     bool alignment = false,
+    bool excludeWallAxes = false,
     Set<String> excludedIds = const {},
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
@@ -74,6 +77,7 @@ class ArchitectSnapHelper {
     radius: tolerance.clamp(0.0, .60),
     magnetic: magnetic,
     alignment: alignment,
+    excludeWallAxes: excludeWallAxes,
     excludedIds: excludedIds,
     underlay: underlay,
     frame: frame,
@@ -148,6 +152,7 @@ class ArchitectSnapHelper {
     required double radius,
     required bool magnetic,
     required bool alignment,
+    bool excludeWallAxes = false,
     required Set<String> excludedIds,
     DxfDocument? underlay,
     required BimCoordinateFrame frame,
@@ -171,6 +176,9 @@ class ArchitectSnapHelper {
     };
     bool excluded(String owner) =>
         excludedOwners.contains(owner) ||
+        (excludeWallAxes && owner.startsWith('@wall-axis')) ||
+        (owner.startsWith('@wall-axis:') &&
+            excludedOwners.contains(owner.substring(11))) ||
         (owner == '@wall-joints' && excludeJoints) ||
         (owner == '@axes' &&
             project.gridAxes.any((a) => excludedIds.contains(a.id)));

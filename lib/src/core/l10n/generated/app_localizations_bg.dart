@@ -4809,6 +4809,15 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectDimensionOverall => 'Общ размер';
 
   @override
+  String get architectDimensionSnap30cm => '30 см';
+
+  @override
+  String get architectDimensionSnap40cm => '40 см';
+
+  @override
+  String get architectDimensionNewPoint => 'Нова точка';
+
+  @override
   String get architectStoreyGround => 'Партер';
 
   @override
@@ -5908,4 +5917,16 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectViewDirectionHint => 'Посочи накъде да сочат стрелките.';
+
+  @override
+  String architectSectionNumber(int number) {
+    return 'Разрез $number';
+  }
+
+  @override
+  String get architectManageViews => 'Управление';
+
+  @override
+  String get architectViewDrawingEmpty =>
+      'Изберете или създайте изглед от менюто.';
 }

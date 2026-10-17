@@ -10,7 +10,7 @@ import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.d
 import 'package:kotoview/src/features/architect/rendering/architect_wall_hatch.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_wall_layers.dart';
 import 'package:kotoview/src/features/architect/services/architect_selection.dart';
-import 'package:kotoview/src/features/architect/widgets/architect_storey_bar.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_workspace_view_bar.dart';
 import 'architect_editing_test.dart' as editing;
 import 'architect_new_point_test.dart' as points;
 import 'architect_workspace_interaction_test.dart' as workspace;
@@ -311,7 +311,7 @@ void main() {
       expect(
         tester.getTopLeft(floating).dy,
         closeTo(
-          tester.getBottomLeft(find.byType(ArchitectStoreyBar)).dy + 8,
+          tester.getBottomLeft(find.byType(ArchitectWorkspaceViewBar)).dy + 8,
           .1,
         ),
       );
