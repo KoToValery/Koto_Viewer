@@ -2,6 +2,7 @@ import '../widgets/architect_slab_layers_dialog.dart';
 import '../widgets/architect_roof_layers_dialog.dart';
 import '../widgets/architect_roof_bar.dart';
 import '../rendering/architect_roof_painter_helper.dart';
+import '../services/architect_roof_geometry.dart';
 import '../services/architect_roof_tool.dart';
 import '../widgets/architect_building_sections_screen.dart';
 import '../widgets/architect_elevations_screen.dart';
@@ -210,8 +211,43 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (mounted) _selectWorkspaceView(type, selected);
   }
 
+  String? _selectedSectionRoofId;
+  double? _sectionRoofDragStartModelY;
+  double? _sectionRoofDragInitialOffset;
+  double? _sectionRoofDragPreviewOffset;
+
+  Offset _modelToSection(Offset rawModel) => Offset(rawModel.dx, -rawModel.dy);
+
+  ArchitectProject get _projectionModelProject {
+    final base = _modelCommands.project;
+    if (_selectedSectionRoofId == null ||
+        _sectionRoofDragPreviewOffset == null) {
+      return base;
+    }
+    return base.copyWith(
+      storeys: [
+        for (final st in base.storeys)
+          if (st.roofs.any((r) => r.id == _selectedSectionRoofId))
+            st.copyWith(
+              roofs: [
+                for (final r in st.roofs)
+                  if (r.id == _selectedSectionRoofId)
+                    r.copyWith(
+                      baseElevationOffset: _sectionRoofDragPreviewOffset!,
+                      attachToWalls: false,
+                    )
+                  else
+                    r,
+              ],
+            )
+          else
+            st,
+      ],
+    );
+  }
+
   void _cacheProjection() {
-    final original = _modelCommands.project;
+    final original = _projectionModelProject;
     if (identical(original, _projectionSource) &&
         _projectionKey == _workspaceViewKey) {
       return;
@@ -237,17 +273,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   ArchitectSectionDrawing? get _workspaceSectionDrawing {
     _cacheProjection();
-    final cut = _modelCommands.project.sections
+    final proj = _projectionModelProject;
+    final cut = proj.sections
         .where((e) => e.id == _commands.viewId).firstOrNull;
     if (cut == null || _sectionGeometry == null) return null;
     return ArchitectSectionDrawing(
-      _modelCommands.project,
+      proj,
       cut,
       _sectionGeometry!,
       context.l10n,
       _canvasPalette.isDark ? const ColorScheme.dark() : const ColorScheme.light(),
       null,
       Theme.of(context).textTheme.bodyMedium?.fontFamily,
+      _selectedSectionRoofId,
     );
   }
 
@@ -384,22 +422,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   List<String> _selectionCandidates(Offset point) {
-    final first = _hitSelection(point);
-    return <String>{
-      ?first,
-      ..._elementTool.hitTestElements(
-        _project.activeStorey,
-        point,
-        _currentScale,
-      ),
-      for (final zone in _project.activeStorey.zones)
-        if ((Path()..addPolygon(zone.polygon, true)).contains(point)) zone.id,
-      for (final axis in _project.gridAxes)
-        if ((point - BimLineGeometry.closest(point, axis.start, axis.end))
-                .distance <=
-            14 / _currentScale)
-          axis.id,
-    }.toList();
+    if (_activeTool == ArchitectTool.select) {
+      final first = _hitSelection(point);
+      return <String>{
+        ?first,
+        ..._elementTool.hitTestElements(
+          _project.activeStorey,
+          point,
+          _currentScale,
+        ),
+        for (final zone in _project.activeStorey.zones)
+          if ((Path()..addPolygon(zone.polygon, true)).contains(point)) zone.id,
+        for (final axis in _project.gridAxes)
+          if ((point - BimLineGeometry.closest(point, axis.start, axis.end))
+                  .distance <=
+              14 / _currentScale)
+            axis.id,
+      }.toList();
+    }
+
+    final id = _hitSelection(point);
+    return id != null ? [id] : const [];
   }
 
   String? _nextSelection(Offset point, {bool advance = true}) {
@@ -1048,6 +1091,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _selectedZoneId = null;
       _zoneTool.cancelEditingZone();
     }
+    if (_selectedSectionRoofId != null &&
+        (_commands.view != ArchitectWorkspaceView.section ||
+            ArchitectBuildingSection.findRoofById(
+                  _modelCommands.project,
+                  _selectedSectionRoofId!,
+                ) ==
+                null)) {
+      _selectedSectionRoofId = null;
+    }
     if (_axisTool.selectedAxisId != null &&
         !valid.contains(_axisTool.selectedAxisId)) {
       _axisTool.deselect();
@@ -1115,6 +1167,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _wallDirectionLocked = false;
       _selectedZoneId = null;
       _selectedElementId = null;
+      _selectedSectionRoofId = null;
     });
   }
 
@@ -1125,6 +1178,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _selectionIds.clear();
       _selectedElementId = null;
       _selectedZoneId = null;
+      _selectedSectionRoofId = null;
       _axisTool.deselect();
       _zoneTool.cancelEditingZone();
       _multiSelect = false;
@@ -1370,7 +1424,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   double _doorHeight = 2.00;
   double _doorSill = 0.0;
   bool _isHingeLeft = true;
-  int _doorSpecCounter = 1;
 
   // Selection & Zoom
   String? _selectedElementId;
@@ -1478,6 +1531,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   /// Whether a geometric vertex or handle is currently being dragged.
   bool get _isDraggingVertexOrHandle =>
       _isHandleEngaged ||
+      _sectionRoofDragStartModelY != null ||
       _duplicateMove != null ||
       _polygonEditor.active ||
       _draggingElementId != null ||
@@ -1730,6 +1784,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _isHandleEngaged = false;
 
     final rawModel = _screenToModel(event.localPosition);
+    if (_commands.view == ArchitectWorkspaceView.section &&
+        _selectedSectionRoofId != null) {
+      _cacheProjection();
+      final secPt = _modelToSection(rawModel);
+      final hitRoof = _sectionGeometry?.pickRoof(secPt, 18 / _currentScale);
+      final rb = _sectionGeometry?.roofBounds(_selectedSectionRoofId!);
+      final nearHandle =
+          rb != null &&
+          (secPt - Offset(rb.center.dx, rb.bottom + 16 / _currentScale))
+                  .distance <=
+              20 / _currentScale;
+      if (hitRoof == _selectedSectionRoofId || nearHandle) {
+        final hit = ArchitectBuildingSection.findRoofById(
+          _modelCommands.project,
+          _selectedSectionRoofId!,
+        );
+        if (hit != null) {
+          _sectionRoofDragStartModelY = rawModel.dy;
+          _sectionRoofDragInitialOffset = hit.roof.baseElevationOffset;
+          _sectionRoofDragPreviewOffset = hit.roof.baseElevationOffset;
+          _isHandleEngaged = true;
+          return;
+        }
+      }
+    }
     if (_activeTool == ArchitectTool.dimension &&
         (_dimensionChainMode || _dimensionPlacing) &&
         _effectiveSelection.isEmpty) {
@@ -2074,7 +2153,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   ArchitectOpeningPlacementResult? get _openingPlacementPreview {
     final raw = _cursorModel;
     if (raw == null ||
-        _effectiveSelection.isNotEmpty ||
         _isActivelyDraggingHandle ||
         (_activeTool != ArchitectTool.door &&
             _activeTool != ArchitectTool.window)) {
@@ -2099,6 +2177,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final activeStyle =
         _elementTool.activeDoorStyle ??
         FenestrationLibraryService.instance.activeDoorStyle;
+    final specId = ArchitectDoor.resolveSpecId(
+      existingDoors: _project.allDoors,
+      width: _doorWidth,
+      height: _doorHeight,
+      sillHeight: _doorSill,
+      isHingeLeft: preview.isHingeLeft,
+    );
     return ArchitectDoor(
       id: 'preview_door',
       wallId: preview.wall.id,
@@ -2108,7 +2193,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       sillHeight: _doorSill,
       isHingeLeft: preview.isHingeLeft,
       openInward: preview.openInward,
-      specId: '$_doorSpecCounter',
+      specId: specId,
       uuid: 'preview_door',
       styleId: activeStyle.id,
       style: activeStyle,
@@ -2407,6 +2492,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _updatePointerPreview(Offset screenPosition) {
     if (_pendingShape != null) return;
     final rawModel = _screenToModel(screenPosition);
+    if (_sectionRoofDragStartModelY != null &&
+        _sectionRoofDragInitialOffset != null &&
+        _selectedSectionRoofId != null) {
+      final deltaZ = -(rawModel.dy - _sectionRoofDragStartModelY!);
+      _sectionRoofDragPreviewOffset = _sectionRoofDragInitialOffset! + deltaZ;
+      _projectionSource = null;
+      _repaintPreview();
+      return;
+    }
     if (_duplicateMove != null) {
       _previewDuplicateMove(rawModel);
       return;
@@ -2945,6 +3039,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     if (_isDraggingVertexOrHandle && !_handleMoved) {
+      if (_sectionRoofDragStartModelY != null) {
+        _cancelActiveDrags();
+        _repaintPreview();
+        return;
+      }
       final pos = _screenToModel(event.localPosition);
       if (_polygonEditId != null || _selectedRoof != null) {
         _selectPolygonEdge(pos);
@@ -3009,6 +3108,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _cancelActiveDrags() {
+    if (_sectionRoofDragStartModelY != null ||
+        _sectionRoofDragPreviewOffset != null) {
+      _sectionRoofDragStartModelY = null;
+      _sectionRoofDragInitialOffset = null;
+      _sectionRoofDragPreviewOffset = null;
+      _projectionSource = null;
+    }
     _draftCancelPointer = null;
     _duplicateMove?.cancel();
     _duplicateMove = null;
@@ -3054,6 +3160,34 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _commitActiveHandleDrag(Offset screenPos) {
+    if (_sectionRoofDragStartModelY != null &&
+        _sectionRoofDragPreviewOffset != null &&
+        _selectedSectionRoofId != null) {
+      final roofId = _selectedSectionRoofId!;
+      final nextOffset = _sectionRoofDragPreviewOffset!;
+      final changed =
+          (_sectionRoofDragInitialOffset! - nextOffset).abs() > 1e-6;
+      _cancelActiveDrags();
+      if (changed) {
+        final hit = ArchitectBuildingSection.findRoofById(
+          _modelCommands.project,
+          roofId,
+        );
+        if (hit != null) {
+          _modelCommands.execute(
+            UpdateArchitectRoofPlane(
+              storeyId: hit.storey.id,
+              roof: hit.roof.copyWith(
+                baseElevationOffset: nextOffset,
+                attachToWalls: false,
+              ),
+            ),
+          );
+          _saveBiMProjectIfAttached();
+        }
+      }
+      return;
+    }
     if (_duplicateMove != null) {
       final id = _duplicateMoveId;
       final preview = _duplicateMove!.finish(_elementMoveContext);
@@ -3304,6 +3438,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     final candidates = _selectionCandidates(rawModel);
+    if (_commands.view == ArchitectWorkspaceView.section &&
+        candidates.isEmpty &&
+        _draftStart == null &&
+        !_axisTool.isDrafting &&
+        !_zoneTool.isDrafting &&
+        !_roofTool.isDrafting &&
+        _elementTool.slabDraftPoints.isEmpty) {
+      _cacheProjection();
+      final hitRoof = _sectionGeometry?.pickRoof(
+        _modelToSection(rawModel),
+        14 / _currentScale,
+      );
+      if (hitRoof != null) {
+        setState(() {
+          _selectionIds.clear();
+          _selectedElementId = null;
+          _selectedZoneId = null;
+          _selectedSectionRoofId = hitRoof;
+        });
+        HapticFeedback.selectionClick();
+        return;
+      } else if (_selectedSectionRoofId != null) {
+        setState(() => _selectedSectionRoofId = null);
+      }
+    }
+
     final now = DateTime.now();
     final isDoubleTap = candidates.length <= 1 &&
         _lastTapTime != null &&
@@ -3313,7 +3473,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _lastTapTime = now;
     _lastTapPos = rawModel;
 
-    if (isDoubleTap && _activeTool != ArchitectTool.select && !_multiSelect) {
+    if (isDoubleTap && _activeTool == ArchitectTool.wall && !_multiSelect) {
       final hitId = _hitSelection(rawModel);
       if (hitId != null) {
         final storey = _project.activeStorey;
@@ -3529,7 +3689,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       setState(() => _wallExtendId = null);
       return;
     }
-    if (_activeTool != ArchitectTool.select && _multiSelect) {
+    if (_activeTool == ArchitectTool.select && _multiSelect) {
       _selectAt(rawModel, toggle: true);
       return;
     }
@@ -3542,9 +3702,80 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         !(_touchInput && _placingWithHold) &&
         _effectiveSelection.isEmpty &&
         _activeTool != ArchitectTool.select &&
+        _activeTool != ArchitectTool.door &&
+        _activeTool != ArchitectTool.window &&
         !(_activeTool == ArchitectTool.axis &&
             _wallForAxis(rawModel) != null) &&
         _selectDraftingElement(rawModel)) {
+      return;
+    }
+
+    // In Door tool: Place door or select/deselect existing door
+    if (_activeTool == ArchitectTool.door) {
+      final placement = ArchitectOpeningPlacement.resolve(
+        walls: _project.activeStorey.walls,
+        rawPoint: rawModel,
+        openingWidth: _doorWidth,
+        magnetic: _magnetEnabled,
+        defaultHingeLeft: _isHingeLeft,
+      );
+      if (placement != null) {
+        _tryPlaceDoorAt(rawModel);
+        return;
+      }
+      final hitDoor = _hitSelection(rawModel);
+      if (hitDoor != null) {
+        _selectAt(rawModel);
+      } else {
+        _clearSelection();
+      }
+      return;
+    }
+
+    // In Window tool: Place window or select/deselect existing window
+    if (_activeTool == ArchitectTool.window) {
+      final placement = ArchitectOpeningPlacement.resolve(
+        walls: _project.activeStorey.walls,
+        rawPoint: rawModel,
+        openingWidth: _elementTool.windowWidth,
+        magnetic: _magnetEnabled,
+      );
+      if (placement != null) {
+        final res = _elementTool.placeWindow(
+          storey: _project.activeStorey,
+          point: rawModel,
+          magnetic: _magnetEnabled,
+        );
+        if (res != null) {
+          final (updatedStorey, newWin) = res;
+          setState(() {
+            _project = _project.updateActiveStorey(updatedStorey);
+            _selectionIds.clear();
+            _selectedElementId = null;
+          });
+          _saveBiMProjectIfAttached();
+          HapticFeedback.mediumImpact();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                context.l10n.architectWindowPlaced(
+                  newWin.id,
+                  (newWin.width * 100).round(),
+                  (newWin.height * 100).round(),
+                ),
+              ),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+        return;
+      }
+      final hitWin = _hitSelection(rawModel);
+      if (hitWin != null) {
+        _selectAt(rawModel);
+      } else {
+        _clearSelection();
+      }
       return;
     }
 
@@ -3795,42 +4026,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         } else if ((snap.point - _draftStart!).distance >= .001) {
           _commitCurrentWallSegment(snap.point);
         }
-      }
-      return;
-    }
-
-    // 5. In Door tool
-    if (_activeTool == ArchitectTool.door) {
-      _tryPlaceDoorAt(rawModel);
-      return;
-    }
-
-    // 6. In Window tool
-    if (_activeTool == ArchitectTool.window) {
-      final res = _elementTool.placeWindow(
-        storey: _project.activeStorey,
-        point: rawModel,
-        magnetic: _magnetEnabled,
-      );
-      if (res != null) {
-        final (updatedStorey, newWin) = res;
-        setState(() {
-          _project = _project.updateActiveStorey(updatedStorey);
-        });
-        _saveBiMProjectIfAttached();
-        HapticFeedback.mediumImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              context.l10n.architectWindowPlaced(
-                newWin.id,
-                (newWin.width * 100).round(),
-                (newWin.height * 100).round(),
-              ),
-            ),
-            duration: const Duration(seconds: 1),
-          ),
-        );
       }
       return;
     }
@@ -5218,6 +5413,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _elementTool.activeDoorStyle ??
         FenestrationLibraryService.instance.activeDoorStyle;
 
+    final specId = ArchitectDoor.resolveSpecId(
+      existingDoors: _project.allDoors,
+      width: _doorWidth,
+      height: _doorHeight,
+      sillHeight: _doorSill,
+      isHingeLeft: placement.isHingeLeft,
+    );
+
     final newDoor = ArchitectDoor(
       id: 'door_$now',
       wallId: targetWall.id,
@@ -5227,19 +5430,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       sillHeight: _doorSill,
       isHingeLeft: placement.isHingeLeft,
       openInward: placement.openInward,
-      specId: '$_doorSpecCounter',
+      specId: specId,
       uuid: 'UUID_$now',
       styleId: activeStyle.id,
       style: activeStyle,
     );
 
-    _doorSpecCounter++;
     final updatedWall = targetWall.addDoor(newDoor);
     final updatedWalls = activeStorey.walls
         .map((w) => w.id == updatedWall.id ? updatedWall : w)
         .toList();
 
     setState(() {
+      _selectionIds.clear();
+      _selectedElementId = null;
       _project = _project.updateActiveStorey(
         activeStorey.copyWith(walls: updatedWalls),
       );
@@ -5296,10 +5500,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   String? _hitSelection(Offset point) {
-    if (_activeTool == ArchitectTool.select ||
-        _multiSelect ||
-        HardwareKeyboard.instance.isShiftPressed ||
-        HardwareKeyboard.instance.isControlPressed) {
+    if (_activeTool == ArchitectTool.select) {
       return _elementTool.hitTestElement(
             _project.activeStorey,
             point,
@@ -5340,11 +5541,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return false;
     }
     if (_dimensionAnchors.isNotEmpty) return false;
-    if (_selectionCandidates(_screenToModel(screenPoint))
-        .any(_effectiveSelection.contains)) {
+    final raw = _screenToModel(screenPoint);
+    if (_selectionCandidates(raw).any(_effectiveSelection.contains)) {
       return true;
     }
-    return _selectAt(_screenToModel(screenPoint), invalidateGesture: false);
+    if (_selectAt(raw, invalidateGesture: false)) {
+      return true;
+    }
+    if (_commands.view == ArchitectWorkspaceView.section) {
+      _cacheProjection();
+      final hitRoof = _sectionGeometry?.pickRoof(
+        _modelToSection(raw),
+        16 / _currentScale,
+      );
+      if (hitRoof != null) {
+        setState(() {
+          _selectionIds.clear();
+          _selectedElementId = null;
+          _selectedZoneId = null;
+          _selectedSectionRoofId = hitRoof;
+        });
+        return true;
+      }
+    }
+    return false;
   }
 
   bool _onContextHold(Offset screenPoint) {
@@ -5359,10 +5579,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return false;
     }
     if (_dimensionAnchors.isNotEmpty) return false;
-    final candidates = _selectionCandidates(_screenToModel(screenPoint));
+    final raw = _screenToModel(screenPoint);
+    final candidates = _selectionCandidates(raw);
     final ok =
         candidates.any(_effectiveSelection.contains) ||
-        _selectAt(_screenToModel(screenPoint), invalidateGesture: false);
+        _selectAt(raw, invalidateGesture: false);
     if (ok) {
       final id = _selectedElementId ?? _selectedZoneId ?? _effectiveSelection.firstOrNull;
       if (id != null) {
@@ -5372,8 +5593,152 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _radialMenuItems = _buildRadialMenuItems(id);
         });
       }
+      return true;
     }
-    return ok;
+    if (_commands.view == ArchitectWorkspaceView.section) {
+      _cacheProjection();
+      final hitRoof =
+          _sectionGeometry?.pickRoof(
+            _modelToSection(raw),
+            16 / _currentScale,
+          ) ??
+          _selectedSectionRoofId;
+      if (hitRoof != null) {
+        setState(() {
+          _selectionIds.clear();
+          _selectedElementId = null;
+          _selectedZoneId = null;
+          _selectedSectionRoofId = hitRoof;
+        });
+        unawaited(_showSectionRoofContextMenu(screenPoint, hitRoof));
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _showSectionRoofContextMenu(
+    Offset localPoint,
+    String roofId,
+  ) async {
+    final l = context.l10n;
+    final box = context.findRenderObject() as RenderBox?;
+    final globalPos = box?.localToGlobal(localPoint) ?? localPoint;
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPos.dx,
+        globalPos.dy,
+        globalPos.dx,
+        globalPos.dy,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'move_vertical',
+          child: Row(
+            children: [
+              const Icon(Icons.swap_vert, size: 18),
+              const SizedBox(width: 8),
+              Text(l.architectRoofMoveVerticalAction),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'snap_walls',
+          child: Row(
+            children: [
+              const Icon(Icons.vertical_align_bottom, size: 18),
+              const SizedBox(width: 8),
+              Text(l.architectRoofSnapToWallsAction),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'properties',
+          child: Row(
+            children: [
+              const Icon(Icons.layers_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(l.architectRoofPropertiesAction),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'flip_slope',
+          child: Row(
+            children: [
+              const Icon(Icons.swap_horiz, size: 18),
+              const SizedBox(width: 8),
+              Text(l.architectRoofFlipSlope),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              const Icon(Icons.delete_outline, size: 18),
+              const SizedBox(width: 8),
+              Text(l.delete),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (!mounted || action == null) return;
+    final hit = ArchitectBuildingSection.findRoofById(
+      _modelCommands.project,
+      roofId,
+    );
+    if (hit == null) return;
+    switch (action) {
+      case 'move_vertical':
+        setState(() => _selectedSectionRoofId = roofId);
+      case 'snap_walls':
+        final sorted = [..._modelCommands.project.storeys]
+          ..sort((a, b) => a.elevation.compareTo(b.elevation));
+        final idx = sorted.indexWhere((s) => s.id == hit.storey.id);
+        final lower = idx > 0 ? sorted[idx - 1] : null;
+        final resolvedOffset =
+            ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
+              roof: hit.roof,
+              storey: hit.storey,
+              lowerStorey: lower,
+            );
+        _modelCommands.execute(
+          UpdateArchitectRoofPlane(
+            storeyId: hit.storey.id,
+            roof: hit.roof.copyWith(
+              attachToWalls: true,
+              baseElevationOffset: resolvedOffset,
+            ),
+          ),
+        );
+        _saveBiMProjectIfAttached();
+      case 'properties':
+        await _openRoofLayersDialog(roof: hit.roof);
+      case 'flip_slope':
+        _modelCommands.execute(
+          UpdateArchitectRoofPlane(
+            storeyId: hit.storey.id,
+            roof: hit.roof.flippedSlope(),
+          ),
+        );
+        _saveBiMProjectIfAttached();
+      case 'delete':
+        _modelCommands.execute(
+          DeleteArchitectRoofPlane(
+            storeyId: hit.storey.id,
+            roofId: hit.roof.id,
+          ),
+        );
+        setState(() {
+          if (_selectedSectionRoofId == roofId) {
+            _selectedSectionRoofId = null;
+          }
+        });
+        _saveBiMProjectIfAttached();
+    }
   }
 
   ArchitectRadialMenuItem _radialItem({
@@ -6101,7 +6466,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Future<void> _openRoofLayersDialog({ArchitectRoofPlane? roof}) async {
-    final target = roof ?? _selectedRoof;
+    final target =
+        roof ??
+        _selectedRoof ??
+        (_selectedSectionRoofId == null
+            ? null
+            : ArchitectBuildingSection.findRoofById(
+                _modelCommands.project,
+                _selectedSectionRoofId!,
+              )?.roof);
     final initialAssembly = target?.assembly ?? _roofTool.activeAssembly;
     final initialSlope = target?.slopeDegrees ?? _roofTool.slopeDegrees;
     final initialOverhang = target?.eavesOverhang ?? _roofTool.eavesOverhang;
@@ -6114,6 +6487,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         initialEavesOverhang: initialOverhang,
         initialEavesCut: initialEavesCut,
         initialBaseElevationOffset: target?.baseElevationOffset,
+        initialAttachToWalls: target?.attachToWalls ?? true,
         onApply: (result) {
           setState(() {
             _roofTool.setAssembly(result.assembly);
@@ -6121,15 +6495,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _roofTool.setEavesOverhang(result.eavesOverhang);
             _roofTool.setEavesCut(result.eavesCut);
             if (target != null) {
-              _commands.execute(
+              final hit = ArchitectBuildingSection.findRoofById(
+                _modelCommands.project,
+                target.id,
+              );
+              final storey = hit?.storey ?? _project.activeStorey;
+              final currentRoof = hit?.roof ?? target;
+              var nextOffset = result.baseElevationOffset;
+              if (result.attachToWalls && !currentRoof.attachToWalls) {
+                final sorted = [..._modelCommands.project.storeys]
+                  ..sort((a, b) => a.elevation.compareTo(b.elevation));
+                final idx = sorted.indexWhere((s) => s.id == storey.id);
+                final lower = idx > 0 ? sorted[idx - 1] : null;
+                nextOffset =
+                    ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
+                      roof: currentRoof.copyWith(
+                        assembly: result.assembly,
+                        slopeDegrees: result.slopeDegrees,
+                        eavesOverhang: result.eavesOverhang,
+                        eavesCut: result.eavesCut,
+                      ),
+                      storey: storey,
+                      lowerStorey: lower,
+                    );
+              }
+              _modelCommands.execute(
                 UpdateArchitectRoofPlane(
-                  storeyId: _project.activeStoreyId,
-                  roof: target.copyWith(
+                  storeyId: storey.id,
+                  roof: currentRoof.copyWith(
                     assembly: result.assembly,
                     slopeDegrees: result.slopeDegrees,
                     eavesOverhang: result.eavesOverhang,
                     eavesCut: result.eavesCut,
-                    baseElevationOffset: result.baseElevationOffset,
+                    baseElevationOffset: nextOffset,
+                    attachToWalls: result.attachToWalls,
                   ),
                 ),
               );
@@ -8340,7 +8739,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ),
             if (!_commands.isPlan)
               RepaintBoundary(child: AnimatedBuilder(
-                animation: _viewport,
+                animation: Listenable.merge([_viewport, _previewRevision]),
                 builder: (context, _) => CustomPaint(
                   key: const ValueKey('architect-workspace-projection'),
                   painter: _workspaceProjectionPainter,

@@ -1451,6 +1451,22 @@ class ReplaceStoreyRoofs extends ArchitectModelCommand {
   }
 }
 
+class DeleteArchitectRoofPlane extends ArchitectModelCommand {
+  final String storeyId;
+  final String roofId;
+  const DeleteArchitectRoofPlane({required this.storeyId, required this.roofId});
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(
+        roofs: floor.roofs.where((r) => r.id != roofId).toList(),
+      ),
+    );
+  }
+}
+
 class UpdateArchitectPolygon extends ArchitectModelCommand {
   final String storeyId, elementId;
   final List<Offset> polygon;

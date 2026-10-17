@@ -6,6 +6,7 @@ import '../models/architect_wall_type.dart';
 import 'architect_wall_material_label.dart';
 import '../models/architect_fenestration_style.dart';
 import '../services/fenestration_library_service.dart';
+import '../models/architect_door.dart';
 import '../services/architect_selection.dart';
 import 'architect_wall_drafting_panel.dart';
 
@@ -363,7 +364,17 @@ class _ArchitectElementPropertiesDialogState
                                 : (records.first['isHingeLeft'] as bool? ?? true)),
                       },
                       onSelectionChanged: (sel) {
-                        setState(() => texts['isHingeLeft'] = '${sel.first}');
+                        setState(() {
+                          final isLeft = sel.first;
+                          texts['isHingeLeft'] = '$isLeft';
+                          final currentSpec = texts['specId'] ?? (records.first['specId'] as String?);
+                          if (currentSpec != null && currentSpec.isNotEmpty) {
+                            final base = ArchitectDoor.extractBaseNumber(currentSpec);
+                            if (base != null) {
+                              texts['specId'] = ArchitectDoor.formatSpecId(baseNumber: base, isHingeLeft: isLeft);
+                            }
+                          }
+                        });
                       },
                       showSelectedIcon: false,
                     ),
@@ -517,9 +528,11 @@ class _ArchitectElementPropertiesDialogState
               ])
                 if (records.every((e) => e.containsKey(key)))
                   TextFormField(
-                    initialValue: records.map((e) => e[key]).toSet().length == 1
-                        ? records.first[key] as String? ?? ''
-                        : '',
+                    key: ValueKey('$key-${texts[key] ?? records.first[key]}'),
+                    initialValue: texts[key] ??
+                        (records.map((e) => e[key]).toSet().length == 1
+                            ? records.first[key] as String? ?? ''
+                            : ''),
                     decoration: InputDecoration(
                       labelText: key == 'text' || key == 'customText'
                           ? l.architectToolText

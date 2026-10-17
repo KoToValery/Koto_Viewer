@@ -5969,6 +5969,28 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectRoofRotateSlope => 'Посока скат';
 
   @override
+  String get architectRoofAttachToWalls => 'Прикрепи към стените';
+
+  @override
+  String get architectRoofAttachToWallsSubtitle =>
+      'Автоматично прикрепя покрива към най-високата точка на стените с конструктивен детайл';
+
+  @override
+  String get architectRoofRingBeamLabel => '10 см стоманобетонен пояс';
+
+  @override
+  String get architectRoofMetalFlashingLabel => 'Метална обшивка (капелник)';
+
+  @override
+  String get architectRoofMoveVerticalAction => 'Премести нагоре / надолу';
+
+  @override
+  String get architectRoofSnapToWallsAction => 'Прикрепи към стени';
+
+  @override
+  String get architectRoofPropertiesAction => 'Свойства';
+
+  @override
   String get cad3dOrbit => 'Завъртане';
 
   @override

@@ -777,7 +777,8 @@ class ArchitectOpeningPlacement {
       for (final wall in walls) {
         if (wall.length < openingWidth - 1e-5) continue;
         final (_, dist) = wall.projectPoint(rawPoint);
-        if (dist <= wall.thickness / 2.0 + 0.35 && dist < bestDist) {
+        final maxSnapDist = wall.thickness / 2.0 + math.max(openingWidth * 1.5, 1.20);
+        if (dist <= maxSnapDist && dist < bestDist) {
           bestDist = dist;
           host = wall;
         }

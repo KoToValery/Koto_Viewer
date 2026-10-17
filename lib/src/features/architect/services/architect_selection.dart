@@ -4,6 +4,7 @@ import '../models/architect_column.dart';
 import '../models/architect_project.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_wall.dart';
+import '../models/architect_door.dart';
 import '../models/architect_wall_type.dart';
 import '../rendering/architect_scene_geometry.dart';
 import 'architect_command_controller.dart';
@@ -340,7 +341,17 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
           if (!{'true', 'false'}.contains(value.value)) {
             throw ArgumentError('Invalid boolean value');
           }
-          e[value.key] = value.value == 'true';
+          final boolVal = value.value == 'true';
+          e[value.key] = boolVal;
+          if (value.key == 'isHingeLeft' && !textValues.containsKey('specId')) {
+            final currentSpec = e['specId'] as String?;
+            if (currentSpec != null && currentSpec.isNotEmpty) {
+              final base = ArchitectDoor.extractBaseNumber(currentSpec);
+              if (base != null) {
+                e['specId'] = ArchitectDoor.formatSpecId(baseNumber: base, isHingeLeft: boolVal);
+              }
+            }
+          }
         } else if (value.key == 'followStoreyHeight') {
           if (!{'true', 'false'}.contains(value.value)) {
             throw ArgumentError('Invalid height mode');

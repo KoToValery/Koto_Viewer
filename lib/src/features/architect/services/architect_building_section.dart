@@ -12,6 +12,8 @@ import 'architect_stair_section.dart';
 
 class ArchitectSectionRegion {
   final String sourceId;
+  String get slabId => sourceId;
+  String get wallId => sourceId;
   final SlabMaterial material;
   final Path path;
   final bool slab;
@@ -56,6 +58,9 @@ class ArchitectBuildingSection {
       };
 
   static Color? _roofMemberColor(ArchitectRoofSectionMember member) {
+    if (member.kind == ArchitectRoofMemberKind.metalFlashing) {
+      return const Color(0xFF37474F);
+    }
     if (member.drawTimberDiagonals) {
       return const Color(0xFFD7A86E);
     }
@@ -87,10 +92,13 @@ class ArchitectBuildingSection {
 
     // 1. Pre-build roof section slices per storey
     final storeyRoofSlices = <String, List<ArchitectRoofSectionSlice>>{};
-    for (final floor in project.storeys) {
+    for (var i = 0; i < project.storeys.length; i++) {
+      final floor = project.storeys[i];
+      final lowerFloor = i > 0 ? project.storeys[i - 1] : null;
       final slices = ArchitectRoofGeometry.buildSectionSlices(
         storey: floor,
         sectionLine: cut,
+        lowerStorey: lowerFloor,
       );
       if (slices.isNotEmpty) {
         storeyRoofSlices[floor.id] = slices;
@@ -162,7 +170,7 @@ class ArchitectBuildingSection {
         }
       }
 
-      // Compute max roof underside height on this floor so gable walls can rise to meet the roof underside
+      // Compute max roof underside height on this floor so supporting and gable walls rise to meet the roof underside
       var maxRoofHeightAboveFloor = floor.height;
       for (final slice in activeRoofSlices) {
         for (final pt in slice.bottomProfile) {
@@ -175,13 +183,9 @@ class ArchitectBuildingSection {
 
       for (final wall in floor.walls) {
         final baseWallHeight = wall.effectiveHeight(floor.height);
-        final canExtendToRoof =
-            activeRoofSlices.isNotEmpty &&
-            !wall.isParapet &&
-            wall.followStoreyHeight &&
-            maxRoofHeightAboveFloor > baseWallHeight;
+        final canExtendToRoof = activeRoofSlices.isNotEmpty && !wall.isParapet;
         final prismHeight = canExtendToRoof
-            ? maxRoofHeightAboveFloor
+            ? math.max(baseWallHeight, maxRoofHeightAboveFloor)
             : baseWallHeight;
 
         var wallPath = sliceMesh(
@@ -375,12 +379,49 @@ class ArchitectBuildingSection {
     ArchitectSlabDetail detail,
   ) {
     if (detail.station < 0 || detail.station > cut.length) return null;
+    return findRoofById(project, detail.slabId);
+  }
+
+  static ({ArchitectStorey storey, ArchitectRoofPlane roof})? findRoofById(
+    ArchitectProject project,
+    String roofId,
+  ) {
     for (final floor in project.storeys) {
-      for (final roof in floor.roofs.where((r) => r.id == detail.slabId)) {
+      for (final roof in floor.roofs.where((r) => r.id == roofId)) {
         return (storey: floor, roof: roof);
       }
     }
     return null;
+  }
+
+  String? pickRoof(Offset point, double tolerance) {
+    for (final r in regions.reversed.where((r) => r.roof)) {
+      if (r.path.contains(point)) return r.sourceId;
+    }
+    for (final r in regions.reversed.where((r) => r.roof)) {
+      if ([
+        Offset(tolerance, 0),
+        Offset(-tolerance, 0),
+        Offset(0, tolerance),
+        Offset(0, -tolerance),
+        Offset(tolerance * 0.7, tolerance * 0.7),
+        Offset(-tolerance * 0.7, -tolerance * 0.7),
+      ].any((offset) => r.path.contains(point + offset))) {
+        return r.sourceId;
+      }
+    }
+    return null;
+  }
+
+  Rect? roofBounds(String roofId) {
+    Rect? result;
+    for (final r in regions.where((r) => r.roof && r.sourceId == roofId)) {
+      final b = r.path.getBounds();
+      if (!b.isEmpty) {
+        result = result?.expandToInclude(b) ?? b;
+      }
+    }
+    return result;
   }
 
   String? pickSlab(Offset point, double tolerance) {

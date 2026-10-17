@@ -6,8 +6,10 @@ import '../models/architect_section.dart';
 import '../models/architect_slab_assembly.dart';
 import '../services/architect_building_section.dart';
 import '../services/architect_command_controller.dart';
+import '../services/architect_roof_geometry.dart';
 import '../services/architect_slab_assemblies.dart';
 import '../services/architect_slab_geometry.dart';
+import 'architect_roof_layers_dialog.dart';
 import 'architect_slab_labels.dart';
 import 'architect_view_plan.dart';
 
@@ -30,6 +32,10 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
     widget.onViewSelected?.call(value);
   }
   String? selectedDetail;
+  String? selectedRoofId;
+  bool movingRoofVertically = false;
+  double? _roofDragStartLocalY;
+  double? _roofDragInitialOffset;
   Offset? firstPoint, secondPoint;
   bool editingCut = false,
       placingDetail = false,
@@ -64,6 +70,12 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
         selectedDetail = null;
         movingDetail = false;
         reattaching = false;
+      }
+      if (selectedRoofId != null &&
+          ArchitectBuildingSection.findRoofById(project, selectedRoofId!) ==
+              null) {
+        selectedRoofId = null;
+        movingRoofVertically = false;
       }
     });
   }
@@ -102,6 +114,188 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
     movingDetail = false;
     reattaching = false;
     selectedDetail = null;
+    selectedRoofId = null;
+    movingRoofVertically = false;
+  }
+
+  void _updateRoof(
+    String roofId,
+    ArchitectRoofPlane Function(ArchitectStorey storey, ArchitectRoofPlane roof)
+    updater,
+  ) {
+    final hit = ArchitectBuildingSection.findRoofById(project, roofId);
+    if (hit == null) return;
+    final nextRoof = updater(hit.storey, hit.roof);
+    widget.controller.execute(
+      UpdateArchitectRoofPlane(storeyId: hit.storey.id, roof: nextRoof),
+    );
+  }
+
+  void _snapRoofToWalls(String roofId) {
+    _updateRoof(roofId, (storey, roof) {
+      final sorted = [...project.storeys]
+        ..sort((a, b) => a.elevation.compareTo(b.elevation));
+      final idx = sorted.indexWhere((s) => s.id == storey.id);
+      final lower = idx > 0 ? sorted[idx - 1] : null;
+      final resolvedOffset =
+          ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
+            roof: roof,
+            storey: storey,
+            lowerStorey: lower,
+          );
+      return roof.copyWith(
+        attachToWalls: true,
+        baseElevationOffset: resolvedOffset,
+      );
+    });
+  }
+
+  void _flipRoofSlope(String roofId) {
+    _updateRoof(roofId, (_, roof) => roof.flippedSlope());
+  }
+
+  void _deleteRoof(String roofId) {
+    final hit = ArchitectBuildingSection.findRoofById(project, roofId);
+    if (hit == null) return;
+    widget.controller.execute(
+      DeleteArchitectRoofPlane(storeyId: hit.storey.id, roofId: hit.roof.id),
+    );
+    setState(() {
+      if (selectedRoofId == roofId) {
+        selectedRoofId = null;
+        movingRoofVertically = false;
+      }
+    });
+  }
+
+  Future<void> _openRoofProperties(String roofId) async {
+    final hit = ArchitectBuildingSection.findRoofById(project, roofId);
+    if (hit == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => ArchitectRoofLayersDialog(
+        initialAssembly: hit.roof.assembly,
+        initialSlopeDegrees: hit.roof.slopeDegrees,
+        initialEavesOverhang: hit.roof.eavesOverhang,
+        initialEavesCut: hit.roof.eavesCut,
+        initialBaseElevationOffset: hit.roof.baseElevationOffset,
+        initialAttachToWalls: hit.roof.attachToWalls,
+        onApply: (res) {
+          _updateRoof(roofId, (st, r) {
+            var nextOffset = res.baseElevationOffset;
+            if (res.attachToWalls && !r.attachToWalls) {
+              final sorted = [...project.storeys]
+                ..sort((a, b) => a.elevation.compareTo(b.elevation));
+              final idx = sorted.indexWhere((s) => s.id == st.id);
+              final lower = idx > 0 ? sorted[idx - 1] : null;
+              nextOffset =
+                  ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
+                    roof: r.copyWith(
+                      assembly: res.assembly,
+                      slopeDegrees: res.slopeDegrees,
+                      eavesOverhang: res.eavesOverhang,
+                      eavesCut: res.eavesCut,
+                    ),
+                    storey: st,
+                    lowerStorey: lower,
+                  );
+            }
+            return r.copyWith(
+              assembly: res.assembly,
+              slopeDegrees: res.slopeDegrees,
+              eavesOverhang: res.eavesOverhang,
+              eavesCut: res.eavesCut,
+              baseElevationOffset: nextOffset,
+              attachToWalls: res.attachToWalls,
+            );
+          });
+        },
+      ),
+    );
+  }
+
+  Future<void> _showRoofContextMenu(
+    Offset globalPosition,
+    String roofId,
+  ) async {
+    final l = context.l10n;
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx,
+        globalPosition.dy,
+        globalPosition.dx,
+        globalPosition.dy,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'move_vertical',
+          child: Row(
+            children: [
+              const Icon(Icons.swap_vert, size: 18),
+              const SizedBox(width: 8),
+              Text(l.architectRoofMoveVerticalAction),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'snap_walls',
+          child: Row(
+            children: [
+              const Icon(Icons.vertical_align_bottom, size: 18),
+              const SizedBox(width: 8),
+              Text(l.architectRoofSnapToWallsAction),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'properties',
+          child: Row(
+            children: [
+              const Icon(Icons.layers_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(l.architectRoofPropertiesAction),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'flip_slope',
+          child: Row(
+            children: [
+              const Icon(Icons.swap_horiz, size: 18),
+              const SizedBox(width: 8),
+              Text(l.architectRoofFlipSlope),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              const Icon(Icons.delete_outline, size: 18),
+              const SizedBox(width: 8),
+              Text(l.delete),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'move_vertical':
+        setState(() {
+          selectedRoofId = roofId;
+          movingRoofVertically = true;
+        });
+      case 'snap_walls':
+        _snapRoofToWalls(roofId);
+      case 'properties':
+        await _openRoofProperties(roofId);
+      case 'flip_slope':
+        _flipRoofSlope(roofId);
+      case 'delete':
+        _deleteRoof(roofId);
+    }
   }
 
   void historyAction({bool redo = false}) {
@@ -258,11 +452,27 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
     }
     for (final d in value.details.reversed) {
       if (drawing._detailLayout(d).bounds.inflate(8 / scale).contains(point)) {
-        setState(() => selectedDetail = d.id);
+        setState(() {
+          selectedDetail = d.id;
+          selectedRoofId = null;
+          movingRoofVertically = false;
+        });
         return;
       }
     }
-    setState(() => selectedDetail = null);
+    final roofHit = data.pickRoof(point, 10 / scale);
+    if (roofHit != null) {
+      setState(() {
+        selectedDetail = null;
+        selectedRoofId = roofHit;
+      });
+      return;
+    }
+    setState(() {
+      selectedDetail = null;
+      selectedRoofId = null;
+      movingRoofVertically = false;
+    });
   }
 
   Future<void> rename() async {
@@ -472,6 +682,30 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                     onPressed: () => transform.value = Matrix4.identity(),
                     icon: const Icon(Icons.fit_screen),
                   ),
+                  if (selectedRoofId != null) ...[
+                    TextButton.icon(
+                      key: const ValueKey('section-roof-snap-walls'),
+                      onPressed: () => _snapRoofToWalls(selectedRoofId!),
+                      icon: const Icon(Icons.vertical_align_bottom, size: 18),
+                      label: Text(l.architectRoofSnapToWallsAction),
+                    ),
+                    TextButton.icon(
+                      key: const ValueKey('section-roof-properties'),
+                      onPressed: () => _openRoofProperties(selectedRoofId!),
+                      icon: const Icon(Icons.layers_outlined, size: 18),
+                      label: Text(l.architectRoofPropertiesAction),
+                    ),
+                    IconButton(
+                      tooltip: l.architectRoofFlipSlope,
+                      onPressed: () => _flipRoofSlope(selectedRoofId!),
+                      icon: const Icon(Icons.swap_horiz, size: 18),
+                    ),
+                    IconButton(
+                      tooltip: l.delete,
+                      onPressed: () => _deleteRoof(selectedRoofId!),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                    ),
+                  ],
                   if (selectedDetail != null)
                     PopupMenuButton<String>(
                       onSelected: (action) {
@@ -534,7 +768,10 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                         ),
                       ],
                     ),
-                  if (placingDetail || movingDetail || reattaching)
+                  if (placingDetail ||
+                      movingDetail ||
+                      reattaching ||
+                      movingRoofVertically)
                     TextButton(
                       onPressed: () => setState(resetModes),
                       child: Text(l.cancel),
@@ -566,6 +803,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                             colors,
                             selectedDetail,
                             Theme.of(context).textTheme.bodyMedium?.fontFamily,
+                            selectedRoofId,
                           );
                           final bounds = drawing.bounds.inflate(.8);
                           final scale = math.min(
@@ -576,26 +814,103 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                             c.maxWidth / 2,
                             c.maxHeight / 2,
                           );
+                          Offset localToSection(Offset localPos) =>
+                              bounds.center +
+                              Offset(
+                                (localPos.dx - centre.dx) / scale,
+                                -(localPos.dy - centre.dy) / scale,
+                              );
                           return ColoredBox(
                             color: colors.surface,
                             child: InteractiveViewer(
                               transformationController: transform,
                               minScale: .5,
                               maxScale: 16,
+                              panEnabled: selectedRoofId == null,
                               child: GestureDetector(
                                 key: const ValueKey('building-section-view'),
                                 behavior: HitTestBehavior.opaque,
                                 onTapUp: (d) {
-                                  final p =
-                                      bounds.center +
-                                      Offset(
-                                        (d.localPosition.dx - centre.dx) /
-                                            scale,
-                                        -(d.localPosition.dy - centre.dy) /
-                                            scale,
-                                      );
-                                  sectionTap(p, scale, drawing);
+                                  sectionTap(
+                                    localToSection(d.localPosition),
+                                    scale,
+                                    drawing,
+                                  );
                                 },
+                                onSecondaryTapUp: (d) {
+                                  final p = localToSection(d.localPosition);
+                                  final hitRoof =
+                                      data.pickRoof(p, 14 / scale) ??
+                                      selectedRoofId;
+                                  if (hitRoof != null) {
+                                    setState(() {
+                                      selectedDetail = null;
+                                      selectedRoofId = hitRoof;
+                                    });
+                                    _showRoofContextMenu(
+                                      d.globalPosition,
+                                      hitRoof,
+                                    );
+                                  }
+                                },
+                                onLongPressStart: (d) {
+                                  final p = localToSection(d.localPosition);
+                                  final hitRoof =
+                                      data.pickRoof(p, 14 / scale) ??
+                                      selectedRoofId;
+                                  if (hitRoof != null) {
+                                    setState(() {
+                                      selectedDetail = null;
+                                      selectedRoofId = hitRoof;
+                                    });
+                                    _showRoofContextMenu(
+                                      d.globalPosition,
+                                      hitRoof,
+                                    );
+                                  }
+                                },
+                                onVerticalDragStart: selectedRoofId == null
+                                    ? null
+                                    : (d) {
+                                        final hit =
+                                            ArchitectBuildingSection.findRoofById(
+                                              project,
+                                              selectedRoofId!,
+                                            );
+                                        if (hit == null) return;
+                                        _roofDragStartLocalY =
+                                            d.localPosition.dy;
+                                        _roofDragInitialOffset =
+                                            hit.roof.baseElevationOffset;
+                                      },
+                                onVerticalDragUpdate: selectedRoofId == null
+                                    ? null
+                                    : (d) {
+                                        if (_roofDragStartLocalY == null ||
+                                            _roofDragInitialOffset == null ||
+                                            selectedRoofId == null) {
+                                          return;
+                                        }
+                                        final deltaZ =
+                                            -(d.localPosition.dy -
+                                                _roofDragStartLocalY!) /
+                                            scale;
+                                        final nextOffset =
+                                            _roofDragInitialOffset! + deltaZ;
+                                        _updateRoof(
+                                          selectedRoofId!,
+                                          (_, roof) => roof.copyWith(
+                                            baseElevationOffset: nextOffset,
+                                            attachToWalls: false,
+                                          ),
+                                        );
+                                      },
+                                onVerticalDragEnd: selectedRoofId == null
+                                    ? null
+                                    : (_) {
+                                        _roofDragStartLocalY = null;
+                                        _roofDragInitialOffset = null;
+                                      },
                                 child: CustomPaint(
                                   size: Size(c.maxWidth, c.maxHeight),
                                   painter: ArchitectBuildingSectionPainter(
@@ -645,6 +960,7 @@ class ArchitectSectionDrawing {
   final ColorScheme colors;
   final String? selected;
   final String? fontFamily;
+  final String? selectedRoofId;
   ArchitectSectionDrawing(
     this.project,
     this.cut,
@@ -652,8 +968,9 @@ class ArchitectSectionDrawing {
     this.l,
     this.colors,
     this.selected,
-    this.fontFamily,
-  );
+    this.fontFamily, [
+    this.selectedRoofId,
+  ]);
   double get textHeight => project.dimensionScale.textHeight;
   _DetailLayout _detailLayout(ArchitectSlabDetail detail) {
     final source = ArchitectBuildingSection.source(project, cut, detail);
@@ -716,6 +1033,24 @@ class ArchitectSectionDrawing {
             '${layer.material.label(l)} — ${formatSlabThickness(layer.thickness)}',
           );
         }
+      }
+      if (timber.hasWallPlate) {
+        rows.add(
+          '${l.architectRoofWallPlateLabel} ${(timber.wallPlateWidth * 100).round()}×${(timber.wallPlateHeight * 100).round()} cm',
+        );
+      }
+      if (timber.hasRingBeam) {
+        rows.add(
+          '${l.architectRoofRingBeamLabel} — ${formatSlabThickness(timber.ringBeamHeight)}',
+        );
+      }
+      if (timber.hasFasciaBoard) {
+        rows.add(
+          '${l.architectRoofFasciaLabel} ${(timber.fasciaThickness * 100).toStringAsFixed(1)} cm',
+        );
+      }
+      if (timber.hasMetalFlashing) {
+        rows.add(l.architectRoofMetalFlashingLabel);
       }
     }
     if (source == null && roofSource == null) rows.add(l.slabDetailLost);
@@ -786,6 +1121,9 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
     canvas.clipRect(Offset.zero & size);
     for (final region in drawing.data.regions) {
       final path = region.path.transform(matrix.storage);
+      final isSelectedRoof =
+          drawing.selectedRoofId != null &&
+          region.slabId == drawing.selectedRoofId;
       final fillColor =
           region.customFillColor ??
           ArchitectSlabGeometry.materialColor(region.material);
@@ -793,19 +1131,21 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
       canvas.drawPath(
         path,
         Paint()
-          ..color = color
+          ..color = isSelectedRoof ? drawing.colors.primary : color
           ..style = PaintingStyle.stroke
-          ..strokeWidth =
-              region.material == SlabMaterial.concrete ||
-                  region.timberCrossSectionPolygon != null
-              ? 1.1
-              : .65,
+          ..strokeWidth = isSelectedRoof
+              ? 1.5
+              : (region.material == SlabMaterial.concrete ||
+                        region.timberCrossSectionPolygon != null
+                    ? 1.1
+                    : .65),
       );
       if (region.timberCrossSectionPolygon != null &&
           region.timberCrossSectionPolygon!.length == 4) {
         final pts = region.timberCrossSectionPolygon!.map(p).toList();
         final diagPaint = Paint()
-          ..color = color.withValues(alpha: 0.65)
+          ..color = (isSelectedRoof ? drawing.colors.primary : color)
+              .withValues(alpha: 0.65)
           ..strokeWidth = 0.65;
         canvas.drawLine(pts[0], pts[2], diagPaint);
         canvas.drawLine(pts[1], pts[3], diagPaint);
@@ -850,6 +1190,34 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
                 ? Offset(tp.width / 2, tp.height / 2)
                 : Offset(0, tp.height)),
       );
+    }
+
+    if (drawing.selectedRoofId != null) {
+      final rb = drawing.data.roofBounds(drawing.selectedRoofId!);
+      if (rb != null) {
+        final handleScreen = p(Offset(rb.center.dx, rb.bottom)) +
+            const Offset(0, -16);
+        canvas.drawCircle(
+          handleScreen,
+          12,
+          Paint()..color = drawing.colors.primaryContainer,
+        );
+        canvas.drawCircle(
+          handleScreen,
+          12,
+          Paint()
+            ..color = drawing.colors.primary
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5,
+        );
+        text(
+          '⇅',
+          handleScreen,
+          13,
+          drawing.colors.onPrimaryContainer,
+          centred: true,
+        );
+      }
     }
 
     for (final floor in drawing.project.storeys) {

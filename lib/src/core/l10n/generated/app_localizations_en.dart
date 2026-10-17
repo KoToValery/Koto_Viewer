@@ -5948,6 +5948,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectRoofRotateSlope => 'Slope dir';
 
   @override
+  String get architectRoofAttachToWalls => 'Attach to wall top';
+
+  @override
+  String get architectRoofAttachToWallsSubtitle =>
+      'Auto-align roof structure to highest supporting walls with constructive eaves detail';
+
+  @override
+  String get architectRoofRingBeamLabel => '10 cm concrete ring beam';
+
+  @override
+  String get architectRoofMetalFlashingLabel => 'Metal flashing (drip edge)';
+
+  @override
+  String get architectRoofMoveVerticalAction => 'Move up / down';
+
+  @override
+  String get architectRoofSnapToWallsAction => 'Snap to walls';
+
+  @override
+  String get architectRoofPropertiesAction => 'Properties';
+
+  @override
   String get cad3dOrbit => 'Orbit';
 
   @override

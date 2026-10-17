@@ -12,6 +12,7 @@ import 'architect_elements.dart';
 export 'architect_elements.dart' show ArchitectCutDisplayMode;
 import 'architect_grid_preset.dart';
 import 'architect_wall.dart';
+import 'architect_door.dart';
 import 'architect_wall_type.dart';
 import 'architect_zone.dart';
 import 'architect_fenestration_style.dart';
@@ -282,6 +283,10 @@ class ArchitectProject {
     (s) => s.id == activeStoreyId,
     orElse: () => storeys.isNotEmpty ? storeys.first : _emptyStorey,
   );
+
+  /// All doors across all storeys in this project.
+  Iterable<ArchitectDoor> get allDoors =>
+      storeys.expand((s) => s.walls).expand((w) => w.doors);
 
   static const _emptyStorey = ArchitectStorey(
     id: 'default',

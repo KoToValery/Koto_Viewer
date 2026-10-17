@@ -193,12 +193,17 @@ class ArchitectRoofTimberSpec {
   final double wallPlateWidth; // horizontal width (m), e.g. 0.14
   final double wallPlateHeight; // vertical height (m), e.g. 0.14
 
+  final bool hasRingBeam;
+  final double ringBeamHeight; // vertical height of concrete belt under wall plate (m), e.g. 0.10
+
   final bool hasRidgePurlin;
   final double ridgePurlinWidth; // horizontal width (m), e.g. 0.16
   final double ridgePurlinHeight; // vertical height (m), e.g. 0.20
 
   final bool hasFasciaBoard;
   final double fasciaThickness; // thickness at eaves (m), e.g. 0.025
+
+  final bool hasMetalFlashing;
 
   const ArchitectRoofTimberSpec({
     this.hasBattens = true,
@@ -215,11 +220,14 @@ class ArchitectRoofTimberSpec {
     this.hasWallPlate = true,
     this.wallPlateWidth = 0.14,
     this.wallPlateHeight = 0.14,
+    this.hasRingBeam = true,
+    this.ringBeamHeight = 0.10,
     this.hasRidgePurlin = true,
     this.ridgePurlinWidth = 0.16,
     this.ridgePurlinHeight = 0.20,
     this.hasFasciaBoard = true,
     this.fasciaThickness = 0.025,
+    this.hasMetalFlashing = true,
   });
 
   static const none = ArchitectRoofTimberSpec(
@@ -227,8 +235,10 @@ class ArchitectRoofTimberSpec {
     hasCounterBattens: false,
     hasRafters: false,
     hasWallPlate: false,
+    hasRingBeam: false,
     hasRidgePurlin: false,
     hasFasciaBoard: false,
+    hasMetalFlashing: false,
   );
 
   ArchitectRoofTimberSpec copyWith({
@@ -246,11 +256,14 @@ class ArchitectRoofTimberSpec {
     bool? hasWallPlate,
     double? wallPlateWidth,
     double? wallPlateHeight,
+    bool? hasRingBeam,
+    double? ringBeamHeight,
     bool? hasRidgePurlin,
     double? ridgePurlinWidth,
     double? ridgePurlinHeight,
     bool? hasFasciaBoard,
     double? fasciaThickness,
+    bool? hasMetalFlashing,
   }) => ArchitectRoofTimberSpec(
     hasBattens: hasBattens ?? this.hasBattens,
     battenWidth: battenWidth ?? this.battenWidth,
@@ -266,11 +279,14 @@ class ArchitectRoofTimberSpec {
     hasWallPlate: hasWallPlate ?? this.hasWallPlate,
     wallPlateWidth: wallPlateWidth ?? this.wallPlateWidth,
     wallPlateHeight: wallPlateHeight ?? this.wallPlateHeight,
+    hasRingBeam: hasRingBeam ?? this.hasRingBeam,
+    ringBeamHeight: ringBeamHeight ?? this.ringBeamHeight,
     hasRidgePurlin: hasRidgePurlin ?? this.hasRidgePurlin,
     ridgePurlinWidth: ridgePurlinWidth ?? this.ridgePurlinWidth,
     ridgePurlinHeight: ridgePurlinHeight ?? this.ridgePurlinHeight,
     hasFasciaBoard: hasFasciaBoard ?? this.hasFasciaBoard,
     fasciaThickness: fasciaThickness ?? this.fasciaThickness,
+    hasMetalFlashing: hasMetalFlashing ?? this.hasMetalFlashing,
   );
 
   Map<String, dynamic> toJson() => {
@@ -288,11 +304,14 @@ class ArchitectRoofTimberSpec {
     'hasWallPlate': hasWallPlate,
     'wallPlateWidth': wallPlateWidth,
     'wallPlateHeight': wallPlateHeight,
+    'hasRingBeam': hasRingBeam,
+    'ringBeamHeight': ringBeamHeight,
     'hasRidgePurlin': hasRidgePurlin,
     'ridgePurlinWidth': ridgePurlinWidth,
     'ridgePurlinHeight': ridgePurlinHeight,
     'hasFasciaBoard': hasFasciaBoard,
     'fasciaThickness': fasciaThickness,
+    'hasMetalFlashing': hasMetalFlashing,
   };
 
   factory ArchitectRoofTimberSpec.fromJson(Map<String, dynamic> json) =>
@@ -313,6 +332,8 @@ class ArchitectRoofTimberSpec {
         hasWallPlate: json['hasWallPlate'] as bool? ?? true,
         wallPlateWidth: (json['wallPlateWidth'] as num?)?.toDouble() ?? 0.14,
         wallPlateHeight: (json['wallPlateHeight'] as num?)?.toDouble() ?? 0.14,
+        hasRingBeam: json['hasRingBeam'] as bool? ?? true,
+        ringBeamHeight: (json['ringBeamHeight'] as num?)?.toDouble() ?? 0.10,
         hasRidgePurlin: json['hasRidgePurlin'] as bool? ?? true,
         ridgePurlinWidth:
             (json['ridgePurlinWidth'] as num?)?.toDouble() ?? 0.16,
@@ -320,6 +341,7 @@ class ArchitectRoofTimberSpec {
             (json['ridgePurlinHeight'] as num?)?.toDouble() ?? 0.20,
         hasFasciaBoard: json['hasFasciaBoard'] as bool? ?? true,
         fasciaThickness: (json['fasciaThickness'] as num?)?.toDouble() ?? 0.025,
+        hasMetalFlashing: json['hasMetalFlashing'] as bool? ?? true,
       );
 }
 
@@ -666,6 +688,7 @@ class ArchitectRoofPlane {
   bool reverseSlope;
   double slopeDegrees;
   double baseElevationOffset;
+  bool attachToWalls;
   double eavesOverhang;
   ArchitectRoofEavesCut eavesCut;
   ArchitectRoofAssembly assembly;
@@ -679,6 +702,7 @@ class ArchitectRoofPlane {
     this.reverseSlope = false,
     this.slopeDegrees = 22.0,
     this.baseElevationOffset = 2.80,
+    this.attachToWalls = true,
     this.eavesOverhang = 0.50,
     this.eavesCut = ArchitectRoofEavesCut.plumb,
     ArchitectRoofAssembly? assembly,
@@ -880,6 +904,7 @@ class ArchitectRoofPlane {
     bool? reverseSlope,
     double? slopeDegrees,
     double? baseElevationOffset,
+    bool? attachToWalls,
     double? eavesOverhang,
     ArchitectRoofEavesCut? eavesCut,
     ArchitectRoofAssembly? assembly,
@@ -892,6 +917,7 @@ class ArchitectRoofPlane {
     reverseSlope: reverseSlope ?? this.reverseSlope,
     slopeDegrees: slopeDegrees ?? this.slopeDegrees,
     baseElevationOffset: baseElevationOffset ?? this.baseElevationOffset,
+    attachToWalls: attachToWalls ?? this.attachToWalls,
     eavesOverhang: eavesOverhang ?? this.eavesOverhang,
     eavesCut: eavesCut ?? this.eavesCut,
     assembly: assembly ?? this.assembly.copyWith(),
@@ -908,6 +934,7 @@ class ArchitectRoofPlane {
     'reverseSlope': reverseSlope,
     'slopeDegrees': slopeDegrees,
     'baseElevationOffset': baseElevationOffset,
+    'attachToWalls': attachToWalls,
     'eavesOverhang': eavesOverhang,
     'eavesCut': eavesCut.name,
     'assembly': assembly.toJson(),
@@ -931,6 +958,7 @@ class ArchitectRoofPlane {
       slopeDegrees: (json['slopeDegrees'] as num?)?.toDouble() ?? 22.0,
       baseElevationOffset:
           (json['baseElevationOffset'] as num?)?.toDouble() ?? 2.80,
+      attachToWalls: json['attachToWalls'] as bool? ?? true,
       eavesOverhang: (json['eavesOverhang'] as num?)?.toDouble() ?? 0.50,
       eavesCut: ArchitectRoofEavesCut.values.byName(
         json['eavesCut'] as String? ?? ArchitectRoofEavesCut.plumb.name,

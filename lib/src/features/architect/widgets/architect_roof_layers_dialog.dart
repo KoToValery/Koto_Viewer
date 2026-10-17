@@ -17,6 +17,7 @@ class ArchitectRoofLayersResult {
   final double eavesOverhang;
   final ArchitectRoofEavesCut eavesCut;
   final double? baseElevationOffset;
+  final bool attachToWalls;
 
   const ArchitectRoofLayersResult({
     required this.assembly,
@@ -24,6 +25,7 @@ class ArchitectRoofLayersResult {
     required this.eavesOverhang,
     required this.eavesCut,
     this.baseElevationOffset,
+    this.attachToWalls = true,
   });
 }
 
@@ -33,6 +35,7 @@ class ArchitectRoofLayersDialog extends StatefulWidget {
   final double initialEavesOverhang;
   final ArchitectRoofEavesCut initialEavesCut;
   final double? initialBaseElevationOffset;
+  final bool initialAttachToWalls;
   final ValueChanged<ArchitectRoofLayersResult> onApply;
 
   const ArchitectRoofLayersDialog({
@@ -42,6 +45,7 @@ class ArchitectRoofLayersDialog extends StatefulWidget {
     required this.initialEavesOverhang,
     required this.initialEavesCut,
     this.initialBaseElevationOffset,
+    this.initialAttachToWalls = true,
     required this.onApply,
   });
 
@@ -56,6 +60,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
   late double _eavesOverhang;
   late ArchitectRoofEavesCut _eavesCut;
   late double? _baseElevationOffset;
+  late bool _attachToWalls;
 
   @override
   void initState() {
@@ -65,6 +70,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
     _eavesOverhang = widget.initialEavesOverhang;
     _eavesCut = widget.initialEavesCut;
     _baseElevationOffset = widget.initialBaseElevationOffset;
+    _attachToWalls = widget.initialAttachToWalls;
   }
 
   void _selectPreset(ArchitectRoofPreset preset) {
@@ -149,6 +155,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
         eavesOverhang: _eavesOverhang,
         eavesCut: _eavesCut,
         baseElevationOffset: _baseElevationOffset,
+        attachToWalls: _attachToWalls,
       ),
     );
     Navigator.of(context).pop();
@@ -371,13 +378,38 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
                     min: 0.0,
                     max: 6.0,
                     divisions: 120,
-                    onChanged: (v) => setState(() => _baseElevationOffset = v),
+                    onChanged: (v) => setState(() {
+                      _baseElevationOffset = v;
+                      _attachToWalls = false;
+                    }),
                   ),
                 ),
               ],
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: Text(
+              l.architectRoofAttachToWalls,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            subtitle: Text(
+              l.architectRoofAttachToWallsSubtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
+            ),
+            value: _attachToWalls,
+            activeThumbColor: const Color(0xFF00E5FF),
+            onChanged: (v) => setState(() => _attachToWalls = v),
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
@@ -686,6 +718,27 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
             ],
           ),
 
+          // 4b. Reinforced Concrete Ring Beam under Wall Plate (10 см стоманобетонен пояс)
+          _buildTimberCard(
+            title: l.architectRoofRingBeamLabel,
+            subtitle:
+                '${l.architectPropertyHeight}: ${(t.ringBeamHeight * 100).round()} cm',
+            enabled: t.hasRingBeam,
+            onToggle: (v) => _updateTimber(t.copyWith(hasRingBeam: v)),
+            children: [
+              _buildCompactSliderField(
+                label:
+                    '${l.architectPropertyHeight}: ${(t.ringBeamHeight * 100).round()} cm',
+                value: (t.ringBeamHeight * 100).clamp(5.0, 25.0),
+                min: 5.0,
+                max: 25.0,
+                divisions: 20,
+                onChanged: (v) =>
+                    _updateTimber(t.copyWith(ringBeamHeight: v / 100.0)),
+              ),
+            ],
+          ),
+
           // 5. Ridge Purlin (Билова столица)
           _buildTimberCard(
             title: l.architectRoofRidgePurlinLabel,
@@ -728,7 +781,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
             ],
           ),
 
-          // 6. Fascia Board (Челна дъска)
+          // 6. Fascia Board & Metal Flashing (Челна дъска и метална обшивка)
           _buildTimberCard(
             title: l.architectRoofFasciaLabel,
             subtitle: '${(t.fasciaThickness * 1000).round()} mm',
@@ -744,6 +797,18 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
                 divisions: 22,
                 onChanged: (v) =>
                     _updateTimber(t.copyWith(fasciaThickness: v / 1000.0)),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(
+                  l.architectRoofMetalFlashingLabel,
+                  style: const TextStyle(color: Colors.white, fontSize: 12.5),
+                ),
+                value: t.hasMetalFlashing,
+                activeThumbColor: const Color(0xFF00E5FF),
+                onChanged: (v) =>
+                    _updateTimber(t.copyWith(hasMetalFlashing: v)),
               ),
             ],
           ),
@@ -893,10 +958,17 @@ class _RoofLayersPreviewPainter extends CustomPainter {
     final eavesPt = Offset(38, size.height - 22);
     final runLength = (size.width - 76) / math.max(cosA, 0.5);
 
-    // Draw supporting wall & Mauerlat preview on the left
+    // Draw supporting wall, 10 cm concrete ring beam & Mauerlat preview on the left
     final wallX = eavesPt.dx + 0.35 * scale * cosA;
     final wallBottomY = size.height;
-    final wallTopY = eavesPt.dy - 0.35 * scale * sinA;
+    final rafterUndersideY = eavesPt.dy - 0.35 * scale * sinA;
+    final mh = assembly.timber.hasWallPlate
+        ? assembly.timber.wallPlateHeight * scale
+        : 0.0;
+    final rbh = assembly.timber.hasRingBeam
+        ? assembly.timber.ringBeamHeight * scale
+        : 0.0;
+    final wallTopY = rafterUndersideY + mh + rbh;
     final wallW = 0.25 * scale;
     final wallRect = Rect.fromLTRB(
       wallX - wallW / 2,
@@ -913,10 +985,26 @@ class _RoofLayersPreviewPainter extends CustomPainter {
         ..strokeWidth = 1.0,
     );
 
+    if (assembly.timber.hasRingBeam) {
+      final rbRect = Rect.fromLTRB(
+        wallX - wallW / 2,
+        wallTopY - rbh,
+        wallX + wallW / 2,
+        wallTopY,
+      );
+      canvas.drawRect(rbRect, Paint()..color = const Color(0xFF78909C));
+      canvas.drawRect(
+        rbRect,
+        Paint()
+          ..color = Colors.white70
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.1,
+      );
+    }
+
     if (assembly.timber.hasWallPlate) {
       final mw = assembly.timber.wallPlateWidth * scale;
-      final mh = assembly.timber.wallPlateHeight * scale;
-      final mRect = Rect.fromLTWH(wallX - mw / 2, wallTopY - mh, mw, mh);
+      final mRect = Rect.fromLTWH(wallX - mw / 2, rafterUndersideY, mw, mh);
       canvas.drawRect(mRect, Paint()..color = const Color(0xFFC68B59));
       canvas.drawRect(
         mRect,

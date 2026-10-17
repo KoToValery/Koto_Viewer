@@ -53,6 +53,69 @@ class ArchitectDoor {
   /// Clear passage width between jamb frames in meters.
   double get clearWidth => math.max(0.20, width - 2 * frameThickness);
 
+  /// Formats the parametric spec ID based on base number and hinge orientation.
+  /// Left-hinged doors append a prime (') symbol to distinguish from right-hinged doors.
+  static String formatSpecId({
+    required int baseNumber,
+    required bool isHingeLeft,
+  }) {
+    return isHingeLeft ? "$baseNumber'" : '$baseNumber';
+  }
+
+  /// Size key matching width, height, and sill height within millimeter precision.
+  static String sizeKey({
+    required double width,
+    required double height,
+    required double sillHeight,
+  }) {
+    final w = (width * 100).round();
+    final h = (height * 100).round();
+    final s = (sillHeight * 100).round();
+    return '${w}_${h}_$s';
+  }
+
+  /// Extracts the base integer number from a specId (e.g. "1" -> 1, "1'" -> 1, "2" -> 2).
+  /// Returns null if specId does not contain digits.
+  static int? extractBaseNumber(String specId) {
+    final match = RegExp(r'\d+').firstMatch(specId);
+    return match != null ? int.tryParse(match.group(0)!) : null;
+  }
+
+  /// Resolves the parametric door ID for a door specification against existing doors.
+  /// Doors of identical dimensions (width, height, sillHeight) share the same base number.
+  /// Left-hinged doors append a prime (') symbol to the base number.
+  static String resolveSpecId({
+    required Iterable<ArchitectDoor> existingDoors,
+    required double width,
+    required double height,
+    required double sillHeight,
+    required bool isHingeLeft,
+  }) {
+    final targetKey = sizeKey(width: width, height: height, sillHeight: sillHeight);
+    int? matchedBase;
+    int maxBase = 0;
+
+    for (final door in existingDoors) {
+      final base = extractBaseNumber(door.specId);
+      if (base != null) {
+        if (base > maxBase) {
+          maxBase = base;
+        }
+        final dKey = sizeKey(
+          width: door.width,
+          height: door.height,
+          sillHeight: door.sillHeight,
+        );
+        if (dKey == targetKey && matchedBase == null) {
+          matchedBase = base;
+        }
+      }
+    }
+
+    final effectiveBase = matchedBase ?? (maxBase + 1);
+    return formatSpecId(baseNumber: effectiveBase, isHingeLeft: isHingeLeft);
+  }
+
   ArchitectDoor copyWith({
     String? id,
     String? wallId,
@@ -295,19 +358,24 @@ class ArchitectDoor {
     // 7. Dimension Line & Text Tag (matching door.dxf New_razmer)
     // Transverse dimension line passing perpendicularly through center of opening
     const badgeR = 0.15; // 15 cm radius circle matching door.dxf
+    // Dynamic extension distance: clear leaf swings outward by up to width.
+    // Margin of at least 18 cm beyond leaf swing ensures leader line & badge sit outside the swing zone.
+    final extDist = halfThick + math.max(0.42, width + 0.18);
     final dimStart = centerPos - n * (halfThick + 0.12);
-    final dimEnd = centerPos + n * (halfThick + 0.28);
+    final dimEnd = centerPos + n * extDist;
     canvas.drawLine(dimStart, dimEnd, dimLinePaint);
 
     final wCm = (width * 100).round();
     final hCm = (height * 100).round();
     final sillCm = (sillHeight * 100).round();
 
-    // Paint dimension numbers on both sides of the transverse line
+    // Paint dimension numbers on both sides of the transverse line, parallel to the line
     canvas.save();
     canvas.translate(centerPos.dx, centerPos.dy);
-    double dimAngle = baseAngle;
-    if (dimAngle > math.pi / 2 || dimAngle < -math.pi / 2) {
+    double dimAngle = math.atan2(n.dy, n.dx);
+    if (dimAngle > math.pi / 2) {
+      dimAngle -= math.pi;
+    } else if (dimAngle <= -math.pi / 2) {
       dimAngle += math.pi;
     }
     canvas.rotate(dimAngle);
@@ -332,7 +400,7 @@ class ArchitectDoor {
       textDirection: TextDirection.ltr,
     )..layout();
 
-    // Position above and below the dimension line
+    // Position parallel above and below the dimension line
     tpWidth.paint(canvas, Offset(-tpWidth.width / 2.0, -tpWidth.height - 2.0));
     tpHeight.paint(canvas, Offset(-tpHeight.width / 2.0, 3.0));
 
@@ -355,17 +423,12 @@ class ArchitectDoor {
     canvas.restore();
 
     // 8. Door ID Circle Badge (matching door.dxf New_ID)
-    // Positioned at the end of the extended dimension line
-    final badgeCenter = centerPos + n * (halfThick + 0.28 + badgeR);
+    // Positioned at the end of the extended dimension line touching circumference.
+    // Circle interior is transparent (outline only) so underlying lines/elements are not masked.
     final badgeRadiusScreen = math.max(badgeR, 12.0 / zoomScale);
+    final badgeCenter = centerPos + n * (extDist + badgeRadiusScreen);
 
-    // Circle background pill
-    canvas.drawCircle(
-      badgeCenter,
-      badgeRadiusScreen,
-      Paint()..color = palette.background,
-    );
-    // Circle border
+    // Circle border (outline only, transparent interior)
     canvas.drawCircle(
       badgeCenter,
       badgeRadiusScreen,
@@ -381,7 +444,7 @@ class ArchitectDoor {
         text: specId,
         style: TextStyle(
           color: isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black),
-          fontSize: math.max(10.0, 10.0),
+          fontSize: 10.0,
           fontWeight: FontWeight.bold,
           fontFamily: 'Arial',
         ),

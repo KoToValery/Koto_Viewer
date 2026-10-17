@@ -27,8 +27,10 @@ enum ArchitectRoofMemberKind {
   counterBatten,
   rafter,
   wallPlate,
+  ringBeam,
   ridgePurlin,
   fascia,
+  metalFlashing,
 }
 
 class ArchitectRoofSectionMember {
@@ -60,6 +62,8 @@ class ArchitectRoofSectionSlice {
   final List<Offset> bottomProfile;
   /// Full outer envelope path of the roof slice (for boolean wall trimming).
   final Path envelopePath;
+  /// Horizontal wall cap intervals `[fromS, toS]` where supporting walls terminate at `maxWallZ` (bottom of 10 cm concrete ring beam).
+  final List<({double fromS, double toS, double maxWallZ})> wallCapIntervals;
 
   const ArchitectRoofSectionSlice({
     required this.roofId,
@@ -68,6 +72,7 @@ class ArchitectRoofSectionSlice {
     required this.members,
     required this.bottomProfile,
     required this.envelopePath,
+    this.wallCapIntervals = const [],
   });
 }
 
@@ -404,13 +409,49 @@ class ArchitectRoofGeometry {
 
   // === SECTION: SECTION CUT GEOMETRY (MITERED LAYERS & CARPENTRY) ===
 
+  /// Resolves the effective `baseElevationOffset` of [roof] when `roof.attachToWalls` is enabled,
+  /// aligning the roof bearing plane with the highest supporting non-parapet wall on [storey]
+  /// (or [lowerStorey] if [storey] has no walls).
+  static double resolveAttachedBaseElevationOffset({
+    required ArchitectRoofPlane roof,
+    required ArchitectStorey storey,
+    ArchitectStorey? lowerStorey,
+  }) {
+    if (!roof.attachToWalls) return roof.baseElevationOffset;
+    final candidateWalls = storey.walls.where((w) => !w.isParapet).toList();
+    if (candidateWalls.isNotEmpty) {
+      var maxH = 0.0;
+      for (final w in candidateWalls) {
+        final h = w.effectiveHeight(storey.height);
+        if (h > maxH) maxH = h;
+      }
+      if (maxH > 0.0) return maxH;
+    }
+    if (storey.walls.isEmpty && lowerStorey != null) {
+      final lowerWalls = lowerStorey.walls.where((w) => !w.isParapet).toList();
+      if (lowerWalls.isNotEmpty) {
+        var maxTopZ = lowerStorey.elevation + lowerStorey.height;
+        for (final w in lowerWalls) {
+          final topZ =
+              lowerStorey.elevation + w.effectiveHeight(lowerStorey.height);
+          if (topZ > maxTopZ) maxTopZ = topZ;
+        }
+        return maxTopZ - storey.elevation;
+      }
+    }
+    return roof.baseElevationOffset;
+  }
+
   /// Slices all roof planes on [storey] along the vertical section plane [sectionLine]
   /// and produces clean, non-overlapping layer polygons, mitered ridge joins,
-  /// plumbed eaves with fascia boards, discrete battens (`летви`), counter-battens,
-  /// rafters, Mauerlat (`мауерлат`), and ridge purlin (`билова столица`).
+  /// plumbed eaves with fascia boards, metal flashing (`метална обшивка`),
+  /// discrete battens (`летви`), counter-battens, rafters (`ребра`),
+  /// Mauerlat (`мауерлат`), 10 cm reinforced concrete ring beam (`10 см стоманобетонен пояс`),
+  /// and ridge purlin (`билова столица`).
   static List<ArchitectRoofSectionSlice> buildSectionSlices({
     required ArchitectStorey storey,
     required ArchitectSection sectionLine,
+    ArchitectStorey? lowerStorey,
   }) {
     if (storey.roofs.isEmpty) return const [];
     final lineVec = sectionLine.end - sectionLine.start;
@@ -418,11 +459,60 @@ class ArchitectRoofGeometry {
     if (lineLen < 1e-6) return const [];
     final lineDir = lineVec / lineLen;
 
+    // 0. Intersect supporting walls with sectionLine to find transverse wall intervals [wMin, wMax]
+    final supportingWalls = storey.walls.isNotEmpty
+        ? storey.walls
+        : (lowerStorey?.walls ?? const []);
+    final wallIntervals = <({double fromS, double toS})>[];
+    for (final wall in supportingWalls) {
+      if (wall.isParapet) continue;
+      final corners = wall.polygonCorners;
+      if (corners.length < 3) continue;
+      final wHits = <double>[];
+      for (var i = 0; i < corners.length; i++) {
+        final a = corners[i];
+        final b = corners[(i + 1) % corners.length];
+        final hit = _intersectSegments(
+          sectionLine.start,
+          sectionLine.end,
+          a,
+          b,
+        );
+        if (hit != null) {
+          final s =
+              (hit - sectionLine.start).dx * lineDir.dx +
+              (hit - sectionLine.start).dy * lineDir.dy;
+          if (wHits.every((h) => (h - s).abs() > 1e-4)) {
+            wHits.add(s);
+          }
+        }
+      }
+      if (wHits.length >= 2) {
+        wHits.sort();
+        final wMin = wHits.first;
+        final wMax = wHits.last;
+        final wSpan = wMax - wMin;
+        // Transverse / oblique wall cross-section (exclude longitudinal gable wall cuts)
+        if (wSpan >= 0.06 && wSpan <= 0.85) {
+          wallIntervals.add((fromS: wMin, toS: wMax));
+        }
+      }
+    }
+
     // 1. Collect raw 1D intervals [fromS, toS] for each roof plane crossed by the section line.
     final rawIntervals =
         <({ArchitectRoofPlane roof, double fromS, double toS})>[];
-    for (final roof in storey.roofs) {
-      if (roof.points.length < 3) continue;
+    for (final rawRoof in storey.roofs) {
+      if (rawRoof.points.length < 3) continue;
+      final effectiveBaseOffset = resolveAttachedBaseElevationOffset(
+        roof: rawRoof,
+        storey: storey,
+        lowerStorey: lowerStorey,
+      );
+      final roof =
+          (effectiveBaseOffset - rawRoof.baseElevationOffset).abs() > 1e-5
+          ? rawRoof.copyWith(baseElevationOffset: effectiveBaseOffset)
+          : rawRoof;
       final hits = <double>[];
       for (var i = 0; i < roof.points.length; i++) {
         final a = roof.points[i];
@@ -465,7 +555,20 @@ class ArchitectRoofGeometry {
     if (rawIntervals.isEmpty) return const [];
     rawIntervals.sort((a, b) => a.fromS.compareTo(b.fromS));
 
-    final result = <ArchitectRoofSectionSlice>[];
+    final draftSlices =
+        <
+          ({
+            String roofId,
+            double fromS,
+            double toS,
+            double zTop0,
+            double zTop1,
+            double totalVerticalThick,
+            List<ArchitectRoofSectionMember> layerMembers,
+            List<ArchitectRoofSectionMember> discreteMembers,
+            List<({double fromS, double toS, double maxWallZ})> wallCapIntervals,
+          })
+        >[];
 
     for (var idx = 0; idx < rawIntervals.length; idx++) {
       final item = rawIntervals[idx];
@@ -497,6 +600,7 @@ class ArchitectRoofGeometry {
 
       final layerMembers = <ArchitectRoofSectionMember>[];
       final discreteMembers = <ArchitectRoofSectionMember>[];
+      final wallCapIntervals = <({double fromS, double toS, double maxWallZ})>[];
       final timber = roof.assembly.timber;
 
       // Apparent slope along the section line:
@@ -512,17 +616,23 @@ class ArchitectRoofGeometry {
       var cumulativePerp = 0.0;
       double? battenTopPerp;
       double? rafterTopPerp;
+      double? rafterBotPerp;
+      double coveringThickPerp = 0.04;
 
       for (final layer in roof.assembly.layers) {
         final dTopV = cumulativePerp / cosSlope;
         final dBotV = (cumulativePerp + layer.thickness) / cosSlope;
 
+        if (layer.role == ArchitectRoofLayerRole.covering) {
+          coveringThickPerp = layer.thickness;
+        }
         if (layer.role == ArchitectRoofLayerRole.battens) {
           battenTopPerp = cumulativePerp;
         }
         if (layer.role == ArchitectRoofLayerRole.rafters ||
             layer.isBetweenRafters) {
           rafterTopPerp ??= cumulativePerp;
+          rafterBotPerp = cumulativePerp + layer.thickness;
         }
 
         final isDiscreteBattenGap =
@@ -631,52 +741,112 @@ class ArchitectRoofGeometry {
         }
       }
 
-      // 5. Mauerlat / Wall Plate (Мауерлат) at the supporting wall or eaves overhang line
-      if (timber.hasWallPlate && slopeDirDotSection > 0.25) {
-        final bearingLine = wallBearingLine(roof);
-        double? sWallPlate;
-        if (bearingLine != null) {
-          final hit = _intersectSegments(
-            sectionLine.start,
-            sectionLine.end,
-            bearingLine.$1,
-            bearingLine.$2,
-          );
-          if (hit != null) {
-            sWallPlate =
-                (hit - sectionLine.start).dx * lineDir.dx +
-                (hit - sectionLine.start).dy * lineDir.dy;
+      // 5. Mauerlat / Wall Plate (Мауерлат) & 10 cm Concrete Ring Beam (Стоманобетонен пояс)
+      // at intersected supporting walls (or at the nominal eaves bearing line if no walls are present).
+      if ((timber.hasWallPlate || timber.hasRingBeam) &&
+          slopeDirDotSection > 0.25) {
+        final sliceWallSpans = <({double fromS, double toS})>[];
+        for (final wSpan in wallIntervals) {
+          final wCenter = (wSpan.fromS + wSpan.toS) * 0.5;
+          if (wCenter > s0 + 0.04 && wCenter < s1 - 0.04) {
+            sliceWallSpans.add(wSpan);
           }
         }
-        if (sWallPlate == null && roof.eavesOverhang > 0.05) {
-          final overhangS =
-              roof.eavesOverhang / math.max(0.3, slopeDirDotSection);
-          sWallPlate = zTop0 <= zTop1 ? (s0 + overhangS) : (s1 - overhangS);
+        if (sliceWallSpans.isEmpty) {
+          final bearingLine = wallBearingLine(roof);
+          double? sWallPlate;
+          if (bearingLine != null) {
+            final hit = _intersectSegments(
+              sectionLine.start,
+              sectionLine.end,
+              bearingLine.$1,
+              bearingLine.$2,
+            );
+            if (hit != null) {
+              sWallPlate =
+                  (hit - sectionLine.start).dx * lineDir.dx +
+                  (hit - sectionLine.start).dy * lineDir.dy;
+            }
+          }
+          if (sWallPlate == null && roof.eavesOverhang > 0.05) {
+            final overhangS =
+                roof.eavesOverhang / math.max(0.3, slopeDirDotSection);
+            sWallPlate = zTop0 <= zTop1 ? (s0 + overhangS) : (s1 - overhangS);
+          }
+          if (sWallPlate != null &&
+              sWallPlate > s0 + 0.05 &&
+              sWallPlate < s1 - 0.05) {
+            final nominalHalfW = math.max(0.125, timber.wallPlateWidth * 0.5);
+            sliceWallSpans.add((
+              fromS: sWallPlate - nominalHalfW,
+              toS: sWallPlate + nominalHalfW,
+            ));
+          }
         }
-        if (sWallPlate != null &&
-            sWallPlate > s0 + 0.05 &&
-            sWallPlate < s1 - 0.05) {
-          final halfWp = timber.wallPlateWidth * 0.5;
-          final sa = sWallPlate - halfWp;
-          final sb = sWallPlate + halfWp;
-          final zSupportTop = storey.elevation + roof.baseElevationOffset;
-          final zSupportBot = zSupportTop - timber.wallPlateHeight;
-          final wpPoly = <Offset>[
-            Offset(sa, zSupportTop),
-            Offset(sb, zSupportTop),
-            Offset(sb, zSupportBot),
-            Offset(sa, zSupportBot),
-          ];
-          discreteMembers.add(
-            ArchitectRoofSectionMember(
-              roofId: roof.id,
-              kind: ArchitectRoofMemberKind.wallPlate,
-              material: ArchitectRoofMaterial.timberBoarding,
-              polygon: wpPoly,
-              path: Path()..addPolygon(wpPoly, true),
-              drawTimberDiagonals: true,
-            ),
-          );
+
+        final dRafterBotV =
+            (rafterBotPerp ?? roof.assembly.totalThickness) / cosSlope;
+
+        for (final wSpan in sliceWallSpans) {
+          final sWallCenter = (wSpan.fromS + wSpan.toS) * 0.5;
+          final wallW = (wSpan.toS - wSpan.fromS).clamp(0.12, 0.85);
+          // Rafter underside elevation at the supporting wall centerline
+          final zRafterBotWall =
+              zTop0 + dzDs * (sWallCenter - s0) - dRafterBotV;
+          var zCurrentBot = zRafterBotWall;
+
+          if (timber.hasWallPlate) {
+            final halfWp = math.min(timber.wallPlateWidth, wallW) * 0.5;
+            final sa = sWallCenter - halfWp;
+            final sb = sWallCenter + halfWp;
+            final zWpTop = zCurrentBot;
+            final zWpBot = zWpTop - timber.wallPlateHeight;
+            final wpPoly = <Offset>[
+              Offset(sa, zWpTop),
+              Offset(sb, zWpTop),
+              Offset(sb, zWpBot),
+              Offset(sa, zWpBot),
+            ];
+            discreteMembers.add(
+              ArchitectRoofSectionMember(
+                roofId: roof.id,
+                kind: ArchitectRoofMemberKind.wallPlate,
+                material: ArchitectRoofMaterial.timberBoarding,
+                polygon: wpPoly,
+                path: Path()..addPolygon(wpPoly, true),
+                drawTimberDiagonals: true,
+              ),
+            );
+            zCurrentBot = zWpBot;
+          }
+
+          if (timber.hasRingBeam && timber.ringBeamHeight > 0.01) {
+            final zRbTop = zCurrentBot;
+            final zRbBot = zRbTop - timber.ringBeamHeight;
+            final rbPoly = <Offset>[
+              Offset(wSpan.fromS, zRbTop),
+              Offset(wSpan.toS, zRbTop),
+              Offset(wSpan.toS, zRbBot),
+              Offset(wSpan.fromS, zRbBot),
+            ];
+            discreteMembers.add(
+              ArchitectRoofSectionMember(
+                roofId: roof.id,
+                kind: ArchitectRoofMemberKind.ringBeam,
+                role: ArchitectRoofLayerRole.structure,
+                material: ArchitectRoofMaterial.rcSlab,
+                polygon: rbPoly,
+                path: Path()..addPolygon(rbPoly, true),
+              ),
+            );
+            zCurrentBot = zRbBot;
+          }
+
+          wallCapIntervals.add((
+            fromS: wSpan.fromS - 0.005,
+            toS: wSpan.toS + 0.005,
+            maxWallZ: zCurrentBot,
+          ));
         }
       }
 
@@ -684,7 +854,9 @@ class ArchitectRoofGeometry {
       if (timber.hasRidgePurlin && slopeDirDotSection > 0.25) {
         final highAtEnd = zTop1 >= zTop0;
         final sRidge = highAtEnd ? s1 : s0;
-        final zRidgeBot = highAtEnd ? zBot1 : zBot0;
+        final dRafterBotV =
+            (rafterBotPerp ?? roof.assembly.totalThickness) / cosSlope;
+        final zRidgeBot = (highAtEnd ? zTop1 : zTop0) - dRafterBotV;
         final isPrimaryAtSharedRidge = highAtEnd ? true : !sharesStart;
         if (isPrimaryAtSharedRidge && roof.slopeDegrees >= 5.0) {
           final halfRp = timber.ridgePurlinWidth * 0.5;
@@ -709,65 +881,140 @@ class ArchitectRoofGeometry {
         }
       }
 
-      // 7. Fascia Board (Челна дъска) at the free lower eaves end
-      if (timber.hasFasciaBoard) {
-        final lowAtStart = zTop0 <= zTop1;
-        if (lowAtStart && !sharesStart) {
-          final fw = timber.fasciaThickness;
-          final fasciaPoly = <Offset>[
-            Offset(s0 - fw, zTop0),
-            Offset(s0, zTop0),
-            Offset(s0, zBot0),
-            Offset(s0 - fw, zBot0),
+      // 7. Fascia Board (Челна дъска) & Metal Flashing / Drip Edge (Метална обшивка / капелник) at the free lower eaves end
+      final lowAtStart = zTop0 <= zTop1;
+      final hasFreeLowStart = lowAtStart && !sharesStart;
+      final hasFreeLowEnd = !lowAtStart && !sharesEnd;
+
+      if (timber.hasFasciaBoard && (hasFreeLowStart || hasFreeLowEnd)) {
+        final fw = timber.fasciaThickness;
+        final fasciaPoly = hasFreeLowStart
+            ? <Offset>[
+                Offset(s0 - fw, zTop0),
+                Offset(s0, zTop0),
+                Offset(s0, zBot0),
+                Offset(s0 - fw, zBot0),
+              ]
+            : <Offset>[
+                Offset(s1, zTop1),
+                Offset(s1 + fw, zTop1),
+                Offset(s1 + fw, zBot1),
+                Offset(s1, zBot1),
+              ];
+        discreteMembers.add(
+          ArchitectRoofSectionMember(
+            roofId: roof.id,
+            kind: ArchitectRoofMemberKind.fascia,
+            material: ArchitectRoofMaterial.timberBoarding,
+            polygon: fasciaPoly,
+            path: Path()..addPolygon(fasciaPoly, true),
+            drawTimberDiagonals: true,
+          ),
+        );
+      }
+
+      if (timber.hasMetalFlashing &&
+          roof.slopeDegrees >= 3.0 &&
+          (hasFreeLowStart || hasFreeLowEnd)) {
+        final fw = timber.hasFasciaBoard ? timber.fasciaThickness : 0.0;
+        final covV = coveringThickPerp / cosSlope;
+        final tFlash = 0.008; // Sheet metal thickness in section representation
+        final apronLen = math.min(0.12, (s1 - s0) * 0.25);
+        final dropLen = math.min(0.065, totalVerticalThick * 0.45);
+        final dripLip = 0.014;
+
+        if (hasFreeLowStart) {
+          final sOuter = s0 - fw;
+          final zApronStart = zTop0 - covV;
+          final zApronEnd = zTop0 + dzDs * apronLen - covV;
+          final flashPoly = <Offset>[
+            Offset(s0 + apronLen, zApronEnd + tFlash),
+            Offset(sOuter - tFlash, zApronStart + tFlash),
+            Offset(sOuter - tFlash, zApronStart - dropLen),
+            Offset(sOuter - tFlash - dripLip, zApronStart - dropLen - dripLip),
+            Offset(sOuter - dripLip, zApronStart - dropLen - dripLip),
+            Offset(sOuter, zApronStart - dropLen),
+            Offset(sOuter, zApronStart),
+            Offset(s0 + apronLen, zApronEnd),
           ];
           discreteMembers.add(
             ArchitectRoofSectionMember(
               roofId: roof.id,
-              kind: ArchitectRoofMemberKind.fascia,
-              material: ArchitectRoofMaterial.timberBoarding,
-              polygon: fasciaPoly,
-              path: Path()..addPolygon(fasciaPoly, true),
-              drawTimberDiagonals: true,
+              kind: ArchitectRoofMemberKind.metalFlashing,
+              material: ArchitectRoofMaterial.metalSeam,
+              polygon: flashPoly,
+              path: Path()..addPolygon(flashPoly, true),
             ),
           );
-        } else if (!lowAtStart && !sharesEnd) {
-          final fw = timber.fasciaThickness;
-          final fasciaPoly = <Offset>[
-            Offset(s1, zTop1),
-            Offset(s1 + fw, zTop1),
-            Offset(s1 + fw, zBot1),
-            Offset(s1, zBot1),
+        } else if (hasFreeLowEnd) {
+          final sOuter = s1 + fw;
+          final zApronStart = zTop1 - covV;
+          final zApronEnd = zTop1 - dzDs * apronLen - covV;
+          final flashPoly = <Offset>[
+            Offset(s1 - apronLen, zApronEnd + tFlash),
+            Offset(sOuter + tFlash, zApronStart + tFlash),
+            Offset(sOuter + tFlash, zApronStart - dropLen),
+            Offset(sOuter + tFlash + dripLip, zApronStart - dropLen - dripLip),
+            Offset(sOuter + dripLip, zApronStart - dropLen - dripLip),
+            Offset(sOuter, zApronStart - dropLen),
+            Offset(sOuter, zApronStart),
+            Offset(s1 - apronLen, zApronEnd),
           ];
           discreteMembers.add(
             ArchitectRoofSectionMember(
               roofId: roof.id,
-              kind: ArchitectRoofMemberKind.fascia,
-              material: ArchitectRoofMaterial.timberBoarding,
-              polygon: fasciaPoly,
-              path: Path()..addPolygon(fasciaPoly, true),
-              drawTimberDiagonals: true,
+              kind: ArchitectRoofMemberKind.metalFlashing,
+              material: ArchitectRoofMaterial.metalSeam,
+              polygon: flashPoly,
+              path: Path()..addPolygon(flashPoly, true),
             ),
           );
         }
       }
 
-      // 8. Boolean-subtract discrete timber cross-sections (rafters, wallPlate, ridgePurlin)
-      // from overlapping continuous layers so zero redundant lines cross through them!
+      draftSlices.add((
+        roofId: roof.id,
+        fromS: s0,
+        toS: s1,
+        zTop0: zTop0,
+        zTop1: zTop1,
+        totalVerticalThick: totalVerticalThick,
+        layerMembers: layerMembers,
+        discreteMembers: discreteMembers,
+        wallCapIntervals: wallCapIntervals,
+      ));
+    }
+
+    // 8. Collect all discrete structural cutouts across ALL slices on this storey
+    // so shared ridge purlins, Mauerlat, ring beams, rafters, fascia, and flashing
+    // cleanly boolean-subtract from every overlapping continuous roof layer!
+    final allDiscreteCutouts = <Path>[];
+    for (final draft in draftSlices) {
+      for (final dm in draft.discreteMembers) {
+        if (dm.kind == ArchitectRoofMemberKind.rafter ||
+            dm.kind == ArchitectRoofMemberKind.wallPlate ||
+            dm.kind == ArchitectRoofMemberKind.ringBeam ||
+            dm.kind == ArchitectRoofMemberKind.ridgePurlin ||
+            dm.kind == ArchitectRoofMemberKind.fascia ||
+            dm.kind == ArchitectRoofMemberKind.metalFlashing) {
+          allDiscreteCutouts.add(dm.path);
+        }
+      }
+    }
+
+    final result = <ArchitectRoofSectionSlice>[];
+    for (final draft in draftSlices) {
       final cleanedLayers = <ArchitectRoofSectionMember>[];
-      for (final layerMember in layerMembers) {
+      for (final layerMember in draft.layerMembers) {
         var cleanedPath = layerMember.path;
-        for (final dm in discreteMembers) {
-          if (dm.kind == ArchitectRoofMemberKind.rafter ||
-              dm.kind == ArchitectRoofMemberKind.wallPlate ||
-              dm.kind == ArchitectRoofMemberKind.ridgePurlin) {
-            try {
-              cleanedPath = Path.combine(
-                PathOperation.difference,
-                cleanedPath,
-                dm.path,
-              );
-            } catch (_) {}
-          }
+        for (final cutout in allDiscreteCutouts) {
+          try {
+            cleanedPath = Path.combine(
+              PathOperation.difference,
+              cleanedPath,
+              cutout,
+            );
+          } catch (_) {}
         }
         cleanedLayers.add(
           ArchitectRoofSectionMember(
@@ -781,36 +1028,55 @@ class ArchitectRoofGeometry {
         );
       }
 
-      final members = [...cleanedLayers, ...discreteMembers];
+      final members = [...cleanedLayers, ...draft.discreteMembers];
 
       var envelope = Path()
         ..addPolygon([
-          Offset(s0, zTop0),
-          Offset(s1, zTop1),
-          Offset(s1, zTop1 - totalVerticalThick),
-          Offset(s0, zTop0 - totalVerticalThick),
+          Offset(draft.fromS, draft.zTop0),
+          Offset(draft.toS, draft.zTop1),
+          Offset(draft.toS, draft.zTop1 - draft.totalVerticalThick),
+          Offset(draft.fromS, draft.zTop0 - draft.totalVerticalThick),
         ], true);
-      for (final m in discreteMembers) {
+      for (final m in draft.discreteMembers) {
         if (m.kind == ArchitectRoofMemberKind.wallPlate ||
+            m.kind == ArchitectRoofMemberKind.ringBeam ||
             m.kind == ArchitectRoofMemberKind.ridgePurlin ||
-            m.kind == ArchitectRoofMemberKind.fascia) {
+            m.kind == ArchitectRoofMemberKind.fascia ||
+            m.kind == ArchitectRoofMemberKind.metalFlashing) {
           try {
             envelope = Path.combine(PathOperation.union, envelope, m.path);
           } catch (_) {}
         }
       }
+      // Also union the vertical cap zone above each supporting wall's 10 cm ring beam
+      // so zero masonry wall slivers protrude beside the Mauerlat!
+      for (final cap in draft.wallCapIntervals) {
+        final capRect = Path()
+          ..addRect(
+            Rect.fromLTRB(
+              cap.fromS,
+              cap.maxWallZ,
+              cap.toS,
+              math.max(draft.zTop0, draft.zTop1) + 0.5,
+            ),
+          );
+        try {
+          envelope = Path.combine(PathOperation.union, envelope, capRect);
+        } catch (_) {}
+      }
 
       result.add(
         ArchitectRoofSectionSlice(
-          roofId: roof.id,
-          fromS: s0,
-          toS: s1,
+          roofId: draft.roofId,
+          fromS: draft.fromS,
+          toS: draft.toS,
           members: members,
           bottomProfile: [
-            Offset(s0, zTop0 - totalVerticalThick),
-            Offset(s1, zTop1 - totalVerticalThick),
+            Offset(draft.fromS, draft.zTop0 - draft.totalVerticalThick),
+            Offset(draft.toS, draft.zTop1 - draft.totalVerticalThick),
           ],
           envelopePath: envelope,
+          wallCapIntervals: draft.wallCapIntervals,
         ),
       );
     }

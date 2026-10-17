@@ -10493,6 +10493,48 @@ abstract class AppLocalizations {
   /// **'Slope dir'**
   String get architectRoofRotateSlope;
 
+  /// No description provided for @architectRoofAttachToWalls.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach to wall top'**
+  String get architectRoofAttachToWalls;
+
+  /// No description provided for @architectRoofAttachToWallsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-align roof structure to highest supporting walls with constructive eaves detail'**
+  String get architectRoofAttachToWallsSubtitle;
+
+  /// No description provided for @architectRoofRingBeamLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'10 cm concrete ring beam'**
+  String get architectRoofRingBeamLabel;
+
+  /// No description provided for @architectRoofMetalFlashingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Metal flashing (drip edge)'**
+  String get architectRoofMetalFlashingLabel;
+
+  /// No description provided for @architectRoofMoveVerticalAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up / down'**
+  String get architectRoofMoveVerticalAction;
+
+  /// No description provided for @architectRoofSnapToWallsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Snap to walls'**
+  String get architectRoofSnapToWallsAction;
+
+  /// No description provided for @architectRoofPropertiesAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Properties'**
+  String get architectRoofPropertiesAction;
+
   /// 3D orbit navigation tooltip
   ///
   /// In en, this message translates to:

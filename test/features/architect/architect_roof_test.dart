@@ -1,6 +1,8 @@
+import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_section.dart';
+import 'package:kotoview/src/features/architect/models/architect_slab_assembly.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_roof_painter_helper.dart';
@@ -480,6 +482,219 @@ void main() {
       final nearOrigin = snapGeo.query(const Offset(0, 0), 0.25);
       final falseCapMidpoints = nearOrigin.where((p) => p.label == 'Midpoint');
       expect(falseCapMidpoints, isEmpty);
+    });
+  });
+
+  group('Roof Wall Attachment, 10cm Concrete Ring Beam, Fascia & Metal Flashing Section Detail', () {
+    test('defaults attachToWalls, hasRingBeam, and hasMetalFlashing to true', () {
+      final defaultRoof = ArchitectRoofPlane(
+        id: 'r_def',
+        storeyId: 's1',
+        points: const [Offset(0, 0), Offset(5, 0), Offset(5, 5), Offset(0, 5)],
+        eavesEdgeIndex: 0,
+      );
+      expect(defaultRoof.attachToWalls, isTrue);
+      expect(defaultRoof.assembly.timber.hasRingBeam, isTrue);
+      expect(defaultRoof.assembly.timber.ringBeamHeight, closeTo(0.10, 1e-4));
+      expect(defaultRoof.assembly.timber.hasMetalFlashing, isTrue);
+    });
+
+    test('resolveAttachedBaseElevationOffset aligns roof underside with supporting wall top', () {
+      const lowerStorey = ArchitectStorey(
+        id: 's_ground',
+        name: 'Ground',
+        elevation: 0.0,
+        height: 2.80,
+        walls: [
+          ArchitectWall(
+            id: 'w1',
+            startPoint: Offset(0, 0),
+            endPoint: Offset(6, 0),
+            height: 2.80,
+          ),
+        ],
+      );
+      final roof = ArchitectRoofPlane(
+        id: 'r1',
+        storeyId: 's_roof',
+        points: const [
+          Offset(-0.6, -0.6),
+          Offset(6.6, -0.6),
+          Offset(6.6, 5.0),
+          Offset(-0.6, 5.0),
+        ],
+        eavesEdgeIndex: 0,
+        eavesOverhang: 0.60,
+        slopeDegrees: 25.0,
+        attachToWalls: true,
+      );
+      const roofStorey = ArchitectStorey(
+        id: 's_roof',
+        name: 'Roof',
+        elevation: 2.80,
+        height: 2.50,
+      );
+
+      final offset = ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
+        roof: roof,
+        storey: roofStorey,
+        lowerStorey: lowerStorey,
+      );
+      expect(offset, isNotNull);
+      // Offset relative to roofStorey.elevation (2.80) aligns roof base with lower wall top (2.80)
+      expect(offset, closeTo(0.0, 1e-4));
+      expect(roofStorey.elevation + offset, closeTo(lowerStorey.elevation + 2.80, 1e-4));
+    });
+
+    test('builds 10cm concrete ring beam, wall plate, fascia, and metal flashing in section slices', () {
+      const walls = [
+        ArchitectWall(
+          id: 'w_front',
+          startPoint: Offset(0, 0),
+          endPoint: Offset(6, 0),
+          thickness: 0.25,
+          height: 2.80,
+        ),
+      ];
+      final roof = ArchitectRoofPlane(
+        id: 'r_detail',
+        storeyId: 's1',
+        points: const [
+          Offset(-0.6, -0.6),
+          Offset(6.6, -0.6),
+          Offset(6.6, 5.0),
+          Offset(-0.6, 5.0),
+        ],
+        eavesEdgeIndex: 0,
+        eavesOverhang: 0.60,
+        slopeDegrees: 25.0,
+        attachToWalls: true,
+      );
+      final storey = ArchitectStorey(
+        id: 's1',
+        name: 'Storey 1',
+        elevation: 0.0,
+        height: 2.80,
+        walls: walls,
+        roofs: [roof],
+      );
+      const cutLine = ArchitectSection(
+        id: 'sec_test',
+        name: 'Cut',
+        start: Offset(3, -2),
+        end: Offset(3, 6),
+      );
+
+      final slices = ArchitectRoofGeometry.buildSectionSlices(
+        storey: storey,
+        sectionLine: cutLine,
+      );
+      expect(slices.length, 1);
+      final slice = slices.first;
+
+      final ringBeam = slice.members.where((m) => m.kind == ArchitectRoofMemberKind.ringBeam).firstOrNull;
+      final wallPlate = slice.members.where((m) => m.kind == ArchitectRoofMemberKind.wallPlate).firstOrNull;
+      final fascia = slice.members.where((m) => m.kind == ArchitectRoofMemberKind.fascia).firstOrNull;
+      final metalFlashing = slice.members.where((m) => m.kind == ArchitectRoofMemberKind.metalFlashing).firstOrNull;
+
+      expect(ringBeam, isNotNull);
+      expect(wallPlate, isNotNull);
+      expect(fascia, isNotNull);
+      expect(metalFlashing, isNotNull);
+
+      // Helper to compute bounding rect of a member's polygon
+      Rect memberBounds(List<Offset> pts) {
+        var minX = pts.first.dx, maxX = pts.first.dx;
+        var minY = pts.first.dy, maxY = pts.first.dy;
+        for (final p in pts.skip(1)) {
+          if (p.dx < minX) minX = p.dx;
+          if (p.dx > maxX) maxX = p.dx;
+          if (p.dy < minY) minY = p.dy;
+          if (p.dy > maxY) maxY = p.dy;
+        }
+        return Rect.fromLTRB(minX, minY, maxX, maxY);
+      }
+
+      // Verify the concrete ring beam height is exactly 10 cm (0.10m)
+      final rbBounds = memberBounds(ringBeam!.polygon);
+      expect(rbBounds.height, closeTo(0.10, 1e-4));
+      // Ring beam spans the wall thickness (0.25m)
+      expect(rbBounds.width, closeTo(0.25, 1e-3));
+
+      // Wall-plate sits directly on top of the concrete ring beam (wp bottom == rb top)
+      final wpBounds = memberBounds(wallPlate!.polygon);
+      expect(wpBounds.top, closeTo(rbBounds.bottom, 1e-3));
+    });
+
+    test('ArchitectBuildingSection clips wall to underside of 10cm ring beam with zero redundant lines and picks roof', () {
+      const walls = [
+        ArchitectWall(
+          id: 'w_front',
+          startPoint: Offset(0, 0),
+          endPoint: Offset(6, 0),
+          thickness: 0.25,
+          height: 3.50, // Wall extends up
+        ),
+      ];
+      final roof = ArchitectRoofPlane(
+        id: 'r_attached',
+        storeyId: 's1',
+        points: const [
+          Offset(-0.6, -0.6),
+          Offset(6.6, -0.6),
+          Offset(6.6, 5.0),
+          Offset(-0.6, 5.0),
+        ],
+        eavesEdgeIndex: 0,
+        eavesOverhang: 0.60,
+        slopeDegrees: 25.0,
+        attachToWalls: true,
+      );
+      final storey = ArchitectStorey(
+        id: 's1',
+        name: 'Storey 1',
+        elevation: 0.0,
+        height: 2.80,
+        walls: walls,
+        roofs: [roof],
+      );
+      final project = ArchitectProject(
+        id: 'p_sec',
+        name: 'Section Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: [storey],
+        activeStoreyId: 's1',
+      );
+      const cutLine = ArchitectSection(
+        id: 'sec_1',
+        name: 'A-A',
+        start: Offset(3, -2),
+        end: Offset(3, 6),
+      );
+
+      final section = ArchitectBuildingSection.build(project, cutLine);
+      expect(section.regions.isNotEmpty, isTrue);
+
+      // Verify roof picking and bounds
+      final found = ArchitectBuildingSection.findRoofById(project, 'r_attached');
+      expect(found, isNotNull);
+      expect(found!.roof.id, 'r_attached');
+
+      final bounds = section.roofBounds('r_attached');
+      expect(bounds, isNotNull);
+
+      final picked = section.pickRoof(bounds!.center, 0.5);
+      expect(picked, 'r_attached');
+
+      // The supporting wall top in the section should be clipped to the bottom of the 10cm ring beam
+      final wallRegion = section.regions.firstWhere((r) => r.wallId == 'w_front');
+      final wallBounds = wallRegion.path.getBounds();
+      final rbRegion = section.regions.firstWhere(
+        (r) => r.timberCrossSectionPolygon == null && r.roof && r.material == SlabMaterial.concrete,
+      );
+      final rbBounds = rbRegion.path.getBounds();
+      expect(wallBounds.bottom, closeTo(rbBounds.top, 0.01));
     });
   });
 }
