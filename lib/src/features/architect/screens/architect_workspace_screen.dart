@@ -854,7 +854,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
-  ArchitectTool _activeTool = ArchitectTool.zone;
+  ArchitectTool _activeTool = ArchitectTool.select;
   bool _is3DView = false;
   ArchitectCanvasPalette _canvasPalette = const ArchitectCanvasPalette.light();
   static const _darkCanvasPreference = 'architect_dark_canvas';
@@ -1658,6 +1658,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       setState(() {
         _commands.restore(loaded);
         _restoreWallType();
+        _activeTool = ArchitectTool.select;
       });
       _initTransform();
     }
