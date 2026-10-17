@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import 'architect_element_properties_dialog.dart';
 import 'architect_roof_layers_dialog.dart';
 import 'architect_slab_layers_dialog.dart';
 import 'architect_stair_properties_dialog.dart';
+import 'architect_wall_drafting_panel.dart';
 
 void navigateArchitectProjection(
   TransformationController transform,
@@ -59,6 +61,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   Offset delta = Offset.zero;
   double lastScale = 1;
   String? error;
+  Timer? _errorTimer;
   final measureRects = <ArchitectOpeningMeasure, Rect>{};
   ArchitectProject get project => widget.controller.project;
   ArchitectProjectedElement? get selected =>
@@ -79,23 +82,42 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
     if (id != null && (!widget.paths.containsKey(id) || selected == null)) {
       id = null;
       delta = Offset.zero;
+      _errorTimer?.cancel();
+      error = null;
     }
+  }
+
+  @override
+  void dispose() {
+    _errorTimer?.cancel();
+    super.dispose();
   }
 
   bool apply(ArchitectProject Function() operation) {
     try {
       final next = operation();
       widget.controller.commit(next);
-      if (mounted) setState(() => error = null);
+      if (mounted) {
+        _errorTimer?.cancel();
+        setState(() => error = null);
+      }
       return true;
     } on ArgumentError {
       if (mounted) {
+        _errorTimer?.cancel();
         setState(() => error = context.l10n.architectProjectionInvalid);
+        _errorTimer = Timer(const Duration(seconds: 4), () {
+          if (mounted) setState(() => error = null);
+        });
       }
       return false;
     } on StateError {
       if (mounted) {
+        _errorTimer?.cancel();
         setState(() => error = context.l10n.architectProjectionInvalid);
+        _errorTimer = Timer(const Duration(seconds: 4), () {
+          if (mounted) setState(() => error = null);
+        });
       }
       return false;
     }
@@ -110,7 +132,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   Future<double?> number(String title, double value, {bool signed = false}) =>
       showDialog<double>(
         context: context,
-        builder: (_) => _ProjectionNumber(
+        builder: (_) => _ProjectionNumberDialog(
           title: title,
           value: project.units.toUnit(value),
           unit: project.units.symbol,
@@ -372,7 +394,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
             ),
           ),
         ),
-        if (ref != null || error != null)
+        if (ref != null)
           Positioned(
             left: 8,
             right: 8,
@@ -386,14 +408,16 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (error != null)
-                        Text(
-                          error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            error!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
                           ),
                         ),
-                      if (ref != null) ...[
-                        Wrap(
+                      Wrap(
                           alignment: WrapAlignment.center,
                           children: [
                             TextButton.icon(
@@ -483,7 +507,6 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                                 ),
                             ],
                           ),
-                      ],
                     ],
                   ),
                 ),
@@ -617,72 +640,48 @@ class _ProjectionSelectionPainter extends CustomPainter {
   bool shouldRepaint(covariant _ProjectionSelectionPainter oldDelegate) => true;
 }
 
-class _ProjectionNumber extends StatefulWidget {
+class _ProjectionNumberDialog extends StatefulWidget {
   final String title, unit;
   final double value;
   final bool signed;
-  const _ProjectionNumber({
+  const _ProjectionNumberDialog({
     required this.title,
     required this.unit,
     required this.value,
     this.signed = false,
   });
+
   @override
-  State<_ProjectionNumber> createState() => _ProjectionNumberState();
+  State<_ProjectionNumberDialog> createState() =>
+      _ProjectionNumberDialogState();
 }
 
-class _ProjectionNumberState extends State<_ProjectionNumber> {
-  late final input = TextEditingController(
-    text: widget.value.toStringAsFixed(3),
-  );
-  final form = GlobalKey<FormState>();
-  @override
-  void dispose() {
-    input.dispose();
-    super.dispose();
-  }
+class _ProjectionNumberDialogState extends State<_ProjectionNumberDialog> {
+  late double _draft = widget.value;
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.title),
-    content: Form(
-      key: form,
-      child: TextFormField(
-        key: const ValueKey('projection-number'),
-        controller: input,
-        autofocus: true,
-        decoration: InputDecoration(suffixText: widget.unit),
-        keyboardType: TextInputType.numberWithOptions(
-          decimal: true,
-          signed: widget.signed,
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: SizedBox(
+        width: 260,
+        child: ArchitectWallDraftingPanel(
+          length: _draft,
+          unit: widget.unit,
+          title: widget.title,
+          endLabel: context.l10n.save,
+          keypadInitiallyOpen: true,
+          showContinue: false,
+          showDirection: false,
+          minimumLength: widget.signed ? -double.infinity : 0.0,
+          onLength: (val) => _draft = val,
+          onEnd: () => Navigator.pop(context, _draft),
+          onContinue: () {},
+          onUnlock: () {},
+          onCancel: () => Navigator.pop(context, null),
         ),
-        validator: (value) {
-          final number = double.tryParse((value ?? '').replaceAll(',', '.'));
-          return number == null ||
-                  !number.isFinite ||
-                  !widget.signed && number < 0
-              ? context.l10n.architectProjectionInvalid
-              : null;
-        },
       ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: Text(context.l10n.cancel),
-      ),
-      FilledButton(
-        key: const ValueKey('projection-number-save'),
-        onPressed: () {
-          if (form.currentState!.validate()) {
-            Navigator.pop(
-              context,
-              double.parse(input.text.replaceAll(',', '.')),
-            );
-          }
-        },
-        child: Text(context.l10n.save),
-      ),
-    ],
-  );
+    );
+  }
 }

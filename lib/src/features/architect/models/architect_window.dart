@@ -297,6 +297,44 @@ class ArchitectWindow {
     }
   }
 
+  /// Returns whether [point] hits any part of this window's 2D representation:
+  /// opening corridor or dimension label.
+  bool containsPoint(
+    Offset point, {
+    required Offset wallStart,
+    required Offset wallEnd,
+    required double wallThickness,
+    double tolerance = 0.15,
+  }) {
+    final wallDelta = wallEnd - wallStart;
+    final wallLen = wallDelta.distance;
+    if (wallLen < 1e-4) return false;
+
+    final centerPos = wallStart + wallDelta * offsetRatio;
+    final u = wallDelta / wallLen;
+    final pLeftBase = centerPos - u * (width / 2.0);
+    final pRightBase = centerPos + u * (width / 2.0);
+
+    final dOpening = _distToSegment(point, pLeftBase, pRightBase);
+    if (dOpening <= (wallThickness / 2.0) + tolerance) return true;
+
+    final n = Offset(-u.dy, u.dx);
+    final labelPos = centerPos + n * (wallThickness / 2.0 + 0.22);
+    if ((point - labelPos).distance <= 0.25 + tolerance) return true;
+
+    return false;
+  }
+
+  static double _distToSegment(Offset p, Offset a, Offset b) {
+    final ab = b - a;
+    final len2 = ab.dx * ab.dx + ab.dy * ab.dy;
+    if (len2 < 1e-8) return (p - a).distance;
+    final t = ((p.dx - a.dx) * ab.dx + (p.dy - a.dy) * ab.dy) / len2;
+    final clampedT = t.clamp(0.0, 1.0);
+    final proj = a + ab * clampedT;
+    return (p - proj).distance;
+  }
+
   // ===========================================================================
   // 3D SOLID MESH
   // ===========================================================================

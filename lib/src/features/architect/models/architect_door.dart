@@ -453,7 +453,84 @@ class ArchitectDoor {
     canvas.restore();
   }
 
-  // == // ===========================================================================
+  /// Returns whether [point] hits any part of this door's 2D representation:
+  /// opening corridor in wall, door leaf, swing arc, or ID circle badge.
+  bool containsPoint(
+    Offset point, {
+    required Offset wallStart,
+    required Offset wallEnd,
+    required double wallThickness,
+    double tolerance = 0.15,
+  }) {
+    final wallDelta = wallEnd - wallStart;
+    final wallLen = wallDelta.distance;
+    if (wallLen < 1e-4) return false;
+
+    final u = wallDelta / wallLen;
+    final n = Offset(-u.dy, u.dx) * (openInward ? 1.0 : -1.0);
+    final halfThick = wallThickness / 2.0;
+
+    final centerPos = wallStart + wallDelta * offsetRatio;
+    final pLeftBase = centerPos - u * (width / 2.0);
+    final pRightBase = centerPos + u * (width / 2.0);
+
+    // 1. Opening corridor in wall
+    final dOpening = _distToSegment(point, pLeftBase, pRightBase);
+    if (dOpening <= halfThick + tolerance) return true;
+
+    // 2. Door leaf
+    const frameThickness = 0.05;
+    final clearWidth = math.max(0.10, width - 2 * frameThickness);
+    final hingeJambBase = isHingeLeft
+        ? pLeftBase + u * frameThickness
+        : pRightBase - u * frameThickness;
+    final hingePos = hingeJambBase + n * halfThick;
+
+    final angleRad = openAngleDeg * math.pi / 180.0;
+    final baseAngle = math.atan2(u.dy, u.dx);
+    final rotAngle = baseAngle +
+        (isHingeLeft
+            ? (openInward ? angleRad : -angleRad)
+            : (openInward ? math.pi - angleRad : math.pi + angleRad));
+    final leafU = Offset(math.cos(rotAngle), math.sin(rotAngle));
+    final leafEnd = hingePos + leafU * clearWidth;
+    if (_distToSegment(point, hingePos, leafEnd) <= tolerance + 0.06) {
+      return true;
+    }
+
+    // 3. ID circle badge & dimension line
+    const badgeR = 0.16;
+    final extDist = halfThick + 0.22;
+    final badgeCenter = centerPos + n * (extDist + badgeR);
+    if ((point - badgeCenter).distance <= badgeR + tolerance) {
+      return true;
+    }
+    final dimStart = centerPos - n * (halfThick + 0.08);
+    final dimEnd = centerPos + n * extDist;
+    if (_distToSegment(point, dimStart, dimEnd) <= tolerance + 0.05) {
+      return true;
+    }
+
+    // 4. Swing arc bounding
+    final distHinge = (point - hingePos).distance;
+    if ((distHinge - clearWidth).abs() <= tolerance + 0.05) {
+      return true;
+    }
+
+    return false;
+  }
+
+  static double _distToSegment(Offset p, Offset a, Offset b) {
+    final ab = b - a;
+    final len2 = ab.dx * ab.dx + ab.dy * ab.dy;
+    if (len2 < 1e-8) return (p - a).distance;
+    final t = ((p.dx - a.dx) * ab.dx + (p.dy - a.dy) * ab.dy) / len2;
+    final clampedT = t.clamp(0.0, 1.0);
+    final proj = a + ab * clampedT;
+    return (p - proj).distance;
+  }
+
+  // ===========================================================================
   // 3D SOLID MESH GENERATION (TRIANGLES)
   // ===========================================================================
 

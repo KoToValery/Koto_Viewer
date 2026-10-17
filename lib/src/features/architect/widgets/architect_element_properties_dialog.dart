@@ -340,20 +340,36 @@ class _ArchitectElementPropertiesDialogState
                     }
                   },
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(l.architectDoorHingeSide,
-                        style: Theme.of(context).textTheme.bodyMedium),
+                    Text(
+                      l.architectDoorHingeSide,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
                     SegmentedButton<bool>(
+                      expandedInsets: EdgeInsets.zero,
+                      style: const ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                       segments: [
                         ButtonSegment(
                           value: true,
-                          label: Text(l.architectDoorHingeLeft),
+                          label: Text(
+                            l.architectDoorHingeLeft,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         ButtonSegment(
                           value: false,
-                          label: Text(l.architectDoorHingeRight),
+                          label: Text(
+                            l.architectDoorHingeRight,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                       selected: {
@@ -380,21 +396,37 @@ class _ArchitectElementPropertiesDialogState
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                const SizedBox(height: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(l.architectDoorSwingDirection,
-                        style: Theme.of(context).textTheme.bodyMedium),
+                    Text(
+                      l.architectDoorSwingDirection,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
                     SegmentedButton<bool>(
+                      expandedInsets: EdgeInsets.zero,
+                      style: const ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                       segments: [
                         ButtonSegment(
                           value: true,
-                          label: Text(l.architectDoorSwingIn),
+                          label: Text(
+                            l.architectDoorSwingIn,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         ButtonSegment(
                           value: false,
-                          label: Text(l.architectDoorSwingOut),
+                          label: Text(
+                            l.architectDoorSwingOut,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                       selected: {

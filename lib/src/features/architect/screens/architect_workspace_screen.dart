@@ -1181,6 +1181,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _axisTool.cancelAll();
     _elementTool.cancelSlabDrafting();
     _roofTool.clearDraft();
+    if (_activeTool == ArchitectTool.door ||
+        _activeTool == ArchitectTool.window) {
+      _activeTool = ArchitectTool.select;
+      _cursorModel = null;
+    }
     setState(() {
       _draftStart = null;
       _draftEnd = null;
@@ -3803,8 +3808,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // In Door tool: Place door or select/deselect existing door
+    // In Door tool: Select existing door first, otherwise place door
     if (_activeTool == ArchitectTool.door) {
+      final hitDoor = _hitSelection(rawModel);
+      if (hitDoor != null) {
+        _selectAt(rawModel);
+        return;
+      }
       final placement = ArchitectOpeningPlacement.resolve(
         walls: _project.activeStorey.walls,
         rawPoint: rawModel,
@@ -3816,17 +3826,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _tryPlaceDoorAt(rawModel);
         return;
       }
-      final hitDoor = _hitSelection(rawModel);
-      if (hitDoor != null) {
-        _selectAt(rawModel);
-      } else {
-        _clearSelection();
-      }
+      _clearSelection();
       return;
     }
 
-    // In Window tool: Place window or select/deselect existing window
+    // In Window tool: Select existing window first, otherwise place window
     if (_activeTool == ArchitectTool.window) {
+      final hitWin = _hitSelection(rawModel);
+      if (hitWin != null) {
+        _selectAt(rawModel);
+        return;
+      }
       final placement = ArchitectOpeningPlacement.resolve(
         walls: _project.activeStorey.walls,
         rawPoint: rawModel,
@@ -3842,9 +3852,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         if (res != null) {
           final (updatedStorey, newWin) = res;
           setState(() {
-            _project = _project.updateActiveStorey(updatedStorey);
+            _cursorModel = null;
+            _activeTool = ArchitectTool.select;
             _selectionIds.clear();
-            _selectedElementId = null;
+            _selectionIds.add(newWin.id);
+            _selectedElementId = newWin.id;
+            _project = _project.updateActiveStorey(updatedStorey);
           });
           _saveBiMProjectIfAttached();
           HapticFeedback.mediumImpact();
@@ -3863,12 +3876,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }
         return;
       }
-      final hitWin = _hitSelection(rawModel);
-      if (hitWin != null) {
-        _selectAt(rawModel);
-      } else {
-        _clearSelection();
-      }
+      _clearSelection();
       return;
     }
 
@@ -5535,8 +5543,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         .toList();
 
     setState(() {
+      _cursorModel = null;
+      _activeTool = ArchitectTool.select;
       _selectionIds.clear();
-      _selectedElementId = null;
+      _selectionIds.add(newDoor.id);
+      _selectedElementId = newDoor.id;
       _project = _project.updateActiveStorey(
         activeStorey.copyWith(walls: updatedWalls),
       );
@@ -5661,6 +5672,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   bool _onContextHold(Offset screenPoint) {
+    if (_activeTool == ArchitectTool.door ||
+        _activeTool == ArchitectTool.window) {
+      return false;
+    }
     if (_handleMoved ||
         _wallCutIds.isNotEmpty ||
         _draftStart != null ||
@@ -8724,13 +8739,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   // === SECTION: 2D CANVAS VIEWPORT (LAYERED MODEL SPACE) ===
 
-  Offset? get _draftCancelAnchor =>
-      _dimensionAnchors.firstOrNull?.point ??
-      _draftStart ??
-      _axisTool.draftStart ??
-      _zoneTool.draftPoints.firstOrNull ??
-      _elementTool.slabDraftPoints.firstOrNull ??
-      _roofTool.draftPoints.firstOrNull;
+  Offset? get _draftCancelAnchor {
+    if (_activeTool == ArchitectTool.door ||
+        _activeTool == ArchitectTool.window) {
+      return _openingPlacementPreview?.centerPoint ?? _cursorModel;
+    }
+    return _dimensionAnchors.firstOrNull?.point ??
+        _draftStart ??
+        _axisTool.draftStart ??
+        _zoneTool.draftPoints.firstOrNull ??
+        _elementTool.slabDraftPoints.firstOrNull ??
+        _roofTool.draftPoints.firstOrNull;
+  }
   int? _draftCancelPointer;
   Rect? _renderedDraftCancelRect, _renderedDraftConfirmRect;
   List<ArchitectDimensionEditHandle> _renderedDimensionEditHandles = [];

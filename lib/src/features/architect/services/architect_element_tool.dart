@@ -456,18 +456,24 @@ class ArchitectElementTool extends ChangeNotifier {
     // Check Hosted Windows
     for (final wall in storey.walls) {
       for (final win in wall.windows) {
-        final winCenter =
-            wall.centerStart +
-            (wall.centerEnd - wall.centerStart) * win.offsetRatio;
-        if ((point - winCenter).distance <= win.width / 2.0 + tolerance) {
+        if (win.containsPoint(
+          point,
+          wallStart: wall.centerStart,
+          wallEnd: wall.centerEnd,
+          wallThickness: wall.thickness,
+          tolerance: tolerance,
+        )) {
           yield win.id;
         }
       }
       for (final door in wall.doors) {
-        final doorCenter =
-            wall.centerStart +
-            (wall.centerEnd - wall.centerStart) * door.offsetRatio;
-        if ((point - doorCenter).distance <= door.width / 2.0 + tolerance) {
+        if (door.containsPoint(
+          point,
+          wallStart: wall.centerStart,
+          wallEnd: wall.centerEnd,
+          wallThickness: wall.thickness,
+          tolerance: tolerance,
+        )) {
           yield door.id;
         }
       }

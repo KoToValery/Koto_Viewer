@@ -232,10 +232,10 @@ class ArchitectProjectionEditing {
         along = (record['offsetRatio'] as num).toDouble() * host.length;
     if (width < .001 ||
         height < .001 ||
-        sill < -1e-7 ||
-        sill + height > host.effectiveHeight(ref.storey.height) + 1e-7 ||
-        along - width / 2 < -1e-7 ||
-        along + width / 2 > host.length + 1e-7) {
+        sill < -1e-4 ||
+        sill + height > host.effectiveHeight(ref.storey.height) + 1e-4 ||
+        along - width / 2 < -1e-4 ||
+        along + width / 2 > host.length + 1e-4) {
       throw ArgumentError('Opening outside host');
     }
     for (final other in [
@@ -468,29 +468,32 @@ class ArchitectProjectionEditing {
         }
       }
     }
+    final distLeft = (left - leftX).abs() < 1e-4 ? 0.0 : left - leftX;
+    final distRight = (rightX - rightEdge).abs() < 1e-4 ? 0.0 : rightX - rightEdge;
+    final distSill = (bottom - ref.storey.elevation).abs() < 1e-4 ? 0.0 : bottom - ref.storey.elevation;
     return [
       ArchitectOpeningMeasure(
         ArchitectOpeningDistance.left,
-        left - leftX,
+        distLeft,
         Offset(leftX, bottom),
         Offset(left, bottom),
       ),
       ArchitectOpeningMeasure(
         ArchitectOpeningDistance.right,
-        rightX - rightEdge,
+        distRight,
         Offset(rightEdge, bottom),
         Offset(rightX, bottom),
       ),
       ArchitectOpeningMeasure(
         ArchitectOpeningDistance.sill,
-        bottom - ref.storey.elevation,
+        distSill,
         Offset(x(centre), ref.storey.elevation),
         Offset(x(centre), bottom),
       ),
       if (ceiling != null)
         ArchitectOpeningMeasure(
           ArchitectOpeningDistance.head,
-          ceiling - top,
+          (ceiling - top).abs() < 1e-4 ? 0.0 : ceiling - top,
           Offset(x(centre), top),
           Offset(x(centre), ceiling),
         ),
