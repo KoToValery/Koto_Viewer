@@ -116,12 +116,17 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
     _navigation =
         (event.buttons & (kMiddleMouseButton | kSecondaryMouseButton)) != 0;
     _suppressRelease = _navigation;
-    final deferredEdit =
-        !_navigation &&
-        widget.holdToEdit &&
-        event.kind == PointerDeviceKind.touch;
-    _pendingEditDown = deferredEdit ? event : null;
-    if (!_navigation && !deferredEdit) widget.onToolDown(event);
+    bool deferredEdit = false;
+    if (!_navigation) {
+      widget.onToolDown(event);
+      if (widget.holdToEdit &&
+          event.kind == PointerDeviceKind.touch &&
+          !widget.isDraggingHandle()) {
+        widget.onToolCancel();
+        deferredEdit = true;
+        _pendingEditDown = event;
+      }
+    }
     if (!_navigation && widget.onContextHold != null) {
       _contextHoldTimer = Timer(const Duration(milliseconds: 700), () {
         if (!mounted || _pointers.length != 1 || _navigation) return;

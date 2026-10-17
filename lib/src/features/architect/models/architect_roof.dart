@@ -43,7 +43,8 @@ enum ArchitectRoofLayerRole {
   String label(AppLocalizations l10n) => switch (this) {
     ArchitectRoofLayerRole.covering => l10n.architectRoofRoleCovering,
     ArchitectRoofLayerRole.battens => l10n.architectRoofRoleBattens,
-    ArchitectRoofLayerRole.counterBattens => l10n.architectRoofRoleCounterBattens,
+    ArchitectRoofLayerRole.counterBattens =>
+      l10n.architectRoofRoleCounterBattens,
     ArchitectRoofLayerRole.underlayment => l10n.architectRoofRoleUnderlayment,
     ArchitectRoofLayerRole.boarding => l10n.architectRoofRoleBoarding,
     ArchitectRoofLayerRole.rafters => l10n.architectRoofRoleRafters,
@@ -74,10 +75,12 @@ enum ArchitectRoofMaterial {
     ArchitectRoofMaterial.clayTiles => l10n.architectRoofMatClayTiles,
     ArchitectRoofMaterial.concreteTiles => l10n.architectRoofMatConcreteTiles,
     ArchitectRoofMaterial.metalSeam => l10n.architectRoofMatMetalSeam,
-    ArchitectRoofMaterial.bitumenShingles => l10n.architectRoofMatBitumenShingles,
+    ArchitectRoofMaterial.bitumenShingles =>
+      l10n.architectRoofMatBitumenShingles,
     ArchitectRoofMaterial.timberBoarding => l10n.architectRoofMatTimberBoarding,
     ArchitectRoofMaterial.osb => l10n.architectRoofMatOsb,
-    ArchitectRoofMaterial.breathableMembrane => l10n.architectRoofMatBreathableMembrane,
+    ArchitectRoofMaterial.breathableMembrane =>
+      l10n.architectRoofMatBreathableMembrane,
     ArchitectRoofMaterial.vapourBarrier => l10n.architectRoofMatVapourBarrier,
     ArchitectRoofMaterial.mineralWool => l10n.architectRoofMatMineralWool,
     ArchitectRoofMaterial.xps => l10n.architectRoofMatXps,
@@ -194,7 +197,8 @@ class ArchitectRoofTimberSpec {
   final double wallPlateHeight; // vertical height (m), e.g. 0.14
 
   final bool hasRingBeam;
-  final double ringBeamHeight; // vertical height of concrete belt under wall plate (m), e.g. 0.10
+  final double
+  ringBeamHeight; // vertical height of concrete belt under wall plate (m), e.g. 0.10
 
   final bool hasRidgePurlin;
   final double ridgePurlinWidth; // horizontal width (m), e.g. 0.16
@@ -314,35 +318,34 @@ class ArchitectRoofTimberSpec {
     'hasMetalFlashing': hasMetalFlashing,
   };
 
-  factory ArchitectRoofTimberSpec.fromJson(Map<String, dynamic> json) =>
-      ArchitectRoofTimberSpec(
-        hasBattens: json['hasBattens'] as bool? ?? true,
-        battenWidth: (json['battenWidth'] as num?)?.toDouble() ?? 0.05,
-        battenHeight: (json['battenHeight'] as num?)?.toDouble() ?? 0.04,
-        battenSpacing: (json['battenSpacing'] as num?)?.toDouble() ?? 0.33,
-        hasCounterBattens: json['hasCounterBattens'] as bool? ?? true,
-        counterBattenWidth:
-            (json['counterBattenWidth'] as num?)?.toDouble() ?? 0.05,
-        counterBattenHeight:
-            (json['counterBattenHeight'] as num?)?.toDouble() ?? 0.05,
-        hasRafters: json['hasRafters'] as bool? ?? true,
-        rafterWidth: (json['rafterWidth'] as num?)?.toDouble() ?? 0.08,
-        rafterHeight: (json['rafterHeight'] as num?)?.toDouble() ?? 0.16,
-        rafterSpacing: (json['rafterSpacing'] as num?)?.toDouble() ?? 0.60,
-        hasWallPlate: json['hasWallPlate'] as bool? ?? true,
-        wallPlateWidth: (json['wallPlateWidth'] as num?)?.toDouble() ?? 0.14,
-        wallPlateHeight: (json['wallPlateHeight'] as num?)?.toDouble() ?? 0.14,
-        hasRingBeam: json['hasRingBeam'] as bool? ?? true,
-        ringBeamHeight: (json['ringBeamHeight'] as num?)?.toDouble() ?? 0.10,
-        hasRidgePurlin: json['hasRidgePurlin'] as bool? ?? true,
-        ridgePurlinWidth:
-            (json['ridgePurlinWidth'] as num?)?.toDouble() ?? 0.16,
-        ridgePurlinHeight:
-            (json['ridgePurlinHeight'] as num?)?.toDouble() ?? 0.20,
-        hasFasciaBoard: json['hasFasciaBoard'] as bool? ?? true,
-        fasciaThickness: (json['fasciaThickness'] as num?)?.toDouble() ?? 0.025,
-        hasMetalFlashing: json['hasMetalFlashing'] as bool? ?? true,
-      );
+  factory ArchitectRoofTimberSpec.fromJson(
+    Map<String, dynamic> json,
+  ) => ArchitectRoofTimberSpec(
+    hasBattens: json['hasBattens'] as bool? ?? true,
+    battenWidth: (json['battenWidth'] as num?)?.toDouble() ?? 0.05,
+    battenHeight: (json['battenHeight'] as num?)?.toDouble() ?? 0.04,
+    battenSpacing: (json['battenSpacing'] as num?)?.toDouble() ?? 0.33,
+    hasCounterBattens: json['hasCounterBattens'] as bool? ?? true,
+    counterBattenWidth:
+        (json['counterBattenWidth'] as num?)?.toDouble() ?? 0.05,
+    counterBattenHeight:
+        (json['counterBattenHeight'] as num?)?.toDouble() ?? 0.05,
+    hasRafters: json['hasRafters'] as bool? ?? true,
+    rafterWidth: (json['rafterWidth'] as num?)?.toDouble() ?? 0.08,
+    rafterHeight: (json['rafterHeight'] as num?)?.toDouble() ?? 0.16,
+    rafterSpacing: (json['rafterSpacing'] as num?)?.toDouble() ?? 0.60,
+    hasWallPlate: json['hasWallPlate'] as bool? ?? true,
+    wallPlateWidth: (json['wallPlateWidth'] as num?)?.toDouble() ?? 0.14,
+    wallPlateHeight: (json['wallPlateHeight'] as num?)?.toDouble() ?? 0.14,
+    hasRingBeam: json['hasRingBeam'] as bool? ?? true,
+    ringBeamHeight: (json['ringBeamHeight'] as num?)?.toDouble() ?? 0.10,
+    hasRidgePurlin: json['hasRidgePurlin'] as bool? ?? true,
+    ridgePurlinWidth: (json['ridgePurlinWidth'] as num?)?.toDouble() ?? 0.16,
+    ridgePurlinHeight: (json['ridgePurlinHeight'] as num?)?.toDouble() ?? 0.20,
+    hasFasciaBoard: json['hasFasciaBoard'] as bool? ?? true,
+    fasciaThickness: (json['fasciaThickness'] as num?)?.toDouble() ?? 0.025,
+    hasMetalFlashing: json['hasMetalFlashing'] as bool? ?? true,
+  );
 }
 
 // === SECTION: ROOF ASSEMBLY & PRESETS ===
@@ -658,8 +661,7 @@ class ArchitectRoofAssembly {
       layers: rawLayers != null
           ? rawLayers
                 .map(
-                  (e) =>
-                      ArchitectRoofLayer.fromJson(e as Map<String, dynamic>),
+                  (e) => ArchitectRoofLayer.fromJson(e as Map<String, dynamic>),
                 )
                 .toList()
           : ArchitectRoofAssembly.fromPreset(preset).layers,
@@ -689,6 +691,9 @@ class ArchitectRoofPlane {
   double slopeDegrees;
   double baseElevationOffset;
   bool attachToWalls;
+
+  /// The initial support height has been materialized in model coordinates.
+  bool placementResolved;
   double eavesOverhang;
   ArchitectRoofEavesCut eavesCut;
   ArchitectRoofAssembly assembly;
@@ -703,6 +708,7 @@ class ArchitectRoofPlane {
     this.slopeDegrees = 22.0,
     this.baseElevationOffset = 2.80,
     this.attachToWalls = true,
+    this.placementResolved = false,
     this.eavesOverhang = 0.50,
     this.eavesCut = ArchitectRoofEavesCut.plumb,
     ArchitectRoofAssembly? assembly,
@@ -779,9 +785,7 @@ class ArchitectRoofPlane {
 
   /// Sets [edgeIndex] as the lower eaves edge from which the roof slopes upward.
   ArchitectRoofPlane withEavesEdge(int edgeIndex) => copyWith(
-    eavesEdgeIndex: points.isEmpty
-        ? 0
-        : edgeIndex.clamp(0, points.length - 1),
+    eavesEdgeIndex: points.isEmpty ? 0 : edgeIndex.clamp(0, points.length - 1),
     reverseSlope: false,
   );
 
@@ -890,7 +894,9 @@ class ArchitectRoofPlane {
       final xj = points[j].dx, yj = points[j].dy;
       final intersect =
           ((yi > pt.dy) != (yj > pt.dy)) &&
-          (pt.dx < (xj - xi) * (pt.dy - yi) / ((yj - yi) == 0 ? 1e-9 : (yj - yi)) + xi);
+          (pt.dx <
+              (xj - xi) * (pt.dy - yi) / ((yj - yi) == 0 ? 1e-9 : (yj - yi)) +
+                  xi);
       if (intersect) inside = !inside;
     }
     return inside;
@@ -905,6 +911,7 @@ class ArchitectRoofPlane {
     double? slopeDegrees,
     double? baseElevationOffset,
     bool? attachToWalls,
+    bool? placementResolved,
     double? eavesOverhang,
     ArchitectRoofEavesCut? eavesCut,
     ArchitectRoofAssembly? assembly,
@@ -918,6 +925,7 @@ class ArchitectRoofPlane {
     slopeDegrees: slopeDegrees ?? this.slopeDegrees,
     baseElevationOffset: baseElevationOffset ?? this.baseElevationOffset,
     attachToWalls: attachToWalls ?? this.attachToWalls,
+    placementResolved: placementResolved ?? this.placementResolved,
     eavesOverhang: eavesOverhang ?? this.eavesOverhang,
     eavesCut: eavesCut ?? this.eavesCut,
     assembly: assembly ?? this.assembly.copyWith(),
@@ -935,6 +943,7 @@ class ArchitectRoofPlane {
     'slopeDegrees': slopeDegrees,
     'baseElevationOffset': baseElevationOffset,
     'attachToWalls': attachToWalls,
+    'placementResolved': placementResolved,
     'eavesOverhang': eavesOverhang,
     'eavesCut': eavesCut.name,
     'assembly': assembly.toJson(),
@@ -948,10 +957,7 @@ class ArchitectRoofPlane {
       storeyId: json['storeyId'] as String? ?? 'storey_0',
       points: rawPts.map((e) {
         final m = e as Map<String, dynamic>;
-        return Offset(
-          (m['x'] as num).toDouble(),
-          (m['y'] as num).toDouble(),
-        );
+        return Offset((m['x'] as num).toDouble(), (m['y'] as num).toDouble());
       }).toList(),
       eavesEdgeIndex: json['eavesEdgeIndex'] as int? ?? 0,
       reverseSlope: json['reverseSlope'] as bool? ?? false,
@@ -959,6 +965,7 @@ class ArchitectRoofPlane {
       baseElevationOffset:
           (json['baseElevationOffset'] as num?)?.toDouble() ?? 2.80,
       attachToWalls: json['attachToWalls'] as bool? ?? true,
+      placementResolved: json['placementResolved'] as bool? ?? false,
       eavesOverhang: (json['eavesOverhang'] as num?)?.toDouble() ?? 0.50,
       eavesCut: ArchitectRoofEavesCut.values.byName(
         json['eavesCut'] as String? ?? ArchitectRoofEavesCut.plumb.name,

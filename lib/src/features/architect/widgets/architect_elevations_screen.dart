@@ -8,6 +8,7 @@ import '../services/architect_building_elevation.dart';
 import '../services/architect_command_controller.dart';
 import 'architect_elevation_labels.dart';
 import 'architect_view_plan.dart';
+import 'architect_projection_editor.dart';
 
 enum _Placement { none, elevation, north }
 
@@ -17,7 +18,12 @@ class ArchitectElevationsScreen extends StatefulWidget {
   final ArchitectCommandController controller;
   final String? initialSelectedId;
   final ValueChanged<String?>? onViewSelected;
-  const ArchitectElevationsScreen({super.key, required this.controller, this.initialSelectedId, this.onViewSelected});
+  const ArchitectElevationsScreen({
+    super.key,
+    required this.controller,
+    this.initialSelectedId,
+    this.onViewSelected,
+  });
   @override
   State<ArchitectElevationsScreen> createState() => _ElevationsState();
 }
@@ -29,6 +35,7 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
     _selectedId = value;
     widget.onViewSelected?.call(value);
   }
+
   bool plan = true;
   _Placement placement = _Placement.none;
   Offset? first, second;
@@ -45,7 +52,12 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
   @override
   void initState() {
     super.initState();
-    selectedId = project.elevations.where((e) => e.id == widget.initialSelectedId).firstOrNull?.id ?? project.elevations.firstOrNull?.id;
+    selectedId =
+        project.elevations
+            .where((e) => e.id == widget.initialSelectedId)
+            .firstOrNull
+            ?.id ??
+        project.elevations.firstOrNull?.id;
     if (selectedId == null) placement = _Placement.elevation;
     widget.controller.addListener(changed);
   }
@@ -388,19 +400,74 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
                               style: const TextStyle(color: Colors.black87),
                             ),
                           )
-                        : InteractiveViewer(
-                            transformationController: elevationTransform,
-                            minScale: .25,
-                            maxScale: 20,
-                            child: CustomPaint(
-                              key: const ValueKey('architect-facade-drawing'),
-                              size: size,
-                              painter: ArchitectFacadePainter(
-                                geometry,
-                                bounds.center,
-                                scale,
+                        : Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              InteractiveViewer(
+                                transformationController: elevationTransform,
+                                minScale: .25,
+                                maxScale: 20,
+                                child: CustomPaint(
+                                  key: const ValueKey(
+                                    'architect-facade-drawing',
+                                  ),
+                                  size: size,
+                                  painter: ArchitectFacadePainter(
+                                    geometry,
+                                    bounds.center,
+                                    scale,
+                                    fontFamily: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium?.fontFamily,
+                                  ),
+                                ),
                               ),
-                            ),
+                              Positioned.fill(
+                                child: AnimatedBuilder(
+                                  animation: elevationTransform,
+                                  builder: (_, _) => ArchitectProjectionEditor(
+                                    key: ValueKey(
+                                      'elevation-editor:${value.id}',
+                                    ),
+                                    controller: widget.controller,
+                                    paths: geometry.elementPaths,
+                                    origin: value.centre,
+                                    right: value.right,
+                                    elevation: true,
+                                    scale:
+                                        scale *
+                                        elevationTransform.value
+                                            .getMaxScaleOnAxis(),
+                                    toView: (p) {
+                                      final local = elevationTransform.toScene(
+                                        p,
+                                      );
+                                      return bounds.center +
+                                          Offset(
+                                            (local.dx - size.width / 2) / scale,
+                                            -(local.dy - size.height / 2) /
+                                                scale,
+                                          );
+                                    },
+                                    toScreen: (p) => MatrixUtils.transformPoint(
+                                      elevationTransform.value,
+                                      size.center(Offset.zero) +
+                                          Offset(
+                                            (p.dx - bounds.center.dx) * scale,
+                                            -(p.dy - bounds.center.dy) * scale,
+                                          ),
+                                    ),
+                                    onNavigate: (delta, factor, focal) =>
+                                        navigateArchitectProjection(
+                                          elevationTransform,
+                                          delta,
+                                          factor,
+                                          focal,
+                                        ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                   );
                 },
@@ -418,7 +485,15 @@ class ArchitectFacadePainter extends CustomPainter {
   final Offset centre;
   final double scale;
   final Color fill, stroke;
-  ArchitectFacadePainter(this.geometry, this.centre, this.scale, {this.fill = const Color(0xfffafafa), this.stroke = const Color(0xff222222)});
+  final String? fontFamily;
+  ArchitectFacadePainter(
+    this.geometry,
+    this.centre,
+    this.scale, {
+    this.fill = const Color(0xfffafafa),
+    this.stroke = const Color(0xff222222),
+    this.fontFamily,
+  });
   @override
   void paint(Canvas canvas, Size size) {
     final matrix = Matrix4.identity()
@@ -429,10 +504,7 @@ class ArchitectFacadePainter extends CustomPainter {
     canvas.clipRect(Offset.zero & size);
     // All fills precede all strokes, so shared depth boundaries remain crisp.
     for (final face in geometry.faces) {
-      canvas.drawPath(
-        face.transform(matrix.storage),
-        Paint()..color = fill,
-      );
+      canvas.drawPath(face.transform(matrix.storage), Paint()..color = fill);
     }
     for (final face in geometry.faces) {
       canvas.drawPath(
@@ -444,11 +516,69 @@ class ArchitectFacadePainter extends CustomPainter {
           ..strokeJoin = StrokeJoin.round,
       );
     }
+    final symbolPaint = Paint()
+      ..color = stroke.withValues(alpha: .8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .9;
+    for (final operation in geometry.operations) {
+      canvas.save();
+      canvas.clipPath(operation.clip.transform(matrix.storage));
+      for (final line
+          in operation.lines.transform(matrix.storage).computeMetrics()) {
+        for (var start = 0.0; start < line.length; start += 7) {
+          canvas.drawPath(
+            line.extractPath(start, math.min(start + 4, line.length)),
+            symbolPaint,
+          );
+        }
+      }
+      canvas.restore();
+    }
+    final labels = <Rect>[];
+    Offset screen(Offset p) => MatrixUtils.transformPoint(matrix, p);
+    for (final slope in geometry.slopes) {
+      final a = screen(slope.start), b = screen(slope.end);
+      if ((b - a).distance < 8) continue;
+      final u = (b - a) / (b - a).distance;
+      final n = Offset(-u.dy, u.dx);
+      canvas.drawLine(a, b, symbolPaint);
+      canvas.drawPath(
+        Path()
+          ..moveTo((b - u * 7 + n * 3).dx, (b - u * 7 + n * 3).dy)
+          ..lineTo(b.dx, b.dy)
+          ..lineTo((b - u * 7 - n * 3).dx, (b - u * 7 - n * 3).dy),
+        symbolPaint,
+      );
+      final percent = (slope.percent - slope.percent.round()).abs() < .05
+          ? slope.percent.round().toString()
+          : slope.percent.toStringAsFixed(1);
+      final text = TextPainter(
+        text: TextSpan(
+          text: '$percent%',
+          style: TextStyle(color: stroke, fontSize: 12, fontFamily: fontFamily),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      var box = Rect.fromCenter(
+        center: (a + b) / 2 - Offset(0, text.height / 2 + 6),
+        width: text.width + 6,
+        height: text.height + 2,
+      );
+      while (labels.any((r) => r.overlaps(box))) {
+        box = box.shift(Offset(0, -box.height - 2));
+      }
+      labels.add(box);
+      canvas.drawRect(box, Paint()..color = fill);
+      text.paint(canvas, box.topLeft + const Offset(3, 1));
+    }
   }
 
   @override
   bool shouldRepaint(covariant ArchitectFacadePainter oldDelegate) =>
-      fill != oldDelegate.fill || stroke != oldDelegate.stroke || geometry != oldDelegate.geometry ||
+      fill != oldDelegate.fill ||
+      stroke != oldDelegate.stroke ||
+      fontFamily != oldDelegate.fontFamily ||
+      geometry != oldDelegate.geometry ||
       centre != oldDelegate.centre ||
       scale != oldDelegate.scale;
 }

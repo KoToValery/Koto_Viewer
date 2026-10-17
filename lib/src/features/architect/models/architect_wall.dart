@@ -63,7 +63,8 @@ class ArchitectWall {
   final Offset endPoint;
   final double thickness; // in meters (default 0.25 m = 25 cm)
   final double height; // in meters (default 2.80 m or 1.05/1.20 m for parapets)
-  final double baseOffset; // in meters relative to storey elevation (default 0.0 m)
+  final double
+  baseOffset; // in meters relative to storey elevation (default 0.0 m)
   final bool followStoreyHeight;
   final WallCoreMaterial? coreMaterialOverride;
   final WallInsulationMaterial insulationMaterial;
@@ -377,7 +378,10 @@ class ArchitectWall {
   // ===========================================================================
 
   /// Builds solid 3D mesh triangles for the wall, splitting it around hosted doors and windows.
-  List<Triangle3D> build3D({required double storeyElevation}) {
+  List<Triangle3D> build3D({
+    required double storeyElevation,
+    Map<Triangle3D, String>? sources,
+  }) {
     final List<Triangle3D> tris = [];
     final len = length;
     if (len < 1e-4) return tris;
@@ -446,6 +450,7 @@ class ArchitectWall {
     final openings =
         <
           ({
+            String id,
             double offsetRatio,
             double width,
             double height,
@@ -456,6 +461,7 @@ class ArchitectWall {
 
     for (final d in doors) {
       openings.add((
+        id: d.id,
         offsetRatio: d.offsetRatio,
         width: d.width,
         height: d.height,
@@ -474,6 +480,7 @@ class ArchitectWall {
 
     for (final w in windows) {
       openings.add((
+        id: w.id,
         offsetRatio: w.offsetRatio,
         width: w.width,
         height: w.height,
@@ -515,7 +522,13 @@ class ArchitectWall {
       }
 
       // 4. Opening mesh elements
-      tris.addAll(op.build3DTris());
+      final openingMesh = op.build3DTris();
+      tris.addAll(openingMesh);
+      if (sources != null) {
+        for (final t in openingMesh) {
+          sources[t] = op.id;
+        }
+      }
 
       currentX = math.max(currentX, opEnd);
     }

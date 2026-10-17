@@ -1,4 +1,5 @@
 import 'architect_slab_assemblies.dart';
+import 'architect_roof_placement.dart';
 import 'dart:ui';
 import '../adapters/architect_element_adapters.dart';
 import '../../bim_editing/commands/bim_edit_history.dart';
@@ -1429,9 +1430,7 @@ class UpdateArchitectRoofPlane extends ArchitectModelCommand {
     return ArchitectModelCommand.replace(
       project,
       floor.copyWith(
-        roofs: [
-          for (final r in floor.roofs) r.id == roof.id ? roof : r,
-        ],
+        roofs: [for (final r in floor.roofs) r.id == roof.id ? roof : r],
       ),
     );
   }
@@ -1444,25 +1443,23 @@ class ReplaceStoreyRoofs extends ArchitectModelCommand {
   @override
   ArchitectProject apply(ArchitectProject project) {
     final floor = ArchitectModelCommand.storey(project, storeyId);
-    return ArchitectModelCommand.replace(
-      project,
-      floor.copyWith(roofs: roofs),
-    );
+    return ArchitectModelCommand.replace(project, floor.copyWith(roofs: roofs));
   }
 }
 
 class DeleteArchitectRoofPlane extends ArchitectModelCommand {
   final String storeyId;
   final String roofId;
-  const DeleteArchitectRoofPlane({required this.storeyId, required this.roofId});
+  const DeleteArchitectRoofPlane({
+    required this.storeyId,
+    required this.roofId,
+  });
   @override
   ArchitectProject apply(ArchitectProject project) {
     final floor = ArchitectModelCommand.storey(project, storeyId);
     return ArchitectModelCommand.replace(
       project,
-      floor.copyWith(
-        roofs: floor.roofs.where((r) => r.id != roofId).toList(),
-      ),
+      floor.copyWith(roofs: floor.roofs.where((r) => r.id != roofId).toList()),
     );
   }
 }
@@ -1690,7 +1687,9 @@ class ArchitectCommandController
   static const historyLimit = 100;
   ArchitectCommandController(ArchitectProject project)
     : super(
-        ArchitectSlabAssemblies.resolve(ArchitectStairRules.resolve(project)),
+        ArchitectRoofPlacement.resolve(
+          ArchitectSlabAssemblies.resolve(ArchitectStairRules.resolve(project)),
+        ),
         historyLimit: historyLimit,
         equivalent: _sameModel,
         restoreView: _retainViewedStorey,
@@ -1698,13 +1697,17 @@ class ArchitectCommandController
   ArchitectProject get project => value;
 
   @override
-  void restore(ArchitectProject next) =>
-      super.restore(ArchitectSlabAssemblies.resolve(next));
+  void restore(ArchitectProject next) => super.restore(
+    ArchitectRoofPlacement.resolve(ArchitectSlabAssemblies.resolve(next)),
+  );
 
   @override
   void commit(ArchitectProject next) => super.commit(
-    ArchitectSlabAssemblies.resolve(
-      ArchitectDimensionChain.resolve(ArchitectStairRules.resolve(next)),
+    ArchitectRoofPlacement.resolve(
+      ArchitectSlabAssemblies.resolve(
+        ArchitectDimensionChain.resolve(ArchitectStairRules.resolve(next)),
+      ),
+      previous: project,
     ),
   );
 

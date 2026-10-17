@@ -12,13 +12,19 @@ import '../services/architect_slab_geometry.dart';
 import 'architect_roof_layers_dialog.dart';
 import 'architect_slab_labels.dart';
 import 'architect_view_plan.dart';
+import 'architect_projection_editor.dart';
 
 /// Uses the workspace controller so changes, autosave and history remain live.
 class ArchitectBuildingSectionsScreen extends StatefulWidget {
   final ArchitectCommandController controller;
   final String? initialSelectedId;
   final ValueChanged<String?>? onViewSelected;
-  const ArchitectBuildingSectionsScreen({super.key, required this.controller, this.initialSelectedId, this.onViewSelected});
+  const ArchitectBuildingSectionsScreen({
+    super.key,
+    required this.controller,
+    this.initialSelectedId,
+    this.onViewSelected,
+  });
   @override
   State<ArchitectBuildingSectionsScreen> createState() =>
       _BuildingSectionsState();
@@ -31,6 +37,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
     _sectionId = value;
     widget.onViewSelected?.call(value);
   }
+
   String? selectedDetail;
   String? selectedRoofId;
   bool movingRoofVertically = false;
@@ -53,7 +60,12 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
   @override
   void initState() {
     super.initState();
-    sectionId = project.sections.where((e) => e.id == widget.initialSelectedId).firstOrNull?.id ?? project.sections.firstOrNull?.id;
+    sectionId =
+        project.sections
+            .where((e) => e.id == widget.initialSelectedId)
+            .firstOrNull
+            ?.id ??
+        project.sections.firstOrNull?.id;
     editingCut = sectionId == null;
     widget.controller.addListener(changed);
   }
@@ -822,104 +834,172 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                               );
                           return ColoredBox(
                             color: colors.surface,
-                            child: InteractiveViewer(
-                              transformationController: transform,
-                              minScale: .5,
-                              maxScale: 16,
-                              panEnabled: selectedRoofId == null,
-                              child: GestureDetector(
-                                key: const ValueKey('building-section-view'),
-                                behavior: HitTestBehavior.opaque,
-                                onTapUp: (d) {
-                                  sectionTap(
-                                    localToSection(d.localPosition),
-                                    scale,
-                                    drawing,
-                                  );
-                                },
-                                onSecondaryTapUp: (d) {
-                                  final p = localToSection(d.localPosition);
-                                  final hitRoof =
-                                      data.pickRoof(p, 14 / scale) ??
-                                      selectedRoofId;
-                                  if (hitRoof != null) {
-                                    setState(() {
-                                      selectedDetail = null;
-                                      selectedRoofId = hitRoof;
-                                    });
-                                    _showRoofContextMenu(
-                                      d.globalPosition,
-                                      hitRoof,
-                                    );
-                                  }
-                                },
-                                onLongPressStart: (d) {
-                                  final p = localToSection(d.localPosition);
-                                  final hitRoof =
-                                      data.pickRoof(p, 14 / scale) ??
-                                      selectedRoofId;
-                                  if (hitRoof != null) {
-                                    setState(() {
-                                      selectedDetail = null;
-                                      selectedRoofId = hitRoof;
-                                    });
-                                    _showRoofContextMenu(
-                                      d.globalPosition,
-                                      hitRoof,
-                                    );
-                                  }
-                                },
-                                onVerticalDragStart: selectedRoofId == null
-                                    ? null
-                                    : (d) {
-                                        final hit =
-                                            ArchitectBuildingSection.findRoofById(
-                                              project,
-                                              selectedRoofId!,
-                                            );
-                                        if (hit == null) return;
-                                        _roofDragStartLocalY =
-                                            d.localPosition.dy;
-                                        _roofDragInitialOffset =
-                                            hit.roof.baseElevationOffset;
-                                      },
-                                onVerticalDragUpdate: selectedRoofId == null
-                                    ? null
-                                    : (d) {
-                                        if (_roofDragStartLocalY == null ||
-                                            _roofDragInitialOffset == null ||
-                                            selectedRoofId == null) {
-                                          return;
-                                        }
-                                        final deltaZ =
-                                            -(d.localPosition.dy -
-                                                _roofDragStartLocalY!) /
-                                            scale;
-                                        final nextOffset =
-                                            _roofDragInitialOffset! + deltaZ;
-                                        _updateRoof(
-                                          selectedRoofId!,
-                                          (_, roof) => roof.copyWith(
-                                            baseElevationOffset: nextOffset,
-                                            attachToWalls: false,
-                                          ),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                InteractiveViewer(
+                                  transformationController: transform,
+                                  minScale: .5,
+                                  maxScale: 16,
+                                  panEnabled: selectedRoofId == null,
+                                  child: GestureDetector(
+                                    key: const ValueKey(
+                                      'building-section-view',
+                                    ),
+                                    behavior: HitTestBehavior.opaque,
+                                    onTapUp: (d) {
+                                      sectionTap(
+                                        localToSection(d.localPosition),
+                                        scale,
+                                        drawing,
+                                      );
+                                    },
+                                    onSecondaryTapUp: (d) {
+                                      final p = localToSection(d.localPosition);
+                                      final hitRoof =
+                                          data.pickRoof(p, 14 / scale) ??
+                                          selectedRoofId;
+                                      if (hitRoof != null) {
+                                        setState(() {
+                                          selectedDetail = null;
+                                          selectedRoofId = hitRoof;
+                                        });
+                                        _showRoofContextMenu(
+                                          d.globalPosition,
+                                          hitRoof,
                                         );
-                                      },
-                                onVerticalDragEnd: selectedRoofId == null
-                                    ? null
-                                    : (_) {
-                                        _roofDragStartLocalY = null;
-                                        _roofDragInitialOffset = null;
-                                      },
-                                child: CustomPaint(
-                                  size: Size(c.maxWidth, c.maxHeight),
-                                  painter: ArchitectBuildingSectionPainter(
-                                    drawing,
-                                    bounds.center,
-                                    scale,
+                                      }
+                                    },
+                                    onLongPressStart: (d) {
+                                      final p = localToSection(d.localPosition);
+                                      final hitRoof =
+                                          data.pickRoof(p, 14 / scale) ??
+                                          selectedRoofId;
+                                      if (hitRoof != null) {
+                                        setState(() {
+                                          selectedDetail = null;
+                                          selectedRoofId = hitRoof;
+                                        });
+                                        _showRoofContextMenu(
+                                          d.globalPosition,
+                                          hitRoof,
+                                        );
+                                      }
+                                    },
+                                    onVerticalDragStart: selectedRoofId == null
+                                        ? null
+                                        : (d) {
+                                            final hit =
+                                                ArchitectBuildingSection.findRoofById(
+                                                  project,
+                                                  selectedRoofId!,
+                                                );
+                                            if (hit == null) return;
+                                            _roofDragStartLocalY =
+                                                d.localPosition.dy;
+                                            _roofDragInitialOffset =
+                                                hit.roof.baseElevationOffset;
+                                          },
+                                    onVerticalDragUpdate: selectedRoofId == null
+                                        ? null
+                                        : (d) {
+                                            if (_roofDragStartLocalY == null ||
+                                                _roofDragInitialOffset ==
+                                                    null ||
+                                                selectedRoofId == null) {
+                                              return;
+                                            }
+                                            final deltaZ =
+                                                -(d.localPosition.dy -
+                                                    _roofDragStartLocalY!) /
+                                                scale;
+                                            final nextOffset =
+                                                _roofDragInitialOffset! +
+                                                deltaZ;
+                                            _updateRoof(
+                                              selectedRoofId!,
+                                              (_, roof) => roof.copyWith(
+                                                baseElevationOffset: nextOffset,
+                                                attachToWalls: false,
+                                              ),
+                                            );
+                                          },
+                                    onVerticalDragEnd: selectedRoofId == null
+                                        ? null
+                                        : (_) {
+                                            _roofDragStartLocalY = null;
+                                            _roofDragInitialOffset = null;
+                                          },
+                                    child: CustomPaint(
+                                      size: Size(c.maxWidth, c.maxHeight),
+                                      painter: ArchitectBuildingSectionPainter(
+                                        drawing,
+                                        bounds.center,
+                                        scale,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                                if (!placingDetail &&
+                                    !movingDetail &&
+                                    !reattaching &&
+                                    selectedDetail == null)
+                                  Positioned.fill(
+                                    child: AnimatedBuilder(
+                                      animation: transform,
+                                      builder: (_, _) =>
+                                          ArchitectProjectionEditor(
+                                            key: ValueKey(
+                                              'section-editor:${value.id}',
+                                            ),
+                                            controller: widget.controller,
+                                            paths: data.elementPaths,
+                                            origin: value.start,
+                                            right: value.axis,
+                                            elevation: false,
+                                            scale:
+                                                scale *
+                                                transform.value
+                                                    .getMaxScaleOnAxis(),
+                                            toView: (p) => localToSection(
+                                              transform.toScene(p),
+                                            ),
+                                            toScreen: (p) =>
+                                                MatrixUtils.transformPoint(
+                                                  transform.value,
+                                                  centre +
+                                                      Offset(
+                                                        (p.dx -
+                                                                bounds
+                                                                    .center
+                                                                    .dx) *
+                                                            scale,
+                                                        -(p.dy -
+                                                                bounds
+                                                                    .center
+                                                                    .dy) *
+                                                            scale,
+                                                      ),
+                                                ),
+                                            onNavigate:
+                                                (delta, factor, focal) =>
+                                                    navigateArchitectProjection(
+                                                      transform,
+                                                      delta,
+                                                      factor,
+                                                      focal,
+                                                    ),
+                                            onMissTap: (p) => sectionTap(
+                                              localToSection(
+                                                transform.toScene(p),
+                                              ),
+                                              scale,
+                                              drawing,
+                                            ),
+                                          ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           );
                         },
@@ -1195,8 +1275,8 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
     if (drawing.selectedRoofId != null) {
       final rb = drawing.data.roofBounds(drawing.selectedRoofId!);
       if (rb != null) {
-        final handleScreen = p(Offset(rb.center.dx, rb.bottom)) +
-            const Offset(0, -16);
+        final handleScreen =
+            p(Offset(rb.center.dx, rb.bottom)) + const Offset(0, -16);
         canvas.drawCircle(
           handleScreen,
           12,
@@ -1304,5 +1384,6 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant ArchitectBuildingSectionPainter oldDelegate) => true;
+  bool shouldRepaint(covariant ArchitectBuildingSectionPainter oldDelegate) =>
+      true;
 }

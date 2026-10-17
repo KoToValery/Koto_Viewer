@@ -422,7 +422,7 @@ class ArchitectRoofGeometry {
     if (candidateWalls.isNotEmpty) {
       var maxH = 0.0;
       for (final w in candidateWalls) {
-        final h = w.effectiveHeight(storey.height);
+        final h = w.baseOffset + w.effectiveHeight(storey.height);
         if (h > maxH) maxH = h;
       }
       if (maxH > 0.0) return maxH;
@@ -430,10 +430,10 @@ class ArchitectRoofGeometry {
     if (storey.walls.isEmpty && lowerStorey != null) {
       final lowerWalls = lowerStorey.walls.where((w) => !w.isParapet).toList();
       if (lowerWalls.isNotEmpty) {
-        var maxTopZ = lowerStorey.elevation + lowerStorey.height;
+        var maxTopZ = double.negativeInfinity;
         for (final w in lowerWalls) {
           final topZ =
-              lowerStorey.elevation + w.effectiveHeight(lowerStorey.height);
+              lowerStorey.elevation + w.baseOffset + w.effectiveHeight(lowerStorey.height);
           if (topZ > maxTopZ) maxTopZ = topZ;
         }
         return maxTopZ - storey.elevation;
@@ -502,17 +502,8 @@ class ArchitectRoofGeometry {
     // 1. Collect raw 1D intervals [fromS, toS] for each roof plane crossed by the section line.
     final rawIntervals =
         <({ArchitectRoofPlane roof, double fromS, double toS})>[];
-    for (final rawRoof in storey.roofs) {
-      if (rawRoof.points.length < 3) continue;
-      final effectiveBaseOffset = resolveAttachedBaseElevationOffset(
-        roof: rawRoof,
-        storey: storey,
-        lowerStorey: lowerStorey,
-      );
-      final roof =
-          (effectiveBaseOffset - rawRoof.baseElevationOffset).abs() > 1e-5
-          ? rawRoof.copyWith(baseElevationOffset: effectiveBaseOffset)
-          : rawRoof;
+    for (final roof in storey.roofs) {
+      if (roof.points.length < 3) continue;
       final hits = <double>[];
       for (var i = 0; i < roof.points.length; i++) {
         final a = roof.points[i];

@@ -5252,6 +5252,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallJoinIncompatible => 'Walls cannot be joined';
 
   @override
+  String get architectWallStraighten => 'Straighten';
+
+  @override
+  String get architectWallStraightened => 'Wall straightened';
+
+  @override
+  String get architectWallAlreadyStraight => 'Wall is already straight';
+
+  @override
   String get stairRailing => 'Railing';
 
   @override
@@ -6028,4 +6037,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cad3dThemeWhite => 'White';
+
+  @override
+  String get architectProjectionInvalid =>
+      'The element does not fit. Check the opening, host and clearances.';
+
+  @override
+  String get architectProjectionLeft => 'Left';
+
+  @override
+  String get architectProjectionRight => 'Right';
+
+  @override
+  String get architectProjectionHead => 'To slab';
+
+  @override
+  String get architectProjectionHorizontal => 'Move sideways';
+
+  @override
+  String get architectProjectionAlignSill => 'Align sills';
+
+  @override
+  String get architectProjectionAlignHead => 'Align heads';
+
+  @override
+  String get architectProjectionNoSlab => 'No upper slab';
+
+  @override
+  String get architectProjectionAlignLeft => 'Align left edges';
+
+  @override
+  String get architectProjectionAlignRight => 'Align right edges';
 }

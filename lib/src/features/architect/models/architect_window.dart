@@ -55,7 +55,7 @@ class ArchitectWindow {
     double? height,
     double? sillHeight,
     double? frameThickness,
-    int panesCount = 2,
+    int? panesCount,
     String? specId,
     String? uuid,
     String? styleId,
@@ -68,7 +68,7 @@ class ArchitectWindow {
     height: height ?? this.height,
     sillHeight: sillHeight ?? this.sillHeight,
     frameThickness: frameThickness ?? this.frameThickness,
-    panesCount: panesCount,
+    panesCount: panesCount ?? this.panesCount,
     specId: specId ?? this.specId,
     uuid: uuid ?? this.uuid,
     styleId: styleId ?? this.styleId,
@@ -416,12 +416,23 @@ class ArchitectWindow {
 
     addGasketBox(gLeft, gLeft + u * gasketW, gzMin, gzMax);
     addGasketBox(gRight - u * gasketW, gRight, gzMin, gzMax);
-    addGasketBox(gLeft + u * gasketW, gRight - u * gasketW, gzMin, gzMin + gasketW);
-    addGasketBox(gLeft + u * gasketW, gRight - u * gasketW, gzMax - gasketW, gzMax);
+    addGasketBox(
+      gLeft + u * gasketW,
+      gRight - u * gasketW,
+      gzMin,
+      gzMin + gasketW,
+    );
+    addGasketBox(
+      gLeft + u * gasketW,
+      gRight - u * gasketW,
+      gzMax - gasketW,
+      gzMax,
+    );
 
     // Interior-facing window hinges
     final interiorDir = -exteriorSign;
-    final hingePos = (centerPos - u * (halfW - jWidth * 0.7)) +
+    final hingePos =
+        (centerPos - u * (halfW - jWidth * 0.7)) +
         n * (interiorDir * halfThick + interiorDir * 0.009);
 
     void addHinge(double zC) {
@@ -455,18 +466,22 @@ class ArchitectWindow {
       for (var i = 0; i < segs; i++) {
         final pA = pts[i];
         final pB = pts[(i + 1) % segs];
-        tris.add(Triangle3D(
-          v0: cT,
-          v1: Vector3(pA.dx, pA.dy, zHMax),
-          v2: Vector3(pB.dx, pB.dy, zHMax),
-          color: capCol,
-        ));
-        tris.add(Triangle3D(
-          v0: cB,
-          v1: Vector3(pB.dx, pB.dy, zHMin),
-          v2: Vector3(pA.dx, pA.dy, zHMin),
-          color: capCol,
-        ));
+        tris.add(
+          Triangle3D(
+            v0: cT,
+            v1: Vector3(pA.dx, pA.dy, zHMax),
+            v2: Vector3(pB.dx, pB.dy, zHMax),
+            color: capCol,
+          ),
+        );
+        tris.add(
+          Triangle3D(
+            v0: cB,
+            v1: Vector3(pB.dx, pB.dy, zHMin),
+            v2: Vector3(pA.dx, pA.dy, zHMin),
+            color: capCol,
+          ),
+        );
       }
     }
 
@@ -499,6 +514,9 @@ class ArchitectWindow {
     // Top
     tris.add(Triangle3D(v0: v1T, v1: v2T, v2: v3T, color: color));
     tris.add(Triangle3D(v0: v1T, v1: v3T, v2: v4T, color: color));
+    // Close the solid so section-plane intersections form complete loops.
+    tris.add(Triangle3D(v0: v1B, v1: v3B, v2: v2B, color: color));
+    tris.add(Triangle3D(v0: v1B, v1: v4B, v2: v3B, color: color));
     // Front
     tris.add(Triangle3D(v0: v1B, v1: v2B, v2: v2T, color: color));
     tris.add(Triangle3D(v0: v1B, v1: v2T, v2: v1T, color: color));

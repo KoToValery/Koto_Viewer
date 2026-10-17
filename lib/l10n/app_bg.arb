@@ -1679,6 +1679,10 @@
   "architectWallJoinSelectSecond": "Изберете втора стена за съединяване",
   "architectWallJoinSuccess": "Стените са съединени",
   "architectWallJoinIncompatible": "Стените не могат да се съединят",
+  "architectWallStraighten": "Изправи",
+  "architectWallStraightened": "Стената е изправена",
+  "architectWallAlreadyStraight": "Стената вече е права",
+
   "stairRailing": "Парапет",
   "stairSmartRailingHelp": "Парапет при отворени страни, ръкохватка до висока стена. При врати, прозорци и ниски стени се запазва парапетът.",
   "stairLabel": "Надпис",
@@ -1954,5 +1958,15 @@
   "cad3dThemeBlueprint": "Чертеж",
   "cad3dThemeStudio": "Студио",
   "cad3dThemeBlack": "Черен",
-  "cad3dThemeWhite": "Бял"
+  "cad3dThemeWhite": "Бял",
+  "architectProjectionInvalid": "Елементът не се побира. Провери отвора, стената и разстоянията.",
+  "architectProjectionLeft": "Вляво",
+  "architectProjectionRight": "Вдясно",
+  "architectProjectionHead": "До плоча",
+  "architectProjectionHorizontal": "Мести странично",
+  "architectProjectionAlignSill": "Подравни долу",
+  "architectProjectionAlignHead": "Подравни горе",
+  "architectProjectionNoSlab": "Няма горна плоча",
+  "architectProjectionAlignLeft": "Подравни вляво",
+  "architectProjectionAlignRight": "Подравни вдясно"
 }

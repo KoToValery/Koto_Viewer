@@ -6,6 +6,7 @@ import '../services/architect_roof_geometry.dart';
 import '../services/architect_roof_tool.dart';
 import '../widgets/architect_building_sections_screen.dart';
 import '../widgets/architect_elevations_screen.dart';
+import '../widgets/architect_projection_editor.dart';
 import '../../bim_editing/widgets/bim_edit_actions.dart';
 import '../../bim_editing/geometry/bim_contour_drafting_geometry.dart';
 import 'dart:math' as math;
@@ -305,6 +306,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _facadeGeometry!, upCentre, _viewport.scale,
         fill: _canvasPalette.background,
         stroke: _canvasPalette.foreground(Colors.black),
+        fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily,
       );
     }
     final drawing = _workspaceSectionDrawing;
@@ -312,6 +314,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ? null
         : ArchitectBuildingSectionPainter(drawing, upCentre, _viewport.scale);
   }
+  Widget _nativeProjectionEditor() => AnimatedBuilder(
+    animation: Listenable.merge([_viewport, _modelCommands]),
+    builder: (_, _) {
+      _cacheProjection();
+      final original = _modelCommands.project;
+      final facade = original.elevations.where((e) => e.id == _commands.viewId).firstOrNull;
+      final cut = original.sections.where((e) => e.id == _commands.viewId).firstOrNull;
+      final paths = _facadeGeometry?.elementPaths ?? _sectionGeometry?.elementPaths ?? <String, Path>{};
+      return ArchitectProjectionEditor(key: ValueKey('workspace-editor:$_workspaceViewKey'),
+        controller: _modelCommands, paths: paths, elevation: _commands.view == ArchitectWorkspaceView.elevation,
+        origin: facade?.centre ?? cut?.start ?? Offset.zero, right: facade?.right ?? cut?.axis ?? const Offset(1, 0),
+        scale: _viewport.scale, toView: (p) => _modelToSection(_screenToModel(p)),
+        toScreen: (p) => _viewport.toScreen(Offset(p.dx, -p.dy)),
+        onNavigate: (delta, factor, focal) => _viewport.navigate(previousFocal: focal - delta, focal: focal, scaleFactor: factor),
+        onMissTap: (p) => _handleTap(_screenToModel(p)));
+    },
+  );
+
   Timer? _saveTimer;
   final ValueNotifier<int> _previewRevision = ValueNotifier(0);
   Object? _toolUiState;
@@ -1360,8 +1380,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   ArchitectWall? get _selectedWall {
+    final singleId = _selectedElementId ??
+        (_selectedWallIds.length == 1 ? _selectedWallIds.first : null);
+    if (singleId == null) return null;
     for (final wall in _project.activeStorey.walls) {
-      if (wall.id == _selectedElementId) return wall;
+      if (wall.id == singleId) return wall;
     }
     return null;
   }
@@ -1682,6 +1705,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // 2D POINTER & TOUCH HANDLING
   // ===========================================================================
 
+  bool _hitTestWallEndpoint(
+    Offset rawModel,
+    ArchitectWall wall, {
+    required bool atStart,
+  }) {
+    final refPt = atStart ? wall.startPoint : wall.endPoint;
+    final centerPt = atStart ? wall.centerStart : wall.centerEnd;
+    final n = wall.normalVector * (wall.thickness / 2.0);
+    final capA = centerPt - n;
+    final capB = centerPt + n;
+    final tol = math.max(26.0 / _currentScale, wall.thickness / 2.0 + 0.15);
+    if ((rawModel - refPt).distance <= tol) return true;
+    if ((rawModel - centerPt).distance <= tol) return true;
+    if ((rawModel - capA).distance <= tol) return true;
+    if ((rawModel - capB).distance <= tol) return true;
+    final closest = BimLineGeometry.closest(rawModel, capA, capB);
+    return (rawModel - closest).distance <= tol;
+  }
+
   int? _hitTestZoneVertex(Offset modelPt, ArchitectZone zone) {
     final tolerance = 14.0 / _currentScale;
     for (int i = 0; i < zone.polygon.length; i++) {
@@ -1921,16 +1963,67 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (!_touchInput) _updatePointerPreview(event.localPosition);
       _repaintPreview();
     }
-    if (_activeTool == ArchitectTool.wall && _selectedWall != null) {
+    // Wall endpoint handle check (works in Wall tool and Select tool)
+    if ((_activeTool == ArchitectTool.wall ||
+            _activeTool == ArchitectTool.select) &&
+        _selectedWall != null) {
       final wall = _selectedWall!;
-      for (final atStart in [true, false]) {
+      final hitStart = _hitTestWallEndpoint(rawModel, wall, atStart: true);
+      final hitEnd = _hitTestWallEndpoint(rawModel, wall, atStart: false);
+      if (hitStart || hitEnd) {
+        final atStart = (hitStart && hitEnd)
+            ? (rawModel - wall.startPoint).distance <=
+                (rawModel - wall.endPoint).distance
+            : hitStart;
         final point = atStart ? wall.startPoint : wall.endPoint;
-        if ((point - rawModel).distance <= 18 / _currentScale) {
+        _wallEndpointOriginal = wall;
+        _wallDragStart = atStart;
+        _wallGrabOffset = point - rawModel;
+        _elementMoveOriginal = _project;
+        _elementMovePreview = _project;
+        _isHandleEngaged = true;
+        HapticFeedback.selectionClick();
+        ArchitectLogger.log(
+          'HANDLE',
+          'Wall ${wall.id} endpoint ${atStart ? "start" : "end"} drag engaged',
+        );
+        return;
+      }
+    }
+
+    // Direct endpoint grab on unselected wall (auto-selects and starts point drag)
+    if ((_activeTool == ArchitectTool.wall ||
+            _activeTool == ArchitectTool.select) &&
+        _selectedWall == null &&
+        _effectiveSelection.isEmpty &&
+        _draftStart == null) {
+      for (final wall in _project.activeStorey.walls.reversed) {
+        final hitStart = _hitTestWallEndpoint(rawModel, wall, atStart: true);
+        final hitEnd = _hitTestWallEndpoint(rawModel, wall, atStart: false);
+        if (hitStart || hitEnd) {
+          final atStart = (hitStart && hitEnd)
+              ? (rawModel - wall.startPoint).distance <=
+                  (rawModel - wall.endPoint).distance
+              : hitStart;
+          final point = atStart ? wall.startPoint : wall.endPoint;
+          setState(() {
+            _selectedElementId = wall.id;
+            _selectionIds
+              ..clear()
+              ..add(wall.id);
+            _selectedZoneId = null;
+          });
           _wallEndpointOriginal = wall;
           _wallDragStart = atStart;
           _wallGrabOffset = point - rawModel;
           _elementMoveOriginal = _project;
+          _elementMovePreview = _project;
           _isHandleEngaged = true;
+          HapticFeedback.selectionClick();
+          ArchitectLogger.log(
+            'HANDLE',
+            'Wall ${wall.id} auto-selected and endpoint ${atStart ? "start" : "end"} drag engaged',
+          );
           return;
         }
       }
@@ -5888,6 +5981,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
       );
     } else if (isWall) {
+      final wall = storey.walls.where((w) => w.id == elementId).firstOrNull;
+      if (wall != null && !_isWallOrthogonal(wall)) {
+        items.add(
+          _radialItem(
+            action: ArchitectRadialAction.straighten,
+            color: const Color(0xFF00E5FF),
+          ),
+        );
+      }
       items.add(
         _radialItem(
           action: ArchitectRadialAction.duplicate,
@@ -6184,6 +6286,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         } else if (_selectedWall != null) {
           _wallEndpointOriginal = _selectedWall;
           _wallDragStart = false;
+          _elementMoveOriginal = _project;
+          _elementMovePreview = _project;
+          _isHandleEngaged = true;
+        }
+        break;
+
+      case ArchitectRadialAction.straighten:
+        final wall = _selectedWall;
+        if (wall != null) {
+          _straightenWall(wall);
         }
         break;
 
@@ -6754,6 +6866,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
             if (wallIds.length == 1) ...[
               IconButton(
+                key: const ValueKey('architect-wall-straighten'),
+                tooltip: l.architectWallStraighten,
+                icon: const Icon(
+                  Icons.square_foot,
+                  color: Color(0xFF00E5FF),
+                ),
+                onPressed: () {
+                  final wall = _project.activeStorey.walls
+                      .where((w) => w.id == wallIds.single)
+                      .firstOrNull;
+                  if (wall != null) {
+                    _straightenWall(wall);
+                  }
+                },
+              ),
+              IconButton(
                 key: const ValueKey('architect-wall-new-point'),
                 tooltip: l.bimNewPoint,
                 icon: const Icon(
@@ -6816,6 +6944,83 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
       ),
     );
+  }
+
+  bool _isWallOrthogonal(ArchitectWall wall) {
+    final delta = wall.endPoint - wall.startPoint;
+    if (delta.distance < 1e-4) return true;
+    final angle = math.atan2(delta.dy, delta.dx);
+    final target = (angle / (math.pi / 2)).round() * (math.pi / 2);
+    return (angle - target).abs() < 1e-4;
+  }
+
+  void _straightenWall(ArchitectWall wall) {
+    _cancelActiveDrags();
+    final delta = wall.endPoint - wall.startPoint;
+    final len = delta.distance;
+    if (len < 1e-4) return;
+    final angle = math.atan2(delta.dy, delta.dx);
+    final target = (angle / (math.pi / 2)).round() * (math.pi / 2);
+    if ((angle - target).abs() < 1e-4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectWallAlreadyStraight),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+
+    final otherWalls =
+        _project.activeStorey.walls.where((w) => w.id != wall.id).toList();
+    final startConnected = otherWalls.any(
+      (w) =>
+          (w.startPoint - wall.startPoint).distance < 0.05 ||
+          (w.endPoint - wall.startPoint).distance < 0.05 ||
+          w.connectsAt(wall.startPoint),
+    );
+    final endConnected = otherWalls.any(
+      (w) =>
+          (w.startPoint - wall.endPoint).distance < 0.05 ||
+          (w.endPoint - wall.endPoint).distance < 0.05 ||
+          w.connectsAt(wall.endPoint),
+    );
+
+    final u = Offset(math.cos(target), math.sin(target));
+    final Offset newStart;
+    final Offset newEnd;
+    final bool carryConn;
+
+    if (endConnected && !startConnected) {
+      newEnd = wall.endPoint;
+      newStart = wall.endPoint - u * len;
+      carryConn = false;
+    } else {
+      newStart = wall.startPoint;
+      newEnd = wall.startPoint + u * len;
+      carryConn = endConnected;
+    }
+
+    final updated = wall.copyWith(startPoint: newStart, endPoint: newEnd);
+    try {
+      _commands.execute(
+        UpdateArchitectWall(
+          storeyId: _project.activeStoreyId,
+          wall: updated,
+          carryConnections: carryConn,
+        ),
+      );
+      _saveBiMProjectIfAttached();
+      HapticFeedback.mediumImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectWallStraightened),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    } on ArgumentError {
+      _operationError();
+    }
   }
 
   void _deleteSelection() {
@@ -9249,6 +9454,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             );
           },
         ),
+      if (!_commands.isPlan && _activeTool == ArchitectTool.select && _effectiveSelection.isEmpty)
+        Positioned.fill(child: _nativeProjectionEditor()),
     ],
   );
 

@@ -735,7 +735,31 @@ class Architect2dPainter extends CustomPainter {
           borderPaint,
         );
         for (final point in [wall.startPoint, wall.endPoint]) {
-          canvas.drawCircle(point, 3 / zoomScale, Paint()..color = Colors.cyan);
+          canvas.drawCircle(
+            point,
+            6.0 / zoomScale,
+            Paint()..color = Colors.black45,
+          );
+          canvas.drawCircle(
+            point,
+            4.5 / zoomScale,
+            Paint()
+              ..color = const Color(0xFF00E5FF)
+              ..style = PaintingStyle.fill,
+          );
+          canvas.drawCircle(
+            point,
+            4.5 / zoomScale,
+            Paint()
+              ..color = Colors.white
+              ..strokeWidth = 1.6 / zoomScale
+              ..style = PaintingStyle.stroke,
+          );
+          canvas.drawCircle(
+            point,
+            1.6 / zoomScale,
+            Paint()..color = Colors.white,
+          );
         }
       }
 

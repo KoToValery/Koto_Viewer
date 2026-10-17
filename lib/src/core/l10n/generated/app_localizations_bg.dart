@@ -5270,6 +5270,15 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallJoinIncompatible => 'Стените не могат да се съединят';
 
   @override
+  String get architectWallStraighten => 'Изправи';
+
+  @override
+  String get architectWallStraightened => 'Стената е изправена';
+
+  @override
+  String get architectWallAlreadyStraight => 'Стената вече е права';
+
+  @override
   String get stairRailing => 'Парапет';
 
   @override
@@ -6049,4 +6058,35 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get cad3dThemeWhite => 'Бял';
+
+  @override
+  String get architectProjectionInvalid =>
+      'Елементът не се побира. Провери отвора, стената и разстоянията.';
+
+  @override
+  String get architectProjectionLeft => 'Вляво';
+
+  @override
+  String get architectProjectionRight => 'Вдясно';
+
+  @override
+  String get architectProjectionHead => 'До плоча';
+
+  @override
+  String get architectProjectionHorizontal => 'Мести странично';
+
+  @override
+  String get architectProjectionAlignSill => 'Подравни долу';
+
+  @override
+  String get architectProjectionAlignHead => 'Подравни горе';
+
+  @override
+  String get architectProjectionNoSlab => 'Няма горна плоча';
+
+  @override
+  String get architectProjectionAlignLeft => 'Подравни вляво';
+
+  @override
+  String get architectProjectionAlignRight => 'Подравни вдясно';
 }

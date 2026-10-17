@@ -9167,6 +9167,24 @@ abstract class AppLocalizations {
   /// **'Walls cannot be joined'**
   String get architectWallJoinIncompatible;
 
+  /// Tooltip for straightening an angled or crooked wall
+  ///
+  /// In en, this message translates to:
+  /// **'Straighten'**
+  String get architectWallStraighten;
+
+  /// Feedback message when a wall is straightened to orthogonal axis
+  ///
+  /// In en, this message translates to:
+  /// **'Wall straightened'**
+  String get architectWallStraightened;
+
+  /// Notice when a wall is already orthogonal
+  ///
+  /// In en, this message translates to:
+  /// **'Wall is already straight'**
+  String get architectWallAlreadyStraight;
+
   /// No description provided for @stairRailing.
   ///
   /// In en, this message translates to:
@@ -10654,6 +10672,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'White'**
   String get cad3dThemeWhite;
+
+  /// No description provided for @architectProjectionInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The element does not fit. Check the opening, host and clearances.'**
+  String get architectProjectionInvalid;
+
+  /// No description provided for @architectProjectionLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get architectProjectionLeft;
+
+  /// No description provided for @architectProjectionRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get architectProjectionRight;
+
+  /// No description provided for @architectProjectionHead.
+  ///
+  /// In en, this message translates to:
+  /// **'To slab'**
+  String get architectProjectionHead;
+
+  /// No description provided for @architectProjectionHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Move sideways'**
+  String get architectProjectionHorizontal;
+
+  /// No description provided for @architectProjectionAlignSill.
+  ///
+  /// In en, this message translates to:
+  /// **'Align sills'**
+  String get architectProjectionAlignSill;
+
+  /// No description provided for @architectProjectionAlignHead.
+  ///
+  /// In en, this message translates to:
+  /// **'Align heads'**
+  String get architectProjectionAlignHead;
+
+  /// No description provided for @architectProjectionNoSlab.
+  ///
+  /// In en, this message translates to:
+  /// **'No upper slab'**
+  String get architectProjectionNoSlab;
+
+  /// No description provided for @architectProjectionAlignLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Align left edges'**
+  String get architectProjectionAlignLeft;
+
+  /// No description provided for @architectProjectionAlignRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Align right edges'**
+  String get architectProjectionAlignRight;
 }
 
 class _AppLocalizationsDelegate

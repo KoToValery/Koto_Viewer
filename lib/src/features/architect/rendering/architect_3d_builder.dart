@@ -12,8 +12,15 @@ class Architect3dBuilder {
   static Mesh3D buildProjectMesh(
     ArchitectProject project, {
     bool previewGeometry = true,
+    Map<Triangle3D, String>? sources,
   }) {
     final List<Triangle3D> allTris = [];
+    void mark(String id, int start) {
+      if (sources == null) return;
+      for (var i = start; i < allTris.length; i++) {
+        sources.putIfAbsent(allTris[i], () => id);
+      }
+    }
 
     for (final storey in project.storeys) {
       // Preview plates belong to this storey, never the cumulative footprint.
@@ -32,7 +39,11 @@ class Architect3dBuilder {
         maxY = math.max(maxY, math.max(wall.startPoint.dy, wall.endPoint.dy));
 
         // Add 3D wall geometry with boolean door cutouts
-        allTris.addAll(wall.build3D(storeyElevation: storey.elevation));
+        final first = allTris.length;
+        allTris.addAll(
+          wall.build3D(storeyElevation: storey.elevation, sources: sources),
+        );
+        mark(wall.id, first);
       }
 
       // Fill physical mitres at the same junctions used by the plan view.
@@ -74,6 +85,7 @@ class Architect3dBuilder {
 
       // The same material solids are used by actual vertical stair sections.
       for (final stair in storey.stairs) {
+        final first = allTris.length;
         final solids = [
           ...ArchitectStairMesh.body(stair),
           ...ArchitectStairMesh.railings(
@@ -100,20 +112,24 @@ class Architect3dBuilder {
             );
           }
         }
+        mark(stair.id, first);
       }
 
       // Add 3D columns
       for (final col in storey.columns) {
+        final first = allTris.length;
         allTris.addAll(
           col.build3D(
             storeyElevation: storey.elevation,
             storeyHeight: storey.height,
           ),
         );
+        mark(col.id, first);
       }
 
       // Add 3D beams
       for (final beam in storey.beams) {
+        final first = allTris.length;
         allTris.addAll(
           ArchitectStairMesh.verticalPrism(
             beam.polygonCorners,
@@ -122,6 +138,7 @@ class Architect3dBuilder {
             StairSolidMaterial.concrete,
           ).triangles,
         );
+        mark(beam.id, first);
       }
 
       // Add 3D floor tiles for functional zones
@@ -156,13 +173,15 @@ class Architect3dBuilder {
       }
 
       for (final slab in storey.slabs) {
+        final first = allTris.length;
         allTris.addAll(ArchitectSlabGeometry.mesh(project, storey, slab));
+        mark(slab.id, first);
       }
 
       for (final roof in storey.roofs) {
-        allTris.addAll(
-          _buildRoofMesh(storey, roof, detailed: previewGeometry),
-        );
+        final first = allTris.length;
+        allTris.addAll(_buildRoofMesh(storey, roof, detailed: previewGeometry));
+        mark(roof.id, first);
       }
 
       // Compatibility preview for storeys with no explicitly drawn slabs.
@@ -285,7 +304,8 @@ class Architect3dBuilder {
     final timber = roof.assembly.timber;
     final rafterH = timber.rafterHeight / cosSlope;
     const boardingH = 0.022;
-    final counterBattenH = math.max(timber.counterBattenHeight, 0.03) / cosSlope;
+    final counterBattenH =
+        math.max(timber.counterBattenHeight, 0.03) / cosSlope;
     final battenH = math.max(timber.battenHeight, 0.03) / cosSlope;
     final coveringH = math.max(
       (roof.assembly.totalThickness / cosSlope) -
@@ -337,13 +357,7 @@ class Architect3dBuilder {
     }
     if (spanD > wpW * 2.5) {
       final dRidge = maxD - wpW;
-      final ridgeClipped = _clipPolygonToRect(
-        polySD,
-        minS,
-        maxS,
-        dRidge,
-        maxD,
-      );
+      final ridgeClipped = _clipPolygonToRect(polySD, minS, maxS, dRidge, maxD);
       _addExtrudedClippedPrism(
         tris,
         ridgeClipped,

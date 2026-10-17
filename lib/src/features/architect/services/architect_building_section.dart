@@ -36,6 +36,19 @@ class ArchitectBuildingSection {
   final List<ArchitectSectionRegion> regions;
   final Rect bounds;
   const ArchitectBuildingSection(this.regions, this.bounds);
+  Map<String, Path> get elementPaths {
+    final result = <String, Path>{};
+    for (final region in regions) {
+      result[region.sourceId] = result.containsKey(region.sourceId)
+          ? Path.combine(
+              PathOperation.union,
+              result[region.sourceId]!,
+              region.path,
+            )
+          : region.path;
+    }
+    return result;
+  }
 
   static SlabMaterial _mapRoofMaterial(ArchitectRoofMaterial? mat) =>
       switch (mat) {
@@ -188,11 +201,11 @@ class ArchitectBuildingSection {
             ? math.max(baseWallHeight, maxRoofHeightAboveFloor)
             : baseWallHeight;
 
-        var wallPath = sliceMesh(
-          wall
-              .copyWith(height: prismHeight)
-              .build3D(storeyElevation: floor.elevation),
-        );
+        final sources = <Triangle3D, String>{};
+        final wallMesh = wall
+            .copyWith(height: prismHeight)
+            .build3D(storeyElevation: floor.elevation, sources: sources);
+        var wallPath = sliceMesh(wallMesh);
         if (wallPath == null) continue;
 
         // If extended to meet a sloped roof, clip the wall top to the underside of the roof slices
@@ -253,6 +266,21 @@ class ArchitectBuildingSection {
           } catch (_) {}
         }
 
+        for (final id in sources.values.toSet()) {
+          final opening = sliceMesh([
+            for (final t in wallMesh)
+              if (sources[t] == id) t,
+          ]);
+          if (opening == null) continue;
+          final clipped = Path.combine(
+            PathOperation.intersect,
+            opening,
+            wallPath!,
+          );
+          if (clipped.getBounds().isEmpty) continue;
+          wallPath = Path.combine(PathOperation.difference, wallPath, clipped);
+          regions.add(ArchitectSectionRegion(id, SlabMaterial.tile, clipped));
+        }
         if (!wallPath!.getBounds().isEmpty) {
           regions.add(
             ArchitectSectionRegion(wall.id, SlabMaterial.plaster, wallPath),

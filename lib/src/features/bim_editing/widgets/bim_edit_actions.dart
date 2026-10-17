@@ -15,6 +15,7 @@ enum BimEditAction {
   newPoint,
   rename,
   join,
+  straighten,
 }
 
 class BimEditActions {
@@ -32,6 +33,7 @@ class BimEditActions {
         BimEditAction.newPoint => l.bimNewPoint,
         BimEditAction.rename => l.architectRadialRename,
         BimEditAction.join => l.architectRadialJoin,
+        BimEditAction.straighten => l.architectWallStraighten,
       };
   static IconData icon(BimEditAction action) => switch (action) {
     BimEditAction.move => Icons.open_with_rounded,
@@ -46,6 +48,7 @@ class BimEditActions {
     BimEditAction.newPoint => Icons.add_location_alt_outlined,
     BimEditAction.rename => Icons.drive_file_rename_outline_rounded,
     BimEditAction.join => Icons.call_merge,
+    BimEditAction.straighten => Icons.square_foot,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};

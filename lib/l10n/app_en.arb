@@ -3659,6 +3659,19 @@
   "@architectWallJoinIncompatible": {
     "description": "Error message when walls cannot be joined"
   },
+  "architectWallStraighten": "Straighten",
+  "@architectWallStraighten": {
+    "description": "Tooltip for straightening an angled or crooked wall"
+  },
+  "architectWallStraightened": "Wall straightened",
+  "@architectWallStraightened": {
+    "description": "Feedback message when a wall is straightened to orthogonal axis"
+  },
+  "architectWallAlreadyStraight": "Wall is already straight",
+  "@architectWallAlreadyStraight": {
+    "description": "Notice when a wall is already orthogonal"
+  },
+
   "stairRailing": "Railing",
   "stairSmartRailingHelp": "Guard on open sides, handrail beside a full-height wall. Doors, windows and low walls keep the guard.",
   "stairLabel": "Label",
@@ -3975,5 +3988,15 @@
   "cad3dThemeBlack": "Black",
   "@cad3dThemeBlack": {"description": "Black 3D background theme"},
   "cad3dThemeWhite": "White",
-  "@cad3dThemeWhite": {"description": "White 3D background theme"}
+  "@cad3dThemeWhite": {"description": "White 3D background theme"},
+  "architectProjectionInvalid": "The element does not fit. Check the opening, host and clearances.",
+  "architectProjectionLeft": "Left",
+  "architectProjectionRight": "Right",
+  "architectProjectionHead": "To slab",
+  "architectProjectionHorizontal": "Move sideways",
+  "architectProjectionAlignSill": "Align sills",
+  "architectProjectionAlignHead": "Align heads",
+  "architectProjectionNoSlab": "No upper slab",
+  "architectProjectionAlignLeft": "Align left edges",
+  "architectProjectionAlignRight": "Align right edges"
 }
