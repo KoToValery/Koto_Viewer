@@ -24,6 +24,19 @@ class ArchitectZonePainterHelper {
     double moveDistanceMeters = 0.0,
   }) {
     final activeStorey = project.activeStorey;
+
+    // Draw drawing schedule table if placed on canvas
+    if (activeStorey.zoneScheduleOrigin != null &&
+        activeStorey.zones.isNotEmpty) {
+      drawZoneScheduleTable(
+        canvas: canvas,
+        storey: activeStorey,
+        origin: activeStorey.zoneScheduleOrigin!,
+        zoomScale: zoomScale,
+        palette: palette,
+      );
+    }
+
     if (activeStorey.zones.isEmpty) return;
 
     for (final zone in activeStorey.zones) {
@@ -123,7 +136,7 @@ class ArchitectZonePainterHelper {
     }
   }
 
-  /// Draws the centered room stamp with room name and net area.
+  /// Draws the compact architectural room badge with sequence number, name, and area.
   static void _drawRoomStamp({
     required Canvas canvas,
     required ArchitectZone zone,
@@ -134,64 +147,74 @@ class ArchitectZonePainterHelper {
     canvas.save();
     canvas.translate(centroid.dx, centroid.dy);
     canvas.scale(1.0 / zoomScale);
-    centroid = Offset.zero;
-    zoomScale = 1;
-    final areaText = '${zone.area.toStringAsFixed(1)} m²';
-    final nameText = zone.name;
 
-    final nameSpan = TextSpan(
-      text: nameText,
+    final numberText = '№ ${zone.number.isNotEmpty ? zone.number : '1'}';
+    final nameText = zone.name;
+    final areaText = '${zone.area.toStringAsFixed(2)} m²';
+
+    final numberSpan = TextSpan(
+      text: '$numberText\n',
       style: TextStyle(
+        color: zone.color,
+        fontFamily: 'Roboto',
+        fontSize: 10.0,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.3,
+      ),
+    );
+    final nameSpan = TextSpan(
+      text: '$nameText\n',
+      style: const TextStyle(
         color: Colors.white,
         fontFamily: 'Roboto',
-        fontSize: 11.0 / zoomScale,
+        fontSize: 11.5,
         fontWeight: FontWeight.bold,
       ),
     );
     final areaSpan = TextSpan(
-      text: '\n$areaText',
+      text: areaText,
       style: TextStyle(
-        color: zone.color,
+        color: Colors.white.withValues(alpha: 0.92),
         fontFamily: 'Roboto',
-        fontSize: 10.0 / zoomScale,
+        fontSize: 10.5,
         fontWeight: FontWeight.w600,
       ),
     );
 
     final tp = TextPainter(
-      text: TextSpan(children: [nameSpan, areaSpan]),
+      text: TextSpan(children: [numberSpan, nameSpan, areaSpan]),
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
     )..layout();
 
-    final badgePaddingH = 8.0 / zoomScale;
-    final badgePaddingV = 4.0 / zoomScale;
+    const badgePaddingH = 8.0;
+    const badgePaddingV = 5.0;
     final badgeRect = Rect.fromCenter(
-      center: centroid,
+      center: Offset.zero,
       width: tp.width + badgePaddingH * 2,
       height: tp.height + badgePaddingV * 2,
     );
 
     final bgPaint = Paint()
-      ..color = const Color(0xDE1A1C24)
+      ..color = const Color(0xEE161822)
       ..style = PaintingStyle.fill;
     final borderPaint = Paint()
       ..color = (isSelected ? const Color(0xFF00E5FF) : zone.color).withValues(
-        alpha: 0.6,
+        alpha: isSelected ? 0.95 : 0.65,
       )
-      ..strokeWidth = 1.0 / zoomScale
+      ..strokeWidth = isSelected ? 1.5 : 1.0
       ..style = PaintingStyle.stroke;
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(badgeRect, Radius.circular(5.0 / zoomScale)),
+      RRect.fromRectAndRadius(badgeRect, const Radius.circular(6.0)),
       bgPaint,
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(badgeRect, Radius.circular(5.0 / zoomScale)),
+      RRect.fromRectAndRadius(badgeRect, const Radius.circular(6.0)),
       borderPaint,
     );
 
-    tp.paint(canvas, centroid - Offset(tp.width / 2, tp.height / 2));
+    tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
     canvas.restore();
   }
 
@@ -896,5 +919,295 @@ class ArchitectZonePainterHelper {
         ..style = PaintingStyle.stroke,
     );
     tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
+  }
+
+  /// Renders a publication-ready architectural room finish schedule table
+  /// directly on the 2D drawing canvas at [origin].
+  static void drawZoneScheduleTable({
+    required Canvas canvas,
+    required ArchitectStorey storey,
+    required Offset origin,
+    required double zoomScale,
+    required ArchitectCanvasPalette palette,
+  }) {
+    final zones = storey.zones;
+    if (zones.isEmpty) return;
+
+    final sortedZones = List<ArchitectZone>.from(zones)
+      ..sort((a, b) => a.number.compareTo(b.number));
+
+    // Column widths in screen pixels
+    const colWidths = [
+      48.0,  // №
+      155.0, // Помещение
+      78.0,  // Площ m²
+      72.0,  // Обик. m
+      120.0, // Под
+      120.0, // Стени
+      110.0, // Таван
+      55.0,  // H (m)
+    ];
+
+    final totalWidth = colWidths.reduce((a, b) => a + b);
+    const titleHeight = 32.0;
+    const headerHeight = 28.0;
+    const rowHeight = 24.0;
+    const footerHeight = 28.0;
+    final totalHeight = titleHeight +
+        headerHeight +
+        (sortedZones.length * rowHeight) +
+        footerHeight;
+
+    canvas.save();
+    canvas.translate(origin.dx, origin.dy);
+    canvas.scale(1.0 / zoomScale);
+
+    final tableRect = Rect.fromLTWH(0, 0, totalWidth, totalHeight);
+
+    // 1. Table Background & Outer Border
+    final bgPaint = Paint()
+      ..color = const Color(0xF7131622)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(tableRect, const Radius.circular(6)),
+      bgPaint,
+    );
+
+    final borderPaint = Paint()
+      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.8)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(tableRect, const Radius.circular(6)),
+      borderPaint,
+    );
+
+    final gridLinePaint = Paint()
+      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.3)
+      ..strokeWidth = 0.8
+      ..style = PaintingStyle.stroke;
+
+    // 2. Title Header
+    final titlePaint = Paint()
+      ..color = const Color(0xFF0F2642)
+      ..style = PaintingStyle.fill;
+    final titleRect = Rect.fromLTWH(0, 0, totalWidth, titleHeight);
+    canvas.drawRRect(
+      RRect.fromRectAndCorners(
+        titleRect,
+        topLeft: const Radius.circular(6),
+        topRight: const Radius.circular(6),
+      ),
+      titlePaint,
+    );
+    canvas.drawLine(
+      const Offset(0, titleHeight),
+      Offset(totalWidth, titleHeight),
+      borderPaint,
+    );
+
+    final titleTp = TextPainter(
+      text: const TextSpan(
+        text: 'ТАБЛИЦА НА ПОМЕЩЕНИЯТА (ROOM FINISH SCHEDULE)',
+        style: TextStyle(
+          color: Colors.white,
+          fontFamily: 'Roboto',
+          fontSize: 11.5,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.8,
+        ),
+      ),
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: totalWidth - 16);
+    titleTp.paint(
+      canvas,
+      Offset((totalWidth - titleTp.width) / 2, (titleHeight - titleTp.height) / 2),
+    );
+
+    // 3. Column Headers
+    final headerPaint = Paint()
+      ..color = const Color(0xFF1E293B)
+      ..style = PaintingStyle.fill;
+    final headerRect =
+        Rect.fromLTWH(0, titleHeight, totalWidth, headerHeight);
+    canvas.drawRect(headerRect, headerPaint);
+    canvas.drawLine(
+      const Offset(0, titleHeight + headerHeight),
+      Offset(totalWidth, titleHeight + headerHeight),
+      borderPaint,
+    );
+
+    const headers = [
+      '№',
+      'Помещение',
+      'Площ m²',
+      'Обик. m',
+      'Под / Настилка',
+      'Стени',
+      'Таван',
+      'H (m)',
+    ];
+
+    double curX = 0;
+    for (int i = 0; i < headers.length; i++) {
+      final w = colWidths[i];
+      final colTp = TextPainter(
+        text: TextSpan(
+          text: headers[i],
+          style: const TextStyle(
+            color: Color(0xFF7DD3FC),
+            fontFamily: 'Roboto',
+            fontSize: 10.0,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textAlign: i == 0 || i == 7 ? TextAlign.center : TextAlign.left,
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: w - 8);
+
+      final tx = i == 0 || i == 7
+          ? curX + (w - colTp.width) / 2
+          : curX + 6.0;
+      colTp.paint(canvas, Offset(tx, titleHeight + (headerHeight - colTp.height) / 2));
+
+      curX += w;
+      if (i < headers.length - 1) {
+        canvas.drawLine(
+          Offset(curX, titleHeight),
+          Offset(curX, totalHeight - footerHeight),
+          gridLinePaint,
+        );
+      }
+    }
+
+    // 4. Room Rows
+    double totalNetArea = 0.0;
+    double curY = titleHeight + headerHeight;
+
+    for (int rowIdx = 0; rowIdx < sortedZones.length; rowIdx++) {
+      final z = sortedZones[rowIdx];
+      totalNetArea += z.area;
+
+      // Alternating row background
+      if (rowIdx % 2 == 1) {
+        final rowRect = Rect.fromLTWH(0, curY, totalWidth, rowHeight);
+        canvas.drawRect(
+          rowRect,
+          Paint()..color = Colors.white.withValues(alpha: 0.03),
+        );
+      }
+
+      // Horizontal separator line
+      canvas.drawLine(
+        Offset(0, curY + rowHeight),
+        Offset(totalWidth, curY + rowHeight),
+        gridLinePaint,
+      );
+
+      final rowValues = [
+        z.number.isNotEmpty ? z.number : '${rowIdx + 1}',
+        z.name,
+        z.area.toStringAsFixed(2),
+        z.perimeter.toStringAsFixed(2),
+        z.floorFinish.isNotEmpty ? z.floorFinish : '—',
+        z.wallFinish.isNotEmpty ? z.wallFinish : '—',
+        z.ceilingFinish.isNotEmpty ? z.ceilingFinish : '—',
+        z.clearHeight.toStringAsFixed(2),
+      ];
+
+      double cellX = 0;
+      for (int c = 0; c < rowValues.length; c++) {
+        final w = colWidths[c];
+        final isNumeric = c == 0 || c == 2 || c == 3 || c == 7;
+        final cellTp = TextPainter(
+          text: TextSpan(
+            text: rowValues[c],
+            style: TextStyle(
+              color: c == 0 ? z.color : Colors.white.withValues(alpha: 0.9),
+              fontFamily: 'Roboto',
+              fontSize: 9.5,
+              fontWeight: c == 0 || c == 2 ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          textAlign: isNumeric ? TextAlign.center : TextAlign.left,
+          textDirection: TextDirection.ltr,
+          maxLines: 1,
+          ellipsis: '…',
+        )..layout(maxWidth: w - 8);
+
+        final pX = isNumeric
+            ? cellX + (w - cellTp.width) / 2
+            : cellX + 6.0;
+        cellTp.paint(
+          canvas,
+          Offset(pX, curY + (rowHeight - cellTp.height) / 2),
+        );
+        cellX += w;
+      }
+
+      curY += rowHeight;
+    }
+
+    // 5. Total Footer Row
+    final footerRect = Rect.fromLTWH(0, curY, totalWidth, footerHeight);
+    final footerPaint = Paint()
+      ..color = const Color(0xFF0F2642)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndCorners(
+        footerRect,
+        bottomLeft: const Radius.circular(6),
+        bottomRight: const Radius.circular(6),
+      ),
+      footerPaint,
+    );
+    canvas.drawLine(
+      Offset(0, curY),
+      Offset(totalWidth, curY),
+      borderPaint,
+    );
+
+    final footerTp = TextPainter(
+      text: TextSpan(
+        children: [
+          const TextSpan(
+            text: 'ОБЩО ЧИСТА ПЛОЩ (TOTAL NET AREA): ',
+            style: TextStyle(
+              color: Color(0xFF7DD3FC),
+              fontFamily: 'Roboto',
+              fontSize: 10.5,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(
+            text: '${totalNetArea.toStringAsFixed(2)} m²',
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'Roboto',
+              fontSize: 11.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          TextSpan(
+            text: '  •  БРОЙ ПОМЕЩЕНИЯ: ${sortedZones.length}',
+            style: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontFamily: 'Roboto',
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: totalWidth - 16);
+
+    footerTp.paint(
+      canvas,
+      Offset(12.0, curY + (footerHeight - footerTp.height) / 2),
+    );
+
+    canvas.restore();
   }
 }

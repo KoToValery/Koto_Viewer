@@ -55,6 +55,7 @@ class ArchitectStorey {
   final List<ArchitectElevationMarker> elevationMarkers;
   final List<ArchitectAnnotation> annotations;
   final List<ArchitectCadPrimitive> cadPrimitives;
+  final Offset? zoneScheduleOrigin;
 
   const ArchitectStorey({
     required this.id,
@@ -75,6 +76,7 @@ class ArchitectStorey {
     this.elevationMarkers = const [],
     this.annotations = const [],
     this.cadPrimitives = const [],
+    this.zoneScheduleOrigin,
   });
 
   String get elevationLabel {
@@ -102,6 +104,8 @@ class ArchitectStorey {
     List<ArchitectElevationMarker>? elevationMarkers,
     List<ArchitectAnnotation>? annotations,
     List<ArchitectCadPrimitive>? cadPrimitives,
+    Offset? zoneScheduleOrigin,
+    bool clearZoneScheduleOrigin = false,
   }) => ArchitectStorey(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -126,6 +130,9 @@ class ArchitectStorey {
     elevationMarkers: elevationMarkers ?? this.elevationMarkers,
     annotations: annotations ?? this.annotations,
     cadPrimitives: cadPrimitives ?? this.cadPrimitives,
+    zoneScheduleOrigin: clearZoneScheduleOrigin
+        ? null
+        : (zoneScheduleOrigin ?? this.zoneScheduleOrigin),
   );
 
   Map<String, dynamic> toJson() => {
@@ -149,6 +156,11 @@ class ArchitectStorey {
     'elevationMarkers': elevationMarkers.map((m) => m.toJson()).toList(),
     'annotations': annotations.map((a) => a.toJson()).toList(),
     'cadPrimitives': cadPrimitives.map((p) => p.toJson()).toList(),
+    if (zoneScheduleOrigin != null)
+      'zoneScheduleOrigin': {
+        'x': zoneScheduleOrigin!.dx,
+        'y': zoneScheduleOrigin!.dy,
+      },
   };
 
   factory ArchitectStorey.fromJson(
@@ -238,6 +250,14 @@ class ArchitectStorey {
             )
             .toList() ??
         const [],
+    zoneScheduleOrigin: json['zoneScheduleOrigin'] != null
+        ? Offset(
+            ((json['zoneScheduleOrigin'] as Map<String, dynamic>)['x'] as num)
+                .toDouble(),
+            ((json['zoneScheduleOrigin'] as Map<String, dynamic>)['y'] as num)
+                .toDouble(),
+          )
+        : null,
   );
 }
 

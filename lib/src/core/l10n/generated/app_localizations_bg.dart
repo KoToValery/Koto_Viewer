@@ -3658,6 +3658,173 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneQuickPoly => 'Свободен полигон';
 
   @override
+  String get architectZoneNumber => '№ на помещение';
+
+  @override
+  String get architectZoneNumberPrompt => '№';
+
+  @override
+  String get architectZoneFinishes => 'Финишни покрития';
+
+  @override
+  String get architectZoneFloorFinish => 'Под / Настилка';
+
+  @override
+  String get architectZoneWallFinish => 'Стени';
+
+  @override
+  String get architectZoneCeilingFinish => 'Таван';
+
+  @override
+  String get architectZoneClearHeight => 'Светла височина (m)';
+
+  @override
+  String get architectZoneBoundaryAuto => 'Динамични граници';
+
+  @override
+  String get architectZoneBoundaryAutoDesc =>
+      'Динамично изменяне при промяна на стените';
+
+  @override
+  String get architectZoneBoundaryManual => 'Ръчна корекция';
+
+  @override
+  String get architectZoneBoundaryManualDesc =>
+      'Фиксирани граници без динамично изменяне';
+
+  @override
+  String get architectZoneModeAuto => 'Автоматично (1 клик)';
+
+  @override
+  String get architectZoneModeManual => 'Ръчно (точка по точка)';
+
+  @override
+  String get architectZoneAutoPrompt =>
+      'Кликнете в готово помещение за автоматично разпознаване';
+
+  @override
+  String get architectZoneAutoFailed =>
+      'Помещението не е напълно затворено от стени';
+
+  @override
+  String get architectZoneMergeDialogTitle => 'Обединяване на помещения';
+
+  @override
+  String architectZoneMergeDialogMessage(String zoneA, String zoneB) {
+    return 'Стената между \"$zoneA\" и \"$zoneB\" беше премахната. Желаете ли да ги обедините в едно общо помещение?';
+  }
+
+  @override
+  String get architectZoneMergeConfirm => 'Обедини';
+
+  @override
+  String get architectZoneMergeKeepSeparate => 'Запази отделни';
+
+  @override
+  String architectZoneMergedSuccess(String name) {
+    return 'Помещенията са обединени в $name';
+  }
+
+  @override
+  String get architectZoneScheduleTitle => 'Таблица на помещенията';
+
+  @override
+  String get architectZoneScheduleTotalArea => 'Обща чиста площ';
+
+  @override
+  String get architectZoneScheduleRoomCount => 'Брой помещения';
+
+  @override
+  String get architectZoneSchedulePlaceOnDrawing => 'Постави на чертежа';
+
+  @override
+  String get architectZoneScheduleRemoveFromDrawing => 'Премахни от чертежа';
+
+  @override
+  String get architectZoneScheduleTablePlaced =>
+      'Таблицата е поставена на чертежа';
+
+  @override
+  String get architectZoneScheduleCopy => 'Копирай таблица';
+
+  @override
+  String get architectZoneScheduleCopied =>
+      'Таблицата на помещенията е копирана';
+
+  @override
+  String get architectZoneScheduleNoRooms =>
+      'Няма създадени зони в текущия етаж';
+
+  @override
+  String get architectZoneScheduleColNo => '№';
+
+  @override
+  String get architectZoneScheduleColName => 'Помещение';
+
+  @override
+  String get architectZoneScheduleColArea => 'Площ (m²)';
+
+  @override
+  String get architectZoneScheduleColPerimeter => 'Обик. (m)';
+
+  @override
+  String get architectZoneScheduleColFloor => 'Под';
+
+  @override
+  String get architectZoneScheduleColWalls => 'Стени';
+
+  @override
+  String get architectZoneScheduleColCeiling => 'Таван';
+
+  @override
+  String get architectZoneScheduleColHeight => 'H (m)';
+
+  @override
+  String get architectZoneFloorLaminate => 'Ламиниран паркет';
+
+  @override
+  String get architectZoneFloorGranite => 'Гранитогрес';
+
+  @override
+  String get architectZoneFloorTerracotta => 'Теракота';
+
+  @override
+  String get architectZoneFloorParquet => 'Естествен паркет';
+
+  @override
+  String get architectZoneFloorCarpet => 'Мокет';
+
+  @override
+  String get architectZoneFloorConcrete => 'Шлайфан бетон';
+
+  @override
+  String get architectZoneWallLatex => 'Шпакловка и латекс';
+
+  @override
+  String get architectZoneWallFaience => 'Фаянс';
+
+  @override
+  String get architectZoneWallPlaster => 'Декоративна мазилка';
+
+  @override
+  String get architectZoneWallWallpaper => 'Тапети';
+
+  @override
+  String get architectZoneWallExposedBrick => 'Видима тухла';
+
+  @override
+  String get architectZoneCeilingLatex => 'Шпакловка и латекс';
+
+  @override
+  String get architectZoneCeilingGypsum => 'Гипсокартон';
+
+  @override
+  String get architectZoneCeilingSuspended => 'Окачен таван';
+
+  @override
+  String get architectZoneCeilingConcrete => 'Видим бетон';
+
+  @override
   String get staircaseAutoGenerate => 'Генерирай отвори за стълби';
 
   @override

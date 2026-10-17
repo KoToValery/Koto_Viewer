@@ -12,6 +12,7 @@ class ArchitectZonePropertiesCard extends StatefulWidget {
   final ValueChanged<ArchitectZone> onZoneUpdated;
   final VoidCallback onDeleteZone;
   final VoidCallback onClose;
+  final VoidCallback? onOpenScheduleTable;
 
   const ArchitectZonePropertiesCard({
     super.key,
@@ -20,6 +21,7 @@ class ArchitectZonePropertiesCard extends StatefulWidget {
     required this.onZoneUpdated,
     required this.onDeleteZone,
     required this.onClose,
+    this.onOpenScheduleTable,
   });
 
   @override
@@ -65,7 +67,7 @@ class _ArchitectZonePropertiesCardState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. Top Row: Category Icon, Name edit, Area & Perimeter chips, Delete, Close
+          // 1. Top Row: Category Icon, Number badge, Name edit, Area chip, Finishes edit, Schedule, Delete, Close
           Row(
             children: [
               Container(
@@ -77,13 +79,36 @@ class _ArchitectZonePropertiesCardState
                 child: Icon(zone.category.icon, size: 18, color: zone.color),
               ),
               const SizedBox(width: 8),
+              // Room Number Badge (tap to edit details)
+              InkWell(
+                onTap: () => _showEditZoneDetailsDialog(context),
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: zone.color.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: zone.color.withValues(alpha: 0.5)),
+                  ),
+                  child: Text(
+                    '№ ${zone.number}',
+                    style: TextStyle(
+                      color: zone.color,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Name Edit
               Expanded(
                 child: InkWell(
-                  onTap: () => _showEditNameDialog(context),
+                  onTap: () => _showEditZoneDetailsDialog(context),
                   borderRadius: BorderRadius.circular(6),
                   child: Padding(
                     padding:
-                        const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                        const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -92,7 +117,7 @@ class _ArchitectZonePropertiesCardState
                             zone.name,
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 15,
+                              fontSize: 14,
                               fontWeight: FontWeight.bold,
                             ),
                             overflow: TextOverflow.ellipsis,
@@ -101,7 +126,7 @@ class _ArchitectZonePropertiesCardState
                         const SizedBox(width: 4),
                         const Icon(
                           Icons.edit_rounded,
-                          size: 14,
+                          size: 13,
                           color: Colors.white54,
                         ),
                       ],
@@ -109,7 +134,7 @@ class _ArchitectZonePropertiesCardState
                   ),
                 ),
               ),
-              // Area & Perimeter Chips
+              // Area Chip
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -121,11 +146,33 @@ class _ArchitectZonePropertiesCardState
                   style: TextStyle(
                     color: zone.color,
                     fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    fontSize: 12.5,
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
+              // Finishes & Properties Dialog Button
+              IconButton(
+                icon: const Icon(
+                  Icons.tune_rounded,
+                  color: Color(0xFF38BDF8),
+                  size: 20,
+                ),
+                tooltip: l10n.architectZoneFinishes,
+                onPressed: () => _showEditZoneDetailsDialog(context),
+                visualDensity: VisualDensity.compact,
+              ),
+              if (widget.onOpenScheduleTable != null)
+                IconButton(
+                  icon: const Icon(
+                    Icons.table_chart_rounded,
+                    color: Color(0xFF00E676),
+                    size: 20,
+                  ),
+                  tooltip: l10n.architectZoneScheduleTitle,
+                  onPressed: widget.onOpenScheduleTable,
+                  visualDensity: VisualDensity.compact,
+                ),
               IconButton(
                 icon: const Icon(
                   Icons.delete_outline_rounded,
@@ -150,7 +197,118 @@ class _ArchitectZonePropertiesCardState
 
           const SizedBox(height: 6),
 
-          // 2. Category Quick Selector Chips
+          // 2. Boundary Mode: Dynamic Auto (default) vs Manual Correction
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: zone.isAutoBoundary
+                  ? const Color(0x1A00E5FF)
+                  : const Color(0x1AFFB74D),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: zone.isAutoBoundary
+                    ? const Color(0x4400E5FF)
+                    : const Color(0x44FFB74D),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  zone.isAutoBoundary
+                      ? Icons.auto_awesome_rounded
+                      : Icons.edit_note_rounded,
+                  color: zone.isAutoBoundary
+                      ? const Color(0xFF00E5FF)
+                      : const Color(0xFFFFB74D),
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        zone.isAutoBoundary
+                            ? l10n.architectZoneBoundaryAuto
+                            : l10n.architectZoneBoundaryManual,
+                        style: TextStyle(
+                          color: zone.isAutoBoundary
+                              ? const Color(0xFF00E5FF)
+                              : const Color(0xFFFFB74D),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        zone.isAutoBoundary
+                            ? l10n.architectZoneBoundaryAutoDesc
+                            : l10n.architectZoneBoundaryManualDesc,
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 10,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Transform.scale(
+                  scale: 0.8,
+                  child: Switch(
+                    value: zone.isAutoBoundary,
+                    activeThumbColor: const Color(0xFF00E5FF),
+                    onChanged: (val) {
+                      widget.onZoneUpdated(zone.copyWith(isAutoBoundary: val));
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          // 3. Finishes Summary Row (Floor, Walls, Ceiling)
+          InkWell(
+            onTap: () => _showEditZoneDetailsDialog(context),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0x1AFFFFFF),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${l10n.architectZoneFloorFinish}: ${zone.resolvedFloorFinish(l10n)}',
+                      style: const TextStyle(color: Colors.white70, fontSize: 10.5),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '${l10n.architectZoneWallFinish}: ${zone.resolvedWallFinish(l10n)}',
+                      style: const TextStyle(color: Colors.white70, fontSize: 10.5),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: Colors.white38, size: 16),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          // 4. Category Quick Selector Chips
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -418,46 +576,276 @@ class _ArchitectZonePropertiesCardState
     );
   }
 
-  void _showEditNameDialog(BuildContext context) {
+  void _showEditZoneDetailsDialog(BuildContext context) {
     final l10n = context.l10n;
-    final controller = TextEditingController(text: widget.zone.name);
+    final zone = widget.zone;
+    final numberController = TextEditingController(text: zone.number);
+    final nameController = TextEditingController(text: zone.name);
+    final floorController = TextEditingController(
+      text: zone.floorFinish.isNotEmpty
+          ? zone.floorFinish
+          : zone.resolvedFloorFinish(l10n),
+    );
+    final wallController = TextEditingController(
+      text: zone.wallFinish.isNotEmpty
+          ? zone.wallFinish
+          : zone.resolvedWallFinish(l10n),
+    );
+    final ceilingController = TextEditingController(
+      text: zone.ceilingFinish.isNotEmpty
+          ? zone.ceilingFinish
+          : zone.resolvedCeilingFinish(l10n),
+    );
+    final heightController =
+        TextEditingController(text: zone.clearHeight.toStringAsFixed(2));
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF22242E),
-        title: Text(
-          l10n.architectZoneName,
-          style: const TextStyle(color: Colors.white, fontSize: 16),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1E2230),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(zone.category.icon, color: zone.color, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${zone.name} (${zone.area.toStringAsFixed(2)} m²)',
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 440,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Row 1: Number & Name
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        child: TextField(
+                          controller: numberController,
+                          style:
+                              const TextStyle(color: Colors.white, fontSize: 14),
+                          decoration: InputDecoration(
+                            labelText: l10n.architectZoneNumberPrompt,
+                            labelStyle: const TextStyle(color: Colors.white70),
+                            filled: true,
+                            fillColor: const Color(0x22FFFFFF),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: nameController,
+                          style:
+                              const TextStyle(color: Colors.white, fontSize: 14),
+                          decoration: InputDecoration(
+                            labelText: l10n.architectZoneName,
+                            labelStyle: const TextStyle(color: Colors.white70),
+                            filled: true,
+                            fillColor: const Color(0x22FFFFFF),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Floor Finish
+                  TextField(
+                    controller: floorController,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      labelText: l10n.architectZoneFloorFinish,
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: const Color(0x22FFFFFF),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final preset in ArchitectZone.standardFloorFinishes(l10n))
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: ActionChip(
+                              label: Text(preset, style: const TextStyle(fontSize: 10)),
+                              onPressed: () {
+                                setDialogState(() => floorController.text = preset);
+                              },
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Wall Finish
+                  TextField(
+                    controller: wallController,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      labelText: l10n.architectZoneWallFinish,
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: const Color(0x22FFFFFF),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final preset in ArchitectZone.standardWallFinishes(l10n))
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: ActionChip(
+                              label: Text(preset, style: const TextStyle(fontSize: 10)),
+                              onPressed: () {
+                                setDialogState(() => wallController.text = preset);
+                              },
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Ceiling Finish
+                  TextField(
+                    controller: ceilingController,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      labelText: l10n.architectZoneCeilingFinish,
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: const Color(0x22FFFFFF),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final preset in ArchitectZone.standardCeilingFinishes(l10n))
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: ActionChip(
+                              label: Text(preset, style: const TextStyle(fontSize: 10)),
+                              onPressed: () {
+                                setDialogState(() => ceilingController.text = preset);
+                              },
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Clear Height
+                  TextField(
+                    controller: heightController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      labelText: l10n.architectZoneClearHeight,
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: const Color(0x22FFFFFF),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.architectZoneCancel),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00E5FF),
+                foregroundColor: Colors.black,
+              ),
+              onPressed: () {
+                final newH = double.tryParse(heightController.text) ?? 2.60;
+                final updated = zone.copyWith(
+                  number: numberController.text.trim(),
+                  name: nameController.text.trim(),
+                  floorFinish: floorController.text.trim(),
+                  wallFinish: wallController.text.trim(),
+                  ceilingFinish: ceilingController.text.trim(),
+                  clearHeight: newH,
+                );
+                widget.onZoneUpdated(updated);
+                Navigator.pop(ctx);
+              },
+              child: Text(l10n.architectZoneSave),
+            ),
+          ],
         ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: widget.zone.category.localizedName(l10n),
-            hintStyle: const TextStyle(color: Colors.white38),
-            filled: true,
-            fillColor: const Color(0xFF161820),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final newName = controller.text.trim();
-              if (newName.isNotEmpty) {
-                widget.onZoneUpdated(widget.zone.copyWith(name: newName));
-              }
-              Navigator.pop(ctx);
-            },
-            child: Text(l10n.save),
-          ),
-        ],
       ),
     );
   }

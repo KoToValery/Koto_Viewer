@@ -96,20 +96,35 @@ enum ArchitectZoneCategory {
 
 
 /// A functional architectural zone (room / space / spatial partition)
-/// defined by a parametric 2D polygon with dynamic vertices and grips.
+/// defined by a parametric 2D polygon with dynamic vertices, grips,
+/// room finishes (floor, wall, ceiling), and automated schedule metadata.
 class ArchitectZone {
   final String id;
+  final String number; // Room number for schedules/drawings (e.g. "1", "01", "101")
   final String name;
   final ArchitectZoneCategory category;
   final List<Offset> polygon; // Coordinates in model meters
+  final String floorFinish; // Floor covering / настилка
+  final String wallFinish; // Wall finish / финиш стени
+  final String ceilingFinish; // Ceiling finish / финиш таван
+  final double clearHeight; // Clear room height in meters (default 2.60 m)
+  final bool isAutoBoundary; // Automatic dynamic room boundary vs manual fixed
+  final Offset? seedPoint; // Internal seed point for dynamic boundary detection & merge
   final double? targetArea; // Optional target program area in m²
   final int? customColorValue;
 
   const ArchitectZone({
     required this.id,
+    this.number = '1',
     required this.name,
     required this.category,
     required this.polygon,
+    this.floorFinish = '',
+    this.wallFinish = '',
+    this.ceilingFinish = '',
+    this.clearHeight = 2.60,
+    this.isAutoBoundary = true,
+    this.seedPoint,
     this.targetArea,
     this.customColorValue,
   });
@@ -117,6 +132,83 @@ class ArchitectZone {
   Color get color => customColorValue != null
       ? Color(customColorValue!)
       : category.color;
+
+  /// Localized default or user-specified floor finish.
+  String resolvedFloorFinish(AppLocalizations l10n) {
+    if (floorFinish.trim().isNotEmpty) return floorFinish;
+    switch (category) {
+      case ArchitectZoneCategory.bathroom:
+        return l10n.architectZoneFloorTerracotta;
+      case ArchitectZoneCategory.kitchen:
+      case ArchitectZoneCategory.corridor:
+      case ArchitectZoneCategory.storage:
+        return l10n.architectZoneFloorGranite;
+      case ArchitectZoneCategory.terrace:
+        return l10n.architectZoneFloorGranite;
+      case ArchitectZoneCategory.living:
+      case ArchitectZoneCategory.bedroom:
+      case ArchitectZoneCategory.office:
+      case ArchitectZoneCategory.custom:
+        return l10n.architectZoneFloorLaminate;
+    }
+  }
+
+  /// Localized default or user-specified wall finish.
+  String resolvedWallFinish(AppLocalizations l10n) {
+    if (wallFinish.trim().isNotEmpty) return wallFinish;
+    switch (category) {
+      case ArchitectZoneCategory.bathroom:
+        return l10n.architectZoneWallFaience;
+      case ArchitectZoneCategory.kitchen:
+        return '${l10n.architectZoneWallLatex} / ${l10n.architectZoneWallFaience}';
+      case ArchitectZoneCategory.living:
+      case ArchitectZoneCategory.bedroom:
+      case ArchitectZoneCategory.corridor:
+      case ArchitectZoneCategory.office:
+      case ArchitectZoneCategory.storage:
+      case ArchitectZoneCategory.terrace:
+      case ArchitectZoneCategory.custom:
+        return l10n.architectZoneWallLatex;
+    }
+  }
+
+  /// Localized default or user-specified ceiling finish.
+  String resolvedCeilingFinish(AppLocalizations l10n) {
+    if (ceilingFinish.trim().isNotEmpty) return ceilingFinish;
+    switch (category) {
+      case ArchitectZoneCategory.bathroom:
+        return l10n.architectZoneCeilingGypsum;
+      default:
+        return l10n.architectZoneCeilingLatex;
+    }
+  }
+
+  /// Standard floor finish presets for architectural schedules.
+  static List<String> standardFloorFinishes(AppLocalizations l10n) => [
+    l10n.architectZoneFloorLaminate,
+    l10n.architectZoneFloorGranite,
+    l10n.architectZoneFloorTerracotta,
+    l10n.architectZoneFloorParquet,
+    l10n.architectZoneFloorCarpet,
+    l10n.architectZoneFloorConcrete,
+  ];
+
+  /// Standard wall finish presets for architectural schedules.
+  static List<String> standardWallFinishes(AppLocalizations l10n) => [
+    l10n.architectZoneWallLatex,
+    l10n.architectZoneWallFaience,
+    l10n.architectZoneWallPlaster,
+    l10n.architectZoneWallWallpaper,
+    l10n.architectZoneWallExposedBrick,
+  ];
+
+  /// Standard ceiling finish presets for architectural schedules.
+  static List<String> standardCeilingFinishes(AppLocalizations l10n) => [
+    l10n.architectZoneCeilingLatex,
+    l10n.architectZoneCeilingGypsum,
+    l10n.architectZoneCeilingSuspended,
+    l10n.architectZoneCeilingConcrete,
+  ];
 
   /// Calculates net polygon area in square meters using Shoelace formula.
   double get area {
@@ -281,17 +373,32 @@ class ArchitectZone {
 
   ArchitectZone copyWith({
     String? id,
+    String? number,
     String? name,
     ArchitectZoneCategory? category,
     List<Offset>? polygon,
+    String? floorFinish,
+    String? wallFinish,
+    String? ceilingFinish,
+    double? clearHeight,
+    bool? isAutoBoundary,
+    Offset? seedPoint,
+    bool clearSeedPoint = false,
     double? targetArea,
     int? customColorValue,
   }) {
     return ArchitectZone(
       id: id ?? this.id,
+      number: number ?? this.number,
       name: name ?? this.name,
       category: category ?? this.category,
       polygon: polygon ?? this.polygon,
+      floorFinish: floorFinish ?? this.floorFinish,
+      wallFinish: wallFinish ?? this.wallFinish,
+      ceilingFinish: ceilingFinish ?? this.ceilingFinish,
+      clearHeight: clearHeight ?? this.clearHeight,
+      isAutoBoundary: isAutoBoundary ?? this.isAutoBoundary,
+      seedPoint: clearSeedPoint ? null : (seedPoint ?? this.seedPoint),
       targetArea: targetArea ?? this.targetArea,
       customColorValue: customColorValue ?? this.customColorValue,
     );
@@ -299,9 +406,16 @@ class ArchitectZone {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'number': number,
         'name': name,
         'category': category.name,
         'polygon': polygon.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
+        'floorFinish': floorFinish,
+        'wallFinish': wallFinish,
+        'ceilingFinish': ceilingFinish,
+        'clearHeight': clearHeight,
+        'isAutoBoundary': isAutoBoundary,
+        if (seedPoint != null) 'seedPoint': {'x': seedPoint!.dx, 'y': seedPoint!.dy},
         'targetArea': targetArea,
         'customColorValue': customColorValue,
       };
@@ -321,11 +435,24 @@ class ArchitectZone {
             .toList() ??
         const [];
 
+    Offset? seed;
+    if (json['seedPoint'] != null) {
+      final sp = json['seedPoint'] as Map<String, dynamic>;
+      seed = Offset((sp['x'] as num).toDouble(), (sp['y'] as num).toDouble());
+    }
+
     return ArchitectZone(
       id: json['id'] as String,
+      number: json['number'] as String? ?? '1',
       name: json['name'] as String? ?? category.defaultBgName,
       category: category,
       polygon: polyList,
+      floorFinish: json['floorFinish'] as String? ?? '',
+      wallFinish: json['wallFinish'] as String? ?? '',
+      ceilingFinish: json['ceilingFinish'] as String? ?? '',
+      clearHeight: (json['clearHeight'] as num?)?.toDouble() ?? 2.60,
+      isAutoBoundary: json['isAutoBoundary'] as bool? ?? true,
+      seedPoint: seed,
       targetArea: (json['targetArea'] as num?)?.toDouble(),
       customColorValue: json['customColorValue'] as int?,
     );

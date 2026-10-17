@@ -6293,6 +6293,318 @@ abstract class AppLocalizations {
   /// **'Freeform'**
   String get architectZoneQuickPoly;
 
+  /// Room number label
+  ///
+  /// In en, this message translates to:
+  /// **'Room No.'**
+  String get architectZoneNumber;
+
+  /// Compact room number prefix
+  ///
+  /// In en, this message translates to:
+  /// **'No.'**
+  String get architectZoneNumberPrompt;
+
+  /// Room finishes section header
+  ///
+  /// In en, this message translates to:
+  /// **'Room Finishes'**
+  String get architectZoneFinishes;
+
+  /// Floor finish label
+  ///
+  /// In en, this message translates to:
+  /// **'Floor Finish'**
+  String get architectZoneFloorFinish;
+
+  /// Wall finish label
+  ///
+  /// In en, this message translates to:
+  /// **'Wall Finish'**
+  String get architectZoneWallFinish;
+
+  /// Ceiling finish label
+  ///
+  /// In en, this message translates to:
+  /// **'Ceiling Finish'**
+  String get architectZoneCeilingFinish;
+
+  /// Clear height label
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Height (m)'**
+  String get architectZoneClearHeight;
+
+  /// Automatic dynamic boundary mode label
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Boundaries'**
+  String get architectZoneBoundaryAuto;
+
+  /// Description of automatic dynamic boundary mode
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamically conforms when walls change'**
+  String get architectZoneBoundaryAutoDesc;
+
+  /// Manual boundary mode label
+  ///
+  /// In en, this message translates to:
+  /// **'Manual Correction'**
+  String get architectZoneBoundaryManual;
+
+  /// Description of manual boundary mode
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed boundaries without dynamic updates'**
+  String get architectZoneBoundaryManualDesc;
+
+  /// Auto 1-click zone placement mode
+  ///
+  /// In en, this message translates to:
+  /// **'Auto (1-Click)'**
+  String get architectZoneModeAuto;
+
+  /// Manual point-by-point zone placement mode
+  ///
+  /// In en, this message translates to:
+  /// **'Manual (Points)'**
+  String get architectZoneModeManual;
+
+  /// Prompt for auto-detecting room boundary
+  ///
+  /// In en, this message translates to:
+  /// **'Tap inside an enclosed room to auto-detect boundary'**
+  String get architectZoneAutoPrompt;
+
+  /// Error when room is not enclosed
+  ///
+  /// In en, this message translates to:
+  /// **'Room is not fully enclosed by walls'**
+  String get architectZoneAutoFailed;
+
+  /// Title of merge rooms confirmation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Merge Rooms'**
+  String get architectZoneMergeDialogTitle;
+
+  /// Confirmation message when a separating wall is removed
+  ///
+  /// In en, this message translates to:
+  /// **'The separating wall between \"{zoneA}\" and \"{zoneB}\" was removed. Would you like to merge them into a single room?'**
+  String architectZoneMergeDialogMessage(String zoneA, String zoneB);
+
+  /// Confirm button to merge rooms
+  ///
+  /// In en, this message translates to:
+  /// **'Merge Rooms'**
+  String get architectZoneMergeConfirm;
+
+  /// Button to keep rooms separate
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Separate'**
+  String get architectZoneMergeKeepSeparate;
+
+  /// Snackbar when rooms are merged
+  ///
+  /// In en, this message translates to:
+  /// **'Rooms merged into {name}'**
+  String architectZoneMergedSuccess(String name);
+
+  /// Room finish schedule title
+  ///
+  /// In en, this message translates to:
+  /// **'Room Schedule'**
+  String get architectZoneScheduleTitle;
+
+  /// Total area label in schedule
+  ///
+  /// In en, this message translates to:
+  /// **'Total Net Area'**
+  String get architectZoneScheduleTotalArea;
+
+  /// Room count in schedule
+  ///
+  /// In en, this message translates to:
+  /// **'Rooms Count'**
+  String get architectZoneScheduleRoomCount;
+
+  /// Button to place schedule table on drawing
+  ///
+  /// In en, this message translates to:
+  /// **'Place on Drawing'**
+  String get architectZoneSchedulePlaceOnDrawing;
+
+  /// Button to remove schedule table from drawing
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from Drawing'**
+  String get architectZoneScheduleRemoveFromDrawing;
+
+  /// Snackbar when table placed
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule table placed on drawing'**
+  String get architectZoneScheduleTablePlaced;
+
+  /// Copy schedule table button
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Schedule'**
+  String get architectZoneScheduleCopy;
+
+  /// Snackbar when schedule copied
+  ///
+  /// In en, this message translates to:
+  /// **'Room schedule copied to clipboard'**
+  String get architectZoneScheduleCopied;
+
+  /// Message when no zones exist
+  ///
+  /// In en, this message translates to:
+  /// **'No zones created in active storey'**
+  String get architectZoneScheduleNoRooms;
+
+  /// Schedule column number
+  ///
+  /// In en, this message translates to:
+  /// **'№'**
+  String get architectZoneScheduleColNo;
+
+  /// Schedule column name
+  ///
+  /// In en, this message translates to:
+  /// **'Room'**
+  String get architectZoneScheduleColName;
+
+  /// Schedule column area
+  ///
+  /// In en, this message translates to:
+  /// **'Area (m²)'**
+  String get architectZoneScheduleColArea;
+
+  /// Schedule column perimeter
+  ///
+  /// In en, this message translates to:
+  /// **'Perim. (m)'**
+  String get architectZoneScheduleColPerimeter;
+
+  /// Schedule column floor finish
+  ///
+  /// In en, this message translates to:
+  /// **'Floor'**
+  String get architectZoneScheduleColFloor;
+
+  /// Schedule column walls finish
+  ///
+  /// In en, this message translates to:
+  /// **'Walls'**
+  String get architectZoneScheduleColWalls;
+
+  /// Schedule column ceiling finish
+  ///
+  /// In en, this message translates to:
+  /// **'Ceiling'**
+  String get architectZoneScheduleColCeiling;
+
+  /// Schedule column clear height
+  ///
+  /// In en, this message translates to:
+  /// **'H (m)'**
+  String get architectZoneScheduleColHeight;
+
+  /// Laminate floor finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Laminate Flooring'**
+  String get architectZoneFloorLaminate;
+
+  /// Granite tiles floor finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Granite Tiles'**
+  String get architectZoneFloorGranite;
+
+  /// Terracotta tiles floor finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Terracotta Tiles'**
+  String get architectZoneFloorTerracotta;
+
+  /// Parquet floor finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Natural Parquet'**
+  String get architectZoneFloorParquet;
+
+  /// Carpet floor finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Carpet'**
+  String get architectZoneFloorCarpet;
+
+  /// Polished concrete floor finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Polished Concrete'**
+  String get architectZoneFloorConcrete;
+
+  /// Latex wall finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Plaster & Latex'**
+  String get architectZoneWallLatex;
+
+  /// Faience wall finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Faience Tiles'**
+  String get architectZoneWallFaience;
+
+  /// Decorative plaster wall finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Decorative Plaster'**
+  String get architectZoneWallPlaster;
+
+  /// Wallpaper wall finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Wallpaper'**
+  String get architectZoneWallWallpaper;
+
+  /// Exposed brick wall finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Exposed Brick'**
+  String get architectZoneWallExposedBrick;
+
+  /// Latex ceiling finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Plaster & Latex'**
+  String get architectZoneCeilingLatex;
+
+  /// Gypsum board ceiling finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Gypsum Board'**
+  String get architectZoneCeilingGypsum;
+
+  /// Suspended ceiling finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Suspended Ceiling'**
+  String get architectZoneCeilingSuspended;
+
+  /// Exposed concrete ceiling finish preset
+  ///
+  /// In en, this message translates to:
+  /// **'Exposed Concrete'**
+  String get architectZoneCeilingConcrete;
+
   /// No description provided for @staircaseAutoGenerate.
   ///
   /// In en, this message translates to:

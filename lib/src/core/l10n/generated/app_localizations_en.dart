@@ -3643,6 +3643,171 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectZoneQuickPoly => 'Freeform';
 
   @override
+  String get architectZoneNumber => 'Room No.';
+
+  @override
+  String get architectZoneNumberPrompt => 'No.';
+
+  @override
+  String get architectZoneFinishes => 'Room Finishes';
+
+  @override
+  String get architectZoneFloorFinish => 'Floor Finish';
+
+  @override
+  String get architectZoneWallFinish => 'Wall Finish';
+
+  @override
+  String get architectZoneCeilingFinish => 'Ceiling Finish';
+
+  @override
+  String get architectZoneClearHeight => 'Clear Height (m)';
+
+  @override
+  String get architectZoneBoundaryAuto => 'Auto Boundaries';
+
+  @override
+  String get architectZoneBoundaryAutoDesc =>
+      'Dynamically conforms when walls change';
+
+  @override
+  String get architectZoneBoundaryManual => 'Manual Correction';
+
+  @override
+  String get architectZoneBoundaryManualDesc =>
+      'Fixed boundaries without dynamic updates';
+
+  @override
+  String get architectZoneModeAuto => 'Auto (1-Click)';
+
+  @override
+  String get architectZoneModeManual => 'Manual (Points)';
+
+  @override
+  String get architectZoneAutoPrompt =>
+      'Tap inside an enclosed room to auto-detect boundary';
+
+  @override
+  String get architectZoneAutoFailed => 'Room is not fully enclosed by walls';
+
+  @override
+  String get architectZoneMergeDialogTitle => 'Merge Rooms';
+
+  @override
+  String architectZoneMergeDialogMessage(String zoneA, String zoneB) {
+    return 'The separating wall between \"$zoneA\" and \"$zoneB\" was removed. Would you like to merge them into a single room?';
+  }
+
+  @override
+  String get architectZoneMergeConfirm => 'Merge Rooms';
+
+  @override
+  String get architectZoneMergeKeepSeparate => 'Keep Separate';
+
+  @override
+  String architectZoneMergedSuccess(String name) {
+    return 'Rooms merged into $name';
+  }
+
+  @override
+  String get architectZoneScheduleTitle => 'Room Schedule';
+
+  @override
+  String get architectZoneScheduleTotalArea => 'Total Net Area';
+
+  @override
+  String get architectZoneScheduleRoomCount => 'Rooms Count';
+
+  @override
+  String get architectZoneSchedulePlaceOnDrawing => 'Place on Drawing';
+
+  @override
+  String get architectZoneScheduleRemoveFromDrawing => 'Remove from Drawing';
+
+  @override
+  String get architectZoneScheduleTablePlaced =>
+      'Schedule table placed on drawing';
+
+  @override
+  String get architectZoneScheduleCopy => 'Copy Schedule';
+
+  @override
+  String get architectZoneScheduleCopied => 'Room schedule copied to clipboard';
+
+  @override
+  String get architectZoneScheduleNoRooms =>
+      'No zones created in active storey';
+
+  @override
+  String get architectZoneScheduleColNo => '№';
+
+  @override
+  String get architectZoneScheduleColName => 'Room';
+
+  @override
+  String get architectZoneScheduleColArea => 'Area (m²)';
+
+  @override
+  String get architectZoneScheduleColPerimeter => 'Perim. (m)';
+
+  @override
+  String get architectZoneScheduleColFloor => 'Floor';
+
+  @override
+  String get architectZoneScheduleColWalls => 'Walls';
+
+  @override
+  String get architectZoneScheduleColCeiling => 'Ceiling';
+
+  @override
+  String get architectZoneScheduleColHeight => 'H (m)';
+
+  @override
+  String get architectZoneFloorLaminate => 'Laminate Flooring';
+
+  @override
+  String get architectZoneFloorGranite => 'Granite Tiles';
+
+  @override
+  String get architectZoneFloorTerracotta => 'Terracotta Tiles';
+
+  @override
+  String get architectZoneFloorParquet => 'Natural Parquet';
+
+  @override
+  String get architectZoneFloorCarpet => 'Carpet';
+
+  @override
+  String get architectZoneFloorConcrete => 'Polished Concrete';
+
+  @override
+  String get architectZoneWallLatex => 'Plaster & Latex';
+
+  @override
+  String get architectZoneWallFaience => 'Faience Tiles';
+
+  @override
+  String get architectZoneWallPlaster => 'Decorative Plaster';
+
+  @override
+  String get architectZoneWallWallpaper => 'Wallpaper';
+
+  @override
+  String get architectZoneWallExposedBrick => 'Exposed Brick';
+
+  @override
+  String get architectZoneCeilingLatex => 'Plaster & Latex';
+
+  @override
+  String get architectZoneCeilingGypsum => 'Gypsum Board';
+
+  @override
+  String get architectZoneCeilingSuspended => 'Suspended Ceiling';
+
+  @override
+  String get architectZoneCeilingConcrete => 'Exposed Concrete';
+
+  @override
   String get staircaseAutoGenerate => 'Generate stair openings';
 
   @override

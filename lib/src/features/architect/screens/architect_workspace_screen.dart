@@ -82,6 +82,8 @@ import '../services/architect_building_section.dart';
 import '../widgets/architect_tool_palette.dart';
 import '../widgets/architect_zone_drafting_bar.dart';
 import '../widgets/architect_zone_properties_card.dart';
+import '../widgets/architect_zone_schedule_dialog.dart';
+import '../services/architect_room_detector.dart';
 import '../widgets/architect_viewport.dart';
 import '../widgets/architect_wall_drafting_panel.dart';
 import 'fenestration_editor_screen.dart';
@@ -1765,9 +1767,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _commitDraftedZone() {
     final l10n = context.l10n;
+    final nextNumber = (_project.activeStorey.zones.length + 1).toString();
     final newZone = _zoneTool.commitDrafting(
       category: _activeZoneCategory,
       defaultName: _activeZoneCategory.localizedName(l10n),
+      number: nextNumber,
     );
 
 
@@ -3349,6 +3353,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (preview != null) {
         _commands.commit(preview);
         _saveBiMProjectIfAttached();
+        _syncAutoZones(preview.activeStorey);
       }
       return;
     }
@@ -3962,7 +3967,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           visibility: _underlayLayerVisibility,
         );
 
-        if (_zoneTool.isClosingSnap) {
+        final distToStart = _zoneTool.draftPoints.isNotEmpty
+            ? (rawModel - _zoneTool.draftPoints.first).distance
+            : double.infinity;
+        final closeThreshold = math.min(16.0 / _currentScale, 0.25);
+
+        if (_zoneTool.isClosingSnap ||
+            _zoneTool.pointStatus == ZoneDraftingPointStatus.closeTarget ||
+            (_zoneTool.draftPoints.length >= 3 && distToStart <= closeThreshold)) {
           _commitDraftedZone();
           return;
         }
@@ -4009,28 +4021,80 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         return;
       }
 
-      // Tapping empty space starts point-by-point drafting!
-      final snap = ArchitectZoneSnap.snap(
-        magnetic: _magnetEnabled,
-        underlay: _currentUnderlayDoc,
-        frame: widget.underlayFrame,
-        visibility: _underlayLayerVisibility,
-        raw: rawModel,
-        project: _project,
-        tolerance: 16.0 / _currentScale,
-      );
-      final startPt = snap.isSnapped ? snap.point : rawModel;
-      _zoneTool.startDrafting(startPt);
-      setState(() {
-        _selectedZoneId = null;
-        _axisTool.deselect();
-      });
-      HapticFeedback.mediumImpact();
-      ArchitectLogger.log(
-        'DRAFT',
-        'Started zone drafting at point 1: $startPt',
-      );
-      return;
+      // Handle empty space tap based on placementMode:
+      if (_zoneTool.placementMode == ArchitectZonePlacementMode.autoClick) {
+        final roomPoly = ArchitectRoomDetector.detectRoomPolygon(
+          seedPoint: rawModel,
+          walls: _project.activeStorey.walls,
+        );
+        if (roomPoly != null && roomPoly.length >= 3) {
+          final nextNumber =
+              (_project.activeStorey.zones.length + 1).toString();
+          final newZone = _zoneTool.createAutoZone(
+            polygon: roomPoly,
+            seedPoint: rawModel,
+            category: _activeZoneCategory,
+            name: _activeZoneCategory.localizedName(context.l10n),
+            number: nextNumber,
+          );
+          setState(() {
+            _commands.execute(
+              CreateArchitectZone(
+                storeyId: _project.activeStorey.id,
+                zone: newZone,
+              ),
+            );
+            _selectedZoneId = newZone.id;
+            _activeMagneticGuides = [];
+            _activeSnapLabel = null;
+          });
+          _zoneTool.startEditingZone(newZone);
+          HapticFeedback.mediumImpact();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                context.l10n.architectZoneCreated(
+                  newZone.name,
+                  newZone.area.toStringAsFixed(1),
+                ),
+              ),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        } else {
+          HapticFeedback.heavyImpact();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.l10n.architectZoneAutoFailed),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      } else {
+        // Point-by-point manual drafting (like slab element)
+        final snap = ArchitectZoneSnap.snap(
+          magnetic: _magnetEnabled,
+          underlay: _currentUnderlayDoc,
+          frame: widget.underlayFrame,
+          visibility: _underlayLayerVisibility,
+          raw: rawModel,
+          project: _project,
+          tolerance: 16.0 / _currentScale,
+        );
+        final startPt = snap.isSnapped ? snap.point : rawModel;
+        _zoneTool.startDrafting(startPt);
+        setState(() {
+          _selectedZoneId = null;
+          _axisTool.deselect();
+        });
+        HapticFeedback.mediumImpact();
+        ArchitectLogger.log(
+          'DRAFT',
+          'Started zone drafting at point 1: $startPt',
+        );
+        return;
+      }
     }
 
     // Active selection tap handling: toggle in multi-select or select tool, replace in single-select, or cancel on empty space
@@ -4500,6 +4564,161 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
+  void _showRoomScheduleDialog() {
+    ArchitectZoneScheduleDialog.show(
+      context: context,
+      storey: _project.activeStorey,
+      onZoneUpdated: _updateZone,
+      onTableOriginChanged: (origin) {
+        setState(() {
+          _project = _project.updateActiveStorey(
+            _project.activeStorey.copyWith(
+              zoneScheduleOrigin: origin,
+              clearZoneScheduleOrigin: origin == null,
+            ),
+          );
+        });
+        _saveBiMProjectIfAttached();
+      },
+    );
+  }
+
+  Future<void> _checkZoneMergeAfterWallDelete(ArchitectStorey newStorey) async {
+    final candidate = ArchitectRoomDetector.detectMergedZones(
+      existingZones: newStorey.zones,
+      remainingWalls: newStorey.walls,
+    );
+    if (candidate == null || !mounted) return;
+
+    final l10n = context.l10n;
+    final shouldMerge = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2430),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: Color(0xFF38BDF8), width: 1.5),
+        ),
+        title: Row(
+          children: [
+            const Icon(
+              Icons.merge_type_rounded,
+              color: Color(0xFF38BDF8),
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                l10n.architectZoneMergeDialogTitle,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          l10n.architectZoneMergeDialogMessage(
+            candidate.zoneA.name,
+            candidate.zoneB.name,
+          ),
+          style: const TextStyle(color: Colors.white70, fontSize: 13.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              l10n.architectZoneMergeKeepSeparate,
+              style: const TextStyle(color: Colors.white60),
+            ),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00E5FF),
+              foregroundColor: Colors.black,
+            ),
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: Text(
+              l10n.architectZoneMergeConfirm,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldMerge == true && mounted) {
+      final updatedZones = newStorey.zones
+          .where((z) => z.id != candidate.zoneB.id)
+          .map((z) => z.id == candidate.zoneA.id
+              ? z.copyWith(polygon: candidate.mergedPolygon)
+              : z)
+          .toList();
+      setState(() {
+        _project = _project.updateActiveStorey(
+          newStorey.copyWith(zones: updatedZones),
+        );
+        _selectedZoneId = candidate.zoneA.id;
+      });
+      _saveBiMProjectIfAttached();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.architectZoneMergedSuccess(candidate.zoneA.name)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _syncAutoZones(ArchitectStorey storey) {
+    if (storey.zones.isEmpty || storey.walls.isEmpty) return;
+    final autoZones = storey.zones
+        .where((z) => z.isAutoBoundary && z.seedPoint != null)
+        .toList();
+    if (autoZones.isEmpty) return;
+
+    bool changed = false;
+    final updatedZones = List<ArchitectZone>.from(storey.zones);
+
+    for (int i = 0; i < updatedZones.length; i++) {
+      final zone = updatedZones[i];
+      if (!zone.isAutoBoundary || zone.seedPoint == null) continue;
+
+      final newPoly = ArchitectRoomDetector.detectRoomPolygon(
+        seedPoint: zone.seedPoint!,
+        walls: storey.walls,
+      );
+
+      if (newPoly != null && newPoly.length >= 3) {
+        if (_hasPolygonGeometryChanged(zone.polygon, newPoly)) {
+          updatedZones[i] = zone.copyWith(polygon: newPoly);
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      setState(() {
+        _project = _project.updateActiveStorey(
+          storey.copyWith(zones: updatedZones),
+        );
+      });
+      _saveBiMProjectIfAttached();
+    }
+  }
+
+  bool _hasPolygonGeometryChanged(List<Offset> a, List<Offset> b) {
+    if (a.length != b.length) return true;
+    for (int i = 0; i < a.length; i++) {
+      if ((a[i] - b[i]).distance > 0.01) return true;
+    }
+    return false;
+  }
+
   // === SECTION: WALL & DOOR CONCEPT DRAFTING ===
 
   void _commitCurrentWallSegment(Offset targetPoint, {bool? continueChain}) {
@@ -4529,6 +4748,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _commands.execute(
         CreateArchitectWall(storeyId: _project.activeStorey.id, wall: newWall),
       );
+      _syncAutoZones(_project.activeStorey);
       _wallDirectionLocked = false;
       if (continueChain == true) _wallMode = WallDraftingMode.chained;
       if (continueChain ?? (_wallMode == WallDraftingMode.chained)) {
@@ -5439,6 +5659,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _executeWallEdit(ArchitectModelCommand command) {
     try {
       _commands.execute(command);
+      _syncAutoZones(_project.activeStorey);
     } on ArgumentError {
       if (command is InsertArchitectElementPoint) {
         _operationError();
@@ -7042,20 +7263,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _deleteSelection() {
     final ids = _effectiveSelection;
     if (ids.isEmpty) return;
+    final hadWalls = _project.activeStorey.walls.any((w) => ids.contains(w.id));
     final storey = _elementTool.deleteElementsByIds(_project.activeStorey, ids);
-    _commands.commit(
-      _project
-          .updateActiveStorey(
-            storey.copyWith(
-              zones: storey.zones.where((z) => !ids.contains(z.id)).toList(),
-            ),
-          )
-          .copyWithGridAxes(
-            _project.gridAxes.where((a) => !ids.contains(a.id)).toList(),
-          ),
+    final nextStorey = storey.copyWith(
+      zones: storey.zones.where((z) => !ids.contains(z.id)).toList(),
     );
+    final nextProject = _project
+        .updateActiveStorey(nextStorey)
+        .copyWithGridAxes(
+          _project.gridAxes.where((a) => !ids.contains(a.id)).toList(),
+        );
+    _commands.commit(nextProject);
     _saveBiMProjectIfAttached();
     _clearSelection();
+
+    if (hadWalls) {
+      _checkZoneMergeAfterWallDelete(nextProject.activeStorey);
+    }
   }
 
   void _beginDuplicateSelection() {
@@ -8347,7 +8571,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         ? Center(child: Text(l10n.architectViewDrawingEmpty))
                         : _build2DCanvas(),
                     if (_activeTool == ArchitectTool.zone &&
-                        _zoneTool.isDrafting &&
                         !_is3DView)
                       Positioned(
                         top: 10,
@@ -8356,6 +8579,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         child: ArchitectZoneDraftingBar(
                           tool: _zoneTool,
                           category: _activeZoneCategory,
+                          onCategoryChanged: (cat) =>
+                              setState(() => _activeZoneCategory = cat),
                           onClose: _commitDraftedZone,
                           onUndo: () =>
                               setState(() => _zoneTool.undoDraftingPoint()),
@@ -8363,6 +8588,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             _zoneTool.cancelDrafting();
                             _selectedZoneId = null;
                           }),
+                          onOpenScheduleTable: _showRoomScheduleDialog,
                         ),
                       ),
                     if (_activeTool == ArchitectTool.axis && !_is3DView)
@@ -8603,6 +8829,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _zoneTool.cancelEditingZone();
                     setState(() => _selectedZoneId = null);
                   },
+                  onOpenScheduleTable: _showRoomScheduleDialog,
                 ),
 
               // Floating Axis Property Inspector Card if an axis is selected

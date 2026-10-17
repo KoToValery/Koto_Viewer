@@ -3,23 +3,40 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_zone.dart';
 import '../services/architect_zone_tool.dart';
 
-/// Floating architectural HUD bar displayed during active point-by-point zone drafting.
-/// Shows live vertex count, active segment length/angle, live area, self-intersection warnings,
-/// and quick actions to close, undo, or cancel drafting.
+// =============================================================================
+// FILE INDEX / TABLE OF CONTENTS (Grep markers: === SECTION: <NAME> ===)
+// =============================================================================
+// 1. === SECTION: ZONE_DRAFTING_BAR ===
+//    - ArchitectZoneDraftingBar (StatelessWidget)
+//      * Mode selector (Auto 1-click vs Manual point-by-point like slab)
+//      * Live metrics (points count, length, area)
+//      * Guidance prompt banner & self-intersection warning
+//      * Schedule table button & quick actions
+// =============================================================================
+
+// === SECTION: ZONE_DRAFTING_BAR ===
+
+/// Floating architectural HUD bar displayed when the Zone tool is active.
+/// Supports 1-click auto-detection (default) and point-by-point slab-style drafting,
+/// real-time metrics, room schedule access, and drafting actions.
 class ArchitectZoneDraftingBar extends StatelessWidget {
   final ArchitectZoneTool tool;
   final ArchitectZoneCategory category;
+  final ValueChanged<ArchitectZoneCategory>? onCategoryChanged;
   final VoidCallback onClose;
   final VoidCallback onUndo;
   final VoidCallback onCancel;
+  final VoidCallback? onOpenScheduleTable;
 
   const ArchitectZoneDraftingBar({
     super.key,
     required this.tool,
     required this.category,
+    this.onCategoryChanged,
     required this.onClose,
     required this.onUndo,
     required this.onCancel,
+    this.onOpenScheduleTable,
   });
 
   @override
@@ -32,12 +49,13 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
 
   Widget _buildContents(BuildContext context) {
     final l10n = context.l10n;
+    final isAuto = tool.placementMode == ArchitectZonePlacementMode.autoClick;
     final isSelfIntersecting =
         tool.pointStatus == ZoneDraftingPointStatus.selfIntersects;
     final canClose = tool.canCloseDraft && !isSelfIntersecting;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xF21C1E28),
@@ -60,7 +78,79 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Warning banner if self-intersecting
+          // 1. Top Row: Mode Selection (Auto 1-Click vs Manual) & Schedule Button
+          Row(
+            children: [
+              // Auto vs Manual Mode Chips
+              ChoiceChip(
+                avatar: const Icon(Icons.auto_awesome_rounded, size: 14),
+                label: Text(
+                  l10n.architectZoneModeAuto,
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                ),
+                selected: isAuto,
+                selectedColor: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                onSelected: (sel) {
+                  if (sel) {
+                    tool.placementMode = ArchitectZonePlacementMode.autoClick;
+                  }
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+              const SizedBox(width: 6),
+              ChoiceChip(
+                avatar: const Icon(Icons.touch_app_outlined, size: 14),
+                label: Text(
+                  l10n.architectZoneModeManual,
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                ),
+                selected: !isAuto,
+                selectedColor: const Color(0xFFFFB74D).withValues(alpha: 0.25),
+                onSelected: (sel) {
+                  if (sel) {
+                    tool.placementMode = ArchitectZonePlacementMode.manualPoints;
+                  }
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+
+              const Spacer(),
+
+              // Schedule Table button
+              if (onOpenScheduleTable != null)
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF38BDF8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  icon: const Icon(Icons.table_chart_rounded, size: 16),
+                  label: Text(
+                    l10n.architectZoneScheduleTitle,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: onOpenScheduleTable,
+                ),
+
+              // Cancel button
+              IconButton(
+                tooltip: l10n.architectZoneCancelDraft,
+                onPressed: onCancel,
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white70,
+                  size: 18,
+                ),
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+
+          // 2. Guidance prompt banner
           if (isSelfIntersecting)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
@@ -95,7 +185,6 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
               ),
             )
           else
-            // Guidance prompt banner (GPS_Mapping style)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Container(
@@ -104,48 +193,60 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: tool.draftPointCount == 0
-                      ? category.color.withValues(alpha: 0.18)
-                      : const Color(0x3300E5FF),
+                  color: isAuto
+                      ? const Color(0x2600E5FF)
+                      : (tool.draftPointCount == 0
+                          ? category.color.withValues(alpha: 0.18)
+                          : const Color(0x3300E5FF)),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: tool.draftPointCount == 0
-                        ? category.color.withValues(alpha: 0.4)
-                        : const Color(0x5500E5FF),
+                    color: isAuto
+                        ? const Color(0x5500E5FF)
+                        : (tool.draftPointCount == 0
+                            ? category.color.withValues(alpha: 0.4)
+                            : const Color(0x5500E5FF)),
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      tool.draftPointCount == 0
-                          ? Icons.touch_app_rounded
-                          : (canClose
-                                ? Icons.check_circle_outline_rounded
-                                : Icons.edit_location_alt_rounded),
-                      color: tool.draftPointCount == 0
-                          ? category.color
-                          : (canClose
-                                ? const Color(0xFF00E676)
-                                : const Color(0xFF00E5FF)),
+                      isAuto
+                          ? Icons.ads_click_rounded
+                          : (tool.draftPointCount == 0
+                              ? Icons.touch_app_rounded
+                              : (canClose
+                                  ? Icons.check_circle_outline_rounded
+                                  : Icons.edit_location_alt_rounded)),
+                      color: isAuto
+                          ? const Color(0xFF00E5FF)
+                          : (tool.draftPointCount == 0
+                              ? category.color
+                              : (canClose
+                                  ? const Color(0xFF00E676)
+                                  : const Color(0xFF00E5FF))),
                       size: 16,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        tool.draftPointCount == 0
-                            ? l10n.architectZoneTapFirstPoint
-                            : (canClose
-                                  ? l10n.architectZonePointSnapStart
-                                  : l10n.architectZoneNextPointPrompt(
-                                      tool.draftPointCount + 1,
-                                    )),
+                        isAuto
+                            ? l10n.architectZoneAutoPrompt
+                            : (tool.draftPointCount == 0
+                                ? l10n.architectZoneTapFirstPoint
+                                : (canClose
+                                    ? l10n.architectZonePointSnapStart
+                                    : l10n.architectZoneNextPointPrompt(
+                                        tool.draftPointCount + 1,
+                                      ))),
                         style: TextStyle(
-                          color: tool.draftPointCount == 0
-                              ? Colors.white
-                              : (canClose
-                                    ? const Color(0xFF00E676)
-                                    : Colors.white),
-                          fontSize: 12,
+                          color: isAuto
+                              ? const Color(0xFF00E5FF)
+                              : (tool.draftPointCount == 0
+                                  ? Colors.white
+                                  : (canClose
+                                      ? const Color(0xFF00E676)
+                                      : Colors.white)),
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w600,
                         ),
                         maxLines: 1,
@@ -157,7 +258,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
               ),
             ),
 
-          // Main metrics and controls row
+          // 3. Category & Metrics & Actions Row
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -196,133 +297,93 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
 
-                // Drafting Mode (Freeform vs 2-click Rectangle)
-                ChoiceChip(
-                  avatar: const Icon(Icons.polyline_rounded, size: 13),
-                  label: Text(
-                    l10n.architectZoneQuickPoly,
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                  selected: tool.draftMode == ArchitectZoneDraftMode.polyline,
-                  onSelected: (sel) {
-                    if (sel) tool.draftMode = ArchitectZoneDraftMode.polyline;
-                  },
-                  visualDensity: VisualDensity.compact,
-                ),
-                const SizedBox(width: 4),
-                ChoiceChip(
-                  avatar: const Icon(Icons.crop_square_rounded, size: 13),
-                  label: Text(
-                    l10n.architectZoneQuickRect,
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                  selected: tool.draftMode == ArchitectZoneDraftMode.rectangle,
-                  onSelected: (sel) {
-                    if (sel) tool.draftMode = ArchitectZoneDraftMode.rectangle;
-                  },
-                  visualDensity: VisualDensity.compact,
-                ),
-                const SizedBox(width: 8),
-
-                // Points count badge
-                _buildMetricChip(
-                  icon: Icons.scatter_plot_rounded,
-                  label: l10n.architectZonePointsCount(tool.draftPointCount),
-                  color: const Color(0xFF00E5FF),
-                ),
-                const SizedBox(width: 6),
-
-                // Active Segment length badge
-                if (tool.activeSegmentLength != null) ...[
+                // Manual point-by-point metrics & controls (like Slab element)
+                if (!isAuto) ...[
+                  // Points count badge
                   _buildMetricChip(
-                    icon: Icons.straighten_rounded,
-                    label: '${tool.activeSegmentLength!.toStringAsFixed(2)} m',
-                    subLabel: tool.orthoLabel,
-                    color: const Color(0xFFFFD600),
+                    icon: Icons.scatter_plot_rounded,
+                    label: l10n.architectZonePointsCount(tool.draftPointCount),
+                    color: const Color(0xFF00E5FF),
                   ),
                   const SizedBox(width: 6),
+
+                  // Active Segment length badge
+                  if (tool.activeSegmentLength != null) ...[
+                    _buildMetricChip(
+                      icon: Icons.straighten_rounded,
+                      label: '${tool.activeSegmentLength!.toStringAsFixed(2)} m',
+                      subLabel: tool.orthoLabel,
+                      color: const Color(0xFFFFD600),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+
+                  // Live area badge (when >= 2 points)
+                  if (tool.draftPointCount >= 2) ...[
+                    _buildMetricChip(
+                      icon: Icons.crop_free_rounded,
+                      label: '${tool.liveArea.toStringAsFixed(1)} m²',
+                      color: const Color(0xFF69F0AE),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+
+                  // Action: Close Zone (Finish)
+                  ElevatedButton.icon(
+                    onPressed: canClose ? onClose : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00E676),
+                      foregroundColor: Colors.black,
+                      disabledBackgroundColor: Colors.white12,
+                      disabledForegroundColor: Colors.white30,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    icon: const Icon(Icons.check_circle_rounded, size: 16),
+                    label: Text(
+                      l10n.architectZoneClose,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+
+                  // Action: Undo last point
+                  OutlinedButton.icon(
+                    onPressed: tool.draftPointCount > 0 ? onUndo : null,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFFFB74D),
+                      side: BorderSide(
+                        color: tool.draftPointCount > 0
+                            ? const Color(0xFFFFB74D)
+                            : Colors.white12,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    icon: const Icon(Icons.undo_rounded, size: 15),
+                    label: Text(
+                      l10n.architectZoneUndoPoint,
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
                 ],
-
-                // Live area badge (when >= 2 points)
-                if (tool.draftPointCount >= 2) ...[
-                  _buildMetricChip(
-                    icon: Icons.crop_free_rounded,
-                    label: '${tool.liveArea.toStringAsFixed(1)} m²',
-                    color: const Color(0xFF69F0AE),
-                  ),
-                  const SizedBox(width: 10),
-                ],
-
-                // Action: Close Zone (Finish)
-                ElevatedButton.icon(
-                  onPressed: canClose ? onClose : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00E676),
-                    foregroundColor: Colors.black,
-                    disabledBackgroundColor: Colors.white12,
-                    disabledForegroundColor: Colors.white30,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  icon: const Icon(Icons.check_circle_rounded, size: 16),
-                  label: Text(
-                    l10n.architectZoneClose,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-
-                // Action: Undo last point
-                OutlinedButton.icon(
-                  onPressed: tool.draftPointCount > 0 ? onUndo : null,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFFB74D),
-                    side: BorderSide(
-                      color: tool.draftPointCount > 0
-                          ? const Color(0xFFFFB74D)
-                          : Colors.white12,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  icon: const Icon(Icons.undo_rounded, size: 15),
-                  label: Text(
-                    l10n.architectZoneUndoPoint,
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                ),
-                const SizedBox(width: 6),
-
-                // Action: Cancel
-                IconButton(
-                  tooltip: l10n.architectZoneCancelDraft,
-                  onPressed: onCancel,
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    color: Colors.white70,
-                    size: 18,
-                  ),
-                  padding: const EdgeInsets.all(6),
-                  constraints: const BoxConstraints(),
-                  visualDensity: VisualDensity.compact,
-                ),
               ],
             ),
           ),
@@ -352,26 +413,18 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
+              color: color,
               fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.bold,
             ),
           ),
           if (subLabel != null) ...[
-            const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                subLabel,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                ),
+            const SizedBox(width: 3),
+            Text(
+              subLabel,
+              style: TextStyle(
+                color: color.withValues(alpha: 0.7),
+                fontSize: 9.5,
               ),
             ),
           ],

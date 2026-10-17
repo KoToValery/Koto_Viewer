@@ -50,6 +50,11 @@ enum ZoneDraftingPointStatus { valid, closeTarget, selfIntersects, tooClose }
 /// Mode of zone creation: freeform point-by-point or 2-click rectangle.
 enum ArchitectZoneDraftMode { polyline, rectangle }
 
+/// High-level placement interaction mode:
+/// - autoClick: 1-click room boundary detection and auto-fit (default)
+/// - manualPoints: point-by-point manual contour placement like slab element
+enum ArchitectZonePlacementMode { autoClick, manualPoints }
+
 // === SECTION: GEOMETRY_AND_MATH_ENGINE ===
 
 /// Mathematical & geometric operations for architectural functional zones:
@@ -63,6 +68,20 @@ typedef ArchitectZoneGeometry = BimContourDraftingGeometry;
 /// Combines point-by-point polyline drafting, interactive edge midpoint extrusion,
 /// and geometric safety validations into a cohesive, single tool unit.
 class ArchitectZoneTool extends ChangeNotifier {
+  // ---------------------------------------------------------------------------
+  // Placement Mode (Auto 1-Click vs Manual Point-by-point)
+  // ---------------------------------------------------------------------------
+  ArchitectZonePlacementMode _placementMode =
+      ArchitectZonePlacementMode.autoClick;
+  ArchitectZonePlacementMode get placementMode => _placementMode;
+  set placementMode(ArchitectZonePlacementMode mode) {
+    if (_placementMode != mode) {
+      _placementMode = mode;
+      cancelDrafting();
+      notifyListeners();
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Drafting Mode & Fast Rectangle State
   // ---------------------------------------------------------------------------
@@ -479,6 +498,7 @@ class ArchitectZoneTool extends ChangeNotifier {
   ArchitectZone? commitDrafting({
     required ArchitectZoneCategory category,
     required String defaultName,
+    String? number,
   }) {
     if (_draftMode == ArchitectZoneDraftMode.rectangle &&
         _draftPoints.length == 1 &&
@@ -523,13 +543,44 @@ class ArchitectZoneTool extends ChangeNotifier {
     final now = ArchitectElementId.next('element');
     final newZone = ArchitectZone(
       id: 'zone_$now',
+      number: number ?? '1',
       name: defaultName,
       category: category,
       polygon: cleaned,
+      isAutoBoundary: _placementMode == ArchitectZonePlacementMode.autoClick,
+      seedPoint: cleaned.isNotEmpty ? cleaned.first : null,
     );
 
     cancelDrafting();
     return newZone;
+  }
+
+  /// Factory for 1-click auto-detected room zones.
+  ArchitectZone createAutoZone({
+    required List<Offset> polygon,
+    required Offset seedPoint,
+    required ArchitectZoneCategory category,
+    required String name,
+    required String number,
+    String floorFinish = '',
+    String wallFinish = '',
+    String ceilingFinish = '',
+    double clearHeight = 2.60,
+  }) {
+    final now = ArchitectElementId.next('element');
+    return ArchitectZone(
+      id: 'zone_$now',
+      number: number,
+      name: name,
+      category: category,
+      polygon: polygon,
+      floorFinish: floorFinish,
+      wallFinish: wallFinish,
+      ceilingFinish: ceilingFinish,
+      clearHeight: clearHeight,
+      isAutoBoundary: true,
+      seedPoint: seedPoint,
+    );
   }
 
   // ---------------------------------------------------------------------------
