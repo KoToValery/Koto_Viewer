@@ -3505,6 +3505,15 @@ class AppLocalizationsBg extends AppLocalizations {
       'Докоснете стена, за да поставите вратата';
 
   @override
+  String get architectDoorSpecId => 'Марка (ID)';
+
+  @override
+  String get architectDoorHingeSide => 'Панти';
+
+  @override
+  String get architectDoorSwingDirection => 'Отваряне';
+
+  @override
   String get architectWallDrawPrompt =>
       'Докоснете за начало, докоснете отново за край на стената';
 
@@ -4947,6 +4956,10 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectFenestrationPresetDoorEntranceCasing =>
       'Входна врата с обрамчване 100/210';
+
+  @override
+  String get architectFenestrationPresetDoorBalconyGlass =>
+      'Балконска остъклена врата 90/210';
 
   @override
   String architectWallParapetPipe(int thickness, String height) {

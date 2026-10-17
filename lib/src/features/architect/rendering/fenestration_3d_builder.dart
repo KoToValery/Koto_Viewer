@@ -3,10 +3,13 @@
 // 1. MAIN ENTRY POINT (build3D)
 // 2. 5-CHAMBER FRAME MESH GENERATOR
 // 3. SUBDIVISION, MULLION & TRANSOM EXTRUSION
-// 4. DOUBLE GLAZING UNIT EXTRUSION (24 mm)
+// 4. DOUBLE GLAZING UNIT EXTRUSION (24 mm) & EPDM GASKET
 // 5. EXTERIOR CASING / TRIM EXTRUSION (Sitting on wall & insulation)
-// 6. 3D PRISM HELPER
+// 6. EXTERIOR SILL PLATE
+// 7. 3D PRISM HELPERS
+// 8. INTERIOR HARDWARE & HINGES (Windows & Doors)
 
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_fenestration_style.dart';
@@ -20,6 +23,11 @@ class Fenestration3dBuilder {
   static const Color sashColor = Color(0xFF455A64);  // Inner moving sash frame
   static const Color glassColor = Color(0x994FC3F7); // Cyan double glazing unit
   static const Color sillColor = Color(0xFF90A4AE);  // Metal/stone exterior sill
+  static const Color gasketColor = Color(0xFF1B1B1B); // Black EPDM rubber glazing gasket
+  static const Color hingeColor = Color(0xFF263238); // Hardware hinge barrel
+  static const Color hingeCapColor = Color(0xFF2E3D44); // Hardware hinge cap & bracket
+  static const Color handleColor = Color(0xFFB0BEC5); // Hardware lever handle
+  static const Color handleRosetteColor = Color(0xFF546E7A); // Hardware handle rosette
 
   /// Generates the complete 3D mesh of the fenestration element hosted within a wall.
   static List<Triangle3D> buildOpening3D({
@@ -35,6 +43,7 @@ class Fenestration3dBuilder {
     required double height,
     required double sillHeight,
     required double storeyElevation,
+    bool isHingeLeft = true,
   }) {
     final List<Triangle3D> tris = [];
     final wallVec = wallEnd - wallStart;
@@ -87,6 +96,8 @@ class Fenestration3dBuilder {
       right: halfW - fFace,
       bottomZ: zBottom + (style.kind == FenestrationKind.window ? fFace : 0.0),
       topZ: zTop - fFace,
+      exteriorSign: exteriorSign,
+      kind: style.kind,
     );
 
     // 3. Exterior Casing / Trim (Обрамчване)
@@ -119,6 +130,23 @@ class Fenestration3dBuilder {
         exteriorSign: exteriorSign,
         halfW: halfW,
         zBottom: zBottom,
+      );
+    }
+
+    // 5. Interior-facing 3D Barrel Hinges for doors
+    if (style.kind == FenestrationKind.door) {
+      _buildDoorHinges3D(
+        tris: tris,
+        frameCenter: frameCenter,
+        u: u,
+        n: n,
+        halfW: halfW,
+        fFace: fFace,
+        wallThickness: wallThickness,
+        exteriorSign: exteriorSign,
+        zBottom: zBottom,
+        zTop: zTop,
+        isHingeLeft: isHingeLeft,
       );
     }
 
@@ -185,6 +213,8 @@ class Fenestration3dBuilder {
     required double right,
     required double bottomZ,
     required double topZ,
+    required double exteriorSign,
+    required FenestrationKind kind,
   }) {
     final curW = right - left;
     final curH = topZ - bottomZ;
@@ -221,6 +251,8 @@ class Fenestration3dBuilder {
             right: childRight,
             bottomZ: bottomZ,
             topZ: topZ,
+            exteriorSign: exteriorSign,
+            kind: kind,
           );
 
           currentX = childRight;
@@ -264,6 +296,8 @@ class Fenestration3dBuilder {
             right: right,
             bottomZ: currentZ,
             topZ: childTop,
+            exteriorSign: exteriorSign,
+            kind: kind,
           );
 
           currentZ = childTop;
@@ -342,6 +376,23 @@ class Fenestration3dBuilder {
           depth: halfFDepth * 0.8,
         );
       }
+
+      // Interior-facing window hinges for operable sashes
+      if (kind == FenestrationKind.window) {
+        _buildWindowSashHinges3D(
+          tris: tris,
+          frameCenter: frameCenter,
+          u: u,
+          n: n,
+          halfFDepth: halfFDepth,
+          exteriorSign: exteriorSign,
+          paneType: pane.paneType,
+          left: left,
+          right: right,
+          bottomZ: bottomZ,
+          topZ: topZ,
+        );
+      }
     } else {
       // Fixed Glazing unit directly inside frame
       if (pane.isGlazed) {
@@ -397,7 +448,32 @@ class Fenestration3dBuilder {
     final g3 = frameCenter + u * right + n * halfGlass;
     final g4 = frameCenter + u * left + n * halfGlass;
 
-    _addBox3D(tris, g1, g2, g3, g4, bottomZ + 0.01, topZ - 0.01, glassColor);
+    _addBox3D(tris, g1, g2, g3, g4, bottomZ + 0.005, topZ - 0.005, glassColor);
+
+    // Black Rubber Glazing Gasket (черно гумено уплътнение за стъклопакета)
+    // Outlines the perimeter of the double glazing unit on both exterior and interior faces.
+    const gasketW = 0.008; // 8 mm width of visible rubber seal
+    if (right - left > 2 * gasketW + 0.01 && topZ - bottomZ > 2 * gasketW + 0.01) {
+      final halfGasket = halfGlass + 0.002; // Protrudes 2mm proud of glass on both faces
+
+      void addGasketStrip(double x1, double x2, double z1, double z2) {
+        if (x2 <= x1 + 1e-4 || z2 <= z1 + 1e-4) return;
+        final gb1 = frameCenter + u * x1 - n * halfGasket;
+        final gb2 = frameCenter + u * x2 - n * halfGasket;
+        final gb3 = frameCenter + u * x2 + n * halfGasket;
+        final gb4 = frameCenter + u * x1 + n * halfGasket;
+        _addBox3D(tris, gb1, gb2, gb3, gb4, z1, z2, gasketColor);
+      }
+
+      // Left vertical gasket strip
+      addGasketStrip(left, left + gasketW, bottomZ, topZ);
+      // Right vertical gasket strip
+      addGasketStrip(right - gasketW, right, bottomZ, topZ);
+      // Bottom horizontal gasket strip
+      addGasketStrip(left + gasketW, right - gasketW, bottomZ, bottomZ + gasketW);
+      // Top horizontal gasket strip
+      addGasketStrip(left + gasketW, right - gasketW, topZ - gasketW, topZ);
+    }
 
     // Build 3D solid muntin bars (шпроси)
     if (pane.hasMuntins) {
@@ -628,5 +704,287 @@ class Fenestration3dBuilder {
     Color color,
   ) {
     _addBox3D(tris, b1, b2, b3, b4, zMin, zMax, color);
+  }
+
+  // ===========================================================================
+  // SECTION 8: INTERIOR HARDWARE & HINGES (Windows & Doors)
+  // ===========================================================================
+
+  static void _buildDoorHinges3D({
+    required List<Triangle3D> tris,
+    required Offset frameCenter,
+    required Offset u,
+    required Offset n,
+    required double halfW,
+    required double fFace,
+    required double wallThickness,
+    required double exteriorSign,
+    required double zBottom,
+    required double zTop,
+    bool isHingeLeft = true,
+  }) {
+    final halfThick = wallThickness / 2.0;
+    // Interior face is opposite to exteriorSign
+    final interiorDir = -exteriorSign;
+    final hingeX = isHingeLeft ? -(halfW - fFace) : (halfW - fFace);
+    final hingePos = (frameCenter + u * hingeX) +
+        n * (interiorDir * halfThick + interiorDir * 0.012);
+
+    final height = zTop - zBottom;
+    void addHingeBarrel(double zC) {
+      const hingeR = 0.013;
+      const halfH = 0.045;
+      final zHMin = zC - halfH;
+      final zHMax = zC + halfH;
+      const segs = 8;
+      final pts = List.generate(segs, (i) {
+        final a = i * 2 * math.pi / segs;
+        return hingePos + Offset(math.cos(a), math.sin(a)) * hingeR;
+      });
+
+      const barrelCol = hingeColor;
+      const capCol = hingeCapColor;
+
+      for (var i = 0; i < segs; i++) {
+        final pA = pts[i];
+        final pB = pts[(i + 1) % segs];
+        final vAB = Vector3(pA.dx, pA.dy, zHMin);
+        final vBB = Vector3(pB.dx, pB.dy, zHMin);
+        final vAT = Vector3(pA.dx, pA.dy, zHMax);
+        final vBT = Vector3(pB.dx, pB.dy, zHMax);
+
+        tris.add(Triangle3D(v0: vAB, v1: vBB, v2: vBT, color: barrelCol));
+        tris.add(Triangle3D(v0: vAB, v1: vBT, v2: vAT, color: barrelCol));
+      }
+
+      final cT = Vector3(hingePos.dx, hingePos.dy, zHMax);
+      final cB = Vector3(hingePos.dx, hingePos.dy, zHMin);
+      for (var i = 0; i < segs; i++) {
+        final pA = pts[i];
+        final pB = pts[(i + 1) % segs];
+        tris.add(Triangle3D(
+          v0: cT,
+          v1: Vector3(pA.dx, pA.dy, zHMax),
+          v2: Vector3(pB.dx, pB.dy, zHMax),
+          color: capCol,
+        ));
+        tris.add(Triangle3D(
+          v0: cB,
+          v1: Vector3(pB.dx, pB.dy, zHMin),
+          v2: Vector3(pA.dx, pA.dy, zHMin),
+          color: capCol,
+        ));
+      }
+    }
+
+    addHingeBarrel(zTop - 0.22);
+    addHingeBarrel(zBottom + height * 0.55);
+    addHingeBarrel(zBottom + 0.25);
+  }
+
+  static void _buildWindowSashHinges3D({
+    required List<Triangle3D> tris,
+    required Offset frameCenter,
+    required Offset u,
+    required Offset n,
+    required double halfFDepth,
+    required double exteriorSign,
+    required PaneType paneType,
+    required double left,
+    required double right,
+    required double bottomZ,
+    required double topZ,
+  }) {
+    final interiorDir = -exteriorSign;
+
+    if (paneType == PaneType.topHopper) {
+      _buildWindowHinge3D(
+        tris: tris,
+        frameCenter: frameCenter,
+        u: u,
+        n: n,
+        interiorDir: interiorDir,
+        halfFDepth: halfFDepth,
+        hingeX: left + 0.04,
+        zCenter: bottomZ + 0.025,
+        isHingeLeft: true,
+      );
+      _buildWindowHinge3D(
+        tris: tris,
+        frameCenter: frameCenter,
+        u: u,
+        n: n,
+        interiorDir: interiorDir,
+        halfFDepth: halfFDepth,
+        hingeX: right - 0.04,
+        zCenter: bottomZ + 0.025,
+        isHingeLeft: false,
+      );
+      return;
+    }
+
+    final bool isHingeLeft;
+    if (paneType == PaneType.casementLeft) {
+      isHingeLeft = true;
+    } else if (paneType == PaneType.casementRight) {
+      isHingeLeft = false;
+    } else if (paneType == PaneType.tiltAndTurn) {
+      isHingeLeft = !(right > 0.05 && left >= -0.05);
+    } else {
+      isHingeLeft = true;
+    }
+
+    final hingeX = isHingeLeft ? (left + 0.012) : (right - 0.012);
+    final topHingeZ = topZ - 0.06;
+    final bottomHingeZ = bottomZ + 0.06;
+
+    // Top hinge
+    _buildWindowHinge3D(
+      tris: tris,
+      frameCenter: frameCenter,
+      u: u,
+      n: n,
+      interiorDir: interiorDir,
+      halfFDepth: halfFDepth,
+      hingeX: hingeX,
+      zCenter: topHingeZ,
+      isHingeLeft: isHingeLeft,
+    );
+
+    // Bottom hinge
+    _buildWindowHinge3D(
+      tris: tris,
+      frameCenter: frameCenter,
+      u: u,
+      n: n,
+      interiorDir: interiorDir,
+      halfFDepth: halfFDepth,
+      hingeX: hingeX,
+      zCenter: bottomHingeZ,
+      isHingeLeft: isHingeLeft,
+    );
+
+    // Interior window handle on the opposite side of hinges
+    final handleX = isHingeLeft ? (right - 0.025) : (left + 0.025);
+    final handleZ = (bottomZ + topZ) / 2.0;
+    _buildWindowHandle3D(
+      tris: tris,
+      frameCenter: frameCenter,
+      u: u,
+      n: n,
+      interiorDir: interiorDir,
+      halfFDepth: halfFDepth,
+      handleX: handleX,
+      handleZ: handleZ,
+      pointingLeft: isHingeLeft,
+    );
+  }
+
+  static void _buildWindowHinge3D({
+    required List<Triangle3D> tris,
+    required Offset frameCenter,
+    required Offset u,
+    required Offset n,
+    required double interiorDir,
+    required double halfFDepth,
+    required double hingeX,
+    required double zCenter,
+    required bool isHingeLeft,
+  }) {
+    const hingeR = 0.009; // 9 mm radius (18 mm cylinder)
+    const halfH = 0.025;  // 50 mm total height
+    final zHMin = zCenter - halfH;
+    final zHMax = zCenter + halfH;
+
+    final interiorFacePos =
+        frameCenter + u * hingeX + n * (interiorDir * halfFDepth);
+    final hingePos =
+        interiorFacePos + n * (interiorDir * (hingeR * 0.9));
+
+    const segs = 8;
+    final pts = List.generate(segs, (i) {
+      final a = i * 2 * math.pi / segs;
+      return hingePos + Offset(math.cos(a), math.sin(a)) * hingeR;
+    });
+
+    const barrelCol = hingeColor;
+    const capCol = hingeCapColor;
+
+    for (var i = 0; i < segs; i++) {
+      final pA = pts[i];
+      final pB = pts[(i + 1) % segs];
+      final vAB = Vector3(pA.dx, pA.dy, zHMin);
+      final vBB = Vector3(pB.dx, pB.dy, zHMin);
+      final vAT = Vector3(pA.dx, pA.dy, zHMax);
+      final vBT = Vector3(pB.dx, pB.dy, zHMax);
+
+      tris.add(Triangle3D(v0: vAB, v1: vBB, v2: vBT, color: barrelCol));
+      tris.add(Triangle3D(v0: vAB, v1: vBT, v2: vAT, color: barrelCol));
+    }
+
+    final cT = Vector3(hingePos.dx, hingePos.dy, zHMax);
+    final cB = Vector3(hingePos.dx, hingePos.dy, zHMin);
+    for (var i = 0; i < segs; i++) {
+      final pA = pts[i];
+      final pB = pts[(i + 1) % segs];
+      tris.add(Triangle3D(
+        v0: cT,
+        v1: Vector3(pA.dx, pA.dy, zHMax),
+        v2: Vector3(pB.dx, pB.dy, zHMax),
+        color: capCol,
+      ));
+      tris.add(Triangle3D(
+        v0: cB,
+        v1: Vector3(pB.dx, pB.dy, zHMin),
+        v2: Vector3(pA.dx, pA.dy, zHMin),
+        color: capCol,
+      ));
+    }
+
+    // Mounting bracket connecting barrel to sash stile
+    final bracketSide = isHingeLeft ? -1.0 : 1.0;
+    final bP1 = interiorFacePos - u * (bracketSide * 0.012) - n * (interiorDir * 0.004);
+    final bP2 = interiorFacePos + u * (bracketSide * 0.012) - n * (interiorDir * 0.004);
+    final bP3 = interiorFacePos + u * (bracketSide * 0.012) + n * (interiorDir * (hingeR * 0.9));
+    final bP4 = interiorFacePos - u * (bracketSide * 0.012) + n * (interiorDir * (hingeR * 0.9));
+
+    _addBox3D(tris, bP1, bP2, bP3, bP4, zCenter - 0.015, zCenter + 0.015, capCol);
+  }
+
+  static void _buildWindowHandle3D({
+    required List<Triangle3D> tris,
+    required Offset frameCenter,
+    required Offset u,
+    required Offset n,
+    required double interiorDir,
+    required double halfFDepth,
+    required double handleX,
+    required double handleZ,
+    required bool pointingLeft,
+  }) {
+    final facePos = frameCenter + u * handleX + n * (interiorDir * halfFDepth);
+
+    // 1. Base rosette
+    final r1 = facePos - u * 0.012;
+    final r2 = facePos + u * 0.012;
+    final r3 = facePos + u * 0.012 + n * (interiorDir * 0.008);
+    final r4 = facePos - u * 0.012 + n * (interiorDir * 0.008);
+    _addBox3D(tris, r1, r2, r3, r4, handleZ - 0.028, handleZ + 0.028, handleRosetteColor);
+
+    // 2. Neck
+    final neckBase = facePos + n * (interiorDir * 0.008);
+    final neckOut = facePos + n * (interiorDir * 0.038);
+    final nk1 = neckBase - u * 0.007;
+    final nk2 = neckBase + u * 0.007;
+    final nk3 = neckOut + u * 0.007;
+    final nk4 = neckOut - u * 0.007;
+    _addBox3D(tris, nk1, nk2, nk3, nk4, handleZ - 0.007, handleZ + 0.007, handleColor);
+
+    // 3. Ergonomic lever pointing down
+    final hLev1 = neckOut - u * 0.007;
+    final hLev2 = neckOut + u * 0.007;
+    final hLev3 = neckOut + u * 0.007 + n * (interiorDir * 0.012);
+    final hLev4 = neckOut - u * 0.007 + n * (interiorDir * 0.012);
+    _addBox3D(tris, hLev1, hLev2, hLev3, hLev4, handleZ - 0.10, handleZ + 0.007, handleColor);
   }
 }

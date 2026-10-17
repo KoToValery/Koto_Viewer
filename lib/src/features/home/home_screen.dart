@@ -22,6 +22,19 @@ import 'widgets/local_network_receive_dialog.dart';
 import '../bim_projects/bim_project_library_screen.dart';
 import '../architect/screens/architect_workspace_screen.dart';
 
+// ============================================================================
+// TABLE OF CONTENTS (grep: "=== SECTION:")
+// 1. === SECTION: FILE TYPE ICONS & BADGES ===
+// 2. === SECTION: HOME SCREEN WIDGET DECLARATION ===
+// 3. === SECTION: STATE & FILE SCANNING LOGIC ===
+// 4. === SECTION: FOLDER PICKING & DIRECTORY MANAGEMENT ===
+// 5. === SECTION: FILE ACTIONS & NAVIGATION ===
+// 6. === SECTION: DIALOGS (DONATION, ABOUT, SETTINGS) ===
+// 7. === SECTION: HEADER, CATEGORIES & SEARCH BAR ===
+// 8. === SECTION: MAIN BUILD & FILE LIST VIEW ===
+// ============================================================================
+
+// === SECTION: FILE TYPE ICONS & BADGES ===
 class FileTypeIcon extends StatelessWidget {
   final KotoFileType type;
   final double width;
@@ -1618,6 +1631,7 @@ class FileTypeIcon extends StatelessWidget {
   }
 }
 
+// === SECTION: HOME SCREEN WIDGET DECLARATION ===
 class HomeScreen extends StatefulWidget {
   final ValueChanged<bool> onToggleTheme;
   final bool isDarkMode;
@@ -1632,6 +1646,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+// === SECTION: STATE & FILE SCANNING LOGIC ===
 class _HomeScreenState extends State<HomeScreen> {
   List<PdfItem> _pdfFiles = [];
   List<PdfItem> _filteredFiles = [];
@@ -1729,6 +1744,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _resolveMissingFolderNames(customFolders);
   }
+
+  // === SECTION: FOLDER PICKING & DIRECTORY MANAGEMENT ===
 
   /// Asynchronously queries Android OS for display names of any folders that
   /// are not yet cached or currently have opaque/ugly internal IDs.
@@ -2018,6 +2035,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return false;
   }
 
+  // === SECTION: FILE ACTIONS & NAVIGATION ===
+
   Future<void> _pickAndOpenFile() async {
     try {
       final initialDir = await _getDownloadDirectoryPath();
@@ -2196,6 +2215,8 @@ class _HomeScreenState extends State<HomeScreen> {
       await _loadFiles();
     }
   }
+
+  // === SECTION: DIALOGS (DONATION, ABOUT, SETTINGS) ===
 
   void _showSupportDeveloperDialog() {
     int? selectedIndex = 0;
@@ -2536,6 +2557,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return Icons.videocam_rounded;
     }
   }
+
+  // === SECTION: HEADER, CATEGORIES & SEARCH BAR ===
 
   Widget _buildCategoryDropdown(ThemeData theme) {
     final isDark = theme.brightness == Brightness.dark;
@@ -3016,6 +3039,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  // === SECTION: MAIN BUILD & FILE LIST VIEW ===
 
   @override
   Widget build(BuildContext context) {

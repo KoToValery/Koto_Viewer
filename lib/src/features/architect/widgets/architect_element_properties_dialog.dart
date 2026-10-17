@@ -295,6 +295,113 @@ class _ArchitectElementPropertiesDialogState
                 ),
                 const SizedBox(height: 8),
               ],
+              if (isDoor) ...[
+                ListTile(
+                  key: const ValueKey('architect-property-specId'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l.architectDoorSpecId),
+                  trailing: Text(
+                    texts['specId'] ?? (records.first['specId'] as String? ?? '1'),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onTap: () async {
+                    final controller = TextEditingController(
+                      text: texts['specId'] ??
+                          (records.first['specId'] as String? ?? '1'),
+                    );
+                    final res = await showDialog<String>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: Text(l.architectDoorSpecId),
+                        content: TextField(
+                          controller: controller,
+                          autofocus: true,
+                          decoration: InputDecoration(
+                            labelText: l.architectDoorSpecId,
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: Text(l.cancel),
+                          ),
+                          ElevatedButton(
+                            onPressed: () =>
+                                Navigator.pop(ctx, controller.text.trim()),
+                            child: Text(l.save),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (res != null && res.isNotEmpty) {
+                      setState(() => texts['specId'] = res);
+                    }
+                  },
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(l.architectDoorHingeSide,
+                        style: Theme.of(context).textTheme.bodyMedium),
+                    SegmentedButton<bool>(
+                      segments: [
+                        ButtonSegment(
+                          value: true,
+                          label: Text(l.architectDoorHingeLeft),
+                        ),
+                        ButtonSegment(
+                          value: false,
+                          label: Text(l.architectDoorHingeRight),
+                        ),
+                      ],
+                      selected: {
+                        texts['isHingeLeft'] == 'false'
+                            ? false
+                            : (texts['isHingeLeft'] == 'true'
+                                ? true
+                                : (records.first['isHingeLeft'] as bool? ?? true)),
+                      },
+                      onSelectionChanged: (sel) {
+                        setState(() => texts['isHingeLeft'] = '${sel.first}');
+                      },
+                      showSelectedIcon: false,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(l.architectDoorSwingDirection,
+                        style: Theme.of(context).textTheme.bodyMedium),
+                    SegmentedButton<bool>(
+                      segments: [
+                        ButtonSegment(
+                          value: true,
+                          label: Text(l.architectDoorSwingIn),
+                        ),
+                        ButtonSegment(
+                          value: false,
+                          label: Text(l.architectDoorSwingOut),
+                        ),
+                      ],
+                      selected: {
+                        texts['openInward'] == 'false'
+                            ? false
+                            : (texts['openInward'] == 'true'
+                                ? true
+                                : (records.first['openInward'] as bool? ?? true)),
+                      },
+                      onSelectionChanged: (sel) {
+                        setState(() => texts['openInward'] = '${sel.first}');
+                      },
+                      showSelectedIcon: false,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
               if (records.every((e) =>
                   e.containsKey('referenceLine') ||
                   e.containsKey('shape') ||

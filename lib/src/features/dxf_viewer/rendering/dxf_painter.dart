@@ -9,6 +9,21 @@ import 'dxf_linetype_helper.dart';
 import 'dxf_math.dart';
 import 'dxf_snap_helper.dart';
 
+// ============================================================================
+// TABLE OF CONTENTS (grep: "=== SECTION:")
+// 1.  === SECTION: ENUMS & PAINT STATS MODELS ===
+// 2.  === SECTION: PAINTER DECLARATION & MAIN PAINT LOOP ===
+// 3.  === SECTION: CANVAS & STROKE DRAWING HELPERS ===
+// 4.  === SECTION: BASIC GEOMETRIC ENTITIES (LINES, ARCS, POLYLINES, SPLINES) ===
+// 5.  === SECTION: TEXT & MULTILINE TEXT RENDERING ===
+// 6.  === SECTION: SOLIDS, HATCHES & PATTERN FILLS ===
+// 7.  === SECTION: BLOCKS & INSERT ENTITIES ===
+// 8.  === SECTION: DIMENSIONS, LEADERS & ARROWHEADS ===
+// 9.  === SECTION: SNAPPING, HIGHLIGHTS & ANNOTATIONS ===
+// 10. === SECTION: MEASUREMENT TOOLS & BADGES ===
+// ============================================================================
+
+// === SECTION: ENUMS & PAINT STATS MODELS ===
 /// Theme presets for the CAD viewer background.
 enum DxfCanvasTheme {
   darkCad(
@@ -123,6 +138,7 @@ class DxfCachedTextLayout {
   });
 }
 
+// === SECTION: PAINTER DECLARATION & MAIN PAINT LOOP ===
 /// CustomPainter for rendering entire DXF drawing.
 class DxfPainter extends CustomPainter {
   static int _paintCallCount = 0;
@@ -730,6 +746,8 @@ class DxfPainter extends CustomPainter {
     return (2.0 * settings.lineThicknessScale) / scale;
   }
 
+  // === SECTION: CANVAS & STROKE DRAWING HELPERS ===
+
   void _drawGrid(Canvas canvas, Size size) {
     final scale = currentScale.clamp(0.001, 10000.0);
     final gridPaint = Paint()
@@ -853,6 +871,8 @@ class DxfPainter extends CustomPainter {
       canvas.drawPath(dashedPath, paint);
     }
   }
+
+  // === SECTION: BASIC GEOMETRIC ENTITIES (LINES, ARCS, POLYLINES, SPLINES) ===
 
   void _renderEntity({
     required Canvas canvas,
@@ -1450,6 +1470,8 @@ class DxfPainter extends CustomPainter {
     ];
   }
 
+  // === SECTION: TEXT & MULTILINE TEXT RENDERING ===
+
   void _renderText(
     Canvas canvas,
     DxfText entity,
@@ -1783,6 +1805,8 @@ class DxfPainter extends CustomPainter {
       canvas.restore();
     }
   }
+
+  // === SECTION: SOLIDS, HATCHES & PATTERN FILLS ===
 
   void _renderSolid(
     Canvas canvas,
@@ -2131,6 +2155,8 @@ class DxfPainter extends CustomPainter {
     }
   }
 
+  // === SECTION: BLOCKS & INSERT ENTITIES ===
+
   void _renderInsert({
     required Canvas canvas,
     required DxfInsert insert,
@@ -2313,6 +2339,8 @@ class DxfPainter extends CustomPainter {
       }
     }
   }
+
+  // === SECTION: DIMENSIONS, LEADERS & ARROWHEADS ===
 
   void _renderDimension(
     Canvas canvas,
@@ -2948,6 +2976,8 @@ class DxfPainter extends CustomPainter {
     }
   }
 
+  // === SECTION: SNAPPING, HIGHLIGHTS & ANNOTATIONS ===
+
   void _drawSnapMarker(
     Canvas canvas,
     DxfSnapResult snap,
@@ -3058,6 +3088,8 @@ class DxfPainter extends CustomPainter {
     canvas.drawRRect(rrect, glowPaint);
     canvas.drawRRect(rrect, borderPaint);
   }
+
+  // === SECTION: MEASUREMENT TOOLS & BADGES ===
 
   void _drawMeasurement(
     Canvas canvas,

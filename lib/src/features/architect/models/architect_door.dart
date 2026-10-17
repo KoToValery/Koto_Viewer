@@ -3,8 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import 'architect_fenestration_style.dart';
-import '../rendering/fenestration_3d_builder.dart';
 import '../services/fenestration_library_service.dart';
+import '../rendering/fenestration_3d_builder.dart';
 
 /// Represents a hosted architectural door element adhering to the DXF standard.
 class ArchitectDoor {
@@ -43,7 +43,7 @@ class ArchitectDoor {
     this.leafThickness = 0.04,
     this.isHingeLeft = true,
     this.openInward = true,
-    this.openAngleDeg = 45.0,
+    this.openAngleDeg = 90.0,
     this.specId = '1',
     required this.uuid,
     this.styleId,
@@ -117,7 +117,7 @@ class ArchitectDoor {
         leafThickness: (json['leafThickness'] as num?)?.toDouble() ?? 0.04,
         isHingeLeft: json['isHingeLeft'] as bool? ?? true,
         openInward: json['openInward'] as bool? ?? true,
-        openAngleDeg: (json['openAngleDeg'] as num?)?.toDouble() ?? 45.0,
+        openAngleDeg: (json['openAngleDeg'] as num?)?.toDouble() ?? 90.0,
         specId: json['specId'] as String? ?? '1',
         uuid: json['uuid'] as String? ?? json['id'] as String,
         styleId: json['styleId'] as String?,
@@ -128,11 +128,12 @@ class ArchitectDoor {
       );
 
   // ===========================================================================
-  // 2D ARCHITECTURAL CANVAS RENDERING (DIRECT FROM element_vrata.dxf STANDARD)
+  // 2D ARCHITECTURAL CANVAS RENDERING (DIRECT FROM door.dxf STANDARD)
   // ===========================================================================
 
-  /// Renders the 2D architectural door symbol with jamb frames, leaf, swing arc,
-  /// dimension label (W/H), sill height, and specification badge.
+  /// Renders the 2D architectural door symbol with jamb frames, 90° open leaf,
+  /// dashed swing arc, central fraction dimension line (W/H, sill), and specification
+  /// mark circle badge, matching door.dxf standard.
   void paint2D({
     required Canvas canvas,
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
@@ -145,33 +146,13 @@ class ArchitectDoor {
     double insulationThickness = 0.0,
     double exteriorSign = 1.0,
   }) {
-    final effectiveStyle = resolvedStyle;
-    if (effectiveStyle != null) {
-      effectiveStyle.paintPlan2D(
-        palette: palette,
-        canvas: canvas,
-        wallStart: wallStart,
-        wallEnd: wallEnd,
-        wallThickness: wallThickness,
-        coreThickness: coreThickness,
-        insulationThickness: insulationThickness,
-        exteriorSign: exteriorSign,
-        offsetRatio: offsetRatio,
-        elementWidth: width,
-        elementHeight: height,
-        elementSillHeight: sillHeight,
-        zoomScale: zoomScale,
-        isSelected: isSelected,
-      );
-      return;
-    }
-
     final wallVec = wallEnd - wallStart;
     final wallLen = wallVec.distance;
     if (wallLen < 1e-4) return;
 
-    final u = wallVec / wallLen; // Unit vector along wall baseline
-    final n = Offset(-u.dy, u.dx); // Unit normal vector across wall thickness
+    final u = wallVec / wallLen; // Vector along wall baseline
+    final n = Offset(-u.dy, u.dx); // Vector normal across wall thickness
+    final halfThick = wallThickness / 2.0;
 
     // Center of door opening on baseline
     final centerPos = wallStart + u * (offsetRatio * wallLen);
@@ -179,29 +160,58 @@ class ArchitectDoor {
     final pLeftBase = centerPos - u * halfW;
     final pRightBase = centerPos + u * halfW;
 
-    final halfThick = wallThickness / 2.0;
-
     // Paints
-    final framePaint = Paint()
-      ..color = palette.foreground(const Color(0xFF263238))
+    final cutMaskPaint = Paint()
+      ..color = palette.background
       ..style = PaintingStyle.fill;
 
-    final strokePaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black)
+    final frameFillPaint = Paint()
+      ..color = const Color(0xFFECEFF1)
+      ..style = PaintingStyle.fill;
+
+    final frameStrokePaint = Paint()
+      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF263238))
+      ..strokeWidth = (isSelected ? 2.2 : 1.3) / zoomScale
+      ..style = PaintingStyle.stroke;
+
+    final wallCutEdgePaint = Paint()
+      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black87)
       ..strokeWidth = (isSelected ? 2.0 : 1.2) / zoomScale
       ..style = PaintingStyle.stroke;
 
-    final leafPaint = Paint()
-      ..color = palette.foreground(const Color(0xFF8D6E63))
+    final leafFillPaint = Paint()
+      ..color = const Color(0xFFEFEBE9)
       ..style = PaintingStyle.fill;
 
+    final leafStrokePaint = Paint()
+      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF3E2723))
+      ..strokeWidth = (isSelected ? 2.0 : 1.2) / zoomScale
+      ..style = PaintingStyle.stroke;
+
     final swingArcPaint = Paint()
-      ..color = (isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black87))
-          .withValues(alpha: 0.6)
+      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black87)
+      ..strokeWidth = (isSelected ? 1.5 : 1.0) / zoomScale
+      ..style = PaintingStyle.stroke;
+
+    final dimLinePaint = Paint()
+      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black87)
       ..strokeWidth = 1.0 / zoomScale
       ..style = PaintingStyle.stroke;
 
-    // 1. Draw 2 Door Frame Jambs (Каси: 4 cm x wallThickness)
+    // 1. Cut rough wall opening through wall body (mask background)
+    final openingPath = Path()
+      ..moveTo(pLeftBase.dx - n.dx * (halfThick + 0.002), pLeftBase.dy - n.dy * (halfThick + 0.002))
+      ..lineTo(pRightBase.dx - n.dx * (halfThick + 0.002), pRightBase.dy - n.dy * (halfThick + 0.002))
+      ..lineTo(pRightBase.dx + n.dx * (halfThick + 0.002), pRightBase.dy + n.dy * (halfThick + 0.002))
+      ..lineTo(pLeftBase.dx + n.dx * (halfThick + 0.002), pLeftBase.dy + n.dy * (halfThick + 0.002))
+      ..close();
+    canvas.drawPath(openingPath, cutMaskPaint);
+
+    // 2. Wall jamb cut lines (Линии на зида при светлия отвор)
+    canvas.drawLine(pLeftBase - n * halfThick, pLeftBase + n * halfThick, wallCutEdgePaint);
+    canvas.drawLine(pRightBase - n * halfThick, pRightBase + n * halfThick, wallCutEdgePaint);
+
+    // 3. Draw 2 Door Frame Jambs (Каси: frameThickness x wallThickness, matching door.dxf New_ramka)
     void drawJamb(Offset baseCorner, bool isLeft) {
       final p1 = baseCorner - n * halfThick;
       final p2 = baseCorner + n * halfThick;
@@ -216,14 +226,14 @@ class ArchitectDoor {
         ..lineTo(p4.dx, p4.dy)
         ..close();
 
-      canvas.drawPath(path, framePaint);
-      canvas.drawPath(path, strokePaint);
+      canvas.drawPath(path, frameFillPaint);
+      canvas.drawPath(path, frameStrokePaint);
     }
 
     drawJamb(pLeftBase, true);
     drawJamb(pRightBase, false);
 
-    // 2. Clear Opening & Hinge Positioning
+    // 4. Clear Opening & Hinge Positioning
     final hingeJambBase = isHingeLeft
         ? pLeftBase + u * frameThickness
         : pRightBase - u * frameThickness;
@@ -232,15 +242,15 @@ class ArchitectDoor {
     final hingePos = hingeJambBase + n * (swingSign * halfThick);
     final leafLen = clearWidth;
 
-    // 3. Door Leaf (4 cm thickness, rotated by openAngleDeg)
+    // 5. Door Leaf (matching door.dxf ploskost_vrata)
     final angleRad = openAngleDeg * math.pi / 180.0;
     final swingDir = isHingeLeft ? 1.0 : -1.0;
 
-    // Compute rotated direction of the door leaf
-    // Baseline angle
     final baseAngle = math.atan2(u.dy, u.dx);
     final rotAngle = baseAngle +
-        (isHingeLeft ? (openInward ? angleRad : -angleRad) : (openInward ? math.pi - angleRad : math.pi + angleRad));
+        (isHingeLeft
+            ? (openInward ? angleRad : -angleRad)
+            : (openInward ? math.pi - angleRad : math.pi + angleRad));
 
     final leafU = Offset(math.cos(rotAngle), math.sin(rotAngle));
     final leafN = Offset(-leafU.dy, leafU.dx) * (swingSign * swingDir);
@@ -257,95 +267,135 @@ class ArchitectDoor {
       ..lineTo(leafP4.dx, leafP4.dy)
       ..close();
 
-    canvas.drawPath(leafPath, leafPaint);
-    canvas.drawPath(leafPath, strokePaint);
+    canvas.drawPath(leafPath, leafFillPaint);
+    canvas.drawPath(leafPath, leafStrokePaint);
 
-    // 4. Swing Arc (Дъга на отваряемост)
-    final arcRect = Rect.fromCircle(center: hingePos, radius: leafLen);
+    // 6. Dashed Swing Arc (matching door.dxf New_otvarqemost)
     final startAngle = isHingeLeft ? baseAngle : baseAngle + math.pi;
     final sweepAngle = (isHingeLeft ? 1.0 : -1.0) * (openInward ? angleRad : -angleRad);
+    final totalSweep = sweepAngle.abs();
+    if (totalSweep > 1e-4) {
+      const stepAngle = 0.08; // ~4.5 degrees
+      const dashRatio = 0.65; // 65% dash, 35% gap
+      var curA = 0.0;
+      final sign = sweepAngle.sign;
+      while (curA < totalSweep) {
+        final curSweep = math.min(stepAngle * dashRatio, totalSweep - curA);
+        canvas.drawArc(
+          Rect.fromCircle(center: hingePos, radius: leafLen),
+          startAngle + sign * curA,
+          sign * curSweep,
+          false,
+          swingArcPaint,
+        );
+        curA += stepAngle;
+      }
+    }
 
-    canvas.drawArc(arcRect, startAngle, sweepAngle, false, swingArcPaint);
+    // 7. Dimension Line & Text Tag (matching door.dxf New_razmer)
+    // Transverse dimension line passing perpendicularly through center of opening
+    const badgeR = 0.15; // 15 cm radius circle matching door.dxf
+    final dimStart = centerPos - n * (halfThick + 0.12);
+    final dimEnd = centerPos + n * (halfThick + 0.28);
+    canvas.drawLine(dimStart, dimEnd, dimLinePaint);
 
-    // 5. Central Dimension Line & Text Tag (90/200, h=15)
-    final lineStart = centerPos - n * halfThick;
-    final lineEnd = centerPos + n * halfThick;
-    final centerLinePaint = Paint()
-      ..color = Colors.black54
-      ..strokeWidth = 1.0 / zoomScale
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(lineStart, lineEnd, centerLinePaint);
-
-    // Dimension string in cm (e.g. "90 / 200")
     final wCm = (width * 100).round();
     final hCm = (height * 100).round();
     final sillCm = (sillHeight * 100).round();
 
-    final label = sillCm > 0 ? '$wCm / $hCm\nh=$sillCm' : '$wCm / $hCm';
-
+    // Paint dimension numbers on both sides of the transverse line
     canvas.save();
     canvas.translate(centerPos.dx, centerPos.dy);
-    canvas.rotate(baseAngle);
+    double dimAngle = baseAngle;
+    if (dimAngle > math.pi / 2 || dimAngle < -math.pi / 2) {
+      dimAngle += math.pi;
+    }
+    canvas.rotate(dimAngle);
     canvas.scale(1.0 / zoomScale);
 
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: TextStyle(
-          color: palette.foreground(Colors.black87),
-          fontSize: 9.0,
-          fontWeight: FontWeight.bold,
-          height: 1.1,
-        ),
-      ),
-      textAlign: TextAlign.center,
+    // Text: Width (e.g. 90) on one side, Height (e.g. 200) on the other
+    final textStyle = TextStyle(
+      color: isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black),
+      fontSize: 10.0,
+      fontWeight: FontWeight.bold,
+      fontFamily: 'Arial',
+      height: 1.0,
+    );
+
+    final tpWidth = TextPainter(
+      text: TextSpan(text: '$wCm', style: textStyle),
       textDirection: TextDirection.ltr,
     )..layout();
 
-    final textOffset = Offset(-textPainter.width / 2.0, -textPainter.height / 2.0);
-    // Draw clean background pill
-    final bgRect = Rect.fromLTWH(
-      textOffset.dx - 3,
-      textOffset.dy - 2,
-      textPainter.width + 6,
-      textPainter.height + 4,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)),
-      Paint()..color = Colors.white.withValues(alpha: 0.85),
-    );
-    textPainter.paint(canvas, textOffset);
+    final tpHeight = TextPainter(
+      text: TextSpan(text: '$hCm', style: textStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
 
-    // 6. Specification Badge (Кръгче/бадж с ID "1")
-    const badgeR = 8.0;
-    final badgeCenter = Offset(0.0, halfThick * zoomScale + 14.0);
-    canvas.drawCircle(badgeCenter, badgeR, Paint()..color = const Color(0xFFE0F7FA));
+    // Position above and below the dimension line
+    tpWidth.paint(canvas, Offset(-tpWidth.width / 2.0, -tpWidth.height - 2.0));
+    tpHeight.paint(canvas, Offset(-tpHeight.width / 2.0, 3.0));
+
+    // Sill height text if > 0 (e.g. h=15)
+    if (sillCm > 0) {
+      final tpSill = TextPainter(
+        text: TextSpan(
+          text: 'h=$sillCm',
+          style: TextStyle(
+            color: palette.foreground(const Color(0xFF00838F)),
+            fontSize: 9.0,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Arial',
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tpSill.paint(canvas, Offset(math.max(tpWidth.width, tpHeight.width) / 2.0 + 4.0, -tpSill.height / 2.0));
+    }
+    canvas.restore();
+
+    // 8. Door ID Circle Badge (matching door.dxf New_ID)
+    // Positioned at the end of the extended dimension line
+    final badgeCenter = centerPos + n * (halfThick + 0.28 + badgeR);
+    final badgeRadiusScreen = math.max(badgeR, 12.0 / zoomScale);
+
+    // Circle background pill
     canvas.drawCircle(
       badgeCenter,
-      badgeR,
+      badgeRadiusScreen,
+      Paint()..color = palette.background,
+    );
+    // Circle border
+    canvas.drawCircle(
+      badgeCenter,
+      badgeRadiusScreen,
       Paint()
-        ..color = const Color(0xFF00838F)
+        ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF263238))
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2,
+        ..strokeWidth = (isSelected ? 1.8 : 1.2) / zoomScale,
     );
 
+    // Text ID inside circle
     final idPainter = TextPainter(
       text: TextSpan(
         text: specId,
-        style: const TextStyle(
-          color: Color(0xFF006064),
-          fontSize: 8.5,
+        style: TextStyle(
+          color: isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black),
+          fontSize: math.max(10.0, 10.0),
           fontWeight: FontWeight.bold,
+          fontFamily: 'Arial',
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
 
+    canvas.save();
+    canvas.translate(badgeCenter.dx, badgeCenter.dy);
+    canvas.scale(1.0 / zoomScale);
     idPainter.paint(
       canvas,
-      badgeCenter - Offset(idPainter.width / 2.0, idPainter.height / 2.0),
+      Offset(-idPainter.width / 2.0, -idPainter.height / 2.0),
     );
-
     canvas.restore();
   }
 
@@ -353,7 +403,8 @@ class ArchitectDoor {
   // 3D SOLID MESH GENERATION (TRIANGLES)
   // ===========================================================================
 
-  /// Generates 3D mesh triangles for jamb frames, lintel, and door leaf.
+  /// Generates 3D mesh triangles for jamb frames, lintel, 3D door leaf,
+  /// 3D door handle, and interior-facing visible 3D barrel hinges.
   List<Triangle3D> build3D({
     required Offset wallStart,
     required Offset wallEnd,
@@ -378,6 +429,7 @@ class ArchitectDoor {
         height: height,
         sillHeight: sillHeight,
         storeyElevation: storeyElevation,
+        isHingeLeft: isHingeLeft,
       );
     }
 
@@ -398,7 +450,7 @@ class ArchitectDoor {
     final zBottom = storeyElevation + sillHeight;
     final zTop = zBottom + height;
 
-    const frameColor = Color(0xFF4E342E);
+    const frameColor = Color(0xFF37474F);
     const leafColor = Color(0xFF8D6E63);
 
     // Helper to extrude 2D box into 3D prism
@@ -434,7 +486,6 @@ class ArchitectDoor {
       // Caps
       tris.add(Triangle3D(v0: v1T, v1: v2T, v2: v3T, color: col));
       tris.add(Triangle3D(v0: v1T, v1: v3T, v2: v4T, color: col));
-
     }
 
     // 1. Left Frame Jamb (Колона 4cm)
@@ -447,7 +498,7 @@ class ArchitectDoor {
     addPrism(pLeft + u * frameThickness, pRight - u * frameThickness,
         zTop - frameThickness, zTop, frameColor);
 
-    // 4. 3D Door Leaf (4cm thick, half-open)
+    // 4. 3D Door Leaf (4cm thick, swung open)
     final swingSign = openInward ? 1.0 : -1.0;
     final hingePos = (isHingeLeft
             ? pLeft + u * frameThickness
@@ -460,12 +511,128 @@ class ArchitectDoor {
         (isHingeLeft ? (openInward ? angleRad : -angleRad) : (openInward ? math.pi - angleRad : math.pi + angleRad));
 
     final leafU = Offset(math.cos(rotAngle), math.sin(rotAngle));
+    final swingDir = isHingeLeft ? 1.0 : -1.0;
+    final leafN = Offset(-leafU.dy, leafU.dx) * (swingSign * swingDir);
+
     final leafStart = hingePos;
     final leafEnd = hingePos + leafU * clearWidth;
 
-    addPrism(leafStart, leafEnd, zBottom + 0.01, zTop - frameThickness - 0.01, leafColor);
+    // Extrude door leaf prism
+    final lp1 = leafStart;
+    final lp2 = leafEnd;
+    final lp3 = leafEnd + leafN * leafThickness;
+    final lp4 = leafStart + leafN * leafThickness;
 
-    // 5. Sill Block (if sill > 0)
+    final lzMin = zBottom + 0.01;
+    final lzMax = zTop - frameThickness - 0.01;
+
+    final lv1B = Vector3(lp1.dx, lp1.dy, lzMin);
+    final lv2B = Vector3(lp2.dx, lp2.dy, lzMin);
+    final lv3B = Vector3(lp3.dx, lp3.dy, lzMin);
+    final lv4B = Vector3(lp4.dx, lp4.dy, lzMin);
+
+    final lv1T = Vector3(lp1.dx, lp1.dy, lzMax);
+    final lv2T = Vector3(lp2.dx, lp2.dy, lzMax);
+    final lv3T = Vector3(lp3.dx, lp3.dy, lzMax);
+    final lv4T = Vector3(lp4.dx, lp4.dy, lzMax);
+
+    tris.add(Triangle3D(v0: lv1B, v1: lv2B, v2: lv2T, color: leafColor));
+    tris.add(Triangle3D(v0: lv1B, v1: lv2T, v2: lv1T, color: leafColor));
+    tris.add(Triangle3D(v0: lv2B, v1: lv3B, v2: lv3T, color: leafColor));
+    tris.add(Triangle3D(v0: lv2B, v1: lv3T, v2: lv2T, color: leafColor));
+    tris.add(Triangle3D(v0: lv3B, v1: lv4B, v2: lv4T, color: leafColor));
+    tris.add(Triangle3D(v0: lv3B, v1: lv4T, v2: lv3T, color: leafColor));
+    tris.add(Triangle3D(v0: lv4B, v1: lv1B, v2: lv1T, color: leafColor));
+    tris.add(Triangle3D(v0: lv4B, v1: lv1T, v2: lv4T, color: leafColor));
+    tris.add(Triangle3D(v0: lv1T, v1: lv2T, v2: lv3T, color: leafColor));
+    tris.add(Triangle3D(v0: lv1T, v1: lv3T, v2: lv4T, color: leafColor));
+
+    // 5. 3D Lever Handle on Door Leaf
+    final handleStation = leafStart + leafU * (clearWidth - 0.08);
+    final handleRoot = handleStation + leafN * leafThickness;
+    final zHandle = zBottom + math.min(1.00, height - 0.20);
+    final hp1 = handleRoot + leafN * (swingSign * 0.06);
+    final hp2 = hp1 - leafU * 0.10;
+    const handleColor = Color(0xFFCFD8DC);
+
+    final hv1 = Vector3(handleRoot.dx, handleRoot.dy, zHandle - 0.012);
+    final hv2 = Vector3(hp1.dx, hp1.dy, zHandle - 0.012);
+    final hv3 = Vector3(hp1.dx, hp1.dy, zHandle + 0.012);
+    final hv4 = Vector3(handleRoot.dx, handleRoot.dy, zHandle + 0.012);
+    tris.add(Triangle3D(v0: hv1, v1: hv2, v2: hv3, color: handleColor, isDoubleSided: true));
+    tris.add(Triangle3D(v0: hv1, v1: hv3, v2: hv4, color: handleColor, isDoubleSided: true));
+
+    final hlv1 = Vector3(hp1.dx, hp1.dy, zHandle - 0.012);
+    final hlv2 = Vector3(hp2.dx, hp2.dy, zHandle - 0.012);
+    final hlv3 = Vector3(hp2.dx, hp2.dy, zHandle + 0.012);
+    final hlv4 = Vector3(hp1.dx, hp1.dy, zHandle + 0.012);
+    tris.add(Triangle3D(v0: hlv1, v1: hlv2, v2: hlv3, color: handleColor, isDoubleSided: true));
+    tris.add(Triangle3D(v0: hlv1, v1: hlv3, v2: hlv4, color: handleColor, isDoubleSided: true));
+
+    // 6. 3D Barrel Hinges visible from the interior side
+    final hingeCenter = hingePos + n * (swingSign * 0.012);
+    void addHingeBarrel(double zC) {
+      const hingeR = 0.013;
+      const halfH = 0.045;
+      final zHMin = zC - halfH;
+      final zHMax = zC + halfH;
+      const segs = 8;
+      final pts = List.generate(segs, (i) {
+        final a = i * 2 * math.pi / segs;
+        return hingeCenter + Offset(math.cos(a), math.sin(a)) * hingeR;
+      });
+
+      const barrelCol = Color(0xFF263238);
+      const capCol = Color(0xFF37474F);
+
+      for (var i = 0; i < segs; i++) {
+        final pA = pts[i];
+        final pB = pts[(i + 1) % segs];
+        final vAB = Vector3(pA.dx, pA.dy, zHMin);
+        final vBB = Vector3(pB.dx, pB.dy, zHMin);
+        final vAT = Vector3(pA.dx, pA.dy, zHMax);
+        final vBT = Vector3(pB.dx, pB.dy, zHMax);
+
+        tris.add(Triangle3D(v0: vAB, v1: vBB, v2: vBT, color: barrelCol));
+        tris.add(Triangle3D(v0: vAB, v1: vBT, v2: vAT, color: barrelCol));
+      }
+
+      final cT = Vector3(hingeCenter.dx, hingeCenter.dy, zHMax);
+      final cB = Vector3(hingeCenter.dx, hingeCenter.dy, zHMin);
+      for (var i = 0; i < segs; i++) {
+        final pA = pts[i];
+        final pB = pts[(i + 1) % segs];
+        tris.add(Triangle3D(
+          v0: cT,
+          v1: Vector3(pA.dx, pA.dy, zHMax),
+          v2: Vector3(pB.dx, pB.dy, zHMax),
+          color: capCol,
+        ));
+        tris.add(Triangle3D(
+          v0: cB,
+          v1: Vector3(pB.dx, pB.dy, zHMin),
+          v2: Vector3(pA.dx, pA.dy, zHMin),
+          color: capCol,
+        ));
+      }
+
+      // Mounting leaf plates
+      final plateDir = isHingeLeft ? -u : u;
+      final mp1 = hingeCenter - n * (swingSign * 0.003);
+      final mp2 = hingeCenter + plateDir * 0.025;
+      final mv1 = Vector3(mp1.dx, mp1.dy, zHMin + 0.01);
+      final mv2 = Vector3(mp2.dx, mp2.dy, zHMin + 0.01);
+      final mv3 = Vector3(mp2.dx, mp2.dy, zHMax - 0.01);
+      final mv4 = Vector3(mp1.dx, mp1.dy, zHMax - 0.01);
+      tris.add(Triangle3D(v0: mv1, v1: mv2, v2: mv3, color: barrelCol, isDoubleSided: true));
+      tris.add(Triangle3D(v0: mv1, v1: mv3, v2: mv4, color: barrelCol, isDoubleSided: true));
+    }
+
+    addHingeBarrel(zTop - 0.22);
+    addHingeBarrel(zBottom + height * 0.55);
+    addHingeBarrel(zBottom + 0.25);
+
+    // 7. Sill Block (if sill > 0)
     if (sillHeight > 0) {
       addPrism(pLeft, pRight, storeyElevation, zBottom, const Color(0xFF78909C));
     }

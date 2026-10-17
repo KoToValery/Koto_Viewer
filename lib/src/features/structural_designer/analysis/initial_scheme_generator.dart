@@ -18,6 +18,17 @@ import 'support_layout_optimizer.dart';
 import 'structural_geometry_units.dart';
 import '../models/vertical_capacity_models.dart';
 
+// ============================================================================
+// TABLE OF CONTENTS (grep: "=== SECTION:")
+// 1. === SECTION: OPTIONS & PROPOSAL MODELS ===
+// 2. === SECTION: GENERATOR ENTRY & GEOMETRIC HELPERS ===
+// 3. === SECTION: STAIRCASE, SHAFTS & CORE BOUNDARY WALLS ===
+// 4. === SECTION: SHEAR WALL PLACEMENT & SEISMIC PAIRING ===
+// 5. === SECTION: COLUMN LAYOUT & SPAN OPTIMIZATION ===
+// 6. === SECTION: BEAMS & FINAL SCHEME VALIDATION ===
+// ============================================================================
+
+// === SECTION: OPTIONS & PROPOSAL MODELS ===
 class InitialSchemeOptions {
   final double minSpacingM, minWallSpacingM, targetSpacingM, wallLengthM;
   final double? maxWallLengthM;
@@ -254,6 +265,7 @@ class _WallRun {
   double get length => (b - a).distance;
 }
 
+// === SECTION: GENERATOR ENTRY & GEOMETRIC HELPERS ===
 /// Bounded, deterministic preliminary layout. Wall runs preserve opening gaps;
 /// grid axes guide candidates but never authorize placement outside walls.
 class InitialSchemeGenerator {
@@ -1212,6 +1224,9 @@ class InitialSchemeGenerator {
       if (work >= 5000) limitReasons.add('junctions');
       stage = 'core';
     }
+
+    // === SECTION: STAIRCASE, SHAFTS & CORE BOUNDARY WALLS ===
+
     for (final run in wallRuns) {
       if (walls.length + cols.length >= 300 || !budgetAvailable()) break;
       if (stairDistance(run) > 1.5 ||
@@ -1396,6 +1411,8 @@ class InitialSchemeGenerator {
       directionCoverage.putIfAbsent(r, () => {}).add(d);
       return true;
     }
+
+    // === SECTION: SHEAR WALL PLACEMENT & SEISMIC PAIRING ===
 
     stage = 'walls';
     // Shear wall pairing engine
@@ -1772,6 +1789,8 @@ class InitialSchemeGenerator {
       }
     }
 
+    // === SECTION: COLUMN LAYOUT & SPAN OPTIMIZATION ===
+
     stage = 'columns';
     // Where a core wall cannot fit, try columns along its actual solid runs.
     for (final run in wallRuns.where((r) => stairDistance(r) <= 1.5)) {
@@ -2142,6 +2161,9 @@ class InitialSchemeGenerator {
         if (cols.length > before) supportRegions.add(regionOf(occupied.last));
       }
     }
+
+    // === SECTION: BEAMS & FINAL SCHEME VALIDATION ===
+
     final columnSizingReviewIds = <String>{};
     if (options.adaptiveSizes) {
       StructuralProject assessedProject() => project.copyWith(

@@ -327,6 +327,8 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
               'coreMaterial',
               'insulationMaterial',
               'cutDisplayMode',
+              'isHingeLeft',
+              'openInward',
             }.contains(value.key)) {
           throw ArgumentError('Unsupported property');
         }
@@ -334,7 +336,12 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
             !ArchitectCutDisplayMode.values.any((m) => m.name == value.value)) {
           throw ArgumentError('Invalid cut display mode');
         }
-        if (value.key == 'followStoreyHeight') {
+        if (value.key == 'isHingeLeft' || value.key == 'openInward') {
+          if (!{'true', 'false'}.contains(value.value)) {
+            throw ArgumentError('Invalid boolean value');
+          }
+          e[value.key] = value.value == 'true';
+        } else if (value.key == 'followStoreyHeight') {
           if (!{'true', 'false'}.contains(value.value)) {
             throw ArgumentError('Invalid height mode');
           }

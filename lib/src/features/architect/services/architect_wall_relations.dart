@@ -493,6 +493,7 @@ class ArchitectOpeningPlacementResult {
   final String? snapLabel;
   final List<ArchitectOpeningClearance> clearances;
   final bool openInward;
+  final bool isHingeLeft;
 
   const ArchitectOpeningPlacementResult({
     required this.wall,
@@ -504,6 +505,7 @@ class ArchitectOpeningPlacementResult {
     this.snapLabel,
     required this.clearances,
     this.openInward = true,
+    this.isHingeLeft = true,
   });
 
   Offset get centerPoint =>
@@ -767,6 +769,7 @@ class ArchitectOpeningPlacement {
     String? excludeOpeningId,
     ArchitectWall? fixedHostWall,
     bool magnetic = true,
+    bool? defaultHingeLeft,
   }) {
     ArchitectWall? host = fixedHostWall;
     if (host == null) {
@@ -864,6 +867,12 @@ class ArchitectOpeningPlacement {
         toCursor.dx * host.normalVector.dx + toCursor.dy * host.normalVector.dy;
     final openInward = normalDot.abs() < 1e-3 ? true : normalDot >= 0;
 
+    final alongDot =
+        toCursor.dx * host.unitVector.dx + toCursor.dy * host.unitVector.dy;
+    final isHingeLeft = alongDot.abs() > 0.03
+        ? alongDot < 0
+        : (defaultHingeLeft ?? true);
+
     return ArchitectOpeningPlacementResult(
       wall: host,
       offsetRatio: ratio,
@@ -874,6 +883,7 @@ class ArchitectOpeningPlacement {
       snapLabel: snapLabel,
       clearances: clearances,
       openInward: openInward,
+      isHingeLeft: isHingeLeft,
     );
   }
 }

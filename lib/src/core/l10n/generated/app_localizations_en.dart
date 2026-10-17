@@ -3491,6 +3491,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectDoorSelectWallPrompt => 'Tap on a wall to place door';
 
   @override
+  String get architectDoorSpecId => 'Mark (ID)';
+
+  @override
+  String get architectDoorHingeSide => 'Hinge';
+
+  @override
+  String get architectDoorSwingDirection => 'Opening';
+
+  @override
   String get architectWallDrawPrompt => 'Tap to start wall, tap again to place';
 
   @override
@@ -4929,6 +4938,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectFenestrationPresetDoorEntranceCasing =>
       'Entrance door with casing 100/210';
+
+  @override
+  String get architectFenestrationPresetDoorBalconyGlass =>
+      'Glazed balcony door 90/210';
 
   @override
   String architectWallParapetPipe(int thickness, String height) {

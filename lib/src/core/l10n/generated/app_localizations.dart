@@ -6017,6 +6017,24 @@ abstract class AppLocalizations {
   /// **'Tap on a wall to place door'**
   String get architectDoorSelectWallPrompt;
 
+  /// Door specification mark or ID label
+  ///
+  /// In en, this message translates to:
+  /// **'Mark (ID)'**
+  String get architectDoorSpecId;
+
+  /// Door hinge side label
+  ///
+  /// In en, this message translates to:
+  /// **'Hinge'**
+  String get architectDoorHingeSide;
+
+  /// Door swing direction label
+  ///
+  /// In en, this message translates to:
+  /// **'Opening'**
+  String get architectDoorSwingDirection;
+
   /// Guidance prompt when wall tool is active
   ///
   /// In en, this message translates to:
@@ -8572,6 +8590,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Entrance door with casing 100/210'**
   String get architectFenestrationPresetDoorEntranceCasing;
+
+  /// Glazed balcony door preset name
+  ///
+  /// In en, this message translates to:
+  /// **'Glazed balcony door 90/210'**
+  String get architectFenestrationPresetDoorBalconyGlass;
 
   /// Parapet wall type name with handrail pipe
   ///

@@ -89,17 +89,25 @@ import '../services/fenestration_library_service.dart';
 import '../services/architect_wall_overshoot_detector.dart';
 import '../widgets/architect_wall_overshoot_banner.dart';
 
-// === SECTION: TABLE OF CONTENTS ===
-// 1. STATE & TOOL CONTROLLERS
-// 2. COORDINATE TRANSFORMS (SCREEN <-> MODEL)
-// 3. 2D POINTER & TOUCH HANDLING (TOOL INPUT FROM ARCHITECT VIEWPORT)
-// 4. ZONE EDITING & MUTATION HANDLERS
-// 5. WALL & DOOR CONCEPT DRAFTING
-// 6. DYNAMIC GRID AXES ACTIONS
-// 7. DIAGNOSTIC LOGS DIALOG (ARCHITECT LOGGER)
-// 8. 2D CANVAS VIEWPORT (LAYERED MODEL SPACE)
-// 9. 3D SOLID VIEWPORT
+// ============================================================================
+// TABLE OF CONTENTS (grep: "=== SECTION:")
+// 1.  === SECTION: WIDGET DECLARATION & PUBLIC API ===
+// 2.  === SECTION: STATE & TOOL CONTROLLERS ===
+// 3.  === SECTION: COORDINATE TRANSFORMS (SCREEN <-> MODEL) ===
+// 4.  === SECTION: 2D POINTER & TOUCH HANDLING (TOOL INPUT FROM ARCHITECT VIEWPORT) ===
+// 5.  === SECTION: ZONE EDITING & MUTATION HANDLERS ===
+// 6.  === SECTION: WALL & DOOR CONCEPT DRAFTING ===
+// 7.  === SECTION: WALL SPLIT, SURFACE DETECTION & CLEARANCES ===
+// 8.  === SECTION: FENESTRATION (DOORS, WINDOWS) & RADIAL ACTIONS ===
+// 9.  === SECTION: SELECTION ACTIONS, BARS & TOOLBARS ===
+// 10. === SECTION: DYNAMIC GRID AXES ACTIONS ===
+// 11. === SECTION: MAIN BUILD METHOD & WORKSPACE LAYOUT ===
+// 12. === SECTION: DIAGNOSTIC LOGS DIALOG (ARCHITECT LOGGER) ===
+// 13. === SECTION: 2D CANVAS VIEWPORT (LAYERED MODEL SPACE) ===
+// 14. === SECTION: 3D SOLID VIEWPORT ===
+// ============================================================================
 
+// === SECTION: WIDGET DECLARATION & PUBLIC API ===
 /// The primary unified workspace for architectural concept drafting in 2D and 3D.
 class ArchitectWorkspaceScreen extends StatefulWidget {
   final ArchitectProject? initialProject;
@@ -2091,6 +2099,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       rawPoint: raw,
       openingWidth: width,
       magnetic: _magnetEnabled,
+      defaultHingeLeft: _isHingeLeft,
     );
   }
 
@@ -2108,7 +2117,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       width: _doorWidth,
       height: _doorHeight,
       sillHeight: _doorSill,
-      isHingeLeft: _isHingeLeft,
+      isHingeLeft: preview.isHingeLeft,
       openInward: preview.openInward,
       specId: '$_doorSpecCounter',
       uuid: 'preview_door',
@@ -4307,7 +4316,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         : ArchitectWallTrimSpan.at(picked, _project.activeStorey.walls, point);
   }
 
-  // === SECTION: WALL SPLIT & SURFACE DETECTION ===
+  // === SECTION: WALL SPLIT, SURFACE DETECTION & CLEARANCES ===
   _ArchitectSurfaceHit? _findNearestSurface(Offset rawPoint) {
     _ArchitectSurfaceHit? bestHit;
     double bestDist = 30 / _currentScale;
@@ -5199,6 +5208,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
+  // === SECTION: FENESTRATION (DOORS, WINDOWS) & RADIAL ACTIONS ===
+
   void _tryPlaceDoorAt(Offset point) {
     final activeStorey = _project.activeStorey;
     final placement = ArchitectOpeningPlacement.resolve(
@@ -5206,6 +5217,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       rawPoint: point,
       openingWidth: _doorWidth,
       magnetic: _magnetEnabled,
+      defaultHingeLeft: _isHingeLeft,
     );
     if (placement == null) return;
 
@@ -5224,7 +5236,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       width: _doorWidth,
       height: _doorHeight,
       sillHeight: _doorSill,
-      isHingeLeft: _isHingeLeft,
+      isHingeLeft: placement.isHingeLeft,
+      openInward: placement.openInward,
       specId: '$_doorSpecCounter',
       uuid: 'UUID_$now',
       styleId: activeStyle.id,
@@ -6294,6 +6307,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  // === SECTION: SELECTION ACTIONS, BARS & TOOLBARS ===
+
   Widget _buildWallSelectionActions(Set<String> wallIds) {
     final l = context.l10n;
     return Material(
@@ -7294,6 +7309,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _initTransform();
     }
   }
+
+  // === SECTION: MAIN BUILD METHOD & WORKSPACE LAYOUT ===
 
   @override
   Widget build(BuildContext context) {

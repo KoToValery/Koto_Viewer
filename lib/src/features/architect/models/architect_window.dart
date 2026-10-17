@@ -396,6 +396,83 @@ class ArchitectWindow {
       glassColor,
     );
 
+    // Black Rubber Glazing Gasket (черно гумено уплътнение за стъклопакета)
+    const gasketColor = Color(0xFF1B1B1B);
+    const gasketW = 0.008;
+    const halfGasket = 0.012;
+    final gLeft = centerPos - u * (halfW - jWidth);
+    final gRight = centerPos + u * (halfW - jWidth);
+    final gzMin = zBottom + jWidth;
+    final gzMax = zTop - jWidth;
+
+    void addGasketBox(Offset pA, Offset pB, double z1, double z2) {
+      if (z2 <= z1 + 1e-4) return;
+      final b1 = pA - n * halfGasket;
+      final b2 = pB - n * halfGasket;
+      final b3 = pB + n * halfGasket;
+      final b4 = pA + n * halfGasket;
+      _addBox3D(tris, b1, b2, b3, b4, z1, z2, gasketColor);
+    }
+
+    addGasketBox(gLeft, gLeft + u * gasketW, gzMin, gzMax);
+    addGasketBox(gRight - u * gasketW, gRight, gzMin, gzMax);
+    addGasketBox(gLeft + u * gasketW, gRight - u * gasketW, gzMin, gzMin + gasketW);
+    addGasketBox(gLeft + u * gasketW, gRight - u * gasketW, gzMax - gasketW, gzMax);
+
+    // Interior-facing window hinges
+    final interiorDir = -exteriorSign;
+    final hingePos = (centerPos - u * (halfW - jWidth * 0.7)) +
+        n * (interiorDir * halfThick + interiorDir * 0.009);
+
+    void addHinge(double zC) {
+      const hingeR = 0.009;
+      const halfH = 0.025;
+      final zHMin = zC - halfH;
+      final zHMax = zC + halfH;
+      const segs = 8;
+      final pts = List.generate(segs, (i) {
+        final a = i * 2 * math.pi / segs;
+        return hingePos + Offset(math.cos(a), math.sin(a)) * hingeR;
+      });
+
+      const barrelCol = Color(0xFF263238);
+      const capCol = Color(0xFF37474F);
+
+      for (var i = 0; i < segs; i++) {
+        final pA = pts[i];
+        final pB = pts[(i + 1) % segs];
+        final vAB = Vector3(pA.dx, pA.dy, zHMin);
+        final vBB = Vector3(pB.dx, pB.dy, zHMin);
+        final vAT = Vector3(pA.dx, pA.dy, zHMax);
+        final vBT = Vector3(pB.dx, pB.dy, zHMax);
+
+        tris.add(Triangle3D(v0: vAB, v1: vBB, v2: vBT, color: barrelCol));
+        tris.add(Triangle3D(v0: vAB, v1: vBT, v2: vAT, color: barrelCol));
+      }
+
+      final cT = Vector3(hingePos.dx, hingePos.dy, zHMax);
+      final cB = Vector3(hingePos.dx, hingePos.dy, zHMin);
+      for (var i = 0; i < segs; i++) {
+        final pA = pts[i];
+        final pB = pts[(i + 1) % segs];
+        tris.add(Triangle3D(
+          v0: cT,
+          v1: Vector3(pA.dx, pA.dy, zHMax),
+          v2: Vector3(pB.dx, pB.dy, zHMax),
+          color: capCol,
+        ));
+        tris.add(Triangle3D(
+          v0: cB,
+          v1: Vector3(pB.dx, pB.dy, zHMin),
+          v2: Vector3(pA.dx, pA.dy, zHMin),
+          color: capCol,
+        ));
+      }
+    }
+
+    addHinge(zTop - jWidth - 0.06);
+    addHinge(zBottom + jWidth + 0.06);
+
     return tris;
   }
 

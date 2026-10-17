@@ -14,6 +14,19 @@ import 'grid_axis_bubble_layout.dart';
 import 'support_span_overlay_layout.dart';
 import 'structural_overview_layout.dart';
 
+// ============================================================================
+// TABLE OF CONTENTS (grep: "=== SECTION:")
+// 1. === SECTION: PAINTER DECLARATION & MAIN PAINT DISPATCHER ===
+// 2. === SECTION: MEASUREMENTS, SPANS & STOREY GHOSTS ===
+// 3. === SECTION: SLABS, OPENINGS & EXTRUSION PREVIEWS ===
+// 4. === SECTION: STAIRS & ELEVATORS ARCHITECTURAL GRAPHICS ===
+// 5. === SECTION: BEAMS & STRUCTURAL GRID AXES ===
+// 6. === SECTION: SHEAR WALLS, GUIDELINES & COLUMNS ===
+// 7. === SECTION: INTERACTIVE PLACEMENT PREVIEWS ===
+// 8. === SECTION: ANALYSIS OVERLAYS (CANTILEVERS & SEISMIC TARGETS) ===
+// ============================================================================
+
+// === SECTION: PAINTER DECLARATION & MAIN PAINT DISPATCHER ===
 /// 2D CustomPainter that renders structural elements, ghost storeys (ArchiCAD Trace Reference),
 /// interactive drawing previews, and cantilever warning zones projected onto CAD scene coordinates.
 class Structural2dPainter extends CustomPainter {
@@ -317,6 +330,8 @@ class Structural2dPainter extends CustomPainter {
     _drawSupportOverviewLabels(canvas, overview);
     if (showSlabs && activeTool == StructuralDrawTool.slab) _drawSlabLabels(canvas);
   }
+
+  // === SECTION: MEASUREMENTS, SPANS & STOREY GHOSTS ===
 
   void _drawMeasurementLine(Canvas canvas, Offset p1Cad, Offset p2Cad, String label, {Color color = const Color(0xFFFF5252)}) {
     final p1 = cadToScene(p1Cad);
@@ -639,6 +654,8 @@ class Structural2dPainter extends CustomPainter {
       canvas.restore();
     }
   }
+
+  // === SECTION: SLABS, OPENINGS & EXTRUSION PREVIEWS ===
 
   void _drawSlab(
     Canvas canvas,
@@ -1230,6 +1247,8 @@ class Structural2dPainter extends CustomPainter {
     canvas.restore();
   }
 
+  // === SECTION: STAIRS & ELEVATORS ARCHITECTURAL GRAPHICS ===
+
   void _drawStaircaseTreads(Canvas canvas, List<Offset> opPts, Paint borderPaint) {
     if (opPts.length < 4) return;
     final treadPaint = Paint()
@@ -1325,6 +1344,8 @@ class Structural2dPainter extends CustomPainter {
     )..layout();
     tp.paint(canvas, center - Offset(tp.width / 2.0, tp.height / 2.0));
   }
+
+  // === SECTION: BEAMS & STRUCTURAL GRID AXES ===
 
   void _drawBeam(Canvas canvas, StructuralBeam beam, {required bool isGhost}) {
     final pts = beam.polygonVertices.map(cadToScene).toList();
@@ -1566,6 +1587,8 @@ class Structural2dPainter extends CustomPainter {
       d += dotLen + gapLen;
     }
   }
+
+  // === SECTION: SHEAR WALLS, GUIDELINES & COLUMNS ===
 
   void _drawShearWall(Canvas canvas, StructuralShearWall wall,
       {required bool isGhost, bool isPreview = false, bool isMoving = false}) {
@@ -1823,6 +1846,8 @@ class Structural2dPainter extends CustomPainter {
     }
 
   }
+
+  // === SECTION: INTERACTIVE PLACEMENT PREVIEWS ===
 
   void _drawInteractivePreview(Canvas canvas) {
     // 1. Moving column live preview
@@ -2222,6 +2247,8 @@ class Structural2dPainter extends CustomPainter {
       }
     }
   }
+
+  // === SECTION: ANALYSIS OVERLAYS (CANTILEVERS & SEISMIC TARGETS) ===
 
   void _drawCantileverOverlays(Canvas canvas) {
     for (final zone in cantileverZones) {

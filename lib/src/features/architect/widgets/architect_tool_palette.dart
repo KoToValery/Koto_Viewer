@@ -773,6 +773,26 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               ),
             ),
           const SizedBox(width: 6),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text(
+              l10n.architectDoorHeight,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+          for (final h in [2.00, 2.10])
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: ChoiceChip(
+                label: Text('${(h * 100).round()} cm'),
+                selected: (doorHeight - h).abs() < 1e-3,
+                onSelected: (sel) {
+                  if (sel) onDoorHeightChanged(h);
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          const SizedBox(width: 6),
           ChoiceChip(
             label: Text(l10n.architectDoorSillNone),
             selected: doorSill == 0.0,

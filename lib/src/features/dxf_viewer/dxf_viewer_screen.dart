@@ -44,6 +44,19 @@ import '../structural_designer/rendering/structural_pointer_painter.dart';
 import '../structural_designer/services/structural_persistence_service.dart';
 import '../structural_designer/structural_designer_screen.dart';
 
+// ============================================================================
+// TABLE OF CONTENTS (grep: "=== SECTION:")
+// 1. === SECTION: WIDGET DECLARATION & PUBLIC API ===
+// 2. === SECTION: STATE & LIFECYCLE (LOAD, SETTINGS, TRANSFORM) ===
+// 3. === SECTION: MEASUREMENT CONTROLLER & SNAPPING ===
+// 4. === SECTION: ANNOTATIONS, EXPORT & AREA ACTIONS ===
+// 5. === SECTION: CANVAS GESTURES, MOUSE WHEEL & KEYBOARD ===
+// 6. === SECTION: FILE IMPORT, SHEETS & DIALOGS ===
+// 7. === SECTION: LAYOUT TABS & HUD BUILDERS ===
+// 8. === SECTION: MAIN BUILD METHOD & VIEWPORT CANVAS ===
+// ============================================================================
+
+// === SECTION: WIDGET DECLARATION & PUBLIC API ===
 class DxfViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
@@ -68,6 +81,7 @@ class DxfViewerScreen extends StatefulWidget {
   State<DxfViewerScreen> createState() => _DxfViewerScreenState();
 }
 
+// === SECTION: STATE & LIFECYCLE (LOAD, SETTINGS, TRANSFORM) ===
 class _DxfViewerScreenState extends State<DxfViewerScreen> {
   final TransformationController _transformController = TransformationController();
 
@@ -498,6 +512,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     return math.min(availW / docW, availH / docH);
   }
 
+  // === SECTION: MEASUREMENT CONTROLLER & SNAPPING ===
+
   void _handleMeasurePointerDown(PointerDownEvent event) {
     if (!_isMeasureMode || _document == null) return;
     _activePointersCount++;
@@ -803,6 +819,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       }
     });
   }
+
+  // === SECTION: ANNOTATIONS, EXPORT & AREA ACTIONS ===
 
   Future<void> _openAnnotationDialog({
     DxfAnnotation? annotation,
@@ -1118,6 +1136,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     });
   }
 
+  // === SECTION: CANVAS GESTURES, MOUSE WHEEL & KEYBOARD ===
+
   void _handlePointerSignal(PointerSignalEvent event) {
     if (event is PointerScrollEvent) {
       _isGestureActive = false;
@@ -1400,6 +1420,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     });
   }
 
+  // === SECTION: FILE IMPORT, SHEETS & DIALOGS ===
+
   /// Handles importing an additional DXF drawing into the current workspace.
   Future<void> _importDxfFile() async {
     if (_document == null) return;
@@ -1672,6 +1694,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       }
     }
   }
+
+  // === SECTION: LAYOUT TABS & HUD BUILDERS ===
 
   Widget _buildLayoutTabsWidget(ThemeData theme) {
     if (_document == null || _document!.layouts.length <= 1) {
@@ -1989,6 +2013,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       ),
     ];
   }
+
+  // === SECTION: MAIN BUILD METHOD & VIEWPORT CANVAS ===
 
   @override
   Widget build(BuildContext context) {

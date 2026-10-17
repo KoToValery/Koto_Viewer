@@ -75,6 +75,25 @@ import 'models/structural_bim_context.dart';
 import 'widgets/structural_3d_viewport.dart';
 import 'widgets/vertical_capacity_sheet.dart';
 
+// ============================================================================
+// TABLE OF CONTENTS (grep: "=== SECTION:")
+// 1.  === SECTION: WIDGET DECLARATION & PUBLIC API ===
+// 2.  === SECTION: STATE VARIABLES & LIFECYCLE ===
+// 3.  === SECTION: COORDINATE TRANSFORMATIONS & VIEWPORT ===
+// 4.  === SECTION: HIT TESTING & SELECTION HELPERS ===
+// 5.  === SECTION: ELEMENT ACTIONS (COLUMNS, WALLS, BEAMS) ===
+// 6.  === SECTION: OPENINGS & GRID AXES MANAGEMENT ===
+// 7.  === SECTION: SLAB CORRECTION & POLYGON EDITING ===
+// 8.  === SECTION: POINTER GESTURES & INTERACTION CONTROLLER ===
+// 9.  === SECTION: ELEMENT PLACEMENT & COMMIT LOGIC ===
+// 10. === SECTION: UNDERLAY FILTERING & CAD SETTINGS ===
+// 11. === SECTION: STOREY MANAGEMENT & ANALYSIS DIALOGS ===
+// 12. === SECTION: APPBAR & HUD ACTION BUILDERS ===
+// 13. === SECTION: MAIN BUILD METHOD & VIEWPORT CANVAS ===
+// 14. === SECTION: CONTEXTUAL BOTTOM DOCKS & ACTION BARS ===
+// ============================================================================
+
+// === SECTION: WIDGET DECLARATION & PUBLIC API ===
 /// Main CAD/BIM Structural Designer workspace screen.
 /// Enables placing columns, shear walls, and slabs over DWG/DXF underlay,
 /// managing multi-storey buildings with ArchiCAD-like Trace Reference,
@@ -104,6 +123,7 @@ class StructuralDesignerScreen extends StatefulWidget {
       _StructuralDesignerScreenState();
 }
 
+// === SECTION: STATE VARIABLES & LIFECYCLE ===
 class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   late final TransformationController _transformController;
   late final _viewportNavigation = BimTransformNavigation(
@@ -702,7 +722,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       (_isPlacingWithHold || _isMovingColumn || _isMovingShearWall)
           ? _currentCadCoord : _selectedColumn?.center ?? _selectedShearWall?.center;
 
-  // --- Coordinate Transformations ---
+  // === SECTION: COORDINATE TRANSFORMATIONS & VIEWPORT ===
 
   Rect get _cadBounds {
     if (widget.bimContext != null) {
@@ -807,7 +827,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
   }
 
-  // --- Pointer & Touch Handling with Offset Ruler (56px) & Magnetic Snap ---
+  // === SECTION: HIT TESTING & SELECTION HELPERS ===
 
   SlabEdgeGripInfo? _hitTestSlabMidpoint(Offset screenPos) {
     if (_activeTool != StructuralDrawTool.slab && _activeTool != StructuralDrawTool.select) {
@@ -1118,6 +1138,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final proj = a + ab * t;
     return (p - proj).distance;
   }
+
+  // === SECTION: ELEMENT ACTIONS (COLUMNS, WALLS, BEAMS) ===
 
   void _deleteSelectedColumn() {
     if (_selectedColumn == null) return;
@@ -1852,6 +1874,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     });
     HapticFeedback.selectionClick();
   }
+
+  // === SECTION: OPENINGS & GRID AXES MANAGEMENT ===
 
   void _deleteSelectedOpening() {
     if (_selectedOpening == null) return;
@@ -2804,7 +2828,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.selectionClick();
   }
 
-  // --- Slab Correction Methods (Kotocadastre Object Correction Workflow) ---
+  // === SECTION: SLAB CORRECTION & POLYGON EDITING ===
 
   void _startSlabCorrection(StructuralSlab slab) {
     final ownerId = _slabBadgeOwnerId;
@@ -3121,6 +3145,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _mergeCandidateOpeningVertexIndex = bestCandidate;
     });
   }
+
+  // === SECTION: POINTER GESTURES & INTERACTION CONTROLLER ===
 
   void _handlePointerDown(PointerDownEvent event) {
     _slabBadgeSelectionHandled = false;
@@ -5465,7 +5491,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
   }
 
-  // --- Element Placement Logic ---
+  // === SECTION: ELEMENT PLACEMENT & COMMIT LOGIC ===
 
   void _commitPlacement(Offset cadCoord) {
     final active = _project.activeStorey;
@@ -5983,7 +6009,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return true;
   }
 
-  // --- Structural Underlay Layer Filtering (White Thick Walls & Slabs focus) ---
+  // === SECTION: UNDERLAY FILTERING & CAD SETTINGS ===
 
   void _applyUnderlayFilter(bool activate) {
     void execute() {
@@ -6776,7 +6802,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _startSlabCorrection(slabs.first);
   }
 
-  // --- Storey Management Actions ---
+  // === SECTION: STOREY MANAGEMENT & ANALYSIS DIALOGS ===
 
   void _openStoreyManager() {
     showModalBottomSheet(
@@ -7004,6 +7030,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       ),
     );
   }
+
+  // === SECTION: APPBAR & HUD ACTION BUILDERS ===
 
   List<Widget> _buildAppBarActions(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -7287,6 +7315,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       const SizedBox(width: 4),
     ];
   }
+
+  // === SECTION: MAIN BUILD METHOD & VIEWPORT CANVAS ===
 
   @override
   Widget build(BuildContext context) {
@@ -7939,6 +7969,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       ),
     );
   }
+
+  // === SECTION: CONTEXTUAL BOTTOM DOCKS & ACTION BARS ===
 
   Widget _buildContextualElementBottomDock(BuildContext context) {
     if (!_hasSelectedElement || _isMovingColumn || _isMovingShearWall || _isMovingOpening || _isPlacingWithHold || _isEditingSlab) {

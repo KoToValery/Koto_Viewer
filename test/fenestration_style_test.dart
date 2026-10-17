@@ -179,6 +179,108 @@ void main() {
       expect(minFrameY, closeTo(-0.095, 1e-3));
       expect(maxFrameY, closeTo(-0.025, 1e-3));
     });
+
+    test('Builds black rubber glazing gasket and interior-facing hinges for windows', () {
+      final style = ArchitectFenestrationStyle.standardCatalog().firstWhere(
+        (s) => s.id == 'win_double_casement',
+      );
+
+      final tris = Fenestration3dBuilder.buildOpening3D(
+        style: style,
+        wallStart: const Offset(0, 0),
+        wallEnd: const Offset(3.0, 0),
+        wallThickness: 0.37,
+        coreThickness: 0.25,
+        insulationThickness: 0.12,
+        exteriorSign: 1.0,
+        offsetRatio: 0.5,
+        width: 1.40,
+        height: 1.40,
+        sillHeight: 0.85,
+        storeyElevation: 0.0,
+      );
+
+      // 1. Black EPDM rubber glazing gasket around glass
+      final gasketTris = tris.where((t) => t.color == Fenestration3dBuilder.gasketColor).toList();
+      expect(gasketTris.isNotEmpty, isTrue,
+          reason: '3D window must include black rubber glazing gasket around double glazing');
+
+      // 2. Interior-facing window hinges on operable sashes
+      final hingeTris = tris.where((t) => t.color == Fenestration3dBuilder.hingeColor).toList();
+      expect(hingeTris.isNotEmpty, isTrue,
+          reason: 'Operable window sashes must include 3D hinges visible from interior side');
+
+      // Hinges must sit on interior face (Y < 0 along wall baseline when exteriorSign = +1)
+      for (final t in hingeTris) {
+        expect(t.v0.y, lessThan(0.0),
+            reason: 'Window hinges must be situated on the interior side of the frame');
+        expect(t.v1.y, lessThan(0.0));
+        expect(t.v2.y, lessThan(0.0));
+      }
+
+      // 3. Window handle on interior face
+      final handleTris = tris.where((t) => t.color == Fenestration3dBuilder.handleColor).toList();
+      expect(handleTris.isNotEmpty, isTrue,
+          reason: 'Operable window sash must include 3D handle on interior face');
+    });
+
+    test('Glazed balcony door builds black rubber gasket and interior door hinges', () {
+      final balconyDoorStyle = ArchitectFenestrationStyle.standardCatalog().firstWhere(
+        (s) => s.id == 'door_balcony_glass',
+      );
+      expect(balconyDoorStyle.kind, equals(FenestrationKind.door));
+
+      final tris = Fenestration3dBuilder.buildOpening3D(
+        style: balconyDoorStyle,
+        wallStart: const Offset(0, 0),
+        wallEnd: const Offset(3.0, 0),
+        wallThickness: 0.37,
+        coreThickness: 0.25,
+        insulationThickness: 0.12,
+        exteriorSign: 1.0,
+        offsetRatio: 0.5,
+        width: 0.90,
+        height: 2.10,
+        sillHeight: 0.0,
+        storeyElevation: 0.0,
+      );
+
+      // Black rubber gasket on glazed door
+      final gasketTris = tris.where((t) => t.color == Fenestration3dBuilder.gasketColor).toList();
+      expect(gasketTris.isNotEmpty, isTrue,
+          reason: 'Glazed door must render black rubber gasket around glass pane');
+
+      // Door hinges on interior side
+      final doorHingeTris = tris.where((t) => t.color == Fenestration3dBuilder.hingeColor).toList();
+      expect(doorHingeTris.isNotEmpty, isTrue,
+          reason: 'Door must include interior-facing barrel hinges');
+    });
+
+    test('Fallback ArchitectWindow.build3D includes black rubber gasket and interior hinges', () {
+      final window = ArchitectWindow(
+        id: 'fallback_win',
+        wallId: 'w1',
+        offsetRatio: 0.5,
+        width: 1.20,
+        height: 1.40,
+        uuid: 'UUID_FALLBACK',
+      );
+
+      final tris = window.build3D(
+        wallStart: const Offset(0, 0),
+        wallEnd: const Offset(3.0, 0),
+        wallThickness: 0.25,
+        storeyElevation: 0.0,
+      );
+
+      final gasketTris = tris.where((t) => t.color == const Color(0xFF1B1B1B)).toList();
+      expect(gasketTris.isNotEmpty, isTrue,
+          reason: 'Fallback window must include black rubber gasket');
+
+      final hingeTris = tris.where((t) => t.color == const Color(0xFF263238)).toList();
+      expect(hingeTris.isNotEmpty, isTrue,
+          reason: 'Fallback window must include interior-facing hinges');
+    });
   });
 
   group('2D Plan & Wall Integration tests', () {

@@ -1433,6 +1433,8 @@ class ArchitectFenestrationStyle {
         return l10n.architectFenestrationPresetDoorInterior;
       case 'door_entrance_casing':
         return l10n.architectFenestrationPresetDoorEntranceCasing;
+      case 'door_balcony_glass':
+        return l10n.architectFenestrationPresetDoorBalconyGlass;
       default:
         return name;
     }
@@ -1657,6 +1659,26 @@ class ArchitectFenestrationStyle {
             pane: FenestrationPane(
               id: 'p_entrance',
               paneType: PaneType.doorLeaf,
+            ),
+          ),
+        ),
+
+        // 8. Single Glazed Balcony / Terrace Door 90x210 cm (5-chamber, double glazing)
+        ArchitectFenestrationStyle(
+          id: 'door_balcony_glass',
+          name: 'Балконска остъклена врата 90/210',
+          kind: FenestrationKind.door,
+          defaultWidth: 0.90,
+          defaultHeight: 2.10,
+          defaultSillHeight: 0.00,
+          frameFaceWidth: 0.07,
+          frameDepth: 0.07,
+          hasCasing: false,
+          rootSubdivision: const FenestrationSubdivision(
+            id: 'root',
+            pane: FenestrationPane(
+              id: 'p_balcony_glass',
+              paneType: PaneType.tiltAndTurn,
             ),
           ),
         ),
