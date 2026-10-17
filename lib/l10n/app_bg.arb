@@ -1918,6 +1918,10 @@
     }
   },
   "architectOpeningClearance": "Чисто разстояние (простенок)",
-  "architectOpeningModularSnap": "Модулна стъпка ({step} cm)"
-
+  "architectOpeningModularSnap": "Модулна стъпка ({step} cm)",
+  "architectRoofSetEavesHere": "Стреха тук",
+  "architectRoofSetEavesHereTooltip": "Задай избраната отсечка като долна стреха (скатът се изкачва от нея)",
+  "architectRoofFlipSlope": "Обърни 180°",
+  "architectRoofFlipSlopeTooltip": "Обърни посоката на наклона на ската на 180°",
+  "architectRoofRotateSlope": "Посока скат"
 }

@@ -5937,4 +5937,21 @@ class AppLocalizationsBg extends AppLocalizations {
   String architectOpeningModularSnap(int step) {
     return 'Модулна стъпка ($step cm)';
   }
+
+  @override
+  String get architectRoofSetEavesHere => 'Стреха тук';
+
+  @override
+  String get architectRoofSetEavesHereTooltip =>
+      'Задай избраната отсечка като долна стреха (скатът се изкачва от нея)';
+
+  @override
+  String get architectRoofFlipSlope => 'Обърни 180°';
+
+  @override
+  String get architectRoofFlipSlopeTooltip =>
+      'Обърни посоката на наклона на ската на 180°';
+
+  @override
+  String get architectRoofRotateSlope => 'Посока скат';
 }

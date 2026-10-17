@@ -11,9 +11,12 @@ import '../services/architect_roof_tool.dart';
 class ArchitectRoofBar extends StatelessWidget {
   final ArchitectRoofTool tool;
   final ArchitectRoofPlane? selectedRoof;
+  final int? selectedEdgeIndex;
   final ValueChanged<AutoRoofType> onAutoRoof;
   final VoidCallback onOpenLayersDialog;
   final VoidCallback? onSwitchEavesEdge;
+  final VoidCallback? onFlipSlopeDirection;
+  final VoidCallback? onSetSelectedEdgeAsEaves;
   final ValueChanged<double>? onSelectedRoofSlopeChanged;
   final ValueChanged<double>? onSelectedRoofOverhangChanged;
   final VoidCallback? onFinishPolygon;
@@ -24,9 +27,12 @@ class ArchitectRoofBar extends StatelessWidget {
     super.key,
     required this.tool,
     this.selectedRoof,
+    this.selectedEdgeIndex,
     required this.onAutoRoof,
     required this.onOpenLayersDialog,
     this.onSwitchEavesEdge,
+    this.onFlipSlopeDirection,
+    this.onSetSelectedEdgeAsEaves,
     this.onSelectedRoofSlopeChanged,
     this.onSelectedRoofOverhangChanged,
     this.onFinishPolygon,
@@ -157,19 +163,62 @@ class ArchitectRoofBar extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                   ] else ...[
-                    // Selected roof: Switch Eaves Edge button
+                    if (selectedEdgeIndex != null &&
+                        (selectedEdgeIndex != roof.safeEavesEdgeIndex ||
+                            roof.reverseSlope)) ...[
+                      Tooltip(
+                        message: l.architectRoofSetEavesHereTooltip,
+                        child: ActionChip(
+                          key: const ValueKey('roof-set-eaves-edge'),
+                          visualDensity: VisualDensity.compact,
+                          backgroundColor: const Color(0x3300E676),
+                          side: const BorderSide(color: Color(0xFF00E676)),
+                          avatar: const Icon(
+                            Icons.south_rounded,
+                            size: 15,
+                            color: Color(0xFF00E676),
+                          ),
+                          label: Text(
+                            l.architectRoofSetEavesHere,
+                            style: const TextStyle(
+                              color: Color(0xFF00E676),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          onPressed: onSetSelectedEdgeAsEaves,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    // Selected roof: Rotate / Switch Eaves Edge button
                     Tooltip(
                       message: l.architectRoofSwitchEavesTooltip,
                       child: ActionChip(
                         key: const ValueKey('roof-switch-eaves'),
                         visualDensity: VisualDensity.compact,
                         avatar: const Icon(
-                          Icons.swap_calls_rounded,
+                          Icons.rotate_right_rounded,
                           size: 15,
                           color: Color(0xFF00E5FF),
                         ),
-                        label: Text(l.architectRoofSwitchEaves),
+                        label: Text(l.architectRoofRotateSlope),
                         onPressed: onSwitchEavesEdge,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    // Selected roof: Flip Slope 180° button
+                    Tooltip(
+                      message: l.architectRoofFlipSlopeTooltip,
+                      child: ActionChip(
+                        key: const ValueKey('roof-flip-slope'),
+                        visualDensity: VisualDensity.compact,
+                        avatar: const Icon(
+                          Icons.swap_vert_rounded,
+                          size: 15,
+                          color: Colors.amberAccent,
+                        ),
+                        label: Text(l.architectRoofFlipSlope),
+                        onPressed: onFlipSlopeDirection,
                       ),
                     ),
                     const SizedBox(width: 6),

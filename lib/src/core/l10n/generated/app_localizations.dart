@@ -10438,6 +10438,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Modular step ({step} cm)'**
   String architectOpeningModularSnap(int step);
+
+  /// No description provided for @architectRoofSetEavesHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Eaves here'**
+  String get architectRoofSetEavesHere;
+
+  /// No description provided for @architectRoofSetEavesHereTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the selected roof edge as the lower eaves edge (slope rises from here)'**
+  String get architectRoofSetEavesHereTooltip;
+
+  /// No description provided for @architectRoofFlipSlope.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip 180°'**
+  String get architectRoofFlipSlope;
+
+  /// No description provided for @architectRoofFlipSlopeTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse the roof slope direction by 180°'**
+  String get architectRoofFlipSlopeTooltip;
+
+  /// No description provided for @architectRoofRotateSlope.
+  ///
+  /// In en, this message translates to:
+  /// **'Slope dir'**
+  String get architectRoofRotateSlope;
 }
 
 class _AppLocalizationsDelegate

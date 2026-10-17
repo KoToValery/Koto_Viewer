@@ -127,9 +127,21 @@ class ArchitectRoofPainterHelper {
           roof: roof,
           scale: scale,
           color: isSelected ? const Color(0xFFFFCC80) : baseColor,
+          isSelected: isSelected,
         );
       }
     }
+  }
+
+  /// Returns true if [worldPoint] taps on the central slope direction arrow/badge of [roof].
+  static bool hitTestSlopeIndicator(
+    ArchitectRoofPlane roof,
+    Offset worldPoint, {
+    required double scale,
+  }) {
+    if (roof.points.length < 3) return false;
+    final radius = math.max(0.45, 22.0 / scale);
+    return (worldPoint - roof.centroid).distance <= radius;
   }
 
   static void _drawSlopeIndicator({
@@ -138,6 +150,7 @@ class ArchitectRoofPainterHelper {
     required ArchitectRoofPlane roof,
     required double scale,
     required Color color,
+    bool isSelected = false,
   }) {
     final center = roof.centroid;
     final dir = roof.slopeDirection;
@@ -145,9 +158,28 @@ class ArchitectRoofPainterHelper {
     final start = center - dir * arrowHalfLen;
     final end = center + dir * arrowHalfLen;
 
+    if (isSelected) {
+      final haloRadius = (0.42).clamp(13.0 / scale, 0.60);
+      canvas.drawCircle(
+        center,
+        haloRadius,
+        Paint()
+          ..color = const Color(0x3300E5FF)
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawCircle(
+        center,
+        haloRadius,
+        Paint()
+          ..color = const Color(0xAA00E5FF)
+          ..strokeWidth = 1.2 / scale
+          ..style = PaintingStyle.stroke,
+      );
+    }
+
     final arrowPaint = Paint()
-      ..color = color.withValues(alpha: 0.9)
-      ..strokeWidth = 1.6 / scale
+      ..color = color.withValues(alpha: 0.95)
+      ..strokeWidth = (isSelected ? 2.1 : 1.6) / scale
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 

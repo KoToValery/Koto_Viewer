@@ -3915,6 +3915,10 @@
         "type": "int"
       }
     }
-  }
-
+  },
+  "architectRoofSetEavesHere": "Eaves here",
+  "architectRoofSetEavesHereTooltip": "Set the selected roof edge as the lower eaves edge (slope rises from here)",
+  "architectRoofFlipSlope": "Flip 180°",
+  "architectRoofFlipSlopeTooltip": "Reverse the roof slope direction by 180°",
+  "architectRoofRotateSlope": "Slope dir"
 }

@@ -59,13 +59,16 @@ class ArchitectPolygonDimensions {
     return hit;
   }
 
-  /// The nearest opposite contour edge and the nearest facing external edge.
-  /// Walls contribute their finished faces, independent of their reference line.
+  /// The nearest opposite contour edge (or inward parallel wall for overhangs)
+  /// and the nearest facing external edge.
+  /// Walls contribute their finished faces, independent of their reference line,
+  /// including walls from lower storeys when [project] is provided.
   static List<ArchitectPolygonDistance> nearest({
     required String elementId,
     required List<Offset> polygon,
     required int edge,
     required ArchitectStorey storey,
+    ArchitectProject? project,
   }) {
     if (edge < 0 || edge >= polygon.length) return [];
     final a = polygon[edge], b = polygon[(edge + 1) % polygon.length];
@@ -73,7 +76,7 @@ class ArchitectPolygonDimensions {
     if (length < .001) return [];
     final u = (b - a) / length;
     final normal = ArchitectPolygonGeometry.normal(polygon, edge);
-    ArchitectPolygonDistance? inside, outside;
+    ArchitectPolygonDistance? inside, outside, inwardWall;
 
     void inspect(String id, List<Offset> contour, bool internal) {
       for (var j = 0; j < contour.length; j++) {
@@ -119,9 +122,74 @@ class ArchitectPolygonDimensions {
       }
     }
 
+    void inspectWall(String id, List<Offset> contour) {
+      for (var j = 0; j < contour.length; j++) {
+        final c = contour[j], d = contour[(j + 1) % contour.length];
+        final delta = d - c;
+        if (delta.distance < .001 ||
+            ArchitectPolygonGeometry.cross(u, delta / delta.distance).abs() >
+                1e-3) {
+          continue;
+        }
+        final cAlong = ArchitectPolygonGeometry.dot(c - a, u);
+        final dAlong = ArchitectPolygonGeometry.dot(d - a, u);
+        final low = math.max(0.0, math.min(cAlong, dAlong));
+        final high = math.min(length, math.max(cAlong, dAlong));
+        if (high - low < .001) continue;
+        final signed = ArchitectPolygonGeometry.dot(c - a, normal);
+        final wallNormal = ArchitectPolygonGeometry.normal(contour, j);
+        final normalDot = ArchitectPolygonGeometry.dot(normal, wallNormal);
+
+        if (signed >= .001 && normalDot <= -.999) {
+          final distance = signed.abs();
+          if (outside != null && outside!.distance <= distance) continue;
+          final start = a + u * ((low + high) / 2);
+          outside = ArchitectPolygonDistance(
+            referenceId: id,
+            referenceEdge: j,
+            edge: edge,
+            side: 1,
+            distance: distance,
+            start: start,
+            end: start + normal * signed,
+            normal: normal,
+          );
+        } else if (signed <= -.001 && normalDot >= .999) {
+          // Wall lies inside the polygon (e.g. building wall under a roof overhang).
+          // Measure from the roof/polygon edge inward to the wall's exterior face.
+          final distance = signed.abs();
+          if (inwardWall != null && inwardWall!.distance <= distance) continue;
+          final start = a + u * ((low + high) / 2);
+          inwardWall = ArchitectPolygonDistance(
+            referenceId: id,
+            referenceEdge: j,
+            edge: edge,
+            side: -1,
+            distance: distance,
+            start: start,
+            end: start + normal * signed,
+            normal: normal,
+          );
+        }
+      }
+    }
+
     inspect(elementId, polygon, true);
     for (final wall in storey.walls) {
-      inspect(wall.id, wall.polygonCorners, false);
+      inspectWall(wall.id, wall.polygonCorners);
+    }
+    if (project != null) {
+      final activeIdx = project.storeys.indexWhere((s) => s.id == storey.id);
+      for (var i = 0; i < project.storeys.length; i++) {
+        final other = project.storeys[i];
+        if (other.id == storey.id) continue;
+        if (other.elevation <= storey.elevation ||
+            (activeIdx >= 0 && i < activeIdx)) {
+          for (final wall in other.walls) {
+            inspectWall(wall.id, wall.polygonCorners);
+          }
+        }
+      }
     }
     for (final slab in storey.slabs) {
       if (slab.id != elementId) inspect(slab.id, slab.polygon, false);
@@ -132,6 +200,10 @@ class ArchitectPolygonDimensions {
         inspect(primitive.id, primitive.polygonCorners, false);
       }
     }
-    return [if (inside != null) inside!, if (outside != null) outside!];
+    final effectiveInside = inwardWall ?? inside;
+    return [
+      ?effectiveInside,
+      if (outside != null) outside!,
+    ];
   }
 }

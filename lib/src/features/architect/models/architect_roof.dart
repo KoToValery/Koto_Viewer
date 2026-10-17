@@ -663,6 +663,7 @@ class ArchitectRoofPlane {
   final String storeyId;
   List<Offset> points;
   int eavesEdgeIndex;
+  bool reverseSlope;
   double slopeDegrees;
   double baseElevationOffset;
   double eavesOverhang;
@@ -675,6 +676,7 @@ class ArchitectRoofPlane {
     required this.storeyId,
     required this.points,
     this.eavesEdgeIndex = 0,
+    this.reverseSlope = false,
     this.slopeDegrees = 22.0,
     this.baseElevationOffset = 2.80,
     this.eavesOverhang = 0.50,
@@ -697,44 +699,96 @@ class ArchitectRoofPlane {
     return (points[i], points[(i + 1) % points.length]);
   }
 
-  /// Unit vector pointing horizontally from the eaves edge inward (upslope).
-  Offset get slopeDirection {
+  /// Inward normal of the edge at [edgeIndex] pointing toward the polygon centroid.
+  Offset inwardNormalOfEdge(int edgeIndex) {
     if (points.length < 2) return const Offset(0, -1);
-    final (a, b) = eavesEdge;
+    final idx = edgeIndex.clamp(0, points.length - 1);
+    final a = points[idx];
+    final b = points[(idx + 1) % points.length];
     final edgeVec = b - a;
     final len = edgeVec.distance;
     if (len < 1e-6) return const Offset(0, -1);
     final u = edgeVec / len;
     final n1 = Offset(-u.dy, u.dx);
-    final centroid = this.centroid;
+    final c = centroid;
     final mid = (a + b) / 2.0;
-    final toCentroid = centroid - mid;
+    final toCentroid = c - mid;
     return (toCentroid.dx * n1.dx + toCentroid.dy * n1.dy) >= 0 ? n1 : -n1;
   }
+
+  Offset get _rawEavesInwardNormal => inwardNormalOfEdge(safeEavesEdgeIndex);
+
+  /// Unit vector pointing horizontally from the low eaves side toward the high ridge side (upslope).
+  Offset get slopeDirection =>
+      reverseSlope ? -_rawEavesInwardNormal : _rawEavesInwardNormal;
 
   double get slopeRadians => slopeDegrees * math.pi / 180.0;
 
   double get slopePercent => math.tan(slopeRadians) * 100.0;
 
-  /// Horizontal distance from the eaves edge line along `slopeDirection`.
-  /// At the eaves outer edge `signedDistanceFromEaves == 0`.
-  /// At the supporting wall line (`eavesOverhang` inward), `signedDistanceFromEaves == eavesOverhang`.
-  double signedDistanceFromEaves(Offset worldPt) {
-    final (a, _) = eavesEdge;
-    final dir = slopeDirection;
-    final delta = worldPt - a;
-    return delta.dx * dir.dx + delta.dy * dir.dy;
-  }
-
-  /// Maximum horizontal run of this roof plane from eaves to ridge along `slopeDirection`.
-  double get maxSlopeRun {
+  double get _maxRawRun {
     if (points.isEmpty) return 0.0;
+    final (a, _) = eavesEdge;
+    final dir = _rawEavesInwardNormal;
     var maxDist = 0.0;
     for (final p in points) {
-      final d = signedDistanceFromEaves(p);
+      final delta = p - a;
+      final d = delta.dx * dir.dx + delta.dy * dir.dy;
       if (d > maxDist) maxDist = d;
     }
     return maxDist;
+  }
+
+  /// Horizontal distance from the low eaves line along `slopeDirection` (upslope).
+  /// At the low eaves outer edge `signedDistanceFromEaves == 0`.
+  /// At the supporting wall line (`eavesOverhang` inward), `signedDistanceFromEaves == eavesOverhang`.
+  double signedDistanceFromEaves(Offset worldPt) {
+    final (a, _) = eavesEdge;
+    final rawDir = _rawEavesInwardNormal;
+    final delta = worldPt - a;
+    final rawDist = delta.dx * rawDir.dx + delta.dy * rawDir.dy;
+    return reverseSlope ? (_maxRawRun - rawDist) : rawDist;
+  }
+
+  /// Maximum horizontal run of this roof plane from eaves to ridge along `slopeDirection`.
+  double get maxSlopeRun => _maxRawRun;
+
+  /// Sets [edgeIndex] as the lower eaves edge from which the roof slopes upward.
+  ArchitectRoofPlane withEavesEdge(int edgeIndex) => copyWith(
+    eavesEdgeIndex: points.isEmpty
+        ? 0
+        : edgeIndex.clamp(0, points.length - 1),
+    reverseSlope: false,
+  );
+
+  /// Cycles the slope direction to the next polygon edge.
+  ArchitectRoofPlane nextSlopeEdge() => points.length < 2
+      ? this
+      : copyWith(
+          eavesEdgeIndex: (safeEavesEdgeIndex + 1) % points.length,
+          reverseSlope: false,
+        );
+
+  /// Reverses the slope direction by 180°. If the polygon has an opposing parallel
+  /// edge, switches `eavesEdgeIndex` to that edge; otherwise toggles `reverseSlope`.
+  ArchitectRoofPlane flippedSlope() {
+    if (points.length < 3) return copyWith(reverseSlope: !reverseSlope);
+    final currentDir = slopeDirection;
+    int? oppositeIdx;
+    var bestDot = -0.85;
+    for (var i = 0; i < points.length; i++) {
+      if (i == safeEavesEdgeIndex && !reverseSlope) continue;
+      final n = inwardNormalOfEdge(i);
+      final dot = currentDir.dx * n.dx + currentDir.dy * n.dy;
+      if (dot <= bestDot) {
+        bestDot = dot;
+        oppositeIdx = i;
+      }
+    }
+    if (oppositeIdx != null) {
+      return copyWith(eavesEdgeIndex: oppositeIdx, reverseSlope: false);
+    }
+    return copyWith(reverseSlope: !reverseSlope);
   }
 
   /// Bearing underside of rafters (or base surface) at [worldPt], relative to storey floor Z.
@@ -753,7 +807,7 @@ class ArchitectRoofPlane {
   }
 
   double get eavesUndersideElevation =>
-      undersideElevationAt(eavesEdge.$1);
+      baseElevationOffset - eavesOverhang * math.tan(slopeRadians);
 
   double get ridgeTopElevation {
     if (points.isEmpty) return baseElevationOffset;
@@ -823,6 +877,7 @@ class ArchitectRoofPlane {
     String? storeyId,
     List<Offset>? points,
     int? eavesEdgeIndex,
+    bool? reverseSlope,
     double? slopeDegrees,
     double? baseElevationOffset,
     double? eavesOverhang,
@@ -834,6 +889,7 @@ class ArchitectRoofPlane {
     storeyId: storeyId ?? this.storeyId,
     points: points ?? List<Offset>.from(this.points),
     eavesEdgeIndex: eavesEdgeIndex ?? this.eavesEdgeIndex,
+    reverseSlope: reverseSlope ?? this.reverseSlope,
     slopeDegrees: slopeDegrees ?? this.slopeDegrees,
     baseElevationOffset: baseElevationOffset ?? this.baseElevationOffset,
     eavesOverhang: eavesOverhang ?? this.eavesOverhang,
@@ -849,6 +905,7 @@ class ArchitectRoofPlane {
     'storeyId': storeyId,
     'points': points.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
     'eavesEdgeIndex': eavesEdgeIndex,
+    'reverseSlope': reverseSlope,
     'slopeDegrees': slopeDegrees,
     'baseElevationOffset': baseElevationOffset,
     'eavesOverhang': eavesOverhang,
@@ -870,6 +927,7 @@ class ArchitectRoofPlane {
         );
       }).toList(),
       eavesEdgeIndex: json['eavesEdgeIndex'] as int? ?? 0,
+      reverseSlope: json['reverseSlope'] as bool? ?? false,
       slopeDegrees: (json['slopeDegrees'] as num?)?.toDouble() ?? 22.0,
       baseElevationOffset:
           (json['baseElevationOffset'] as num?)?.toDouble() ?? 2.80,

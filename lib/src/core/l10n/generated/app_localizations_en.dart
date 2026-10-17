@@ -5916,4 +5916,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String architectOpeningModularSnap(int step) {
     return 'Modular step ($step cm)';
   }
+
+  @override
+  String get architectRoofSetEavesHere => 'Eaves here';
+
+  @override
+  String get architectRoofSetEavesHereTooltip =>
+      'Set the selected roof edge as the lower eaves edge (slope rises from here)';
+
+  @override
+  String get architectRoofFlipSlope => 'Flip 180°';
+
+  @override
+  String get architectRoofFlipSlopeTooltip =>
+      'Reverse the roof slope direction by 180°';
+
+  @override
+  String get architectRoofRotateSlope => 'Slope dir';
 }

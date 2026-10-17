@@ -1,6 +1,7 @@
 import '../widgets/architect_slab_layers_dialog.dart';
 import '../widgets/architect_roof_layers_dialog.dart';
 import '../widgets/architect_roof_bar.dart';
+import '../rendering/architect_roof_painter_helper.dart';
 import '../services/architect_roof_tool.dart';
 import '../widgets/architect_building_sections_screen.dart';
 import '../widgets/architect_elevations_screen.dart';
@@ -1827,7 +1828,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 rawModel,
                 _currentScale,
                 mode: _polygonEditId == null
-                    ? ArchitectPolygonEdgeMode.pull
+                    ? (_selectedRoof != null
+                          ? ArchitectPolygonEdgeMode.move
+                          : ArchitectPolygonEdgeMode.pull)
                     : _polygonEdgeMode,
               ))) {
       _elementMoveOriginal = _project;
@@ -2944,12 +2947,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     if (_isDraggingVertexOrHandle && !_handleMoved) {
-      if (_polygonEditId != null) {
-        _selectPolygonEdge(_screenToModel(event.localPosition));
+      final pos = _screenToModel(event.localPosition);
+      if (_polygonEditId != null || _selectedRoof != null) {
+        _selectPolygonEdge(pos);
       }
       _cancelActiveDrags();
-      if (_polygonEditId == null && !_moveSelection) {
-        _selectAt(_screenToModel(event.localPosition), toggle:
+      if (_polygonEditId == null &&
+          _selectedRoof == null &&
+          !_moveSelection) {
+        _selectAt(pos, toggle:
             _multiSelect || _activeTool == ArchitectTool.select ||
             HardwareKeyboard.instance.isShiftPressed ||
             HardwareKeyboard.instance.isControlPressed);
@@ -3092,7 +3098,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         );
         _saveBiMProjectIfAttached();
-        if (_polygonEditId == id) _polygonSelectedEdge = editedEdge;
+        if (_polygonEditId == id || _selectedRoof?.id == id) {
+          _polygonSelectedEdge = editedEdge;
+        }
       } else if (!valid) {
         _operationError();
       }
@@ -3696,23 +3704,51 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // Active selection tap handling: toggle in multi-select or select tool, replace in single-select, or cancel on empty space
     if (_effectiveSelection.isNotEmpty) {
-      // If a single roof plane is selected and the user taps near one of its edges,
-      // switch its eaves edge directly with 1 tap!
       final selectedRoof = _selectedRoof;
       if (selectedRoof != null && !_multiSelect) {
+        // 1. Tap on the central slope direction arrow/badge rotates slope direction
+        if (ArchitectRoofPainterHelper.hitTestSlopeIndicator(
+          selectedRoof,
+          rawModel,
+          scale: _currentScale,
+        )) {
+          final nextRoof = selectedRoof.nextSlopeEdge();
+          setState(() {
+            _commands.execute(
+              UpdateArchitectRoofPlane(
+                storeyId: _project.activeStoreyId,
+                roof: nextRoof,
+              ),
+            );
+            _polygonSelectedEdge = nextRoof.safeEavesEdgeIndex;
+          });
+          _saveBiMProjectIfAttached();
+          HapticFeedback.selectionClick();
+          return;
+        }
+
+        // 2. Tap near a roof edge selects that edge for dynamic wall distance editing
+        //    (and a second tap on the already-selected edge sets it as the eaves edge).
         final edgeIdx = ArchitectRoofTool.hitTestEdgeIndex(
           selectedRoof,
           rawModel,
           tolerance: math.min(18.0 / _currentScale, 0.35),
         );
-        if (edgeIdx != null && edgeIdx != selectedRoof.safeEavesEdgeIndex) {
-          _commands.execute(
-            UpdateArchitectRoofPlane(
-              storeyId: _project.activeStoreyId,
-              roof: selectedRoof.copyWith(eavesEdgeIndex: edgeIdx),
-            ),
-          );
-          _saveBiMProjectIfAttached();
+        if (edgeIdx != null) {
+          setState(() {
+            if (_polygonSelectedEdge == edgeIdx &&
+                (edgeIdx != selectedRoof.safeEavesEdgeIndex ||
+                    selectedRoof.reverseSlope)) {
+              _commands.execute(
+                UpdateArchitectRoofPlane(
+                  storeyId: _project.activeStoreyId,
+                  roof: selectedRoof.withEavesEdge(edgeIdx),
+                ),
+              );
+              _saveBiMProjectIfAttached();
+            }
+            _polygonSelectedEdge = edgeIdx;
+          });
           HapticFeedback.selectionClick();
           return;
         }
@@ -3913,6 +3949,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ..clear()
             ..add(created.id);
           _selectedElementId = created.id;
+          _polygonSelectedEdge = created.safeEavesEdgeIndex;
           _activeMagneticGuides = [];
           _activeSnapLabel = null;
         });
@@ -4668,26 +4705,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     ),
   );
 
+  String? get _activePolygonDistanceElementId =>
+      _polygonEditId ?? _selectedRoof?.id;
+
   List<Offset>? get _editablePolygon {
-    if (_polygonEditId == null ||
-        _polygonEditId != (_selectedElementId ?? _selectedZoneId)) {
+    final targetId = _activePolygonDistanceElementId;
+    if (targetId == null ||
+        targetId != (_selectedElementId ?? _selectedZoneId)) {
       return null;
     }
     final storey = (_elementMovePreview ?? _project).activeStorey;
     for (final slab in storey.slabs) {
-      if (slab.id == _polygonEditId) return slab.polygon;
+      if (slab.id == targetId) return slab.polygon;
     }
     for (final roof in storey.roofs) {
-      if (roof.id == _polygonEditId) return roof.points;
+      if (roof.id == targetId) return roof.points;
     }
     for (final primitive in storey.cadPrimitives) {
-      if (primitive.id == _polygonEditId &&
+      if (primitive.id == targetId &&
           primitive.type == CadPrimitiveType.rect) {
         return primitive.polygonCorners;
       }
     }
     for (final zone in storey.zones) {
-      if (zone.id == _polygonEditId) return zone.polygon;
+      if (zone.id == targetId) return zone.polygon;
     }
     return null;
   }
@@ -4727,11 +4768,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       animation: Listenable.merge([_viewport, _previewRevision]),
       builder: (context, child) {
         final polygon = _editablePolygon;
-        if (polygon == null || _radialMenuScreenPosition != null) {
+        final targetId = _activePolygonDistanceElementId;
+        if (polygon == null ||
+            targetId == null ||
+            _radialMenuScreenPosition != null) {
           return const SizedBox.shrink();
         }
         final edge = _polygonSelectedEdge;
         final selected = edge != null && edge < polygon.length;
+        final effectiveProject = _elementMovePreview ?? _project;
         return Stack(
           children: [
             if (selected && !_polygonEditor.active)
@@ -4740,115 +4785,118 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   polygon: polygon,
                   edge: edge,
                   dimensions: ArchitectPolygonDimensions.nearest(
-                    elementId: _polygonEditId!,
+                    elementId: targetId,
                     polygon: polygon,
                     edge: edge,
-                    storey: (_elementMovePreview ?? _project).activeStorey,
+                    storey: effectiveProject.activeStorey,
+                    project: effectiveProject,
                   ),
                   unit: _project.units,
                   scale: _currentScale,
                   toScreen: _viewport.toScreen,
                   obstacles: ArchitectWallNetwork.body(
-                    (_elementMovePreview ?? _project).activeStorey.walls,
+                    effectiveProject.activeStorey.walls,
                   ),
                   onEdit: (dimension) => _editPolygonDistance(dimension),
                 ),
               ),
-            Positioned(
-              top: 8,
-              left: 8,
-              right: 64,
-              child: Material(
-                color: const Color(0xEE1E242C),
-                elevation: 4,
-                shadowColor: Colors.black54,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: const BorderSide(color: Colors.white24),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    for (final mode in ArchitectPolygonEdgeMode.values)
+            if (_polygonEditId != null)
+              Positioned(
+                top: 8,
+                left: 8,
+                right: 64,
+                child: Material(
+                  color: const Color(0xEE1E242C),
+                  elevation: 4,
+                  shadowColor: Colors.black54,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: const BorderSide(color: Colors.white24),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                      for (final mode in ArchitectPolygonEdgeMode.values)
+                        IconButton(
+                          key: ValueKey('polygon-edge-${mode.name}'),
+                          constraints: const BoxConstraints.tightFor(
+                            width: 44,
+                            height: 44,
+                          ),
+                          padding: EdgeInsets.zero,
+                          tooltip: mode == ArchitectPolygonEdgeMode.move
+                              ? context.l10n.architectEdgeMoveHint
+                              : context.l10n.architectEdgePullHint,
+                          icon: Icon(
+                            mode == ArchitectPolygonEdgeMode.move
+                                ? Icons.open_with
+                                : Icons.unfold_more,
+                            size: 20,
+                            color: _polygonEdgeMode == mode
+                                ? Colors.cyanAccent
+                                : Colors.white70,
+                          ),
+                          onPressed:
+                              _polygonDistanceOpen || _polygonEditor.active
+                              ? null
+                              : () => setState(() => _polygonEdgeMode = mode),
+                        ),
+                      Expanded(
+                        child: !selected
+                            ? Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                child: Text(
+                                  context.l10n.architectEdgeSelectHint,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              )
+                            : TextButton.icon(
+                                key: const ValueKey('polygon-edge-offset'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.cyanAccent,
+                                ),
+                                onPressed: _polygonDistanceOpen
+                                    ? null
+                                    : () => _editPolygonDistance(null),
+                                icon: const Icon(Icons.swap_vert, size: 18),
+                                label: Text(
+                                  context.l10n.architectZoneOffset,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                      ),
                       IconButton(
-                        key: ValueKey('polygon-edge-${mode.name}'),
+                        key: const ValueKey('polygon-edit-close'),
                         constraints: const BoxConstraints.tightFor(
                           width: 44,
                           height: 44,
                         ),
                         padding: EdgeInsets.zero,
-                        tooltip: mode == ArchitectPolygonEdgeMode.move
-                            ? context.l10n.architectEdgeMoveHint
-                            : context.l10n.architectEdgePullHint,
-                        icon: Icon(
-                          mode == ArchitectPolygonEdgeMode.move
-                              ? Icons.open_with
-                              : Icons.unfold_more,
-                          size: 20,
-                          color: _polygonEdgeMode == mode
-                              ? Colors.cyanAccent
-                              : Colors.white70,
-                        ),
-                        onPressed: _polygonDistanceOpen || _polygonEditor.active
+                        tooltip: context.l10n.close,
+                        onPressed: _polygonDistanceOpen
                             ? null
-                            : () => setState(() => _polygonEdgeMode = mode),
+                            : () => setState(() {
+                                _polygonEditId = null;
+                                _polygonSelectedEdge = null;
+                              }),
+                        icon: const Icon(
+                          Icons.check,
+                          size: 20,
+                          color: Colors.cyanAccent,
+                        ),
                       ),
-                    Expanded(
-                      child: !selected
-                          ? Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                              child: Text(
-                                context.l10n.architectEdgeSelectHint,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            )
-                          : TextButton.icon(
-                              key: const ValueKey('polygon-edge-offset'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.cyanAccent,
-                              ),
-                              onPressed: _polygonDistanceOpen
-                                  ? null
-                                  : () => _editPolygonDistance(null),
-                              icon: const Icon(Icons.swap_vert, size: 18),
-                              label: Text(
-                                context.l10n.architectZoneOffset,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                    ),
-                    IconButton(
-                      key: const ValueKey('polygon-edit-close'),
-                      constraints: const BoxConstraints.tightFor(
-                        width: 44,
-                        height: 44,
-                      ),
-                      padding: EdgeInsets.zero,
-                      tooltip: context.l10n.close,
-                      onPressed: _polygonDistanceOpen
-                          ? null
-                          : () => setState(() {
-                              _polygonEditId = null;
-                              _polygonSelectedEdge = null;
-                            }),
-                      icon: const Icon(
-                        Icons.check,
-                        size: 20,
-                        color: Colors.cyanAccent,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
           ],
         );
       },
@@ -4858,14 +4906,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Future<void> _editPolygonDistance(ArchitectPolygonDistance? dimension) async {
     if (_polygonDistanceOpen) return;
     final polygon = _editablePolygon, edge = _polygonSelectedEdge;
-    final id = _polygonEditId;
+    final id = _activePolygonDistanceElementId;
     if (polygon == null || edge == null || id == null) return;
     final original = List<Offset>.of(polygon);
-    final mode = _polygonEdgeMode;
+    final isRoofDirect = _polygonEditId == null && _selectedRoof?.id == id;
+    final mode = isRoofDirect
+        ? ArchitectPolygonEdgeMode.move
+        : _polygonEdgeMode;
     final project = _project;
     final unit = project.units;
     List<Offset>? candidate = original;
     var displacement = 0.0;
+    var enteredMeters = dimension?.distance ?? 0.0;
     final normal = ArchitectPolygonGeometry.normal(original, edge);
     final midpoint =
         (original[edge] + original[(edge + 1) % original.length]) / 2;
@@ -4896,6 +4948,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 canSave: candidate != null && identical(project, _project),
                 onChanged: (_, value) {
                   final meters = unit.fromUnit(value);
+                  enteredMeters = meters;
                   displacement = dimension == null
                       ? meters
                       : dimension.side * (dimension.distance - meters);
@@ -4928,13 +4981,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   }
                   _elementMovePreview = null;
                   if (displacement.abs() > ArchitectPolygonGeometry.epsilon) {
-                    _commands.execute(
-                      UpdateArchitectPolygon(
-                        storeyId: project.activeStoreyId,
-                        elementId: id,
-                        polygon: candidate!,
-                      ),
-                    );
+                    final roof = _selectedRoof;
+                    if (roof != null &&
+                        roof.id == id &&
+                        dimension != null &&
+                        dimension.side == -1 &&
+                        edge == roof.safeEavesEdgeIndex) {
+                      _roofTool.setEavesOverhang(enteredMeters);
+                      _commands.execute(
+                        UpdateArchitectRoofPlane(
+                          storeyId: project.activeStoreyId,
+                          roof: roof.copyWith(
+                            points: candidate!,
+                            eavesOverhang: enteredMeters,
+                          ),
+                        ),
+                      );
+                    } else {
+                      _commands.execute(
+                        UpdateArchitectPolygon(
+                          storeyId: project.activeStoreyId,
+                          elementId: id,
+                          polygon: candidate!,
+                        ),
+                      );
+                    }
                     _saveBiMProjectIfAttached();
                   }
                   _polygonSelectedEdge = ArchitectPolygonDimensions.hitEdge(
@@ -5534,6 +5605,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           color: const Color(0xFF00E5FF),
         ),
       );
+      if (isRoof) {
+        items.add(
+          _radialItem(
+            action: ArchitectRadialAction.rotate,
+            color: const Color(0xFF40C4FF),
+          ),
+        );
+        items.add(
+          _radialItem(
+            action: ArchitectRadialAction.flip,
+            color: const Color(0xFF80D8FF),
+          ),
+        );
+      }
       items.add(
         _radialItem(
           action: ArchitectRadialAction.move,
@@ -5726,7 +5811,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _cancelActiveDrags();
           setState(() {
             _polygonEditId = id;
-            _polygonSelectedEdge = null;
+            _polygonSelectedEdge = _selectedRoof?.safeEavesEdgeIndex;
             _moveSelection = false;
           });
         } else if (_selectedWall != null) {
@@ -5754,6 +5839,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _handleAxisRotate(axis);
           break;
         }
+        final roofToRotate = _project.activeStorey.roofs
+            .where((r) => r.id == id)
+            .firstOrNull;
+        if (roofToRotate != null) {
+          final nextRoof = roofToRotate.nextSlopeEdge();
+          setState(() {
+            _commands.execute(
+              UpdateArchitectRoofPlane(
+                storeyId: _project.activeStoreyId,
+                roof: nextRoof,
+              ),
+            );
+            _polygonSelectedEdge = nextRoof.safeEavesEdgeIndex;
+          });
+          _saveBiMProjectIfAttached();
+          HapticFeedback.mediumImpact();
+          break;
+        }
         final nextStorey = _elementTool.rotateElementById(
           _project.activeStorey,
           id,
@@ -5764,6 +5867,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         break;
 
       case ArchitectRadialAction.flip:
+        final roofToFlip = _project.activeStorey.roofs
+            .where((r) => r.id == id)
+            .firstOrNull;
+        if (roofToFlip != null) {
+          final nextRoof = roofToFlip.flippedSlope();
+          setState(() {
+            _commands.execute(
+              UpdateArchitectRoofPlane(
+                storeyId: _project.activeStoreyId,
+                roof: nextRoof,
+              ),
+            );
+            _polygonSelectedEdge = nextRoof.safeEavesEdgeIndex;
+          });
+          _saveBiMProjectIfAttached();
+          HapticFeedback.mediumImpact();
+          break;
+        }
         final nextStorey = _elementTool.flipElementById(
           _project.activeStorey,
           id,
@@ -5897,6 +6018,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _zoneTool.startEditingZone(zone);
         } else if (_project.gridAxes.any((e) => e.id == primary)) {
           _axisTool.selectAxis(primary);
+        } else if (_selectionIds.length == 1) {
+          final roof = _project.activeStorey.roofs
+              .where((r) => r.id == primary)
+              .firstOrNull;
+          if (roof != null) {
+            final edgeHit = ArchitectRoofTool.hitTestEdgeIndex(
+              roof,
+              point,
+              tolerance: math.min(18.0 / _currentScale, 0.35),
+            );
+            _polygonSelectedEdge = edgeHit ?? roof.safeEavesEdgeIndex;
+          }
         }
       }
     });
@@ -6034,6 +6167,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ..clear()
         ..add(generated.first.id);
       _selectedElementId = generated.first.id;
+      _polygonSelectedEdge = generated.first.safeEavesEdgeIndex;
       _multiSelect = false;
     });
     _saveBiMProjectIfAttached();
@@ -7621,7 +7755,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     if ((_activeTool == ArchitectTool.roof ||
                             _selectedRoof != null) &&
                         !_is3DView &&
-                        _polygonEditId == null)
+                        (_polygonEditId == null ||
+                            _polygonEditId == _selectedRoof?.id))
                       Positioned(
                         top: 10,
                         left: 8,
@@ -7629,22 +7764,62 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         child: ArchitectRoofBar(
                           tool: _roofTool,
                           selectedRoof: _selectedRoof,
+                          selectedEdgeIndex: _polygonSelectedEdge,
                           onAutoRoof: _handleAutoRoof,
                           onOpenLayersDialog: () =>
                               _openRoofLayersDialog(roof: _selectedRoof),
                           onSwitchEavesEdge: () {
                             final sel = _selectedRoof;
                             if (sel == null || sel.points.length < 3) return;
-                            final nextEdge =
-                                (sel.safeEavesEdgeIndex + 1) %
-                                sel.points.length;
+                            final nextRoof = sel.nextSlopeEdge();
                             setState(() {
                               _commands.execute(
                                 UpdateArchitectRoofPlane(
                                   storeyId: _project.activeStoreyId,
-                                  roof: sel.copyWith(eavesEdgeIndex: nextEdge),
+                                  roof: nextRoof,
                                 ),
                               );
+                              _polygonSelectedEdge =
+                                  nextRoof.safeEavesEdgeIndex;
+                            });
+                            _saveBiMProjectIfAttached();
+                            HapticFeedback.selectionClick();
+                          },
+                          onFlipSlopeDirection: () {
+                            final sel = _selectedRoof;
+                            if (sel == null || sel.points.length < 3) return;
+                            final nextRoof = sel.flippedSlope();
+                            setState(() {
+                              _commands.execute(
+                                UpdateArchitectRoofPlane(
+                                  storeyId: _project.activeStoreyId,
+                                  roof: nextRoof,
+                                ),
+                              );
+                              _polygonSelectedEdge =
+                                  nextRoof.safeEavesEdgeIndex;
+                            });
+                            _saveBiMProjectIfAttached();
+                            HapticFeedback.selectionClick();
+                          },
+                          onSetSelectedEdgeAsEaves: () {
+                            final sel = _selectedRoof;
+                            final edgeIdx = _polygonSelectedEdge;
+                            if (sel == null ||
+                                edgeIdx == null ||
+                                sel.points.length < 3) {
+                              return;
+                            }
+                            final nextRoof = sel.withEavesEdge(edgeIdx);
+                            setState(() {
+                              _commands.execute(
+                                UpdateArchitectRoofPlane(
+                                  storeyId: _project.activeStoreyId,
+                                  roof: nextRoof,
+                                ),
+                              );
+                              _polygonSelectedEdge =
+                                  nextRoof.safeEavesEdgeIndex;
                             });
                             _saveBiMProjectIfAttached();
                             HapticFeedback.selectionClick();
@@ -7697,6 +7872,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                   ..clear()
                                   ..add(created.id);
                                 _selectedElementId = created.id;
+                                _polygonSelectedEdge =
+                                    created.safeEavesEdgeIndex;
                               });
                               _saveBiMProjectIfAttached();
                               HapticFeedback.mediumImpact();

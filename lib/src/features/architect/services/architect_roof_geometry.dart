@@ -356,8 +356,11 @@ class ArchitectRoofGeometry {
   static (Offset, Offset)? wallBearingLine(ArchitectRoofPlane roof) {
     if (roof.eavesOverhang <= 0.01 || roof.points.length < 3) return null;
     final (ea, eb) = roof.eavesEdge;
-    final dir = roof.slopeDirection;
-    final shift = dir * roof.eavesOverhang;
+    final inward = roof.inwardNormalOfEdge(roof.safeEavesEdgeIndex);
+    final shift = inward *
+        (roof.reverseSlope
+            ? (roof.maxSlopeRun - roof.eavesOverhang)
+            : roof.eavesOverhang);
     final lineA = ea + shift;
     final lineB = eb + shift;
     final edgeDir = eb - ea;
