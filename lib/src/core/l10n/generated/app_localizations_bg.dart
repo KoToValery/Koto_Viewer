@@ -5967,4 +5967,64 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectRoofRotateSlope => 'Посока скат';
+
+  @override
+  String get cad3dOrbit => 'Завъртане';
+
+  @override
+  String get cad3dPan => 'Преместване';
+
+  @override
+  String get cad3dWalk => 'Разходка';
+
+  @override
+  String get cad3dNativeDepthOn => 'Ускорено 3D';
+
+  @override
+  String get cad3dNativeDepthOff => 'Съвместим режим';
+
+  @override
+  String get cad3dShadingSmooth => 'Осветен';
+
+  @override
+  String get cad3dShadingFlat => 'Плосък';
+
+  @override
+  String get cad3dShadingXray => 'Прозрачен';
+
+  @override
+  String get cad3dCamera => 'Изглед';
+
+  @override
+  String get cad3dInvertY => 'Обърни вертикалното оглеждане';
+
+  @override
+  String get cad3dViewIsometric => 'Изометрия';
+
+  @override
+  String get cad3dViewTop => 'Отгоре';
+
+  @override
+  String get cad3dViewFront => 'Отпред';
+
+  @override
+  String get cad3dViewRight => 'Отдясно';
+
+  @override
+  String get cad3dViewBottom => 'Отдолу';
+
+  @override
+  String get cad3dViewBack => 'Отзад';
+
+  @override
+  String get cad3dThemeBlueprint => 'Чертеж';
+
+  @override
+  String get cad3dThemeStudio => 'Студио';
+
+  @override
+  String get cad3dThemeBlack => 'Черен';
+
+  @override
+  String get cad3dThemeWhite => 'Бял';
 }

@@ -74,6 +74,8 @@ dependencies:
   video_player_win: ^3.3.0
   web: ^1.1.1
   in_app_update: ^5.0.0
+  thermion_flutter: 0.5.0
+  thermion_dart: 0.5.0
 
 dependency_overrides:
   archive: ^3.6.1
@@ -93,7 +95,8 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.2
   image: ^4.3.0
-  ffigen: ^21.0.0
+  # Thermion 0.5 uses hooks 1.x; this generator supports our C-only config.
+  ffigen: ^20.1.1
 
 flutter_launcher_icons:
   android: true

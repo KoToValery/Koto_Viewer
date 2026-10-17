@@ -8,6 +8,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   nsd_windows
   printing
   share_plus
+  thermion_flutter
   url_launcher_windows
   video_player_win
 )

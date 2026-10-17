@@ -14,8 +14,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/l10n/l10n_extensions.dart';
-import '../../dxf_3d_viewer/rendering/cad_3d_camera.dart';
-import '../../dxf_3d_viewer/rendering/cad_3d_mesh_painter.dart';
+import '../../cad_3d/cad_3d_controller.dart';
+import '../widgets/architect_3d_viewport.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../bim_projects/models/bim_work_project.dart';
 import '../../bim_projects/models/bim_coordinate_frame.dart';
@@ -38,7 +38,6 @@ import '../rendering/architect_2d_painter.dart';
 import '../rendering/architect_canvas_palette.dart';
 import '../rendering/architect_ghost_storey_painter.dart';
 import '../widgets/architect_workspace_settings_dialog.dart';
-import '../rendering/architect_3d_builder.dart';
 import '../rendering/architect_snap_helper.dart';
 import '../rendering/architect_wall_snap.dart';
 import '../rendering/architect_wall_geometry.dart';
@@ -936,11 +935,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _resetWorkspaceView() {
     if (_is3DView) {
-      setState(() {
-        _camera3D.yaw = math.pi / 4;
-        _camera3D.pitch = .6;
-        _camera3D.zoom = 1;
-      });
+      _camera3D.reset();
     } else {
       _initTransform();
     }
@@ -1464,7 +1459,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _elementMoveSession?.finish(_elementMoveContext, changed: changed);
   final BimViewportController _viewport = BimViewportController();
   bool _hasFramedViewport = false;
-  late Cad3DCamera _camera3D;
+  final Cad3DController _camera3D = Cad3DController();
 
   // Pointer ownership and navigation live in ArchitectViewport.
   bool _isHandleEngaged = false;
@@ -1551,13 +1546,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _loadAttachedBimProject();
     }
 
-    _camera3D = Cad3DCamera(
-      yaw: math.pi / 4,
-      pitch: 0.6,
-      zoom: 1.0,
-      mode: Cad3DInteractionMode.orbit,
-    );
-
     // Initial camera scale for 2D canvas: 1 meter = 40 logical pixels
   }
 
@@ -1623,6 +1611,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _elementTool.dispose();
     _roofTool.dispose();
     _viewport.dispose();
+    _camera3D.dispose();
     _previewRevision.dispose();
     super.dispose();
   }
@@ -9185,33 +9174,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   // === SECTION: 3D SOLID VIEWPORT ===
 
-  Widget _build3DViewport() {
-    final mesh = Architect3dBuilder.buildProjectMesh(_project);
-
-    return GestureDetector(
-      onPanUpdate: (details) {
-        setState(() {
-          _camera3D.yaw += details.delta.dx * 0.01;
-          _camera3D.pitch = (_camera3D.pitch + details.delta.dy * 0.01).clamp(
-            0.05,
-            math.pi / 2 - 0.05,
-          );
-        });
-      },
-      child: Container(
-        color: const Color(0xFF181A20),
-        child: CustomPaint(
-          size: Size.infinite,
-          painter: Cad3DMeshPainter(
-            mesh: mesh,
-            camera: _camera3D,
-            shadingMode: Cad3DShadingMode.smoothShaded,
-            theme: Cad3DTheme.darkCad,
-            showGrid: true,
-            isInteracting: false,
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _build3DViewport() => Architect3dViewport(
+    project: _modelCommands.project,
+    controller: _camera3D,
+  );
 }

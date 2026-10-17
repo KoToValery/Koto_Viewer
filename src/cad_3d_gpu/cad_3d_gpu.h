@@ -20,24 +20,24 @@ extern "C" {
 #endif
 
 /**
- * Checks whether native GPU / OpenGL hardware acceleration is available.
- * Returns 1 if available, 0 if software fallback will be used.
+ * Checks whether this native software depth renderer is available.
+ * The legacy GPU symbol names are retained for ABI compatibility.
  */
 KOTO_GPU_API int32_t cad_3d_gpu_is_available(void);
 
 /**
- * Initializes the GPU offscreen rendering context and depth-stencil framebuffer.
+ * Allocates the native offscreen depth buffer. No hardware context is created.
  * Returns 1 on success, 0 on failure.
  */
 KOTO_GPU_API int32_t cad_3d_gpu_init(int32_t width, int32_t height);
 
 /**
- * Destroys the GPU offscreen context and releases all vertex and depth buffers.
+ * Releases native vertex and depth buffers.
  */
 KOTO_GPU_API void cad_3d_gpu_destroy(void);
 
 /**
- * Uploads triangle mesh data to the GPU.
+ * Copies triangle mesh data into native memory.
  *
  * @param positions Contiguous array of 3D coordinates (x, y, z) per vertex (3 vertices per triangle).
  * @param normals   Contiguous array of 3D normals (nx, ny, nz) per vertex.
@@ -56,7 +56,7 @@ KOTO_GPU_API int32_t cad_3d_gpu_upload_mesh(
 );
 
 /**
- * Renders the uploaded mesh into the destination RGBA pixel buffer using hardware Z-buffering.
+ * Renders the mesh into the destination RGBA buffer using software Z-buffering.
  *
  * @param mvpMatrix 16-element column-major 4x4 Model-View-Projection matrix.
  * @param lightParams 16-element array of lighting parameters (key, fill, headlight, ambient, etc.).

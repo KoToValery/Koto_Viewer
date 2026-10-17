@@ -1,2 +1,2 @@
-export 'cad_3d_gpu_bindings_stub.dart'
-    if (dart.library.ffi) 'cad_3d_gpu_bindings_native.dart';
+// Compatibility export; shared 3D implementation lives outside the file viewer.
+export '../../cad_3d/rendering/cad_3d_gpu_bindings.dart';

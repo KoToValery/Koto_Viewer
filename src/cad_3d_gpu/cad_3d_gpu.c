@@ -4,18 +4,6 @@
 #include <string.h>
 #include <math.h>
 
-#if defined(__ANDROID__)
-  #include <EGL/egl.h>
-  #include <GLES3/gl3.h>
-  #include <android/log.h>
-  #define LOG_TAG "Kotoview3DGPU"
-  #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-  #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#else
-  #include <stdio.h>
-  #define LOGI(...) printf(__VA_ARGS__)
-  #define LOGE(...) fprintf(stderr, __VA_ARGS__)
-#endif
 
 /* ---------------------------------------------------------------------------
  * Internal Mesh Storage
@@ -33,112 +21,28 @@ static int32_t g_width = 0;
 static int32_t g_height = 0;
 static float* g_depthBuffer = NULL;
 
-#if defined(__ANDROID__)
-static EGLDisplay g_eglDisplay = EGL_NO_DISPLAY;
-static EGLContext g_eglContext = EGL_NO_CONTEXT;
-static EGLSurface g_eglSurface = EGL_NO_SURFACE;
-static GLuint g_fbo = 0;
-static GLuint g_colorTex = 0;
-static GLuint g_depthRbo = 0;
-static GLuint g_shaderProgram = 0;
-static GLuint g_vbo = 0;
-static int32_t g_glesInitialized = 0;
-#endif
 
 /* ---------------------------------------------------------------------------
  * Public API Implementations
  * --------------------------------------------------------------------------- */
 
 int32_t cad_3d_gpu_is_available(void) {
+    /* Legacy ABI name: this library provides native SOFTWARE depth rendering. */
     return 1;
 }
 
 int32_t cad_3d_gpu_init(int32_t width, int32_t height) {
     if (width <= 0 || height <= 0) return 0;
+    if (g_depthBuffer && g_width == width && g_height == height) return 1;
+
+    /* No unused EGL context: resizing a CPU rasterizer only needs CPU storage. */
+    float* replacement = (float*)malloc(sizeof(float) * (size_t)width * (size_t)height);
+    if (!replacement) return 0;
+    free(g_depthBuffer);
+    g_depthBuffer = replacement;
     g_width = width;
     g_height = height;
 
-    /* Allocate depth buffer for hardware/simulated rasterizer */
-    if (g_depthBuffer != NULL) {
-        free(g_depthBuffer);
-    }
-    g_depthBuffer = (float*)malloc(sizeof(float) * (size_t)width * (size_t)height);
-    if (!g_depthBuffer) return 0;
-
-#if defined(__ANDROID__)
-    /* Initialize EGL 1.4 context on Android */
-    g_eglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    if (g_eglDisplay == EGL_NO_DISPLAY) {
-        LOGE("eglGetDisplay failed\n");
-        return 1; /* fallback enabled */
-    }
-
-    EGLint major = 0, minor = 0;
-    if (!eglInitialize(g_eglDisplay, &major, &minor)) {
-        LOGE("eglInitialize failed\n");
-        return 1;
-    }
-
-    const EGLint configAttribs[] = {
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
-        EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
-        EGL_RED_SIZE, 8,
-        EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE, 8,
-        EGL_ALPHA_SIZE, 8,
-        EGL_DEPTH_SIZE, 24,
-        EGL_NONE
-    };
-
-    EGLConfig config;
-    EGLint numConfigs = 0;
-    if (!eglChooseConfig(g_eglDisplay, configAttribs, &config, 1, &numConfigs) || numConfigs < 1) {
-        LOGE("eglChooseConfig failed\n");
-        return 1;
-    }
-
-    const EGLint contextAttribs[] = {
-        EGL_CONTEXT_CLIENT_VERSION, 3,
-        EGL_NONE
-    };
-
-    g_eglContext = eglCreateContext(g_eglDisplay, config, EGL_NO_CONTEXT, contextAttribs);
-    if (g_eglContext == EGL_NO_CONTEXT) {
-        LOGE("eglCreateContext failed\n");
-        return 1;
-    }
-
-    const EGLint pbufferAttribs[] = {
-        EGL_WIDTH, width,
-        EGL_HEIGHT, height,
-        EGL_NONE
-    };
-
-    g_eglSurface = eglCreatePbufferSurface(g_eglDisplay, config, pbufferAttribs);
-    if (!eglMakeCurrent(g_eglDisplay, g_eglSurface, g_eglSurface, g_eglContext)) {
-        LOGE("eglMakeCurrent failed\n");
-        return 1;
-    }
-
-    /* Create Framebuffer with 24-bit Depth Buffer */
-    glGenFramebuffers(1, &g_fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, g_fbo);
-
-    glGenTextures(1, &g_colorTex);
-    glBindTexture(GL_TEXTURE_2D, g_colorTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_colorTex, 0);
-
-    glGenRenderbuffers(1, &g_depthRbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, g_depthRbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, g_depthRbo);
-
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
-        g_glesInitialized = 1;
-        LOGI("GLES3 24-bit Depth Buffer Framebuffer initialized: %dx%d\n", width, height);
-    }
-#endif
 
     return 1;
 }
@@ -155,19 +59,6 @@ void cad_3d_gpu_destroy(void) {
         g_depthBuffer = NULL;
     }
 
-#if defined(__ANDROID__)
-    if (g_fbo) { glDeleteFramebuffers(1, &g_fbo); g_fbo = 0; }
-    if (g_colorTex) { glDeleteTextures(1, &g_colorTex); g_colorTex = 0; }
-    if (g_depthRbo) { glDeleteRenderbuffers(1, &g_depthRbo); g_depthRbo = 0; }
-    if (g_eglDisplay != EGL_NO_DISPLAY) {
-        eglMakeCurrent(g_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-        if (g_eglSurface != EGL_NO_SURFACE) eglDestroySurface(g_eglDisplay, g_eglSurface);
-        if (g_eglContext != EGL_NO_CONTEXT) eglDestroyContext(g_eglDisplay, g_eglContext);
-        eglTerminate(g_eglDisplay);
-        g_eglDisplay = EGL_NO_DISPLAY;
-    }
-    g_glesInitialized = 0;
-#endif
 }
 
 int32_t cad_3d_gpu_upload_mesh(
@@ -259,7 +150,7 @@ int32_t cad_3d_gpu_render(
         if (!cad_3d_gpu_init(width, height)) return 0;
     }
 
-    /* 1. Clear color and 24-bit depth buffer (Z = 1.0f far plane) */
+    /* 1. Clear color and floating-point depth buffer (Z = 1.0f far plane) */
     memset(outRgbaPixels, 0, (size_t)width * (size_t)height * 4);
     for (int32_t i = 0; i < width * height; ++i) {
         g_depthBuffer[i] = 1.0f;
@@ -337,7 +228,7 @@ int32_t cad_3d_gpu_render(
                 continue;
             }
 
-            /* Hardware Polygon Offset: subtle offset toward camera for cladding (pass 1) */
+            /* Native depth bias: subtle offset toward camera for cladding (pass 1) */
             const float zOffset = (pass == 1) ? -0.00002f : 0.0f;
             const float z0 = (ndcZ0 * 0.5f + 0.5f) + zOffset;
             const float z1 = (ndcZ1 * 0.5f + 0.5f) + zOffset;
@@ -407,7 +298,7 @@ int32_t cad_3d_gpu_render(
                         const float zVal = w0 * z0 + w1 * z1 + w2 * z2;
                         const int32_t pixIdx = rowOffset + px;
 
-                        /* Hardware Depth-Buffer Test: zVal <= depthBuffer[pixIdx] */
+                        /* Software depth-buffer test: zVal <= depthBuffer[pixIdx] */
                         if (zVal >= 0.0f && zVal <= 1.0f && zVal <= g_depthBuffer[pixIdx]) {
                             const int32_t byteIdx = pixIdx * 4;
 

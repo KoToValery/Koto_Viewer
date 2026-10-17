@@ -15,12 +15,11 @@ class Architect3dBuilder {
   }) {
     final List<Triangle3D> allTris = [];
 
-    // Collect all wall points to find bounding footprint for floor slabs
-    double minX = double.infinity, maxX = -double.infinity;
-    double minY = double.infinity, maxY = -double.infinity;
-    bool hasWalls = false;
-
     for (final storey in project.storeys) {
+      // Preview plates belong to this storey, never the cumulative footprint.
+      double minX = double.infinity, maxX = -double.infinity;
+      double minY = double.infinity, maxY = -double.infinity;
+      bool hasWalls = false;
       final walls = [
         for (final wall in storey.walls)
           wall.copyWith(height: wall.effectiveHeight(storey.height)),
@@ -129,17 +128,29 @@ class Architect3dBuilder {
       for (final zone in storey.zones) {
         if (!previewGeometry) continue;
         if (zone.polygon.length >= 3) {
-          final c = zone.centroid;
           final z = storey.elevation + 0.005; // slightly above floor slab
-          final c3D = Vector3(c.dx, c.dy, z);
           final zoneColor = zone.color.withValues(alpha: 0.85);
+          Vector3 point(int index) {
+            final p = zone.polygon[index];
+            return Vector3(p.dx, p.dy, z);
+          }
 
-          for (int i = 0; i < zone.polygon.length; i++) {
-            final p1 = zone.polygon[i];
-            final p2 = zone.polygon[(i + 1) % zone.polygon.length];
-            final v1 = Vector3(p1.dx, p1.dy, z);
-            final v2 = Vector3(p2.dx, p2.dy, z);
-            allTris.add(Triangle3D(v0: c3D, v1: v1, v2: v2, color: zoneColor));
+          final List<(int, int, int)> triangles;
+          try {
+            triangles = ArchitectStairMesh.triangulate(zone.polygon);
+          } on StateError {
+            // A malformed imported/legacy zone must not prevent viewing the building.
+            continue;
+          }
+          for (final (a, b, c) in triangles) {
+            allTris.add(
+              Triangle3D(
+                v0: point(a),
+                v1: point(b),
+                v2: point(c),
+                color: zoneColor,
+              ),
+            );
           }
         }
       }

@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
-import 'package:flutter/gestures.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -20,12 +19,14 @@ import 'parser/ifc_parser.dart';
 import 'parser/fbx_parser.dart';
 import 'parser/three_mf_parser.dart';
 import 'widgets/ifc_bim_sheet.dart';
-import 'widgets/cad_3d_virtual_joystick.dart';
+import '../cad_3d/cad_3d_controller.dart';
+import '../cad_3d/widgets/cad_3d_viewport.dart';
+import '../cad_3d/rendering/cad_3d_labels.dart';
 import 'rendering/cad_3d_camera.dart';
 import 'rendering/cad_3d_mesh_painter.dart';
-import 'rendering/cad_3d_gpu_bindings.dart';
+import '../cad_3d/rendering/cad_3d_backend.dart';
 import 'package:archive/archive.dart';
-import 'package:flutter/scheduler.dart';
+
 import '../../core/errors/app_error_handler.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
 import '../../core/l10n/l10n_extensions.dart';
@@ -53,9 +54,9 @@ class Dxf3DViewerScreen extends StatefulWidget {
   State<Dxf3DViewerScreen> createState() => _Dxf3DViewerScreenState();
 }
 
-class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
-    with SingleTickerProviderStateMixin {
-  final Cad3DCamera _camera = Cad3DCamera();
+class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
+  final Cad3DController _navigation = Cad3DController();
+  Cad3DCamera get _camera => _navigation.camera;
 
   Mesh3D? _mesh;
   IfcModel? _ifcModel;
@@ -68,23 +69,16 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
   Cad3DTheme _theme = Cad3DTheme.darkCad;
   final bool _showGrid = true;
   Color? _customModelColor;
-  Cad3DInteractionMode _interactionMode = Cad3DInteractionMode.orbit;
+  Cad3DInteractionMode get _interactionMode => _navigation.mode;
 
-  Offset? _lastPanPos;
-  double _baseScale = 1.0;
-
-  final Cad3DGpuRenderer _gpuRenderer = Cad3DGpuRenderer();
-  bool _useGpuAcceleration = true;
-  ui.Image? _gpuImage;
-  bool _isGpuRendering = false;
-  bool _pendingGpuRender = false;
-  Size _lastViewportSize = Size.zero;
+  bool _useNativeDepth = true;
   bool _isFullscreen = true;
+  Cad3DInteractionMode _lastMode = Cad3DInteractionMode.orbit;
 
-  double get _modelScale {
-    if (_mesh == null || _lastViewportSize.isEmpty) return 1.0;
-    final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
-    return (math.min(_lastViewportSize.width, _lastViewportSize.height) * 0.55) / maxDim;
+  void _onNavigationChanged() {
+    if (_lastMode != _navigation.mode) {
+      setState(() => _lastMode = _navigation.mode);
+    }
   }
 
   void _toggleFullscreen() {
@@ -94,157 +88,21 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
     });
   }
 
-  Ticker? _flyTicker;
-  Duration? _lastTickTime;
-  Offset _joystickDeflection = Offset.zero;
-
   @override
   void initState() {
     super.initState();
     _fileName =
         widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
-    _flyTicker = createTicker(_onFlyTick);
+    _navigation.addListener(_onNavigationChanged);
     _load3DModel();
   }
 
   @override
   void dispose() {
-    _flyTicker?.dispose();
-    _gpuRenderer.dispose();
-    _gpuImage?.dispose();
+    _navigation.removeListener(_onNavigationChanged);
+    _navigation.dispose();
     super.dispose();
   }
-
-  void _onJoystickDirectionChanged(Offset deflection) {
-    _joystickDeflection = deflection;
-    if (deflection != Offset.zero) {
-      if (_flyTicker != null && !_flyTicker!.isActive) {
-        _lastTickTime = null;
-        _flyTicker!.start();
-      }
-    } else {
-      _flyTicker?.stop();
-      _lastTickTime = null;
-      _requestGpuRender(_lastViewportSize);
-    }
-  }
-
-  void _onFlyTick(Duration elapsed) {
-    if (_mesh == null || !_camera.isFlyMode || _joystickDeflection == Offset.zero) {
-      _flyTicker?.stop();
-      return;
-    }
-
-    final dt = _lastTickTime == null
-        ? 0.016
-        : (elapsed - _lastTickTime!).inMicroseconds / 1000000.0;
-    _lastTickTime = elapsed;
-
-    final clampedDt = dt.clamp(0.001, 0.2);
-
-    final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
-    final deflectionMag = _joystickDeflection.distance.clamp(0.0, 1.0);
-    if (deflectionMag < 1e-4) return;
-
-    // 1. Detect real-world 1-meter unit scale from model bounds:
-    // Millimeter models (IFC/CAD buildings in mm): maxDim >= 500.0 -> 1 meter = 1000 units.
-    // Meter models (IFC/OBJ buildings in m): maxDim in [3.0, 500.0) -> 1 meter = 1.0 unit.
-    // Small parts/components: maxDim < 3.0 -> 1 meter-equivalent = maxDim / 10.0.
-    final double oneMeter;
-    if (maxDim >= 500.0) {
-      oneMeter = 1000.0;
-    } else if (maxDim >= 3.0) {
-      oneMeter = 1.0;
-    } else {
-      oneMeter = maxDim / 10.0;
-    }
-
-    // 2. Realistic human walking and flight speeds:
-    // Normal human walking speed: ~1.3 m/s.
-    final double walkSpeed = 1.3 * oneMeter;
-    // Outdoor cruise flight speed: scales smoothly for massive campuses while remaining grounded for houses.
-    final double modelMeters = maxDim / oneMeter;
-    final double maxFlySpeed = (modelMeters <= 30.0)
-        ? 7.0 * oneMeter
-        : (7.0 + (modelMeters - 30.0) * 0.1).clamp(7.0, 30.0) * oneMeter;
-
-    // 3. Piecewise analog response curve for ultra-fine adjustment in tight corridors:
-    // - For small tilts (d <= 0.5): quadratic curve up to walkSpeed (e.g. 5 cm/s at 10% tilt, 20 cm/s at 20% tilt).
-    //   Allows millimeter-fine positioning in narrow corridors, doorways, and rooms.
-    // - For large tilts (d > 0.5): smooth ramp from walkSpeed up to maxFlySpeed for fast cruising.
-    final double speed;
-    if (deflectionMag <= 0.5) {
-      final t = deflectionMag / 0.5; // [0.0, 1.0]
-      speed = walkSpeed * (t * t);
-    } else {
-      final u = (deflectionMag - 0.5) / 0.5; // [0.0, 1.0]
-      speed = walkSpeed + (maxFlySpeed - walkSpeed) * (u * u);
-    }
-
-    // Normalize speed if camera zoom was adjusted so apparent screen motion remains natural
-    final effectiveSpeed = speed / math.max(_camera.zoom, 0.5);
-
-    final normDir = _joystickDeflection / deflectionMag;
-    final forward = -normDir.dy; // Up is forward
-    final strafe = normDir.dx;   // Right is strafe right
-
-    _camera.fly(
-      forward: forward,
-      strafe: strafe,
-      speed: effectiveSpeed,
-      dt: clampedDt,
-    );
-
-    setState(() {});
-    _requestGpuRender(_lastViewportSize);
-  }
-
-  void _requestGpuRender(Size size) {
-    if (!_useGpuAcceleration ||
-        !_gpuRenderer.isReady ||
-        _mesh == null ||
-        size.isEmpty) {
-      return;
-    }
-    if (_isGpuRendering) {
-      _pendingGpuRender = true;
-      return;
-    }
-    _isGpuRendering = true;
-    _pendingGpuRender = false;
-
-    final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
-    final modelScale = (math.min(size.width, size.height) * 0.55) / maxDim;
-
-    _gpuRenderer
-        .renderFrame(
-          camera: _camera,
-          viewport: size,
-          modelScale: modelScale,
-          customColor: _customModelColor,
-        )
-        .then((img) {
-          if (!mounted) {
-            img?.dispose();
-            return;
-          }
-          if (img != null) {
-            final old = _gpuImage;
-            setState(() {
-              _gpuImage = img;
-            });
-            old?.dispose();
-          }
-          _isGpuRendering = false;
-          if (_pendingGpuRender && _lastViewportSize != Size.zero) {
-            _requestGpuRender(_lastViewportSize);
-          }
-        })
-        .catchError((_) {
-          _isGpuRendering = false;
-        });
-  }
-
 
   Future<void> _load3DModel() async {
     setState(() {
@@ -333,12 +191,6 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
           _mesh = mesh;
           _isLoading = false;
         });
-        if (_useGpuAcceleration && _gpuRenderer.bindings.isAvailable) {
-          _gpuRenderer.setMesh(mesh, customColor: _customModelColor);
-          if (_lastViewportSize != Size.zero) {
-            _requestGpuRender(_lastViewportSize);
-          }
-        }
       }
     } on FileSystemException catch (e, stack) {
       AppErrorHandler.recordError(
@@ -407,18 +259,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
     }
   }
 
-  bool _isInteracting = false;
-
-  bool get _isPanActive {
-    if (_interactionMode == Cad3DInteractionMode.pan) return true;
-    final keys = HardwareKeyboard.instance.logicalKeysPressed;
-    return HardwareKeyboard.instance.isShiftPressed ||
-        HardwareKeyboard.instance.isControlPressed ||
-        keys.contains(LogicalKeyboardKey.space);
-  }
-
   void _toggleInteractionMode() {
-    HapticFeedback.selectionClick();
     final next = switch (_interactionMode) {
       Cad3DInteractionMode.orbit => Cad3DInteractionMode.pan,
       Cad3DInteractionMode.pan => Cad3DInteractionMode.fly,
@@ -427,157 +268,10 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
     _setInteractionMode(next);
   }
 
-  void _setInteractionMode(Cad3DInteractionMode mode) {
-    if (_interactionMode == mode) return;
-    HapticFeedback.selectionClick();
-    setState(() {
-      _interactionMode = mode;
-      if (mode == Cad3DInteractionMode.fly) {
-        _camera.switchToFlyMode(_modelScale);
-      } else {
-        _joystickDeflection = Offset.zero;
-        _flyTicker?.stop();
-        _camera.switchToOrbitMode();
-      }
-    });
-    _requestGpuRender(_lastViewportSize);
-  }
-
-  void _onScaleStart(ScaleStartDetails details) {
-    _lastPanPos = details.localFocalPoint;
-    _baseScale = _camera.zoom;
-    _isInteracting = true;
-  }
-
-  void _onScaleUpdate(ScaleUpdateDetails details) {
-    if (_lastPanPos == null) return;
-
-    final delta = details.localFocalPoint - _lastPanPos!;
-    _lastPanPos = details.localFocalPoint;
-
-    setState(() {
-      _isInteracting = true;
-      if (_interactionMode == Cad3DInteractionMode.fly) {
-        // Fly / Walkthrough Mode: Drag rotates first-person look (yaw & pitch)
-        _camera.look(delta.dx, delta.dy, _modelScale);
-      } else {
-        if (details.pointerCount == 1) {
-          if (_isPanActive) {
-            // 1 pointer in Pan / Drag Mode (or Shift/Space/Ctrl held): Drag model across screen
-            _camera.pan(delta);
-          } else {
-            // 1 pointer in Orbit Mode: Rotate model
-            _camera.orbit(delta.dx, delta.dy);
-          }
-        } else if (details.pointerCount >= 2) {
-          // 2 fingers: Pan and Zoom
-          _camera.pan(delta);
-          _camera.zoom = (_baseScale * details.scale).clamp(0.05, 100.0);
-        }
-      }
-    });
-    _requestGpuRender(_lastViewportSize);
-  }
-
-  void _onScaleEnd(ScaleEndDetails details) {
-    _lastPanPos = null;
-    setState(() {
-      _isInteracting = false;
-    });
-    _requestGpuRender(_lastViewportSize);
-  }
-
-  Offset? _mousePanStart;
-
-  void _handlePointerSignal(PointerSignalEvent event) {
-    if (event is PointerScrollEvent) {
-      final delta = event.scrollDelta.dy;
-      if (_interactionMode == Cad3DInteractionMode.fly) {
-        if (_mesh != null) {
-          final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
-          final step = (maxDim * 0.25) / math.max(_camera.zoom, 0.4);
-          final forwardDelta = delta < 0 ? 1.0 : -1.0;
-          setState(() {
-            _camera.fly(
-              forward: forwardDelta,
-              strafe: 0.0,
-              speed: step,
-              dt: 1.0,
-            );
-          });
-          _requestGpuRender(_lastViewportSize);
-        }
-      } else {
-        if (delta < 0) {
-          // Scrolled up -> Zoom In
-          setState(() {
-            _camera.zoomBy(1.15);
-          });
-          _requestGpuRender(_lastViewportSize);
-        } else if (delta > 0) {
-          // Scrolled down -> Zoom Out
-          setState(() {
-            _camera.zoomBy(1.0 / 1.15);
-          });
-          _requestGpuRender(_lastViewportSize);
-        }
-      }
-    }
-  }
-
-  void _handlePointerDown(PointerDownEvent event) {
-    if ((event.buttons & kTertiaryButton) != 0 ||
-        (event.buttons & kSecondaryMouseButton) != 0) {
-      _mousePanStart = event.position;
-    }
-  }
-
-  void _handlePointerMove(PointerMoveEvent event) {
-    if (_mousePanStart != null &&
-        ((event.buttons & kTertiaryButton) != 0 ||
-            (event.buttons & kSecondaryMouseButton) != 0)) {
-      final delta = event.position - _mousePanStart!;
-      _mousePanStart = event.position;
-      setState(() {
-        if (_interactionMode == Cad3DInteractionMode.fly) {
-          _camera.look(delta.dx, delta.dy, _modelScale);
-        } else {
-          _camera.pan(delta);
-        }
-      });
-      _requestGpuRender(_lastViewportSize);
-    }
-  }
-
-  void _handlePointerUp(PointerUpEvent event) {
-    _mousePanStart = null;
-  }
-
-  void _resetView() {
-    HapticFeedback.selectionClick();
-    setState(() {
-      final wasFly = _interactionMode == Cad3DInteractionMode.fly;
-      _joystickDeflection = Offset.zero;
-      _flyTicker?.stop();
-      _camera.reset(keepMode: wasFly);
-      if (!wasFly) {
-        _interactionMode = Cad3DInteractionMode.orbit;
-      }
-    });
-    _requestGpuRender(_lastViewportSize);
-  }
-
-  void _setViewPreset(Cad3DViewPreset preset) {
-    HapticFeedback.selectionClick();
-    setState(() {
-      _interactionMode = Cad3DInteractionMode.orbit;
-      _joystickDeflection = Offset.zero;
-      _flyTicker?.stop();
-      _camera.setPreset(preset);
-    });
-    _requestGpuRender(_lastViewportSize);
-  }
-
+  void _setInteractionMode(Cad3DInteractionMode mode) =>
+      _navigation.setMode(mode);
+  void _resetView() => _navigation.reset();
+  void _setViewPreset(Cad3DViewPreset preset) => _navigation.setPreset(preset);
   String _formatDimension(double val) {
     if (val >= 1000.0) {
       return '${(val / 1000.0).toStringAsFixed(2)} m';
@@ -769,12 +463,6 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
         setState(() {
           _mesh = newMesh;
         });
-        if (_useGpuAcceleration && _gpuRenderer.bindings.isAvailable) {
-          _gpuRenderer.setMesh(newMesh, customColor: _customModelColor);
-          if (_lastViewportSize != Size.zero) {
-            _requestGpuRender(_lastViewportSize);
-          }
-        }
       },
     );
   }
@@ -786,7 +474,9 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: theme.brightness == Brightness.dark ? Colors.white12 : Colors.black12,
+          color: theme.brightness == Brightness.dark
+              ? Colors.white12
+              : Colors.black12,
         ),
       ),
       child: Row(
@@ -818,20 +508,17 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
     );
   }
 
-  List<Widget> _buildDxf3dActionButtons(ThemeData theme, AppLocalizations l10n) {
+  List<Widget> _buildDxf3dActionButtons(
+    ThemeData theme,
+    AppLocalizations l10n,
+  ) {
     return [
       // Quick Views Menu & Controls
       PopupMenuButton<dynamic>(
-        icon: const Icon(
-          Icons.videocam_outlined,
-          size: 20,
-        ),
+        icon: const Icon(Icons.videocam_outlined, size: 20),
         padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(
-          minWidth: 38,
-          minHeight: 38,
-        ),
-        tooltip: 'Camera View',
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: l10n.cad3dCamera,
         onSelected: (val) {
           if (val is Cad3DViewPreset) {
             _setViewPreset(val);
@@ -839,6 +526,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
             HapticFeedback.selectionClick();
             setState(() {
               _camera.invertY = !_camera.invertY;
+              _navigation.changed();
             });
           }
         },
@@ -848,13 +536,9 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
               value: v,
               child: Row(
                 children: [
-                  Icon(
-                    v.icon,
-                    size: 18,
-                    color: theme.colorScheme.primary,
-                  ),
+                  Icon(v.icon, size: 18, color: theme.colorScheme.primary),
                   const SizedBox(width: 10),
-                  Text(v.label),
+                  Text(v.localizedLabel(l10n)),
                 ],
               ),
             );
@@ -872,14 +556,10 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
                   color: theme.colorScheme.primary,
                 ),
                 const SizedBox(width: 10),
-                const Text('Invert Up/Down (Y)'),
+                Text(l10n.cad3dInvertY),
                 const Spacer(),
                 if (_camera.invertY)
-                  Icon(
-                    Icons.check,
-                    size: 18,
-                    color: theme.colorScheme.primary,
-                  ),
+                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
               ],
             ),
           ),
@@ -888,16 +568,10 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
 
       // Canvas Theme Menu
       PopupMenuButton<Cad3DTheme>(
-        icon: const Icon(
-          Icons.palette_outlined,
-          size: 20,
-        ),
+        icon: const Icon(Icons.palette_outlined, size: 20),
         padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(
-          minWidth: 38,
-          minHeight: 38,
-        ),
-        tooltip: 'Theme',
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: l10n.theme,
         onSelected: (t) => setState(() => _theme = t),
         itemBuilder: (context) => Cad3DTheme.values.map((t) {
           return PopupMenuItem<Cad3DTheme>(
@@ -910,21 +584,14 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
                   decoration: BoxDecoration(
                     color: t.background,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.grey,
-                      width: 1,
-                    ),
+                    border: Border.all(color: Colors.grey, width: 1),
                   ),
                 ),
                 const SizedBox(width: 10),
-                Text(t.label),
+                Text(t.localizedLabel(l10n)),
                 if (_theme == t) ...[
                   const Spacer(),
-                  Icon(
-                    Icons.check,
-                    size: 18,
-                    color: theme.colorScheme.primary,
-                  ),
+                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
                 ],
               ],
             ),
@@ -932,52 +599,21 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
         }).toList(),
       ),
 
-      // Hardware GPU Depth-Buffer Acceleration Toggle
-      if (_gpuRenderer.bindings.isAvailable)
+      // The legacy native backend has a software Z-buffer, not GPU acceleration.
+      if (Cad3DRenderBackend.acceleratedAvailable)
         IconButton(
-          icon: Icon(
-            _useGpuAcceleration
-                ? Icons.speed_rounded
-                : Icons.speed_outlined,
-            size: 20,
-            color: _useGpuAcceleration
-                ? const Color(0xFF00E5FF)
-                : Colors.grey,
-          ),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(
-            minWidth: 38,
-            minHeight: 38,
-          ),
-          tooltip: _useGpuAcceleration
-              ? 'Hardware GPU Depth Buffer (Active)'
-              : 'Hardware GPU Depth Buffer (Off - Canvas Fallback)',
-          onPressed: () {
-            HapticFeedback.selectionClick();
-            setState(() {
-              _useGpuAcceleration = !_useGpuAcceleration;
-              if (!_useGpuAcceleration) {
-                _gpuImage = null;
-              }
-            });
-            if (_useGpuAcceleration && _lastViewportSize != Size.zero) {
-              _requestGpuRender(_lastViewportSize);
-            }
-          },
+          icon: Icon(_useNativeDepth ? Icons.layers : Icons.layers_outlined),
+          tooltip: _useNativeDepth
+              ? l10n.cad3dNativeDepthOn
+              : l10n.cad3dNativeDepthOff,
+          onPressed: () => setState(() => _useNativeDepth = !_useNativeDepth),
         ),
-
       // BIM Storeys & Categories (when IFC model is loaded)
       if (_ifcModel != null)
         IconButton(
-          icon: const Icon(
-            Icons.apartment_rounded,
-            size: 20,
-          ),
+          icon: const Icon(Icons.apartment_rounded, size: 20),
           padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(
-            minWidth: 38,
-            minHeight: 38,
-          ),
+          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
           color: const Color(0xFF00E5FF),
           tooltip: l10n.bimStoreysAndCategories,
           onPressed: _openBimSheet,
@@ -987,10 +623,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
       IconButton(
         icon: const Icon(Icons.info_outline, size: 20),
         padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(
-          minWidth: 38,
-          minHeight: 38,
-        ),
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: l10n.properties3d,
         onPressed: _showMetricsSheet,
       ),
@@ -999,10 +632,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
       IconButton(
         icon: const Icon(Icons.share_outlined, size: 20),
         padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(
-          minWidth: 38,
-          minHeight: 38,
-        ),
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: l10n.share,
         onPressed: _shareFile,
       ),
@@ -1016,10 +646,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
           size: 20,
         ),
         padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(
-          minWidth: 38,
-          minHeight: 38,
-        ),
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: _isFullscreen ? 'Exit Fullscreen' : 'Fullscreen',
         onPressed: _toggleFullscreen,
       ),
@@ -1042,7 +669,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
     }
 
     final theme = Theme.of(context);
-    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return PopScope(
       canPop: !_isFullscreen,
@@ -1078,7 +706,10 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
                     ),
                     title: Text(
                       _fileName,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1108,19 +739,31 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
                                 builder: (context, constraints) {
                                   return SingleChildScrollView(
                                     scrollDirection: Axis.horizontal,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
                                     child: ConstrainedBox(
                                       constraints: BoxConstraints(
-                                        minWidth: math.max(0.0, constraints.maxWidth - 24.0),
+                                        minWidth: math.max(
+                                          0.0,
+                                          constraints.maxWidth - 24.0,
+                                        ),
                                       ),
                                       child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
-                                          _buildInteractionModeSwitch(theme, l10n),
+                                          _buildInteractionModeSwitch(
+                                            theme,
+                                            l10n,
+                                          ),
                                           const SizedBox(width: 8),
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
-                                            children: _buildDxf3dActionButtons(theme, l10n),
+                                            children: _buildDxf3dActionButtons(
+                                              theme,
+                                              l10n,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -1131,343 +774,306 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
                             ),
                           ),
                   ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (_isLoading) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 16),
-                  Text(l10n.loading3dModel),
-                ],
-              ),
-            );
-          }
+            body: LayoutBuilder(
+              builder: (context, constraints) {
+                if (_isLoading) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        Text(l10n.loading3dModel),
+                      ],
+                    ),
+                  );
+                }
 
-          if (_errorMessage != null || _mesh == null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                if (_errorMessage != null || _mesh == null) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: Colors.redAccent,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _errorMessage ?? l10n.failedToParse3dMesh,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _load3DModel,
+                            icon: const Icon(Icons.refresh),
+                            label: Text(l10n.retry),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return Stack(
                   children: [
-                    const Icon(
-                      Icons.error_outline,
-                      size: 48,
-                      color: Colors.redAccent,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _errorMessage ?? l10n.failedToParse3dMesh,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _load3DModel,
-                      icon: const Icon(Icons.refresh),
-                      label: Text(l10n.retry),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          final viewportSize = Size(
-            constraints.maxWidth,
-            constraints.maxHeight,
-          );
-          if (_lastViewportSize != viewportSize) {
-            _lastViewportSize = viewportSize;
-            if (_useGpuAcceleration && _gpuRenderer.isReady && _mesh != null) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _requestGpuRender(viewportSize);
-              });
-            }
-          }
-
-          return Stack(
-            children: [
-              // 3D Viewport with Mouse Wheel Zoom & Gestures
-              Listener(
-                onPointerSignal: _handlePointerSignal,
-                onPointerDown: _handlePointerDown,
-                onPointerMove: _handlePointerMove,
-                onPointerUp: _handlePointerUp,
-                child: GestureDetector(
-                  onScaleStart: _onScaleStart,
-                  onScaleUpdate: _onScaleUpdate,
-                  onScaleEnd: _onScaleEnd,
-                  onDoubleTap: _resetView,
-                  child: MouseRegion(
-                    cursor: _isInteracting
-                        ? (_isPanActive
-                              ? SystemMouseCursors.grabbing
-                              : SystemMouseCursors.move)
-                        : (_interactionMode == Cad3DInteractionMode.pan
-                              ? SystemMouseCursors.grab
-                              : SystemMouseCursors.basic),
-                    child: CustomPaint(
-                      size: Size(constraints.maxWidth, constraints.maxHeight),
-                      painter: Cad3DMeshPainter(
+                    Positioned.fill(
+                      child: Cad3DViewport(
                         mesh: _mesh!,
-                        camera: _camera,
-                        shadingMode: _shadingMode,
+                        controller: _navigation,
                         theme: _theme,
+                        shadingMode: _shadingMode,
                         showGrid: _showGrid,
-                        customModelColor: _customModelColor,
-                        isInteracting: _isInteracting,
-                        gpuImage: _useGpuAcceleration ? _gpuImage : null,
+                        showControls: false,
+                        preferNativeDepth: _useNativeDepth,
+                        modelColor: _customModelColor,
                       ),
                     ),
-                  ),
-                ),
-              ),
-
-              // Drag Mode Active Indicator Pill
-              if (_interactionMode == Cad3DInteractionMode.pan)
-                Positioned(
-                  top: 16,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: InkWell(
-                      onTap: _toggleInteractionMode,
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(
-                              0xFF00E5FF,
-                            ).withValues(alpha: 0.8),
-                            width: 1.2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.pan_tool_rounded,
-                              size: 15,
-                              color: Color(0xFF00E5FF),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              l10n.dragModeActive,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF00E5FF),
-                                letterSpacing: 0.3,
+                    // Drag Mode Active Indicator Pill
+                    if (_interactionMode == Cad3DInteractionMode.pan)
+                      Positioned(
+                        top: 16,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: InkWell(
+                            onTap: _toggleInteractionMode,
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(
+                                  0xFF00E5FF,
+                                ).withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: const Color(
+                                    0xFF00E5FF,
+                                  ).withValues(alpha: 0.8),
+                                  width: 1.2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.35),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.pan_tool_rounded,
+                                    size: 15,
+                                    color: Color(0xFF00E5FF),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    l10n.dragModeActive,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF00E5FF),
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
 
-              // Fly Mode Active Indicator Pill
-              if (_interactionMode == Cad3DInteractionMode.fly)
-                Positioned(
-                  top: 16,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: InkWell(
-                      onTap: _toggleInteractionMode,
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(
-                              0xFF00E5FF,
-                            ).withValues(alpha: 0.8),
-                            width: 1.2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.flight_takeoff_rounded,
-                              size: 15,
-                              color: Color(0xFF00E5FF),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              l10n.flyModeActive,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF00E5FF),
-                                letterSpacing: 0.3,
+                    // Fly Mode Active Indicator Pill
+                    if (_interactionMode == Cad3DInteractionMode.fly)
+                      Positioned(
+                        top: 16,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: InkWell(
+                            onTap: _toggleInteractionMode,
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(
+                                  0xFF00E5FF,
+                                ).withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: const Color(
+                                    0xFF00E5FF,
+                                  ).withValues(alpha: 0.8),
+                                  width: 1.2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.35),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.flight_takeoff_rounded,
+                                    size: 15,
+                                    color: Color(0xFF00E5FF),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    l10n.flyModeActive,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF00E5FF),
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
 
-              // Left Virtual Joystick (in Walk / Fly Mode)
-              if (_interactionMode == Cad3DInteractionMode.fly)
-                Positioned(
-                  bottom: 28,
-                  left: 24,
-                  child: Cad3DVirtualJoystick(
-                    isDark: _theme.isDark,
-                    onDirectionChanged: _onJoystickDirectionChanged,
-                  ),
-                ),
-
-              // Floating Controls (Flight Mode, 3D Orbit, Drag, Fit to Screen)
-              Positioned(
-                bottom: 24,
-                right: 20,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildFloatingButton(
-                      icon: Icons.flight_takeoff_rounded,
-                      tooltip: '${l10n.flyMode} (${l10n.flyModeTooltip})',
-                      isActive: _interactionMode == Cad3DInteractionMode.fly,
-                      onTap: () => _setInteractionMode(
-                        _interactionMode == Cad3DInteractionMode.fly
-                            ? Cad3DInteractionMode.orbit
-                            : Cad3DInteractionMode.fly,
+                    // Floating Controls (Flight Mode, 3D Orbit, Drag, Fit to Screen)
+                    Positioned(
+                      bottom: 24,
+                      right: 20,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildFloatingButton(
+                            icon: Icons.flight_takeoff_rounded,
+                            tooltip: '${l10n.flyMode} (${l10n.flyModeTooltip})',
+                            isActive:
+                                _interactionMode == Cad3DInteractionMode.fly,
+                            onTap: () => _setInteractionMode(
+                              _interactionMode == Cad3DInteractionMode.fly
+                                  ? Cad3DInteractionMode.orbit
+                                  : Cad3DInteractionMode.fly,
+                            ),
+                            theme: theme,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildFloatingButton(
+                            icon: Icons.threed_rotation_rounded,
+                            tooltip:
+                                '${l10n.orbitMode} (${l10n.rotateModelTooltip})',
+                            isActive:
+                                _interactionMode == Cad3DInteractionMode.orbit,
+                            onTap: () =>
+                                _setInteractionMode(Cad3DInteractionMode.orbit),
+                            theme: theme,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildFloatingButton(
+                            icon: Icons.pan_tool_rounded,
+                            tooltip:
+                                '${l10n.dragMode} (${l10n.dragModelTooltip})',
+                            isActive:
+                                _interactionMode == Cad3DInteractionMode.pan,
+                            onTap: () =>
+                                _setInteractionMode(Cad3DInteractionMode.pan),
+                            theme: theme,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildFloatingButton(
+                            icon: Icons.fit_screen_outlined,
+                            tooltip: l10n.centerView,
+                            onTap: _resetView,
+                            theme: theme,
+                          ),
+                        ],
                       ),
-                      theme: theme,
                     ),
-                    const SizedBox(height: 8),
-                    _buildFloatingButton(
-                      icon: Icons.threed_rotation_rounded,
-                      tooltip: '${l10n.orbitMode} (${l10n.rotateModelTooltip})',
-                      isActive: _interactionMode == Cad3DInteractionMode.orbit,
-                      onTap: () => _setInteractionMode(Cad3DInteractionMode.orbit),
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildFloatingButton(
-                      icon: Icons.pan_tool_rounded,
-                      tooltip: '${l10n.dragMode} (${l10n.dragModelTooltip})',
-                      isActive: _interactionMode == Cad3DInteractionMode.pan,
-                      onTap: () => _setInteractionMode(Cad3DInteractionMode.pan),
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildFloatingButton(
-                      icon: Icons.fit_screen_outlined,
-                      tooltip: 'Reset / Isometric View',
-                      onTap: _resetView,
-                      theme: theme,
-                    ),
+
+                    // Presentation Mode Switcher Bar
+                    if (widget.projectBundle != null)
+                      Positioned(
+                        bottom: 24,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: ProjectPresentationBar(
+                            projectBundle: widget.projectBundle!,
+                            currentIndex: widget.currentProjectIndex ?? 0,
+                            onSwitchProjectItem: widget.onSwitchProjectItem,
+                            onExit: () => Navigator.of(context).pop(),
+                          ),
+                        ),
+                      ),
+
+                    // Floating Back Button in Fullscreen
+                    if (_isFullscreen)
+                      Positioned(
+                        top: 16,
+                        left: 16,
+                        child: SafeArea(
+                          child: Material(
+                            color: Colors.black54,
+                            shape: const CircleBorder(),
+                            elevation: 4,
+                            clipBehavior: Clip.antiAlias,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.arrow_back_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                              tooltip: 'Back',
+                              onPressed: () => Navigator.of(context).pop(true),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    // Floating Exit Fullscreen Button
+                    if (_isFullscreen)
+                      Positioned(
+                        top: 16,
+                        right: 16,
+                        child: SafeArea(
+                          child: Material(
+                            color: Colors.black54,
+                            shape: const CircleBorder(),
+                            elevation: 4,
+                            clipBehavior: Clip.antiAlias,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.fullscreen_exit_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                              tooltip: 'Exit Fullscreen (ESC)',
+                              onPressed: _toggleFullscreen,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
-                ),
-              ),
-
-              // Presentation Mode Switcher Bar
-              if (widget.projectBundle != null)
-                Positioned(
-                  bottom: 24,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: ProjectPresentationBar(
-                      projectBundle: widget.projectBundle!,
-                      currentIndex: widget.currentProjectIndex ?? 0,
-                      onSwitchProjectItem: widget.onSwitchProjectItem,
-                      onExit: () => Navigator.of(context).pop(),
-                    ),
-                  ),
-                ),
-
-              // Floating Back Button in Fullscreen
-              if (_isFullscreen)
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  child: SafeArea(
-                    child: Material(
-                      color: Colors.black54,
-                      shape: const CircleBorder(),
-                      elevation: 4,
-                      clipBehavior: Clip.antiAlias,
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                        tooltip: 'Back',
-                        onPressed: () => Navigator.of(context).pop(true),
-                      ),
-                    ),
-                  ),
-                ),
-
-              // Floating Exit Fullscreen Button
-              if (_isFullscreen)
-                Positioned(
-                  top: 16,
-                  right: 16,
-                  child: SafeArea(
-                    child: Material(
-                      color: Colors.black54,
-                      shape: const CircleBorder(),
-                      elevation: 4,
-                      clipBehavior: Clip.antiAlias,
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.fullscreen_exit_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                        tooltip: 'Exit Fullscreen (ESC)',
-                        onPressed: _toggleFullscreen,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
+                );
+              },
+            ),
+          ),
+        ),
       ),
-    ),
-  ),
-),
-);
+    );
   }
 
   Widget _buildModeButton({

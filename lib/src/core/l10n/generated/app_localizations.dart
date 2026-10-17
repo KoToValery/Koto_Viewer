@@ -10492,6 +10492,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Slope dir'**
   String get architectRoofRotateSlope;
+
+  /// 3D orbit navigation tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Orbit'**
+  String get cad3dOrbit;
+
+  /// 3D pan navigation tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Pan'**
+  String get cad3dPan;
+
+  /// 3D walkthrough navigation tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Walk'**
+  String get cad3dWalk;
+
+  /// Prefer GPU texture rendering with native depth fallback
+  ///
+  /// In en, this message translates to:
+  /// **'Accelerated 3D'**
+  String get cad3dNativeDepthOn;
+
+  /// Canvas fallback rendering option
+  ///
+  /// In en, this message translates to:
+  /// **'Compatibility mode'**
+  String get cad3dNativeDepthOff;
+
+  /// Shaded 3D display style
+  ///
+  /// In en, this message translates to:
+  /// **'Shaded'**
+  String get cad3dShadingSmooth;
+
+  /// Flat shaded 3D display style
+  ///
+  /// In en, this message translates to:
+  /// **'Flat'**
+  String get cad3dShadingFlat;
+
+  /// Transparent 3D display style
+  ///
+  /// In en, this message translates to:
+  /// **'Transparent'**
+  String get cad3dShadingXray;
+
+  /// 3D camera preset menu tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get cad3dCamera;
+
+  /// Invert vertical orbit and look input
+  ///
+  /// In en, this message translates to:
+  /// **'Invert vertical look'**
+  String get cad3dInvertY;
+
+  /// Isometric 3D camera preset
+  ///
+  /// In en, this message translates to:
+  /// **'Isometric'**
+  String get cad3dViewIsometric;
+
+  /// Top 3D camera preset
+  ///
+  /// In en, this message translates to:
+  /// **'Top'**
+  String get cad3dViewTop;
+
+  /// Front 3D camera preset
+  ///
+  /// In en, this message translates to:
+  /// **'Front'**
+  String get cad3dViewFront;
+
+  /// Right 3D camera preset
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get cad3dViewRight;
+
+  /// Bottom 3D camera preset
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom'**
+  String get cad3dViewBottom;
+
+  /// Back 3D camera preset
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get cad3dViewBack;
+
+  /// Blueprint 3D background theme
+  ///
+  /// In en, this message translates to:
+  /// **'Blueprint'**
+  String get cad3dThemeBlueprint;
+
+  /// Light studio 3D background theme
+  ///
+  /// In en, this message translates to:
+  /// **'Studio'**
+  String get cad3dThemeStudio;
+
+  /// Black 3D background theme
+  ///
+  /// In en, this message translates to:
+  /// **'Black'**
+  String get cad3dThemeBlack;
+
+  /// White 3D background theme
+  ///
+  /// In en, this message translates to:
+  /// **'White'**
+  String get cad3dThemeWhite;
 }
 
 class _AppLocalizationsDelegate

@@ -5946,4 +5946,64 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectRoofRotateSlope => 'Slope dir';
+
+  @override
+  String get cad3dOrbit => 'Orbit';
+
+  @override
+  String get cad3dPan => 'Pan';
+
+  @override
+  String get cad3dWalk => 'Walk';
+
+  @override
+  String get cad3dNativeDepthOn => 'Accelerated 3D';
+
+  @override
+  String get cad3dNativeDepthOff => 'Compatibility mode';
+
+  @override
+  String get cad3dShadingSmooth => 'Shaded';
+
+  @override
+  String get cad3dShadingFlat => 'Flat';
+
+  @override
+  String get cad3dShadingXray => 'Transparent';
+
+  @override
+  String get cad3dCamera => 'View';
+
+  @override
+  String get cad3dInvertY => 'Invert vertical look';
+
+  @override
+  String get cad3dViewIsometric => 'Isometric';
+
+  @override
+  String get cad3dViewTop => 'Top';
+
+  @override
+  String get cad3dViewFront => 'Front';
+
+  @override
+  String get cad3dViewRight => 'Right';
+
+  @override
+  String get cad3dViewBottom => 'Bottom';
+
+  @override
+  String get cad3dViewBack => 'Back';
+
+  @override
+  String get cad3dThemeBlueprint => 'Blueprint';
+
+  @override
+  String get cad3dThemeStudio => 'Studio';
+
+  @override
+  String get cad3dThemeBlack => 'Black';
+
+  @override
+  String get cad3dThemeWhite => 'White';
 }
