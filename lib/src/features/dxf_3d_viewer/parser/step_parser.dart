@@ -72,6 +72,89 @@ class _StepBSplineCurve {
     return res4.toVector3();
   }
 
+  double findParameterForPoint(Vector3 pt, Map<int, Vector3> pointMap) {
+    if (controlPointIds.isEmpty) return 0.0;
+    final n = controlPointIds.length - 1;
+    final p = degree;
+    if (n < p || knots.length < n + p + 2) return 0.0;
+    final uMin = knots[p];
+    final uMax = knots[n + 1];
+    final span = uMax - uMin;
+    if (span.abs() < 1e-12) return uMin;
+
+    final ptStart = evaluate(uMin, pointMap);
+    if ((ptStart - pt).lengthSquared < 1e-6) return uMin;
+
+    final ptEnd = evaluate(uMax, pointMap);
+    if ((ptEnd - pt).lengthSquared < 1e-6) return uMax;
+
+    const steps = 36;
+    var bestU = uMin;
+    var bestDistSq = double.infinity;
+
+    for (int i = 0; i <= steps; i++) {
+      final u = uMin + span * (i / steps);
+      final evalPt = evaluate(u, pointMap);
+      final dSq = (evalPt - pt).lengthSquared;
+      if (dSq < bestDistSq) {
+        bestDistSq = dSq;
+        bestU = u;
+      }
+    }
+
+    final stepSize = span / steps;
+    var low = (bestU - stepSize).clamp(uMin, uMax);
+    var high = (bestU + stepSize).clamp(uMin, uMax);
+
+    for (int iter = 0; iter < 12; iter++) {
+      final m1 = low + (high - low) * (1.0 / 3.0);
+      final m2 = low + (high - low) * (2.0 / 3.0);
+      final d1 = (evaluate(m1, pointMap) - pt).lengthSquared;
+      final d2 = (evaluate(m2, pointMap) - pt).lengthSquared;
+      if (d1 < d2) {
+        high = m2;
+      } else {
+        low = m1;
+      }
+    }
+
+    return (low + high) / 2.0;
+  }
+
+  List<Vector3> sampleSegment(
+    Vector3 vFrom,
+    Vector3 vTo,
+    Map<int, Vector3> pointMap, {
+    int minSamples = 4,
+    int maxSamples = 32,
+  }) {
+    if (controlPointIds.isEmpty) return [vFrom, vTo];
+    final n = controlPointIds.length - 1;
+    final p = degree;
+    if (n < p || knots.length < n + p + 2) return [vFrom, vTo];
+
+    final uFrom = findParameterForPoint(vFrom, pointMap);
+    final uTo = findParameterForPoint(vTo, pointMap);
+
+    final uMin = knots[p];
+    final uMax = knots[n + 1];
+    final totalSpan = (uMax - uMin).abs();
+    final segSpan = (uTo - uFrom).abs();
+    final ratio = totalSpan > 1e-12 ? (segSpan / totalSpan) : 1.0;
+
+    final spans = math.max(1, n - p + 1);
+    final count = (spans * 2 * ratio).round().clamp(minSamples, maxSamples);
+
+    final pts = <Vector3>[vFrom];
+    for (int i = 1; i < count; i++) {
+      final t = i / count;
+      final u = uFrom + (uTo - uFrom) * t;
+      pts.add(evaluate(u, pointMap));
+    }
+    pts.add(vTo);
+    return pts;
+  }
+
   List<Vector3> sample(
     Map<int, Vector3> pointMap, {
     int samplesPerSpan = 2,
@@ -105,6 +188,7 @@ class _StepBSplineCurve {
     return pts;
   }
 }
+
 
 class _StepMatrix4 {
   final List<double> m;
@@ -661,22 +745,16 @@ class StepParser {
         final vFrom = effOrientation ? startPt : endPt;
         final vTo = effOrientation ? endPt : startPt;
 
-        // Sample B-SPLINE curves for smooth curved profiles
+        // Sample B-SPLINE curves delimited precisely between vFrom and vTo
         final bSpline = bSplineCurveMap[curveId];
         if (bSpline != null) {
-          final sampled = bSpline.sample(pointMap);
-          if (sampled.isNotEmpty) {
-            final dStart = (sampled.first - vFrom).lengthSquared;
-            final dEnd = (sampled.last - vFrom).lengthSquared;
-            final ordered = (dEnd < dStart) ? sampled.reversed.toList() : sampled;
-
-            for (final p in ordered) {
-              if (pts.isEmpty || (pts.last - p).lengthSquared > 1e-8) {
-                pts.add(p);
-              }
+          final sampled = bSpline.sampleSegment(vFrom, vTo, pointMap);
+          for (final p in sampled) {
+            if (pts.isEmpty || (pts.last - p).lengthSquared > 1e-8) {
+              pts.add(p);
             }
-            continue;
           }
+          continue;
         }
 
         // Sample CIRCLE arcs for smooth cylindrical curves
@@ -821,42 +899,53 @@ class StepParser {
           final heights = worldPts.map((p) => (p - origW).dot(axisW)).toList();
           final minH = heights.reduce(math.min);
           final maxH = heights.reduce(math.max);
+          final hSpan = maxH - minH;
 
-          if ((maxH - minH) > 1e-4) {
-            final midH = (minH + maxH) / 2.0;
-            final botPts = <Vector3>[];
-            final topPts = <Vector3>[];
+          if (hSpan > 1e-4) {
+            final tolH = hSpan * 0.05;
 
-            // Extract two contiguous rim curves across the closed boundary loop
-            int transToTop = -1;
-            for (int i = 0; i < n; i++) {
-              final prevH = heights[(i - 1 + n) % n];
-              final curH = heights[i];
-              if (prevH < midH && curH >= midH) {
-                transToTop = i;
-                break;
-              }
-            }
-
-            if (transToTop != -1) {
-              int idx = transToTop;
-              while (heights[idx % n] >= midH && topPts.length < n) {
-                topPts.add(worldPts[idx % n]);
-                idx++;
-              }
-              while (heights[idx % n] < midH && botPts.length < n) {
-                botPts.add(worldPts[idx % n]);
-                idx++;
-              }
-            } else {
+            List<Vector3> extractContiguousRun(bool Function(int i) predicate) {
+              int startFalse = -1;
               for (int i = 0; i < n; i++) {
-                if (heights[i] < midH) {
-                  botPts.add(worldPts[i]);
-                } else {
-                  topPts.add(worldPts[i]);
+                if (!predicate(i)) {
+                  startFalse = i;
+                  break;
                 }
               }
+              if (startFalse == -1) {
+                return List<Vector3>.from(worldPts);
+              }
+
+              final run = <Vector3>[];
+              int bestStart = -1;
+              int bestLen = 0;
+              int curStart = -1;
+              int curLen = 0;
+
+              for (int step = 0; step < n; step++) {
+                final idx = (startFalse + 1 + step) % n;
+                if (predicate(idx)) {
+                  if (curLen == 0) curStart = idx;
+                  curLen++;
+                  if (curLen > bestLen) {
+                    bestLen = curLen;
+                    bestStart = curStart;
+                  }
+                } else {
+                  curLen = 0;
+                }
+              }
+
+              if (bestLen > 0) {
+                for (int k = 0; k < bestLen; k++) {
+                  run.add(worldPts[(bestStart + k) % n]);
+                }
+              }
+              return run;
             }
+
+            final topPts = extractContiguousRun((i) => (maxH - heights[i]) <= tolH);
+            final botPts = extractContiguousRun((i) => (heights[i] - minH) <= tolH);
 
             if (botPts.length >= 2 && topPts.length >= 2) {
               // Match orientation of topPts to botPts if reversed along loop
@@ -864,12 +953,40 @@ class StepParser {
               final d0N = (botPts.first - topPts.last).lengthSquared;
               final orderedTop = d0N < d00 ? topPts.reversed.toList() : topPts;
 
-              final steps = math.max(botPts.length, orderedTop.length);
-              for (int i = 0; i < steps - 1; i++) {
-                final b0 = botPts[math.min(i, botPts.length - 1)];
-                final b1 = botPts[math.min(i + 1, botPts.length - 1)];
-                final t0 = orderedTop[math.min(i, orderedTop.length - 1)];
-                final t1 = orderedTop[math.min(i + 1, orderedTop.length - 1)];
+              List<Vector3> resample(List<Vector3> pts, int targetCount) {
+                if (pts.length == targetCount) return pts;
+                if (pts.length < 2) return pts;
+                final cumDist = <double>[0.0];
+                for (int i = 0; i < pts.length - 1; i++) {
+                  cumDist.add(cumDist.last + (pts[i + 1] - pts[i]).length);
+                }
+                final totalLen = cumDist.last;
+                if (totalLen < 1e-9) return List.filled(targetCount, pts.first);
+
+                final res = <Vector3>[pts.first];
+                int seg = 0;
+                for (int i = 1; i < targetCount - 1; i++) {
+                  final targetDist = totalLen * (i / (targetCount - 1));
+                  while (seg < cumDist.length - 2 && cumDist[seg + 1] < targetDist) {
+                    seg++;
+                  }
+                  final segLen = cumDist[seg + 1] - cumDist[seg];
+                  final t = segLen > 1e-9 ? (targetDist - cumDist[seg]) / segLen : 0.0;
+                  res.add(pts[seg] + (pts[seg + 1] - pts[seg]) * t);
+                }
+                res.add(pts.last);
+                return res;
+              }
+
+              final mSteps = math.max(botPts.length, orderedTop.length);
+              final resBot = resample(botPts, mSteps);
+              final resTop = resample(orderedTop, mSteps);
+
+              for (int i = 0; i < mSteps - 1; i++) {
+                final b0 = resBot[i];
+                final b1 = resBot[i + 1];
+                final t0 = resTop[i];
+                final t1 = resTop[i + 1];
 
                 if ((b0 - b1).lengthSquared > 1e-8 && (t0 - t1).lengthSquared > 1e-8) {
                   result.add(Triangle3D(v0: b0, v1: b1, v2: t1, color: faceColor, isDoubleSided: true));

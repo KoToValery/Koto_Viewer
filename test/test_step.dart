@@ -73,5 +73,23 @@ END-ISO-10303-21;''';
     expect(mesh.bounds.max.x, closeTo(300.0, 1.0));
     expect(mesh.bounds.max.y, closeTo(420.0, 1.0));
   });
+
+  test('StepParser accurately triangulates tondach_twiston9.step without false chords', () {
+    final file = File('C:/Users/KoTo/Dropbox/test_files/tondach_twiston9.step');
+    if (!file.existsSync()) return;
+
+    final bytes = file.readAsBytesSync();
+    final mesh = StepParser.parseFromBytes(bytes, name: 'tondach_twiston9.step');
+    print('Tondach triangles: ${mesh.triangles.length}, min: ${mesh.bounds.min}, max: ${mesh.bounds.max}');
+
+    expect(mesh.triangles.length, greaterThan(500));
+    expect(mesh.bounds.max.x, closeTo(300.0, 1.0));
+    expect(mesh.bounds.max.y, closeTo(500.0, 1.0));
+  });
 }
+
+
+
+
+
 
