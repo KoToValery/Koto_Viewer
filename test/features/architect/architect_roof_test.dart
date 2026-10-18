@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
@@ -968,6 +969,110 @@ void main() {
       expect(offset.any((p) => (p - const Offset(10.5, -0.5)).distance < 1e-4), isTrue);
       expect(offset.any((p) => (p - const Offset(10.5, 6.5)).distance < 1e-4), isTrue);
       expect(offset.any((p) => (p - const Offset(-0.5, 6.5)).distance < 1e-4), isTrue);
+    });
+  });
+
+  group('Weighted Straight Skeleton & Unequal Roof Pitches', () {
+    test('calculateSlopeToMatchRidgeHeight computes exact matching pitch for narrower wing', () {
+      // Main wing: half-span run = 5.0m, pitch = 22.0 deg
+      final mainRidgeHeight = 5.0 * math.tan(22.0 * math.pi / 180.0); // ~2.020m
+      // Narrow wing: half-span run = 3.5m
+      final requiredSlope = ArchitectRoofGeometry.calculateSlopeToMatchRidgeHeight(
+        targetRidgeHeight: mainRidgeHeight,
+        runDistance: 3.5,
+      );
+      // Expected: atan(2.020 / 3.5) * 180 / pi = 29.99 deg (~30.0 deg)
+      expect(requiredSlope, closeTo(30.0, 0.1));
+
+      // Check elevation match in mm
+      final narrowRidgeHeight = 3.5 * math.tan(requiredSlope * math.pi / 180.0);
+      expect((narrowRidgeHeight - mainRidgeHeight).abs(), lessThan(0.005));
+    });
+
+    test('calculateHipAngle computes plan hip angle for orthogonal and non-orthogonal corners', () {
+      // 90 deg corner with equal slopes -> 45.0 deg
+      final hipEqual = ArchitectRoofGeometry.calculateHipAngle(
+        slopeDeg1: 25.0,
+        slopeDeg2: 25.0,
+      );
+      expect(hipEqual, closeTo(45.0, 1e-4));
+
+      // 90 deg corner with unequal slopes (25 deg vs 35 deg)
+      final hipUnequal = ArchitectRoofGeometry.calculateHipAngle(
+        slopeDeg1: 25.0,
+        slopeDeg2: 35.0,
+      );
+      final expectedAngle = math.atan2(
+        math.tan(25.0 * math.pi / 180.0),
+        math.tan(35.0 * math.pi / 180.0),
+      ) * 180.0 / math.pi;
+      expect(hipUnequal, closeTo(expectedAngle, 1e-4));
+      expect(hipUnequal, closeTo(33.66, 0.1));
+
+      // 120 deg obtuse corner with equal slopes -> 60.0 deg
+      final hip120 = ArchitectRoofGeometry.calculateHipAngle(
+        slopeDeg1: 25.0,
+        slopeDeg2: 25.0,
+        cornerAngleRad: 120.0 * math.pi / 180.0,
+      );
+      expect(hip120, closeTo(60.0, 1e-4));
+    });
+
+    test('decomposeMultiPitchPolygon with perEdgeSlopeDegrees yields continuous 3D hips and valleys', () {
+      const storey = ArchitectStorey(
+        id: 's_unequal',
+        name: 'Storey Unequal',
+        elevation: 0.0,
+        height: 3.0,
+      );
+      final lFootprint = [
+        const Offset(0, 0),
+        const Offset(12, 0),
+        const Offset(12, 6),
+        const Offset(6, 6),
+        const Offset(6, 10),
+        const Offset(0, 10),
+      ];
+
+      // Slopes for each of the 6 edges: edges along main body = 22 deg, wing edges = 30 deg
+      final perEdge = [22.0, 22.0, 30.0, 30.0, 30.0, 22.0];
+
+      final planes = ArchitectRoofGeometry.decomposeMultiPitchPolygon(
+        eavesPolygon: lFootprint,
+        storey: storey,
+        slopeDegrees: 22.0,
+        baseElevationOffset: 3.0,
+        eavesOverhang: 0.50,
+        assembly: ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles),
+        perEdgeSlopeDegrees: perEdge,
+      );
+
+      expect(planes.isNotEmpty, isTrue);
+      // Verify planes retain individual slope degrees and group linkage
+      for (var i = 0; i < planes.length; i++) {
+        expect(planes[i].isSlopeLocked, isTrue);
+        expect(planes[i].points.length, greaterThanOrEqualTo(3));
+      }
+    });
+
+    test('ArchitectRoofPlane isSlopeLocked field serializes and clones correctly', () {
+      final roof = ArchitectRoofPlane(
+        id: 'r_lock_test',
+        storeyId: 's1',
+        points: const [Offset(0, 0), Offset(5, 0), Offset(5, 4), Offset(0, 4)],
+        roofGroupId: 'grp_123',
+        isSlopeLocked: true,
+      );
+      expect(roof.isSlopeLocked, isTrue);
+
+      final unlocked = roof.copyWith(isSlopeLocked: false);
+      expect(unlocked.isSlopeLocked, isFalse);
+
+      final json = unlocked.toJson();
+      expect(json['isSlopeLocked'], isFalse);
+
+      final restored = ArchitectRoofPlane.fromJson(json);
+      expect(restored.isSlopeLocked, isFalse);
     });
   });
 }

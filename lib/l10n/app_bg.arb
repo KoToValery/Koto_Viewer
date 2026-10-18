@@ -7,6 +7,7 @@
   "systemDefault": "Системен по подразбиране",
 
   "cancel": "Отказ",
+  "back": "Назад",
   "close": "Затвори",
   "ok": "ОК",
   "save": "Запази",
@@ -2028,6 +2029,30 @@
   "architectRoofLinkedSlopes": "Свързани скатове",
   "architectRoofLinkedSlopesTooltip": "Всички скатове в тази покривна група споделят общ наклон и височина на стрехата",
   "architectRoofSnap45Degrees": "45° Скат / Било",
+  "architectRoofIndependentSlope": "Индивидуален наклон",
+  "architectRoofIndependentSlopeTooltip": "Този скат има индивидуален наклон (отключен от групата)",
+  "architectRoofToggleSlopeLockTooltip": "Превключване между свързан наклон и индивидуален наклон",
+  "architectRoofMatchRidge": "Изравни по било",
+  "architectRoofMatchRidgeTooltip": "Напасва наклона, за да съвпадне с височината на главното било",
+  "architectRoofRidgeHeightMatched": "Наклонът е напаснат на {degrees}° за кота било {height}m",
+  "@architectRoofRidgeHeightMatched": {
+    "placeholders": {
+      "degrees": {
+        "type": "String"
+      },
+      "height": {
+        "type": "String"
+      }
+    }
+  },
+  "architectRoofSnapHipAngle": "{angle}° Скат / Мавия",
+  "@architectRoofSnapHipAngle": {
+    "placeholders": {
+      "angle": {
+        "type": "String"
+      }
+    }
+  },
   "cad3dOrbit": "Завъртане",
   "cad3dPan": "Преместване",
   "cad3dWalk": "Разходка",

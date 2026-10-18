@@ -24,6 +24,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get cancel => 'Отказ';
 
   @override
+  String get back => 'Назад';
+
+  @override
   String get close => 'Затвори';
 
   @override
@@ -6225,6 +6228,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectRoofDrawMultiPitch => 'Многоскатен';
 
   @override
+  String get architectRoofSnap45Degrees => '45° Скат / Било';
+
+  @override
   String get architectRoofLinkedSlopes => 'Свързани скатове';
 
   @override
@@ -6232,7 +6238,32 @@ class AppLocalizationsBg extends AppLocalizations {
       'Всички скатове в тази покривна група споделят общ наклон и височина на стрехата';
 
   @override
-  String get architectRoofSnap45Degrees => '45° Скат / Било';
+  String get architectRoofIndependentSlope => 'Индивидуален наклон';
+
+  @override
+  String get architectRoofIndependentSlopeTooltip =>
+      'Този скат има индивидуален наклон (отключен от групата)';
+
+  @override
+  String get architectRoofToggleSlopeLockTooltip =>
+      'Превключване между свързан наклон и индивидуален наклон';
+
+  @override
+  String get architectRoofMatchRidge => 'Изравни по било';
+
+  @override
+  String get architectRoofMatchRidgeTooltip =>
+      'Напасва наклона, за да съвпадне с височината на главното било';
+
+  @override
+  String architectRoofRidgeHeightMatched(String degrees, String height) {
+    return 'Наклонът е напаснат на $degrees° за кота било ${height}m';
+  }
+
+  @override
+  String architectRoofSnapHipAngle(String angle) {
+    return '$angle° Скат / Мавия';
+  }
 
   @override
   String get cad3dOrbit => 'Завъртане';

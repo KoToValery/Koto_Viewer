@@ -12,6 +12,8 @@
 
   "cancel": "Cancel",
   "@cancel": { "description": "Generic Cancel button text" },
+  "back": "Back",
+  "@back": { "description": "Generic Back button text or tooltip" },
   "close": "Close",
   "@close": { "description": "Generic Close button text" },
   "ok": "OK",
@@ -4099,9 +4101,33 @@
     }
   },
   "architectRoofDrawMultiPitch": "Multi-pitch",
+  "architectRoofSnap45Degrees": "45° Hip / Ridge",
   "architectRoofLinkedSlopes": "Linked slopes",
   "architectRoofLinkedSlopesTooltip": "All roof planes in this group share the same slope and eaves height",
-  "architectRoofSnap45Degrees": "45° Hip / Ridge",
+  "architectRoofIndependentSlope": "Independent slope",
+  "architectRoofIndependentSlopeTooltip": "This roof plane has an independent slope (unlocked from group)",
+  "architectRoofToggleSlopeLockTooltip": "Toggle linked group slope vs independent slope",
+  "architectRoofMatchRidge": "Match ridge",
+  "architectRoofMatchRidgeTooltip": "Adjust slope to match the ridge height of adjacent roofs",
+  "architectRoofRidgeHeightMatched": "Slope adjusted to {degrees}° to match ridge height {height}m",
+  "@architectRoofRidgeHeightMatched": {
+    "placeholders": {
+      "degrees": {
+        "type": "String"
+      },
+      "height": {
+        "type": "String"
+      }
+    }
+  },
+  "architectRoofSnapHipAngle": "{angle}° Hip / Valley",
+  "@architectRoofSnapHipAngle": {
+    "placeholders": {
+      "angle": {
+        "type": "String"
+      }
+    }
+  },
   "cad3dOrbit": "Orbit",
   "@cad3dOrbit": {"description": "3D orbit navigation tooltip"},
   "cad3dPan": "Pan",

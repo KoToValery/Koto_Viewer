@@ -88,6 +88,15 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     });
   }
 
+  void _handleBack() {
+    if (!mounted) return;
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(true);
+    } else {
+      Navigator.of(context).maybePop(true);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -664,7 +673,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         accentColor: const Color(0xFF00E5FF),
         loadingTitle: l10n.loading3dModel,
         statusMessage: l10n.statusTriangulatingMesh,
-        onCancel: () => Navigator.of(context).pop(false),
+        onCancel: _handleBack,
       );
     }
 
@@ -685,6 +694,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
           const SingleActivator(LogicalKeyboardKey.escape): () {
             if (_isFullscreen) {
               _toggleFullscreen();
+            } else {
+              _handleBack();
             }
           },
           const SingleActivator(LogicalKeyboardKey.keyF): () {
@@ -702,7 +713,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                     elevation: 0,
                     leading: IconButton(
                       icon: const Icon(Icons.arrow_back),
-                      onPressed: () => Navigator.of(context).pop(true),
+                      tooltip: l10n.back,
+                      onPressed: _handleBack,
                     ),
                     title: Text(
                       _fileName,
@@ -1014,7 +1026,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                             projectBundle: widget.projectBundle!,
                             currentIndex: widget.currentProjectIndex ?? 0,
                             onSwitchProjectItem: widget.onSwitchProjectItem,
-                            onExit: () => Navigator.of(context).pop(),
+                            onExit: _handleBack,
                           ),
                         ),
                       ),
@@ -1036,8 +1048,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                                 color: Colors.white,
                                 size: 22,
                               ),
-                              tooltip: 'Back',
-                              onPressed: () => Navigator.of(context).pop(true),
+                              tooltip: l10n.back,
+                              onPressed: _handleBack,
                             ),
                           ),
                         ),

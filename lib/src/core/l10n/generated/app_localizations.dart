@@ -128,6 +128,12 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get cancel;
 
+  /// Generic Back button text or tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get back;
+
   /// Generic Close button text
   ///
   /// In en, this message translates to:
@@ -10973,6 +10979,12 @@ abstract class AppLocalizations {
   /// **'Multi-pitch'**
   String get architectRoofDrawMultiPitch;
 
+  /// No description provided for @architectRoofSnap45Degrees.
+  ///
+  /// In en, this message translates to:
+  /// **'45° Hip / Ridge'**
+  String get architectRoofSnap45Degrees;
+
   /// No description provided for @architectRoofLinkedSlopes.
   ///
   /// In en, this message translates to:
@@ -10985,11 +10997,47 @@ abstract class AppLocalizations {
   /// **'All roof planes in this group share the same slope and eaves height'**
   String get architectRoofLinkedSlopesTooltip;
 
-  /// No description provided for @architectRoofSnap45Degrees.
+  /// No description provided for @architectRoofIndependentSlope.
   ///
   /// In en, this message translates to:
-  /// **'45° Hip / Ridge'**
-  String get architectRoofSnap45Degrees;
+  /// **'Independent slope'**
+  String get architectRoofIndependentSlope;
+
+  /// No description provided for @architectRoofIndependentSlopeTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'This roof plane has an independent slope (unlocked from group)'**
+  String get architectRoofIndependentSlopeTooltip;
+
+  /// No description provided for @architectRoofToggleSlopeLockTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle linked group slope vs independent slope'**
+  String get architectRoofToggleSlopeLockTooltip;
+
+  /// No description provided for @architectRoofMatchRidge.
+  ///
+  /// In en, this message translates to:
+  /// **'Match ridge'**
+  String get architectRoofMatchRidge;
+
+  /// No description provided for @architectRoofMatchRidgeTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust slope to match the ridge height of adjacent roofs'**
+  String get architectRoofMatchRidgeTooltip;
+
+  /// No description provided for @architectRoofRidgeHeightMatched.
+  ///
+  /// In en, this message translates to:
+  /// **'Slope adjusted to {degrees}° to match ridge height {height}m'**
+  String architectRoofRidgeHeightMatched(String degrees, String height);
+
+  /// No description provided for @architectRoofSnapHipAngle.
+  ///
+  /// In en, this message translates to:
+  /// **'{angle}° Hip / Valley'**
+  String architectRoofSnapHipAngle(String angle);
 
   /// 3D orbit navigation tooltip
   ///

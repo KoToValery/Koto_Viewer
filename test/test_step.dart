@@ -82,9 +82,22 @@ END-ISO-10303-21;''';
     final mesh = StepParser.parseFromBytes(bytes, name: 'tondach_twiston9.step');
     print('Tondach triangles: ${mesh.triangles.length}, min: ${mesh.bounds.min}, max: ${mesh.bounds.max}');
 
-    expect(mesh.triangles.length, greaterThan(500));
+    // Let's inspect all 31 faces
+    // We can add a debug loop
+
+    expect(mesh.triangles.length, greaterThan(1800));
     expect(mesh.bounds.max.x, closeTo(300.0, 1.0));
     expect(mesh.bounds.max.y, closeTo(500.0, 1.0));
+    expect(mesh.bounds.max.z, closeTo(23.9, 1.0));
+    expect(mesh.bounds.min.z, closeTo(-33.2, 1.0));
+
+    // Verify both cylindrical nail holes are present and triangulated
+    final hole1Tris = mesh.triangles.where((t) =>
+        (t.v0.x - 115.0).abs() <= 5.0 && (t.v0.y - 486.0).abs() <= 5.0).toList();
+    final hole2Tris = mesh.triangles.where((t) =>
+        (t.v0.x - 185.0).abs() <= 5.0 && (t.v0.y - 486.0).abs() <= 5.0).toList();
+    expect(hole1Tris.length, greaterThanOrEqualTo(50));
+    expect(hole2Tris.length, greaterThanOrEqualTo(50));
   });
 }
 

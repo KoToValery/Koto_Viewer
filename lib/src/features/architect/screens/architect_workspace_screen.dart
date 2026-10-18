@@ -3230,12 +3230,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     var snapLabel = snap.snapLabel;
     var guides = snap.magneticGuides;
 
-    // Check 45° hip angle guide from anchor
+    // Check hip angle guides from anchor (45° for equal slopes, or custom angle for unequal slopes)
     if (anchor != null && _magnetEnabled) {
       final delta = raw - anchor;
       final dist = delta.distance;
       if (dist > 0.15) {
-        for (final angleDeg in const [45.0, 135.0, 225.0, 315.0]) {
+        // Look for adjacent roof near anchor to detect unequal slopes
+        double baseHip = 45.0;
+        final nearRoof = _project.activeStorey.roofs.where((r) {
+          return r.points.any((p) => (p - anchor).distance < 0.5);
+        }).firstOrNull;
+        if (nearRoof != null &&
+            (nearRoof.slopeDegrees - _roofTool.slopeDegrees).abs() > 0.5) {
+          baseHip = ArchitectRoofGeometry.calculateHipAngle(
+            slopeDeg1: _roofTool.slopeDegrees,
+            slopeDeg2: nearRoof.slopeDegrees,
+          );
+        }
+
+        final angles = [
+          baseHip,
+          180.0 - baseHip,
+          180.0 + baseHip,
+          360.0 - baseHip,
+          if ((baseHip - 45.0).abs() > 0.5) ...const [45.0, 135.0, 225.0, 315.0],
+        ];
+
+        for (final angleDeg in angles) {
           final rad = angleDeg * math.pi / 180.0;
           final dir = Offset(math.cos(rad), math.sin(rad));
           final proj = delta.dx * dir.dx + delta.dy * dir.dy;
@@ -3245,7 +3266,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             final snapTol = (_touchInput ? 16 : 10) / _currentScale;
             if (perpDist <= snapTol) {
               pt = guidePt;
-              snapLabel = context.l10n.architectRoofSnap45Degrees;
+              snapLabel = (angleDeg - 45.0).abs() < 0.5
+                  ? context.l10n.architectRoofSnap45Degrees
+                  : context.l10n.architectRoofSnapHipAngle(
+                      angleDeg.toStringAsFixed(1),
+                    );
               final guideSpan = math.max(dist + 2.0, 10.0);
               guides = [
                 (anchor, anchor + dir * guideSpan),
@@ -9069,9 +9094,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               final sel = _selectedRoof;
                               if (sel != null) {
                                 final grp = sel.roofGroupId;
-                                if (grp != null && grp.isNotEmpty) {
+                                if (grp != null && grp.isNotEmpty && sel.isSlopeLocked) {
                                   for (final r in _project.activeStorey.roofs) {
-                                    if (r.roofGroupId == grp) {
+                                    if (r.roofGroupId == grp && r.isSlopeLocked) {
                                       _commands.execute(
                                         UpdateArchitectRoofPlane(
                                           storeyId: _project.activeStoreyId,
@@ -9092,6 +9117,70 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               }
                             });
                             HapticFeedback.selectionClick();
+                          },
+                          onToggleSlopeLocked: () {
+                            final sel = _selectedRoof;
+                            if (sel != null) {
+                              setState(() {
+                                _commands.execute(
+                                  UpdateArchitectRoofPlane(
+                                    storeyId: _project.activeStoreyId,
+                                    roof: sel.copyWith(isSlopeLocked: !sel.isSlopeLocked),
+                                  ),
+                                );
+                              });
+                              _saveBiMProjectIfAttached();
+                              HapticFeedback.selectionClick();
+                            }
+                          },
+                          onMatchRidgeHeight: () {
+                            final sel = _selectedRoof;
+                            if (sel == null) return;
+                            final grp = sel.roofGroupId;
+                            ArchitectRoofPlane? refRoof;
+                            if (grp != null && grp.isNotEmpty) {
+                              for (final r in _project.activeStorey.roofs) {
+                                if (r.id != sel.id && r.roofGroupId == grp) {
+                                  if (refRoof == null || r.maxSlopeRun > refRoof.maxSlopeRun) {
+                                    refRoof = r;
+                                  }
+                                }
+                              }
+                            }
+                            refRoof ??= _project.activeStorey.roofs.where((r) => r.id != sel.id).firstOrNull;
+                            if (refRoof == null) return;
+
+                            final targetZ = refRoof.maxSlopeRun * math.tan(refRoof.slopeRadians);
+                            final myRun = sel.maxSlopeRun;
+                            final newSlope = ArchitectRoofGeometry.calculateSlopeToMatchRidgeHeight(
+                              targetRidgeHeight: targetZ,
+                              runDistance: myRun,
+                            );
+
+                            setState(() {
+                              _commands.execute(
+                                UpdateArchitectRoofPlane(
+                                  storeyId: _project.activeStoreyId,
+                                  roof: sel.copyWith(
+                                    slopeDegrees: newSlope,
+                                    isSlopeLocked: false,
+                                  ),
+                                ),
+                              );
+                            });
+                            _saveBiMProjectIfAttached();
+                            HapticFeedback.mediumImpact();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  context.l10n.architectRoofRidgeHeightMatched(
+                                    newSlope.toStringAsFixed(1),
+                                    (refRoof.baseElevationOffset + targetZ).toStringAsFixed(2),
+                                  ),
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
                           },
                           onSelectedRoofOverhangChanged: (overhang) {
                             setState(() {

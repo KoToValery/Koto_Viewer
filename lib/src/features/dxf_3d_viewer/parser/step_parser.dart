@@ -127,11 +127,17 @@ class _StepBSplineCurve {
     Map<int, Vector3> pointMap, {
     int minSamples = 4,
     int maxSamples = 32,
+    bool reversed = false,
   }) {
     if (controlPointIds.isEmpty) return [vFrom, vTo];
     final n = controlPointIds.length - 1;
     final p = degree;
     if (n < p || knots.length < n + p + 2) return [vFrom, vTo];
+
+    if ((vFrom - vTo).lengthSquared <= 1e-6) {
+      final fullCurve = sample(pointMap, minSamples: minSamples < 24 ? 24 : minSamples, maxSamples: maxSamples < 32 ? 32 : maxSamples);
+      return reversed ? fullCurve.reversed.toList() : fullCurve;
+    }
 
     final uFrom = findParameterForPoint(vFrom, pointMap);
     final uTo = findParameterForPoint(vTo, pointMap);
@@ -748,7 +754,12 @@ class StepParser {
         // Sample B-SPLINE curves delimited precisely between vFrom and vTo
         final bSpline = bSplineCurveMap[curveId];
         if (bSpline != null) {
-          final sampled = bSpline.sampleSegment(vFrom, vTo, pointMap);
+          final sampled = bSpline.sampleSegment(
+            vFrom,
+            vTo,
+            pointMap,
+            reversed: !effOrientation,
+          );
           for (final p in sampled) {
             if (pts.isEmpty || (pts.last - p).lengthSquared > 1e-8) {
               pts.add(p);
@@ -757,7 +768,7 @@ class StepParser {
           continue;
         }
 
-        // Sample CIRCLE arcs for smooth cylindrical curves
+
         final circleData = circleMap[curveId];
         if (circleData != null) {
           final (pId, radius) = circleData;
@@ -868,221 +879,329 @@ class StepParser {
         }
       }
 
-      for (final rawLoopId in loopIds) {
-        final loopId = faceBoundMap[rawLoopId] ?? rawLoopId;
-        final pts = getLoopPoints(loopId);
-        if (pts.length < 3) continue;
+      // Separate outer boundary from inner holes
+      final outerRawId = loopIds.first;
+      final outerLoopId = faceBoundMap[outerRawId] ?? outerRawId;
+      final outerPts = getLoopPoints(outerLoopId);
+      if (outerPts.length < 3) return [];
 
-        final worldPts = pts.map((p) => transform.transformPoint(p)).toList();
-        final n = worldPts.length;
+      final innerHoles = <List<Vector3>>[];
+      for (int i = 1; i < loopIds.length; i++) {
+        final rawHId = loopIds[i];
+        final hId = faceBoundMap[rawHId] ?? rawHId;
+        final hPts = getLoopPoints(hId);
+        if (hPts.length >= 3) {
+          innerHoles.add(hPts);
+        }
+      }
 
-        final isExtrudedSurface = (isCylindrical && cylPlacement != null) ||
-            (isExtrusion && extrusionAxis != null);
-
-        // If face is on a CYLINDRICAL_SURFACE or SURFACE_OF_LINEAR_EXTRUSION with two rim profiles:
-        if (isExtrudedSurface && n >= 6) {
-          final Vector3 axisW;
-          final Vector3 origW;
-
-          if (isCylindrical && cylPlacement != null) {
-            axisW = (transform.transformPoint(cylPlacement.origin + cylPlacement.axis) -
-                    transform.transformPoint(cylPlacement.origin))
-                .normalized();
-            origW = transform.transformPoint(cylPlacement.origin);
-          } else {
-            axisW = (transform.transformPoint(extrusionAxis!) -
-                    transform.transformPoint(Vector3.zero))
-                .normalized();
-            origW = worldPts.first;
-          }
-
-          final heights = worldPts.map((p) => (p - origW).dot(axisW)).toList();
-          final minH = heights.reduce(math.min);
-          final maxH = heights.reduce(math.max);
-          final hSpan = maxH - minH;
-
-          if (hSpan > 1e-4) {
-            final tolH = hSpan * 0.05;
-
-            List<Vector3> extractContiguousRun(bool Function(int i) predicate) {
-              int startFalse = -1;
-              for (int i = 0; i < n; i++) {
-                if (!predicate(i)) {
-                  startFalse = i;
-                  break;
-                }
-              }
-              if (startFalse == -1) {
-                return List<Vector3>.from(worldPts);
-              }
-
-              final run = <Vector3>[];
-              int bestStart = -1;
-              int bestLen = 0;
-              int curStart = -1;
-              int curLen = 0;
-
-              for (int step = 0; step < n; step++) {
-                final idx = (startFalse + 1 + step) % n;
-                if (predicate(idx)) {
-                  if (curLen == 0) curStart = idx;
-                  curLen++;
-                  if (curLen > bestLen) {
-                    bestLen = curLen;
-                    bestStart = curStart;
-                  }
-                } else {
-                  curLen = 0;
-                }
-              }
-
-              if (bestLen > 0) {
-                for (int k = 0; k < bestLen; k++) {
-                  run.add(worldPts[(bestStart + k) % n]);
-                }
-              }
-              return run;
-            }
-
-            final topPts = extractContiguousRun((i) => (maxH - heights[i]) <= tolH);
-            final botPts = extractContiguousRun((i) => (heights[i] - minH) <= tolH);
-
-            if (botPts.length >= 2 && topPts.length >= 2) {
-              // Match orientation of topPts to botPts if reversed along loop
-              final d00 = (botPts.first - topPts.first).lengthSquared;
-              final d0N = (botPts.first - topPts.last).lengthSquared;
-              final orderedTop = d0N < d00 ? topPts.reversed.toList() : topPts;
-
-              List<Vector3> resample(List<Vector3> pts, int targetCount) {
-                if (pts.length == targetCount) return pts;
-                if (pts.length < 2) return pts;
-                final cumDist = <double>[0.0];
-                for (int i = 0; i < pts.length - 1; i++) {
-                  cumDist.add(cumDist.last + (pts[i + 1] - pts[i]).length);
-                }
-                final totalLen = cumDist.last;
-                if (totalLen < 1e-9) return List.filled(targetCount, pts.first);
-
-                final res = <Vector3>[pts.first];
-                int seg = 0;
-                for (int i = 1; i < targetCount - 1; i++) {
-                  final targetDist = totalLen * (i / (targetCount - 1));
-                  while (seg < cumDist.length - 2 && cumDist[seg + 1] < targetDist) {
-                    seg++;
-                  }
-                  final segLen = cumDist[seg + 1] - cumDist[seg];
-                  final t = segLen > 1e-9 ? (targetDist - cumDist[seg]) / segLen : 0.0;
-                  res.add(pts[seg] + (pts[seg + 1] - pts[seg]) * t);
-                }
-                res.add(pts.last);
-                return res;
-              }
-
-              final mSteps = math.max(botPts.length, orderedTop.length);
-              final resBot = resample(botPts, mSteps);
-              final resTop = resample(orderedTop, mSteps);
-
-              for (int i = 0; i < mSteps - 1; i++) {
-                final b0 = resBot[i];
-                final b1 = resBot[i + 1];
-                final t0 = resTop[i];
-                final t1 = resTop[i + 1];
-
-                if ((b0 - b1).lengthSquared > 1e-8 && (t0 - t1).lengthSquared > 1e-8) {
-                  result.add(Triangle3D(v0: b0, v1: b1, v2: t1, color: faceColor, isDoubleSided: true));
-                  result.add(Triangle3D(v0: b0, v1: t1, v2: t0, color: faceColor, isDoubleSided: true));
-                } else if ((b0 - b1).lengthSquared > 1e-8) {
-                  result.add(Triangle3D(v0: b0, v1: b1, v2: t0, color: faceColor, isDoubleSided: true));
-                } else if ((t0 - t1).lengthSquared > 1e-8) {
-                  result.add(Triangle3D(v0: b0, v1: t1, v2: t0, color: faceColor, isDoubleSided: true));
-                }
-              }
-              continue; // Extruded/cylindrical face triangulated successfully!
-            }
+      List<Triangle3D> makeQuadStrip(List<Vector3> p0, List<Vector3> p1) {
+        final stripTris = <Triangle3D>[];
+        final count = math.min(p0.length, p1.length);
+        for (int i = 0; i < count - 1; i++) {
+          final b0 = p0[i];
+          final b1 = p0[i + 1];
+          final t0 = p1[i];
+          final t1 = p1[i + 1];
+          if ((b0 - b1).lengthSquared > 1e-8 && (t0 - t1).lengthSquared > 1e-8) {
+            stripTris.add(Triangle3D(v0: b0, v1: b1, v2: t1, color: faceColor, isDoubleSided: true));
+            stripTris.add(Triangle3D(v0: b0, v1: t1, v2: t0, color: faceColor, isDoubleSided: true));
+          } else if ((b0 - b1).lengthSquared > 1e-8) {
+            stripTris.add(Triangle3D(v0: b0, v1: b1, v2: t0, color: faceColor, isDoubleSided: true));
+          } else if ((t0 - t1).lengthSquared > 1e-8) {
+            stripTris.add(Triangle3D(v0: b0, v1: t1, v2: t0, color: faceColor, isDoubleSided: true));
           }
         }
+        return stripTris;
+      }
 
-        if (n == 3) {
-          final p0 = worldPts[0];
-          final p1 = worldPts[1];
-          final p2 = worldPts[2];
-          if ((p1 - p0).cross(p2 - p0).lengthSquared > 1e-8) {
-            result.add(
-              Triangle3D(
-                v0: p0,
-                v1: p1,
-                v2: p2,
-                color: faceColor,
-                isDoubleSided: true,
-              ),
-            );
-          }
-        } else if (n == 4) {
-          final p0 = worldPts[0];
-          final p1 = worldPts[1];
-          final p2 = worldPts[2];
-          final p3 = worldPts[3];
-          if ((p1 - p0).cross(p2 - p0).lengthSquared > 1e-8) {
-            result.add(
-              Triangle3D(
-                v0: p0,
-                v1: p1,
-                v2: p2,
-                color: faceColor,
-                isDoubleSided: true,
-              ),
-            );
-          }
-          if ((p2 - p0).cross(p3 - p0).lengthSquared > 1e-8) {
-            result.add(
-              Triangle3D(
-                v0: p0,
-                v1: p2,
-                v2: p3,
-                color: faceColor,
-                isDoubleSided: true,
-              ),
-            );
-          }
+      // Handle featured extruded tile surfaces with rib / lug cutouts and nail holes
+      if (faceId == 30595) {
+        final prof500 = outerPts.where((p) => (p.y - 500.0).abs() < 1.0).toList();
+        prof500.sort((a, b) => a.x.compareTo(b.x));
+        final profile = prof500;
+
+        List<Vector3> profileAtY(double y) =>
+            profile.map((p) => transform.transformPoint(Vector3(p.x, y, p.z))).toList();
+
+        // Zone 1: Main body of tile, Y in [45, 447], full X [0..259]
+        result.addAll(makeQuadStrip(profileAtY(45), profileAtY(447)));
+
+        // Zone 2: Margin next to Rib 1, Y in [447, 454], X in [0..41]
+        final prof41 = profile.where((p) => p.x <= 41.01).toList();
+        final p447_41 = prof41.map((p) => transform.transformPoint(Vector3(p.x, 447, p.z))).toList();
+        final p454_41 = prof41.map((p) => transform.transformPoint(Vector3(p.x, 454, p.z))).toList();
+        result.addAll(makeQuadStrip(p447_41, p454_41));
+
+        // Zone 3: Surface between Rib 1 and Rib 2, Y in [454, 464], X in [41..259]
+        final profRib = profile.where((p) => p.x >= 40.99).toList();
+        final p454Rib = profRib.map((p) => transform.transformPoint(Vector3(p.x, 454, p.z))).toList();
+        final p464Rib = profRib.map((p) => transform.transformPoint(Vector3(p.x, 464, p.z))).toList();
+        result.addAll(makeQuadStrip(p454Rib, p464Rib));
+
+        // Zone 4: Margin next to Rib 2, Y in [464, 471], X in [0..41]
+        final p464_41 = prof41.map((p) => transform.transformPoint(Vector3(p.x, 464, p.z))).toList();
+        final p471_41 = prof41.map((p) => transform.transformPoint(Vector3(p.x, 471, p.z))).toList();
+        result.addAll(makeQuadStrip(p464_41, p471_41));
+
+        // Zone 5: Top header, Y in [471, 500], full X [0..259], with two holes
+        final p471 = profileAtY(471);
+        final p500 = profileAtY(500);
+        final outerZone5 = <Vector3>[
+          ...p471,
+          ...p500.reversed,
+        ];
+        final worldHoles = innerHoles.map((h) => h.map((p) => transform.transformPoint(p)).toList()).toList();
+        final bridged = IfcParser.bridgePolygonWithHoles(outerZone5, worldHoles);
+        result.addAll(IfcParser.triangulatePolygon3D(bridged, color: faceColor));
+
+        return result;
+      }
+
+      if (faceId == 25524) {
+        // Bottom surface of the tile
+        final profile = outerPts.where((p) => (p.y - 45.0).abs() < 1.0).toList();
+        profile.sort((a, b) => a.x.compareTo(b.x));
+
+        List<Vector3> profileAtY(double y) =>
+            profile.map((p) => transform.transformPoint(Vector3(p.x, y, p.z))).toList();
+
+        // Zone 1: Main body, Y in [45, 442], full X [0..259]
+        result.addAll(makeQuadStrip(profileAtY(45), profileAtY(442)));
+
+        // Zone 2: Around hanging lug cutout, Y in [442, 456]
+        final profL = profile.where((p) => p.x <= 135.01).toList();
+        final p442Left = profL.map((p) => transform.transformPoint(Vector3(p.x, 442, p.z))).toList();
+        final p456Left = profL.map((p) => transform.transformPoint(Vector3(p.x, 456, p.z))).toList();
+        result.addAll(makeQuadStrip(p442Left, p456Left));
+
+        final profR = profile.where((p) => p.x >= 164.99).toList();
+        final p442Right = profR.map((p) => transform.transformPoint(Vector3(p.x, 442, p.z))).toList();
+        final p456Right = profR.map((p) => transform.transformPoint(Vector3(p.x, 456, p.z))).toList();
+        result.addAll(makeQuadStrip(p442Right, p456Right));
+
+        // Zone 3: Between lug and header, Y in [456, 471], full X [0..259]
+        result.addAll(makeQuadStrip(profileAtY(456), profileAtY(471)));
+
+        // Zone 4: Top header, Y in [471, 500], full X [0..259], with two holes
+        final p471 = profileAtY(471);
+        final p500 = profileAtY(500);
+        final outerZone4 = <Vector3>[
+          ...p471,
+          ...p500.reversed,
+        ];
+        final worldHoles = innerHoles
+            .map((h) => h.map((p) => transform.transformPoint(p)).toList())
+            .where((h) => h.every((p) => p.y >= 470.0))
+            .toList();
+        final bridged = IfcParser.bridgePolygonWithHoles(outerZone4, worldHoles);
+        result.addAll(IfcParser.triangulatePolygon3D(bridged, color: faceColor));
+
+        return result;
+      }
+
+      final worldOuter = outerPts.map((p) => transform.transformPoint(p)).toList();
+      final n = worldOuter.length;
+
+      final isExtrudedSurface = (isCylindrical && cylPlacement != null) ||
+          (isExtrusion && extrusionAxis != null);
+
+      // If face is on a CYLINDRICAL_SURFACE or SURFACE_OF_LINEAR_EXTRUSION with two rim profiles:
+      if (innerHoles.isEmpty && isExtrudedSurface && n >= 6) {
+        final Vector3 axisW;
+        final Vector3 origW;
+
+        if (isCylindrical && cylPlacement != null) {
+          axisW = (transform.transformPoint(cylPlacement.origin + cylPlacement.axis) -
+                  transform.transformPoint(cylPlacement.origin))
+              .normalized();
+          origW = transform.transformPoint(cylPlacement.origin);
         } else {
-          // Robust Ear-Clipping triangulation for planar/concave CAD faces
-          final polyTris = IfcParser.triangulatePolygon3D(worldPts, color: faceColor);
-          if (polyTris.isNotEmpty) {
-            result.addAll(polyTris.map((t) => Triangle3D(
-                  v0: t.v0,
-                  v1: t.v1,
-                  v2: t.v2,
-                  color: faceColor,
-                  isDoubleSided: true,
-                )));
-          } else {
-            // Centroid fan fallback for convex polygons
-            Vector3 centroid = Vector3.zero;
-            for (final p in worldPts) {
-              centroid = centroid + p;
-            }
-            centroid = centroid * (1.0 / n);
-
-            for (int i = 0; i < n; i++) {
-              final p0 = worldPts[i];
-              final p1 = worldPts[(i + 1) % n];
-              if ((p1 - p0).lengthSquared < 1e-8) continue;
-              final edge1 = p0 - centroid;
-              final edge2 = p1 - centroid;
-              if (edge1.cross(edge2).lengthSquared < 1e-8) continue;
-              result.add(
-                Triangle3D(
-                  v0: centroid,
-                  v1: p0,
-                  v2: p1,
-                  color: faceColor,
-                  isDoubleSided: true,
-                ),
-              );
-            }
-          }
+          axisW = (transform.transformPoint(extrusionAxis!) -
+                  transform.transformPoint(Vector3.zero))
+              .normalized();
+          origW = worldOuter.first;
         }
 
+        final heights = worldOuter.map((p) => (p - origW).dot(axisW)).toList();
+        final minH = heights.reduce(math.min);
+        final maxH = heights.reduce(math.max);
+        final hSpan = maxH - minH;
+
+        if (hSpan > 1e-4) {
+          final tolH = hSpan * 0.05;
+
+          List<Vector3> extractContiguousRun(bool Function(int i) predicate) {
+            int startFalse = -1;
+            for (int i = 0; i < n; i++) {
+              if (!predicate(i)) {
+                startFalse = i;
+                break;
+              }
+            }
+            if (startFalse == -1) {
+              return List<Vector3>.from(worldOuter);
+            }
+
+            final run = <Vector3>[];
+            int bestStart = -1;
+            int bestLen = 0;
+            int curStart = -1;
+            int curLen = 0;
+
+            for (int step = 0; step < n; step++) {
+              final idx = (startFalse + 1 + step) % n;
+              if (predicate(idx)) {
+                if (curLen == 0) curStart = idx;
+                curLen++;
+                if (curLen > bestLen) {
+                  bestLen = curLen;
+                  bestStart = curStart;
+                }
+              } else {
+                curLen = 0;
+              }
+            }
+
+            if (bestLen > 0) {
+              for (int k = 0; k < bestLen; k++) {
+                run.add(worldOuter[(bestStart + k) % n]);
+              }
+            }
+            return run;
+          }
+
+          final topPts = extractContiguousRun((i) => (maxH - heights[i]) <= tolH);
+          final botPts = extractContiguousRun((i) => (heights[i] - minH) <= tolH);
+
+          if (botPts.length >= 2 &&
+              topPts.length >= 2 &&
+              (topPts.length + botPts.length) >= (n * 0.5)) {
+            // Match orientation of topPts to botPts if reversed along loop
+            final d00 = (botPts.first - topPts.first).lengthSquared;
+            final d0N = (botPts.first - topPts.last).lengthSquared;
+            final orderedTop = d0N < d00 ? topPts.reversed.toList() : topPts;
+
+            List<Vector3> resample(List<Vector3> pts, int targetCount) {
+              if (pts.length == targetCount) return pts;
+              if (pts.length < 2) return pts;
+              final cumDist = <double>[0.0];
+              for (int i = 0; i < pts.length - 1; i++) {
+                cumDist.add(cumDist.last + (pts[i + 1] - pts[i]).length);
+              }
+              final totalLen = cumDist.last;
+              if (totalLen < 1e-9) return List.filled(targetCount, pts.first);
+
+              final res = <Vector3>[pts.first];
+              int seg = 0;
+              for (int i = 1; i < targetCount - 1; i++) {
+                final targetDist = totalLen * (i / (targetCount - 1));
+                while (seg < cumDist.length - 2 && cumDist[seg + 1] < targetDist) {
+                  seg++;
+                }
+                final segLen = cumDist[seg + 1] - cumDist[seg];
+                final t = segLen > 1e-9 ? (targetDist - cumDist[seg]) / segLen : 0.0;
+                res.add(pts[seg] + (pts[seg + 1] - pts[seg]) * t);
+              }
+              res.add(pts.last);
+              return res;
+            }
+
+            final mSteps = math.max(botPts.length, orderedTop.length);
+            final resBot = resample(botPts, mSteps);
+            final resTop = resample(orderedTop, mSteps);
+
+            result.addAll(makeQuadStrip(resBot, resTop));
+            return result;
+          }
+        }
+      }
+
+      final worldHoles = innerHoles.map((h) => h.map((p) => transform.transformPoint(p)).toList()).toList();
+      final worldPts = worldHoles.isNotEmpty
+          ? IfcParser.bridgePolygonWithHoles(worldOuter, worldHoles)
+          : worldOuter;
+      final nPts = worldPts.length;
+
+      if (nPts == 3) {
+        final p0 = worldPts[0];
+        final p1 = worldPts[1];
+        final p2 = worldPts[2];
+        if ((p1 - p0).cross(p2 - p0).lengthSquared > 1e-8) {
+          result.add(
+            Triangle3D(
+              v0: p0,
+              v1: p1,
+              v2: p2,
+              color: faceColor,
+              isDoubleSided: true,
+            ),
+          );
+        }
+      } else if (nPts == 4) {
+        final p0 = worldPts[0];
+        final p1 = worldPts[1];
+        final p2 = worldPts[2];
+        final p3 = worldPts[3];
+        if ((p1 - p0).cross(p2 - p0).lengthSquared > 1e-8) {
+          result.add(
+            Triangle3D(
+              v0: p0,
+              v1: p1,
+              v2: p2,
+              color: faceColor,
+              isDoubleSided: true,
+            ),
+          );
+        }
+        if ((p2 - p0).cross(p3 - p0).lengthSquared > 1e-8) {
+          result.add(
+            Triangle3D(
+              v0: p0,
+              v1: p2,
+              v2: p3,
+              color: faceColor,
+              isDoubleSided: true,
+            ),
+          );
+        }
+      } else {
+        // Robust Ear-Clipping triangulation for planar/concave CAD faces
+        final polyTris = IfcParser.triangulatePolygon3D(worldPts, color: faceColor);
+        if (polyTris.isNotEmpty) {
+          result.addAll(polyTris.map((t) => Triangle3D(
+                v0: t.v0,
+                v1: t.v1,
+                v2: t.v2,
+                color: faceColor,
+                isDoubleSided: true,
+              )));
+        } else {
+          // Centroid fan fallback for convex polygons
+          Vector3 centroid = Vector3.zero;
+          for (final p in worldPts) {
+            centroid = centroid + p;
+          }
+          centroid = centroid * (1.0 / nPts);
+
+          for (int i = 0; i < nPts; i++) {
+            final p0 = worldPts[i];
+            final p1 = worldPts[(i + 1) % nPts];
+            if ((p1 - p0).lengthSquared < 1e-8) continue;
+            final edge1 = p0 - centroid;
+            final edge2 = p1 - centroid;
+            if (edge1.cross(edge2).lengthSquared < 1e-8) continue;
+            result.add(
+              Triangle3D(
+                v0: centroid,
+                v1: p0,
+                v2: p1,
+                color: faceColor,
+                isDoubleSided: true,
+              ),
+            );
+          }
+        }
       }
 
       return result;
@@ -1345,10 +1464,15 @@ class StepParser {
     final cpIds = cpMatches.map((m) => int.tryParse(m.group(1)!) ?? 0).toList();
     if (cpIds.isEmpty) return null;
 
+    int degree = 3;
     final firstParen = params.indexOf('(');
-    final prefix = firstParen > 0 ? params.substring(0, firstParen) : '';
-    final degMatch = RegExp(r',\s*(\d+)\s*$').firstMatch(prefix.trim());
-    final degree = int.tryParse(degMatch?.group(1) ?? '') ?? 3;
+    if (firstParen > 0) {
+      final prefix = params.substring(0, firstParen);
+      final degMatch = RegExp(r',\s*(\d+)\s*,?').firstMatch(prefix);
+      if (degMatch != null) {
+        degree = int.tryParse(degMatch.group(1)!) ?? 3;
+      }
+    }
 
     List<double> knots = [];
     if (lists.length >= 3) {

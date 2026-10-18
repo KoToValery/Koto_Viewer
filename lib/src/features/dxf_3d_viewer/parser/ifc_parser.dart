@@ -82,6 +82,10 @@ class IfcParser {
   /// Public geometric helper for robust planar 3D polygon triangulation.
   static List<Triangle3D> triangulatePolygon3D(List<Vector3> rawPts, {Color? color}) =>
       _IfcGeometrySolver.triangulatePolygon3D(rawPts, color: color);
+
+  /// Public geometric helper for bridging inner holes into an outer 3D polygon.
+  static List<Vector3> bridgePolygonWithHoles(List<Vector3> outer, List<List<Vector3>> holes) =>
+      _IfcGeometrySolver.bridgePolygonWithHoles(outer, holes);
 }
 
 class _RawIfcEntity {
@@ -3575,10 +3579,14 @@ class _IfcGeometrySolver {
   }
 
   /// Bridges holes into an outer planar polygon using seam cuts
+  List<Vector3> _bridgePolygonWithHoles(List<Vector3> outer, List<List<Vector3>> holes) =>
+      bridgePolygonWithHoles(outer, holes);
+
+  /// Bridges multiple inner holes into the outer polygon via 2D seam cuts
   /// so ear-clipping triangulation seamlessly cuts around the holes.
   /// Projects 3D points onto the dominant 2D plane of the polygon to ensure
   /// robustness regardless of face orientation (horizontal, vertical, or sloped).
-  List<Vector3> _bridgePolygonWithHoles(List<Vector3> outer, List<List<Vector3>> holes) {
+  static List<Vector3> bridgePolygonWithHoles(List<Vector3> outer, List<List<Vector3>> holes) {
     if (holes.isEmpty) return outer;
     if (outer.length < 3) return outer;
 
@@ -3926,7 +3934,12 @@ class _IfcGeometrySolver {
         final next = normPoly2d[i];
         final cross = (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x);
         final dot = (curr.x - prev.x) * (next.x - curr.x) + (curr.y - prev.y) * (next.y - curr.y);
-        if (cross.abs() < tolCollinear && dot > 0) {
+        final pPrev3 = cleanPts[cleanPts.length - 2];
+        final pCurr3 = cleanPts.last;
+        final pNext3 = pts[i];
+        final is3dCollinear =
+            (pCurr3 - pPrev3).cross(pNext3 - pCurr3).lengthSquared < 1e-6;
+        if (cross.abs() < tolCollinear && dot > 0 && is3dCollinear) {
           // curr is strictly along the same direction, replace it with next
           poly2d[poly2d.length - 1] = next;
           cleanPts[cleanPts.length - 1] = pts[i];
@@ -3944,7 +3957,12 @@ class _IfcGeometrySolver {
       final next = poly2d[1];
       final cross = (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x);
       final dot = (curr.x - prev.x) * (next.x - curr.x) + (curr.y - prev.y) * (next.y - curr.y);
-      if (cross.abs() < tolCollinear && dot > 0) {
+      final pPrev3 = cleanPts.last;
+      final pCurr3 = cleanPts.first;
+      final pNext3 = cleanPts[1];
+      final is3dCollinear =
+          (pCurr3 - pPrev3).cross(pNext3 - pCurr3).lengthSquared < 1e-6;
+      if (cross.abs() < tolCollinear && dot > 0 && is3dCollinear) {
         poly2d.removeAt(0);
         cleanPts.removeAt(0);
       } else {
@@ -3959,7 +3977,12 @@ class _IfcGeometrySolver {
       final next = poly2d.first;
       final cross = (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x);
       final dot = (curr.x - prev.x) * (next.x - curr.x) + (curr.y - prev.y) * (next.y - curr.y);
-      if (cross.abs() < tolCollinear && dot > 0) {
+      final pPrev3 = cleanPts[cleanPts.length - 2];
+      final pCurr3 = cleanPts.last;
+      final pNext3 = cleanPts.first;
+      final is3dCollinear =
+          (pCurr3 - pPrev3).cross(pNext3 - pCurr3).lengthSquared < 1e-6;
+      if (cross.abs() < tolCollinear && dot > 0 && is3dCollinear) {
         poly2d.removeLast();
         cleanPts.removeLast();
       } else {

@@ -55,7 +55,6 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
   gpu.ToneMapper? _toneMapper;
   final _assets = <gpu.ThermionAsset>[];
   final _materials = <gpu.MaterialInstance>[];
-  final _swapChains = <gpu.SwapChain>[];
   Future<void> _work = Future.value();
   bool _closed = false, _failed = false, _queued = false;
   bool _foreground = true, _textureReady = false;
@@ -76,9 +75,6 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
   Future<void> _initialize() async {
     final viewer = await gpu.ThermionFlutterPlugin.createViewer();
     _viewer = viewer;
-    _swapChains.addAll(
-      viewer.app.renderManager.getAttachedSwapChains(viewer.view),
-    );
     await viewer.setRendering(false);
     if (_closed) return;
     await viewer.setPostProcessing(true);
@@ -420,19 +416,18 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
           .then((_) async {
             final viewer = _viewer;
             if (viewer == null) return;
-            await viewer.setRendering(false);
-            await gpu.ThermionFlutterPlugin.instance.destroyTextureForView(
-              viewer.view,
-            );
-            await _clear(viewer);
-            await viewer.dispose();
-            await _toneMapper?.dispose();
-            for (final chain in _swapChains) {
-              if (viewer.app.renderManager.getAttachedViews(chain).isEmpty) {
-                await viewer.app.destroySwapChain(chain);
+            try {
+              await viewer.setRendering(false);
+              await gpu.ThermionFlutterPlugin.instance.destroyTextureForView(
+                viewer.view,
+              );
+            } finally {
+              try {
+                await _clear(viewer);
+              } finally {
+                await viewer.dispose();
               }
             }
-            _swapChains.clear();
           })
           .catchError((Object error) {
             debugPrint('CAD texture cleanup: $error');

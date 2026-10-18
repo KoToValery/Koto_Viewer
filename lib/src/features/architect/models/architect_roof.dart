@@ -698,6 +698,7 @@ class ArchitectRoofPlane {
   ArchitectRoofEavesCut eavesCut;
   ArchitectRoofAssembly assembly;
   String? roofGroupId;
+  bool isSlopeLocked;
 
   ArchitectRoofPlane({
     required this.id,
@@ -713,6 +714,7 @@ class ArchitectRoofPlane {
     this.eavesCut = ArchitectRoofEavesCut.plumb,
     ArchitectRoofAssembly? assembly,
     this.roofGroupId,
+    this.isSlopeLocked = true,
   }) : assembly =
            assembly ??
            ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles);
@@ -916,6 +918,7 @@ class ArchitectRoofPlane {
     ArchitectRoofEavesCut? eavesCut,
     ArchitectRoofAssembly? assembly,
     String? roofGroupId,
+    bool? isSlopeLocked,
   }) => ArchitectRoofPlane(
     id: id ?? this.id,
     storeyId: storeyId ?? this.storeyId,
@@ -930,6 +933,7 @@ class ArchitectRoofPlane {
     eavesCut: eavesCut ?? this.eavesCut,
     assembly: assembly ?? this.assembly.copyWith(),
     roofGroupId: roofGroupId ?? this.roofGroupId,
+    isSlopeLocked: isSlopeLocked ?? this.isSlopeLocked,
   );
 
   ArchitectRoofPlane clone() => copyWith();
@@ -948,6 +952,7 @@ class ArchitectRoofPlane {
     'eavesCut': eavesCut.name,
     'assembly': assembly.toJson(),
     'roofGroupId': roofGroupId,
+    'isSlopeLocked': isSlopeLocked,
   };
 
   factory ArchitectRoofPlane.fromJson(Map<String, dynamic> json) {
@@ -976,6 +981,7 @@ class ArchitectRoofPlane {
             )
           : ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles),
       roofGroupId: json['roofGroupId'] as String?,
+      isSlopeLocked: json['isSlopeLocked'] as bool? ?? true,
     );
   }
 

@@ -24,6 +24,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cancel => 'Cancel';
 
   @override
+  String get back => 'Back';
+
+  @override
   String get close => 'Close';
 
   @override
@@ -6202,6 +6205,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectRoofDrawMultiPitch => 'Multi-pitch';
 
   @override
+  String get architectRoofSnap45Degrees => '45° Hip / Ridge';
+
+  @override
   String get architectRoofLinkedSlopes => 'Linked slopes';
 
   @override
@@ -6209,7 +6215,32 @@ class AppLocalizationsEn extends AppLocalizations {
       'All roof planes in this group share the same slope and eaves height';
 
   @override
-  String get architectRoofSnap45Degrees => '45° Hip / Ridge';
+  String get architectRoofIndependentSlope => 'Independent slope';
+
+  @override
+  String get architectRoofIndependentSlopeTooltip =>
+      'This roof plane has an independent slope (unlocked from group)';
+
+  @override
+  String get architectRoofToggleSlopeLockTooltip =>
+      'Toggle linked group slope vs independent slope';
+
+  @override
+  String get architectRoofMatchRidge => 'Match ridge';
+
+  @override
+  String get architectRoofMatchRidgeTooltip =>
+      'Adjust slope to match the ridge height of adjacent roofs';
+
+  @override
+  String architectRoofRidgeHeightMatched(String degrees, String height) {
+    return 'Slope adjusted to $degrees° to match ridge height ${height}m';
+  }
+
+  @override
+  String architectRoofSnapHipAngle(String angle) {
+    return '$angle° Hip / Valley';
+  }
 
   @override
   String get cad3dOrbit => 'Orbit';

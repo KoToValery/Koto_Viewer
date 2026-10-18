@@ -19,6 +19,8 @@ class ArchitectRoofBar extends StatelessWidget {
   final VoidCallback? onSetSelectedEdgeAsEaves;
   final ValueChanged<double>? onSelectedRoofSlopeChanged;
   final ValueChanged<double>? onSelectedRoofOverhangChanged;
+  final VoidCallback? onToggleSlopeLocked;
+  final VoidCallback? onMatchRidgeHeight;
   final VoidCallback? onFinishPolygon;
   final VoidCallback? onUndoDraftPoint;
   final VoidCallback? onCancelDraft;
@@ -35,6 +37,8 @@ class ArchitectRoofBar extends StatelessWidget {
     this.onSetSelectedEdgeAsEaves,
     this.onSelectedRoofSlopeChanged,
     this.onSelectedRoofOverhangChanged,
+    this.onToggleSlopeLocked,
+    this.onMatchRidgeHeight,
     this.onFinishPolygon,
     this.onUndoDraftPoint,
     this.onCancelDraft,
@@ -237,35 +241,86 @@ class ArchitectRoofBar extends StatelessWidget {
 
                   if (roof != null && roof.roofGroupId != null) ...[
                     Tooltip(
-                      message: l.architectRoofLinkedSlopesTooltip,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0x3300E5FF),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFF00E5FF)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.link, size: 13, color: Color(0xFF00E5FF)),
-                            const SizedBox(width: 4),
-                            Text(
-                              l.architectRoofLinkedSlopes,
-                              style: const TextStyle(
-                                color: Color(0xFF00E5FF),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
+                      message: roof.isSlopeLocked
+                          ? l.architectRoofLinkedSlopesTooltip
+                          : l.architectRoofIndependentSlopeTooltip,
+                      child: InkWell(
+                        key: const ValueKey('roof-toggle-slope-lock'),
+                        onTap: onToggleSlopeLocked,
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: roof.isSlopeLocked
+                                ? const Color(0x3300E5FF)
+                                : const Color(0x33FFD54F),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: roof.isSlopeLocked
+                                  ? const Color(0xFF00E5FF)
+                                  : Colors.amberAccent,
                             ),
-                          ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                roof.isSlopeLocked
+                                    ? Icons.link
+                                    : Icons.link_off,
+                                size: 13,
+                                color: roof.isSlopeLocked
+                                    ? const Color(0xFF00E5FF)
+                                    : Colors.amberAccent,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                roof.isSlopeLocked
+                                    ? l.architectRoofLinkedSlopes
+                                    : l.architectRoofIndependentSlope,
+                                style: TextStyle(
+                                  color: roof.isSlopeLocked
+                                      ? const Color(0xFF00E5FF)
+                                      : Colors.amberAccent,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 6),
+                    if (onMatchRidgeHeight != null) ...[
+                      Tooltip(
+                        message: l.architectRoofMatchRidgeTooltip,
+                        child: ActionChip(
+                          key: const ValueKey('roof-match-ridge'),
+                          visualDensity: VisualDensity.compact,
+                          backgroundColor: const Color(0x2269F0AE),
+                          side: const BorderSide(color: Color(0xFF69F0AE)),
+                          avatar: const Icon(
+                            Icons.vertical_align_top_rounded,
+                            size: 14,
+                            color: Color(0xFF69F0AE),
+                          ),
+                          label: Text(
+                            l.architectRoofMatchRidge,
+                            style: const TextStyle(
+                              color: Color(0xFF69F0AE),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          onPressed: onMatchRidgeHeight,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                   ],
 
                   // Slope popup selector

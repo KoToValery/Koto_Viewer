@@ -387,9 +387,9 @@ class ArchitectRoofGeometry {
   }
 
   /// Decomposes an arbitrary closed polygon [eavesPolygon] into matching hipped roof planes
-  /// using straight skeleton bisector decomposition.
-  /// Generates clean planar faces with 45° hips, 45° valleys (at reflex corners),
-  /// and horizontal ridges.
+  /// using weighted straight skeleton bisector decomposition.
+  /// Supports equal slopes (45° hips/valleys at 90° corners) or unequal per-edge slopes
+  /// [perEdgeSlopeDegrees] for roofs over wings of differing spans or varied pitches.
   static List<ArchitectRoofPlane> decomposeMultiPitchPolygon({
     required List<Offset> eavesPolygon,
     required ArchitectStorey storey,
@@ -398,6 +398,7 @@ class ArchitectRoofGeometry {
     required double eavesOverhang,
     required ArchitectRoofAssembly assembly,
     String? roofGroupId,
+    List<double>? perEdgeSlopeDegrees,
   }) {
     final cleaned = BimPolygonGeometry.clean(eavesPolygon, removeCollinear: true);
     if (cleaned.length < 3) return const [];
@@ -416,8 +417,14 @@ class ArchitectRoofGeometry {
       final edgeDir = b - a;
       if (edgeDir.distance < 0.05) continue;
 
+      final slopeDegI = perEdgeSlopeDegrees != null && i < perEdgeSlopeDegrees.length
+          ? perEdgeSlopeDegrees[i]
+          : slopeDegrees;
+      final tanI = math.tan(slopeDegI * math.pi / 180.0);
+
       // Inward unit normal for CCW polygon: (-dy, dx)
       final normI = Offset(-edgeDir.dy, edgeDir.dx) / edgeDir.distance;
+      final vecI = normI * tanI;
 
       var facePoly = List<Offset>.from(poly);
 
@@ -428,17 +435,24 @@ class ArchitectRoofGeometry {
         final edgeJDir = bJ - aJ;
         if (edgeJDir.distance < 0.05) continue;
 
+        final slopeDegJ = perEdgeSlopeDegrees != null && j < perEdgeSlopeDegrees.length
+            ? perEdgeSlopeDegrees[j]
+            : slopeDegrees;
+        final tanJ = math.tan(slopeDegJ * math.pi / 180.0);
+
         final normJ = Offset(-edgeJDir.dy, edgeJDir.dx) / edgeJDir.distance;
+        final vecJ = normJ * tanJ;
 
-        // Condition: dist(P, Edge_i) <= dist(P, Edge_j)
-        // (P - a) . normI <= (P - aJ) . normJ
-        // P . (normI - normJ) <= a . normI - aJ . normJ
-        final deltaNorm = normI - normJ;
-        if (deltaNorm.distance < 1e-6) continue;
+        // In 3D space, height on face i is z_i(P) = (P - a) . vecI
+        // Condition for point P belonging to face i: z_i(P) <= z_j(P)
+        // (P - a) . vecI <= (P - aJ) . vecJ
+        // P . (vecI - vecJ) <= a . vecI - aJ . vecJ
+        final deltaVec = vecI - vecJ;
+        if (deltaVec.distance < 1e-6) continue;
 
-        final rhs = BimPolygonGeometry.dot(a, normI) - BimPolygonGeometry.dot(aJ, normJ);
+        final rhs = BimPolygonGeometry.dot(a, vecI) - BimPolygonGeometry.dot(aJ, vecJ);
 
-        facePoly = _clipPolygonByHalfPlane(facePoly, deltaNorm, rhs);
+        facePoly = _clipPolygonByHalfPlane(facePoly, deltaVec, rhs);
         if (facePoly.length < 3) break;
       }
 
@@ -452,11 +466,12 @@ class ArchitectRoofGeometry {
               storeyId: storey.id,
               points: orderedFace,
               eavesEdgeIndex: 0,
-              slopeDegrees: slopeDegrees,
+              slopeDegrees: slopeDegI,
               baseElevationOffset: baseElevationOffset,
               eavesOverhang: eavesOverhang,
               assembly: assembly.copyWith(),
               roofGroupId: groupId,
+              isSlopeLocked: true,
             ),
           );
         }
@@ -464,6 +479,40 @@ class ArchitectRoofGeometry {
     }
 
     return planes;
+  }
+
+  /// Calculates the required roof slope in degrees for a roof plane with horizontal run [runDistance]
+  /// to reach a target ridge height [targetRidgeHeight] above its eaves.
+  static double calculateSlopeToMatchRidgeHeight({
+    required double targetRidgeHeight,
+    required double runDistance,
+    double minSlope = 5.0,
+    double maxSlope = 60.0,
+  }) {
+    if (runDistance <= 0.05 || targetRidgeHeight <= 0.01) {
+      return 22.0;
+    }
+    final slopeRad = math.atan(targetRidgeHeight / runDistance);
+    final slopeDeg = slopeRad * 180.0 / math.pi;
+    return slopeDeg.clamp(minSlope, maxSlope);
+  }
+
+  /// Calculates the horizontal plan angle in degrees of the hip or valley bisector
+  /// between two slopes with pitches [slopeDeg1] and [slopeDeg2] meeting at corner angle [cornerAngleRad].
+  static double calculateHipAngle({
+    required double slopeDeg1,
+    required double slopeDeg2,
+    double cornerAngleRad = math.pi / 2.0,
+  }) {
+    final s1 = math.tan(slopeDeg1 * math.pi / 180.0);
+    final s2 = math.tan(slopeDeg2 * math.pi / 180.0);
+    if ((cornerAngleRad - math.pi / 2.0).abs() < 1e-4) {
+      return math.atan2(s1, s2) * 180.0 / math.pi;
+    }
+    final sinCorner = math.sin(cornerAngleRad);
+    final cosCorner = math.cos(cornerAngleRad);
+    final tanTheta = (s1 * sinCorner) / (s2 + s1 * cosCorner);
+    return math.atan(tanTheta) * 180.0 / math.pi;
   }
 
   static List<Offset> _clipPolygonByHalfPlane(
