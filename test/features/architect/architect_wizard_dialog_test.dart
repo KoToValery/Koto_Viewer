@@ -130,6 +130,9 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('architect-wizard-step-2')));
         await tester.pumpAndSettle();
         expect(find.byType(TextFormField), findsNWidgets(2));
+        expect(find.text('H= (cm)'), findsOneWidget);
+        expect(find.text('готов под → готов под'), findsOneWidget);
+        expect(find.text('Височина (cm)'), findsNothing);
         expect(find.text('Добави етаж'), findsOneWidget);
         expect(tester.takeException(), isNull);
       },

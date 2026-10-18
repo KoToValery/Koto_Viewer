@@ -8383,7 +8383,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   Widget _buildDockActionButton({IconData? icon, String? label, BimEditAction? action,
     required Color color, required VoidCallback onTap}) => BimActionButton(
-      icon: icon ?? BimEditActions.icon(action!), label: label ?? BimEditActions.label(action!, context.l10n),
+      action: icon == null ? action : null, icon: icon ?? BimEditActions.icon(action!), label: label ?? BimEditActions.label(action!, context.l10n),
       color: color, onTap: onTap, tooltip: action == BimEditAction.duplicate ? context.l10n.dragDuplicateHint : null);
 
   void _cleanEditingSlabContour() {

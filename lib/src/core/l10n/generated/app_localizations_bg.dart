@@ -5095,6 +5095,12 @@ class AppLocalizationsBg extends AppLocalizations {
   String get snapMerge => 'Обединяване';
 
   @override
+  String get snapDoorJamb => 'Каса на врата';
+
+  @override
+  String get snapWindowJamb => 'Каса на прозорец';
+
+  @override
   String get architectDoorSillNone => 'Без праг';
 
   @override
@@ -6298,7 +6304,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWizardElevation => 'Кота';
 
   @override
-  String get architectWizardHeight => 'Височина';
+  String get architectWizardHeight => 'H=';
 
   @override
   String get architectWizardStoreyHeightHelp =>
@@ -6313,4 +6319,158 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectWizardCreateShort => 'Създай';
+
+  @override
+  String get architectWizardHeightReference => 'готов под → готов под';
+
+  @override
+  String architectWallConcreteCode(String thickness) {
+    return 'СБ $thickness';
+  }
+
+  @override
+  String architectWallParapetCode(String thickness) {
+    return 'Борд $thickness';
+  }
+
+  @override
+  String architectWallTypeThicknessHint(String name, String thickness) {
+    return '$name · $thickness cm';
+  }
+
+  @override
+  String get architectWallQuickCore => 'Ядро';
+
+  @override
+  String get architectWallQuickInsulation => 'Изолация';
+
+  @override
+  String get architectWallInvalidThickness => 'Въведете валидна дебелина.';
+
+  @override
+  String get architectWallQuickThickness => 'Дебелина';
+
+  @override
+  String get wallTypesTitle => 'Типове стени';
+
+  @override
+  String get wallNewType => 'Нов тип';
+
+  @override
+  String get wallCompositionName => 'Име';
+
+  @override
+  String get wallLocation => 'Предназначение';
+
+  @override
+  String get wallExterior => 'Външна';
+
+  @override
+  String get wallInterior => 'Вътрешна';
+
+  @override
+  String get wallBearing => 'Носеща';
+
+  @override
+  String get wallLayerCore => 'Ядро';
+
+  @override
+  String get wallLayerInsulation => 'Изолация';
+
+  @override
+  String get wallLayerFinish => 'Покритие';
+
+  @override
+  String get wallLayerRole => 'Роля на слоя';
+
+  @override
+  String get wallLayerAdd => 'Добави слой';
+
+  @override
+  String get wallLayerUp => 'Нагоре';
+
+  @override
+  String get wallLayerDown => 'Надолу';
+
+  @override
+  String get wallLayerOutsideInside => 'Вън → вътре';
+
+  @override
+  String get wallLayerSides => 'A → B';
+
+  @override
+  String get wallLayerInvalid =>
+      'Задайте положителни дебелини и непрекъснато ядро.';
+
+  @override
+  String get wallSelectedScope => 'Само избраните стени';
+
+  @override
+  String wallTypeApply(int count) {
+    return 'Приложи към типа ($count)';
+  }
+
+  @override
+  String get wallTypeReplacement => 'Замени с';
+
+  @override
+  String get wallTypeInUse => 'Изберете заместител за стените с този тип.';
+
+  @override
+  String get wallCompositionAction => 'Слоеве';
+
+  @override
+  String get wallManageTypes => 'Редактирай типовете';
+
+  @override
+  String get wallMaterialPlaster => 'Мазилка';
+
+  @override
+  String get wallMaterialRender => 'Фасадна мазилка';
+
+  @override
+  String get wallMaterialBoard => 'Гипсокартон';
+
+  @override
+  String get wallMaterialStone => 'Камък';
+
+  @override
+  String get wallPlinth => 'Цокъл';
+
+  @override
+  String get wallPlinthFinish => 'Завършек';
+
+  @override
+  String get wallPlinthBase => 'Базова кота (m)';
+
+  @override
+  String get wallPlinthBaseHelp =>
+      'Проектна кота на долния ръб; H се измерва нагоре.';
+
+  @override
+  String get wallAdvanced => 'Още';
+
+  @override
+  String get wallTypeCopy => 'Копирай типа';
+
+  @override
+  String get wallMixedValue => 'Различни';
+
+  @override
+  String get wallArc => 'Заоблена стена';
+
+  @override
+  String get wallArcPickEnd => 'Посочи края на дъгата';
+
+  @override
+  String get wallArcPickThrough => 'Посочи точка на извивката';
+
+  @override
+  String get wallArcInvalidRadius => 'Радиусът е твърде малък за тази стена.';
+
+  @override
+  String get wallArcPickStart => 'Посочи началото на дъгата';
+
+  @override
+  String get wallPlinthEnabled => 'Включен';
 }

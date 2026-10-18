@@ -217,6 +217,74 @@ class ArchitectColumn {
     }
 
     canvas.restore();
+
+    // Column designation / number label next to the column (not scaled up when zoomed out)
+    if (label.isNotEmpty && zoomScale >= 8.0) {
+      final double halfExtentX;
+      final double halfExtentY;
+      if (shape == ColumnShape.circular) {
+        halfExtentX = width / 2.0;
+        halfExtentY = width / 2.0;
+      } else {
+        final rad = rotationDeg * math.pi / 180.0;
+        final cosA = math.cos(rad).abs();
+        final sinA = math.sin(rad).abs();
+        final halfW = width / 2.0;
+        final halfD = depth / 2.0;
+        halfExtentX = halfW * cosA + halfD * sinA;
+        halfExtentY = halfW * sinA + halfD * cosA;
+      }
+
+      final labelPos = Offset(
+        position.dx + halfExtentX + 0.04,
+        position.dy - halfExtentY - 0.02,
+      );
+
+      final tpLabel = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            color: isSelected
+                ? const Color(0xFF00E5FF)
+                : palette.foreground(const Color(0xFF1A237E)),
+            fontFamily: 'Roboto',
+            fontSize: 11.0,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      // Bounded model height: stays crisp at close zoom, never balloons above ~0.12m upon zoom-out
+      final scaleFactor = (1.0 / zoomScale).clamp(0.0, 0.12 / tpLabel.height);
+
+      const padX = 2.5;
+      const padY = 1.0;
+      final bgRect = Rect.fromLTWH(
+        -padX,
+        -padY,
+        tpLabel.width + padX * 2,
+        tpLabel.height + padY * 2,
+      );
+      final bgRRect = RRect.fromRectAndRadius(bgRect, const Radius.circular(2.5));
+      final bgPaint = Paint()
+        ..color = palette.background.withValues(alpha: 0.88)
+        ..style = PaintingStyle.fill;
+      final tagBorderPaint = Paint()
+        ..color = isSelected
+            ? const Color(0xFF00E5FF)
+            : palette.foreground(Colors.black38).withValues(alpha: 0.5)
+        ..strokeWidth = 0.6
+        ..style = PaintingStyle.stroke;
+
+      canvas.save();
+      canvas.translate(labelPos.dx, labelPos.dy);
+      canvas.scale(scaleFactor);
+      canvas.drawRRect(bgRRect, bgPaint);
+      canvas.drawRRect(bgRRect, tagBorderPaint);
+      tpLabel.paint(canvas, Offset.zero);
+      canvas.restore();
+    }
   }
 
   List<Triangle3D> build3D({

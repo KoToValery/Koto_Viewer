@@ -311,7 +311,7 @@ class _ArchitectRadialMenuState extends State<ArchitectRadialMenu>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(item.icon, size: 19, color: item.color),
+                    BimEditingSymbol(item.action, fallback: item.icon, size: 19, color: item.color),
                     const SizedBox(height: 1),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 2),

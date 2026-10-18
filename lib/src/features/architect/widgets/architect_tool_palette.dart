@@ -192,7 +192,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   @override
   void didUpdateWidget(ArchitectToolPalette oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.drawingOnly && category != ArchitectToolCategory.annotations &&
+    if (widget.drawingOnly &&
+        category != ArchitectToolCategory.annotations &&
         category != ArchitectToolCategory.drawing) {
       category = ArchitectToolCategory.drawing;
     }
@@ -331,7 +332,12 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                     initialValue: category,
                     onSelected: (value) => setState(() => category = value),
                     itemBuilder: (_) => [
-                      for (final value in ArchitectToolCategory.values.where((c) => !widget.drawingOnly || c == ArchitectToolCategory.annotations || c == ArchitectToolCategory.drawing))
+                      for (final value in ArchitectToolCategory.values.where(
+                        (c) =>
+                            !widget.drawingOnly ||
+                            c == ArchitectToolCategory.annotations ||
+                            c == ArchitectToolCategory.drawing,
+                      ))
                         PopupMenuItem(
                           value: value,
                           key: ValueKey('architect-category-${value.name}'),
@@ -585,7 +591,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           if (wallTypes != null && wallTypes!.isNotEmpty)
             PopupMenuButton<ArchitectWallType>(
               key: const ValueKey('architect-wall-type-picker'),
-              tooltip: l10n.architectWallType,
+              tooltip: (activeWallType ?? wallTypes!.first).pickerHelp(l10n),
               position: PopupMenuPosition.over,
               // The bottom toolbar anchors the list above the selected type.
               offset: Offset(0, -(wallTypes!.length * 48.0 + 16)),
@@ -604,9 +610,12 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                         Icon(Icons.circle, size: 8, color: type.color),
                         const SizedBox(width: 8),
                         Flexible(
-                          child: Text(
-                            type.compactLabel(l10n),
-                            style: const TextStyle(color: Colors.white),
+                          child: Tooltip(
+                            message: type.pickerHelp(l10n),
+                            child: Text(
+                              type.compactLabel(l10n),
+                              style: const TextStyle(color: Colors.white),
+                            ),
                           ),
                         ),
                         if (type.id == activeWallType?.id) ...[

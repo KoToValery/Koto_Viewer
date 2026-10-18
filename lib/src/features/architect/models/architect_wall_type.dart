@@ -1,3 +1,5 @@
+import 'architect_material_layer.dart';
+export 'architect_material_layer.dart';
 // === SECTION: ARCHITECTURAL WALL TYPE MODELS ===
 import 'dart:ui';
 import '../../../core/l10n/generated/app_localizations.dart';
@@ -33,11 +35,15 @@ enum ParapetFinish {
 /// Parametric definition of an architectural wall type.
 class ArchitectWallType {
   final String id;
+  final List<ArchitectMaterialLayer> layers;
+  final ArchitectWallLocation? location;
+  final bool loadBearing;
   final String name;
+  final String? labelId;
   final WallUsage usage;
-  final double totalThickness; // in meters (e.g. 0.37 m)
-  final double brickThickness; // in meters (e.g. 0.25 m or 0.12 m)
-  final double insulationThickness; // in meters (e.g. 0.12 m EPS or 0.0)
+  final double _totalThickness; // in meters (e.g. 0.37 m)
+  final double _brickThickness; // in meters (e.g. 0.25 m or 0.12 m)
+  final double _insulationThickness; // in meters (e.g. 0.12 m EPS or 0.0)
   final double? customHeight; // used for parapets (e.g. 1.05 m or 1.20 m)
   final ParapetFinish? parapetFinish;
   final int colorValue;
@@ -45,19 +51,79 @@ class ArchitectWallType {
   const ArchitectWallType({
     required this.id,
     required this.name,
+    this.labelId,
     required this.usage,
-    required this.totalThickness,
-    this.brickThickness = 0.25,
-    this.insulationThickness = 0.0,
+    required double totalThickness,
+    double brickThickness = 0.25,
+    double insulationThickness = 0.0,
     this.customHeight,
     this.parapetFinish,
     this.colorValue = 0xFF78909C,
-  });
+    this.layers = const [],
+    this.location,
+    this.loadBearing = false,
+  }) : _totalThickness = totalThickness,
+       _brickThickness = brickThickness,
+       _insulationThickness = insulationThickness;
 
+  double get totalThickness => layers.isEmpty
+      ? _totalThickness
+      : layers.fold(0, (v, l) => v + l.thickness);
+  double get brickThickness => layers.isEmpty
+      ? _brickThickness
+      : layers
+            .where((l) => l.role == ArchitectLayerRole.core)
+            .fold(0, (v, l) => v + l.thickness);
+  double get insulationThickness => layers.isEmpty
+      ? _insulationThickness
+      : layers
+            .where((l) => l.role == ArchitectLayerRole.insulation)
+            .fold(0, (v, l) => v + l.thickness);
+  ArchitectWallLocation get resolvedLocation =>
+      location ??
+      (usage == WallUsage.exterior || usage == WallUsage.parapet
+          ? ArchitectWallLocation.exterior
+          : ArchitectWallLocation.interior);
+  List<ArchitectMaterialLayer> get resolvedLayers => layers.isNotEmpty
+      ? layers
+      : [
+          if (insulationThickness > 0)
+            ArchitectMaterialLayer(
+              id: 'insulation',
+              material: ArchitectMaterial.eps,
+              role: ArchitectLayerRole.insulation,
+              thickness: insulationThickness,
+            ),
+          ArchitectMaterialLayer(
+            id: 'core',
+            material: usage == WallUsage.bearing
+                ? ArchitectMaterial.concrete
+                : ArchitectMaterial.brick,
+            role: ArchitectLayerRole.core,
+            thickness: totalThickness - insulationThickness,
+          ),
+        ];
+
+  bool get isFactoryPreset =>
+      labelId == null &&
+      const {
+        'ext_25_12_eps',
+        'int_12_partition',
+        'ext_25_brick',
+        'bearing_25_concrete',
+        'parapet_12',
+      }.contains(id);
+  bool get isLoadBearing =>
+      layers.isEmpty && usage == WallUsage.bearing ? true : loadBearing;
   bool get isParapet => usage == WallUsage.parapet;
   bool get hasInsulation => insulationThickness > 0.001;
 
-  Color get color => Color(colorValue);
+  Color get color => layers.isEmpty
+      ? Color(colorValue)
+      : layers
+            .firstWhere((l) => l.role == ArchitectLayerRole.core)
+            .material
+            .color;
 
   /// Resolves the compliant parapet height in meters according to Bulgarian building codes
   /// (Наредба № 7 / Наредба № РД-02-20-2):
@@ -79,22 +145,10 @@ class ArchitectWallType {
     ParapetFinish parapetFinish = ParapetFinish.cap,
     AppLocalizations? l10n,
   }) {
-    final extName = l10n != null ? '${l10n.architectWallExterior} 25+12 EPS' : 'Exterior 25+12 EPS';
-    final intName = l10n != null ? '${l10n.architectWallPartition} 12 cm' : 'Partition 12 cm';
-    final brickName = l10n != null ? '${l10n.architectWallBrick} 25 cm' : 'Brick 25 cm';
-    final concName = l10n != null ? '${l10n.architectWallConcrete} 25 cm' : 'Concrete 25 cm';
-    final parapetName = l10n != null
-        ? (parapetFinish == ParapetFinish.handrailPipes
-            ? l10n.architectWallParapetPipe(12, parapetHeight.toStringAsFixed(2))
-            : l10n.architectWallParapetCap(12, parapetHeight.toStringAsFixed(2)))
-        : (parapetFinish == ParapetFinish.handrailPipes
-            ? 'Parapet 12 cm (pipe h=${parapetHeight.toStringAsFixed(2)}m)'
-            : 'Parapet 12 cm (cap h=${parapetHeight.toStringAsFixed(2)}m)');
-
     return [
       ArchitectWallType(
         id: 'ext_25_12_eps',
-        name: extName,
+        name: '',
         usage: WallUsage.exterior,
         totalThickness: 0.37,
         brickThickness: 0.25,
@@ -103,7 +157,7 @@ class ArchitectWallType {
       ),
       ArchitectWallType(
         id: 'int_12_partition',
-        name: intName,
+        name: '',
         usage: WallUsage.interior,
         totalThickness: 0.12,
         brickThickness: 0.12,
@@ -112,7 +166,7 @@ class ArchitectWallType {
       ),
       ArchitectWallType(
         id: 'ext_25_brick',
-        name: brickName,
+        name: '',
         usage: WallUsage.exterior,
         totalThickness: 0.25,
         brickThickness: 0.25,
@@ -121,7 +175,7 @@ class ArchitectWallType {
       ),
       ArchitectWallType(
         id: 'bearing_25_concrete',
-        name: concName,
+        name: '',
         usage: WallUsage.bearing,
         totalThickness: 0.25,
         brickThickness: 0.25,
@@ -130,7 +184,7 @@ class ArchitectWallType {
       ),
       ArchitectWallType(
         id: 'parapet_12',
-        name: parapetName,
+        name: '',
         usage: WallUsage.parapet,
         totalThickness: 0.12,
         brickThickness: 0.12,
@@ -142,10 +196,10 @@ class ArchitectWallType {
     ];
   }
 
-
   ArchitectWallType copyWith({
     String? id,
     String? name,
+    String? labelId,
     WallUsage? usage,
     double? totalThickness,
     double? brickThickness,
@@ -153,23 +207,33 @@ class ArchitectWallType {
     double? customHeight,
     ParapetFinish? parapetFinish,
     int? colorValue,
-  }) =>
-      ArchitectWallType(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        usage: usage ?? this.usage,
-        totalThickness: totalThickness ?? this.totalThickness,
-        brickThickness: brickThickness ?? this.brickThickness,
-        insulationThickness: insulationThickness ?? this.insulationThickness,
-        customHeight: customHeight ?? this.customHeight,
-        parapetFinish: parapetFinish ?? this.parapetFinish,
-        colorValue: colorValue ?? this.colorValue,
-      );
+    List<ArchitectMaterialLayer>? layers,
+    ArchitectWallLocation? location,
+    bool? loadBearing,
+  }) => ArchitectWallType(
+    id: id ?? this.id,
+    layers: layers ?? this.layers,
+    location: location ?? this.location,
+    loadBearing: loadBearing ?? this.loadBearing,
+    name: name ?? this.name,
+    labelId: labelId ?? this.labelId,
+    usage: usage ?? this.usage,
+    totalThickness: totalThickness ?? this.totalThickness,
+    brickThickness: brickThickness ?? this.brickThickness,
+    insulationThickness: insulationThickness ?? this.insulationThickness,
+    customHeight: customHeight ?? this.customHeight,
+    parapetFinish: parapetFinish ?? this.parapetFinish,
+    colorValue: colorValue ?? this.colorValue,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
+    if (labelId != null) 'labelId': labelId,
     'usage': usage.name,
+    'layers': layers.map((l) => l.toJson()).toList(),
+    'location': resolvedLocation.name,
+    'loadBearing': loadBearing || usage == WallUsage.bearing,
     'totalThickness': totalThickness,
     'brickThickness': brickThickness,
     'insulationThickness': insulationThickness,
@@ -181,7 +245,19 @@ class ArchitectWallType {
   factory ArchitectWallType.fromJson(Map<String, dynamic> json) =>
       ArchitectWallType(
         id: json['id'] as String,
+        layers: (json['layers'] as List? ?? [])
+            .map(
+              (l) => ArchitectMaterialLayer.fromJson(
+                Map<String, dynamic>.from(l as Map),
+              ),
+            )
+            .toList(),
+        location: ArchitectWallLocation.values
+            .where((l) => l.name == json['location'])
+            .firstOrNull,
+        loadBearing: json['loadBearing'] as bool? ?? json['usage'] == 'bearing',
         name: json['name'] as String,
+        labelId: json['labelId'] as String?,
         usage: WallUsage.values.firstWhere(
           (u) => u.name == json['usage'],
           orElse: () => WallUsage.exterior,

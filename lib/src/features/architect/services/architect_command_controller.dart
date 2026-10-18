@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import '../models/architect_wall_type.dart';
 import 'architect_slab_assemblies.dart';
 import 'architect_roof_placement.dart';
 import 'dart:ui';
@@ -83,6 +85,13 @@ class CreateArchitectWall extends ArchitectModelCommand {
   const CreateArchitectWall({required this.storeyId, required this.wall});
   @override
   ArchitectProject apply(ArchitectProject project) {
+    if(wall.layers.isNotEmpty) {
+      ArchitectMaterialLayer.validate(wall.layers);
+      final total=wall.layers.fold(0.0,(v,l)=>v+l.thickness);
+      if((wall.thickness-total).abs()>1e-8)throw ArgumentError('Wall thickness differs from composition');
+    }
+    wall.plinth.validate();
+    wall.validateGeometry();
     ArchitectModelCommand.point(wall.startPoint);
     ArchitectModelCommand.point(wall.endPoint);
     ArchitectModelCommand.positive(wall.thickness);
@@ -115,6 +124,13 @@ class UpdateArchitectWall extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     final s = ArchitectModelCommand.storey(project, storeyId);
     final previous = s.walls.firstWhere((w) => w.id == wall.id);
+    if(wall.layers.isNotEmpty) {
+      ArchitectMaterialLayer.validate(wall.layers);
+      final total=wall.layers.fold(0.0,(v,l)=>v+l.thickness);
+      if((wall.thickness-total).abs()>1e-8)throw ArgumentError('Wall thickness differs from composition');
+    }
+    wall.plinth.validate();
+    wall.validateGeometry();
     ArchitectModelCommand.point(wall.startPoint);
     ArchitectModelCommand.point(wall.endPoint);
     ArchitectModelCommand.positive(wall.thickness);
@@ -215,9 +231,10 @@ class SplitArchitectWall extends ArchitectModelCommand {
         throw ArgumentError('Cannot split through an opening');
       }
     }
-    final point = wall.startPoint + (wall.endPoint - wall.startPoint) * ratio;
+    final point = wall.referencePointAt(ratio);
     final first = wall.copyWith(
       endPoint: point,
+      arcBulge:wall.isCurved?math.tan(math.atan(wall.arcBulge)*ratio):0,
       connectEnd: !detachCut,
       doors: [
         for (final d in wall.doors)
@@ -233,6 +250,7 @@ class SplitArchitectWall extends ArchitectModelCommand {
     final second = wall.copyWith(
       id: newWallId,
       startPoint: point,
+      arcBulge:wall.isCurved?math.tan(math.atan(wall.arcBulge)*(1-ratio)):0,
       connectStart: !detachCut,
       doors: [
         for (final d in wall.doors)
@@ -283,18 +301,13 @@ class CutArchitectWalls extends ArchitectModelCommand {
     var cuts = 0;
     for (final wall in ArchitectModelCommand.storey(project, storeyId).walls) {
       if (!wallIds.contains(wall.id)) continue;
-      final point = ArchitectWallNetwork.intersection(
-        wall.startPoint,
-        wall.endPoint,
-        start,
-        end,
-        finite: true,
-      );
-      if (point == null) continue;
-      final ratio =
-          ((point - wall.startPoint).dx * wall.unitVector.dx +
-              (point - wall.startPoint).dy * wall.unitVector.dy) /
-          wall.length;
+      final points=wall.intersections(ArchitectWall(id:'cutter',startPoint:start,endPoint:end));
+      if(points.isEmpty)continue;
+      // Process from the far end so all earlier offsets stay on the retained first wall.
+      final ratios=[for(final p in points)wall.isCurved?wall.arc!.parameter(p):BimLineGeometry.parameter(p,wall.startPoint,wall.endPoint)]..sort((a,b)=>b.compareTo(a));
+      var retained=1.0;
+      for(final originalRatio in ratios) {
+      final ratio=originalRatio/retained;
       if (ratio * wall.length < .001 || (1 - ratio) * wall.length < .001) {
         continue;
       }
@@ -306,6 +319,8 @@ class CutArchitectWalls extends ArchitectModelCommand {
         detachCut: true,
       ).apply(result);
       cuts++;
+      retained=originalRatio;
+      }
     }
     if (cuts == 0) throw ArgumentError('No wall crossed');
     return result;
@@ -341,8 +356,9 @@ class TrimArchitectWall extends ArchitectModelCommand {
     }
     ArchitectWall slice(double from, double to, String id) => wall.copyWith(
       id: id,
-      startPoint: wall.startPoint + wall.unitVector * (from * wall.length),
-      endPoint: wall.startPoint + wall.unitVector * (to * wall.length),
+      startPoint: wall.referencePointAt(from),
+      endPoint: wall.referencePointAt(to),
+      arcBulge:wall.isCurved?math.tan(math.atan(wall.arcBulge)*(to-from)):0,
       connectStart: from == 0 ? wall.connectStart : true,
       connectEnd: to == 1 ? wall.connectEnd : true,
       doors: [
@@ -1178,17 +1194,15 @@ List<(Offset, Offset)> _wallConnectionFaces(ArchitectWall wall) => [
 ArchitectWall _wallOpeningsAfterEdit(ArchitectWall old, ArchitectWall next) {
   if (identical(old, next)) return next;
   if (next.length < .001) throw ArgumentError('Wall too short');
+  next.validateGeometry();
   final translation = next.startPoint - old.startPoint;
   final translated =
       ((next.endPoint - old.endPoint) - translation).distance < 1e-8;
   if (translated) return next;
   double ratio(double oldRatio, double width) {
-    final point =
-        old.startPoint +
-        old.unitVector * (oldRatio * old.length) +
-        (translated ? translation : Offset.zero);
+    final point=old.referencePointAt(oldRatio);
     final d = point - next.startPoint;
-    final along = d.dx * next.unitVector.dx + d.dy * next.unitVector.dy;
+    final along = next.isCurved ? next.arc!.parameter(point)*next.length : d.dx * next.unitVector.dx + d.dy * next.unitVector.dy;
     if (along - width / 2 < -1e-8 || along + width / 2 > next.length + 1e-8) {
       throw ArgumentError('Opening would leave its host');
     }
@@ -1223,12 +1237,9 @@ class ExtendArchitectWall extends ArchitectModelCommand {
     final wall = s.walls.firstWhere((w) => w.id == wallId);
     final delta = target - wall.startPoint;
     final along = delta.dx * wall.unitVector.dx + delta.dy * wall.unitVector.dy;
-    final point = wall.startPoint + wall.unitVector * along;
-    final atStart =
-        (point - wall.startPoint).distance < (point - wall.endPoint).distance;
-    final next = atStart
-        ? wall.copyWith(startPoint: point)
-        : wall.copyWith(endPoint: point);
+    final point = wall.isCurved ? wall.arc!.pointAt(wall.arc!.parameter(target)) : wall.startPoint + wall.unitVector * along;
+    final atStart = (point-wall.startPoint).distance<(point-wall.endPoint).distance;
+    final next = wall.withExtendedEnds(start:atStart?point:null,end:atStart?null:point);
     final updated = UpdateArchitectWall(
       storeyId: storeyId,
       wall: next,
@@ -1261,7 +1272,7 @@ class JoinArchitectWalls extends ArchitectModelCommand {
     final targets = <(String, bool), Offset>{};
     void extend(ArchitectWall wall, Offset point) {
       final d = point - wall.startPoint;
-      final along = d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
+      final along = wall.isCurved?wall.arc!.parameter(point)*wall.length:d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
       final atStart = along < -1e-8;
       if (!atStart && along <= wall.length + 1e-8) return;
       final key = (wall.id, atStart);
@@ -1276,6 +1287,14 @@ class JoinArchitectWalls extends ArchitectModelCommand {
     for (var i = 0; i < walls.length; i++) {
       final a = walls[i];
       for (final b in walls.skip(i + 1)) {
+        if(a.isCurved||b.isCurved) {
+          final points=a.intersections(b,finite:false);
+          double score(Offset p)=>math.min((p-a.startPoint).distance,(p-a.endPoint).distance)+math.min((p-b.startPoint).distance,(p-b.endPoint).distance);
+          points.sort((p,q)=>score(p).compareTo(score(q)));
+          if(points.isNotEmpty){compatible=true;extend(a,points.first);extend(b,points.first);}
+          continue;
+        }
+
         final point = ArchitectWallNetwork.intersection(
           a.startPoint,
           a.endPoint,
@@ -1314,9 +1333,10 @@ class JoinArchitectWalls extends ArchitectModelCommand {
     }
     var result = project;
     for (final wall in walls) {
-      final next = wall.copyWith(
-        startPoint: targets[(wall.id, true)],
-        endPoint: targets[(wall.id, false)],
+      final next = wall.withExtendedEnds(
+        start: targets[(wall.id, true)],
+        end: targets[(wall.id, false)],
+      ).copyWith(
         connectStart: true,
         connectEnd: true,
       );

@@ -26,10 +26,11 @@ class ArchitectWorkspaceSettings {
 class ArchitectWorkspaceSettingsDialog extends StatefulWidget {
   final ArchitectWorkspaceSettings settings;
   final bool hasUnderlay;
+  final VoidCallback? onWalls;
   const ArchitectWorkspaceSettingsDialog({
     super.key,
     required this.settings,
-    required this.hasUnderlay,
+    required this.hasUnderlay, this.onWalls,
   });
   @override
   State<ArchitectWorkspaceSettingsDialog> createState() =>
@@ -91,6 +92,7 @@ class _ArchitectWorkspaceSettingsDialogState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if(widget.onWalls!=null)ListTile(key:const ValueKey('architect-settings-walls'),contentPadding:EdgeInsets.zero,title:Text(l.wallTypesTitle),leading:const Icon(Icons.line_weight),trailing:const Icon(Icons.chevron_right),onTap:widget.onWalls),
               DropdownButtonFormField<ArchitectUnit>(
                 key: const ValueKey('architect-settings-units'),
                 initialValue: units,

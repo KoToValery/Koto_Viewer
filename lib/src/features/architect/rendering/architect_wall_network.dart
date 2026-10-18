@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../models/architect_wall.dart';
+import 'architect_path_solid.dart';
 
 /// Plan solids are joined by their physical faces, not by axis position.
 class ArchitectWallNetwork {
@@ -29,16 +30,10 @@ class ArchitectWallNetwork {
     for (final wall in walls) {
       if (wall.length < 1e-6) continue;
       final (low, high) = _faces(wall, faceOffsets);
-      final n = wall.normalVector;
       result = Path.combine(
         PathOperation.union,
         result,
-        polygon([
-          wall.startPoint + n * low,
-          wall.endPoint + n * low,
-          wall.endPoint + n * high,
-          wall.startPoint + n * high,
-        ]),
+        polygon(wall.facePolygon(low, high)),
       );
     }
     for (final junction in junctions(walls, faceOffsets: faceOffsets)) {
@@ -59,6 +54,45 @@ class ArchitectWallNetwork {
     for (var i = 0; i < walls.length; i++) {
       final a = walls[i];
       for (final b in walls.skip(i + 1)) {
+        if (a.isCurved || b.isCurved) {
+          final nodes = a.intersections(b);
+          // An endpoint on a face still joins even if the saved references differ.
+          for (final p in [a.startPoint, a.endPoint]) {
+            if (b.containsPoint(p, tolerance: .0001) &&
+                !nodes.any((n) => (n - p).distance < .0001))
+              nodes.add(p);
+          }
+          for (final p in [b.startPoint, b.endPoint]) {
+            if (a.containsPoint(p, tolerance: .0001) &&
+                !nodes.any((n) => (n - p).distance < .0001))
+              nodes.add(p);
+          }
+          for (final node in nodes) {
+            if (!a.connectsAt(node) || !b.connectsAt(node)) continue;
+            final fa = _faces(a, faceOffsets), fb = _faces(b, faceOffsets);
+            final reach = math.max(a.thickness, b.thickness) * 3;
+            Path extended(ArchitectWall w, (double, double) faces) {
+              final extra = math.min(reach / w.length, .3);
+              return polygon(
+                w.facePolygon(faces.$1, faces.$2, from: -extra, to: 1 + extra),
+              );
+            }
+
+            final joint = Path.combine(
+              PathOperation.intersect,
+              Path.combine(
+                PathOperation.intersect,
+                extended(a, fa),
+                extended(b, fb),
+              ),
+              Path()..addRect(Rect.fromCircle(center: node, radius: reach)),
+            );
+            for (final contour in ArchitectPathSolid.contours(joint)) {
+              result.add((contour, math.min(a.height, b.height)));
+            }
+          }
+          continue;
+        }
         final node = intersection(
           a.startPoint,
           a.endPoint,

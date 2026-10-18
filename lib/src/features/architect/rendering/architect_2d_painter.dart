@@ -1,3 +1,4 @@
+import '../models/architect_wall_type.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_elevation_markers.dart';
@@ -69,6 +70,8 @@ class Architect2dPainter extends CustomPainter {
   final ArchitectCanvasPalette palette;
   final AppLocalizations? l10n;
   final ArchitectTool activeTool;
+  final List<ArchitectMaterialLayer> activeWallLayers;
+  final Offset? activeWallArcEnd;
   final Offset? activeDraftStart;
   final Offset? activeDraftEnd;
   final ArchitectStair? stairPreview;
@@ -166,6 +169,8 @@ class Architect2dPainter extends CustomPainter {
     this.upperOverhangs,
     this.showUpperOverhangs = true,
     required this.activeTool,
+    this.activeWallLayers=const [],
+    this.activeWallArcEnd,
     this.activeDraftStart,
     this.activeDraftEnd,
     this.stairPreview,
@@ -799,7 +804,7 @@ class Architect2dPainter extends CustomPainter {
       }
 
       // Unobtrusive midpoint edit handle for extrusion/step move
-      final midPoint = (wall.startPoint + wall.endPoint) / 2;
+      final midPoint = wall.referencePointAt(.5);
       canvas.drawCircle(midPoint, 3.2 / zoomScale, midDotPaint);
       canvas.drawCircle(midPoint, 3.2 / zoomScale, midBorderPaint);
 
@@ -807,10 +812,12 @@ class Architect2dPainter extends CustomPainter {
         door.paint2D(
           palette: palette,
           canvas: canvas,
-          wallStart: wall.centerStart,
-          wallEnd: wall.centerEnd,
+          wallGeometryProvided:wall.isCurved,
+          wallStart: wall.openingAxis(door.offsetRatio).$1,
+          wallEnd: wall.openingAxis(door.offsetRatio).$2,
           wallThickness: wall.thickness,
           coreThickness: wall.coreThickness,
+          coreCenterShift: -wall.exteriorSign*wall.coreAsymmetry/2,
           insulationThickness: wall.insulationThickness,
           exteriorSign: wall.exteriorSign.toDouble(),
           zoomScale: zoomScale,
@@ -821,10 +828,12 @@ class Architect2dPainter extends CustomPainter {
         window.paint2D(
           palette: palette,
           canvas: canvas,
-          wallStart: wall.centerStart,
-          wallEnd: wall.centerEnd,
+          wallGeometryProvided:wall.isCurved,
+          wallStart: wall.openingAxis(window.offsetRatio).$1,
+          wallEnd: wall.openingAxis(window.offsetRatio).$2,
           wallThickness: wall.thickness,
           coreThickness: wall.coreThickness,
+          coreCenterShift: -wall.exteriorSign*wall.coreAsymmetry/2,
           insulationThickness: wall.insulationThickness,
           exteriorSign: wall.exteriorSign.toDouble(),
           zoomScale: zoomScale,
@@ -850,9 +859,17 @@ class Architect2dPainter extends CustomPainter {
     );
     for (final wall in layers.walls) {
       final region = layers.coreRegions[wall.id];
-      if (region != null) {
+      if (region != null && wall.layers.isEmpty) {
         ArchitectWallHatch.paint(canvas, wall, region, zoomScale, hatchColor);
       }
+    }
+    for(final material in layers.materials.where((r)=>r.wall.layers.isNotEmpty)) {
+      final region=material.path;
+      canvas.drawPath(region,Paint()..color=material.layer.material.color.withValues(alpha:.18));
+      if(material.layer.role==ArchitectLayerRole.core) {
+        ArchitectWallHatch.paint(canvas,material.wall,region,zoomScale,hatchColor,material:WallCoreMaterial.values.where((m)=>m.name==material.layer.material.name).firstOrNull);
+      }
+      canvas.drawPath(region,Paint()..color=border.color..style=PaintingStyle.stroke..strokeWidth=ArchitectLineWeights.cutThin/zoomScale);
     }
     // Thick boundary encloses only the cut core (2.2 px)
     canvas.drawPath(layers.core, border);
@@ -924,10 +941,11 @@ class Architect2dPainter extends CustomPainter {
         doorPreview!.paint2D(
           palette: palette,
           canvas: canvas,
-          wallStart: hostWall.centerStart,
-          wallEnd: hostWall.centerEnd,
+          wallStart: hostWall.openingAxis(doorPreview!.offsetRatio).$1,
+          wallEnd: hostWall.openingAxis(doorPreview!.offsetRatio).$2,
           wallThickness: hostWall.thickness,
           coreThickness: hostWall.coreThickness,
+          coreCenterShift: -hostWall.exteriorSign*hostWall.coreAsymmetry/2,
           insulationThickness: hostWall.insulationThickness,
           exteriorSign: hostWall.exteriorSign.toDouble(),
           zoomScale: zoomScale,
@@ -943,10 +961,11 @@ class Architect2dPainter extends CustomPainter {
         windowPreview!.paint2D(
           palette: palette,
           canvas: canvas,
-          wallStart: hostWall.centerStart,
-          wallEnd: hostWall.centerEnd,
+          wallStart: hostWall.openingAxis(windowPreview!.offsetRatio).$1,
+          wallEnd: hostWall.openingAxis(windowPreview!.offsetRatio).$2,
           wallThickness: hostWall.thickness,
           coreThickness: hostWall.coreThickness,
+          coreCenterShift: -hostWall.exteriorSign*hostWall.coreAsymmetry/2,
           insulationThickness: hostWall.insulationThickness,
           exteriorSign: hostWall.exteriorSign.toDouble(),
           zoomScale: zoomScale,
@@ -1233,13 +1252,15 @@ class Architect2dPainter extends CustomPainter {
         activeDraftStart != null &&
         activeDraftEnd != null) {
       final p1 = activeDraftStart!;
-      final p2 = activeDraftEnd!;
+      final p2 = activeWallArcEnd??activeDraftEnd!;
       final delta = p2 - p1;
       final dist = delta.distance;
       if (dist < 1e-4) return;
 
       final wall = ArchitectWall(
         id: 'preview',
+        layers:activeWallLayers,
+        arcBulge:activeWallArcEnd==null?0:ArchitectWallArc.through(p1,p2,activeDraftEnd!),
         startPoint: p1,
         endPoint: p2,
         thickness: activeWallThickness,
@@ -1266,7 +1287,7 @@ class Architect2dPainter extends CustomPainter {
       canvas.drawCircle(p2, 2 / zoomScale, Paint()..color = Colors.cyanAccent);
       // Keep a single target marker and a length-only badge outside the body.
       final textSpan = TextSpan(
-        text: project.formatLength(dist),
+        text: project.formatLength(wall.length),
         style: const TextStyle(
           color: Colors.white,
           fontFamily: 'Roboto',

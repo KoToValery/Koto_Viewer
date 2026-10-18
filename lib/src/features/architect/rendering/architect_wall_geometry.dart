@@ -16,16 +16,23 @@ class ArchitectWallGeometry {
     final coreFaces = <String, (double, double)>{};
     for (final wall in walls) {
       if (wall.length < 1e-8) continue;
-      edges.add((wall.startPoint, wall.endPoint));
-      edges.add((wall.coreCenterStart, wall.coreCenterEnd));
+      if(!wall.isCurved) {
+        edges.add((wall.startPoint, wall.endPoint));
+        edges.add((wall.coreCenterStart, wall.coreCenterEnd));
+      } else {
+        final path=wall.facePolygon(0,0),count=path.length~/2;
+        for(var i=0;i+1<count;i++) {
+          edges.add((path[i],path[i+1]));
+        }
+        corners.addAll([wall.startPoint,wall.endPoint,wall.referencePointAt(.5)]);
+      }
       for (final polygon in [wall.polygonCorners, wall.coreCorners]) {
-        corners.addAll(polygon);
+        if(!wall.isCurved)corners.addAll(polygon);
         for (var i = 0; i < polygon.length; i++) {
           edges.add((polygon[i], polygon[(i + 1) % polygon.length]));
         }
       }
-      final d = wall.coreCenterStart - wall.startPoint;
-      final c = d.dx * wall.normalVector.dx + d.dy * wall.normalVector.dy;
+      final c = wall.centerLineOffset-wall.exteriorSign*wall.coreAsymmetry/2;
       coreFaces[wall.id] = (
         c - wall.coreThickness / 2,
         c + wall.coreThickness / 2,
@@ -36,7 +43,10 @@ class ArchitectWallGeometry {
       ...ArchitectWallNetwork.junctions(walls),
       ...ArchitectWallNetwork.junctions(walls, faceOffsets: coreFaces),
     ]) {
-      corners.addAll(junction.$1);
+      for(var i=0;i<junction.$1.length;i++) {
+        final a=junction.$1[i]-junction.$1[(i+junction.$1.length-1)%junction.$1.length],b=junction.$1[(i+1)%junction.$1.length]-junction.$1[i];
+        if((a.dx*b.dy-a.dy*b.dx).abs()>.05*a.distance*b.distance)corners.add(junction.$1[i]);
+      }
       for (var i = 0; i < junction.$1.length; i++) {
         edges.add((junction.$1[i], junction.$1[(i + 1) % junction.$1.length]));
       }
@@ -59,6 +69,7 @@ class ArchitectWallAlignment {
     Offset? snapped;
     (Offset, Offset)? guide;
     for (final wall in walls) {
+      if(wall.isCurved)continue;
       for (final corner in [...wall.polygonCorners, ...wall.coreCorners]) {
         for (final direction in [wall.unitVector, wall.normalVector]) {
           final projected = corner + direction * dot(raw - corner, direction);
@@ -97,6 +108,7 @@ class ArchitectWallAlignment {
       (Offset, Offset)? guide;
       for (final a in moving) {
         for (final b in walls.where((w) => !ids.contains(w.id))) {
+          if(a.isCurved||b.isCurved)continue;
           final angle = dot(a.unitVector, b.unitVector).abs();
           if (angle > 1e-6 && (1 - angle).abs() > 1e-6) continue;
           for (final p in [...a.polygonCorners, ...a.coreCorners]) {

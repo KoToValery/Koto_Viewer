@@ -45,9 +45,9 @@ class BimEditActions {
     BimEditAction.properties => Icons.tune_rounded,
     BimEditAction.split => Icons.content_cut,
     BimEditAction.offset => Icons.straighten_rounded,
-    BimEditAction.newPoint => Icons.add_location_alt_outlined,
+    BimEditAction.newPoint => Icons.fiber_manual_record,
     BimEditAction.rename => Icons.drive_file_rename_outline_rounded,
-    BimEditAction.join => Icons.call_merge,
+    BimEditAction.join => Icons.polyline_outlined,
     BimEditAction.straighten => Icons.square_foot,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
@@ -79,8 +79,10 @@ class BimActionButton extends StatelessWidget {
     required this.color,
     required this.onTap,
     this.tooltip,
+    this.action,
   });
   final IconData icon;
+  final BimEditAction? action;
   final String label;
   final Color color;
   final VoidCallback onTap;
@@ -100,7 +102,7 @@ class BimActionButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 15, color: color),
+            BimEditingSymbol(action, fallback: icon, size: 15, color: color),
             const SizedBox(width: 5),
             Text(
               label,
@@ -116,4 +118,78 @@ class BimActionButton extends StatelessWidget {
     );
     return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
+}
+
+/// Shared drafting symbols, independent of map/navigation iconography.
+class BimEditingSymbol extends StatelessWidget {
+  final BimEditAction? action;
+  final IconData? fallback;
+  final double size;
+  final Color? color;
+  const BimEditingSymbol(
+    this.action, {
+    super.key,
+    this.fallback,
+    this.size = 24,
+    this.color,
+  });
+  @override
+  Widget build(BuildContext context) {
+    if (action != BimEditAction.newPoint && action != BimEditAction.join) {
+      return Icon(
+        fallback ?? BimEditActions.icon(action!),
+        size: size,
+        color: color,
+      );
+    }
+    return SizedBox.square(
+      dimension: size,
+      child: CustomPaint(
+        painter: _DraftingSymbolPainter(
+          action!,
+          color ?? IconTheme.of(context).color ?? Colors.black,
+        ),
+      ),
+    );
+  }
+}
+
+class _DraftingSymbolPainter extends CustomPainter {
+  final BimEditAction action;
+  final Color color;
+  const _DraftingSymbolPainter(this.action, this.color);
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 24, size.height / 24);
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    if (action == BimEditAction.newPoint) {
+      canvas.drawCircle(const Offset(12, 12), 3, paint);
+    } else {
+      // Existing halves are solid; the proposed perpendicular junction is dashed.
+      canvas.drawLine(const Offset(5, 3), const Offset(5, 11), paint);
+      canvas.drawLine(const Offset(21, 19), const Offset(13, 19), paint);
+      final dashed = Paint()
+        ..color = color
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.butt;
+      for (final distance in [0.0, 3.5, 7.0]) {
+        final end = (distance + 1.5).clamp(0.0, 8.0);
+        canvas.drawLine(Offset(5, 11 + distance), Offset(5, 11 + end), dashed);
+        canvas.drawLine(
+          Offset(13 - distance, 19),
+          Offset(13 - end, 19),
+          dashed,
+        );
+      }
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_DraftingSymbolPainter old) =>
+      old.action != action || old.color != color;
 }

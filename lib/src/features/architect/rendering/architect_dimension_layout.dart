@@ -241,7 +241,7 @@ class ArchitectDimensionLayout {
     final halfWidth = pixels.width / scale / 2,
         halfHeight = pixels.height / scale / 2;
     final support = n.dx.abs() * halfWidth + n.dy.abs() * halfHeight;
-    final midpoint = (wall.centerStart + wall.centerEnd) / 2;
+    final midpoint = wall.centerPointAt(.5);
     final path = obstacles ?? (Path()..addPolygon(wall.polygonCorners, true));
     Rect candidate(double sign, int step) => Rect.fromCenter(
       center:

@@ -2,10 +2,12 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_elements.dart';
+import '../models/architect_material_layer.dart';
 import '../models/architect_project.dart';
 import '../models/architect_section.dart';
 import '../models/architect_slab_assembly.dart';
 import '../rendering/architect_stair_mesh.dart';
+import '../rendering/architect_wall_solids.dart';
 import 'architect_roof_geometry.dart';
 import 'architect_slab_geometry.dart';
 import 'architect_stair_section.dart';
@@ -194,6 +196,8 @@ class ArchitectBuildingSection {
         }
       }
 
+      final useCompositions=floor.walls.any((w)=>w.layers.isNotEmpty||w.plinth.enabled||w.isCurved);
+      final sharedSolids=useCompositions ? ArchitectWallSolids.build(floor,project.wallTypes,project:project) : const <ArchitectWallSolid>[];
       for (final wall in floor.walls) {
         final baseWallHeight = wall.effectiveHeight(floor.height);
         final canExtendToRoof = activeRoofSlices.isNotEmpty && !wall.isParapet;
@@ -204,7 +208,8 @@ class ArchitectBuildingSection {
         final sources = <Triangle3D, String>{};
         final wallMesh = wall
             .copyWith(height: prismHeight)
-            .build3D(storeyElevation: floor.elevation, sources: sources);
+            .build3D(storeyElevation: floor.elevation, sources: sources,includeSolid:!useCompositions,resolveComposition:!useCompositions);
+        if(useCompositions) wallMesh.addAll([for(final solid in sharedSolids)if(solid.wall.id==wall.id)...solid.triangles]);
         var wallPath = sliceMesh(wallMesh);
         if (wallPath == null) continue;
 
@@ -282,9 +287,20 @@ class ArchitectBuildingSection {
           regions.add(ArchitectSectionRegion(id, SlabMaterial.tile, clipped));
         }
         if (!wallPath!.getBounds().isEmpty) {
-          regions.add(
-            ArchitectSectionRegion(wall.id, SlabMaterial.plaster, wallPath),
-          );
+          if(useCompositions) {
+            var remaining=wallPath;
+            for(final part in sharedSolids.where((s)=>s.wall.id==wall.id)) {
+              final raw=sliceMesh(part.triangles);
+              if(raw==null)continue;
+              final region=Path.combine(PathOperation.intersect,remaining,raw);
+              remaining=Path.combine(PathOperation.difference,remaining,region);
+              if(region.getBounds().isEmpty)continue;
+              final material=switch(part.layer.material){ArchitectMaterial.concrete=>SlabMaterial.concrete,ArchitectMaterial.xps=>SlabMaterial.xps,ArchitectMaterial.eps=>SlabMaterial.floorInsulation,ArchitectMaterial.stoneWool=>SlabMaterial.mineralWool,ArchitectMaterial.timber=>SlabMaterial.parquet,ArchitectMaterial.tile||ArchitectMaterial.stone=>SlabMaterial.tile,_=>SlabMaterial.plaster};
+              regions.add(ArchitectSectionRegion(wall.id,material,region,customFillColor:part.layer.material.color));
+            }
+          } else {
+            regions.add(ArchitectSectionRegion(wall.id, SlabMaterial.plaster, wallPath));
+          }
         }
       }
 

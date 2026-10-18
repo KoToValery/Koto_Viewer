@@ -88,25 +88,51 @@ class ArchitectSnapGeometry {
         : (activeIdx > 0 ? project.storeys[activeIdx - 1].walls : floor.walls);
 
     for (final wall in referenceWalls) {
+      if(wall.isCurved) {
+        for(final ratio in [0.0,.5,1.0]) {
+          point(wall.referencePointAt(ratio),ratio==.5?'Midpoint':'Endpoint',wall.id);
+        }
+        point(wall.arc!.center,'Center',wall.id);
+        final paths=[(wall.facePolygon(0,0),'@wall-axis:${wall.id}'),(wall.polygonCorners,wall.id),(wall.coreCorners,wall.id)];
+        for(final (points,owner) in paths)for(var i=0;i<points.length;i++) {
+           {
+          edges.add((a:points[i],b:points[(i+1)%points.length],owner:owner));
+        }
+        }
+      } else {
       edge(wall.startPoint, wall.endPoint, '@wall-axis:${wall.id}');
       edge(wall.coreCenterStart, wall.coreCenterEnd, '@wall-axis:${wall.id}');
       wallBox(wall.polygonCorners, wall.id);
       wallBox(wall.coreCorners, wall.id);
+      }
       for (final opening in [
-        for (final d in wall.doors) (d.id, d.offsetRatio, d.width),
-        for (final w in wall.windows) (w.id, w.offsetRatio, w.width),
+        for (final d in wall.doors) (d.id, d.offsetRatio, d.width, true),
+        for (final w in wall.windows) (w.id, w.offsetRatio, w.width, false),
       ]) {
-        final center =
-            wall.centerStart + wall.unitVector * (wall.length * opening.$2);
+        final center = wall.centerPointAt(opening.$2);
         point(center, 'Center', opening.$1);
-        final along = wall.unitVector * opening.$3 / 2;
-        final across = wall.normalVector * wall.thickness / 2;
-        wallBox([
-          center - along - across,
-          center + along - across,
-          center + along + across,
-          center - along + across,
-        ], opening.$1);
+        final along = wall.tangentAt(opening.$2) * opening.$3 / 2;
+        final across = wall.normalAt(opening.$2) * wall.thickness / 2;
+        final jambLeft = center - along;
+        final jambRight = center + along;
+        final isDoor = opening.$4;
+        final jambLabel = isDoor ? 'Door jamb' : 'Window jamb';
+        point(jambLeft, jambLabel, opening.$1);
+        point(jambRight, jambLabel, opening.$1);
+        final c0 = jambLeft - across;
+        final c1 = jambRight - across;
+        final c2 = jambRight + across;
+        final c3 = jambLeft + across;
+        wallBox([c0, c1, c2, c3], opening.$1);
+        edge(c3, c0, opening.$1, includeMidpoint: true);
+        edge(c1, c2, opening.$1, includeMidpoint: true);
+        if (wall.hasInsulation) {
+          final coreAcross = wall.normalAt(opening.$2) * wall.coreThickness / 2;
+          point(jambLeft - coreAcross, 'Endpoint', opening.$1);
+          point(jambLeft + coreAcross, 'Endpoint', opening.$1);
+          point(jambRight - coreAcross, 'Endpoint', opening.$1);
+          point(jambRight + coreAcross, 'Endpoint', opening.$1);
+        }
       }
     }
     // Intersections between wall faces (outer finish lines and core lines)
@@ -115,6 +141,12 @@ class ArchitectSnapGeometry {
       if (a.length < 1e-4) continue;
       for (final b in referenceWalls.skip(i + 1)) {
         if (b.length < 1e-4) continue;
+        if(a.isCurved||b.isCurved) {
+          for(final p in a.intersections(b)) {
+            point(p,'Intersection','@wall-face-joints');
+          }
+          continue;
+        }
         final cross = BimLineGeometry.cross(a.unitVector, b.unitVector);
         if (cross.abs() < 1e-4) continue;
 

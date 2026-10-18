@@ -14,13 +14,16 @@ class ArchitectElementPropertiesDialog extends StatefulWidget {
   final ArchitectProject project;
   final Set<String> elementIds;
   final VoidCallback? onSlabLayers;
+  final void Function(Map<String,double>,Map<String,String>)? onWallLayers,onWallPlinth;
+  final bool Function(Map<String, double>, Map<String, String>)? onStraighten;
   final bool Function(Map<String, double>, Map<String, String>) onApply;
   const ArchitectElementPropertiesDialog({
     super.key,
     required this.project,
     required this.elementIds,
     required this.onApply,
-    this.onSlabLayers,
+    this.onSlabLayers, this.onWallLayers,this.onWallPlinth,
+    this.onStraighten,
   });
   @override
   State<ArchitectElementPropertiesDialog> createState() =>
@@ -82,6 +85,7 @@ class _ArchitectElementPropertiesDialogState
   String label(String key) {
     final l = context.l10n;
     return switch (key) {
+      'arcRadius' => 'R=',
       'height' => l.architectPropertyHeight,
       'width' => l.architectPropertyWidth,
       'depth' => l.architectPropertyDepth,
@@ -481,6 +485,18 @@ class _ArchitectElementPropertiesDialogState
               if (!walls)
                 for (final key in fields.keys) numberField(key, false),
               if (walls) ...[
+                if(widget.onWallPlinth!=null)OutlinedButton.icon(key:const ValueKey('architect-property-wall-plinth'),icon:const Icon(Icons.border_bottom),label:Text(l.wallPlinth),onPressed:(){Navigator.pop(context);widget.onWallPlinth!(values,texts);}),
+                if(widget.onWallLayers!=null)OutlinedButton.icon(key:const ValueKey('architect-property-wall-layers'),icon:const Icon(Icons.layers_outlined),label:Text(l.wallCompositionAction),onPressed:(){Navigator.pop(context);widget.onWallLayers!(values,texts);}),
+                if (widget.onStraighten != null)
+                  OutlinedButton.icon(
+                    key: const ValueKey('architect-property-straighten'),
+                    icon: const Icon(Icons.square_foot),
+                    label: Text(l.architectWallStraighten),
+                    onPressed: () {
+                      if (widget.onStraighten!(values, texts)) Navigator.pop(context);
+                    },
+                  ),
+                if(fields.containsKey('arcRadius'))numberField('arcRadius',false),
                 numberField('baseOffset', false),
                 numberField('height', true),
                 if (normalWalls)
@@ -497,11 +513,13 @@ class _ArchitectElementPropertiesDialogState
                       if (value == true) values.remove('height');
                     }),
                   ),
+                if(!records.any((e)=>(e['layers'] as List? ?? []).isNotEmpty))...[
                 materialField('coreMaterial'),
                 numberField('coreThickness', true),
                 materialField('insulationMaterial'),
                 numberField('insulationThicknessOverride', true),
                 numberField('thickness', true),
+                ],
                 IconButton(
                   key: const ValueKey('architect-property-flipSide'),
                   tooltip: l.architectWallFlipSide,

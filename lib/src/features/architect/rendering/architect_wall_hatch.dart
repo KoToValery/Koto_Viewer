@@ -11,6 +11,7 @@ class ArchitectWallHatch {
     Path region,
     double scale,
     Color color,
+    {WallCoreMaterial? material}
   ) {
     if (region.getBounds().isEmpty) return;
     canvas.save();
@@ -30,13 +31,13 @@ class ArchitectWallHatch {
         paint,
       );
       line(0);
-      if (wall.coreMaterial == WallCoreMaterial.timber) line(spacing * .22);
-      if (wall.coreMaterial == WallCoreMaterial.panel) {
+      if ((material ?? wall.coreMaterial) == WallCoreMaterial.timber) line(spacing * .22);
+      if ((material ?? wall.coreMaterial) == WallCoreMaterial.panel) {
         line(spacing * .15);
         line(spacing * .3);
       }
     }
-    if (wall.coreMaterial == WallCoreMaterial.concrete) {
+    if ((material ?? wall.coreMaterial) == WallCoreMaterial.concrete) {
       for (
         var x = (bounds.left / spacing).floor() * spacing;
         x < bounds.right;

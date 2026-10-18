@@ -206,8 +206,10 @@ class ArchitectDoor {
     required double wallThickness,
     required double zoomScale,
     bool isSelected = false,
+    bool wallGeometryProvided = false,
     double coreThickness = 0.25,
     double insulationThickness = 0.0,
+    double? coreCenterShift,
     double exteriorSign = 1.0,
   }) {
     final wallVec = wallEnd - wallStart;
@@ -256,12 +258,14 @@ class ArchitectDoor {
       ..lineTo(pRightBase.dx + n.dx * (halfThick + 0.002), pRightBase.dy + n.dy * (halfThick + 0.002))
       ..lineTo(pLeftBase.dx + n.dx * (halfThick + 0.002), pLeftBase.dy + n.dy * (halfThick + 0.002))
       ..close();
-    canvas.drawPath(openingPath, cutMaskPaint);
+    if(!wallGeometryProvided)canvas.drawPath(openingPath, cutMaskPaint);
 
     // 2. Wall jamb cut lines (Линии на зида при светлия отвор)
+    if(!wallGeometryProvided) {
     canvas.drawLine(pLeftBase - n * halfThick, pLeftBase + n * halfThick, wallCutEdgePaint);
     canvas.drawLine(pRightBase - n * halfThick, pRightBase + n * halfThick, wallCutEdgePaint);
 
+    }
     // 3. Draw 2 Door Frame Jambs (Каси: frameThickness x wallThickness, matching door.dxf New_ramka)
     // Transparent interior, thin stroke outline only (no solid hatch)
     void drawJamb(Offset baseCorner, bool isLeft) {
@@ -445,6 +449,7 @@ class ArchitectDoor {
     required double storeyElevation,
     double coreThickness = 0.25,
     double insulationThickness = 0.0,
+    double? coreCenterShift,
     double exteriorSign = 1.0,
   }) {
     final effectiveStyle = resolvedStyle;
@@ -456,6 +461,7 @@ class ArchitectDoor {
         wallThickness: wallThickness,
         coreThickness: coreThickness,
         insulationThickness: insulationThickness,
+        coreCenterShift: coreCenterShift,
         exteriorSign: exteriorSign,
         offsetRatio: offsetRatio,
         width: width,

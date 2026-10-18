@@ -71,6 +71,7 @@ class ArchitectSelection {
     }
     if (e.containsKey('referenceLine')) {
       final wall = ArchitectWall.fromJson(e);
+      if(wall.isCurved)fields['arcRadius']=wall.arc!.radius;
       fields['coreThickness'] = wall.coreThickness;
       fields['insulationThicknessOverride'] = wall.insulationThickness;
     }
@@ -89,10 +90,10 @@ class ArchitectSelection {
         ...w.windows.map((e) => (e.id, e.offsetRatio, e.width)),
       ]) {
         if (o.$1 == id) {
-          final center = w.centerStart + w.unitVector * (o.$2 * w.length);
+          final center = w.centerPointAt(o.$2);
           return ArchitectSceneGeometry.boundsOf([
-            center - w.unitVector * o.$3 / 2 - w.normalVector * w.thickness / 2,
-            center + w.unitVector * o.$3 / 2 + w.normalVector * w.thickness / 2,
+            center - w.tangentAt(o.$2) * o.$3 / 2 - w.normalAt(o.$2) * w.thickness / 2,
+            center + w.tangentAt(o.$2) * o.$3 / 2 + w.normalAt(o.$2) * w.thickness / 2,
           ]);
         }
       }
@@ -150,8 +151,8 @@ class ArchitectSelection {
         ...w.windows.map((e) => (e.id, e.offsetRatio, e.width)),
       ]) {
         if (o.$1 != id) continue;
-        final p = w.centerStart + w.unitVector * (o.$2 * w.length);
-        final u = w.unitVector * o.$3 / 2, n = w.normalVector * w.thickness / 2;
+        final p = w.centerPointAt(o.$2);
+        final u = w.tangentAt(o.$2) * o.$3 / 2, n = w.normalAt(o.$2) * w.thickness / 2;
         return path
           ..addPolygon([p - u - n, p + u - n, p + u + n, p - u + n], true);
       }
@@ -306,7 +307,14 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         if (!fields.containsKey(value.key)) {
           throw ArgumentError('Unsupported property');
         }
-        e[value.key] = value.key == 'stepCount'
+        if(value.key=='arcRadius') {
+          final wall=ArchitectWall.fromJson(e),chord=(wall.endPoint-wall.startPoint).distance;
+          if(value.value<chord/2)throw ArgumentError('Invalid arc radius');
+          final root=math.sqrt(math.max(0,value.value*value.value-chord*chord/4));
+          e['arcBulge']=wall.arcBulge.sign*(value.value+(wall.arcBulge.abs()>1?root:-root))/(chord/2);
+          continue;
+        }
+        e[value.key] = value.key == 'stepCount' 
             ? value.value.toInt()
             : value.value;
         if (value.key == 'stepCount' && e['design'] is Map) {
@@ -400,6 +408,21 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
             values.containsKey('insulationThicknessOverride')) {
           e['thickness'] = core + insulation;
         }
+        if(old.layers.isNotEmpty && (values.containsKey('coreThickness') || values.containsKey('insulationThicknessOverride') || values.containsKey('thickness'))) {
+          final list=[...old.layers];
+          if(values.containsKey('thickness')&&!values.containsKey('coreThickness')&&list.length!=1)throw ArgumentError('Edit composition layers explicitly');
+          for(final role in [ArchitectLayerRole.core,ArchitectLayerRole.insulation]) {
+            final update=role==ArchitectLayerRole.core?values['coreThickness']??(list.length==1?values['thickness']:null):values['insulationThicknessOverride'];
+            if(update==null)continue;
+            final indices=[for(var i=0;i<list.length;i++)if(list[i].role==role)i];
+            if(indices.length!=1)throw ArgumentError('Edit composition layers explicitly');
+            if(update==0){list.removeAt(indices.single);}else{list[indices.single]=list[indices.single].copyWith(thickness:update);}
+          }
+          ArchitectMaterialLayer.validate(list);
+          e['layers']=list.map((l)=>l.toJson()).toList();
+          e['thickness']=list.fold(0.0,(v,l)=>v+l.thickness);
+          e['insulationThicknessOverride']=list.where((l)=>l.role==ArchitectLayerRole.insulation).fold(0.0,(v,l)=>v+l.thickness);
+        }
         e.remove('coreThickness');
       }
     }
@@ -432,7 +455,9 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
       final old = project.activeStorey.walls.firstWhere((w) => w.id == wall.id);
       var updated = wall;
       final flipped = old.exteriorSide != wall.exteriorSide;
-      if (flipped) {
+      if (flipped && wall.isCurved) {
+        updated=wall.copyWith(exteriorSide:old.exteriorSide).mirroredAroundCore();
+      } else if (flipped) {
         final shift = old.coreCenterStart - wall.coreCenterStart;
         updated = wall.copyWith(
           startPoint: wall.startPoint + shift,

@@ -5076,6 +5076,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get snapMerge => 'Merge';
 
   @override
+  String get snapDoorJamb => 'Door jamb';
+
+  @override
+  String get snapWindowJamb => 'Window jamb';
+
+  @override
   String get architectDoorSillNone => 'Sill: 0';
 
   @override
@@ -6275,7 +6281,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWizardElevation => 'Elevation';
 
   @override
-  String get architectWizardHeight => 'Height';
+  String get architectWizardHeight => 'H=';
 
   @override
   String get architectWizardStoreyHeightHelp =>
@@ -6290,4 +6296,160 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectWizardCreateShort => 'Create';
+
+  @override
+  String get architectWizardHeightReference =>
+      'finished floor → finished floor';
+
+  @override
+  String architectWallConcreteCode(String thickness) {
+    return 'RC $thickness';
+  }
+
+  @override
+  String architectWallParapetCode(String thickness) {
+    return 'P $thickness';
+  }
+
+  @override
+  String architectWallTypeThicknessHint(String name, String thickness) {
+    return '$name · $thickness cm';
+  }
+
+  @override
+  String get architectWallQuickCore => 'Core';
+
+  @override
+  String get architectWallQuickInsulation => 'Insulation';
+
+  @override
+  String get architectWallInvalidThickness => 'Enter a valid thickness.';
+
+  @override
+  String get architectWallQuickThickness => 'Thickness';
+
+  @override
+  String get wallTypesTitle => 'Wall types';
+
+  @override
+  String get wallNewType => 'New type';
+
+  @override
+  String get wallCompositionName => 'Name';
+
+  @override
+  String get wallLocation => 'Use';
+
+  @override
+  String get wallExterior => 'Exterior';
+
+  @override
+  String get wallInterior => 'Interior';
+
+  @override
+  String get wallBearing => 'Load-bearing';
+
+  @override
+  String get wallLayerCore => 'Core';
+
+  @override
+  String get wallLayerInsulation => 'Insulation';
+
+  @override
+  String get wallLayerFinish => 'Finish';
+
+  @override
+  String get wallLayerRole => 'Layer role';
+
+  @override
+  String get wallLayerAdd => 'Add layer';
+
+  @override
+  String get wallLayerUp => 'Move up';
+
+  @override
+  String get wallLayerDown => 'Move down';
+
+  @override
+  String get wallLayerOutsideInside => 'Outside → inside';
+
+  @override
+  String get wallLayerSides => 'A → B';
+
+  @override
+  String get wallLayerInvalid =>
+      'Use positive thicknesses and a continuous core.';
+
+  @override
+  String get wallSelectedScope => 'Selected walls only';
+
+  @override
+  String wallTypeApply(int count) {
+    return 'Apply to type ($count)';
+  }
+
+  @override
+  String get wallTypeReplacement => 'Replace with';
+
+  @override
+  String get wallTypeInUse =>
+      'Select a replacement for the walls using this type.';
+
+  @override
+  String get wallCompositionAction => 'Layers';
+
+  @override
+  String get wallManageTypes => 'Manage types';
+
+  @override
+  String get wallMaterialPlaster => 'Plaster';
+
+  @override
+  String get wallMaterialRender => 'Facade render';
+
+  @override
+  String get wallMaterialBoard => 'Plasterboard';
+
+  @override
+  String get wallMaterialStone => 'Stone';
+
+  @override
+  String get wallPlinth => 'Plinth';
+
+  @override
+  String get wallPlinthFinish => 'Finish';
+
+  @override
+  String get wallPlinthBase => 'Base elevation (m)';
+
+  @override
+  String get wallPlinthBaseHelp =>
+      'Project elevation of the bottom edge; H is measured upwards.';
+
+  @override
+  String get wallAdvanced => 'More';
+
+  @override
+  String get wallTypeCopy => 'Copy type';
+
+  @override
+  String get wallMixedValue => 'Mixed';
+
+  @override
+  String get wallArc => 'Arc wall';
+
+  @override
+  String get wallArcPickEnd => 'Pick the end of the arc';
+
+  @override
+  String get wallArcPickThrough => 'Pick a point on the arc';
+
+  @override
+  String get wallArcInvalidRadius => 'Radius is too small for this wall.';
+
+  @override
+  String get wallArcPickStart => 'Pick the start of the arc';
+
+  @override
+  String get wallPlinthEnabled => 'Enabled';
 }

@@ -37,6 +37,7 @@ class Fenestration3dBuilder {
     required double wallThickness,
     required double coreThickness,
     required double insulationThickness,
+    double? coreCenterShift,
     required double exteriorSign, // +1 or -1 along wall normal pointing to exterior
     required double offsetRatio,
     required double width,
@@ -61,9 +62,9 @@ class Fenestration3dBuilder {
     final zTop = zBottom + height;
 
     // Center in masonry core (5-chamber frame depth = 70 mm = 0.07 m)
-    final coreCenterShift =
+    final resolvedCoreShift = coreCenterShift ??
         (wallThickness - coreThickness) / 2.0 * (-exteriorSign);
-    final frameCenter = centerPos + n * coreCenterShift;
+    final frameCenter = centerPos + n * resolvedCoreShift;
     final fDepth = style.frameDepth;
     final fFace = style.frameFaceWidth;
     final halfFDepth = fDepth / 2.0;
@@ -112,6 +113,7 @@ class Fenestration3dBuilder {
         wallThickness: wallThickness,
         coreThickness: coreThickness,
         insulationThickness: insulationThickness,
+        coreCenterShift: coreCenterShift,
         exteriorSign: exteriorSign,
         halfW: halfW,
         zBottom: zBottom,
@@ -556,6 +558,7 @@ class Fenestration3dBuilder {
     required double wallThickness,
     required double coreThickness,
     required double insulationThickness,
+    double? coreCenterShift,
     required double exteriorSign,
     required double halfW,
     required double zBottom,

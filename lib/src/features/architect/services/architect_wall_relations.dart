@@ -68,6 +68,7 @@ class ArchitectWallClearance {
     List<ArchitectWall> walls, {
     bool includeParallel = false,
   }) {
+    if(wall.isCurved)return const [];
     double dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
     double cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
     final result = <ArchitectWallClearance>[];
@@ -245,11 +246,12 @@ class ArchitectWallClearance {
     ArchitectWall wall,
     List<ArchitectWall> walls,
   ) {
+    if(wall.isCurved)return const [];
     double dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
     final nearest = <int, ArchitectWallClearance>{};
     final origin = wall.centerStart, u = wall.unitVector, n = wall.normalVector;
     for (final other in walls) {
-      if (other.id == wall.id ||
+      if (other.isCurved || other.id == wall.id ||
           (dot(u, other.unitVector).abs() - 1).abs() > 1e-7) {
         continue;
       }
@@ -292,8 +294,8 @@ class ArchitectWallTrimSpan {
   final double from, to;
   const ArchitectWallTrimSpan(this.wall, this.from, this.to);
   Offset get start =>
-      wall.coreCenterStart + wall.unitVector * (from * wall.length);
-  Offset get end => wall.coreCenterStart + wall.unitVector * (to * wall.length);
+      wall.isCurved?wall.referencePointAt(from):wall.coreCenterStart + wall.unitVector * (from * wall.length);
+  Offset get end => wall.isCurved?wall.referencePointAt(to):wall.coreCenterStart + wall.unitVector * (to * wall.length);
 
   /// The picked interval is bounded by real wall crossings or wall ends.
   static ArchitectWallTrimSpan at(
@@ -304,6 +306,13 @@ class ArchitectWallTrimSpan {
     final cuts = <double>[0, 1];
     for (final other in walls) {
       if (other.id == wall.id) continue;
+      if(wall.isCurved||other.isCurved) {
+        for(final p in wall.intersections(other)) {
+          final ratio=wall.isCurved?wall.arc!.parameter(p):wall.projectPoint(p).$1;
+          if(ratio*wall.length>.001&&(1-ratio)*wall.length>.001&&cuts.every((c)=>(c-ratio).abs()>1e-8))cuts.add(ratio);
+        }
+        continue;
+      }
       final point = ArchitectWallNetwork.intersection(
         wall.coreCenterStart,
         wall.coreCenterEnd,
@@ -327,7 +336,7 @@ class ArchitectWallTrimSpan {
     }
     cuts.sort();
     final d = pick - wall.coreCenterStart;
-    final ratio =
+    final ratio = wall.isCurved ? wall.arc!.parameter(pick).clamp(0.0,1.0) :
         ((d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy) / wall.length)
             .clamp(0.0, 1.0);
     for (var i = 0; i < cuts.length - 1; i++) {
@@ -417,20 +426,12 @@ class ArchitectOpeningClearance {
     bool isModular(double d) =>
         d > 1e-4 && (d / step - (d / step).round()).abs() < 1e-3;
 
-    final u = wall.unitVector;
-    final sideNormal = wall.exteriorNormal;
-    final faceOffset = sideNormal * (wall.thickness / 2.0);
-    final dimOffset = sideNormal * (wall.thickness / 2.0 + 0.22);
-
-    final leftRefPt = wall.centerStart + u * leftStation + faceOffset;
-    final leftJambPt = wall.centerStart + u * leftJamb + faceOffset;
-    final leftStart = wall.centerStart + u * leftStation + dimOffset;
-    final leftEnd = wall.centerStart + u * leftJamb + dimOffset;
-
-    final rightJambPt = wall.centerStart + u * rightJamb + faceOffset;
-    final rightRefPt = wall.centerStart + u * rightStation + faceOffset;
-    final rightStart = wall.centerStart + u * rightJamb + dimOffset;
-    final rightEnd = wall.centerStart + u * rightStation + dimOffset;
+    Offset at(double station,double extra) {
+      final r=station/len;
+      return wall.centerPointAt(r)+wall.normalAt(r)*wall.exteriorSign*(wall.thickness/2+extra);
+    }
+    final leftRefPt=at(leftStation,0),leftJambPt=at(leftJamb,0),leftStart=at(leftStation,.22),leftEnd=at(leftJamb,.22);
+    final rightRefPt=at(rightStation,0),rightJambPt=at(rightJamb,0),rightStart=at(rightJamb,.22),rightEnd=at(rightStation,.22);
 
     return [
       ArchitectOpeningClearance(
@@ -509,7 +510,7 @@ class ArchitectOpeningPlacementResult {
   });
 
   Offset get centerPoint =>
-      wall.centerStart + (wall.centerEnd - wall.centerStart) * offsetRatio;
+      wall.centerPointAt(offsetRatio);
 }
 
 /// Constructive masonry placement and snapping engine for hosted doors & windows.
@@ -571,6 +572,17 @@ class ArchitectOpeningPlacement {
     // 2. Intersecting (cross / T-junction / corner) walls
     for (final other in walls) {
       if (other.id == wall.id || other.isDetached) continue;
+      if(wall.isCurved||other.isCurved) {
+        for(final p in wall.intersections(other)) {
+          final ratio=wall.isCurved?wall.arc!.parameter(p):wall.projectPoint(p).$1,otherRatio=other.isCurved?other.arc!.parameter(p):other.projectPoint(p).$1;
+          final a=wall.tangentAt(ratio),b=other.tangentAt(otherRatio),sin=(a.dx*b.dy-a.dy*b.dx).abs();
+          if(sin<.15)continue;
+          final station=ratio*len,half=other.coreThickness/2/sin;
+          final from=(station-half).clamp(0.0,len),to=(station+half).clamp(0.0,len);
+          if(from>.01&&to<len-.01)obstacles.add((start:from,end:to,kind:ArchitectOpeningBoundaryKind.intersectingWall,id:other.id));
+        }
+        continue;
+      }
       final sinTheta =
           (u.dx * other.unitVector.dy - u.dy * other.unitVector.dx).abs();
       if (sinTheta < 0.15) continue;
@@ -863,13 +875,13 @@ class ArchitectOpeningPlacement {
       openingWidth: openingWidth,
     );
 
-    final toCursor = rawPoint - (host.centerStart + host.unitVector * centerAlong);
+    final toCursor = rawPoint - host.centerPointAt(ratio);
     final normalDot =
-        toCursor.dx * host.normalVector.dx + toCursor.dy * host.normalVector.dy;
+        toCursor.dx * host.normalAt(ratio).dx + toCursor.dy * host.normalAt(ratio).dy;
     final openInward = normalDot.abs() < 1e-3 ? true : normalDot >= 0;
 
     final alongDot =
-        toCursor.dx * host.unitVector.dx + toCursor.dy * host.unitVector.dy;
+        toCursor.dx * host.tangentAt(ratio).dx + toCursor.dy * host.tangentAt(ratio).dy;
     final isHingeLeft = alongDot.abs() > 0.03
         ? alongDot < 0
         : (defaultHingeLeft ?? true);

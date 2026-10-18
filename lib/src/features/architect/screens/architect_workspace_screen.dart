@@ -1,3 +1,9 @@
+import '../widgets/architect_wall_types_manager.dart';
+import '../widgets/architect_wall_composition_editor.dart';
+import '../widgets/architect_wall_radius_dialog.dart';
+import '../widgets/architect_wall_plinth_dialog.dart';
+import '../services/architect_wall_compositions.dart';
+import '../widgets/architect_wall_thickness_dialog.dart';
 import '../widgets/architect_slab_layers_dialog.dart';
 import '../widgets/architect_roof_layers_dialog.dart';
 import '../widgets/architect_roof_bar.dart';
@@ -42,6 +48,7 @@ import '../rendering/architect_ghost_storey_painter.dart';
 import '../widgets/architect_workspace_settings_dialog.dart';
 import '../rendering/architect_snap_helper.dart';
 import '../rendering/architect_wall_snap.dart';
+import '../rendering/architect_column_snap.dart';
 import '../rendering/architect_wall_geometry.dart';
 import '../rendering/architect_zone_snap.dart';
 import '../rendering/architect_underlay_painter.dart';
@@ -942,6 +949,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       context: context,
       builder: (_) => ArchitectWorkspaceSettingsDialog(
         hasUnderlay: _underlaysByStorey.isNotEmpty,
+        onWalls: _showWallTypes,
         settings: ArchitectWorkspaceSettings(
           units: _project.units,
           dimensionScale: _project.dimensionScale,
@@ -1105,6 +1113,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _onModelChanged() {
     if (!mounted) return;
+    _restoreWallType();
     final valid = {
       for (final e in ArchitectSelection.records(
         _project.toJson(),
@@ -1201,6 +1210,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     setState(() {
       _draftStart = null;
+      _wallArcEnd=null;
       _draftEnd = null;
       _wallDirectionLocked = false;
       _selectedZoneId = null;
@@ -1283,6 +1293,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  bool _wallCurved=false;
+  Offset? _wallArcEnd;
+  double get _draftArcBulge => _wallArcEnd==null||_draftStart==null||_draftEnd==null ? 0 : ArchitectWallArc.through(_draftStart!,_wallArcEnd!,_draftEnd!);
+  void _commitWallArc() {
+    if(_wallArcEnd==null)return;
+    final bulge=_draftArcBulge;
+    try {
+      if(bulge.abs()<1e-6)throw ArgumentError('Collinear arc');
+      ArchitectWall(id:'validate',startPoint:_draftStart!,endPoint:_wallArcEnd!,arcBulge:bulge,thickness:_wallThickness,referenceLine:_wallReference,exteriorSide:_wallExteriorSide,layers:_activeWallType?.layers??const [],insulationThicknessOverride:_activeWallType?.insulationThickness).validateGeometry();
+      _commitCurrentWallSegment(_wallArcEnd!,arcBulge:bulge,continueChain:false);
+      setState(()=>_wallArcEnd=null);
+    } on ArgumentError {_operationError();}
+  }
+  Future<void> _editDraftArcRadius() async {
+    if(_wallArcEnd==null||_draftStart==null)return;
+    final start=_draftStart!,end=_wallArcEnd!,bulge=_draftArcBulge;
+    final chord=(end-start).distance,previous=bulge.abs()<1e-6?chord:ArchitectWallArc(start,end,bulge).radius;
+    final radius=await showDialog<double>(context:context,builder:(_)=>ArchitectWallRadiusDialog(project:_project,radius:previous,minimum:chord/2));
+    if(radius==null||!mounted||_draftStart!=start||_wallArcEnd!=end)return;
+    final root=math.sqrt(math.max(0,radius*radius-chord*chord/4));
+    final next=(bulge<0?-1:1)*(radius+(bulge.abs()>1?root:-root))/(chord/2);
+    setState(()=>_draftEnd=ArchitectWallArc(start,end,next).pointAt(.5));
+  }
   WallDraftingMode _wallMode = WallDraftingMode.singleLine;
   Offset? _draftStart;
   Offset? _draftEnd;
@@ -1309,7 +1342,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         .where((w) => w.id == _wallJoinSourceId)
         .firstOrNull;
     if (wall == null) return null;
-    final center = (wall.startPoint + wall.endPoint) / 2;
+    final center = wall.referencePointAt(.5);
     final target = _wallJoinPointer ??
         (center + wall.normalVector * (wall.thickness + 0.6));
     return (center, target);
@@ -1459,6 +1492,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Offset? _cursorModel;
   Offset? _columnPreviewPoint;
+  double _columnPreviewRotation = 0.0;
   String? _activeSnapLabel;
 
   // Door State (from element_vrata.dxf)
@@ -2054,7 +2088,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     // Midpoint handle check for selected wall (extrusion / step move)
     if (_selectedWall != null && _wallCutIds.isEmpty && _wallExtendId == null) {
       final wall = _selectedWall!;
-      final mid = (wall.startPoint + wall.endPoint) / 2;
+      final mid = wall.referencePointAt(.5);
       final midTol = math.min(16 / _currentScale, 0.35);
       if ((rawModel - mid).distance <= midTol) {
         _draggingElementId = wall.id;
@@ -2417,6 +2451,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return snap;
   }
 
+  ArchitectSnapResult _snapColumn(Offset raw) {
+    final snap = ArchitectColumnSnap.resolve(
+      raw: raw,
+      project: _project,
+      columnWidth: _elementTool.columnWidth,
+      columnDepth: _elementTool.columnDepth,
+      columnShape: _elementTool.columnShape,
+      currentRotationDeg: _columnPreviewRotation,
+      tolerance: (_touchInput ? 14 : 10) / _currentScale,
+      magnetic: _magnetEnabled,
+      underlay: _currentUnderlayDoc,
+      frame: widget.underlayFrame,
+      visibility: _underlayLayerVisibility,
+    );
+    _activeSnapLabel = snap.snapLabel;
+    _activeMagneticGuides = snap.magneticGuides;
+    return snap;
+  }
+
   ArchitectSnapResult _snapDimensionPoint(Offset raw, {Offset? anchor}) {
     final snap = anchor == null
         ? ArchitectSnapHelper.snapFree(
@@ -2576,6 +2629,34 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _activeSnapLabel = 'Center';
         _activeMagneticGuides = [best.guide];
         return best.delta;
+      }
+    }
+    if (_magnetEnabled && ids.length == 1) {
+      final movingCol = _elementMoveOriginal!.activeStorey.columns
+          .where((c) => ids.contains(c.id))
+          .firstOrNull;
+      if (movingCol != null) {
+        final colSnap = ArchitectColumnSnap.resolve(
+          raw: movingCol.position + delta,
+          project: _elementMoveOriginal!,
+          columnWidth: movingCol.width,
+          columnDepth: movingCol.depth,
+          columnShape: movingCol.shape,
+          currentRotationDeg: movingCol.rotationDeg,
+          tolerance: (_touchInput ? 14 : 10) / _currentScale,
+          magnetic: _magnetEnabled,
+          excludedIds: ids,
+          underlay: _currentUnderlayDoc,
+          frame: widget.underlayFrame,
+          visibility: _underlayLayerVisibility,
+        );
+        if (colSnap.isSnapped &&
+            (colSnap.snapLabel == 'Door jamb' ||
+                colSnap.snapLabel == 'Window jamb')) {
+          _activeSnapLabel = colSnap.snapLabel;
+          _activeMagneticGuides = colSnap.magneticGuides;
+          return colSnap.point - movingCol.position;
+        }
       }
     }
     final snap = ArchitectSnapHelper.snapTranslation(
@@ -2765,9 +2846,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     if (_activeTool == ArchitectTool.column && !_isActivelyDraggingHandle) {
-      final snap = _snapElement(rawModel);
+      final snap = _snapColumn(rawModel);
       _columnPreviewPoint = snap.point;
+      _columnPreviewRotation = snap.angleDeg ?? 0.0;
       _activeSnapLabel = snap.snapLabel;
+      _activeMagneticGuides = snap.magneticGuides;
       _cursorModel = _columnPreviewPoint;
       _repaintPreview();
       return;
@@ -3043,6 +3126,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 5. Wall drafting preview
     if (_activeTool == ArchitectTool.wall && _draftStart != null) {
+      if(_wallCurved&&_wallArcEnd!=null){_draftEnd=_snapElement(rawModel).point;_repaintPreview();return;}
       if (_wallDirectionLocked) return;
       final snap = _snapWall(rawModel, anchor: _draftStart);
       _activeMagneticGuides = snap.magneticGuides;
@@ -4231,6 +4315,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 4. In Wall tool
     if (_activeTool == ArchitectTool.wall) {
+      if(_wallCurved&&_wallArcEnd!=null) {
+        _draftEnd=_snapElement(rawModel).point;
+        _commitWallArc();return;
+      }
       if (_wallDirectionLocked) return;
       if (_draftStart == null) {
         final snap = _snapWall(rawModel);
@@ -4245,6 +4333,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       } else {
         final snap = _snapWall(rawModel, anchor: _draftStart);
         _orientWallReference(snap.point);
+        if(_wallCurved&&(snap.point-_draftStart!).distance>=.001) {
+          setState((){
+            _wallArcEnd=snap.point;
+            final chord=snap.point-_draftStart!,normal=Offset(-chord.dy,chord.dx)/chord.distance;
+            _draftEnd=(_draftStart!+snap.point)/2+normal*(chord.distance*.2);
+          });
+          return;
+        }
         if ((snap.point - _draftStart!).distance >= .001 &&
             _wallPrecisionMode) {
           setState(() {
@@ -4262,11 +4358,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 7. In Column tool
     if (_activeTool == ArchitectTool.column) {
-      final snap = _snapElement(rawModel);
+      final snap = _snapColumn(rawModel);
       final pt = snap.point;
+      final rot = snap.angleDeg ?? _columnPreviewRotation;
       final (_, newCol) = _elementTool.placeColumn(
         storey: _project.activeStorey,
         point: pt,
+        rotationDeg: rot,
+        existingColumns: _project.storeys.expand((s) => s.columns),
       );
       setState(() {
         _commands.execute(
@@ -4310,6 +4409,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           setState(() {
             _project = _project.updateActiveStorey(res.$1);
             _draftStart = null;
+      _wallArcEnd=null;
             _draftEnd = null;
           });
           _saveBiMProjectIfAttached();
@@ -4323,6 +4423,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         } else {
           setState(() {
             _draftStart = null;
+      _wallArcEnd=null;
             _draftEnd = null;
           });
         }
@@ -4402,6 +4503,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           setState(() {
             _project = _project.updateActiveStorey(res.$1);
             _draftStart = null;
+      _wallArcEnd=null;
             _draftEnd = null;
           });
           _saveBiMProjectIfAttached();
@@ -4415,6 +4517,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         } else {
           setState(() {
             _draftStart = null;
+      _wallArcEnd=null;
             _draftEnd = null;
           });
         }
@@ -4453,6 +4556,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         );
         setState(() {
           _draftStart = null;
+      _wallArcEnd=null;
           _draftEnd = null;
         });
         _saveBiMProjectIfAttached();
@@ -4483,6 +4587,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _dimensionPlacing = true;
             _singleDimensionStartAnchor = null;
             _draftStart = null;
+      _wallArcEnd=null;
             _draftEnd = null;
           });
           HapticFeedback.selectionClick();
@@ -4571,6 +4676,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         final dy = (endpoint.dy - _draftStart!.dy).abs();
         setState(() {
           _draftStart = null;
+      _wallArcEnd=null;
           _draftEnd = null;
         });
         HapticFeedback.mediumImpact();
@@ -4802,7 +4908,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   // === SECTION: WALL & DOOR CONCEPT DRAFTING ===
 
-  void _commitCurrentWallSegment(Offset targetPoint, {bool? continueChain}) {
+  void _commitCurrentWallSegment(Offset targetPoint, {bool? continueChain,double arcBulge=0}) {
     if (_draftStart == null) return;
     final p1 = _draftStart!;
     final p2 = targetPoint;
@@ -4813,9 +4919,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final now = ArchitectElementId.next('element');
     final newWall = ArchitectWall(
       id: 'wall_$now',
+      arcBulge:arcBulge,
+      plinth:ArchitectWallPlinth(baseElevation:_project.activeStorey.elevation),
       startPoint: p1,
       endPoint: p2,
       thickness: _wallThickness,
+      layers: _activeWallType?.resolvedLayers ?? const [],
+      location: _activeWallType?.resolvedLocation,
+      loadBearing: _activeWallType?.isLoadBearing ?? false,
       height: _activeWallType?.customHeight ?? _project.activeStorey.height,
       followStoreyHeight: _activeWallType?.isParapet != true,
       wallTypeId: _activeWallType?.id,
@@ -4838,6 +4949,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _wallStartAttachment = ArchitectWallAttachment(newWall, _wallReference);
       } else {
         _draftStart = null;
+      _wallArcEnd=null;
         _draftEnd = null;
         _wallStartAttachment = null;
         _wallDirectionLocked = false;
@@ -4851,7 +4963,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _finishChainedWall() {
     setState(() {
+      _wallArcEnd=null;
       _draftStart = null;
+      _wallArcEnd=null;
       _draftEnd = null;
       _wallDirectionLocked = false;
       _activeSnapLabel = null;
@@ -6300,15 +6414,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
       );
     } else if (isWall) {
-      final wall = storey.walls.where((w) => w.id == elementId).firstOrNull;
-      if (wall != null && !_isWallOrthogonal(wall)) {
-        items.add(
-          _radialItem(
-            action: ArchitectRadialAction.straighten,
-            color: const Color(0xFF00E5FF),
-          ),
-        );
-      }
       items.add(
         _radialItem(
           action: ArchitectRadialAction.duplicate,
@@ -6532,6 +6637,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _wallCutConfirmedDir = null;
       _wallExtendId = null;
       _draftStart = null;
+      _wallArcEnd=null;
       _draftEnd = null;
     });
     HapticFeedback.selectionClick();
@@ -6780,6 +6886,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     setState(() {
       if (invalidateGesture) _interactionEpoch++;
       _draftStart = null;
+      _wallArcEnd=null;
       _draftEnd = null;
       if (shouldMulti) {
         if (_selectionIds.isEmpty && _selectedElementId != null) {
@@ -6881,6 +6988,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               if (create) {
                 setState(() {
                   _draftStart = null;
+      _wallArcEnd=null;
                   _draftEnd = null;
                 });
               }
@@ -7012,6 +7120,53 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
+  void _showWallTypes() {
+    showDialog<void>(context:context,builder:(_)=>ArchitectWallTypesManager(project:_modelCommands.project,onApply:(next){
+      try {_modelCommands.commit(next);_restoreWallType();_saveBiMProjectIfAttached();return true;}
+      on ArgumentError {_operationError();return false;}
+    }));
+  }
+
+  void _editWallPlinth(Set<String> ids,Map<String,double> values,Map<String,String> texts) {
+    final original=_project;
+    ArchitectProject seeded;
+    try {seeded=SetArchitectElementProperties(storeyId:original.activeStoreyId,elementIds:ids,values:values,textValues:texts).apply(original);}
+    on ArgumentError {_operationError();return;}
+    final walls=seeded.activeStorey.walls.where((w)=>ids.contains(w.id)).toList();
+    if(walls.length!=ids.length||walls.isEmpty)return;
+    showDialog<void>(context:context,builder:(_)=>ArchitectWallPlinthDialog(project:seeded,values:walls.map((w)=>w.plinth).toList(),onApply:(patch){
+      if(!identical(original,_project)){_operationError();return false;}
+      try {_commands.executeBatch([
+        SetArchitectElementProperties(storeyId:original.activeStoreyId,elementIds:ids,values:values,textValues:texts),
+        SetArchitectWallPlinth(storeyId:original.activeStoreyId,wallIds:ids,patch:patch),
+      ]);_saveBiMProjectIfAttached();return true;}
+      on ArgumentError {_operationError();return false;}
+    }));
+  }
+
+  void _editWallLayers(Set<String> ids,{Map<String,double> values=const {},Map<String,String> texts=const {}}) {
+    final original=_project;
+    ArchitectProject seeded;
+    try {seeded=SetArchitectElementProperties(storeyId:original.activeStoreyId,elementIds:ids,values:values,textValues:texts).apply(original);}
+    on ArgumentError {_operationError();return;}
+    final walls=seeded.activeStorey.walls.where((w)=>ids.contains(w.id)).toList();
+    if(walls.length!=ids.length||walls.isEmpty)return;
+    final wall=walls.first;
+    final previous=seeded.wallTypes.where((t)=>t.id==wall.wallTypeId).firstOrNull;
+    final type=ArchitectWallType(id:ArchitectElementId.next('wall_type'),name:previous!=null&&!previous.isFactoryPreset?previous.name:'',
+      labelId:previous?.labelId??previous?.id,usage:wall.isParapet?WallUsage.parapet:wall.isExterior?WallUsage.exterior:WallUsage.interior,
+      totalThickness:wall.thickness,layers:wall.resolvedLayers,location:wall.isExterior?ArchitectWallLocation.exterior:ArchitectWallLocation.interior,loadBearing:wall.isLoadBearing,
+      customHeight:previous?.customHeight,parapetFinish:wall.parapetFinish);
+    showDialog<void>(context:context,builder:(_)=>ArchitectWallCompositionEditor(project:seeded,type:type,allowTypeSelection:true,onApply:(next,region,changed){
+      if(!identical(original,_project)){_operationError();return false;}
+      try {_commands.executeBatch([
+        SetArchitectElementProperties(storeyId:original.activeStoreyId,elementIds:ids,values:values,textValues:texts),
+        SetArchitectWallComposition(type:next,storeyId:original.activeStoreyId,wallIds:ids,plinthPatch:region,preserveComposition:!changed),
+      ]);_saveBiMProjectIfAttached();return true;}
+      on ArgumentError {_operationError();return false;}
+    }));
+  }
+
   void _showProperties() {
     final ids = _effectiveSelection;
     if (ids.isEmpty) return;
@@ -7036,14 +7191,50 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       builder: (_) => ArchitectElementPropertiesDialog(
         project: _project,
         elementIds: ids,
-        onSlabLayers: ids.length == 1 && _project.activeStorey.slabs.any((s) => ids.contains(s.id))
+        onWallPlinth:_selectedWallIds.length==ids.length&&_project.activeStorey.walls.where((w)=>ids.contains(w.id)).every((w)=>w.isExterior)?(values,texts)=>_editWallPlinth(ids,values,texts):null,
+        onWallLayers: _selectedWallIds.length==ids.length ? (values,texts)=>_editWallLayers(ids,values:values,texts:texts) : null,
+        onSlabLayers:
+            ids.length == 1 &&
+                _project.activeStorey.slabs.any((s) => ids.contains(s.id))
             ? () {
                 Navigator.pop(context);
-                final slab = _project.activeStorey.slabs.firstWhere((s) => ids.contains(s.id));
-                showDialog<void>(context: context, builder: (_) => ArchitectSlabLayersDialog(
-                  project: _project, slab: slab, onApply: (next) {
-                    _commands.commit(next); return true;
-                  }));
+                final slab = _project.activeStorey.slabs.firstWhere(
+                  (s) => ids.contains(s.id),
+                );
+                showDialog<void>(
+                  context: context,
+                  builder: (_) => ArchitectSlabLayersDialog(
+                    project: _project,
+                    slab: slab,
+                    onApply: (next) {
+                      _commands.commit(next);
+                      return true;
+                    },
+                  ),
+                );
+              }
+            : null,
+        onStraighten: ids.length == 1 && _selectedWallIds.length == 1 && !_project.activeStorey.walls.firstWhere((w)=>w.id==ids.single).isCurved
+            ? (values, texts) {
+                try {
+                  final edited = SetArchitectElementProperties(
+                    storeyId: _project.activeStoreyId,
+                    elementIds: ids,
+                    values: values,
+                    textValues: texts,
+                  ).apply(_project);
+                  final wall = edited.activeStorey.walls.firstWhere(
+                    (w) => w.id == ids.single,
+                  );
+                  final command = _straightenWallCommand(edited, wall);
+                  _cancelActiveDrags();
+                  _commands.commit(command?.apply(edited) ?? edited);
+                  _saveBiMProjectIfAttached();
+                  return true;
+                } on ArgumentError {
+                  _operationError();
+                  return false;
+                }
               }
             : null,
         onApply: (values, texts) {
@@ -7116,7 +7307,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               .where((w) => w.id == sourceId)
               .firstOrNull;
           if (wall != null) {
-            final center = (wall.startPoint + wall.endPoint) / 2;
+            final center = wall.referencePointAt(.5);
             _wallJoinPointer =
                 center + wall.normalVector * (wall.thickness + 0.6);
           }
@@ -7128,138 +7319,177 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   // === SECTION: SELECTION ACTIONS, BARS & TOOLBARS ===
 
+  void _editWallThickness(String id) {
+    final wall = _project.activeStorey.walls
+        .where((w) => w.id == id)
+        .firstOrNull;
+    if (wall == null) return;
+    if(wall.layers.isNotEmpty){_editWallLayers({id});return;}
+    _cancelActiveDrags();
+    setState(() => _radialMenuScreenPosition = null);
+    showDialog<void>(
+      context: context,
+      builder: (_) => ArchitectWallThicknessDialog(
+        project: _project,
+        wall: wall,
+        onApply: (core, insulation) {
+          try {
+            _commands.execute(
+              SetArchitectElementProperties(
+                storeyId: _project.activeStoreyId,
+                elementIds: {id},
+                values: {
+                  'coreThickness': core,
+                  'insulationThicknessOverride': insulation,
+                },
+              ),
+            );
+            _saveBiMProjectIfAttached();
+            return true;
+          } on ArgumentError {
+            _operationError();
+            return false;
+          }
+        },
+      ),
+    );
+  }
+
   Widget _buildWallSelectionActions(Set<String> wallIds) {
     final l = context.l10n;
-    return Material(
-      key: const ValueKey('architect-wall-floating-actions'),
-      color: const Color(0xEE1E242C),
-      borderRadius: BorderRadius.circular(8),
-      elevation: 4,
-      shadowColor: Colors.black54,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white24, width: 1.0),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              key: const ValueKey('architect-wall-flip'),
-              tooltip: l.architectWallFlipSide,
-              icon: const Icon(Icons.flip, color: Color(0xFF00E5FF)),
-              onPressed: () => _executeWallEdit(
-                MirrorArchitectWalls(
-                  storeyId: _project.activeStoreyId,
-                  wallIds: wallIds,
-                ),
-              ),
-            ),
-            IconButton(
-              key: const ValueKey('architect-wall-cut'),
-              tooltip: l.architectWallCut,
-              icon: Icon(
-                Icons.content_cut,
-                color: _wallCutIds.isNotEmpty ? Colors.amber : Colors.white,
-              ),
-              onPressed: () {
-                _cancelActiveDrags();
-                setState(() {
-                  _wallCutIds = _wallCutIds.isEmpty ? wallIds : {};
-                  _wallCutStroke = false;
-                  _wallCutStart = null;
-                  _wallCutConfirmedDir = null;
-                  _moveSelection = false;
-                  _wallParallelMove = false;
-                });
-              },
-            ),
-            IconButton(
-              key: const ValueKey('architect-wall-join'),
-              tooltip: l.architectWallJoinTooltip,
-              icon: Icon(
-                Icons.call_merge,
-                color: _wallJoinSourceId != null ? Colors.amber : Colors.white,
-              ),
-              onPressed: () => _triggerWallJoin(),
-            ),
-            if (wallIds.length == 1) ...[
-              IconButton(
-                key: const ValueKey('architect-wall-straighten'),
-                tooltip: l.architectWallStraighten,
-                icon: const Icon(
-                  Icons.square_foot,
-                  color: Color(0xFF00E5FF),
-                ),
-                onPressed: () {
-                  final wall = _project.activeStorey.walls
-                      .where((w) => w.id == wallIds.single)
-                      .firstOrNull;
-                  if (wall != null) {
-                    _straightenWall(wall);
-                  }
-                },
-              ),
-              IconButton(
-                key: const ValueKey('architect-wall-new-point'),
-                tooltip: l.bimNewPoint,
-                icon: const Icon(
-                  Icons.add_location_alt_outlined,
-                  color: Color(0xFF80CBC4),
-                ),
-                onPressed: () {
-                  _cancelActiveDrags();
-                  _insertMidpoint(wallIds.single);
-                },
-              ),
-              IconButton(
-                key: const ValueKey('architect-wall-extend'),
-                tooltip: l.architectWallExtend,
-                icon: Icon(
-                  Icons.open_in_full,
-                  color: _wallExtendId == wallIds.single
-                      ? Colors.amber
-                      : Colors.white,
-                ),
-                onPressed: () {
-                  _cancelActiveDrags();
-                  setState(() {
-                    _radialMenuScreenPosition = null;
-                    _wallCutIds = {};
-                    _wallCutStart = null;
-                    _moveSelection = false;
-                    _wallParallelMove = false;
-                    _wallExtendId = _wallExtendId == wallIds.single
-                        ? null
-                        : wallIds.single;
-                  });
-                },
-              ),
-              () {
-                final wall = _project.activeStorey.walls
-                    .where((w) => w.id == wallIds.single)
-                    .firstOrNull;
-                final overshoot = wall != null
-                    ? ArchitectWallOvershootDetector.detectForWall(
-                        wall,
-                        _project.activeStorey.walls,
-                      ).firstOrNull
-                    : null;
-                if (overshoot != null) {
-                  return IconButton(
-                    key: const ValueKey('architect-wall-trim-overshoot'),
-                    tooltip: l.architectWallOvershootTooltip,
-                    icon: const Icon(
-                      Icons.auto_fix_high_rounded,
-                      color: Colors.amberAccent,
+    return IntrinsicWidth(
+      child: Material(
+        key: const ValueKey('architect-wall-floating-actions'),
+        color: const Color(0xEE1E242C),
+        borderRadius: BorderRadius.circular(8),
+        elevation: 4,
+        shadowColor: Colors.black54,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.white24, width: 1.0),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (wallIds.length == 1)
+                  TextButton(
+                    key: const ValueKey('architect-wall-thickness'),
+                    onPressed: () => _editWallThickness(wallIds.single),
+                    child: Tooltip(
+                      message: l.architectWallQuickThickness,
+                      child: Text(
+                        'd=${_project.formatLength(_project.activeStorey.walls.firstWhere((w) => w.id == wallIds.single).thickness)}',
+                        style: const TextStyle(color: Colors.cyanAccent),
+                      ),
                     ),
-                    onPressed: () => _handleTrimOvershoot(overshoot),
-                  );
-                }
-                return const SizedBox.shrink();
-              }(),
-            ],
-          ],
+                  ),
+                IconButton(
+                  key: const ValueKey('architect-wall-flip'),
+                  tooltip: l.architectWallFlipSide,
+                  icon: const Icon(Icons.flip, color: Color(0xFF00E5FF)),
+                  onPressed: () => _executeWallEdit(
+                    MirrorArchitectWalls(
+                      storeyId: _project.activeStoreyId,
+                      wallIds: wallIds,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  key: const ValueKey('architect-wall-cut'),
+                  tooltip: l.architectWallCut,
+                  icon: Icon(
+                    Icons.content_cut,
+                    color: _wallCutIds.isNotEmpty ? Colors.amber : Colors.white,
+                  ),
+                  onPressed: () {
+                    _cancelActiveDrags();
+                    setState(() {
+                      _wallCutIds = _wallCutIds.isEmpty ? wallIds : {};
+                      _wallCutStroke = false;
+                      _wallCutStart = null;
+                      _wallCutConfirmedDir = null;
+                      _moveSelection = false;
+                      _wallParallelMove = false;
+                    });
+                  },
+                ),
+                IconButton(
+                  key: const ValueKey('architect-wall-join'),
+                  tooltip: l.architectWallJoinTooltip,
+                  icon: BimEditingSymbol(
+                    BimEditAction.join,
+                    color: _wallJoinSourceId != null
+                        ? Colors.amber
+                        : Colors.white,
+                  ),
+                  onPressed: () => _triggerWallJoin(),
+                ),
+                if (wallIds.length == 1) ...[
+                  IconButton(
+                    key: const ValueKey('architect-wall-new-point'),
+                    tooltip: l.bimNewPoint,
+                    icon: const BimEditingSymbol(
+                      BimEditAction.newPoint,
+                      color: Color(0xFF80CBC4),
+                    ),
+                    onPressed: () {
+                      _cancelActiveDrags();
+                      _insertMidpoint(wallIds.single);
+                    },
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-wall-extend'),
+                    tooltip: l.architectWallExtend,
+                    icon: Icon(
+                      Icons.open_in_full,
+                      color: _wallExtendId == wallIds.single
+                          ? Colors.amber
+                          : Colors.white,
+                    ),
+                    onPressed: () {
+                      _cancelActiveDrags();
+                      setState(() {
+                        _radialMenuScreenPosition = null;
+                        _wallCutIds = {};
+                        _wallCutStart = null;
+                        _moveSelection = false;
+                        _wallParallelMove = false;
+                        _wallExtendId = _wallExtendId == wallIds.single
+                            ? null
+                            : wallIds.single;
+                      });
+                    },
+                  ),
+                  () {
+                    final wall = _project.activeStorey.walls
+                        .where((w) => w.id == wallIds.single)
+                        .firstOrNull;
+                    final overshoot = wall != null
+                        ? ArchitectWallOvershootDetector.detectForWall(
+                            wall,
+                            _project.activeStorey.walls,
+                          ).firstOrNull
+                        : null;
+                    if (overshoot != null) {
+                      return IconButton(
+                        key: const ValueKey('architect-wall-trim-overshoot'),
+                        tooltip: l.architectWallOvershootTooltip,
+                        icon: const Icon(
+                          Icons.auto_fix_high_rounded,
+                          color: Colors.amberAccent,
+                        ),
+                        onPressed: () => _handleTrimOvershoot(overshoot),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  }(),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -7273,25 +7503,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return (angle - target).abs() < 1e-4;
   }
 
-  void _straightenWall(ArchitectWall wall) {
-    _cancelActiveDrags();
+  UpdateArchitectWall? _straightenWallCommand(
+    ArchitectProject project,
+    ArchitectWall wall,
+  ) {
     final delta = wall.endPoint - wall.startPoint;
     final len = delta.distance;
-    if (len < 1e-4) return;
+    if (len < 1e-4 || _isWallOrthogonal(wall)) return null;
     final angle = math.atan2(delta.dy, delta.dx);
     final target = (angle / (math.pi / 2)).round() * (math.pi / 2);
-    if ((angle - target).abs() < 1e-4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.architectWallAlreadyStraight),
-          duration: const Duration(seconds: 1),
-        ),
-      );
-      return;
-    }
-
-    final otherWalls =
-        _project.activeStorey.walls.where((w) => w.id != wall.id).toList();
+    final otherWalls = project.activeStorey.walls
+        .where((w) => w.id != wall.id)
+        .toList();
     final startConnected = otherWalls.any(
       (w) =>
           (w.startPoint - wall.startPoint).distance < 0.05 ||
@@ -7321,14 +7544,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     final updated = wall.copyWith(startPoint: newStart, endPoint: newEnd);
-    try {
-      _commands.execute(
-        UpdateArchitectWall(
-          storeyId: _project.activeStoreyId,
-          wall: updated,
-          carryConnections: carryConn,
+    return UpdateArchitectWall(
+      storeyId: project.activeStoreyId,
+      wall: updated,
+      carryConnections: carryConn,
+    );
+  }
+
+  void _straightenWall(ArchitectWall wall) {
+    _cancelActiveDrags();
+    final delta = wall.endPoint - wall.startPoint;
+    final len = delta.distance;
+    if (len < 1e-4) return;
+    final angle = math.atan2(delta.dy, delta.dx);
+    final target = (angle / (math.pi / 2)).round() * (math.pi / 2);
+    if ((angle - target).abs() < 1e-4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectWallAlreadyStraight),
+          duration: const Duration(seconds: 1),
         ),
       );
+      return;
+    }
+
+    final command = _straightenWallCommand(_project, wall)!;
+    try {
+      _commands.execute(command);
       _saveBiMProjectIfAttached();
       HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -7488,6 +7730,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     onPressed: () => setState(() {
                       _resetDimensionDraft();
                       _draftStart = null;
+      _wallArcEnd=null;
                       _draftEnd = null;
                       _dimensionStyle = mode.$1;
                       _dimensionChainMode =
@@ -7544,8 +7787,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 IconButton(
                   key: const ValueKey('architect-dimension-new-point'),
                   tooltip: l.architectDimensionNewPoint,
-                  icon: Icon(
-                    Icons.add_location_alt_outlined,
+                  icon: BimEditingSymbol(BimEditAction.newPoint,
                     color: _dimensionAllowPoint
                         ? Colors.cyanAccent
                         : Colors.white70,
@@ -7626,8 +7868,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   IconButton(
                     key: const ValueKey('architect-dimension-new-point'),
                     tooltip: l.architectDimensionNewPoint,
-                    icon: const Icon(
-                      Icons.add_location_alt_outlined,
+                    icon: const BimEditingSymbol(BimEditAction.newPoint,
                       color: Colors.cyanAccent,
                       size: 18,
                     ),
@@ -7841,8 +8082,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ),
                     padding: EdgeInsets.zero,
                     tooltip: l.bimNewPoint,
-                    icon: const Icon(
-                      Icons.add_location_alt_outlined,
+                    icon: const BimEditingSymbol(BimEditAction.newPoint,
                       color: Color(0xFF80CBC4),
                       size: 18,
                     ),
@@ -8218,6 +8458,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _wallDirectionLocked = false;
         _restoreWallType();
         _draftStart = null;
+      _wallArcEnd=null;
         _draftEnd = null;
       });
       _saveBiMProjectIfAttached();
@@ -8537,8 +8778,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _pendingShape = null;
                     _shapePanelAnchor = null;
                     _columnPreviewPoint = null;
+                    _columnPreviewRotation = 0.0;
                     _cursorModel = null;
                     _draftStart = null;
+      _wallArcEnd=null;
                     _draftEnd = null;
                     _wallDirectionLocked = false;
                     _activeMagneticGuides = [];
@@ -8878,8 +9121,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
-                                    Icons.call_merge,
+                                  BimEditingSymbol(BimEditAction.join,
                                     color: Color(0xFF00E5FF),
                                     size: 20,
                                   ),
@@ -9652,6 +9894,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         }),
                       ),
 
+                      if(!_wallCurved)
                       TextButton(
                         key: const ValueKey('wall-dimension-mode'),
                         style: TextButton.styleFrom(
@@ -9690,6 +9933,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           ),
                         ),
                       ),
+                      IconButton(
+                        key:const ValueKey('wall-arc-toggle'),
+                        tooltip:context.l10n.wallArc,
+                        constraints:const BoxConstraints.tightFor(width:36,height:40),padding:EdgeInsets.zero,
+                        icon:Icon(Icons.rounded_corner,color:_wallCurved?Colors.cyanAccent:Colors.white70,size:20),
+                        onPressed:(){_finishChainedWall();setState(()=>_wallCurved=!_wallCurved);},
+                      ),
+                      if(_wallArcEnd!=null) ...[
+                        TextButton(key:const ValueKey('wall-arc-radius'),onPressed:_editDraftArcRadius,child:const Text('R=')),
+                        IconButton(key:const ValueKey('wall-arc-confirm'),tooltip:context.l10n.applyAction,onPressed:_commitWallArc,icon:const Icon(Icons.check,color:Colors.cyanAccent)),
+                      ],
+                      if(!_wallCurved)
                       IconButton(
                         key: const ValueKey('wall-chain-toggle'),
                         constraints: const BoxConstraints.tightFor(
@@ -9735,6 +9990,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           ),
         ),
+      if(_activeTool==ArchitectTool.wall&&_wallCurved&&_effectiveSelection.isEmpty)
+        Positioned(top:60,left:8,right:8,child:IgnorePointer(child:Align(alignment:Alignment.topLeft,child:DecoratedBox(decoration:BoxDecoration(color:const Color(0xDD1E242C),borderRadius:BorderRadius.circular(5)),child:Padding(padding:const EdgeInsets.symmetric(horizontal:8,vertical:4),child:Text(_draftStart==null?context.l10n.wallArcPickStart:_wallArcEnd==null?context.l10n.wallArcPickEnd:context.l10n.wallArcPickThrough,style:const TextStyle(color:Colors.white,fontSize:12))))))),
       if (_activeTool == ArchitectTool.wall)
         AnimatedBuilder(
           animation: Listenable.merge([_viewport, _previewRevision]),
@@ -9812,6 +10069,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _pendingShape = null;
     _shapePanelAnchor = null;
     _draftStart = null;
+      _wallArcEnd=null;
     _draftEnd = null;
     _activeMagneticGuides = [];
     _activeSnapLabel = null;
@@ -9959,6 +10217,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       'Alignment with Point 1' => l10n.snapAlignPoint1,
       '30 cm' => l10n.architectDimensionSnap30cm,
       '40 cm' => l10n.architectDimensionSnap40cm,
+      'Door jamb' => l10n.snapDoorJamb,
+      'Window jamb' => l10n.snapWindowJamb,
       _ => label,
     };
   }
@@ -10019,6 +10279,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 width: _elementTool.columnWidth,
                 depth: _elementTool.columnDepth,
                 shape: _elementTool.columnShape,
+                rotationDeg: _columnPreviewRotation,
+                label: ArchitectElementTool.nextColumnLabel(
+                  _project.storeys.expand((s) => s.columns),
+                ),
               )
             : null,
         activeDraftStart: _activeTool == ArchitectTool.dimension ? null : _draftStart,
@@ -10073,6 +10337,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }(),
         activeWallInsulation: _activeWallType?.insulationThickness,
         activeWallTypeId: _activeWallType?.id,
+        activeWallArcEnd:_wallArcEnd,
+        activeWallLayers:_activeWallType?.resolvedLayers??const [],
         activeSnapLabel: _localizedSnapLabel(_activeSnapLabel),
         selectedElementId: _selectedElementId,
         selectedElementIds: _effectiveSelection,

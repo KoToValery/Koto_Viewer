@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_project.dart';
 import 'architect_wall_network.dart';
+import 'architect_wall_solids.dart';
 import 'architect_stair_mesh.dart';
 
 /// Real-time 3D solid mesh builder for architectural projects.
@@ -27,18 +28,26 @@ class Architect3dBuilder {
         for (final wall in storey.walls)
           wall.copyWith(height: wall.effectiveHeight(storey.height)),
       ];
+      final composed = walls.any((w)=>w.layers.isNotEmpty||w.plinth.enabled||w.isCurved);
+      if(composed) {
+        for(final solid in ArchitectWallSolids.build(storey,project.wallTypes,project:project)) {
+          final first=allTris.length;
+          allTris.addAll(solid.triangles);
+          mark(solid.wall.id,first);
+        }
+      }
       for (final wall in walls) {
         // Add 3D wall geometry with boolean door cutouts
         final first = allTris.length;
         allTris.addAll(
-          wall.build3D(storeyElevation: storey.elevation, sources: sources),
+          wall.build3D(storeyElevation: storey.elevation, sources: sources,includeSolid:!composed,resolveComposition:!composed),
         );
         mark(wall.id, first);
       }
 
       // Fill physical mitres at the same junctions used by the plan view.
       for (final (points, height) in ArchitectWallNetwork.junctions(
-        walls,
+        composed ? const [] : walls,
         solidOnly: true,
       )) {
         const color = Color(0xFFECEFF1);

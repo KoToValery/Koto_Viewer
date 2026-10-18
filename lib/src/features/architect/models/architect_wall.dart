@@ -7,6 +7,9 @@ import 'architect_door.dart';
 import 'architect_elements.dart' show ArchitectCutDisplayMode;
 import 'architect_wall_type.dart';
 import 'architect_window.dart';
+import 'architect_wall_arc.dart';
+import '../rendering/architect_path_solid.dart';
+export 'architect_wall_arc.dart';
 
 /// Legacy left/right retain their saved physical placement.
 enum WallReferenceLine { center, inner, outer, left, right }
@@ -59,6 +62,11 @@ class ArchitectWallAttachment {
 /// Represents an architectural parametric wall with hosted openings (doors/windows).
 class ArchitectWall {
   final String id;
+  final double arcBulge;
+  final List<ArchitectMaterialLayer> layers;
+  final ArchitectWallLocation? location;
+  final bool loadBearing;
+  final ArchitectWallPlinth plinth;
   final Offset startPoint;
   final Offset endPoint;
   final double thickness; // in meters (default 0.25 m = 25 cm)
@@ -81,6 +89,11 @@ class ArchitectWall {
 
   const ArchitectWall({
     required this.id,
+    this.arcBulge = 0,
+    this.layers = const [],
+    this.location,
+    this.loadBearing = false,
+    this.plinth = const ArchitectWallPlinth(),
     required this.startPoint,
     required this.endPoint,
     this.thickness = 0.25,
@@ -129,33 +142,194 @@ class ArchitectWall {
   double effectiveHeight(double storeyHeight) =>
       followStoreyHeight && !isParapet ? storeyHeight : height;
   WallCoreMaterial get coreMaterial =>
+      (layers.isNotEmpty
+          ? WallCoreMaterial.values
+                .where(
+                  (m) =>
+                      m.name ==
+                      layers
+                          .firstWhere((l) => l.role == ArchitectLayerRole.core)
+                          .material
+                          .name,
+                )
+                .firstOrNull
+          : null) ??
       coreMaterialOverride ??
       (wallTypeId == 'bearing_25_concrete'
           ? WallCoreMaterial.concrete
           : WallCoreMaterial.brick);
 
-  double get length => (endPoint - startPoint).distance;
+  bool get isCurved => arcBulge.abs() > 1e-8;
+  ArchitectWallArc? get arc =>
+      isCurved ? ArchitectWallArc(startPoint, endPoint, arcBulge) : null;
+  double get length => arc?.length ?? (endPoint - startPoint).distance;
+  double get centerLineOffset =>
+      centerOffset.dx * normalVector.dx + centerOffset.dy * normalVector.dy;
+  Offset referencePointAt(double ratio) =>
+      arc?.pointAt(ratio) ?? startPoint + (endPoint - startPoint) * ratio;
+  Offset tangentAt(double ratio) => arc?.tangentAt(ratio) ?? unitVector;
+  Offset normalAt(double ratio) {
+    final u = tangentAt(ratio);
+    return Offset(-u.dy, u.dx);
+  }
+
+  Offset centerPointAt(double ratio) =>
+      arc?.pointAt(ratio, leftOffset: centerLineOffset) ??
+      centerStart + unitVector * (length * ratio);
+  (Offset, Offset) openingAxis(double ratio) {
+    final p = centerPointAt(ratio), u = tangentAt(ratio);
+    return (p - u * (length * ratio), p + u * (length * (1 - ratio)));
+  }
+
+  List<Offset> facePolygon(
+    double low,
+    double high, {
+    double from = 0,
+    double to = 1,
+  }) =>
+      arc?.face(
+        low,
+        high,
+        from: from,
+        to: to,
+        envelopeOffset: centerLineOffset.abs() + thickness / 2,
+      ) ??
+      [
+        referencePointAt(from) + normalVector * low,
+        referencePointAt(to) + normalVector * low,
+        referencePointAt(to) + normalVector * high,
+        referencePointAt(from) + normalVector * high,
+      ];
+  void validateGeometry() {
+    if (!arcBulge.isFinite ||
+        arcBulge.abs() > 100 ||
+        (isCurved &&
+            arc!.radius -
+                    math.max(
+                      (centerLineOffset - thickness / 2).abs(),
+                      (centerLineOffset + thickness / 2).abs(),
+                    ) <=
+                .001))
+      throw ArgumentError('Invalid wall arc radius');
+  }
+
+  List<Offset> intersections(ArchitectWall other, {bool finite = true}) {
+    if (isCurved && other.isCurved)
+      return arc!.arcIntersections(other.arc!, finite: finite);
+    if (isCurved)
+      return arc!.lineIntersections(
+        other.startPoint,
+        other.endPoint,
+        finite: finite,
+      );
+    if (other.isCurved)
+      return other.arc!.lineIntersections(startPoint, endPoint, finite: finite);
+    final p = BimLineGeometry.intersection(
+      startPoint,
+      endPoint,
+      other.startPoint,
+      other.endPoint,
+      firstFinite: finite,
+      secondFinite: finite,
+    );
+    return [?p];
+  }
+
+  ArchitectWall withExtendedEnds({Offset? start, Offset? end}) {
+    if (!isCurved) return copyWith(startPoint: start, endPoint: end);
+    final a = start ?? startPoint,
+        b = end ?? endPoint,
+        from = arc!.parameter(a),
+        to = arc!.parameter(b),
+        sweep = arc!.sweep * (to - from);
+    if (sweep.abs() < .000001 ||
+        sweep.abs() >= 2 * math.pi - .0001 ||
+        sweep.sign != arc!.sweep.sign)
+      throw ArgumentError('Invalid arc extension');
+    final result = copyWith(
+      startPoint: a,
+      endPoint: b,
+      arcBulge: math.tan(sweep / 4),
+    );
+    result.validateGeometry();
+    return result;
+  }
 
   static final _standardInsulation = {
     for (final type in ArchitectWallType.standardCatalog())
       type.id: type.insulationThickness,
   };
-  double get insulationThickness =>
-      (insulationThicknessOverride ?? _standardInsulation[wallTypeId] ?? 0)
-          .clamp(0.0, math.max(0.0, thickness - .001));
+  double get insulationThickness => layers.isNotEmpty
+      ? layers
+            .where((l) => l.role == ArchitectLayerRole.insulation)
+            .fold(0.0, (v, l) => v + l.thickness)
+      : (insulationThicknessOverride ?? _standardInsulation[wallTypeId] ?? 0)
+            .clamp(0.0, math.max(0.0, thickness - .001));
   bool get hasInsulation => insulationThickness > 1e-4;
-  bool get isInterior => !hasInsulation;
-  bool get isExterior => hasInsulation;
-  double get coreThickness => thickness - insulationThickness;
+  bool get isLoadBearing =>
+      layers.isEmpty && wallTypeId == 'bearing_25_concrete'
+      ? true
+      : loadBearing;
+  bool get isInterior => !isExterior;
+  bool get isExterior => location == null
+      ? !{'int_12_partition', 'bearing_25_concrete'}.contains(wallTypeId) &&
+            (hasInsulation ||
+                {
+                  'ext_25_brick',
+                  'ext_25_12_eps',
+                  'parapet_12',
+                }.contains(wallTypeId))
+      : location == ArchitectWallLocation.exterior;
+  List<ArchitectMaterialLayer> get resolvedLayers => layers.isNotEmpty
+      ? layers
+      : [
+          if (insulationThickness > 0)
+            ArchitectMaterialLayer(
+              id: 'insulation',
+              material: switch (insulationMaterial) {
+                WallInsulationMaterial.eps => ArchitectMaterial.eps,
+                WallInsulationMaterial.xps => ArchitectMaterial.xps,
+                _ => ArchitectMaterial.stoneWool,
+              },
+              role: ArchitectLayerRole.insulation,
+              thickness: insulationThickness,
+            ),
+          ArchitectMaterialLayer(
+            id: 'core',
+            material: ArchitectMaterial.values.byName(coreMaterial.name),
+            role: ArchitectLayerRole.core,
+            thickness: thickness - insulationThickness,
+          ),
+        ];
+  double get exteriorBuildUp {
+    if (layers.isEmpty) return insulationThickness;
+    return layers
+        .takeWhile((l) => l.role != ArchitectLayerRole.core)
+        .fold(0, (v, l) => v + l.thickness);
+  }
+
+  double get interiorBuildUp {
+    if (layers.isEmpty) return 0;
+    return layers.reversed
+        .takeWhile((l) => l.role != ArchitectLayerRole.core)
+        .fold(0, (v, l) => v + l.thickness);
+  }
+
+  double get coreAsymmetry => exteriorBuildUp - interiorBuildUp;
+  double get coreThickness => layers.isEmpty
+      ? thickness - insulationThickness
+      : layers
+            .where((l) => l.role == ArchitectLayerRole.core)
+            .fold(0.0, (v, l) => v + l.thickness);
   double get exteriorSign => exteriorSide == WallExteriorSide.left ? 1 : -1;
   Offset get exteriorNormal => normalVector * exteriorSign;
   Offset get coreCenterStart =>
-      centerStart - exteriorNormal * insulationThickness / 2;
+      centerStart - normalAt(0) * exteriorSign * coreAsymmetry / 2;
   Offset get coreCenterEnd =>
-      centerEnd - exteriorNormal * insulationThickness / 2;
+      centerEnd - normalAt(1) * exteriorSign * coreAsymmetry / 2;
 
   Offset get unitVector {
-    final len = length;
+    final len = (endPoint - startPoint).distance;
     if (len < 1e-4) return const Offset(1, 0);
     return (endPoint - startPoint) / len;
   }
@@ -168,23 +342,30 @@ class ArchitectWall {
   Offset get centerOffset =>
       normalVector *
       switch (referenceLine) {
-        WallReferenceLine.center => exteriorSign * insulationThickness / 2,
+        WallReferenceLine.center => exteriorSign * coreAsymmetry / 2,
         WallReferenceLine.inner => exteriorSign * thickness / 2,
         WallReferenceLine.outer => -exteriorSign * thickness / 2,
         WallReferenceLine.left => -thickness / 2,
         WallReferenceLine.right => thickness / 2,
       };
-  Offset get centerStart => startPoint + centerOffset;
-  Offset get centerEnd => endPoint + centerOffset;
+  Offset get centerStart => startPoint + normalAt(0) * centerLineOffset;
+  Offset get centerEnd => endPoint + normalAt(1) * centerLineOffset;
 
   /// 4 corner points of the 2D wall polygon.
   List<Offset> get polygonCorners {
-    final n = normalVector * (thickness / 2.0);
-    return [centerStart - n, centerEnd - n, centerEnd + n, centerStart + n];
+    return facePolygon(
+      centerLineOffset - thickness / 2,
+      centerLineOffset + thickness / 2,
+    );
   }
 
   ArchitectWall copyWith({
     String? id,
+    double? arcBulge,
+    List<ArchitectMaterialLayer>? layers,
+    ArchitectWallLocation? location,
+    bool? loadBearing,
+    ArchitectWallPlinth? plinth,
     Offset? startPoint,
     Offset? endPoint,
     double? thickness,
@@ -205,6 +386,11 @@ class ArchitectWall {
     List<ArchitectWindow>? windows,
   }) => ArchitectWall(
     id: id ?? this.id,
+    arcBulge: arcBulge ?? this.arcBulge,
+    layers: layers ?? this.layers,
+    location: location ?? this.location,
+    loadBearing: loadBearing ?? this.loadBearing,
+    plinth: plinth ?? this.plinth,
     startPoint: startPoint ?? this.startPoint,
     endPoint: endPoint ?? this.endPoint,
     thickness: thickness ?? this.thickness,
@@ -230,6 +416,11 @@ class ArchitectWall {
 
   bool connectsAt(Offset point) {
     if (isDetached) return false;
+    if (isCurved) {
+      final r = arc!.parameter(point);
+      return (r.abs() > 1e-7 || connectStart) &&
+          ((r - 1).abs() > 1e-7 || connectEnd);
+    }
     final delta = point - startPoint;
     final along = delta.dx * unitVector.dx + delta.dy * unitVector.dy;
     return (along.abs() >= 1e-8 || connectStart) &&
@@ -237,13 +428,8 @@ class ArchitectWall {
   }
 
   List<Offset> get coreCorners {
-    final n = normalVector * coreThickness / 2;
-    return [
-      coreCenterStart - n,
-      coreCenterEnd - n,
-      coreCenterEnd + n,
-      coreCenterStart + n,
-    ];
+    final offset = centerLineOffset - exteriorSign * coreAsymmetry / 2;
+    return facePolygon(offset - coreThickness / 2, offset + coreThickness / 2);
   }
 
   /// Change the material side without moving the masonry/concrete core.
@@ -253,6 +439,16 @@ class ArchitectWall {
           ? WallExteriorSide.right
           : WallExteriorSide.left,
     );
+    if (isCurved) {
+      final shift =
+          centerLineOffset -
+          exteriorSign * coreAsymmetry / 2 -
+          (flipped.centerLineOffset - flipped.exteriorSign * coreAsymmetry / 2);
+      return flipped.copyWith(
+        startPoint: arc!.pointAt(0, leftOffset: shift),
+        endPoint: arc!.pointAt(1, leftOffset: shift),
+      );
+    }
     final shift = coreCenterStart - flipped.coreCenterStart;
     return flipped.copyWith(
       startPoint: flipped.startPoint + shift,
@@ -278,6 +474,10 @@ class ArchitectWall {
 
   /// Projects a click [point] onto the baseline, returning normalized ratio [0..1] and distance.
   (double ratio, double dist) projectPoint(Offset point) {
+    if (isCurved) {
+      final ratio = arc!.parameter(point);
+      return (ratio, (point - centerPointAt(ratio.clamp(0, 1))).distance);
+    }
     final len = length;
     if (len < 1e-4) return (0.0, (point - startPoint).distance);
     final ratio = BimLineGeometry.parameter(point, centerStart, centerEnd);
@@ -297,6 +497,11 @@ class ArchitectWall {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    if (isCurved) 'arcBulge': arcBulge,
+    'layers': layers.map((l) => l.toJson()).toList(),
+    if (location != null) 'location': location!.name,
+    'loadBearing': loadBearing,
+    'plinth': plinth.toJson(),
     'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'thickness': thickness,
@@ -319,6 +524,21 @@ class ArchitectWall {
 
   factory ArchitectWall.fromJson(Map<String, dynamic> json) => ArchitectWall(
     id: json['id'] as String,
+    arcBulge: (json['arcBulge'] as num?)?.toDouble() ?? 0,
+    layers: (json['layers'] as List? ?? [])
+        .map(
+          (l) => ArchitectMaterialLayer.fromJson(
+            Map<String, dynamic>.from(l as Map),
+          ),
+        )
+        .toList(),
+    location: ArchitectWallLocation.values
+        .where((v) => v.name == json['location'])
+        .firstOrNull,
+    loadBearing: json['loadBearing'] as bool? ?? false,
+    plinth: ArchitectWallPlinth.fromJson(
+      Map<String, dynamic>.from(json['plinth'] as Map? ?? {}),
+    ),
     startPoint: Offset(
       (json['startPoint']['x'] as num).toDouble(),
       (json['startPoint']['y'] as num).toDouble(),
@@ -373,6 +593,108 @@ class ArchitectWall {
         const [],
   );
 
+  Path openingCutoutAt(double heightAboveBase) {
+    final path = Path();
+    for (final op in [
+      ...doors.map((o) => (o.offsetRatio, o.width, o.sillHeight, o.height)),
+      ...windows.map((o) => (o.offsetRatio, o.width, o.sillHeight, o.height)),
+    ]) {
+      if (heightAboveBase <= op.$3 || heightAboveBase >= op.$3 + op.$4)
+        continue;
+      final center = centerPointAt(op.$1),
+          u = tangentAt(op.$1),
+          normal = normalAt(op.$1);
+      final depth =
+          thickness / 2 +
+          (isCurved ? op.$2 * op.$2 / (4 * arc!.radius) : 0) +
+          .001;
+      final a = center - u * (op.$2 / 2),
+          b = center + u * (op.$2 / 2),
+          n = normal * depth;
+      path.addPolygon([a - n, b - n, b + n, a + n], true);
+    }
+    return path;
+  }
+
+  /// Physical material slices, ordered outside to inside and split at the plinth.
+  List<ArchitectWallMaterialSlice> materialSlices(double storeyElevation) {
+    final result = <ArchitectWallMaterialSlice>[];
+    final composition = resolvedLayers;
+    final firstCore = composition.indexWhere(
+      (l) => l.role == ArchitectLayerRole.core,
+    );
+    final z0 = storeyElevation + baseOffset, z1 = z0 + height;
+    var cursor = 0.0;
+    for (var index = 0; index < composition.length; index++) {
+      final layer = composition[index];
+      final shift =
+          exteriorNormal * (thickness / 2 - cursor - layer.thickness / 2);
+      final faceOffset =
+          centerLineOffset +
+          exteriorSign * (thickness / 2 - cursor - layer.thickness / 2);
+      final from =
+              arc?.pointAt(0, leftOffset: faceOffset) ?? centerStart + shift,
+          to = arc?.pointAt(1, leftOffset: faceOffset) ?? centerEnd + shift;
+      final band = plinth.enabled && isExterior && index < firstCore;
+      final breaks = <double>[z0, z1];
+      if (band)
+        for (final z in [
+          plinth.baseElevation,
+          plinth.baseElevation + plinth.height,
+        ]) {
+          if (z > z0 && z < z1) breaks.add(z);
+        }
+      breaks.sort();
+      for (var j = 0; j + 1 < breaks.length; j++) {
+        final bottom = breaks[j], top = breaks[j + 1], mid = (bottom + top) / 2;
+        final inPlinth =
+            band &&
+            mid >= plinth.baseElevation &&
+            mid < plinth.baseElevation + plinth.height;
+        final material = inPlinth
+            ? layer.role == ArchitectLayerRole.insulation
+                  ? ArchitectMaterial.xps
+                  : plinth.finish
+            : layer.material;
+        final segment = copyWith(
+          layers: const [],
+          thickness: layer.thickness,
+          insulationThicknessOverride: 0,
+          startPoint: from,
+          endPoint: to,
+          referenceLine: WallReferenceLine.center,
+          baseOffset: bottom - storeyElevation,
+          height: top - bottom,
+          followStoreyHeight: false,
+          plinth: const ArchitectWallPlinth(),
+          doors: [
+            for (final d in doors)
+              d.copyWith(sillHeight: d.sillHeight + z0 - bottom),
+          ],
+          windows: [
+            for (final w in windows)
+              w.copyWith(sillHeight: w.sillHeight + z0 - bottom),
+          ],
+        );
+        result.add(
+          ArchitectWallMaterialSlice(
+            segment,
+            material,
+            layer.id,
+            surfaceFinish:
+                inPlinth &&
+                    index == 0 &&
+                    layer.role == ArchitectLayerRole.insulation
+                ? plinth.finish
+                : null,
+          ),
+        );
+      }
+      cursor += layer.thickness;
+    }
+    return result;
+  }
+
   // ===========================================================================
   // 3D SOLID WALL EXTRUSION WITH BOOLEAN CUTOUTS
   // ===========================================================================
@@ -381,7 +703,57 @@ class ArchitectWall {
   List<Triangle3D> build3D({
     required double storeyElevation,
     Map<Triangle3D, String>? sources,
+    bool resolveComposition = true,
+    bool includeSolid = true,
+    bool includeOpeningMeshes = true,
+    Color? solidColor,
   }) {
+    if (resolveComposition && (layers.isNotEmpty || plinth.enabled)) {
+      return [
+        if (includeSolid)
+          for (final part in materialSlices(storeyElevation))
+            ...part.build3D(storeyElevation),
+        if (includeOpeningMeshes)
+          ...build3D(
+            storeyElevation: storeyElevation,
+            sources: sources,
+            resolveComposition: false,
+            includeSolid: false,
+          ),
+      ];
+    }
+    if (isCurved && includeSolid) {
+      final bottom = storeyElevation + baseOffset, top = bottom + height;
+      final breaks = <double>{bottom, top};
+      for (final op in [
+        ...doors.map((o) => (o.sillHeight, o.height)),
+        ...windows.map((o) => (o.sillHeight, o.height)),
+      ])
+        for (final z in [bottom + op.$1, bottom + op.$1 + op.$2]) {
+          if (z > bottom && z < top) breaks.add(z);
+        }
+      final levels = breaks.toList()..sort();
+      return [
+        for (var i = 0; i + 1 < levels.length; i++)
+          ...ArchitectPathSolid.extrude(
+            Path.combine(
+              PathOperation.difference,
+              Path()..addPolygon(polygonCorners, true),
+              openingCutoutAt((levels[i] + levels[i + 1]) / 2 - bottom),
+            ),
+            levels[i],
+            levels[i + 1],
+            solidColor ?? const Color(0xFFECEFF1),
+          ),
+        if (includeOpeningMeshes)
+          ...build3D(
+            storeyElevation: storeyElevation,
+            sources: sources,
+            resolveComposition: false,
+            includeSolid: false,
+          ),
+      ];
+    }
     final List<Triangle3D> tris = [];
     final len = length;
     if (len < 1e-4) return tris;
@@ -390,7 +762,7 @@ class ArchitectWall {
     final n = normalVector;
     final halfThick = thickness / 2.0;
 
-    const wallColor = Color(0xFFECEFF1);
+    final wallColor = solidColor ?? const Color(0xFFECEFF1);
     final zBottom = storeyElevation + baseOffset;
     final zTop = zBottom + height;
 
@@ -401,6 +773,9 @@ class ArchitectWall {
       double zMin,
       double zMax,
     ) {
+      if (!includeSolid) return;
+      zMin = math.max(zMin, zBottom);
+      zMax = math.min(zMax, zTop);
       if (endAlong <= startAlong + 1e-4 || zMax <= zMin + 1e-4) return;
       final a = centerStart + u * startAlong;
       final b = centerStart + u * endAlong;
@@ -467,11 +842,12 @@ class ArchitectWall {
         height: d.height,
         sillHeight: d.sillHeight,
         build3DTris: () => d.build3D(
-          wallStart: centerStart,
-          wallEnd: centerEnd,
+          wallStart: openingAxis(d.offsetRatio).$1,
+          wallEnd: openingAxis(d.offsetRatio).$2,
           wallThickness: thickness,
           storeyElevation: storeyElevation + baseOffset,
           coreThickness: coreThickness,
+          coreCenterShift: -exteriorSign * coreAsymmetry / 2,
           insulationThickness: insulationThickness,
           exteriorSign: exteriorSign.toDouble(),
         ),
@@ -486,11 +862,12 @@ class ArchitectWall {
         height: w.height,
         sillHeight: w.sillHeight,
         build3DTris: () => w.build3D(
-          wallStart: centerStart,
-          wallEnd: centerEnd,
+          wallStart: openingAxis(w.offsetRatio).$1,
+          wallEnd: openingAxis(w.offsetRatio).$2,
           wallThickness: thickness,
           storeyElevation: storeyElevation + baseOffset,
           coreThickness: coreThickness,
+          coreCenterShift: -exteriorSign * coreAsymmetry / 2,
           insulationThickness: insulationThickness,
           exteriorSign: exteriorSign.toDouble(),
         ),
@@ -522,7 +899,9 @@ class ArchitectWall {
       }
 
       // 4. Opening mesh elements
-      final openingMesh = op.build3DTris();
+      final openingMesh = includeOpeningMeshes
+          ? op.build3DTris()
+          : <Triangle3D>[];
       tris.addAll(openingMesh);
       if (sources != null) {
         for (final t in openingMesh) {
@@ -539,5 +918,47 @@ class ArchitectWall {
     }
 
     return tris;
+  }
+}
+
+class ArchitectWallMaterialSlice {
+  final ArchitectWall wall;
+  final ArchitectMaterial material;
+  final String layerId;
+  final ArchitectMaterial? surfaceFinish;
+  const ArchitectWallMaterialSlice(
+    this.wall,
+    this.material,
+    this.layerId, {
+    this.surfaceFinish,
+  });
+  List<Triangle3D> build3D(double elevation) {
+    final triangles = wall.build3D(
+      storeyElevation: elevation,
+      resolveComposition: false,
+      includeOpeningMeshes: false,
+      solidColor: material.color,
+    );
+    if (surfaceFinish == null) return triangles;
+    final n = wall.exteriorNormal,
+        face = wall.centerStart + n * wall.thickness / 2;
+    bool outside(Vector3 v) =>
+        ((Offset(v.x, v.y) - face).dx * n.dx +
+                (Offset(v.x, v.y) - face).dy * n.dy)
+            .abs() <
+        1e-8;
+    return [
+      for (final t in triangles)
+        if (outside(t.v0) && outside(t.v1) && outside(t.v2))
+          Triangle3D(
+            v0: t.v0,
+            v1: t.v1,
+            v2: t.v2,
+            color: surfaceFinish!.color,
+            isDoubleSided: t.isDoubleSided,
+          )
+        else
+          t,
+    ];
   }
 }

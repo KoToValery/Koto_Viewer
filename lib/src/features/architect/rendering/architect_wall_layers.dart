@@ -7,6 +7,7 @@ import 'architect_wall_network.dart';
 /// Insulation follows the explicit exterior side. All layers retain the
 /// original reference nodes, so their faces share the same mitred junctions.
 class ArchitectWallLayers {
+  final List<ArchitectWallMaterialRegion> materials;
   final Path body;
   final Path core;
   final Path insulation;
@@ -20,6 +21,7 @@ class ArchitectWallLayers {
     Path? uncutBody,
     this.walls = const [],
     this.coreRegions = const {},
+    this.materials = const [],
   }) : uncutBody = uncutBody ?? Path();
   static final _cache = Expando<ArchitectWallLayers>();
   static final _defaults = {
@@ -31,12 +33,14 @@ class ArchitectWallLayers {
         project.activeStorey.walls,
         project.wallTypes,
         cutPlaneHeight: project.activeStorey.cutPlaneHeight,
+        storeyElevation: project.activeStorey.elevation,
       );
 
   static ArchitectWallLayers build(
     List<ArchitectWall> walls,
     List<ArchitectWallType> types, {
     double cutPlaneHeight = 1.20,
+    double storeyElevation = 0,
   }) {
     final catalog = {..._defaults, for (final type in types) type.id: type};
     final cutWalls = walls.where((w) => w.isCutAt(cutPlaneHeight)).toList();
@@ -53,15 +57,30 @@ class ArchitectWallLayers {
       final offset =
           wall.centerOffset.dx * wall.normalVector.dx +
           wall.centerOffset.dy * wall.normalVector.dy;
+      final outside = wall.layers.isEmpty ? insulation : wall.exteriorBuildUp;
+      final inside = wall.layers.isEmpty ? 0.0 : wall.interiorBuildUp;
       faces[wall.id] = (
-        offset - wall.thickness / 2 + (wall.exteriorSign < 0 ? insulation : 0),
-        offset + wall.thickness / 2 - (wall.exteriorSign > 0 ? insulation : 0),
+        offset -
+            wall.thickness / 2 +
+            (wall.exteriorSign < 0 ? outside : inside),
+        offset +
+            wall.thickness / 2 -
+            (wall.exteriorSign > 0 ? outside : inside),
       );
     }
-    final body = ArchitectWallNetwork.body(cutWalls);
-    final core = ArchitectWallNetwork.body(cutWalls, faceOffsets: faces);
+    var body = ArchitectWallNetwork.body(cutWalls);
+    var core = ArchitectWallNetwork.body(cutWalls, faceOffsets: faces);
+    for (final wall in cutWalls.where((w) => w.isCurved)) {
+      final holes = wall.openingCutoutAt(cutPlaneHeight - wall.baseOffset);
+      body = Path.combine(PathOperation.difference, body, holes);
+      core = Path.combine(PathOperation.difference, core, holes);
+    }
     final rawUncutBody = ArchitectWallNetwork.body(uncutWalls);
-    final uncutBody = Path.combine(PathOperation.difference, rawUncutBody, body);
+    final uncutBody = Path.combine(
+      PathOperation.difference,
+      rawUncutBody,
+      body,
+    );
 
     return ArchitectWallLayers(
       body,
@@ -70,7 +89,118 @@ class ArchitectWallLayers {
       uncutBody: uncutBody,
       walls: cutWalls,
       coreRegions: _partitionCores(cutWalls, faces, core),
+      materials: _materialRegions(
+        cutWalls,
+        body,
+        core,
+        faces,
+        storeyElevation + cutPlaneHeight,
+      ),
     );
+  }
+
+  static List<ArchitectWallMaterialRegion> _materialRegions(
+    List<ArchitectWall> walls,
+    Path body,
+    Path core,
+    Map<String, (double, double)> coreFaces,
+    double elevation,
+  ) {
+    final result = <ArchitectWallMaterialRegion>[];
+    var claimed = Path();
+    final coreOwners = _partitionCores(walls, coreFaces, core);
+    final groups =
+        <
+          String,
+          List<(ArchitectWall, ArchitectMaterialLayer, double, double)>
+        >{};
+    for (final wall in walls) {
+      final layers = wall.resolvedLayers;
+      final firstCore = layers.indexWhere(
+        (l) => l.role == ArchitectLayerRole.core,
+      );
+      final offset =
+          wall.centerOffset.dx * wall.normalVector.dx +
+          wall.centerOffset.dy * wall.normalVector.dy;
+      var cursor = 0.0;
+      for (var i = 0; i < layers.length; i++) {
+        var layer = layers[i];
+        if (wall.plinth.enabled &&
+            wall.isExterior &&
+            i < firstCore &&
+            elevation >= wall.plinth.baseElevation &&
+            elevation < wall.plinth.baseElevation + wall.plinth.height) {
+          layer = layer.copyWith(
+            material: layer.role == ArchitectLayerRole.insulation
+                ? ArchitectMaterial.xps
+                : wall.plinth.finish,
+          );
+        }
+        final a = offset + wall.exteriorSign * (wall.thickness / 2 - cursor);
+        final b = a - wall.exteriorSign * layer.thickness;
+        final key =
+            '${layer.role.name}:${layer.material.name}:${i < firstCore ? 'out' : 'in'}:${layers.take(i).where((l) => l.material == layer.material && l.role == layer.role).length}';
+        groups.putIfAbsent(key, () => []).add((
+          wall,
+          layer,
+          a < b ? a : b,
+          a > b ? a : b,
+        ));
+        cursor += layer.thickness;
+      }
+    }
+    final ordered = groups.values.toList()
+      ..sort((a, b) => a.first.$2.role.index.compareTo(b.first.$2.role.index));
+    for (final group in ordered) {
+      final list = [for (final e in group) e.$1];
+      final faces = {for (final e in group) e.$1.id: (e.$3, e.$4)};
+      final raw = ArchitectWallNetwork.body(list, faceOffsets: faces);
+      final owners = _partitionCores(list, faces, raw);
+      for (final entry in group) {
+        var region = Path.combine(
+          PathOperation.intersect,
+          owners[entry.$1.id]!,
+          body,
+        );
+        if (entry.$2.role == ArchitectLayerRole.core) {
+          region = Path.combine(
+            PathOperation.intersect,
+            region,
+            coreOwners[entry.$1.id]!,
+          );
+        } else {
+          region = Path.combine(PathOperation.difference, region, core);
+        }
+        region = Path.combine(PathOperation.difference, region, claimed);
+        claimed = Path.combine(PathOperation.union, claimed, region);
+        result.add(ArchitectWallMaterialRegion(entry.$1, entry.$2, region));
+      }
+    }
+    // Resolve residual joint wedges to their physical wall owner; never overlap a core.
+    final fullFaces = {
+      for (final w in walls)
+        w.id: (
+          (w.centerOffset.dx * w.normalVector.dx +
+                  w.centerOffset.dy * w.normalVector.dy) -
+              w.thickness / 2,
+          (w.centerOffset.dx * w.normalVector.dx +
+                  w.centerOffset.dy * w.normalVector.dy) +
+              w.thickness / 2,
+        ),
+    };
+    final owners = _partitionCores(walls, fullFaces, body);
+    for (final wall in walls) {
+      final rest = Path.combine(
+        PathOperation.difference,
+        owners[wall.id]!,
+        claimed,
+      );
+      if (rest.getBounds().isEmpty) continue;
+      final layer = wall.resolvedLayers.first;
+      result.add(ArchitectWallMaterialRegion(wall, layer, rest));
+      claimed = Path.combine(PathOperation.union, claimed, rest);
+    }
+    return result;
   }
 
   /// Give each wall its own hatch region. At a junction, the angular bisector
@@ -83,32 +213,23 @@ class ArchitectWallLayers {
     final regions = <String, Path>{};
     for (final wall in walls) {
       final (low, high) = faces[wall.id]!;
-      regions[wall.id] = ArchitectWallNetwork.polygon([
-        wall.startPoint + wall.normalVector * low,
-        wall.endPoint + wall.normalVector * low,
-        wall.endPoint + wall.normalVector * high,
-        wall.startPoint + wall.normalVector * high,
-      ]);
+      regions[wall.id] = ArchitectWallNetwork.polygon(
+        wall.facePolygon(low, high),
+      );
     }
     for (var i = 0; i < walls.length; i++) {
       final a = walls[i];
       for (final b in walls.skip(i + 1)) {
-        if (!Rect.fromPoints(a.startPoint, a.endPoint)
+        if (!(ArchitectWallNetwork.polygon(a.polygonCorners).getBounds())
             .inflate(a.thickness * 4)
             .overlaps(
-              Rect.fromPoints(
-                b.startPoint,
-                b.endPoint,
-              ).inflate(b.thickness * 4),
+              ArchitectWallNetwork.polygon(
+                b.polygonCorners,
+              ).getBounds().inflate(b.thickness * 4),
             )) {
           continue;
         }
-        final node = ArchitectWallNetwork.intersection(
-          a.startPoint,
-          a.endPoint,
-          b.startPoint,
-          b.endPoint,
-        );
+        final node = a.intersections(b, finite: false).firstOrNull;
         if (node == null) continue;
         for (final (polygon, _) in ArchitectWallNetwork.junctions([
           a,
@@ -174,4 +295,11 @@ class ArchitectWallLayers {
     }
     return result;
   }
+}
+
+class ArchitectWallMaterialRegion {
+  final ArchitectWall wall;
+  final ArchitectMaterialLayer layer;
+  final Path path;
+  const ArchitectWallMaterialRegion(this.wall, this.layer, this.path);
 }

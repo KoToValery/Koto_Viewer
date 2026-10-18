@@ -145,20 +145,47 @@ class ArchitectElementTool extends ChangeNotifier {
   (ArchitectStorey, ArchitectColumn) placeColumn({
     required ArchitectStorey storey,
     required Offset point,
+    double rotationDeg = 0.0,
+    String? label,
+    Iterable<ArchitectColumn>? existingColumns,
   }) {
     final now = ArchitectElementId.next('element');
+    final effectiveExisting = existingColumns ?? storey.columns;
+    final colLabel = label ?? nextColumnLabel(effectiveExisting);
     final newColumn = ArchitectColumn(
       id: 'col_$now',
       position: point,
       shape: columnShape,
       width: columnWidth,
       depth: columnDepth,
+      rotationDeg: rotationDeg,
+      label: colLabel,
     );
 
     return (
       storey.copyWith(columns: [...storey.columns, newColumn]),
       newColumn,
     );
+  }
+
+  /// Calculates the next sequential column label (e.g. C1, C2, C3 or K1, K2...).
+  static String nextColumnLabel(Iterable<ArchitectColumn> existing) {
+    var maxNum = 0;
+    String prefix = 'C';
+    final regex = RegExp(r'^([A-Za-zА-Яа-я]+)?(\d+)$');
+    for (final col in existing) {
+      final m = regex.firstMatch(col.label.trim());
+      if (m != null) {
+        if (m.group(1) != null && m.group(1)!.isNotEmpty) {
+          prefix = m.group(1)!;
+        }
+        final val = int.tryParse(m.group(2)!);
+        if (val != null && val > maxNum) {
+          maxNum = val;
+        }
+      }
+    }
+    return '$prefix${maxNum + 1}';
   }
 
   // ===========================================================================
@@ -458,8 +485,8 @@ class ArchitectElementTool extends ChangeNotifier {
       for (final win in wall.windows) {
         if (win.containsPoint(
           point,
-          wallStart: wall.centerStart,
-          wallEnd: wall.centerEnd,
+          wallStart: wall.openingAxis(win.offsetRatio).$1,
+          wallEnd: wall.openingAxis(win.offsetRatio).$2,
           wallThickness: wall.thickness,
           tolerance: tolerance,
         )) {
@@ -469,8 +496,8 @@ class ArchitectElementTool extends ChangeNotifier {
       for (final door in wall.doors) {
         if (door.containsPoint(
           point,
-          wallStart: wall.centerStart,
-          wallEnd: wall.centerEnd,
+          wallStart: wall.openingAxis(door.offsetRatio).$1,
+          wallEnd: wall.openingAxis(door.offsetRatio).$2,
           wallThickness: wall.thickness,
           tolerance: tolerance,
         )) {
@@ -856,6 +883,9 @@ class ArchitectElementTool extends ChangeNotifier {
       newWalls[wallIndex] = wall.copyWith(
         startPoint: wall.endPoint,
         endPoint: wall.startPoint,
+        arcBulge:-wall.arcBulge,
+        doors:[for(final d in wall.doors)d.copyWith(offsetRatio:1-d.offsetRatio,isHingeLeft:!d.isHingeLeft)],
+        windows:[for(final w in wall.windows)w.copyWith(offsetRatio:1-w.offsetRatio)],
       );
       return storey.copyWith(walls: newWalls);
     }

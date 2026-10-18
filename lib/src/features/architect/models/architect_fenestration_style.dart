@@ -682,6 +682,7 @@ class ArchitectFenestrationStyle {
     required double wallThickness,
     required double coreThickness,
     required double insulationThickness,
+    double? coreCenterShift,
     required double exteriorSign, // +1 or -1 along normal vector towards exterior
     required double offsetRatio,
     required double elementWidth,
@@ -689,6 +690,7 @@ class ArchitectFenestrationStyle {
     required double elementSillHeight,
     required double zoomScale,
     bool isSelected = false,
+    bool wallGeometryProvided = false,
     bool showDimensions = true,
   }) {
     final wallVec = wallEnd - wallStart;
@@ -740,9 +742,10 @@ class ArchitectFenestrationStyle {
       ..lineTo(pRightBase.dx + n.dx * halfWallThick, pRightBase.dy + n.dy * halfWallThick)
       ..lineTo(pLeftBase.dx + n.dx * halfWallThick, pLeftBase.dy + n.dy * halfWallThick)
       ..close();
-    canvas.drawPath(openingPath, openingCutPaint);
+    if(!wallGeometryProvided)canvas.drawPath(openingPath, openingCutPaint);
 
     // 2. Wall jamb edges (Линии на зида при светлия отвор)
+    if(!wallGeometryProvided) {
     canvas.drawLine(
       pLeftBase - n * halfWallThick,
       pLeftBase + n * halfWallThick,
@@ -754,10 +757,11 @@ class ArchitectFenestrationStyle {
       framePaint,
     );
 
+    }
     // 3. Frame Positioning: Center in masonry core (5-chamber depth = 70 mm)
     // Frame center is offset along normal by (exteriorSign * (wallThickness - coreThickness)/2) if asymmetric
-    final coreCenterShift = (wallThickness - coreThickness) / 2.0 * (-exteriorSign);
-    final frameCenter = centerPos + n * coreCenterShift;
+    final resolvedCoreShift = coreCenterShift ?? (wallThickness - coreThickness) / 2.0 * (-exteriorSign);
+    final frameCenter = centerPos + n * resolvedCoreShift;
     final halfFrameDepth = frameDepth / 2.0;
 
     // Draw Left and Right Frame Jambs (Каса: frameFaceWidth x frameDepth)

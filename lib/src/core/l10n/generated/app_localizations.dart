@@ -8855,6 +8855,18 @@ abstract class AppLocalizations {
   /// **'Merge'**
   String get snapMerge;
 
+  /// Snap label for door jamb alignment
+  ///
+  /// In en, this message translates to:
+  /// **'Door jamb'**
+  String get snapDoorJamb;
+
+  /// Snap label for window jamb alignment
+  ///
+  /// In en, this message translates to:
+  /// **'Window jamb'**
+  String get snapWindowJamb;
+
   /// Door threshold sill none chip
   ///
   /// In en, this message translates to:
@@ -11126,7 +11138,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectWizardHeight.
   ///
   /// In en, this message translates to:
-  /// **'Height'**
+  /// **'H='**
   String get architectWizardHeight;
 
   /// No description provided for @architectWizardStoreyHeightHelp.
@@ -11152,6 +11164,294 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create'**
   String get architectWizardCreateShort;
+
+  /// No description provided for @architectWizardHeightReference.
+  ///
+  /// In en, this message translates to:
+  /// **'finished floor → finished floor'**
+  String get architectWizardHeightReference;
+
+  /// No description provided for @architectWallConcreteCode.
+  ///
+  /// In en, this message translates to:
+  /// **'RC {thickness}'**
+  String architectWallConcreteCode(String thickness);
+
+  /// No description provided for @architectWallParapetCode.
+  ///
+  /// In en, this message translates to:
+  /// **'P {thickness}'**
+  String architectWallParapetCode(String thickness);
+
+  /// No description provided for @architectWallTypeThicknessHint.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} · {thickness} cm'**
+  String architectWallTypeThicknessHint(String name, String thickness);
+
+  /// No description provided for @architectWallQuickCore.
+  ///
+  /// In en, this message translates to:
+  /// **'Core'**
+  String get architectWallQuickCore;
+
+  /// No description provided for @architectWallQuickInsulation.
+  ///
+  /// In en, this message translates to:
+  /// **'Insulation'**
+  String get architectWallQuickInsulation;
+
+  /// No description provided for @architectWallInvalidThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid thickness.'**
+  String get architectWallInvalidThickness;
+
+  /// No description provided for @architectWallQuickThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Thickness'**
+  String get architectWallQuickThickness;
+
+  /// No description provided for @wallTypesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall types'**
+  String get wallTypesTitle;
+
+  /// No description provided for @wallNewType.
+  ///
+  /// In en, this message translates to:
+  /// **'New type'**
+  String get wallNewType;
+
+  /// No description provided for @wallCompositionName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get wallCompositionName;
+
+  /// No description provided for @wallLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Use'**
+  String get wallLocation;
+
+  /// No description provided for @wallExterior.
+  ///
+  /// In en, this message translates to:
+  /// **'Exterior'**
+  String get wallExterior;
+
+  /// No description provided for @wallInterior.
+  ///
+  /// In en, this message translates to:
+  /// **'Interior'**
+  String get wallInterior;
+
+  /// No description provided for @wallBearing.
+  ///
+  /// In en, this message translates to:
+  /// **'Load-bearing'**
+  String get wallBearing;
+
+  /// No description provided for @wallLayerCore.
+  ///
+  /// In en, this message translates to:
+  /// **'Core'**
+  String get wallLayerCore;
+
+  /// No description provided for @wallLayerInsulation.
+  ///
+  /// In en, this message translates to:
+  /// **'Insulation'**
+  String get wallLayerInsulation;
+
+  /// No description provided for @wallLayerFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get wallLayerFinish;
+
+  /// No description provided for @wallLayerRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Layer role'**
+  String get wallLayerRole;
+
+  /// No description provided for @wallLayerAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add layer'**
+  String get wallLayerAdd;
+
+  /// No description provided for @wallLayerUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get wallLayerUp;
+
+  /// No description provided for @wallLayerDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get wallLayerDown;
+
+  /// No description provided for @wallLayerOutsideInside.
+  ///
+  /// In en, this message translates to:
+  /// **'Outside → inside'**
+  String get wallLayerOutsideInside;
+
+  /// No description provided for @wallLayerSides.
+  ///
+  /// In en, this message translates to:
+  /// **'A → B'**
+  String get wallLayerSides;
+
+  /// No description provided for @wallLayerInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Use positive thicknesses and a continuous core.'**
+  String get wallLayerInvalid;
+
+  /// No description provided for @wallSelectedScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected walls only'**
+  String get wallSelectedScope;
+
+  /// No description provided for @wallTypeApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to type ({count})'**
+  String wallTypeApply(int count);
+
+  /// No description provided for @wallTypeReplacement.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace with'**
+  String get wallTypeReplacement;
+
+  /// No description provided for @wallTypeInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a replacement for the walls using this type.'**
+  String get wallTypeInUse;
+
+  /// No description provided for @wallCompositionAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Layers'**
+  String get wallCompositionAction;
+
+  /// No description provided for @wallManageTypes.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage types'**
+  String get wallManageTypes;
+
+  /// No description provided for @wallMaterialPlaster.
+  ///
+  /// In en, this message translates to:
+  /// **'Plaster'**
+  String get wallMaterialPlaster;
+
+  /// No description provided for @wallMaterialRender.
+  ///
+  /// In en, this message translates to:
+  /// **'Facade render'**
+  String get wallMaterialRender;
+
+  /// No description provided for @wallMaterialBoard.
+  ///
+  /// In en, this message translates to:
+  /// **'Plasterboard'**
+  String get wallMaterialBoard;
+
+  /// No description provided for @wallMaterialStone.
+  ///
+  /// In en, this message translates to:
+  /// **'Stone'**
+  String get wallMaterialStone;
+
+  /// No description provided for @wallPlinth.
+  ///
+  /// In en, this message translates to:
+  /// **'Plinth'**
+  String get wallPlinth;
+
+  /// No description provided for @wallPlinthFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get wallPlinthFinish;
+
+  /// No description provided for @wallPlinthBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Base elevation (m)'**
+  String get wallPlinthBase;
+
+  /// No description provided for @wallPlinthBaseHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Project elevation of the bottom edge; H is measured upwards.'**
+  String get wallPlinthBaseHelp;
+
+  /// No description provided for @wallAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get wallAdvanced;
+
+  /// No description provided for @wallTypeCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy type'**
+  String get wallTypeCopy;
+
+  /// No description provided for @wallMixedValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Mixed'**
+  String get wallMixedValue;
+
+  /// No description provided for @wallArc.
+  ///
+  /// In en, this message translates to:
+  /// **'Arc wall'**
+  String get wallArc;
+
+  /// No description provided for @wallArcPickEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the end of the arc'**
+  String get wallArcPickEnd;
+
+  /// No description provided for @wallArcPickThrough.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a point on the arc'**
+  String get wallArcPickThrough;
+
+  /// No description provided for @wallArcInvalidRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Radius is too small for this wall.'**
+  String get wallArcInvalidRadius;
+
+  /// No description provided for @wallArcPickStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the start of the arc'**
+  String get wallArcPickStart;
+
+  /// No description provided for @wallPlinthEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get wallPlinthEnabled;
 }
 
 class _AppLocalizationsDelegate

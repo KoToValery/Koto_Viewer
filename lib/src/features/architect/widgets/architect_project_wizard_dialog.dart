@@ -397,6 +397,7 @@ class _ArchitectProjectWizardDialogState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Tooltip(
@@ -408,7 +409,16 @@ class _ArchitectProjectWizardDialogState
               Expanded(
                 child: Tooltip(
                   message: l.architectWizardStoreyHeightHelp,
-                  child: Text('${l.architectWizardHeight} (${_unit.symbol})'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${l.architectWizardHeight} (${_unit.symbol})'),
+                      Text(
+                        l.architectWizardHeightReference,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

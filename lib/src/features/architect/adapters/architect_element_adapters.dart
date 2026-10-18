@@ -221,11 +221,11 @@ class ArchitectWallEditingAdapter extends BimElementAdapter<ArchitectWall> {
   }) => BimElementSnapshot(
     reference: reference,
     kind: BimEditingGeometryKind.line,
-    anchor: (source.startPoint + source.endPoint) / 2,
+    anchor: source.referencePointAt(.5),
     outline: source.polygonCorners,
     referenceLines: [
-      (source.startPoint, source.endPoint),
-      (source.coreCenterStart, source.coreCenterEnd),
+      if(!source.isCurved) ...[(source.startPoint,source.endPoint),(source.coreCenterStart,source.coreCenterEnd)]
+      else ...[for(var i=0;i<32;i++)(source.referencePointAt(i/32),source.referencePointAt((i+1)/32))],
     ],
     capabilities: {
       BimEditingCapability.translate,

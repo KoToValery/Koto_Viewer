@@ -124,8 +124,10 @@ class ArchitectWindow {
     required double wallThickness,
     required double zoomScale,
     bool isSelected = false,
+    bool wallGeometryProvided = false,
     double coreThickness = 0.25,
     double insulationThickness = 0.0,
+    double? coreCenterShift,
     double exteriorSign = 1.0,
   }) {
     final wallVec = wallEnd - wallStart;
@@ -147,11 +149,13 @@ class ArchitectWindow {
       effectiveStyle.paintPlan2D(
         palette: palette,
         canvas: canvas,
+        wallGeometryProvided:wallGeometryProvided,
         wallStart: wallStart,
         wallEnd: wallEnd,
         wallThickness: wallThickness,
         coreThickness: coreThickness,
         insulationThickness: insulationThickness,
+        coreCenterShift: coreCenterShift,
         exteriorSign: exteriorSign,
         offsetRatio: offsetRatio,
         elementWidth: width,
@@ -207,9 +211,10 @@ class ArchitectWindow {
       )
       ..lineTo(pLeftBase.dx + n.dx * halfThick, pLeftBase.dy + n.dy * halfThick)
       ..close();
-    canvas.drawPath(openingPath, openingCutPaint);
+    if(!wallGeometryProvided)canvas.drawPath(openingPath, openingCutPaint);
 
     // 2. Window jamb lines
+    if(!wallGeometryProvided) {
     canvas.drawLine(
       pLeftBase - n * halfThick,
       pLeftBase + n * halfThick,
@@ -221,6 +226,7 @@ class ArchitectWindow {
       framePaint,
     );
 
+    }
     ArchitectOpeningPlanPainter.paintWindowSill(
       canvas: canvas,
       center: centerPos,
@@ -338,6 +344,7 @@ class ArchitectWindow {
     required double storeyElevation,
     double coreThickness = 0.25,
     double insulationThickness = 0.0,
+    double? coreCenterShift,
     double exteriorSign = 1.0,
   }) {
     final effectiveStyle = resolvedStyle;
@@ -349,6 +356,7 @@ class ArchitectWindow {
         wallThickness: wallThickness,
         coreThickness: coreThickness,
         insulationThickness: insulationThickness,
+        coreCenterShift: coreCenterShift,
         exteriorSign: exteriorSign,
         offsetRatio: offsetRatio,
         width: width,
