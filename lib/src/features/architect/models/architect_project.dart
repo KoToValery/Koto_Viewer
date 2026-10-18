@@ -56,6 +56,7 @@ class ArchitectStorey {
   final List<ArchitectAnnotation> annotations;
   final List<ArchitectCadPrimitive> cadPrimitives;
   final Offset? zoneScheduleOrigin;
+  final bool isRoof;
 
   const ArchitectStorey({
     required this.id,
@@ -64,6 +65,7 @@ class ArchitectStorey {
     this.height = 2.80,
     this.cutPlaneHeight = 1.20,
     this.floorFinishThickness = 0.05,
+    this.isRoof = false,
     this.walls = const [],
     this.zones = const [],
     this.columns = const [],
@@ -92,6 +94,7 @@ class ArchitectStorey {
     double? height,
     double? cutPlaneHeight,
     double? floorFinishThickness,
+    bool? isRoof,
     List<ArchitectWall>? walls,
     List<ArchitectZone>? zones,
     List<ArchitectColumn>? columns,
@@ -113,6 +116,7 @@ class ArchitectStorey {
     height: height ?? this.height,
     cutPlaneHeight: cutPlaneHeight ?? this.cutPlaneHeight,
     floorFinishThickness: floorFinishThickness ?? this.floorFinishThickness,
+    isRoof: isRoof ?? this.isRoof,
     walls: height == null
         ? (walls ?? this.walls)
         : [
@@ -142,6 +146,7 @@ class ArchitectStorey {
     'height': height,
     'cutPlaneHeight': cutPlaneHeight,
     'floorFinishThickness': floorFinishThickness,
+    if (isRoof) 'isRoof': true,
     'walls': walls
         .map((w) => w.copyWith(height: w.effectiveHeight(height)).toJson())
         .toList(),
@@ -173,6 +178,7 @@ class ArchitectStorey {
     cutPlaneHeight: (json['cutPlaneHeight'] as num?)?.toDouble() ?? 1.20,
     floorFinishThickness:
         (json['floorFinishThickness'] as num?)?.toDouble() ?? 0.05,
+    isRoof: json['isRoof'] as bool? ?? false,
     walls:
         (json['walls'] as List<dynamic>?)
             ?.map(
@@ -312,6 +318,70 @@ class ArchitectProject {
   /// All doors across all storeys in this project.
   Iterable<ArchitectDoor> get allDoors =>
       storeys.expand((s) => s.walls).expand((w) => w.doors);
+
+  /// The dedicated roof lines plan storey, if present.
+  ArchitectStorey? get roofStorey =>
+      storeys.where((s) => s.isRoof).firstOrNull;
+
+  /// The highest non-roof storey with walls (or highest non-roof storey).
+  ArchitectStorey? get highestWallStorey {
+    final withWalls =
+        storeys.where((s) => !s.isRoof && s.walls.isNotEmpty).toList();
+    if (withWalls.isNotEmpty) {
+      withWalls.sort((a, b) => a.elevation.compareTo(b.elevation));
+      return withWalls.last;
+    }
+    final normal = storeys.where((s) => !s.isRoof).toList();
+    if (normal.isNotEmpty) {
+      normal.sort((a, b) => a.elevation.compareTo(b.elevation));
+      return normal.last;
+    }
+    return storeys.firstOrNull;
+  }
+
+  /// Storeys ordered for the plan menu / tabs:
+  /// The roof lines plan always sits at the very top (index 0),
+  /// followed by storeys sorted from highest elevation down to lowest.
+  List<ArchitectStorey> get orderedPlanStoreys {
+    final normal = storeys.where((s) => !s.isRoof).toList()
+      ..sort((a, b) => b.elevation.compareTo(a.elevation));
+    final roof = roofStorey;
+    if (roof == null) return normal;
+    return [roof, ...normal];
+  }
+
+  /// Ensures a dedicated roof plan storey exists on top of all storeys.
+  ArchitectProject ensureRoofStorey() {
+    if (roofStorey != null) return syncRoofElevation();
+    final top = highestWallStorey ?? (storeys.isNotEmpty ? storeys.last : null);
+    final elev = top != null ? (top.elevation + top.height) : 2.80;
+    final roof = ArchitectStorey(
+      id: 'storey_roof',
+      name: 'Покривни линии',
+      elevation: elev,
+      height: 2.80,
+      isRoof: true,
+    );
+    return copyWith(storeys: [...storeys, roof]);
+  }
+
+  /// Synchronizes the elevation of the roof storey so it always floats above the highest normal storey.
+  ArchitectProject syncRoofElevation() {
+    final roof = roofStorey;
+    if (roof == null) return this;
+    final normal = storeys.where((s) => !s.isRoof).toList();
+    if (normal.isEmpty) return this;
+    normal.sort((a, b) => a.elevation.compareTo(b.elevation));
+    final top = normal.last;
+    final target = top.elevation + top.height;
+    if ((roof.elevation - target).abs() < 1e-4) return this;
+    return copyWith(
+      storeys: [
+        for (final s in storeys)
+          s.isRoof ? s.copyWith(elevation: target) : s,
+      ],
+    );
+  }
 
   static const _emptyStorey = ArchitectStorey(
     id: 'default',
@@ -497,6 +567,15 @@ class ArchitectProject {
       );
       currentElevation += h;
     }
+    storeys.add(
+      ArchitectStorey(
+        id: 'storey_roof',
+        name: 'Покривни линии',
+        elevation: currentElevation,
+        height: 2.80,
+        isRoof: true,
+      ),
+    );
 
     final preset = gridPreset ?? ArchitectGridPreset.standardPresets().first;
     final axes = preset.generateAxes(
@@ -561,6 +640,15 @@ class ArchitectProject {
       );
       currentElevation += h;
     }
+    storeys.add(
+      ArchitectStorey(
+        id: 'storey_roof',
+        name: 'Покривни линии',
+        elevation: currentElevation,
+        height: 2.80,
+        isRoof: true,
+      ),
+    );
 
     final axes = <StructuralGridAxis>[];
     if (axesX > 0 && axesY > 0) {

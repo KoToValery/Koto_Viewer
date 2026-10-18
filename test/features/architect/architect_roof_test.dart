@@ -5,6 +5,7 @@ import 'package:kotoview/src/features/architect/models/architect_section.dart';
 import 'package:kotoview/src/features/architect/models/architect_slab_assembly.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_canvas_palette.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_roof_painter_helper.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_snap_geometry.dart';
 import 'package:kotoview/src/features/architect/services/architect_building_section.dart';
@@ -695,6 +696,175 @@ void main() {
       );
       final rbBounds = rbRegion.path.getBounds();
       expect(wallBounds.bottom, closeTo(rbBounds.top, 0.01));
+    });
+  });
+
+  group('Roof Lines Plan & Multi-Level Setback Roof Representation', () {
+    test('orderedPlanStoreys always positions the roof lines plan at index 0 and adapts above new storeys', () {
+      const s0 = ArchitectStorey(
+        id: 's0',
+        name: 'Ground',
+        elevation: 0.0,
+        height: 3.0,
+      );
+      const s1 = ArchitectStorey(
+        id: 's1',
+        name: 'Floor 1',
+        elevation: 3.0,
+        height: 3.0,
+      );
+      final project = ArchitectProject(
+        id: 'p_plan',
+        name: 'Plan Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: const [s0, s1],
+        activeStoreyId: 's0',
+      ).ensureRoofStorey();
+
+      // Roof lines storey exists and sits at the very top (index 0)
+      expect(project.roofStorey, isNotNull);
+      expect(project.roofStorey!.isRoof, isTrue);
+      expect(project.orderedPlanStoreys.first.id, project.roofStorey!.id);
+      expect(project.roofStorey!.elevation, closeTo(6.0, 1e-4));
+
+      // Add a new higher storey (+6.00)
+      const s2 = ArchitectStorey(
+        id: 's2',
+        name: 'Floor 2',
+        elevation: 6.0,
+        height: 2.80,
+      );
+      final updatedProject = project.copyWith(
+        storeys: [...project.storeys, s2],
+      ).syncRoofElevation();
+
+      // Roof lines plan still sits at index 0, and its elevation dynamically updated to 8.80m!
+      expect(updatedProject.orderedPlanStoreys.first.id, updatedProject.roofStorey!.id);
+      expect(updatedProject.roofStorey!.elevation, closeTo(8.80, 1e-4));
+    });
+
+    test('indexes reference walls from highestWallStorey when active storey is roof', () {
+      const s0 = ArchitectStorey(
+        id: 's0',
+        name: 'Ground',
+        elevation: 0.0,
+        height: 3.0,
+        walls: [
+          ArchitectWall(
+            id: 'w_main',
+            startPoint: Offset(0, 0),
+            endPoint: Offset(10, 0),
+            thickness: 0.25,
+          ),
+        ],
+      );
+      final project = ArchitectProject(
+        id: 'p_snap_roof',
+        name: 'Snap Roof Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: const [s0],
+        activeStoreyId: 's0',
+      ).ensureRoofStorey();
+
+      // Switch to roof storey
+      final roofActiveProject = project.copyWith(
+        activeStoreyId: project.roofStorey!.id,
+      );
+      expect(roofActiveProject.activeStorey.isRoof, isTrue);
+
+      final snapGeo = ArchitectSnapGeometry.of(roofActiveProject);
+      expect(snapGeo.edges.isNotEmpty, isTrue);
+
+      // Snaps to wall endpoint from highest wall storey below
+      final originHits = snapGeo.query(const Offset(0, 0), 0.2);
+      expect(originHits.any((h) => h.label == 'Endpoint'), isTrue);
+    });
+
+    test('drawSupportingWallUnderlay runs cleanly and lower-level roofs render with elevation badge', () {
+      final s0 = ArchitectStorey(
+        id: 's0',
+        name: 'Ground',
+        elevation: 0.0,
+        height: 3.0,
+        walls: const [
+          ArchitectWall(
+            id: 'w1',
+            startPoint: Offset(0, 0),
+            endPoint: Offset(6, 0),
+            thickness: 0.25,
+          ),
+          ArchitectWall(
+            id: 'w2',
+            startPoint: Offset(6, 0),
+            endPoint: Offset(6, 6),
+            thickness: 0.25,
+          ),
+        ],
+        roofs: [
+          // Lower level setback roof over garage/veranda
+          ArchitectRoofPlane(
+            id: 'r_lower',
+            storeyId: 's0',
+            points: [Offset(0, 0), Offset(4, 0), Offset(4, 3), Offset(0, 3)],
+            slopeDegrees: 15.0,
+          ),
+        ],
+      );
+      final project = ArchitectProject(
+        id: 'p_underlay',
+        name: 'Underlay Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: [s0],
+        activeStoreyId: 's0',
+      ).ensureRoofStorey();
+
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+
+      // Verify supporting wall underlay renders without error
+      expect(
+        () => ArchitectRoofPainterHelper.drawSupportingWallUnderlay(
+          canvas: canvas,
+          project: project,
+          palette: const ArchitectCanvasPalette.dark(),
+          scale: 15.0,
+        ),
+        returnsNormally,
+      );
+
+      // Verify lower level roof renders with thin lines and elevation badge
+      expect(
+        () => ArchitectRoofPainterHelper.paintRoofs(
+          canvas: canvas,
+          storey: s0,
+          scale: 15.0,
+          selectedIds: const {},
+          isLowerLevel: true,
+        ),
+        returnsNormally,
+      );
+
+      // Verify top level roof renders with thick lines
+      final roofStorey = project.roofStorey!;
+      final topRoof = ArchitectRoofPlane(
+        id: 'r_top',
+        storeyId: roofStorey.id,
+        points: const [Offset(0, 0), Offset(6, 0), Offset(6, 6), Offset(0, 6)],
+        slopeDegrees: 25.0,
+      );
+      expect(
+        () => ArchitectRoofPainterHelper.paintRoofs(
+          canvas: canvas,
+          storey: roofStorey.copyWith(roofs: [topRoof]),
+          scale: 15.0,
+          selectedIds: const {},
+          isLowerLevel: false,
+        ),
+        returnsNormally,
+      );
     });
   });
 }

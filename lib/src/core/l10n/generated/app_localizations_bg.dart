@@ -6204,6 +6204,24 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectRoofPropertiesAction => 'Свойства';
 
   @override
+  String get architectRoofPlan => 'Покривни линии';
+
+  @override
+  String get architectAddRoofPlan => 'Добави Покривни линии';
+
+  @override
+  String get architectRoofPlanUnderlay => 'Пунктир на ограждащите стени';
+
+  @override
+  String get architectRoofPlanSubtitle =>
+      'Генерален покривен план с пунктир на фасадните стени';
+
+  @override
+  String architectRoofLowerLevelBadge(String level) {
+    return 'Кота $level';
+  }
+
+  @override
   String get cad3dOrbit => 'Завъртане';
 
   @override

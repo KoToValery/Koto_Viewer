@@ -4086,6 +4086,18 @@
   "architectRoofMoveVerticalAction": "Move up / down",
   "architectRoofSnapToWallsAction": "Snap to walls",
   "architectRoofPropertiesAction": "Properties",
+  "architectRoofPlan": "Roof Lines",
+  "architectAddRoofPlan": "Add Roof Lines",
+  "architectRoofPlanUnderlay": "Perimeter wall underlay",
+  "architectRoofPlanSubtitle": "Top-level roof plan with dashed perimeter wall lines",
+  "architectRoofLowerLevelBadge": "Level {level}",
+  "@architectRoofLowerLevelBadge": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
   "cad3dOrbit": "Orbit",
   "@cad3dOrbit": {"description": "3D orbit navigation tooltip"},
   "cad3dPan": "Pan",

@@ -179,6 +179,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       scale: _viewport.scale,
       translation: _viewport.translation,
     );
+    if (id == 'add_roof_plan') {
+      _modelCommands.commit(_modelCommands.project.ensureRoofStorey());
+      _saveBiMProjectIfAttached();
+      id = _modelCommands.project.roofStorey?.id;
+    }
     if (id != null) _lastViewIds[type] = id;
     _commands.select(type, id);
     if (type == ArchitectWorkspaceView.plan && id != null) {

@@ -64,17 +64,56 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                   }
                 },
                 itemBuilder: (_) => [
-                  if (type == ArchitectWorkspaceView.plan)
-                    for (final s in project.storeys)
+                  if (type == ArchitectWorkspaceView.plan) ...[
+                    for (final s in project.orderedPlanStoreys)
                       CheckedPopupMenuItem(
                         value: s.id,
                         checked: s.id == project.activeStoreyId,
-                        child: Text(
-                          s.name.contains(s.elevationLabel)
-                              ? s.name
-                              : '${s.name} · ${s.elevationLabel}',
+                        child: Row(
+                          children: [
+                            if (s.isRoof) ...[
+                              const Icon(
+                                Icons.roofing,
+                                size: 18,
+                                color: Color(0xFF00E5FF),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  l.architectRoofPlan,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ] else ...[
+                              Expanded(
+                                child: Text(
+                                  s.name.contains(s.elevationLabel)
+                                      ? s.name
+                                      : '${s.name} · ${s.elevationLabel}',
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
+                    if (project.roofStorey == null)
+                      PopupMenuItem(
+                        value: 'add_roof_plan',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.add_home_work_outlined,
+                              size: 18,
+                              color: Color(0xFF00E5FF),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(l.architectAddRoofPlan),
+                          ],
+                        ),
+                      ),
+                  ],
                   if (type == ArchitectWorkspaceView.elevation)
                     for (var i = 0; i < project.elevations.length; i++)
                       CheckedPopupMenuItem(
@@ -147,7 +186,9 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                             Text(
                               switch (type) {
                                 ArchitectWorkspaceView.plan =>
-                                  project.activeStorey.elevationLabel,
+                                  project.activeStorey.isRoof
+                                      ? l.architectRoofPlan
+                                      : project.activeStorey.elevationLabel,
                                 ArchitectWorkspaceView.elevation =>
                                   elevation == null
                                       ? '—'

@@ -85,7 +85,9 @@ class ArchitectSnapGeometry {
     final activeIdx = project.storeys.indexWhere((s) => s.id == floor.id);
     final referenceWalls = floor.walls.isNotEmpty
         ? floor.walls
-        : (activeIdx > 0 ? project.storeys[activeIdx - 1].walls : floor.walls);
+        : (floor.isRoof
+            ? (project.highestWallStorey?.walls ?? const [])
+            : (activeIdx > 0 ? project.storeys[activeIdx - 1].walls : floor.walls));
 
     for (final wall in referenceWalls) {
       if(wall.isCurved) {
@@ -94,10 +96,10 @@ class ArchitectSnapGeometry {
         }
         point(wall.arc!.center,'Center',wall.id);
         final paths=[(wall.facePolygon(0,0),'@wall-axis:${wall.id}'),(wall.polygonCorners,wall.id),(wall.coreCorners,wall.id)];
-        for(final (points,owner) in paths)for(var i=0;i<points.length;i++) {
-           {
-          edges.add((a:points[i],b:points[(i+1)%points.length],owner:owner));
-        }
+        for (final (points, owner) in paths) {
+          for (var i = 0; i < points.length; i++) {
+            edges.add((a: points[i], b: points[(i + 1) % points.length], owner: owner));
+          }
         }
       } else {
       edge(wall.startPoint, wall.endPoint, '@wall-axis:${wall.id}');

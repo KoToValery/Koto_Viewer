@@ -322,6 +322,25 @@ class Architect2dPainter extends CustomPainter {
         selectedElementId: selectedElementId,
         project: _project, l10n: l10n, dimensionScale: _project.dimensionScale,
       );
+      if (_project.activeStorey.isRoof) {
+        ArchitectRoofPainterHelper.drawSupportingWallUnderlay(
+          canvas: canvas,
+          project: _project,
+          palette: palette,
+          scale: zoomScale,
+        );
+        final lowerStoreys = _project.storeys
+            .where((s) => s.id != _project.activeStorey.id && s.roofs.isNotEmpty);
+        for (final lower in lowerStoreys) {
+          ArchitectRoofPainterHelper.paintRoofs(
+            canvas: canvas,
+            storey: lower,
+            scale: zoomScale,
+            selectedIds: selectedElementIds,
+            isLowerLevel: true,
+          );
+        }
+      }
       ArchitectRoofPainterHelper.paintRoofs(
         canvas: canvas,
         storey: _elementLayerStorey,

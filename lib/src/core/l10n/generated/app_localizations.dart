@@ -10937,6 +10937,36 @@ abstract class AppLocalizations {
   /// **'Properties'**
   String get architectRoofPropertiesAction;
 
+  /// No description provided for @architectRoofPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Roof Lines'**
+  String get architectRoofPlan;
+
+  /// No description provided for @architectAddRoofPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Roof Lines'**
+  String get architectAddRoofPlan;
+
+  /// No description provided for @architectRoofPlanUnderlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Perimeter wall underlay'**
+  String get architectRoofPlanUnderlay;
+
+  /// No description provided for @architectRoofPlanSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-level roof plan with dashed perimeter wall lines'**
+  String get architectRoofPlanSubtitle;
+
+  /// No description provided for @architectRoofLowerLevelBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Level {level}'**
+  String architectRoofLowerLevelBadge(String level);
+
   /// 3D orbit navigation tooltip
   ///
   /// In en, this message translates to:

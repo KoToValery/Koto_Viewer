@@ -6181,6 +6181,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectRoofPropertiesAction => 'Properties';
 
   @override
+  String get architectRoofPlan => 'Roof Lines';
+
+  @override
+  String get architectAddRoofPlan => 'Add Roof Lines';
+
+  @override
+  String get architectRoofPlanUnderlay => 'Perimeter wall underlay';
+
+  @override
+  String get architectRoofPlanSubtitle =>
+      'Top-level roof plan with dashed perimeter wall lines';
+
+  @override
+  String architectRoofLowerLevelBadge(String level) {
+    return 'Level $level';
+  }
+
+  @override
   String get cad3dOrbit => 'Orbit';
 
   @override

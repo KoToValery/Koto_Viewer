@@ -2012,6 +2012,18 @@
   "architectRoofMoveVerticalAction": "Премести нагоре / надолу",
   "architectRoofSnapToWallsAction": "Прикрепи към стени",
   "architectRoofPropertiesAction": "Свойства",
+  "architectRoofPlan": "Покривни линии",
+  "architectAddRoofPlan": "Добави Покривни линии",
+  "architectRoofPlanUnderlay": "Пунктир на ограждащите стени",
+  "architectRoofPlanSubtitle": "Генерален покривен план с пунктир на фасадните стени",
+  "architectRoofLowerLevelBadge": "Кота {level}",
+  "@architectRoofLowerLevelBadge": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
   "cad3dOrbit": "Завъртане",
   "cad3dPan": "Преместване",
   "cad3dWalk": "Разходка",
