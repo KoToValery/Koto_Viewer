@@ -17,9 +17,9 @@ enum BimDistanceUnit {
   double toUnit(double meters) => meters / scaleToMeters;
   double fromUnit(double valueInUnit) => valueInUnit * scaleToMeters;
 
-  String format(double meters, {int decimals = 2}) {
+  String format(double meters, {int? decimals}) {
     final val = toUnit(meters);
-    if (this == BimDistanceUnit.inches || this == BimDistanceUnit.feet) {
+    if (isImperial && decimals == null) {
       final total = (meters.abs() / .0254 * 16).round();
       final sign = meters < 0 && total != 0 ? '-' : '';
       final feet = this == BimDistanceUnit.feet ? total ~/ 192 : 0;
@@ -36,11 +36,11 @@ enum BimDistanceUnit {
           ? '$sign$feet′ $whole$fraction″'
           : '$sign$whole$fraction in';
     } else if (this == BimDistanceUnit.millimeters) {
-      return '${val.toStringAsFixed(0)} $symbol';
+      return '${val.toStringAsFixed(decimals ?? 0)} $symbol';
     } else if (this == BimDistanceUnit.centimeters) {
-      return '${val.toStringAsFixed(0)} $symbol';
+      return '${val.toStringAsFixed(decimals ?? 0)} $symbol';
     } else {
-      return '${val.toStringAsFixed(decimals)} $symbol';
+      return '${val.toStringAsFixed(decimals ?? 2)} $symbol';
     }
   }
 }

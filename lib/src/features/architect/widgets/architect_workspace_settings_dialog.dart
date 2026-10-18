@@ -5,11 +5,13 @@ import 'architect_wall_drafting_panel.dart';
 
 class ArchitectWorkspaceSettings {
   final ArchitectUnit units;
+  final int distanceDecimals;
   final ArchitectDimensionScale dimensionScale;
   final bool ghostStoreys, upperOverhangs, grid, magnetic, underlay, darkCanvas;
   final double axisCoreThickness;
   const ArchitectWorkspaceSettings({
     required this.units,
+    this.distanceDecimals = 2,
     this.dimensionScale = ArchitectDimensionScale.scale100,
     required this.ghostStoreys,
     this.upperOverhangs = true,
@@ -36,6 +38,7 @@ class ArchitectWorkspaceSettingsDialog extends StatefulWidget {
 
 class _ArchitectWorkspaceSettingsDialogState
     extends State<ArchitectWorkspaceSettingsDialog> {
+  late int distanceDecimals = widget.settings.distanceDecimals;
   late ArchitectUnit units = widget.settings.units;
   late ArchitectDimensionScale dimensionScale = widget.settings.dimensionScale;
   late bool ghost = widget.settings.ghostStoreys,
@@ -56,6 +59,7 @@ class _ArchitectWorkspaceSettingsDialogState
           child: ArchitectWallDraftingPanel(
             length: value,
             unit: units.symbol,
+            decimals: distanceDecimals,
             title: context.l10n.architectAxesWallThickness,
             endLabel: context.l10n.save,
             keypadInitiallyOpen: true,
@@ -97,6 +101,20 @@ class _ArchitectWorkspaceSettingsDialogState
                 ],
                 onChanged: (value) {
                   if (value != null) setState(() => units = value);
+                },
+              ),
+              DropdownButtonFormField<int>(
+                key: const ValueKey('architect-settings-precision'),
+                initialValue: distanceDecimals,
+                decoration: InputDecoration(
+                  labelText: l.architectDistancePrecision,
+                ),
+                items: [
+                  for (final value in [0, 1, 2])
+                    DropdownMenuItem(value: value, child: Text('$value')),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => distanceDecimals = value);
                 },
               ),
               DropdownButtonFormField<ArchitectDimensionScale>(
@@ -164,7 +182,9 @@ class _ArchitectWorkspaceSettingsDialogState
                   key: const ValueKey('architect-settings-axis-thickness'),
                   contentPadding: EdgeInsets.zero,
                   title: Text(l.architectAxesWallThickness),
-                  trailing: Text(units.format(core)),
+                  trailing: Text(
+                    units.format(core, decimals: distanceDecimals),
+                  ),
                   onTap: editCore,
                 ),
               ),
@@ -183,6 +203,7 @@ class _ArchitectWorkspaceSettingsDialogState
             context,
             ArchitectWorkspaceSettings(
               units: units,
+              distanceDecimals: distanceDecimals,
               dimensionScale: dimensionScale,
               ghostStoreys: ghost,
               upperOverhangs: upperOverhangs,

@@ -1740,6 +1740,13 @@ class ArchitectCommandController
     if (project.units != units) replaceView(project.copyWith(units: units));
   }
 
+  void setDistanceDecimals(int decimals) {
+    final value = decimals.clamp(0, 2);
+    if (project.distanceDecimals != value) {
+      replaceView(project.copyWith(distanceDecimals: value));
+    }
+  }
+
   /// Annotation scale is a display setting, independent of geometry history.
   void setDimensionScale(ArchitectDimensionScale scale) {
     if (project.dimensionScale != scale) {
@@ -1757,12 +1764,14 @@ class ArchitectCommandController
         : snapshot.activeStoreyId;
     if (viewed == snapshot.activeStoreyId &&
         current.units == snapshot.units &&
+        current.distanceDecimals == snapshot.distanceDecimals &&
         current.dimensionScale == snapshot.dimensionScale) {
       return snapshot;
     }
     return snapshot.copyWith(
       activeStoreyId: viewed,
       units: current.units,
+      distanceDecimals: current.distanceDecimals,
       dimensionScale: current.dimensionScale,
     );
   }

@@ -3,13 +3,15 @@ import 'package:flutter/material.dart';
 class BimNumericKeypad extends StatelessWidget {
   final ValueChanged<String> onKey;
   final String keyPrefix;
+  final int decimals;
   const BimNumericKeypad({
     super.key,
     required this.onKey,
     this.keyPrefix = 'wall-key',
+    this.decimals = 2,
   });
 
-  static String edit(String? input, String key) {
+  static String edit(String? input, String key, {int decimals = 2}) {
     var value = input ?? '';
     if (key == '±') {
       return value.startsWith('-') ? value.substring(1) : '-$value';
@@ -18,10 +20,11 @@ class BimNumericKeypad extends StatelessWidget {
       return value.isEmpty ? '' : value.substring(0, value.length - 1);
     }
     if (key == '.') {
+      if (decimals == 0) return value;
       return value.contains('.') ? value : '${value.isEmpty ? '0' : value}.';
     }
     if (value.length >= 10 ||
-        (value.contains('.') && value.split('.').last.length >= 2)) {
+        (value.contains('.') && value.split('.').last.length >= decimals)) {
       return value;
     }
     return value + key;
@@ -45,7 +48,9 @@ class BimNumericKeypad extends StatelessWidget {
                   height: 36,
                   child: TextButton(
                     key: ValueKey('$keyPrefix-$key'),
-                    onPressed: () => onKey(key),
+                    onPressed: key == '.' && decimals == 0
+                        ? null
+                        : () => onKey(key),
                     child: key == '⌫'
                         ? const Icon(
                             Icons.backspace_outlined,

@@ -13,6 +13,7 @@ class ArchitectPolygonPainter {
     required List<Offset> polygon,
     required double scale,
     required ArchitectUnit unit,
+    int? decimals,
     bool handles = false,
     bool invalid = false,
     Path? obstacles,
@@ -31,7 +32,7 @@ class ArchitectPolygonPainter {
     for (var i = 0; i < polygon.length; i++) {
       final a = polygon[i], b = polygon[(i + 1) % polygon.length];
       final n = ArchitectPolygonGeometry.normal(polygon, i);
-      dimension(canvas, a, b, n, scale, unit, obstacles: obstacles);
+      dimension(canvas, a, b, n, scale, unit, obstacles: obstacles, decimals: decimals);
       if (handles) {
         // Direct vertex & midpoint handles
         canvas.drawCircle(a, 3.5 / scale, Paint()..color = vertexColor);
@@ -125,12 +126,13 @@ class ArchitectPolygonPainter {
     double scale,
     ArchitectUnit unit, {
     Path? obstacles,
+    int? decimals,
   }) {
     final delta = b - a;
     if (delta.distance < .001) return;
     final u = delta / delta.distance;
     final text =
-        '${unit.toUnit(delta.distance).toStringAsFixed(2)} ${unit.symbol}';
+        unit.format(delta.distance, decimals: decimals);
     final tp = TextPainter(
       text: TextSpan(
         text: text,

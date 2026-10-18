@@ -4202,21 +4202,19 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWizardStep1 => '1. Единици';
 
   @override
-  String get architectWizardStep2 => '2. Етажи и оси';
+  String get architectWizardStep2 => '2. Оси';
 
   @override
-  String get architectWizardStep3 => '3. Размери на стени';
+  String get architectWizardStep3 => '3. Етажи';
 
   @override
   String get architectWizardStep1Subtitle => 'Име на проект и мерни единици';
 
   @override
-  String get architectWizardStep2Subtitle =>
-      'Светли височини и координатни оси';
+  String get architectWizardStep2Subtitle => 'Оси и разстояния';
 
   @override
-  String get architectWizardStep3Subtitle =>
-      'Дебелини на стени и балконски парапет';
+  String get architectWizardStep3Subtitle => 'Коти и етажни височини';
 
   @override
   String get architectWizardNext => 'Напред';
@@ -6289,4 +6287,30 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectProjectionAlignRight => 'Подравни вдясно';
+
+  @override
+  String get architectDistancePrecision => 'Знаци след запетаята';
+
+  @override
+  String get architectWizardStoreysShort => 'Етажи';
+
+  @override
+  String get architectWizardElevation => 'Кота';
+
+  @override
+  String get architectWizardHeight => 'Височина';
+
+  @override
+  String get architectWizardStoreyHeightHelp =>
+      'Височина до следващия етаж, от готов под до готов под. Промяната мести горните етажи. Настилките и таваните определят отделно светлата височина.';
+
+  @override
+  String get architectWizardElevationHelp =>
+      'Кота готов под спрямо проектната нула. Промяната запазва другите коти и преизчислява съседните височини.';
+
+  @override
+  String get architectWizardInvalidLevel => 'Проверете котите и височините.';
+
+  @override
+  String get architectWizardCreateShort => 'Създай';
 }

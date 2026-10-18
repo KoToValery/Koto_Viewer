@@ -380,6 +380,7 @@ class ArchitectElementsPainterHelper {
     String? selectedElementId,
     Path? wallObstacles,
     ArchitectUnit unit = ArchitectUnit.meters,
+    int? decimals,
     ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
   }) {
     for (final dim in storey.dimensions) {
@@ -452,10 +453,8 @@ class ArchitectElementsPainterHelper {
               : unit
                     .toUnit((p2 - p1).distance)
                     .toStringAsFixed(
-                      unit == ArchitectUnit.centimeters ||
-                              unit == ArchitectUnit.millimeters
-                          ? 0
-                          : 2,
+                      decimals ?? (unit == ArchitectUnit.centimeters ||
+                              unit == ArchitectUnit.millimeters ? 0 : 2),
                     );
 
           final tp = TextPainter(
@@ -615,6 +614,7 @@ class ArchitectElementsPainterHelper {
     required Offset? draftEnd,
     required double zoomScale,
     ArchitectUnit unit = ArchitectUnit.meters,
+    int? decimals,
     ArchitectStair? stairPreview,
     ArchitectStorey? stairStorey,
     ArchitectProject? stairProject,
@@ -653,6 +653,7 @@ class ArchitectElementsPainterHelper {
         ],
         scale: zoomScale,
         unit: unit,
+        decimals: decimals,
       );
       if (activeTool == ArchitectTool.opening) {
         canvas.drawLine(rect.topLeft, rect.bottomRight, previewPaint);
@@ -685,6 +686,7 @@ class ArchitectElementsPainterHelper {
           Offset(-u.dy, u.dx),
           zoomScale,
           unit,
+          decimals: decimals,
         );
       }
     } else if (activeTool == ArchitectTool.measure) {
@@ -696,7 +698,7 @@ class ArchitectElementsPainterHelper {
       canvas.scale(1.0 / zoomScale);
       final tp = TextPainter(
         text: TextSpan(
-          text: '${unit.toUnit(dist).toStringAsFixed(2)} ${unit.symbol}',
+          text: unit.format(dist, decimals: decimals),
           style: const TextStyle(
             color: Colors.white,
             fontFamily: 'Roboto',

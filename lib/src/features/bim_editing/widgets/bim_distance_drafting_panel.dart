@@ -7,6 +7,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 class BimDistanceDraftingPanel extends StatefulWidget {
   final double length;
   final String unit;
+  final int decimals;
   final double minimumLength;
   final ValueChanged<double> onLength;
   final VoidCallback onEnd, onContinue, onUnlock, onCancel;
@@ -16,6 +17,7 @@ class BimDistanceDraftingPanel extends StatefulWidget {
     super.key,
     required this.length,
     required this.unit,
+    this.decimals = 2,
     this.minimumLength = .001,
     required this.onLength,
     required this.onEnd,
@@ -51,7 +53,7 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
 
   void _key(String key) {
     setState(() {
-      final value = BimNumericKeypad.edit(_input, key);
+      final value = BimNumericKeypad.edit(_input, key, decimals: widget.decimals);
       _input = value;
       final number = const BimNumericRule().parse(value);
       if (number != null && number.isFinite && number >= widget.minimumLength) {
@@ -110,7 +112,7 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                   children: [
                     Expanded(
                       child: Text(
-                        '${_input ?? widget.length.toStringAsFixed(2)} ${widget.unit}',
+                        '${_input ?? widget.length.toStringAsFixed(widget.decimals)} ${widget.unit}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -129,7 +131,7 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
             ),
             if (_keypad) ...[
               const SizedBox(height: 4),
-              BimNumericKeypad(onKey: _key),
+              BimNumericKeypad(decimals: widget.decimals, onKey: _key),
             ],
             if (_keypad && widget.minimumLength < 0)
               TextButton(

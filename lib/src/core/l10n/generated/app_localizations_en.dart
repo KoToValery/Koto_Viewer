@@ -4185,22 +4185,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWizardStep1 => '1. Units';
 
   @override
-  String get architectWizardStep2 => '2. Storeys & Grid';
+  String get architectWizardStep2 => '2. Axes';
 
   @override
-  String get architectWizardStep3 => '3. Walls & Sizing';
+  String get architectWizardStep3 => '3. Storeys';
 
   @override
   String get architectWizardStep1Subtitle =>
       'Project name and dimensions system';
 
   @override
-  String get architectWizardStep2Subtitle =>
-      'Storey heights and structural grid axes';
+  String get architectWizardStep2Subtitle => 'Grid axes and spacing';
 
   @override
-  String get architectWizardStep3Subtitle =>
-      'Wall thicknesses and balcony parapet finish';
+  String get architectWizardStep3Subtitle => 'Storey elevations and heights';
 
   @override
   String get architectWizardNext => 'Next';
@@ -4511,7 +4509,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWizardUnitsShort => 'Units';
 
   @override
-  String get architectWizardGridShort => 'Grid';
+  String get architectWizardGridShort => 'Axes';
 
   @override
   String get architectWizardWallsShort => 'Walls';
@@ -6266,4 +6264,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectProjectionAlignRight => 'Align right edges';
+
+  @override
+  String get architectDistancePrecision => 'Decimal places';
+
+  @override
+  String get architectWizardStoreysShort => 'Storeys';
+
+  @override
+  String get architectWizardElevation => 'Elevation';
+
+  @override
+  String get architectWizardHeight => 'Height';
+
+  @override
+  String get architectWizardStoreyHeightHelp =>
+      'Height to the next storey, measured from finished floor to finished floor. Changing height moves the storeys above. Floor finishes and ceilings affect clear height separately.';
+
+  @override
+  String get architectWizardElevationHelp =>
+      'Finished floor elevation relative to project zero. Editing an elevation keeps the other levels in place and adjusts the adjacent heights.';
+
+  @override
+  String get architectWizardInvalidLevel => 'Check the levels and heights.';
+
+  @override
+  String get architectWizardCreateShort => 'Create';
 }

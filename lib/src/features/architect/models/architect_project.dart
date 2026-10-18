@@ -39,7 +39,7 @@ class ArchitectStorey {
   final String id;
   final String name;
   final double elevation; // in meters (кота готов под)
-  final double height; // clear floor-to-floor height in meters
+  final double height; // finished floor to next finished floor, in meters
   final double
   cutPlaneHeight; // floor plan cut plane height above storey elevation (default 1.20 m)
   final double floorFinishThickness; // default 0.05 m
@@ -268,6 +268,7 @@ class ArchitectProject {
   final DateTime createdAt;
   final DateTime updatedAt;
   final ArchitectUnit units;
+  final int distanceDecimals;
   final ArchitectDimensionScale dimensionScale;
   final List<ArchitectStorey> storeys;
   final String activeStoreyId;
@@ -286,6 +287,7 @@ class ArchitectProject {
     required this.createdAt,
     required this.updatedAt,
     this.units = ArchitectUnit.meters,
+    this.distanceDecimals = 2,
     this.dimensionScale = ArchitectDimensionScale.scale100,
     required this.storeys,
     required this.activeStoreyId,
@@ -298,6 +300,9 @@ class ArchitectProject {
     this.northSymbol,
     this.slabCompositionNumbers = const {},
   });
+
+  String formatLength(double meters) =>
+      units.format(meters, decimals: distanceDecimals);
 
   ArchitectStorey get activeStorey => storeys.firstWhere(
     (s) => s.id == activeStoreyId,
@@ -331,6 +336,7 @@ class ArchitectProject {
     DateTime? createdAt,
     DateTime? updatedAt,
     ArchitectUnit? units,
+    int? distanceDecimals,
     ArchitectDimensionScale? dimensionScale,
     List<ArchitectStorey>? storeys,
     String? activeStoreyId,
@@ -349,6 +355,7 @@ class ArchitectProject {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     units: units ?? this.units,
+    distanceDecimals: distanceDecimals ?? this.distanceDecimals,
     dimensionScale: dimensionScale ?? this.dimensionScale,
     storeys: storeys ?? this.storeys,
     activeStoreyId: activeStoreyId ?? this.activeStoreyId,
@@ -369,6 +376,7 @@ class ArchitectProject {
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'units': units.name,
+    'distanceDecimals': distanceDecimals,
     'dimensionScale': dimensionScale.denominator,
     'storeys': storeys.map((s) => s.toJson()).toList(),
     'activeStoreyId': activeStoreyId,
@@ -395,6 +403,8 @@ class ArchitectProject {
       (u) => u.name == json['units'],
       orElse: () => ArchitectUnit.meters,
     ),
+    distanceDecimals: ((json['distanceDecimals'] as num?)?.toInt() ??
+        (json['units'] == 'centimeters' || json['units'] == 'millimeters' ? 0 : 2)).clamp(0, 2),
     dimensionScale: ArchitectDimensionScale.values.firstWhere(
       (scale) => scale.denominator == json['dimensionScale'],
       orElse: () => ArchitectDimensionScale.scale100,

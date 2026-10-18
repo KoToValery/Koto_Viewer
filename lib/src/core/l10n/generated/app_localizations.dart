@@ -7298,13 +7298,13 @@ abstract class AppLocalizations {
   /// Step 2 title in wizard
   ///
   /// In en, this message translates to:
-  /// **'2. Storeys & Grid'**
+  /// **'2. Axes'**
   String get architectWizardStep2;
 
   /// Step 3 title in wizard
   ///
   /// In en, this message translates to:
-  /// **'3. Walls & Sizing'**
+  /// **'3. Storeys'**
   String get architectWizardStep3;
 
   /// Step 1 subtitle
@@ -7316,13 +7316,13 @@ abstract class AppLocalizations {
   /// Step 2 subtitle
   ///
   /// In en, this message translates to:
-  /// **'Storey heights and structural grid axes'**
+  /// **'Grid axes and spacing'**
   String get architectWizardStep2Subtitle;
 
   /// Step 3 subtitle
   ///
   /// In en, this message translates to:
-  /// **'Wall thicknesses and balcony parapet finish'**
+  /// **'Storey elevations and heights'**
   String get architectWizardStep3Subtitle;
 
   /// Next step button
@@ -7856,7 +7856,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectWizardGridShort.
   ///
   /// In en, this message translates to:
-  /// **'Grid'**
+  /// **'Axes'**
   String get architectWizardGridShort;
 
   /// No description provided for @architectWizardWallsShort.
@@ -11104,6 +11104,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Align right edges'**
   String get architectProjectionAlignRight;
+
+  /// No description provided for @architectDistancePrecision.
+  ///
+  /// In en, this message translates to:
+  /// **'Decimal places'**
+  String get architectDistancePrecision;
+
+  /// No description provided for @architectWizardStoreysShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Storeys'**
+  String get architectWizardStoreysShort;
+
+  /// No description provided for @architectWizardElevation.
+  ///
+  /// In en, this message translates to:
+  /// **'Elevation'**
+  String get architectWizardElevation;
+
+  /// No description provided for @architectWizardHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get architectWizardHeight;
+
+  /// No description provided for @architectWizardStoreyHeightHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Height to the next storey, measured from finished floor to finished floor. Changing height moves the storeys above. Floor finishes and ceilings affect clear height separately.'**
+  String get architectWizardStoreyHeightHelp;
+
+  /// No description provided for @architectWizardElevationHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished floor elevation relative to project zero. Editing an elevation keeps the other levels in place and adjusts the adjacent heights.'**
+  String get architectWizardElevationHelp;
+
+  /// No description provided for @architectWizardInvalidLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the levels and heights.'**
+  String get architectWizardInvalidLevel;
+
+  /// No description provided for @architectWizardCreateShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get architectWizardCreateShort;
 }
 
 class _AppLocalizationsDelegate

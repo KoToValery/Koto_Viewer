@@ -63,7 +63,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
   ).showSnackBar(SnackBar(content: Text(context.l10n.stairUnsupported)));
 
   String length(double value) =>
-      '${unit.toUnit(value).toStringAsFixed(unit == ArchitectUnit.meters ? 3 : 1)} ${unit.symbol}';
+      widget.project.formatLength(value);
   Future<void> edit(
     String key,
     String label,
@@ -82,6 +82,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
           width: 250,
           child: ArchitectWallDraftingPanel(
             title: label,
+            decimals: metric ? widget.project.distanceDecimals : integer ? 0 : 2,
             length: draft,
             unit: metric
                 ? unit.symbol

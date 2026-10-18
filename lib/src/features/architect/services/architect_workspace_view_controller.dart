@@ -114,6 +114,7 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
   void redo() => source.redo();
   void restore(ArchitectProject next) => source.restore(next);
   void activateStorey(String id) => source.activateStorey(id);
+  void setDistanceDecimals(int decimals) => source.setDistanceDecimals(decimals);
   void setUnits(ArchitectUnit units) => source.setUnits(units);
   void setDimensionScale(ArchitectDimensionScale scale) =>
       source.setDimensionScale(scale);

@@ -9,6 +9,7 @@ class ArchitectDimensionChainPreview extends CustomPainter {
   final ArchitectDimension? dimension;
   final BimViewportController viewport;
   final ArchitectUnit units;
+  final int? decimals;
   final ArchitectDimensionScale dimensionScale;
   final ArchitectCanvasPalette palette;
   final ArchitectStorey? storey;
@@ -16,6 +17,7 @@ class ArchitectDimensionChainPreview extends CustomPainter {
     required this.dimension,
     required this.viewport,
     required this.units,
+    this.decimals,
     this.dimensionScale = ArchitectDimensionScale.scale100,
     required this.palette,
     this.storey,
@@ -33,6 +35,7 @@ class ArchitectDimensionChainPreview extends CustomPainter {
       zoomScale: viewport.scale,
       selectedElementId: dimension!.id,
       unit: units,
+      decimals: decimals,
       dimensionScale: dimensionScale,
       palette: palette,
       wallObstacles: Path(),
@@ -45,6 +48,7 @@ class ArchitectDimensionChainPreview extends CustomPainter {
       old.dimension != dimension ||
       old.storey != storey ||
       old.units != units ||
+      old.decimals != decimals ||
       old.dimensionScale != dimensionScale ||
       old.palette != palette;
 }

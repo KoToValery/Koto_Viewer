@@ -614,6 +614,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           values: [unit.toUnit(_dimensionOffset)],
           labels: [context.l10n.architectPropertyOffset],
           unit: unit.symbol,
+          decimals: _project.distanceDecimals,
           signed: true,
           minimum: -double.maxFinite,
           onChanged: (_, value) => distance = unit.fromUnit(value),
@@ -944,6 +945,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         settings: ArchitectWorkspaceSettings(
           units: _project.units,
           dimensionScale: _project.dimensionScale,
+          distanceDecimals: _project.distanceDecimals,
           ghostStoreys: _showGhostStoreys,
           upperOverhangs: _showUpperOverhangs,
           grid: _showDrawingGrid,
@@ -958,6 +960,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _canvasPreferenceChanged = true;
     _commands.setUnits(result.units);
     _commands.setDimensionScale(result.dimensionScale);
+    _commands.setDistanceDecimals(result.distanceDecimals);
     _changeViewPreference(() {
       _showGhostStoreys = result.ghostStoreys;
       _showUpperOverhangs = result.upperOverhangs;
@@ -5212,15 +5215,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             child: Center(
                               child: Text(
                                 gap.atStart == null
-                                    ? _project.units.format(
+                                    ? _project.formatLength(
                                         gap.distance,
-                                        decimals: 3,
                                       )
                                     : context.l10n.architectWallEndpointValue(
                                         gap.atStart! ? 1 : 2,
-                                        _project.units.format(
+                                        _project.formatLength(
                                           gap.distance,
-                                          decimals: 3,
                                         ),
                                       ),
                                 style: TextStyle(
@@ -5270,9 +5271,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             },
                             child: Center(
                               child: Text(
-                                _project.units.format(
+                                _project.formatLength(
                                   gap.distance,
-                                  decimals: 3,
                                 ),
                                 style: TextStyle(
                                   color: gap.isModularSnap
@@ -5534,6 +5534,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       : context.l10n.architectEdgeDistance,
                 ],
                 unit: unit.symbol,
+                decimals: _project.distanceDecimals,
                 minimum: dimension == null
                     ? -double.infinity
                     : unit.toUnit(.001),
@@ -5653,6 +5654,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             endLabel: context.l10n.save,
             length: _project.units.toUnit(distance),
             unit: _project.units.symbol,
+            decimals: _project.distanceDecimals,
             minimumLength: 0,
             keypadInitiallyOpen: true,
             showContinue: false,
@@ -5700,6 +5702,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             endLabel: context.l10n.save,
             length: _project.units.toUnit(distance),
             unit: _project.units.symbol,
+            decimals: _project.distanceDecimals,
             minimumLength: 0,
             keypadInitiallyOpen: true,
             showContinue: false,
@@ -5761,6 +5764,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           child: ArchitectWallDraftingPanel(
             length: _project.units.toUnit(length),
             unit: _project.units.symbol,
+            decimals: _project.distanceDecimals,
             minimumLength: _project.units.toUnit(.001),
             onLength: (value) => length = _project.units.fromUnit(value),
             onEnd: () {
@@ -9338,9 +9342,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           _roofTool.draftPoints.lastOrNull;
                       final liveDim = lastAnchor != null &&
                               (target - lastAnchor).distance > 0.01
-                          ? _project.units.format(
+                          ? _project.formatLength(
                               (target - lastAnchor).distance,
-                              decimals: 2,
                             )
                           : null;
                       return CustomPaint(
@@ -9386,6 +9389,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       dimension: _dimensionDraft ?? _singleDimensionPreview,
                       viewport: _viewport,
                       units: _project.units,
+                      decimals: _project.distanceDecimals,
                       dimensionScale: _project.dimensionScale,
                       palette: _canvasPalette,
                       storey: _project.activeStorey,
@@ -9471,8 +9475,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             ? context.l10n.architectWallDraftHint
                             : _cursorModel == null
                             ? context.l10n.architectNavigationHint
-                            : 'X: ${_project.units.format((_columnPreviewPoint ?? _draftEnd ?? _cursorModel!).dx, decimals: 3)}  '
-                                  'Y: ${_project.units.format((_columnPreviewPoint ?? _draftEnd ?? _cursorModel!).dy, decimals: 3)}',
+                            : 'X: ${_project.formatLength((_columnPreviewPoint ?? _draftEnd ?? _cursorModel!).dx)}  '
+                                  'Y: ${_project.formatLength((_columnPreviewPoint ?? _draftEnd ?? _cursorModel!).dy)}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
@@ -9766,6 +9770,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           (_draftEnd! - _draftStart!).distance,
                         ),
                         unit: _project.units.symbol,
+                        decimals: _project.distanceDecimals,
                         minimumLength: _project.units.toUnit(.001),
                         onLength: (value) {
                           if (_project.units.fromUnit(value) < .001) return;
@@ -9880,6 +9885,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             context.l10n.architectShapeHeight,
                           ],
                     unit: _project.units.symbol,
+                    decimals: _project.distanceDecimals,
                     minimum: _project.units.toUnit(.001),
                     onChanged: (index, value) {
                       final meters = _project.units.fromUnit(value);

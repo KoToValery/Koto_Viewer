@@ -412,8 +412,8 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                       ),
                     ),
                     Text(
-                      '${l.slabAbove}: ${widget.project.units.format(surfaces.first.topAt(p) - storey.elevation - previewSlab.coreTopOffset, decimals: 3)} · '
-                      '${l.slabBelow}: ${widget.project.units.format(draft.lowerThickness, decimals: 3)}',
+                      '${l.slabAbove}: ${widget.project.formatLength(surfaces.first.topAt(p) - storey.elevation - previewSlab.coreTopOffset)} · '
+                      '${l.slabBelow}: ${widget.project.formatLength(draft.lowerThickness)}',
                     ),
                     Text(
                       '${l.slabFinishedLevel}: ${surfaces.first.topAt(p).toStringAsFixed(3)} m · '

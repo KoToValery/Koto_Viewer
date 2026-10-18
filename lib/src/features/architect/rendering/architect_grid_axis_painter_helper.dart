@@ -161,7 +161,7 @@ class ArchitectGridAxisPainterHelper {
       }
       final tp = TextPainter(
         text: TextSpan(
-          text: project.units.format(neighbor.distance.abs()),
+          text: project.formatLength(neighbor.distance.abs()),
           style: TextStyle(
             color: palette.foreground(const Color(0xFF8A4800)),
             fontFamily: 'Roboto',

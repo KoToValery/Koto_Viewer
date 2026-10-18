@@ -382,7 +382,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                       Expanded(
                         child: Text(
                           l10n.bimProjectNew,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -443,7 +443,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                         // Project Type Selector
                         Text(
                           l10n.bimProjectType,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
@@ -460,13 +460,13 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: _selectedProjectType == BimProjectType.structural
-                                        ? const Color(0xFF00E5FF).withValues(alpha: 0.15)
+                                        ? theme.colorScheme.primary.withValues(alpha: 0.15)
                                         : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: _selectedProjectType == BimProjectType.structural
-                                          ? const Color(0xFF00E5FF)
-                                          : Colors.white12,
+                                          ? theme.colorScheme.primary
+                                          : theme.colorScheme.outlineVariant,
                                       width: _selectedProjectType == BimProjectType.structural ? 1.8 : 1.0,
                                     ),
                                   ),
@@ -479,8 +479,8 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                             Icons.apartment_rounded,
                                             size: 20,
                                             color: _selectedProjectType == BimProjectType.structural
-                                                ? const Color(0xFF00E5FF)
-                                                : Colors.white70,
+                                                ? theme.colorScheme.primary
+                                                : theme.colorScheme.onSurfaceVariant,
                                           ),
                                           const SizedBox(width: 8),
                                           Expanded(
@@ -492,8 +492,8 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 13,
                                                 color: _selectedProjectType == BimProjectType.structural
-                                                    ? Colors.white
-                                                    : Colors.white70,
+                                                    ? theme.colorScheme.onSurface
+                                                    : theme.colorScheme.onSurfaceVariant,
                                               ),
                                             ),
                                           ),
@@ -506,7 +506,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           fontSize: 10.5,
-                                          color: Colors.white.withValues(alpha: 0.65),
+                                          color: theme.colorScheme.onSurfaceVariant,
                                         ),
                                       ),
                                     ],
@@ -524,13 +524,13 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: _selectedProjectType == BimProjectType.architectural
-                                        ? const Color(0xFFAB47BC).withValues(alpha: 0.18)
+                                        ? theme.colorScheme.tertiary.withValues(alpha: 0.18)
                                         : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: _selectedProjectType == BimProjectType.architectural
-                                          ? const Color(0xFFAB47BC)
-                                          : Colors.white12,
+                                          ? theme.colorScheme.tertiary
+                                          : theme.colorScheme.outlineVariant,
                                       width: _selectedProjectType == BimProjectType.architectural ? 1.8 : 1.0,
                                     ),
                                   ),
@@ -543,8 +543,8 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                             Icons.architecture_rounded,
                                             size: 20,
                                             color: _selectedProjectType == BimProjectType.architectural
-                                                ? const Color(0xFFCE93D8)
-                                                : Colors.white70,
+                                                ? theme.colorScheme.tertiary
+                                                : theme.colorScheme.onSurfaceVariant,
                                           ),
                                           const SizedBox(width: 8),
                                           Expanded(
@@ -556,8 +556,8 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 13,
                                                 color: _selectedProjectType == BimProjectType.architectural
-                                                    ? Colors.white
-                                                    : Colors.white70,
+                                                    ? theme.colorScheme.onSurface
+                                                    : theme.colorScheme.onSurfaceVariant,
                                               ),
                                             ),
                                           ),
@@ -570,7 +570,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           fontSize: 10.5,
-                                          color: Colors.white.withValues(alpha: 0.65),
+                                          color: theme.colorScheme.onSurfaceVariant,
                                         ),
                                       ),
                                     ],
@@ -585,17 +585,17 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFAB47BC).withValues(alpha: 0.12),
+                              color: theme.colorScheme.tertiary.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: const Color(0xFFCE93D8).withValues(alpha: 0.4),
+                                color: theme.colorScheme.tertiary.withValues(alpha: 0.4),
                               ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.auto_awesome_rounded,
-                                  color: Color(0xFFCE93D8),
+                                  color: theme.colorScheme.tertiary,
                                   size: 24,
                                 ),
                                 const SizedBox(width: 12),
@@ -605,8 +605,8 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                     children: [
                                       Text(
                                         l10n.architectWizardTitle,
-                                        style: const TextStyle(
-                                          color: Colors.white,
+                                        style: TextStyle(
+                                          color: theme.colorScheme.onSurface,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 13,
                                         ),
@@ -614,8 +614,8 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                       const SizedBox(height: 2),
                                       Text(
                                         l10n.architectWizardSubtitle,
-                                        style: const TextStyle(
-                                          color: Colors.white60,
+                                        style: TextStyle(
+                                          color: theme.colorScheme.onSurfaceVariant,
                                           fontSize: 11,
                                         ),
                                       ),
@@ -625,7 +625,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                 const SizedBox(width: 8),
                                 ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFCE93D8),
+                                    backgroundColor: theme.colorScheme.tertiary,
                                     foregroundColor: Colors.black,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 12,
@@ -640,7 +640,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                     fit: BoxFit.scaleDown,
                                     child: Text(
                                       l10n.architectLaunchWizard,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -659,7 +659,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                           children: [
                             Text(
                               l10n.bimProjectStoreysSection,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -706,7 +706,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                               ).withValues(alpha: 0.8),
                                         child: Text(
                                           '${idx + 1}',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.black,
                                             fontWeight: FontWeight.bold,
@@ -721,7 +721,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                           children: [
                                             Text(
                                               displayName,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 14,
                                               ),
@@ -827,7 +827,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                                         maxLines: 1,
                                                         overflow: TextOverflow
                                                             .ellipsis,
-                                                        style: const TextStyle(
+                                                        style: TextStyle(
                                                           fontSize: 12,
                                                           fontWeight:
                                                               FontWeight.w600,
@@ -855,7 +855,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                           draft.pickedFile != null
                                               ? l10n.bimProjectReplaceUnderlay
                                               : l10n.bimProjectAddUnderlay,
-                                          style: const TextStyle(fontSize: 12),
+                                          style: TextStyle(fontSize: 12),
                                         ),
                                         onPressed: () =>
                                             _pickUnderlayForStorey(draft),
@@ -877,12 +877,12 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                   padding: const EdgeInsets.all(16),
                   child: ElevatedButton.icon(
                     icon: _isCreating
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: theme.colorScheme.onPrimary,
                             ),
                           )
                         : const Icon(Icons.check_rounded),
@@ -890,14 +890,14 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                       _isCreating
                           ? l10n.bimProjectSaving
                           : l10n.bimProjectCreateButton,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: Colors.white,
+                      foregroundColor: theme.colorScheme.onPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),

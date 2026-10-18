@@ -8,6 +8,7 @@ class BimShapeDimensionPanel extends StatefulWidget {
   final List<double> values;
   final List<String> labels;
   final String unit;
+  final int decimals;
   final double minimum;
   final bool canSave, signed;
   final void Function(int index, double value) onChanged;
@@ -17,6 +18,7 @@ class BimShapeDimensionPanel extends StatefulWidget {
     required this.values,
     required this.labels,
     required this.unit,
+    this.decimals = 2,
     required this.minimum,
     this.canSave = true,
     this.signed = false,
@@ -43,7 +45,11 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
   bool valid(int i) =>
       value(i) != null && value(i)!.isFinite && value(i)! >= widget.minimum;
   void key(String key) => setState(() {
-    input[active] = BimNumericKeypad.edit(input[active], key);
+    input[active] = BimNumericKeypad.edit(
+      input[active],
+      key,
+      decimals: widget.decimals,
+    );
     if (valid(active)) widget.onChanged(active, value(active)!);
   });
   @override
@@ -91,7 +97,7 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
                               fit: BoxFit.scaleDown,
                               alignment: Alignment.centerLeft,
                               child: Text(
-                                '${input[i] ?? widget.values[i].toStringAsFixed(2)} ${widget.unit}',
+                                '${input[i] ?? widget.values[i].toStringAsFixed(widget.decimals)} ${widget.unit}',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -108,7 +114,11 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
           ),
           if (widget.signed)
             TextButton(onPressed: () => key('±'), child: const Text('±')),
-          BimNumericKeypad(keyPrefix: 'shape-key', onKey: key),
+          BimNumericKeypad(
+            decimals: widget.decimals,
+            keyPrefix: 'shape-key',
+            onKey: key,
+          ),
           if (!widget.canSave)
             Text(
               context.l10n.architectOperationRejected,

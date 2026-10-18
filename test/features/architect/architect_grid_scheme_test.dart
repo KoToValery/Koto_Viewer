@@ -529,13 +529,15 @@ void main() {
     await tester.ensureVisible(find.byKey(const ValueKey('grid-gap-x-1')));
     await tester.tap(find.byKey(const ValueKey('grid-gap-x-1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('wall-key-5')));
-    await tester.pump();
+    for (final digit in ['5', '0', '0']) {
+      await tester.tap(find.byKey(ValueKey('wall-key-$digit')));
+      await tester.pump();
+    }
     await tester.tap(find.byKey(const ValueKey('wall-end')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Create Project & Start'));
+    await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
     expect(result!.gridAxes, hasLength(7));
     expect(result!.gridAxes.where((a) => a.isVertical).map((a) => a.start.dx), [

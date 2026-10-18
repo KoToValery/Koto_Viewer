@@ -23,21 +23,11 @@ class Architect3dBuilder {
     }
 
     for (final storey in project.storeys) {
-      // Preview plates belong to this storey, never the cumulative footprint.
-      double minX = double.infinity, maxX = -double.infinity;
-      double minY = double.infinity, maxY = -double.infinity;
-      bool hasWalls = false;
       final walls = [
         for (final wall in storey.walls)
           wall.copyWith(height: wall.effectiveHeight(storey.height)),
       ];
       for (final wall in walls) {
-        hasWalls = true;
-        minX = math.min(minX, math.min(wall.startPoint.dx, wall.endPoint.dx));
-        maxX = math.max(maxX, math.max(wall.startPoint.dx, wall.endPoint.dx));
-        minY = math.min(minY, math.min(wall.startPoint.dy, wall.endPoint.dy));
-        maxY = math.max(maxY, math.max(wall.startPoint.dy, wall.endPoint.dy));
-
         // Add 3D wall geometry with boolean door cutouts
         final first = allTris.length;
         allTris.addAll(
@@ -183,64 +173,6 @@ class Architect3dBuilder {
         allTris.addAll(_buildRoofMesh(storey, roof, detailed: previewGeometry));
         mark(roof.id, first);
       }
-
-      // Compatibility preview for storeys with no explicitly drawn slabs.
-      // Never used by the section engine.
-      // Add a base concrete slab plate under the storey
-      if (previewGeometry && hasWalls && storey.slabs.isEmpty) {
-        const margin = 1.0; // 1m slab overhang around building
-        final sMinX = minX - margin;
-        final sMaxX = maxX + margin;
-        final sMinY = minY - margin;
-        final sMaxY = maxY + margin;
-        final zTop = storey.elevation;
-        final zBottom = zTop - 0.20; // 20 cm slab thickness
-
-        const slabColor = Color(0xFFB0BEC5);
-
-        final p1 = Vector3(sMinX, sMinY, zBottom);
-        final p2 = Vector3(sMaxX, sMinY, zBottom);
-        final p3 = Vector3(sMaxX, sMaxY, zBottom);
-        final p4 = Vector3(sMinX, sMaxY, zBottom);
-
-        final p1T = Vector3(sMinX, sMinY, zTop);
-        final p2T = Vector3(sMaxX, sMinY, zTop);
-        final p3T = Vector3(sMaxX, sMaxY, zTop);
-        final p4T = Vector3(sMinX, sMaxY, zTop);
-
-        // Top surface
-        allTris.add(Triangle3D(v0: p1T, v1: p2T, v2: p3T, color: slabColor));
-        allTris.add(Triangle3D(v0: p1T, v1: p3T, v2: p4T, color: slabColor));
-
-        // Bottom surface
-        allTris.add(Triangle3D(v0: p1, v1: p3, v2: p2, color: slabColor));
-        allTris.add(Triangle3D(v0: p1, v1: p4, v2: p3, color: slabColor));
-
-        // Sides
-        allTris.add(Triangle3D(v0: p1, v1: p2, v2: p2T, color: slabColor));
-        allTris.add(Triangle3D(v0: p1, v1: p2T, v2: p1T, color: slabColor));
-
-        allTris.add(Triangle3D(v0: p2, v1: p3, v2: p3T, color: slabColor));
-        allTris.add(Triangle3D(v0: p2, v1: p3T, v2: p2T, color: slabColor));
-
-        allTris.add(Triangle3D(v0: p3, v1: p4, v2: p4T, color: slabColor));
-        allTris.add(Triangle3D(v0: p3, v1: p4T, v2: p3T, color: slabColor));
-
-        allTris.add(Triangle3D(v0: p4, v1: p1, v2: p1T, color: slabColor));
-        allTris.add(Triangle3D(v0: p4, v1: p1T, v2: p4T, color: slabColor));
-      }
-    }
-
-    if (previewGeometry && allTris.isEmpty) {
-      // Fallback ground grid plate if no walls exist yet
-      const fallbackColor = Color(0xFFCFD8DC);
-      const s = 10.0;
-      final v1 = Vector3(-s, -s, 0);
-      final v2 = Vector3(s, -s, 0);
-      final v3 = Vector3(s, s, 0);
-      final v4 = Vector3(-s, s, 0);
-      allTris.add(Triangle3D(v0: v1, v1: v2, v2: v3, color: fallbackColor));
-      allTris.add(Triangle3D(v0: v1, v1: v3, v2: v4, color: fallbackColor));
     }
 
     return Mesh3D(name: project.name, triangles: allTris);

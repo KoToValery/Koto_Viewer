@@ -241,6 +241,7 @@ class ArchitectRoofPainterHelper {
     required ArchitectRoofTool roofTool,
     required double scale,
     required ArchitectUnit units,
+    int? decimals,
   }) {
     if (!roofTool.isDrafting) return;
 
@@ -304,7 +305,7 @@ class ArchitectRoofPainterHelper {
         final len = (b - a).distance;
         if (len > 0.15) {
           final mid = (a + b) / 2.0;
-          final text = units.format(len, decimals: 2);
+          final text = units.format(len, decimals: decimals);
           final fontSize = (10.5 / scale).clamp(0.08, 0.28);
           final tp = TextPainter(
             text: TextSpan(

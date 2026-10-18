@@ -8,12 +8,14 @@ import 'architect_wall_drafting_panel.dart';
 class ArchitectGridScheme extends StatelessWidget {
   final List<double> spacingsX, spacingsY;
   final ArchitectUnit unit;
+  final int? decimals;
   final void Function(List<double>, List<double>) onChanged;
   const ArchitectGridScheme({
     super.key,
     required this.spacingsX,
     required this.spacingsY,
     required this.unit,
+    this.decimals,
     required this.onChanged,
   });
 
@@ -44,6 +46,7 @@ class ArchitectGridScheme extends StatelessWidget {
             endLabel: context.l10n.save,
             length: unit.toUnit(value),
             unit: unit.symbol,
+            decimals: decimals ?? 2,
             minimumLength: unit.toUnit(.05),
             keypadInitiallyOpen: true,
             showContinue: false,
@@ -68,6 +71,7 @@ class ArchitectGridScheme extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -98,6 +102,8 @@ class ArchitectGridScheme extends StatelessWidget {
                       spacingsY.length,
                       columns,
                       rows,
+                      colors.primary,
+                      colors.surfaceContainerHighest,
                     ),
                   ),
                 ),
@@ -117,7 +123,10 @@ class ArchitectGridScheme extends StatelessWidget {
               final axes = x
                   ? '${index + 1}–${index + 2}'
                   : '${_letter(index)}–${_letter(index + 1)}';
-              final value = unit.format((x ? spacingsX : spacingsY)[index]);
+              final value = unit.format(
+                (x ? spacingsX : spacingsY)[index],
+                decimals: decimals,
+              );
               return Semantics(
                 button: true,
                 label: l.architectGridSpanLabel(axes, value),
@@ -130,10 +139,9 @@ class ArchitectGridScheme extends StatelessWidget {
                       child: Text(
                         value,
                         maxLines: 1,
-                        style: DefaultTextStyle.of(context).style.copyWith(
-                          fontSize: 11,
-                          color: const Color(0xFF00E5FF),
-                        ),
+                        style: DefaultTextStyle.of(
+                          context,
+                        ).style.copyWith(fontSize: 11, color: colors.primary),
                       ),
                     ),
                   ),
@@ -150,7 +158,9 @@ class ArchitectGridScheme extends StatelessWidget {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: CustomPaint(painter: _GridSchemePainter(layout)),
+                      child: CustomPaint(
+                        painter: _GridSchemePainter(layout, colors.primary),
+                      ),
                     ),
                     for (var i = 0; i < spacingsX.length; i++)
                       Positioned(
@@ -181,7 +191,15 @@ class ArchitectGridScheme extends StatelessWidget {
 
 class _BayPickerPainter extends CustomPainter {
   final int x, y, columns, rows;
-  _BayPickerPainter(this.x, this.y, this.columns, this.rows);
+  final Color selectedColor, backgroundColor;
+  _BayPickerPainter(
+    this.x,
+    this.y,
+    this.columns,
+    this.rows,
+    this.selectedColor,
+    this.backgroundColor,
+  );
   @override
   void paint(Canvas canvas, Size size) {
     final cell = Size(size.width / columns, size.height / rows);
@@ -195,10 +213,7 @@ class _BayPickerPainter extends CustomPainter {
         );
         canvas.drawRRect(
           RRect.fromRectAndRadius(rect, const Radius.circular(3)),
-          Paint()
-            ..color = col < x && row < y
-                ? const Color(0xFF00BCD4)
-                : const Color(0xFF41434D),
+          Paint()..color = col < x && row < y ? selectedColor : backgroundColor,
         );
       }
     }
@@ -206,7 +221,10 @@ class _BayPickerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BayPickerPainter old) =>
-      x != old.x || y != old.y;
+      x != old.x ||
+      y != old.y ||
+      selectedColor != old.selectedColor ||
+      backgroundColor != old.backgroundColor;
 }
 
 class _GridSchemeLayout {
@@ -233,11 +251,12 @@ class _GridSchemeLayout {
 
 class _GridSchemePainter extends CustomPainter {
   final _GridSchemeLayout layout;
-  _GridSchemePainter(this.layout);
+  final Color color;
+  _GridSchemePainter(this.layout, this.color);
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF00E5FF)
+      ..color = color
       ..strokeWidth = 1;
     for (final x in layout.xs) {
       canvas.drawLine(
@@ -256,5 +275,6 @@ class _GridSchemePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _GridSchemePainter old) => layout != old.layout;
+  bool shouldRepaint(covariant _GridSchemePainter old) =>
+      layout != old.layout || color != old.color;
 }

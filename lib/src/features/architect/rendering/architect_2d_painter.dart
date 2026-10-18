@@ -361,11 +361,13 @@ class Architect2dPainter extends CustomPainter {
         stairStorey: _project.activeStorey, stairProject: _project,
         zoomScale: zoomScale,
         unit: _project.units,
+        decimals: _project.distanceDecimals,
       );
     }
     if (layer != ArchitectPaintLayer.interaction) {
       ArchitectElementsPainterHelper.drawDimensions(
         unit: _project.units,
+        decimals: _project.distanceDecimals,
         dimensionScale: _project.dimensionScale,
         palette: palette,
         canvas: canvas,
@@ -415,6 +417,7 @@ class Architect2dPainter extends CustomPainter {
           roofTool: roofTool!,
           scale: zoomScale,
           units: _project.units,
+          decimals: _project.distanceDecimals,
         );
       }
       _drawZoneDrafting(canvas);
@@ -543,6 +546,7 @@ class Architect2dPainter extends CustomPainter {
       polygon: polygon,
       scale: zoomScale,
       unit: _project.units,
+      decimals: _project.distanceDecimals,
       handles: true,
       invalid: polygonEditInvalid,
       leaderLine: polygonLeaderLine,
@@ -981,7 +985,7 @@ class Architect2dPainter extends CustomPainter {
       if (showOpeningClearanceBadges && gap.distance >= 0.01) {
         final tp = TextPainter(
           text: TextSpan(
-            text: _project.units.format(gap.distance),
+            text: _project.formatLength(gap.distance),
             style: TextStyle(
               color: Colors.white,
               fontFamily: 'Roboto',
@@ -1262,7 +1266,7 @@ class Architect2dPainter extends CustomPainter {
       canvas.drawCircle(p2, 2 / zoomScale, Paint()..color = Colors.cyanAccent);
       // Keep a single target marker and a length-only badge outside the body.
       final textSpan = TextSpan(
-        text: project.units.format(dist, decimals: 3),
+        text: project.formatLength(dist),
         style: const TextStyle(
           color: Colors.white,
           fontFamily: 'Roboto',

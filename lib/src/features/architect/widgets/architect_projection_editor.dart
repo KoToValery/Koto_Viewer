@@ -136,6 +136,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
           title: title,
           value: project.units.toUnit(value),
           unit: project.units.symbol,
+          decimals: project.distanceDecimals,
           signed: signed,
         ),
       );
@@ -492,7 +493,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                                     ),
                                     onPressed: () => editDistance(measure),
                                     child: Text(
-                                      '${label(measure.kind)} ${project.units.format(measure.value)}',
+                                      '${label(measure.kind)} ${project.formatLength(measure.value)}',
                                     ),
                                   ),
                               if (!measures.any(
@@ -643,11 +644,13 @@ class _ProjectionSelectionPainter extends CustomPainter {
 class _ProjectionNumberDialog extends StatefulWidget {
   final String title, unit;
   final double value;
+  final int decimals;
   final bool signed;
   const _ProjectionNumberDialog({
     required this.title,
     required this.unit,
     required this.value,
+    required this.decimals,
     this.signed = false,
   });
 
@@ -669,6 +672,7 @@ class _ProjectionNumberDialogState extends State<_ProjectionNumberDialog> {
         child: ArchitectWallDraftingPanel(
           length: _draft,
           unit: widget.unit,
+          decimals: widget.decimals,
           title: widget.title,
           endLabel: context.l10n.save,
           keypadInitiallyOpen: true,

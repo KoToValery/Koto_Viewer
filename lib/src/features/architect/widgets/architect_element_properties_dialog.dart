@@ -139,6 +139,7 @@ class _ArchitectElementPropertiesDialogState
           child: ArchitectWallDraftingPanel(
             length: draft,
             unit: unit,
+            decimals: metric(key) ? widget.project.distanceDecimals : key == 'stepCount' ? 0 : 2,
             title: label(key),
             endLabel: context.l10n.save,
             keypadInitiallyOpen: true,
@@ -183,7 +184,7 @@ class _ArchitectElementPropertiesDialogState
       fieldValue(key) == null
           ? '—'
           : metric(key)
-          ? widget.project.units.format(fieldValue(key)!, decimals: 3)
+          ? widget.project.formatLength(fieldValue(key)!)
           : fieldValue(key)!.toStringAsFixed(key == 'stepCount' ? 0 : 1),
     ),
     onTap:
