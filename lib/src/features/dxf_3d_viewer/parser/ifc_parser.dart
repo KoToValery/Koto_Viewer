@@ -78,6 +78,10 @@ class IfcParser {
     final solver = _IfcGeometrySolver(entityMap: entityMap);
     return solver.buildModel(projectName: projectName, schema: schema);
   }
+
+  /// Public geometric helper for robust planar 3D polygon triangulation.
+  static List<Triangle3D> triangulatePolygon3D(List<Vector3> rawPts, {Color? color}) =>
+      _IfcGeometrySolver.triangulatePolygon3D(rawPts, color: color);
 }
 
 class _RawIfcEntity {
@@ -3817,10 +3821,14 @@ class _IfcGeometrySolver {
   }
 
   /// Robust 3D Ear-Clipping Polygon Triangulator.
+  static List<Triangle3D> _triangulatePolygon3D(List<Vector3> rawPts, {Color? color}) =>
+      triangulatePolygon3D(rawPts, color: color);
+
   /// Handles arbitrary convex, concave, L-shaped, U-shaped, stepped planar polygons, and polygons with bridged holes.
   /// Normalizes coordinates to [0, 1] for uniform numerical stability regardless of CAD scale (mm to km).
   /// Prevents false triangles from shooting across concave indentations, cadastral boundaries, or openings.
-  static List<Triangle3D> _triangulatePolygon3D(List<Vector3> rawPts, {Color? color}) {
+  static List<Triangle3D> triangulatePolygon3D(List<Vector3> rawPts, {Color? color}) {
+
     // 0. Filter coincident points to prevent degenerate triangles and infinite loops
     final List<Vector3> pts = [];
     for (int i = 0; i < rawPts.length; i++) {

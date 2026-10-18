@@ -58,4 +58,20 @@ END-ISO-10303-21;''';
     final mesh = StepParser.parseFromBytes(bytes, name: 'Converter.step');
     expect(mesh.triangles.length, greaterThan(5000));
   });
+
+  test('StepParser accurately triangulates keramida_300x420.step with B-spline wave', () {
+    final file = File('C:/Users/KoTo/Dropbox/test_files/keramida_300x420.step');
+    if (!file.existsSync()) return;
+
+    final bytes = file.readAsBytesSync();
+    final mesh = StepParser.parseFromBytes(bytes, name: 'keramida_300x420.step');
+    print('Keramida triangles: ${mesh.triangles.length}, min: ${mesh.bounds.min}, max: ${mesh.bounds.max}');
+
+    // Ensure the wave reaches ~30.4mm height and has smooth geometry
+    expect(mesh.triangles.length, greaterThan(50));
+    expect(mesh.bounds.max.z, greaterThan(25.0)); // The wave peaks at ~30.4 mm
+    expect(mesh.bounds.max.x, closeTo(300.0, 1.0));
+    expect(mesh.bounds.max.y, closeTo(420.0, 1.0));
+  });
 }
+

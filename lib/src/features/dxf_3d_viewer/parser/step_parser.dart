@@ -4,6 +4,7 @@ import 'dart:ui' show Color;
 import 'package:flutter/foundation.dart';
 import '../geometry/nurbs_surface.dart';
 import '../models/mesh_3d.dart';
+import 'ifc_parser.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 
 class _StepSubEntity {
@@ -34,6 +35,75 @@ class _StepAxisPlacement {
   });
 
   Vector3 get yAxis => axis.cross(refDirection).normalized();
+}
+
+class _StepBSplineCurve {
+  final int degree;
+  final List<int> controlPointIds;
+  final List<double> knots;
+  final List<double>? weights;
+  final bool isClosed;
+
+  const _StepBSplineCurve({
+    required this.degree,
+    required this.controlPointIds,
+    required this.knots,
+    this.weights,
+    this.isClosed = false,
+  });
+
+  Vector3 evaluate(double u, Map<int, Vector3> pointMap) {
+    if (controlPointIds.isEmpty) return Vector3.zero;
+    final n = controlPointIds.length - 1;
+    final p = degree;
+    if (n < p || knots.length < n + p + 2) {
+      return pointMap[controlPointIds.first] ?? Vector3.zero;
+    }
+    final clampedU = u.clamp(knots[p], knots[n + 1]);
+    final s = NurbsSurface.findKnotSpan(n, p, clampedU, knots);
+
+    final cp4 = List<Vector4>.generate(controlPointIds.length, (i) {
+      final pt = pointMap[controlPointIds[i]] ?? Vector3.zero;
+      final w = (weights != null && i < weights!.length) ? weights![i] : 1.0;
+      return Vector4(pt.x * w, pt.y * w, pt.z * w, w);
+    });
+
+    final res4 = NurbsSurface.deBoor1D(p, cp4, knots, clampedU, s);
+    return res4.toVector3();
+  }
+
+  List<Vector3> sample(
+    Map<int, Vector3> pointMap, {
+    int samplesPerSpan = 2,
+    int minSamples = 24,
+    int maxSamples = 64,
+  }) {
+    if (controlPointIds.isEmpty) return [];
+    if (controlPointIds.length == 1) {
+      final pt = pointMap[controlPointIds.first];
+      return pt != null ? [pt] : [];
+    }
+    final n = controlPointIds.length - 1;
+    final p = degree;
+    if (n < p || knots.length < n + p + 2) {
+      return controlPointIds.map((id) => pointMap[id] ?? Vector3.zero).toList();
+    }
+    final uMin = knots[p];
+    final uMax = knots[n + 1];
+    if ((uMax - uMin).abs() < 1e-12) {
+      return [pointMap[controlPointIds.first] ?? Vector3.zero];
+    }
+
+    final spans = math.max(1, n - p + 1);
+    final count = (spans * samplesPerSpan).clamp(minSamples, maxSamples);
+    final pts = <Vector3>[];
+    for (int i = 0; i <= count; i++) {
+      final t = i / count;
+      final u = uMin + (uMax - uMin) * t;
+      pts.add(evaluate(u, pointMap));
+    }
+    return pts;
+  }
 }
 
 class _StepMatrix4 {
@@ -177,6 +247,9 @@ class StepParser {
     final Map<int, Color> itemColorMap = {}; // Item ID -> Color
     final Map<int, int> curveBasisMap = {}; // Curve ID -> Basis Curve ID
     final Map<int, (int, double)> cylindricalSurfaceMap = {}; // Surf ID -> (Placement ID, radius)
+    final Map<int, _StepBSplineCurve> bSplineCurveMap = {};
+    final Map<int, (int, double)> vectorMap = {}; // Vector ID -> (dirId, length)
+    final Map<int, (int, int)> extrusionSurfaceMap = {}; // Surf ID -> (curveId, vectorId)
     final Map<int, String> entityParamsMap = {};
 
     String? rootProductName;
@@ -283,6 +356,48 @@ class StepParser {
                 ? (double.tryParse(rMatch.group(1)!) ?? 1.0)
                 : 1.0;
             cylindricalSurfaceMap[ent.id] = (pId, r);
+          }
+        } else if (type == 'VECTOR') {
+          final idMatch = RegExp(r'#(\d+)').firstMatch(params);
+          const fp = r'[-+]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][-+]?[0-9]+)?';
+          final lenMatch = RegExp(r',\s*(' + fp + r')\s*\)?$').firstMatch(params);
+          if (idMatch != null) {
+            final dId = int.tryParse(idMatch.group(1)!) ?? 0;
+            final len = lenMatch != null
+                ? (double.tryParse(lenMatch.group(1)!) ?? 1.0)
+                : 1.0;
+            vectorMap[ent.id] = (dId, len);
+          }
+        } else if (type == 'SURFACE_OF_LINEAR_EXTRUSION') {
+          final idMatches = RegExp(r'#(\d+)').allMatches(params).toList();
+          if (idMatches.length >= 2) {
+            final cId = int.tryParse(idMatches[0].group(1)!) ?? 0;
+            final vId = int.tryParse(idMatches[1].group(1)!) ?? 0;
+            extrusionSurfaceMap[ent.id] = (cId, vId);
+          }
+        } else if (type == 'B_SPLINE_CURVE_WITH_KNOTS' ||
+            type == 'B_SPLINE_CURVE' ||
+            type == 'BEZIER_CURVE') {
+          final curve = _parseBSplineCurve(params);
+          if (curve != null) {
+            List<double>? weights;
+            final ratSub = ent.getSub('RATIONAL_B_SPLINE_CURVE');
+            if (ratSub != null) {
+              const fp = r'[-+]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][-+]?[0-9]+)?';
+              weights = RegExp(fp)
+                  .allMatches(ratSub.params)
+                  .map((m) => double.tryParse(m.group(0)!) ?? 1.0)
+                  .toList();
+            }
+            bSplineCurveMap[ent.id] = weights != null
+                ? _StepBSplineCurve(
+                    degree: curve.degree,
+                    controlPointIds: curve.controlPointIds,
+                    knots: curve.knots,
+                    weights: weights,
+                    isClosed: curve.isClosed,
+                  )
+                : curve;
           }
         } else if (type == 'EDGE_CURVE') {
           final idMatches = RegExp(r'#(\d+)').allMatches(params).toList();
@@ -546,6 +661,24 @@ class StepParser {
         final vFrom = effOrientation ? startPt : endPt;
         final vTo = effOrientation ? endPt : startPt;
 
+        // Sample B-SPLINE curves for smooth curved profiles
+        final bSpline = bSplineCurveMap[curveId];
+        if (bSpline != null) {
+          final sampled = bSpline.sample(pointMap);
+          if (sampled.isNotEmpty) {
+            final dStart = (sampled.first - vFrom).lengthSquared;
+            final dEnd = (sampled.last - vFrom).lengthSquared;
+            final ordered = (dEnd < dStart) ? sampled.reversed.toList() : sampled;
+
+            for (final p in ordered) {
+              if (pts.isEmpty || (pts.last - p).lengthSquared > 1e-8) {
+                pts.add(p);
+              }
+            }
+            continue;
+          }
+        }
+
         // Sample CIRCLE arcs for smooth cylindrical curves
         final circleData = circleMap[curveId];
         if (circleData != null) {
@@ -642,6 +775,21 @@ class StepParser {
       final cylData = isCylindrical ? cylindricalSurfaceMap[surfId] : null;
       final cylPlacement = cylData != null ? placementMap[cylData.$1] : null;
 
+      final isExtrusion = extrusionSurfaceMap.containsKey(surfId);
+      final extData = isExtrusion ? extrusionSurfaceMap[surfId] : null;
+
+      Vector3? extrusionAxis;
+      if (isExtrusion && extData != null) {
+        final (_, vId) = extData;
+        if (vectorMap.containsKey(vId)) {
+          final (dId, len) = vectorMap[vId]!;
+          final d = directionMap[dId] ?? const Vector3(0, 1, 0);
+          extrusionAxis = d * len;
+        } else if (directionMap.containsKey(vId)) {
+          extrusionAxis = directionMap[vId]!;
+        }
+      }
+
       for (final rawLoopId in loopIds) {
         final loopId = faceBoundMap[rawLoopId] ?? rawLoopId;
         final pts = getLoopPoints(loopId);
@@ -650,14 +798,26 @@ class StepParser {
         final worldPts = pts.map((p) => transform.transformPoint(p)).toList();
         final n = worldPts.length;
 
-        // If face is on a CYLINDRICAL_SURFACE with top and bottom rim points:
-        if (isCylindrical && cylPlacement != null && n >= 6) {
-          final axisW = (transform.transformPoint(cylPlacement.origin + cylPlacement.axis) -
-                  transform.transformPoint(cylPlacement.origin))
-              .normalized();
-          final origW = transform.transformPoint(cylPlacement.origin);
+        final isExtrudedSurface = (isCylindrical && cylPlacement != null) ||
+            (isExtrusion && extrusionAxis != null);
 
-          // Project points to height along cylinder axis
+        // If face is on a CYLINDRICAL_SURFACE or SURFACE_OF_LINEAR_EXTRUSION with two rim profiles:
+        if (isExtrudedSurface && n >= 6) {
+          final Vector3 axisW;
+          final Vector3 origW;
+
+          if (isCylindrical && cylPlacement != null) {
+            axisW = (transform.transformPoint(cylPlacement.origin + cylPlacement.axis) -
+                    transform.transformPoint(cylPlacement.origin))
+                .normalized();
+            origW = transform.transformPoint(cylPlacement.origin);
+          } else {
+            axisW = (transform.transformPoint(extrusionAxis!) -
+                    transform.transformPoint(Vector3.zero))
+                .normalized();
+            origW = worldPts.first;
+          }
+
           final heights = worldPts.map((p) => (p - origW).dot(axisW)).toList();
           final minH = heights.reduce(math.min);
           final maxH = heights.reduce(math.max);
@@ -667,11 +827,34 @@ class StepParser {
             final botPts = <Vector3>[];
             final topPts = <Vector3>[];
 
+            // Extract two contiguous rim curves across the closed boundary loop
+            int transToTop = -1;
             for (int i = 0; i < n; i++) {
-              if (heights[i] < midH) {
-                botPts.add(worldPts[i]);
-              } else {
-                topPts.add(worldPts[i]);
+              final prevH = heights[(i - 1 + n) % n];
+              final curH = heights[i];
+              if (prevH < midH && curH >= midH) {
+                transToTop = i;
+                break;
+              }
+            }
+
+            if (transToTop != -1) {
+              int idx = transToTop;
+              while (heights[idx % n] >= midH && topPts.length < n) {
+                topPts.add(worldPts[idx % n]);
+                idx++;
+              }
+              while (heights[idx % n] < midH && botPts.length < n) {
+                botPts.add(worldPts[idx % n]);
+                idx++;
+              }
+            } else {
+              for (int i = 0; i < n; i++) {
+                if (heights[i] < midH) {
+                  botPts.add(worldPts[i]);
+                } else {
+                  topPts.add(worldPts[i]);
+                }
               }
             }
 
@@ -697,7 +880,7 @@ class StepParser {
                   result.add(Triangle3D(v0: b0, v1: t1, v2: t0, color: faceColor, isDoubleSided: true));
                 }
               }
-              continue; // Cylindrical face triangulated successfully!
+              continue; // Extruded/cylindrical face triangulated successfully!
             }
           }
         }
@@ -745,31 +928,44 @@ class StepParser {
             );
           }
         } else {
-          // Centroid fan triangulation for robust convex/planar polygons
-          Vector3 centroid = Vector3.zero;
-          for (final p in worldPts) {
-            centroid = centroid + p;
-          }
-          centroid = centroid * (1.0 / n);
+          // Robust Ear-Clipping triangulation for planar/concave CAD faces
+          final polyTris = IfcParser.triangulatePolygon3D(worldPts, color: faceColor);
+          if (polyTris.isNotEmpty) {
+            result.addAll(polyTris.map((t) => Triangle3D(
+                  v0: t.v0,
+                  v1: t.v1,
+                  v2: t.v2,
+                  color: faceColor,
+                  isDoubleSided: true,
+                )));
+          } else {
+            // Centroid fan fallback for convex polygons
+            Vector3 centroid = Vector3.zero;
+            for (final p in worldPts) {
+              centroid = centroid + p;
+            }
+            centroid = centroid * (1.0 / n);
 
-          for (int i = 0; i < n; i++) {
-            final p0 = worldPts[i];
-            final p1 = worldPts[(i + 1) % n];
-            if ((p1 - p0).lengthSquared < 1e-8) continue;
-            final edge1 = p0 - centroid;
-            final edge2 = p1 - centroid;
-            if (edge1.cross(edge2).lengthSquared < 1e-8) continue;
-            result.add(
-              Triangle3D(
-                v0: centroid,
-                v1: p0,
-                v2: p1,
-                color: faceColor,
-                isDoubleSided: true,
-              ),
-            );
+            for (int i = 0; i < n; i++) {
+              final p0 = worldPts[i];
+              final p1 = worldPts[(i + 1) % n];
+              if ((p1 - p0).lengthSquared < 1e-8) continue;
+              final edge1 = p0 - centroid;
+              final edge2 = p1 - centroid;
+              if (edge1.cross(edge2).lengthSquared < 1e-8) continue;
+              result.add(
+                Triangle3D(
+                  v0: centroid,
+                  v1: p0,
+                  v2: p1,
+                  color: faceColor,
+                  isDoubleSided: true,
+                ),
+              );
+            }
           }
         }
+
       }
 
       return result;
@@ -1007,6 +1203,66 @@ class StepParser {
 
     final surfTris = nurbs.tessellate();
     triangles.addAll(surfTris);
+  }
+
+  static _StepBSplineCurve? _parseBSplineCurve(String params) {
+    final lists = <String>[];
+    int depth = 0;
+    int start = -1;
+    for (int i = 0; i < params.length; i++) {
+      if (params[i] == '(') {
+        if (depth == 0) start = i + 1;
+        depth++;
+      } else if (params[i] == ')') {
+        depth--;
+        if (depth == 0 && start != -1) {
+          lists.add(params.substring(start, i));
+          start = -1;
+        }
+      }
+    }
+
+    if (lists.isEmpty) return null;
+
+    final cpMatches = RegExp(r'#(\d+)').allMatches(lists[0]);
+    final cpIds = cpMatches.map((m) => int.tryParse(m.group(1)!) ?? 0).toList();
+    if (cpIds.isEmpty) return null;
+
+    final firstParen = params.indexOf('(');
+    final prefix = firstParen > 0 ? params.substring(0, firstParen) : '';
+    final degMatch = RegExp(r',\s*(\d+)\s*$').firstMatch(prefix.trim());
+    final degree = int.tryParse(degMatch?.group(1) ?? '') ?? 3;
+
+    List<double> knots = [];
+    if (lists.length >= 3) {
+      final mults = RegExp(r'\d+')
+          .allMatches(lists[1])
+          .map((m) => double.tryParse(m.group(0)!) ?? 1.0)
+          .toList();
+      const fp = r'[-+]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][-+]?[0-9]+)?';
+      final rawKnots = RegExp(fp)
+          .allMatches(lists[2])
+          .map((m) => double.tryParse(m.group(0)!) ?? 0.0)
+          .toList();
+
+      knots = _expandKnots(mults, rawKnots);
+    } else if (lists.length == 2) {
+      const fp = r'[-+]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][-+]?[0-9]+)?';
+      knots = RegExp(fp)
+          .allMatches(lists[1])
+          .map((m) => double.tryParse(m.group(0)!) ?? 0.0)
+          .toList();
+    }
+
+    if (knots.length < cpIds.length + degree + 1) {
+      knots = NurbsSurface.createClampedKnotVector(cpIds.length - 1, degree);
+    }
+
+    return _StepBSplineCurve(
+      degree: degree,
+      controlPointIds: cpIds,
+      knots: knots,
+    );
   }
 
   static List<_StepSubEntity> _parseSubEntities(String rhs) {
