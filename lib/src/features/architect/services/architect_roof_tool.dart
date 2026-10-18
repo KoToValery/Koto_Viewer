@@ -12,6 +12,7 @@ import 'architect_roof_geometry.dart';
 enum RoofDrawMode {
   rectangle,
   polygon,
+  multiPitch,
 }
 
 // === SECTION: ARCHITECT ROOF TOOL ===
@@ -82,9 +83,9 @@ class ArchitectRoofTool extends ChangeNotifier {
   }
 
   /// Adds a point during interactive drafting.
-  /// In `RoofDrawMode.rectangle`, the 2nd point immediately completes and returns the new `ArchitectRoofPlane`.
-  /// In `RoofDrawMode.polygon`, tapping near the first point (when `>= 3` points) closes and returns the `ArchitectRoofPlane`.
-  ArchitectRoofPlane? addDraftPoint(
+  /// In `RoofDrawMode.rectangle`, the 2nd point immediately completes and returns the new plane.
+  /// In `RoofDrawMode.polygon` or `multiPitch`, tapping near the first point closes and returns the planes.
+  List<ArchitectRoofPlane>? addDraftPoint(
     Offset point, {
     required ArchitectStorey storey,
     double closeRadius = 0.35,
@@ -117,13 +118,13 @@ class ArchitectRoofTool extends ChangeNotifier {
         eavesEdgeIndex: eavesIdx,
       );
       clearDraft();
-      return created;
+      return [created];
     }
 
-    // Polygon mode
+    // Polygon or Multi-pitch mode
     if (draftPoints.length >= 3 &&
         (point - draftPoints.first).distance <= closeRadius) {
-      return finishPolygonDraft(storey: storey);
+      return finishDraft(storey: storey);
     }
     if (draftPoints.isEmpty || (point - draftPoints.last).distance > 0.05) {
       draftPoints.add(point);
@@ -131,6 +132,15 @@ class ArchitectRoofTool extends ChangeNotifier {
       notifyListeners();
     }
     return null;
+  }
+
+  /// Closes the draft and generates either a single polygon plane or a coordinated multi-pitch roof.
+  List<ArchitectRoofPlane>? finishDraft({required ArchitectStorey storey}) {
+    if (drawMode == RoofDrawMode.multiPitch) {
+      return finishMultiPitchDraft(storey: storey);
+    }
+    final single = finishPolygonDraft(storey: storey);
+    return single != null ? [single] : null;
   }
 
   ArchitectRoofPlane? finishPolygonDraft({required ArchitectStorey storey}) {
@@ -143,6 +153,23 @@ class ArchitectRoofTool extends ChangeNotifier {
     );
     clearDraft();
     return created;
+  }
+
+  List<ArchitectRoofPlane>? finishMultiPitchDraft({
+    required ArchitectStorey storey,
+  }) {
+    if (draftPoints.length < 3) return null;
+    final pts = List<Offset>.from(draftPoints);
+    final planes = ArchitectRoofGeometry.decomposeMultiPitchPolygon(
+      eavesPolygon: pts,
+      storey: storey,
+      slopeDegrees: slopeDegrees,
+      baseElevationOffset: storey.height,
+      eavesOverhang: eavesOverhang,
+      assembly: activeAssembly,
+    );
+    clearDraft();
+    return planes.isNotEmpty ? planes : null;
   }
 
   void undoLastDraftPoint() {

@@ -1,6 +1,6 @@
 import 'dart:ui';
 
-enum BimPolygonEdgeMode { pull, move }
+enum BimPolygonEdgeMode { pull, move, extendCatheti }
 
 /// Shared contour editing for planar CAD shapes and volumetric slabs.
 class BimPolygonGeometry {
@@ -164,9 +164,11 @@ class BimPolygonGeometry {
     int edge,
     double distance, {
     BimPolygonEdgeMode mode = BimPolygonEdgeMode.pull,
-  }) => mode == BimPolygonEdgeMode.move
-      ? moveEdge(polygon, edge, distance)
-      : pullEdge(polygon, edge, distance);
+  }) => switch (mode) {
+    BimPolygonEdgeMode.move => moveEdge(polygon, edge, distance),
+    BimPolygonEdgeMode.extendCatheti => offsetEdgePreservingAngles(polygon, edge, distance),
+    BimPolygonEdgeMode.pull => pullEdge(polygon, edge, distance),
+  };
 
   /// Translate both endpoints by the same normal displacement. Neighboring
   /// edges follow those endpoints without retaining the old endpoint positions.
@@ -191,5 +193,68 @@ class BimPolygonGeometry {
       return null;
     }
     return cleaned;
+  }
+
+  /// Displaces [edge] parallel to itself by [distance] along its normal, but extends
+  /// or trims the adjacent segments (the "катети" / hips / verges) by intersecting
+  /// the displaced edge line with the ray lines of the neighboring edges.
+  /// This completely preserves the angles of the adjacent edges.
+  static List<Offset>? offsetEdgePreservingAngles(
+    List<Offset> polygon,
+    int edge,
+    double distance,
+  ) {
+    if (polygon.length < 3 ||
+        edge < 0 ||
+        edge >= polygon.length ||
+        !distance.isFinite) {
+      return null;
+    }
+    if (distance.abs() < epsilon) {
+      return List<Offset>.of(polygon);
+    }
+    final n = polygon.length;
+    final a = polygon[edge];
+    final b = polygon[(edge + 1) % n];
+    final ab = b - a;
+    if (ab.distance < epsilon) return null;
+
+    final prevIdx = (edge - 1 + n) % n;
+    final pPrev = polygon[prevIdx];
+    final nextIdx = (edge + 2) % n;
+    final pNext = polygon[nextIdx];
+
+    final disp = normal(polygon, edge) * distance;
+    final aPrime = a + disp;
+    final bPrime = b + disp;
+
+    // Line 1: Displaced edge line passing through aPrime, bPrime with direction ab.
+    // Line 2 (prev edge): passes through pPrev and a with direction (a - pPrev).
+    // Line 3 (next edge): passes through b and pNext with direction (pNext - b).
+    final newA = _intersectLines(pPrev, a, aPrime, bPrime) ?? aPrime;
+    final newB = _intersectLines(aPrime, bPrime, b, pNext) ?? bPrime;
+
+    final moved = List<Offset>.of(polygon)
+      ..[edge] = newA
+      ..[(edge + 1) % n] = newB;
+
+    final cleaned = clean(moved);
+    if (!valid(cleaned) || signedArea(cleaned) * signedArea(polygon) <= 0) {
+      return null;
+    }
+    return cleaned;
+  }
+
+  /// Finds intersection of infinite line passing through [p1]-[p2] and infinite line passing through [p3]-[p4].
+  /// Returns null if lines are parallel.
+  static Offset? _intersectLines(Offset p1, Offset p2, Offset p3, Offset p4) {
+    final d1 = p2 - p1;
+    final d2 = p4 - p3;
+    final crossVal = cross(d1, d2);
+    if (crossVal.abs() < 1e-9) {
+      return null; // parallel
+    }
+    final t = cross(p3 - p1, d2) / crossVal;
+    return p1 + d1 * t;
   }
 }

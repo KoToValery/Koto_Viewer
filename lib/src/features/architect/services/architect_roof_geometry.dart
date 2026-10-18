@@ -9,7 +9,10 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_project.dart';
 import '../models/architect_section.dart';
+import '../rendering/architect_path_solid.dart';
+import '../rendering/architect_wall_network.dart';
 import 'architect_element_id.dart';
+import 'architect_polygon_geometry.dart';
 
 // === SECTION: DATA STRUCTURES ===
 
@@ -144,6 +147,39 @@ class ArchitectRoofGeometry {
     final assembly = ArchitectRoofAssembly.fromPreset(effectivePreset);
     final baseZ = storey.walls.isEmpty && storeyIdx > 0 ? 0.0 : storey.height;
     final groupId = ArchitectElementId.next('roof_grp');
+
+    // Multi-pitch Straight Skeleton generation over real exterior walls (supports L-shape, T-shape, articulated walls)
+    if (type == AutoRoofType.hip && walls.isNotEmpty) {
+      final wallPath = ArchitectWallNetwork.body(walls);
+      final rawContours = ArchitectPathSolid.contours(wallPath);
+      if (rawContours.isNotEmpty) {
+        var maxArea = 0.0;
+        List<Offset>? largest;
+        for (final c in rawContours) {
+          final cleaned = BimPolygonGeometry.clean(c, removeCollinear: true);
+          final area = BimPolygonGeometry.signedArea(cleaned).abs();
+          if (area > maxArea && cleaned.length >= 3) {
+            maxArea = area;
+            largest = cleaned;
+          }
+        }
+        if (largest != null && maxArea > 1.0) {
+          final eavesPoly = offsetPolygonOutwards(largest, overhang);
+          final planes = decomposeMultiPitchPolygon(
+            eavesPolygon: eavesPoly,
+            storey: storey,
+            slopeDegrees: slopeDegrees,
+            baseElevationOffset: baseZ,
+            eavesOverhang: overhang,
+            assembly: assembly,
+            roofGroupId: groupId,
+          );
+          if (planes.isNotEmpty) {
+            return planes;
+          }
+        }
+      }
+    }
 
     ArchitectRoofPlane makePlane(
       List<Offset> pts, {
@@ -313,6 +349,189 @@ class ArchitectRoofGeometry {
           ];
         }
     }
+  }
+
+  /// Offsets closed polygon [polygon] outwards by [distance].
+  static List<Offset> offsetPolygonOutwards(List<Offset> polygon, double distance) {
+    if (distance <= 0.001 || polygon.length < 3) return polygon;
+    final n = polygon.length;
+    final isCcw = BimPolygonGeometry.signedArea(polygon) > 0;
+    final pts = isCcw ? polygon : polygon.reversed.toList();
+
+    final result = <Offset>[];
+    for (var i = 0; i < n; i++) {
+      final prev = pts[(i - 1 + n) % n];
+      final curr = pts[i];
+      final next = pts[(i + 1) % n];
+
+      final ePrev = curr - prev;
+      final eNext = next - curr;
+      if (ePrev.distance < 1e-6 || eNext.distance < 1e-6) continue;
+
+      // Outward unit normal for CCW polygon: (dy, -dx)
+      final nPrev = Offset(ePrev.dy, -ePrev.dx) / ePrev.distance;
+      final nNext = Offset(eNext.dy, -eNext.dx) / eNext.distance;
+
+      // Bisector vector pointing outwards
+      final b = nPrev + nNext;
+      final denom = 1.0 + (nPrev.dx * nNext.dx + nPrev.dy * nNext.dy);
+      if (denom.abs() < 1e-4) {
+        result.add(curr + nPrev * distance);
+      } else {
+        final v = b / denom;
+        result.add(curr + v * distance);
+      }
+    }
+    final cleaned = BimPolygonGeometry.clean(result, removeCollinear: true);
+    return cleaned.length >= 3 ? cleaned : polygon;
+  }
+
+  /// Decomposes an arbitrary closed polygon [eavesPolygon] into matching hipped roof planes
+  /// using straight skeleton bisector decomposition.
+  /// Generates clean planar faces with 45° hips, 45° valleys (at reflex corners),
+  /// and horizontal ridges.
+  static List<ArchitectRoofPlane> decomposeMultiPitchPolygon({
+    required List<Offset> eavesPolygon,
+    required ArchitectStorey storey,
+    required double slopeDegrees,
+    required double baseElevationOffset,
+    required double eavesOverhang,
+    required ArchitectRoofAssembly assembly,
+    String? roofGroupId,
+  }) {
+    final cleaned = BimPolygonGeometry.clean(eavesPolygon, removeCollinear: true);
+    if (cleaned.length < 3) return const [];
+
+    final isCcw = BimPolygonGeometry.signedArea(cleaned) > 0;
+    final poly = isCcw ? cleaned : cleaned.reversed.toList();
+    final n = poly.length;
+    final groupId = roofGroupId ?? ArchitectElementId.next('roof_grp');
+
+    final planes = <ArchitectRoofPlane>[];
+
+    // For each edge i, construct its face by clipping poly against all bisector half-planes
+    for (var i = 0; i < n; i++) {
+      final a = poly[i];
+      final b = poly[(i + 1) % n];
+      final edgeDir = b - a;
+      if (edgeDir.distance < 0.05) continue;
+
+      // Inward unit normal for CCW polygon: (-dy, dx)
+      final normI = Offset(-edgeDir.dy, edgeDir.dx) / edgeDir.distance;
+
+      var facePoly = List<Offset>.from(poly);
+
+      for (var j = 0; j < n; j++) {
+        if (i == j) continue;
+        final aJ = poly[j];
+        final bJ = poly[(j + 1) % n];
+        final edgeJDir = bJ - aJ;
+        if (edgeJDir.distance < 0.05) continue;
+
+        final normJ = Offset(-edgeJDir.dy, edgeJDir.dx) / edgeJDir.distance;
+
+        // Condition: dist(P, Edge_i) <= dist(P, Edge_j)
+        // (P - a) . normI <= (P - aJ) . normJ
+        // P . (normI - normJ) <= a . normI - aJ . normJ
+        final deltaNorm = normI - normJ;
+        if (deltaNorm.distance < 1e-6) continue;
+
+        final rhs = BimPolygonGeometry.dot(a, normI) - BimPolygonGeometry.dot(aJ, normJ);
+
+        facePoly = _clipPolygonByHalfPlane(facePoly, deltaNorm, rhs);
+        if (facePoly.length < 3) break;
+      }
+
+      if (facePoly.length >= 3) {
+        // Ensure edge i is at index 0 (safeEavesEdgeIndex)
+        final orderedFace = _alignFaceToEaves(facePoly, a, b);
+        if (orderedFace.length >= 3 && BimPolygonGeometry.signedArea(orderedFace).abs() > 0.05) {
+          planes.add(
+            ArchitectRoofPlane(
+              id: ArchitectElementId.next('roof'),
+              storeyId: storey.id,
+              points: orderedFace,
+              eavesEdgeIndex: 0,
+              slopeDegrees: slopeDegrees,
+              baseElevationOffset: baseElevationOffset,
+              eavesOverhang: eavesOverhang,
+              assembly: assembly.copyWith(),
+              roofGroupId: groupId,
+            ),
+          );
+        }
+      }
+    }
+
+    return planes;
+  }
+
+  static List<Offset> _clipPolygonByHalfPlane(
+    List<Offset> poly,
+    Offset normal,
+    double c,
+  ) {
+    if (poly.length < 3) return const [];
+    final output = <Offset>[];
+
+    bool isInside(Offset p) => (p.dx * normal.dx + p.dy * normal.dy) <= c + 1e-6;
+
+    Offset intersect(Offset p1, Offset p2) {
+      final val1 = p1.dx * normal.dx + p1.dy * normal.dy - c;
+      final val2 = p2.dx * normal.dx + p2.dy * normal.dy - c;
+      final denom = val2 - val1;
+      if (denom.abs() < 1e-9) return p1;
+      final t = (-val1 / denom).clamp(0.0, 1.0);
+      return p1 + (p2 - p1) * t;
+    }
+
+    for (var k = 0; k < poly.length; k++) {
+      final curr = poly[k];
+      final next = poly[(k + 1) % poly.length];
+      final currIn = isInside(curr);
+      final nextIn = isInside(next);
+
+      if (currIn) {
+        if (nextIn) {
+          output.add(next);
+        } else {
+          output.add(intersect(curr, next));
+        }
+      } else {
+        if (nextIn) {
+          output.add(intersect(curr, next));
+          output.add(next);
+        }
+      }
+    }
+    return BimPolygonGeometry.clean(output, removeCollinear: true);
+  }
+
+  static List<Offset> _alignFaceToEaves(
+    List<Offset> face,
+    Offset eavesA,
+    Offset eavesB,
+  ) {
+    if (face.length < 3) return face;
+    var bestIdx = -1;
+    var bestDist = 0.20;
+    for (var k = 0; k < face.length; k++) {
+      final p1 = face[k];
+      final p2 = face[(k + 1) % face.length];
+      final d = (p1 - eavesA).distance + (p2 - eavesB).distance;
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = k;
+      }
+    }
+    if (bestIdx == 0) return face;
+    if (bestIdx > 0) {
+      return [
+        ...face.sublist(bestIdx),
+        ...face.sublist(0, bestIdx),
+      ];
+    }
+    return face;
   }
 
   // === SECTION: PLAN EDGE CLASSIFICATION & WALL SUPPORT LINE ===

@@ -91,6 +91,17 @@ class ArchitectRoofBar extends StatelessWidget {
                         if (sel) tool.setDrawMode(RoofDrawMode.polygon);
                       },
                     ),
+                    const SizedBox(width: 4),
+                    ChoiceChip(
+                      key: const ValueKey('roof-mode-multipitch'),
+                      visualDensity: VisualDensity.compact,
+                      avatar: const Icon(Icons.polyline_rounded, size: 15),
+                      label: Text(l.architectRoofDrawMultiPitch),
+                      selected: tool.drawMode == RoofDrawMode.multiPitch,
+                      onSelected: (sel) {
+                        if (sel) tool.setDrawMode(RoofDrawMode.multiPitch);
+                      },
+                    ),
                     const SizedBox(width: 6),
 
                     // Auto-Roof menu button
@@ -219,6 +230,39 @@ class ArchitectRoofBar extends StatelessWidget {
                         ),
                         label: Text(l.architectRoofFlipSlope),
                         onPressed: onFlipSlopeDirection,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+
+                  if (roof != null && roof.roofGroupId != null) ...[
+                    Tooltip(
+                      message: l.architectRoofLinkedSlopesTooltip,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0x3300E5FF),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF00E5FF)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.link, size: 13, color: Color(0xFF00E5FF)),
+                            const SizedBox(width: 4),
+                            Text(
+                              l.architectRoofLinkedSlopes,
+                              style: const TextStyle(
+                                color: Color(0xFF00E5FF),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),

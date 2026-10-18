@@ -867,4 +867,107 @@ void main() {
       );
     });
   });
+
+  group('Roof Edge Displacement & Catheti Angle Preservation', () {
+    test('offsetEdgePreservingAngles preserves adjacent hip/verge angles perfectly', () {
+      // Hipped roof trapezoid:
+      // Edge 0 (eaves): (0, 0) to (10, 0)
+      // Edge 1 (hip): (10, 0) to (7, 3) [angle: 135 deg / -45 deg]
+      // Edge 2 (ridge): (7, 3) to (3, 3)
+      // Edge 3 (hip): (3, 3) to (0, 0) [angle: 225 deg / +45 deg]
+      final poly = [
+        const Offset(0, 0),
+        const Offset(10, 0),
+        const Offset(7, 3),
+        const Offset(3, 3),
+      ];
+
+      // Pull edge 0 outward (towards eaves) by 0.50m
+      final extended = BimPolygonGeometry.offsetEdge(
+        poly,
+        0,
+        0.50,
+        mode: BimPolygonEdgeMode.extendCatheti,
+      );
+
+      expect(extended, isNotNull);
+      expect(extended!.length, equals(4));
+
+      // The new eaves edge endpoints should be (-0.5, -0.5) and (10.5, -0.5)
+      expect(extended[0].dx, closeTo(-0.5, 1e-4));
+      expect(extended[0].dy, closeTo(-0.5, 1e-4));
+      expect(extended[1].dx, closeTo(10.5, 1e-4));
+      expect(extended[1].dy, closeTo(-0.5, 1e-4));
+
+      // Check that the hip directions (катети) are strictly preserved
+      final originalHip0Dir = poly[0] - poly[3]; // (0,0) - (3,3) = (-3, -3)
+      final extendedHip0Dir = extended[0] - extended[3]; // (-0.5, -0.5) - (3, 3) = (-3.5, -3.5)
+      expect(extendedHip0Dir.dx, closeTo(extendedHip0Dir.dy, 1e-6));
+      expect(BimPolygonGeometry.cross(originalHip0Dir, extendedHip0Dir).abs(), closeTo(0.0, 1e-6));
+
+      final originalHip1Dir = poly[2] - poly[1]; // (7,3) - (10,0) = (-3, 3)
+      final extendedHip1Dir = extended[2] - extended[1]; // (7,3) - (10.5,-0.5) = (-3.5, 3.5)
+      expect(extendedHip1Dir.dx, closeTo(-extendedHip1Dir.dy, 1e-6));
+      expect(BimPolygonGeometry.cross(originalHip1Dir, extendedHip1Dir).abs(), closeTo(0.0, 1e-6));
+    });
+  });
+
+  group('Multi-Pitch Roof & Straight Skeleton Decomposition for Articulated Walls', () {
+    test('decomposeMultiPitchPolygon cleanly breaks L-shaped building into matching hipped planes with 45 deg hips and valleys', () {
+      const storey = ArchitectStorey(
+        id: 's_l',
+        name: 'Storey L',
+        elevation: 0.0,
+        height: 3.0,
+      );
+      // L-shaped footprint:
+      // (0,0) -> (12,0) -> (12,6) -> (6,6) -> (6,10) -> (0,10)
+      final lFootprint = [
+        const Offset(0, 0),
+        const Offset(12, 0),
+        const Offset(12, 6),
+        const Offset(6, 6),
+        const Offset(6, 10),
+        const Offset(0, 10),
+      ];
+
+      final planes = ArchitectRoofGeometry.decomposeMultiPitchPolygon(
+        eavesPolygon: lFootprint,
+        storey: storey,
+        slopeDegrees: 25.0,
+        baseElevationOffset: 3.0,
+        eavesOverhang: 0.50,
+        assembly: ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles),
+      );
+
+      expect(planes.isNotEmpty, isTrue);
+      // All generated planes belong to the same roof group
+      final grpId = planes.first.roofGroupId;
+      expect(grpId, isNotNull);
+      expect(planes.every((p) => p.roofGroupId == grpId), isTrue);
+
+      // Verify that all planes have valid planar points and eaves edge index 0
+      for (final p in planes) {
+        expect(p.points.length, greaterThanOrEqualTo(3));
+        expect(p.safeEavesEdgeIndex, equals(0));
+        expect(p.slopeDegrees, equals(25.0));
+      }
+    });
+
+    test('offsetPolygonOutwards offsets perimeter uniformly and cleanly', () {
+      final rect = [
+        const Offset(0, 0),
+        const Offset(10, 0),
+        const Offset(10, 6),
+        const Offset(0, 6),
+      ];
+      final offset = ArchitectRoofGeometry.offsetPolygonOutwards(rect, 0.50);
+      expect(offset.length, equals(4));
+      // Outer rect should be [-0.5, 10.5] x [-0.5, 6.5]
+      expect(offset.any((p) => (p - const Offset(-0.5, -0.5)).distance < 1e-4), isTrue);
+      expect(offset.any((p) => (p - const Offset(10.5, -0.5)).distance < 1e-4), isTrue);
+      expect(offset.any((p) => (p - const Offset(10.5, 6.5)).distance < 1e-4), isTrue);
+      expect(offset.any((p) => (p - const Offset(-0.5, 6.5)).distance < 1e-4), isTrue);
+    });
+  });
 }

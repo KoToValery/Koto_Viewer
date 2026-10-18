@@ -6199,6 +6199,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get architectRoofDrawMultiPitch => 'Multi-pitch';
+
+  @override
+  String get architectRoofLinkedSlopes => 'Linked slopes';
+
+  @override
+  String get architectRoofLinkedSlopesTooltip =>
+      'All roof planes in this group share the same slope and eaves height';
+
+  @override
+  String get architectRoofSnap45Degrees => '45° Hip / Ridge';
+
+  @override
   String get cad3dOrbit => 'Orbit';
 
   @override

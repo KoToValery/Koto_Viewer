@@ -2024,6 +2024,10 @@
       }
     }
   },
+  "architectRoofDrawMultiPitch": "Многоскатен",
+  "architectRoofLinkedSlopes": "Свързани скатове",
+  "architectRoofLinkedSlopesTooltip": "Всички скатове в тази покривна група споделят общ наклон и височина на стрехата",
+  "architectRoofSnap45Degrees": "45° Скат / Било",
   "cad3dOrbit": "Завъртане",
   "cad3dPan": "Преместване",
   "cad3dWalk": "Разходка",

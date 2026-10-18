@@ -6222,6 +6222,19 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
+  String get architectRoofDrawMultiPitch => 'Многоскатен';
+
+  @override
+  String get architectRoofLinkedSlopes => 'Свързани скатове';
+
+  @override
+  String get architectRoofLinkedSlopesTooltip =>
+      'Всички скатове в тази покривна група споделят общ наклон и височина на стрехата';
+
+  @override
+  String get architectRoofSnap45Degrees => '45° Скат / Било';
+
+  @override
   String get cad3dOrbit => 'Завъртане';
 
   @override

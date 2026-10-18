@@ -1981,10 +1981,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
     final polygon = _selectedPolygon;
+    final isRoofDirect = _polygonEditId == null && _selectedRoof != null;
     final movableEdge =
         polygon != null &&
-            _polygonEditId != null &&
-            _polygonEdgeMode == ArchitectPolygonEdgeMode.move &&
+            (_polygonEditId != null &&
+                    (_polygonEdgeMode == ArchitectPolygonEdgeMode.move ||
+                        _polygonEdgeMode == ArchitectPolygonEdgeMode.extendCatheti) ||
+                isRoofDirect) &&
             !polygon.any((p) => (p - rawModel).distance < 10 / _currentScale)
         ? ArchitectPolygonDimensions.hitEdge(
             polygon,
@@ -2000,6 +2003,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 movableEdge,
                 rawModel,
                 _currentScale,
+                mode: isRoofDirect
+                    ? ArchitectPolygonEdgeMode.extendCatheti
+                    : _polygonEdgeMode,
               )
             : _polygonEditor.start(
                 (_selectedElementId ?? _selectedZoneId)!,
@@ -2008,7 +2014,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 _currentScale,
                 mode: _polygonEditId == null
                     ? (_selectedRoof != null
-                          ? ArchitectPolygonEdgeMode.move
+                          ? ArchitectPolygonEdgeMode.extendCatheti
                           : ArchitectPolygonEdgeMode.pull)
                     : _polygonEdgeMode,
               ))) {
@@ -3198,7 +3204,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Offset _resolveRoofPoint(Offset raw) {
     final points = _roofTool.draftPoints;
-    if (_roofTool.drawMode == RoofDrawMode.polygon && points.length >= 3) {
+    final isPolyMode = _roofTool.drawMode == RoofDrawMode.polygon ||
+        _roofTool.drawMode == RoofDrawMode.multiPitch;
+    if (isPolyMode && points.length >= 3) {
       if ((raw - points.first).distance <= math.min(18 / _currentScale, 0.35)) {
         _activeSnapLabel = context.l10n.architectZonePointSnapStart;
         _activeMagneticGuides = [];
@@ -3216,13 +3224,42 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         return closure.point;
       }
     }
-    final anchor = _roofTool.drawMode == RoofDrawMode.polygon
-        ? points.lastOrNull
-        : null;
+    final anchor = isPolyMode ? points.lastOrNull : null;
     final snap = _snapElement(raw, anchor: anchor);
-    _activeSnapLabel = snap.snapLabel;
-    _activeMagneticGuides = snap.magneticGuides;
-    return snap.point;
+    var pt = snap.point;
+    var snapLabel = snap.snapLabel;
+    var guides = snap.magneticGuides;
+
+    // Check 45° hip angle guide from anchor
+    if (anchor != null && _magnetEnabled) {
+      final delta = raw - anchor;
+      final dist = delta.distance;
+      if (dist > 0.15) {
+        for (final angleDeg in const [45.0, 135.0, 225.0, 315.0]) {
+          final rad = angleDeg * math.pi / 180.0;
+          final dir = Offset(math.cos(rad), math.sin(rad));
+          final proj = delta.dx * dir.dx + delta.dy * dir.dy;
+          if (proj > 0.10) {
+            final guidePt = anchor + dir * proj;
+            final perpDist = (raw - guidePt).distance;
+            final snapTol = (_touchInput ? 16 : 10) / _currentScale;
+            if (perpDist <= snapTol) {
+              pt = guidePt;
+              snapLabel = context.l10n.architectRoofSnap45Degrees;
+              final guideSpan = math.max(dist + 2.0, 10.0);
+              guides = [
+                (anchor, anchor + dir * guideSpan),
+              ];
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    _activeSnapLabel = snapLabel;
+    _activeMagneticGuides = guides;
+    return pt;
   }
 
   Offset _resolveSlabPoint(Offset raw) {
@@ -4461,24 +4498,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     // 9b. In Roof tool
     if (_activeTool == ArchitectTool.roof) {
       final pt = _resolveRoofPoint(rawModel);
-      final created = _roofTool.addDraftPoint(
+      final createdList = _roofTool.addDraftPoint(
         pt,
         storey: _project.activeStorey,
         closeRadius: math.min(18.0 / _currentScale, 0.35),
       );
-      if (created != null) {
+      if (createdList != null && createdList.isNotEmpty) {
         setState(() {
-          _commands.execute(
-            CreateArchitectRoofPlane(
-              storeyId: _project.activeStoreyId,
-              roof: created,
-            ),
-          );
+          for (final plane in createdList) {
+            _commands.execute(
+              CreateArchitectRoofPlane(
+                storeyId: _project.activeStoreyId,
+                roof: plane,
+              ),
+            );
+          }
           _selectionIds
             ..clear()
-            ..add(created.id);
-          _selectedElementId = created.id;
-          _polygonSelectedEdge = created.safeEavesEdgeIndex;
+            ..addAll(createdList.map((p) => p.id));
+          _selectedElementId = createdList.first.id;
+          _polygonSelectedEdge = createdList.first.safeEavesEdgeIndex;
           _activeMagneticGuides = [];
           _activeSnapLabel = null;
         });
@@ -5623,7 +5662,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final original = List<Offset>.of(polygon);
     final isRoofDirect = _polygonEditId == null && _selectedRoof?.id == id;
     final mode = isRoofDirect
-        ? ArchitectPolygonEdgeMode.move
+        ? ArchitectPolygonEdgeMode.extendCatheti
         : _polygonEdgeMode;
     final project = _project;
     final unit = project.units;
@@ -9029,12 +9068,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               _roofTool.setSlopeDegrees(slopeDeg);
                               final sel = _selectedRoof;
                               if (sel != null) {
-                                _commands.execute(
-                                  UpdateArchitectRoofPlane(
-                                    storeyId: _project.activeStoreyId,
-                                    roof: sel.copyWith(slopeDegrees: slopeDeg),
-                                  ),
-                                );
+                                final grp = sel.roofGroupId;
+                                if (grp != null && grp.isNotEmpty) {
+                                  for (final r in _project.activeStorey.roofs) {
+                                    if (r.roofGroupId == grp) {
+                                      _commands.execute(
+                                        UpdateArchitectRoofPlane(
+                                          storeyId: _project.activeStoreyId,
+                                          roof: r.copyWith(slopeDegrees: slopeDeg),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } else {
+                                  _commands.execute(
+                                    UpdateArchitectRoofPlane(
+                                      storeyId: _project.activeStoreyId,
+                                      roof: sel.copyWith(slopeDegrees: slopeDeg),
+                                    ),
+                                  );
+                                }
                                 _saveBiMProjectIfAttached();
                               }
                             });
@@ -9045,35 +9098,51 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               _roofTool.setEavesOverhang(overhang);
                               final sel = _selectedRoof;
                               if (sel != null) {
-                                _commands.execute(
-                                  UpdateArchitectRoofPlane(
-                                    storeyId: _project.activeStoreyId,
-                                    roof: sel.copyWith(eavesOverhang: overhang),
-                                  ),
-                                );
+                                final grp = sel.roofGroupId;
+                                if (grp != null && grp.isNotEmpty) {
+                                  for (final r in _project.activeStorey.roofs) {
+                                    if (r.roofGroupId == grp) {
+                                      _commands.execute(
+                                        UpdateArchitectRoofPlane(
+                                          storeyId: _project.activeStoreyId,
+                                          roof: r.copyWith(eavesOverhang: overhang),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } else {
+                                  _commands.execute(
+                                    UpdateArchitectRoofPlane(
+                                      storeyId: _project.activeStoreyId,
+                                      roof: sel.copyWith(eavesOverhang: overhang),
+                                    ),
+                                  );
+                                }
                                 _saveBiMProjectIfAttached();
                               }
                             });
                             HapticFeedback.selectionClick();
                           },
                           onFinishPolygon: () {
-                            final created = _roofTool.finishPolygonDraft(
+                            final createdList = _roofTool.finishDraft(
                               storey: _project.activeStorey,
                             );
-                            if (created != null) {
+                            if (createdList != null && createdList.isNotEmpty) {
                               setState(() {
-                                _commands.execute(
-                                  CreateArchitectRoofPlane(
-                                    storeyId: _project.activeStoreyId,
-                                    roof: created,
-                                  ),
-                                );
+                                for (final plane in createdList) {
+                                  _commands.execute(
+                                    CreateArchitectRoofPlane(
+                                      storeyId: _project.activeStoreyId,
+                                      roof: plane,
+                                    ),
+                                  );
+                                }
                                 _selectionIds
                                   ..clear()
-                                  ..add(created.id);
-                                _selectedElementId = created.id;
+                                  ..addAll(createdList.map((p) => p.id));
+                                _selectedElementId = createdList.first.id;
                                 _polygonSelectedEdge =
-                                    created.safeEavesEdgeIndex;
+                                    createdList.first.safeEavesEdgeIndex;
                               });
                               _saveBiMProjectIfAttached();
                               HapticFeedback.mediumImpact();

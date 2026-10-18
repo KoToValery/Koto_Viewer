@@ -4098,6 +4098,10 @@
       }
     }
   },
+  "architectRoofDrawMultiPitch": "Multi-pitch",
+  "architectRoofLinkedSlopes": "Linked slopes",
+  "architectRoofLinkedSlopesTooltip": "All roof planes in this group share the same slope and eaves height",
+  "architectRoofSnap45Degrees": "45° Hip / Ridge",
   "cad3dOrbit": "Orbit",
   "@cad3dOrbit": {"description": "3D orbit navigation tooltip"},
   "cad3dPan": "Pan",

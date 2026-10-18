@@ -10967,6 +10967,30 @@ abstract class AppLocalizations {
   /// **'Level {level}'**
   String architectRoofLowerLevelBadge(String level);
 
+  /// No description provided for @architectRoofDrawMultiPitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-pitch'**
+  String get architectRoofDrawMultiPitch;
+
+  /// No description provided for @architectRoofLinkedSlopes.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked slopes'**
+  String get architectRoofLinkedSlopes;
+
+  /// No description provided for @architectRoofLinkedSlopesTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'All roof planes in this group share the same slope and eaves height'**
+  String get architectRoofLinkedSlopesTooltip;
+
+  /// No description provided for @architectRoofSnap45Degrees.
+  ///
+  /// In en, this message translates to:
+  /// **'45° Hip / Ridge'**
+  String get architectRoofSnap45Degrees;
+
   /// 3D orbit navigation tooltip
   ///
   /// In en, this message translates to:
