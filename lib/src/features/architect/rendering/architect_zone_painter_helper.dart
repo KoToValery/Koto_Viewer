@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../core/l10n/generated/app_localizations.dart';
 import '../models/architect_project.dart';
 import '../models/architect_zone.dart';
 import 'architect_canvas_palette.dart';
@@ -7,6 +8,40 @@ import 'architect_canvas_palette.dart';
 /// Specialized rendering helper for architectural functional zones,
 /// dynamic vertex handles, midpoint grips, and magnetic guide lines.
 class ArchitectZonePainterHelper {
+  /// Draws the room schedule table or ghost preview.
+  static void drawZoneSchedule({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
+    required Canvas canvas,
+    required ArchitectStorey storey,
+    required double zoomScale,
+    bool isTableSelected = false,
+    Offset? tableDragPreviewOrigin,
+    Offset? tableGhostOrigin,
+    AppLocalizations? l10n,
+  }) {
+    final effectiveTableOrigin =
+        tableDragPreviewOrigin ?? storey.zoneScheduleOrigin;
+    if (effectiveTableOrigin != null && storey.zones.isNotEmpty) {
+      drawZoneScheduleTable(
+        canvas: canvas,
+        storey: storey,
+        origin: effectiveTableOrigin,
+        zoomScale: zoomScale,
+        palette: palette,
+        isSelected: isTableSelected,
+        l10n: l10n,
+      );
+    } else if (tableGhostOrigin != null) {
+      drawZoneTableGhostPreview(
+        canvas: canvas,
+        origin: tableGhostOrigin,
+        zoomScale: zoomScale,
+        zoneCount: storey.zones.length,
+        l10n: l10n,
+      );
+    }
+  }
+
   /// Renders all functional zones for the active storey.
   static void drawZones({
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
@@ -20,23 +55,8 @@ class ArchitectZonePainterHelper {
     List<Offset>? extrudePreviewPolygon,
     bool isExtrudeSelfIntersecting = false,
     List<Offset>? editingPolygon,
-    bool isMoveWholeZoneMode = false,
-    double moveDistanceMeters = 0.0,
   }) {
     final activeStorey = project.activeStorey;
-
-    // Draw drawing schedule table if placed on canvas
-    if (activeStorey.zoneScheduleOrigin != null &&
-        activeStorey.zones.isNotEmpty) {
-      drawZoneScheduleTable(
-        canvas: canvas,
-        storey: activeStorey,
-        origin: activeStorey.zoneScheduleOrigin!,
-        zoomScale: zoomScale,
-        palette: palette,
-      );
-    }
-
     if (activeStorey.zones.isEmpty) return;
 
     for (final zone in activeStorey.zones) {
@@ -55,8 +75,6 @@ class ArchitectZonePainterHelper {
             ? isExtrudeSelfIntersecting
             : false,
         editingPolygon: isSelected ? editingPolygon : null,
-        isMoveWholeZoneMode: isSelected ? isMoveWholeZoneMode : false,
-        moveDistanceMeters: isSelected ? moveDistanceMeters : 0.0,
       );
     }
   }
@@ -73,8 +91,6 @@ class ArchitectZonePainterHelper {
     List<Offset>? extrudePreviewPolygon,
     bool isExtrudeSelfIntersecting = false,
     List<Offset>? editingPolygon,
-    bool isMoveWholeZoneMode = false,
-    double moveDistanceMeters = 0.0,
   }) {
     final poly = extrudePreviewPolygon != null
         ? List<Offset>.from(extrudePreviewPolygon)
@@ -921,7 +937,46 @@ class ArchitectZonePainterHelper {
     tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
   }
 
-  /// Renders a publication-ready architectural room finish schedule table
+  // ===========================================================================
+  // SECTION: COMPACT ZONE FINISH SCHEDULE TABLE
+  // ===========================================================================
+
+  static const double zoneTableTotalWidth = 590.0;
+  static const double zoneTableTitleHeight = 28.0;
+  static const double zoneTableHeaderHeight = 24.0;
+  static const double zoneTableRowHeight = 22.0;
+  static const double zoneTableFooterHeight = 24.0;
+
+  static const List<double> zoneTableColWidths = [
+    36.0,  // №
+    135.0, // Наименование
+    80.0,  // Квадратура (m²)
+    115.0, // Настилка под
+    114.0, // Стени
+    110.0, // Таван
+  ];
+
+  static double getZoneTableTotalHeight(int zoneCount) {
+    final rowCount = zoneCount > 0 ? zoneCount : 1;
+    return zoneTableTitleHeight +
+        zoneTableHeaderHeight +
+        (rowCount * zoneTableRowHeight) +
+        zoneTableFooterHeight;
+  }
+
+  /// Calculates the bounding rectangle of the table in model coordinates (meters).
+  static Rect getZoneTableBounds({
+    required ArchitectStorey storey,
+    required Offset origin,
+    required double zoomScale,
+  }) {
+    final totalHeight = getZoneTableTotalHeight(storey.zones.length);
+    final widthModel = zoneTableTotalWidth / zoomScale;
+    final heightModel = totalHeight / zoomScale;
+    return Rect.fromLTWH(origin.dx, origin.dy, widthModel, heightModel);
+  }
+
+  /// Renders a publication-ready compact architectural room finish schedule table
   /// directly on the 2D drawing canvas at [origin].
   static void drawZoneScheduleTable({
     required Canvas canvas,
@@ -929,6 +984,8 @@ class ArchitectZonePainterHelper {
     required Offset origin,
     required double zoomScale,
     required ArchitectCanvasPalette palette,
+    bool isSelected = false,
+    AppLocalizations? l10n,
   }) {
     final zones = storey.zones;
     if (zones.isEmpty) return;
@@ -936,27 +993,8 @@ class ArchitectZonePainterHelper {
     final sortedZones = List<ArchitectZone>.from(zones)
       ..sort((a, b) => a.number.compareTo(b.number));
 
-    // Column widths in screen pixels
-    const colWidths = [
-      48.0,  // №
-      155.0, // Помещение
-      78.0,  // Площ m²
-      72.0,  // Обик. m
-      120.0, // Под
-      120.0, // Стени
-      110.0, // Таван
-      55.0,  // H (m)
-    ];
-
-    final totalWidth = colWidths.reduce((a, b) => a + b);
-    const titleHeight = 32.0;
-    const headerHeight = 28.0;
-    const rowHeight = 24.0;
-    const footerHeight = 28.0;
-    final totalHeight = titleHeight +
-        headerHeight +
-        (sortedZones.length * rowHeight) +
-        footerHeight;
+    final totalWidth = zoneTableTotalWidth;
+    final totalHeight = getZoneTableTotalHeight(sortedZones.length);
 
     canvas.save();
     canvas.translate(origin.dx, origin.dy);
@@ -974,13 +1012,26 @@ class ArchitectZonePainterHelper {
     );
 
     final borderPaint = Paint()
-      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.8)
-      ..strokeWidth = 1.5
+      ..color = isSelected
+          ? const Color(0xFF00E5FF)
+          : const Color(0xFF38BDF8).withValues(alpha: 0.8)
+      ..strokeWidth = isSelected ? 2.0 : 1.5
       ..style = PaintingStyle.stroke;
     canvas.drawRRect(
       RRect.fromRectAndRadius(tableRect, const Radius.circular(6)),
       borderPaint,
     );
+
+    if (isSelected) {
+      final glowPaint = Paint()
+        ..color = const Color(0x3300E5FF)
+        ..strokeWidth = 5.0
+        ..style = PaintingStyle.stroke;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(tableRect.inflate(2), const Radius.circular(8)),
+        glowPaint,
+      );
+    }
 
     final gridLinePaint = Paint()
       ..color = const Color(0xFF38BDF8).withValues(alpha: 0.3)
@@ -991,7 +1042,7 @@ class ArchitectZonePainterHelper {
     final titlePaint = Paint()
       ..color = const Color(0xFF0F2642)
       ..style = PaintingStyle.fill;
-    final titleRect = Rect.fromLTWH(0, 0, totalWidth, titleHeight);
+    final titleRect = Rect.fromLTWH(0, 0, totalWidth, zoneTableTitleHeight);
     canvas.drawRRect(
       RRect.fromRectAndCorners(
         titleRect,
@@ -1001,18 +1052,20 @@ class ArchitectZonePainterHelper {
       titlePaint,
     );
     canvas.drawLine(
-      const Offset(0, titleHeight),
-      Offset(totalWidth, titleHeight),
+      const Offset(0, zoneTableTitleHeight),
+      Offset(totalWidth, zoneTableTitleHeight),
       borderPaint,
     );
 
+    final titlePrefix = l10n?.architectZoneScheduleTitle ?? 'ТАБЛИЦА НА ПОМЕЩЕНИЯТА';
+    final titleText = '${titlePrefix.toUpperCase()} — ${storey.name.toUpperCase()}';
     final titleTp = TextPainter(
-      text: const TextSpan(
-        text: 'ТАБЛИЦА НА ПОМЕЩЕНИЯТА (ROOM FINISH SCHEDULE)',
-        style: TextStyle(
+      text: TextSpan(
+        text: titleText,
+        style: const TextStyle(
           color: Colors.white,
           fontFamily: 'Roboto',
-          fontSize: 11.5,
+          fontSize: 11.0,
           fontWeight: FontWeight.bold,
           letterSpacing: 0.8,
         ),
@@ -1022,7 +1075,7 @@ class ArchitectZonePainterHelper {
     )..layout(maxWidth: totalWidth - 16);
     titleTp.paint(
       canvas,
-      Offset((totalWidth - titleTp.width) / 2, (titleHeight - titleTp.height) / 2),
+      Offset((totalWidth - titleTp.width) / 2, (zoneTableTitleHeight - titleTp.height) / 2),
     );
 
     // 3. Column Headers
@@ -1030,28 +1083,27 @@ class ArchitectZonePainterHelper {
       ..color = const Color(0xFF1E293B)
       ..style = PaintingStyle.fill;
     final headerRect =
-        Rect.fromLTWH(0, titleHeight, totalWidth, headerHeight);
+        Rect.fromLTWH(0, zoneTableTitleHeight, totalWidth, zoneTableHeaderHeight);
     canvas.drawRect(headerRect, headerPaint);
     canvas.drawLine(
-      const Offset(0, titleHeight + headerHeight),
-      Offset(totalWidth, titleHeight + headerHeight),
+      const Offset(0, zoneTableTitleHeight + zoneTableHeaderHeight),
+      Offset(totalWidth, zoneTableTitleHeight + zoneTableHeaderHeight),
       borderPaint,
     );
 
-    const headers = [
-      '№',
-      'Помещение',
-      'Площ m²',
-      'Обик. m',
-      'Под / Настилка',
-      'Стени',
-      'Таван',
-      'H (m)',
+    final headers = [
+      l10n?.architectZoneScheduleColNo ?? '№',
+      l10n?.architectZoneScheduleColName ?? 'Помещение',
+      l10n?.architectZoneScheduleColArea ?? 'Квадратура',
+      l10n?.architectZoneScheduleColFloor ?? 'Настилка под',
+      l10n?.architectZoneScheduleColWalls ?? 'Стени',
+      l10n?.architectZoneScheduleColCeiling ?? 'Таван',
     ];
 
     double curX = 0;
     for (int i = 0; i < headers.length; i++) {
-      final w = colWidths[i];
+      final w = zoneTableColWidths[i];
+      final isCentered = i == 0;
       final colTp = TextPainter(
         text: TextSpan(
           text: headers[i],
@@ -1062,20 +1114,23 @@ class ArchitectZonePainterHelper {
             fontWeight: FontWeight.bold,
           ),
         ),
-        textAlign: i == 0 || i == 7 ? TextAlign.center : TextAlign.left,
+        textAlign: isCentered ? TextAlign.center : TextAlign.left,
         textDirection: TextDirection.ltr,
       )..layout(maxWidth: w - 8);
 
-      final tx = i == 0 || i == 7
+      final tx = isCentered
           ? curX + (w - colTp.width) / 2
           : curX + 6.0;
-      colTp.paint(canvas, Offset(tx, titleHeight + (headerHeight - colTp.height) / 2));
+      colTp.paint(
+        canvas,
+        Offset(tx, zoneTableTitleHeight + (zoneTableHeaderHeight - colTp.height) / 2),
+      );
 
       curX += w;
       if (i < headers.length - 1) {
         canvas.drawLine(
-          Offset(curX, titleHeight),
-          Offset(curX, totalHeight - footerHeight),
+          Offset(curX, zoneTableTitleHeight),
+          Offset(curX, totalHeight - zoneTableFooterHeight),
           gridLinePaint,
         );
       }
@@ -1083,7 +1138,7 @@ class ArchitectZonePainterHelper {
 
     // 4. Room Rows
     double totalNetArea = 0.0;
-    double curY = titleHeight + headerHeight;
+    double curY = zoneTableTitleHeight + zoneTableHeaderHeight;
 
     for (int rowIdx = 0; rowIdx < sortedZones.length; rowIdx++) {
       final z = sortedZones[rowIdx];
@@ -1091,7 +1146,7 @@ class ArchitectZonePainterHelper {
 
       // Alternating row background
       if (rowIdx % 2 == 1) {
-        final rowRect = Rect.fromLTWH(0, curY, totalWidth, rowHeight);
+        final rowRect = Rect.fromLTWH(0, curY, totalWidth, zoneTableRowHeight);
         canvas.drawRect(
           rowRect,
           Paint()..color = Colors.white.withValues(alpha: 0.03),
@@ -1100,26 +1155,25 @@ class ArchitectZonePainterHelper {
 
       // Horizontal separator line
       canvas.drawLine(
-        Offset(0, curY + rowHeight),
-        Offset(totalWidth, curY + rowHeight),
+        Offset(0, curY + zoneTableRowHeight),
+        Offset(totalWidth, curY + zoneTableRowHeight),
         gridLinePaint,
       );
 
       final rowValues = [
         z.number.isNotEmpty ? z.number : '${rowIdx + 1}',
         z.name,
-        z.area.toStringAsFixed(2),
-        z.perimeter.toStringAsFixed(2),
+        '${z.area.toStringAsFixed(2)} m²',
         z.floorFinish.isNotEmpty ? z.floorFinish : '—',
         z.wallFinish.isNotEmpty ? z.wallFinish : '—',
         z.ceilingFinish.isNotEmpty ? z.ceilingFinish : '—',
-        z.clearHeight.toStringAsFixed(2),
       ];
 
       double cellX = 0;
       for (int c = 0; c < rowValues.length; c++) {
-        final w = colWidths[c];
-        final isNumeric = c == 0 || c == 2 || c == 3 || c == 7;
+        final w = zoneTableColWidths[c];
+        final isCentered = c == 0;
+        final isNumeric = c == 0 || c == 2;
         final cellTp = TextPainter(
           text: TextSpan(
             text: rowValues[c],
@@ -1127,30 +1181,30 @@ class ArchitectZonePainterHelper {
               color: c == 0 ? z.color : Colors.white.withValues(alpha: 0.9),
               fontFamily: 'Roboto',
               fontSize: 9.5,
-              fontWeight: c == 0 || c == 2 ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isNumeric ? FontWeight.bold : FontWeight.normal,
             ),
           ),
-          textAlign: isNumeric ? TextAlign.center : TextAlign.left,
+          textAlign: isCentered ? TextAlign.center : TextAlign.left,
           textDirection: TextDirection.ltr,
           maxLines: 1,
           ellipsis: '…',
         )..layout(maxWidth: w - 8);
 
-        final pX = isNumeric
+        final pX = isCentered
             ? cellX + (w - cellTp.width) / 2
             : cellX + 6.0;
         cellTp.paint(
           canvas,
-          Offset(pX, curY + (rowHeight - cellTp.height) / 2),
+          Offset(pX, curY + (zoneTableRowHeight - cellTp.height) / 2),
         );
         cellX += w;
       }
 
-      curY += rowHeight;
+      curY += zoneTableRowHeight;
     }
 
     // 5. Total Footer Row
-    final footerRect = Rect.fromLTWH(0, curY, totalWidth, footerHeight);
+    final footerRect = Rect.fromLTWH(0, curY, totalWidth, zoneTableFooterHeight);
     final footerPaint = Paint()
       ..color = const Color(0xFF0F2642)
       ..style = PaintingStyle.fill;
@@ -1168,15 +1222,17 @@ class ArchitectZonePainterHelper {
       borderPaint,
     );
 
+    final totalLabel = l10n?.architectZoneScheduleTotalArea.toUpperCase() ?? 'ОБЩО';
+    final countLabel = l10n?.architectZoneScheduleRoomCount.toUpperCase() ?? 'БРОЙ';
     final footerTp = TextPainter(
       text: TextSpan(
         children: [
-          const TextSpan(
-            text: 'ОБЩО ЧИСТА ПЛОЩ (TOTAL NET AREA): ',
-            style: TextStyle(
+          TextSpan(
+            text: '$totalLabel: ',
+            style: const TextStyle(
               color: Color(0xFF7DD3FC),
               fontFamily: 'Roboto',
-              fontSize: 10.5,
+              fontSize: 10.0,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1185,12 +1241,12 @@ class ArchitectZonePainterHelper {
             style: const TextStyle(
               color: Colors.white,
               fontFamily: 'Roboto',
-              fontSize: 11.5,
+              fontSize: 11.0,
               fontWeight: FontWeight.w900,
             ),
           ),
           TextSpan(
-            text: '  •  БРОЙ ПОМЕЩЕНИЯ: ${sortedZones.length}',
+            text: '   •   $countLabel: ${sortedZones.length}',
             style: const TextStyle(
               color: Color(0xFF94A3B8),
               fontFamily: 'Roboto',
@@ -1205,7 +1261,67 @@ class ArchitectZonePainterHelper {
 
     footerTp.paint(
       canvas,
-      Offset(12.0, curY + (footerHeight - footerTp.height) / 2),
+      Offset(12.0, curY + (zoneTableFooterHeight - footerTp.height) / 2),
+    );
+
+    canvas.restore();
+  }
+
+  /// Draws a lightweight ghost placement preview following cursor when placing the table.
+  static void drawZoneTableGhostPreview({
+    required Canvas canvas,
+    required Offset origin,
+    required double zoomScale,
+    required int zoneCount,
+    AppLocalizations? l10n,
+  }) {
+    final totalWidth = zoneTableTotalWidth;
+    final rowCount = zoneCount > 0 ? zoneCount : 2;
+    final totalHeight = getZoneTableTotalHeight(rowCount);
+
+    canvas.save();
+    canvas.translate(origin.dx, origin.dy);
+    canvas.scale(1.0 / zoomScale);
+
+    final tableRect = Rect.fromLTWH(0, 0, totalWidth, totalHeight);
+
+    // Translucent preview box
+    final fillPaint = Paint()
+      ..color = const Color(0x3300E5FF)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(tableRect, const Radius.circular(6)),
+      fillPaint,
+    );
+
+    // Glowing cyan border
+    final borderPaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(tableRect, const Radius.circular(6)),
+      borderPaint,
+    );
+
+    // Prompt inside
+    final hint = l10n?.architectZoneTableBarHint ?? 'Кликнете за поставяне на таблицата';
+    final hintTp = TextPainter(
+      text: TextSpan(
+        text: '📋 $hint',
+        style: const TextStyle(
+          color: Color(0xFF00E5FF),
+          fontFamily: 'Roboto',
+          fontSize: 12.0,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: totalWidth - 16);
+    hintTp.paint(
+      canvas,
+      Offset((totalWidth - hintTp.width) / 2, (totalHeight - hintTp.height) / 2),
     );
 
     canvas.restore();

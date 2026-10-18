@@ -37,6 +37,7 @@ enum ArchitectTool {
   select,
   axis,
   zone,
+  zoneTable,
   wall,
   door,
   window,
@@ -135,8 +136,10 @@ class Architect2dPainter extends CustomPainter {
   // Zone Editing and Fast Rectangle Preview
   final List<Offset> zonePreviewRectangle;
   final List<Offset>? zoneEditingPolygon;
-  final bool isMoveWholeZoneMode;
-  final double zoneMoveDistanceMeters;
+
+  // Zone Schedule Table
+  final bool isZoneTableSelected;
+  final Offset? zoneTableDragPreviewOrigin;
 
   // CAD Underlay state
   final DxfDocument? underlayDoc;
@@ -222,8 +225,8 @@ class Architect2dPainter extends CustomPainter {
     this.isZoneExtrudeSelfIntersecting = false,
     this.zonePreviewRectangle = const [],
     this.zoneEditingPolygon,
-    this.isMoveWholeZoneMode = false,
-    this.zoneMoveDistanceMeters = 0.0,
+    this.isZoneTableSelected = false,
+    this.zoneTableDragPreviewOrigin,
     this.underlayDoc,
     this.underlayLayerVisibility = const {},
     this.slabDraftPoints = const [],
@@ -272,6 +275,7 @@ class Architect2dPainter extends CustomPainter {
         selectedElementId: selectedElementId,
       );
       _drawZones(canvas);
+      _drawZoneSchedule(canvas);
       if (showUpperOverhangs) {
         ArchitectOverhangPainterHelper.drawOverhangs(
           canvas: canvas,
@@ -334,6 +338,7 @@ class Architect2dPainter extends CustomPainter {
       if (layer == ArchitectPaintLayer.interaction) {
         _drawGridAxes(canvas);
         _drawZones(canvas);
+        _drawZoneSchedule(canvas);
         _drawSelectedElement(canvas);
       }
       _drawPolygonEditing(canvas);
@@ -560,8 +565,34 @@ class Architect2dPainter extends CustomPainter {
       extrudePreviewPolygon: zoneExtrudePreviewPolygon,
       isExtrudeSelfIntersecting: isZoneExtrudeSelfIntersecting,
       editingPolygon: zoneEditingPolygon,
-      isMoveWholeZoneMode: isMoveWholeZoneMode,
-      moveDistanceMeters: zoneMoveDistanceMeters,
+    );
+  }
+
+  void _drawZoneSchedule(Canvas canvas) {
+    final isDraggingOrGhostingTable =
+        zoneTableDragPreviewOrigin != null ||
+        (activeTool == ArchitectTool.zoneTable && cursorPosition != null);
+
+    final shouldDrawTableInThisLayer =
+        layer == ArchitectPaintLayer.all ||
+        (layer == ArchitectPaintLayer.interaction &&
+            (isDraggingOrGhostingTable || isZoneTableSelected)) ||
+        (layer == ArchitectPaintLayer.model &&
+            !isDraggingOrGhostingTable &&
+            !isZoneTableSelected);
+
+    if (!shouldDrawTableInThisLayer) return;
+
+    ArchitectZonePainterHelper.drawZoneSchedule(
+      palette: palette,
+      canvas: canvas,
+      storey: _project.activeStorey,
+      zoomScale: zoomScale,
+      isTableSelected: isZoneTableSelected,
+      tableDragPreviewOrigin: zoneTableDragPreviewOrigin,
+      tableGhostOrigin:
+          activeTool == ArchitectTool.zoneTable ? cursorPosition : null,
+      l10n: l10n,
     );
   }
 
@@ -1314,6 +1345,8 @@ class Architect2dPainter extends CustomPainter {
       activeOvershoot != oldDelegate.activeOvershoot ||
       showUpperOverhangs != oldDelegate.showUpperOverhangs ||
       upperOverhangs != oldDelegate.upperOverhangs ||
+      isZoneTableSelected != oldDelegate.isZoneTableSelected ||
+      zoneTableDragPreviewOrigin != oldDelegate.zoneTableDragPreviewOrigin ||
       _zoomScale != oldDelegate._zoomScale ||
       underlayDoc != oldDelegate.underlayDoc;
 }

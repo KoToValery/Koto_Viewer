@@ -27,7 +27,10 @@ enum ArchitectToolCategory {
   };
 
   static ArchitectToolCategory of(ArchitectTool tool) => switch (tool) {
-    ArchitectTool.select || ArchitectTool.zone || ArchitectTool.axis => plan,
+    ArchitectTool.select ||
+    ArchitectTool.zone ||
+    ArchitectTool.zoneTable ||
+    ArchitectTool.axis => plan,
     ArchitectTool.wall ||
     ArchitectTool.door ||
     ArchitectTool.window ||
@@ -435,12 +438,18 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                               label: l10n.architectToolStair,
                             ),
                           if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.zone))
+                              ArchitectToolCategory.of(ArchitectTool.zone)) ...[
                             _buildToolButton(
                               tool: ArchitectTool.zone,
                               icon: Icons.space_dashboard_rounded,
                               label: l10n.architectToolZone,
                             ),
+                            _buildToolButton(
+                              tool: ArchitectTool.zoneTable,
+                              icon: Icons.table_chart_rounded,
+                              label: l10n.architectToolZoneTable,
+                            ),
+                          ],
                           if (category ==
                               ArchitectToolCategory.of(ArchitectTool.dimension))
                             _buildToolButton(

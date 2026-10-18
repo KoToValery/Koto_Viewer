@@ -269,132 +269,29 @@ void main() {
     });
   });
 
-  group('GPS_Mapping Zone Transform & Edit Mode Tests', () {
-    test('calculateCentroid accurately computes visual center', () {
-      const rect = [
-        Offset(0, 0),
-        Offset(10, 0),
-        Offset(10, 6),
-        Offset(0, 6),
-      ];
-      final centroid = ArchitectZoneGeometry.calculateCentroid(rect);
-      expect(centroid.dx, closeTo(5.0, 1e-4));
-      expect(centroid.dy, closeTo(3.0, 1e-4));
-    });
-
-    test('rotatePolygon rotates polygon around center', () {
-      const rect = [
-        Offset(0, 0),
-        Offset(10, 0),
-        Offset(10, 6),
-        Offset(0, 6),
-      ];
-      final center = ArchitectZoneGeometry.calculateCentroid(rect);
-      final rotated90 = ArchitectZoneGeometry.rotatePolygon(rect, 90.0, center);
-
-      expect(rotated90.length, 4);
-      final newCenter = ArchitectZoneGeometry.calculateCentroid(rotated90);
-      expect(newCenter.dx, closeTo(center.dx, 1e-4));
-      expect(newCenter.dy, closeTo(center.dy, 1e-4));
-      // Area is preserved under rotation
-      expect(ArchitectZoneGeometry.calculateArea(rotated90),
-          closeTo(ArchitectZoneGeometry.calculateArea(rect), 1e-4));
-    });
-
-    test('translatePolygon shifts all vertices uniformly', () {
-      const rect = [
-        Offset(0, 0),
-        Offset(10, 0),
-        Offset(10, 6),
-        Offset(0, 6),
-      ];
-      final moved = ArchitectZoneGeometry.translatePolygon(rect, const Offset(3.5, -2.0));
-      expect(moved[0], const Offset(3.5, -2.0));
-      expect(moved[1], const Offset(13.5, -2.0));
-      expect(moved[2], const Offset(13.5, 4.0));
-      expect(moved[3], const Offset(3.5, 4.0));
-    });
-
-    test('offsetPolygon expands and shrinks boundary polygon', () {
-      const rect = [
-        Offset(0, 0),
-        Offset(10, 0),
-        Offset(10, 6),
-        Offset(0, 6),
-      ];
-      final initialArea = ArchitectZoneGeometry.calculateArea(rect); // 60 m²
-
-      // Expand by 0.5m
-      final expanded = ArchitectZoneGeometry.offsetPolygon(rect, 0.5);
-      final expandedArea = ArchitectZoneGeometry.calculateArea(expanded);
-      expect(expandedArea, greaterThan(initialArea));
-
-      // Shrink by 0.5m
-      final shrunk = ArchitectZoneGeometry.offsetPolygon(rect, -0.5);
-      final shrunkArea = ArchitectZoneGeometry.calculateArea(shrunk);
-      expect(shrunkArea, lessThan(initialArea));
-    });
-
-    test('alignPolygonToNearest2D squares corners to exact 90°', () {
-      // Slightly distorted 4-corner box (e.g. hand-drawn or GPS jitter)
-      const skewed = [
-        Offset(0.05, 0.1),
-        Offset(9.9, 0.0),
-        Offset(10.1, 6.05),
-        Offset(0.0, 5.95),
-      ];
-
-      final aligned = ArchitectZoneGeometry.alignPolygonToNearest2D(skewed);
-      expect(aligned.length, 4);
-
-      // Check angles: each corner should form a 90° angle
-      for (int i = 0; i < 4; i++) {
-        final pPrev = aligned[(i + 3) % 4];
-        final pCurr = aligned[i];
-        final pNext = aligned[(i + 1) % 4];
-
-        final v1 = pPrev - pCurr;
-        final v2 = pNext - pCurr;
-        final dot = v1.dx * v2.dx + v1.dy * v2.dy;
-        final cosAngle = dot / (v1.distance * v2.distance);
-        expect(cosAngle.abs(), closeTo(0.0, 0.02)); // dot product near 0 = 90°
-      }
-    });
-
-    test('ArchitectZoneTool autoAlignZone and undoAutoAlignZone workflow', () {
+  group('ArchitectZone Model & Properties Tests', () {
+    test('ArchitectZone calculates accurate area, perimeter, and centroid', () {
       final zone = ArchitectZone(
-        id: 'zone_skewed',
-        name: 'Хореография',
+        id: 'z_test',
+        name: 'Дневна',
         category: ArchitectZoneCategory.living,
         polygon: const [
-          Offset(0.05, 0.1),
-          Offset(9.9, 0.0),
-          Offset(10.1, 6.05),
-          Offset(0.0, 5.95),
+          Offset(0, 0),
+          Offset(10, 0),
+          Offset(10, 6),
+          Offset(0, 6),
         ],
       );
 
-      final tool = ArchitectZoneTool();
-      tool.startEditingZone(zone);
-      expect(tool.isEditingZone, isTrue);
-      expect(tool.canUndoAutoAlign, isFalse);
-
-      // Auto align
-      final aligned = tool.autoAlignZone();
-      expect(aligned, isTrue);
-      expect(tool.canUndoAutoAlign, isTrue);
-      expect(tool.canUndoEdit, isTrue);
-
-      // Undo auto align
-      final undone = tool.undoAutoAlignZone();
-      expect(undone, isTrue);
-      expect(tool.canUndoAutoAlign, isFalse);
-      expect(tool.editingPolygon![0], const Offset(0.05, 0.1));
+      expect(zone.area, closeTo(60.0, 1e-4));
+      expect(zone.perimeter, closeTo(32.0, 1e-4));
+      expect(zone.centroid.dx, closeTo(5.0, 1e-4));
+      expect(zone.centroid.dy, closeTo(3.0, 1e-4));
     });
 
-    test('ArchitectZoneTool rotation slider, undo/redo stack, and whole zone move', () {
+    test('ArchitectZoneTool editing workflow starts, modifies polygon, and commits', () {
       final zone = ArchitectZone(
-        id: 'zone_transform',
+        id: 'zone_edit',
         name: 'Офис',
         category: ArchitectZoneCategory.office,
         polygon: const [
@@ -407,36 +304,19 @@ void main() {
 
       final tool = ArchitectZoneTool();
       tool.startEditingZone(zone);
+      expect(tool.isEditingZone, isTrue);
+      expect(tool.editingPolygon, isNotNull);
+      expect(tool.editingPolygon!.length, 4);
 
-      // 1. Quick step rotation +15°
-      tool.applyRotationStep(15.0);
-      expect(tool.canUndoEdit, isTrue);
-      expect(tool.editingPolygon![0].dx, isNot(closeTo(0.0, 1e-3)));
-
-      // Undo
-      tool.undoEditAction();
-      expect(tool.editingPolygon![0], const Offset(0, 0));
-      expect(tool.canRedoEdit, isTrue);
-
-      // Redo
-      tool.redoEditAction();
-      expect(tool.canRedoEdit, isFalse);
-
-      // 2. Move whole zone mode
-      tool.toggleMoveWholeZoneMode();
-      expect(tool.isMoveWholeZoneMode, isTrue);
-
-      tool.startMovingZone(const Offset(4, 2.5));
-      tool.updateMovingZone(const Offset(6, 4.5)); // Delta (2, 2)
-      expect(tool.moveDistanceMeters, greaterThan(1.0));
-
-      tool.finishMovingZone();
-      expect(tool.canUndoEdit, isTrue);
+      // Modify a vertex
+      tool.editingPolygon![1] = const Offset(10, 0);
 
       // Commit
       final committed = tool.commitEditingZone();
       expect(committed, isNotNull);
       expect(tool.isEditingZone, isFalse);
+      expect(committed!.polygon[1], const Offset(10, 0));
+      expect(committed.area, closeTo(45.0, 0.01));
     });
   });
 
@@ -470,37 +350,6 @@ void main() {
 
       ArchitectLogger.clear();
       expect(ArchitectLogger.history.isEmpty, isTrue);
-    });
-
-    test('ArchitectZoneTool isMovingZone accurately reflects drag start and finish', () {
-      final tool = ArchitectZoneTool();
-      final zone = ArchitectZone(
-        id: 'z1',
-        name: 'Zone',
-        category: ArchitectZoneCategory.living,
-        polygon: [
-          const Offset(0, 0),
-          const Offset(4, 0),
-          const Offset(4, 4),
-          const Offset(0, 4),
-        ],
-      );
-
-      tool.startEditingZone(zone);
-      tool.toggleMoveWholeZoneMode();
-      expect(tool.isMoveWholeZoneMode, isTrue);
-      expect(tool.isMovingZone, isFalse);
-
-      tool.startMovingZone(const Offset(2, 2));
-      expect(tool.isMovingZone, isTrue);
-      expect(tool.isInteracting, isTrue);
-
-      tool.updateMovingZone(const Offset(3, 3));
-      expect(tool.isMovingZone, isTrue);
-      expect(tool.moveDistanceMeters, closeTo(1.414, 0.01));
-
-      tool.finishMovingZone();
-      expect(tool.isMovingZone, isFalse);
     });
   });
 }

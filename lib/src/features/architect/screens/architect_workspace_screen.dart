@@ -83,6 +83,8 @@ import '../widgets/architect_tool_palette.dart';
 import '../widgets/architect_zone_drafting_bar.dart';
 import '../widgets/architect_zone_properties_card.dart';
 import '../widgets/architect_zone_schedule_dialog.dart';
+import '../widgets/architect_zone_table_bar.dart';
+import '../rendering/architect_zone_painter_helper.dart';
 import '../services/architect_room_detector.dart';
 import '../widgets/architect_viewport.dart';
 import '../widgets/architect_wall_drafting_panel.dart';
@@ -1049,6 +1051,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset _axisHandleGrabOffset = Offset.zero;
   List<(Offset, Offset)> _activeMagneticGuides = [];
 
+  // Zone Schedule Table Placement & Drag State
+  bool _isZoneTableSelected = false;
+  bool _isDraggingZoneTable = false;
+  Offset? _zoneTableDragOffset;
+  Offset? _zoneTablePreviewOrigin;
+
   // Unified tool controller for zone drafting, edge extrusion, and geometry
   late final ArchitectZoneTool _zoneTool;
 
@@ -1205,6 +1213,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _selectionIds.clear();
       _selectedElementId = null;
       _selectedZoneId = null;
+      _isZoneTableSelected = false;
       _selectedSectionRoofId = null;
       _axisTool.deselect();
       _zoneTool.cancelEditingZone();
@@ -1567,12 +1576,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _draggingElementId != null ||
       _draggingVertexIndex != null ||
       _zoneTool.isExtruding ||
-      _zoneTool.isMovingZone ||
       _zoneMoveStartPoint != null ||
       _axisTool.isDraggingHandle ||
       _axisTool.isMovingAxis ||
       _axisTool.isOffsettingWithDrag ||
       _wallEndpointOriginal != null ||
+      _isDraggingZoneTable ||
       _groupDragIds.isNotEmpty;
 
   /// Whether gestures should be captured exclusively by the tool instead of panning.
@@ -2127,19 +2136,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
 
-    // 2. Zone handle interactions in Zone or Select mode
-    if (_activeTool == ArchitectTool.zone) {
-      // 2a. Whole zone move mode check (GPS_Mapping mode)
-      if (_zoneTool.isMoveWholeZoneMode && _selectedZone != null) {
-        _zoneTool.startMovingZone(rawModel);
+    // 2. Zone Schedule Table hit check (drag table or select it)
+    if ((_activeTool == ArchitectTool.zoneTable ||
+            _activeTool == ArchitectTool.zone ||
+            _activeTool == ArchitectTool.select) &&
+        _project.activeStorey.zoneScheduleOrigin != null &&
+        _project.activeStorey.zones.isNotEmpty) {
+      final tableBounds = ArchitectZonePainterHelper.getZoneTableBounds(
+        storey: _project.activeStorey,
+        origin: _project.activeStorey.zoneScheduleOrigin!,
+        zoomScale: _currentScale,
+      );
+      if (tableBounds.contains(rawModel)) {
+        _isDraggingZoneTable = true;
         _isHandleEngaged = true;
+        _zoneTableDragOffset =
+            _project.activeStorey.zoneScheduleOrigin! - rawModel;
+        _zoneTablePreviewOrigin = _project.activeStorey.zoneScheduleOrigin!;
+        setState(() {
+          _isZoneTableSelected = true;
+          _selectedZoneId = null;
+          _selectedElementId = null;
+          _selectionIds.clear();
+        });
+        HapticFeedback.selectionClick();
         ArchitectLogger.log(
           'HANDLE',
-          'Zone move whole mode engaged for ${_selectedZone!.name}',
+          'Zone schedule table drag engaged at ${_project.activeStorey.zoneScheduleOrigin}',
         );
         return;
       }
+    }
 
+    // 2. Zone handle interactions in Zone or Select mode
+    if (_activeTool == ArchitectTool.zone) {
       final currentSelected = _selectedZone;
       if (currentSelected != null) {
         // 2b. Vertex handle check (drag existing vertex)
@@ -2945,6 +2975,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
+    // Zone Schedule Table dragging
+    if (_isDraggingZoneTable && _zoneTableDragOffset != null) {
+      _zoneTablePreviewOrigin = rawModel + _zoneTableDragOffset!;
+      _repaintPreview();
+      return;
+    }
+
     // 1. Point-by-point zone drafting preview
     if (_activeTool == ArchitectTool.zone && _zoneTool.isDrafting) {
       _zoneTool.updateDraftingPointer(
@@ -2988,11 +3025,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // 4. Moving whole zone (GPS_Mapping mode or legacy drag)
-    if (_zoneTool.isMoveWholeZoneMode && _zoneTool.isEditingZone) {
-      _zoneTool.updateMovingZone(rawModel);
-      return;
-    }
+    // 4. Moving whole zone on canvas
     if (_zoneMoveStartPoint != null &&
         _zoneMoveOriginalPolygon != null &&
         _selectedZone != null) {
@@ -3252,17 +3285,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_zoneTool.isExtruding) {
       _zoneTool.cancelExtrude();
     }
-    if (_zoneTool.isMovingZone) {
-      _zoneTool.cancelMovingZone();
-    }
     if (_axisTool.isDraggingHandle ||
         _axisTool.isMovingAxis ||
         _axisTool.isOffsettingWithDrag) {
       _axisTool.cancelAll();
     }
+    _isDraggingZoneTable = false;
+    _zoneTableDragOffset = null;
+    _zoneTablePreviewOrigin = null;
   }
 
   void _commitActiveHandleDrag(Offset screenPos) {
+    if (_isDraggingZoneTable && _zoneTablePreviewOrigin != null) {
+      final newOrigin = _zoneTablePreviewOrigin!;
+      _cancelActiveDrags();
+      setState(() {
+        final updatedStorey =
+            _project.activeStorey.copyWith(zoneScheduleOrigin: newOrigin);
+        _project = _project.updateActiveStorey(updatedStorey);
+      });
+      _saveBiMProjectIfAttached();
+      HapticFeedback.mediumImpact();
+      return;
+    }
     if (_sectionRoofDragStartModelY != null &&
         _sectionRoofDragPreviewOffset != null &&
         _selectedSectionRoofId != null) {
@@ -3490,16 +3535,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // 3. Commit whole zone move (GPS_Mapping mode or legacy drag)
-    if (_zoneTool.isMoveWholeZoneMode && _zoneTool.isEditingZone) {
-      _zoneTool.finishMovingZone();
-      final updated = _zoneTool.commitEditingZone();
-      if (updated != null) {
-        _updateZone(updated);
-        _zoneTool.startEditingZone(updated);
-      }
-      return;
-    }
     if (_zoneMoveStartPoint != null) {
       if (_zoneMovePreviewPolygon != null && _selectedZone != null) {
         _updateZone(_selectedZone!.copyWith(polygon: _zoneMovePreviewPolygon));
@@ -4097,6 +4132,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
 
+    // 3. In Zone Table tool: Place or reposition schedule table
+    if (_activeTool == ArchitectTool.zoneTable) {
+      final updatedStorey =
+          _project.activeStorey.copyWith(zoneScheduleOrigin: rawModel);
+      setState(() {
+        _project = _project.updateActiveStorey(updatedStorey);
+        _isZoneTableSelected = true;
+        _selectedZoneId = null;
+        _selectedElementId = null;
+        _selectionIds.clear();
+      });
+      _saveBiMProjectIfAttached();
+      HapticFeedback.mediumImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectZoneTablePlaced),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+
+    if (_isZoneTableSelected) {
+      setState(() => _isZoneTableSelected = false);
+    }
+
     // Active selection tap handling: toggle in multi-select or select tool, replace in single-select, or cancel on empty space
     if (_effectiveSelection.isNotEmpty) {
       final selectedRoof = _selectedRoof;
@@ -4580,6 +4641,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         });
         _saveBiMProjectIfAttached();
       },
+    );
+  }
+
+  void _removeZoneScheduleTable() {
+    setState(() {
+      final updatedStorey =
+          _project.activeStorey.copyWith(clearZoneScheduleOrigin: true);
+      _project = _project.updateActiveStorey(updatedStorey);
+      _isZoneTableSelected = false;
+    });
+    _saveBiMProjectIfAttached();
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.architectZoneTableRemoved),
+        duration: const Duration(seconds: 1),
+      ),
     );
   }
 
@@ -8589,6 +8667,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             _selectedZoneId = null;
                           }),
                           onOpenScheduleTable: _showRoomScheduleDialog,
+                          onPlaceTable: () =>
+                              setState(() => _activeTool = ArchitectTool.zoneTable),
+                        ),
+                      ),
+                    if (_activeTool == ArchitectTool.zoneTable && !_is3DView)
+                      Positioned(
+                        top: 10,
+                        left: 0,
+                        right: 0,
+                        child: ArchitectZoneTableBar(
+                          isTablePlaced:
+                              _project.activeStorey.zoneScheduleOrigin != null,
+                          onBackToZones: () =>
+                              setState(() => _activeTool = ArchitectTool.zone),
+                          onOpenScheduleDialog: _showRoomScheduleDialog,
+                          onRemoveTable: _removeZoneScheduleTable,
+                          onClose: () =>
+                              setState(() => _activeTool = ArchitectTool.select),
                         ),
                       ),
                     if (_activeTool == ArchitectTool.axis && !_is3DView)
@@ -10013,8 +10109,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         isZoneExtrudeSelfIntersecting: _zoneTool.isExtrudeSelfIntersecting,
         zonePreviewRectangle: _zoneTool.previewRectangle,
         zoneEditingPolygon: _zoneMovePreviewPolygon ?? _zoneTool.editingPolygon,
-        isMoveWholeZoneMode: _zoneTool.isMoveWholeZoneMode,
-        zoneMoveDistanceMeters: _zoneTool.moveDistanceMeters,
+        isZoneTableSelected: _isZoneTableSelected,
+        zoneTableDragPreviewOrigin: _zoneTablePreviewOrigin,
 
         underlayLayerVisibility: _underlayLayerVisibility,
         slabDraftPoints: _elementTool.slabDraftPoints,

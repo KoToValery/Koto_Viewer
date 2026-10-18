@@ -6,6 +6,7 @@ import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/models/architect_zone.dart';
 import 'package:kotoview/src/features/architect/services/architect_room_detector.dart';
 import 'package:kotoview/src/features/architect/services/architect_zone_tool.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_zone_painter_helper.dart';
 
 void main() {
   group('ArchitectZone Model & Properties Tests', () {
@@ -372,6 +373,81 @@ void main() {
 
       tool.placementMode = ArchitectZonePlacementMode.autoClick;
       expect(tool.placementMode, ArchitectZonePlacementMode.autoClick);
+    });
+  });
+
+  group('ArchitectZoneScheduleTable Tests', () {
+    test('getZoneTableTotalHeight calculates exact sum of title, header, rows and footer', () {
+      final height1 = ArchitectZonePainterHelper.getZoneTableTotalHeight(1);
+      expect(
+        height1,
+        ArchitectZonePainterHelper.zoneTableTitleHeight +
+            ArchitectZonePainterHelper.zoneTableHeaderHeight +
+            ArchitectZonePainterHelper.zoneTableRowHeight +
+            ArchitectZonePainterHelper.zoneTableFooterHeight,
+      );
+
+      final height3 = ArchitectZonePainterHelper.getZoneTableTotalHeight(3);
+      expect(
+        height3,
+        height1 + 2 * ArchitectZonePainterHelper.zoneTableRowHeight,
+      );
+    });
+
+    test('getZoneTableBounds computes correct model rectangle and hit test', () {
+      final zone1 = ArchitectZone(
+        id: 'z1',
+        number: '1',
+        name: 'Антре',
+        category: ArchitectZoneCategory.corridor,
+        polygon: const [Offset(0, 0), Offset(2, 0), Offset(2, 3), Offset(0, 3)],
+        floorFinish: 'Теракота',
+        wallFinish: 'Латекс',
+        ceilingFinish: 'Латекс',
+      );
+      final zone2 = ArchitectZone(
+        id: 'z2',
+        number: '2',
+        name: 'Спалня',
+        category: ArchitectZoneCategory.bedroom,
+        polygon: const [Offset(2, 0), Offset(6, 0), Offset(6, 4), Offset(2, 4)],
+        floorFinish: 'Ламинат',
+        wallFinish: 'Латекс',
+        ceilingFinish: 'Латекс',
+      );
+
+      final storey = ArchitectStorey(
+        id: 'st_1',
+        name: 'Етаж 1',
+        zones: [zone1, zone2],
+        zoneScheduleOrigin: const Offset(10.0, 15.0),
+      );
+
+      const zoom = 50.0;
+      final bounds = ArchitectZonePainterHelper.getZoneTableBounds(
+        storey: storey,
+        origin: storey.zoneScheduleOrigin!,
+        zoomScale: zoom,
+      );
+
+      expect(bounds.left, 10.0);
+      expect(bounds.top, 15.0);
+      expect(
+        bounds.width,
+        closeTo(ArchitectZonePainterHelper.zoneTableTotalWidth / zoom, 1e-4),
+      );
+      final expectedHeight =
+          ArchitectZonePainterHelper.getZoneTableTotalHeight(2) / zoom;
+      expect(bounds.height, closeTo(expectedHeight, 1e-4));
+
+      // Hit testing inside bounds
+      expect(bounds.contains(const Offset(10.1, 15.1)), isTrue);
+      expect(bounds.contains(const Offset(10.0 + (ArchitectZonePainterHelper.zoneTableTotalWidth / zoom) / 2, 15.1)), isTrue);
+
+      // Hit testing outside bounds
+      expect(bounds.contains(const Offset(9.9, 15.0)), isFalse);
+      expect(bounds.contains(const Offset(10.0, 14.9)), isFalse);
+      expect(bounds.contains(const Offset(50.0, 50.0)), isFalse);
     });
   });
 }

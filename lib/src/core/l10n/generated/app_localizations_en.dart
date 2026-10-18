@@ -3763,6 +3763,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectZoneScheduleColHeight => 'H (m)';
 
   @override
+  String get architectToolZoneTable => 'Zone Table';
+
+  @override
+  String get architectToolZoneTableTooltip =>
+      'Place room schedule table on canvas';
+
+  @override
+  String get architectZoneTableBarTitle => 'Room Schedule Table';
+
+  @override
+  String get architectZoneTableBarHint =>
+      'Click on the drawing to place the table';
+
+  @override
+  String get architectZoneTableBarMoveHint =>
+      'Drag table on canvas to reposition';
+
+  @override
+  String get architectZoneTablePlaced => 'Table placed on drawing';
+
+  @override
+  String get architectZoneTableRemoved => 'Table removed from drawing';
+
+  @override
+  String get architectZoneTableRemove => 'Remove Table';
+
+  @override
+  String get architectZoneTableBackToZones => 'Back to Rooms';
+
+  @override
+  String get architectZoneTableActionPlace => 'Place Table';
+
+  @override
   String get architectZoneFloorLaminate => 'Laminate Flooring';
 
   @override

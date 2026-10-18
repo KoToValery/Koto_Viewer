@@ -6515,6 +6515,66 @@ abstract class AppLocalizations {
   /// **'H (m)'**
   String get architectZoneScheduleColHeight;
 
+  /// Zone table placement tool
+  ///
+  /// In en, this message translates to:
+  /// **'Zone Table'**
+  String get architectToolZoneTable;
+
+  /// Tooltip for zone table placement tool
+  ///
+  /// In en, this message translates to:
+  /// **'Place room schedule table on canvas'**
+  String get architectToolZoneTableTooltip;
+
+  /// Title of zone table HUD bar
+  ///
+  /// In en, this message translates to:
+  /// **'Room Schedule Table'**
+  String get architectZoneTableBarTitle;
+
+  /// Hint to place table on canvas
+  ///
+  /// In en, this message translates to:
+  /// **'Click on the drawing to place the table'**
+  String get architectZoneTableBarHint;
+
+  /// Hint to reposition placed table
+  ///
+  /// In en, this message translates to:
+  /// **'Drag table on canvas to reposition'**
+  String get architectZoneTableBarMoveHint;
+
+  /// Notification when table is placed
+  ///
+  /// In en, this message translates to:
+  /// **'Table placed on drawing'**
+  String get architectZoneTablePlaced;
+
+  /// Notification when table is removed
+  ///
+  /// In en, this message translates to:
+  /// **'Table removed from drawing'**
+  String get architectZoneTableRemoved;
+
+  /// Button to remove table from drawing
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Table'**
+  String get architectZoneTableRemove;
+
+  /// Button to return to room zones tool
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Rooms'**
+  String get architectZoneTableBackToZones;
+
+  /// Action to place room schedule table
+  ///
+  /// In en, this message translates to:
+  /// **'Place Table'**
+  String get architectZoneTableActionPlace;
+
   /// Laminate floor finish preset
   ///
   /// In en, this message translates to:

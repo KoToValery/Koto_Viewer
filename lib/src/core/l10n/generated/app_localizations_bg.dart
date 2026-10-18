@@ -3780,6 +3780,39 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneScheduleColHeight => 'H (m)';
 
   @override
+  String get architectToolZoneTable => 'Таблица зони';
+
+  @override
+  String get architectToolZoneTableTooltip =>
+      'Поставяне на таблица с помещенията върху чертежа';
+
+  @override
+  String get architectZoneTableBarTitle => 'Таблица на помещенията';
+
+  @override
+  String get architectZoneTableBarHint =>
+      'Кликнете върху чертежа, за да поставите таблицата';
+
+  @override
+  String get architectZoneTableBarMoveHint =>
+      'Влачете таблицата по чертежа за преместване';
+
+  @override
+  String get architectZoneTablePlaced => 'Таблицата е поставена върху чертежа';
+
+  @override
+  String get architectZoneTableRemoved => 'Таблицата е премахната от чертежа';
+
+  @override
+  String get architectZoneTableRemove => 'Премахни таблица';
+
+  @override
+  String get architectZoneTableBackToZones => 'Към помещенията';
+
+  @override
+  String get architectZoneTableActionPlace => 'Постави таблица';
+
+  @override
   String get architectZoneFloorLaminate => 'Ламиниран паркет';
 
   @override

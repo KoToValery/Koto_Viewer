@@ -21,21 +21,16 @@ import '../../dxf_viewer/models/dxf_models.dart';
 //    - ArchitectZoneGeometry:
 //      * linesIntersect, segmentIntersectsChain, calculateArea, calculateCentroid
 //      * cleanPolygon (orphan/collinear point removal)
-//      * rotatePolygon, translatePolygon, offsetPolygon, rayIntersection
-//      * alignPolygonToNearest2D (GPS_Mapping 90°/5° squarify algorithm)
 //      * extrudeEdge (edge midpoint step/niche extrusion)
 //      * calculateOrthoSnap
 //
 // 3. === SECTION: ZONE_TOOL_CONTROLLER ===
 //    - ArchitectZoneTool (ChangeNotifier):
-//      * Drafting State & Methods (zero-lag point-by-point, quick rectangle)
-//      * Edge Extrusion State & Methods
-//      * GPS_Mapping-style Zone Edit & Transform Mode:
-//        - autoAlignZone (90° squarify) & undoAutoAlignZone
-//        - rotation slider & ±15°/±90° steps
-//        - move whole zone mode
-//        - offset boundary expand/shrink
-//        - full undo/redo stack
+//      * 1-Click Room Boundary Auto-Detection (raycasting & topological flood fill)
+//      * Point-by-point manual drafting (like slab element)
+//      * Edge midpoint niche extrusion
+//      * Vertex handle dragging
+//      * Dynamic boundary update & room merge on wall removal
 // =============================================================================
 
 // === SECTION: ORTHO_GUIDES_AND_STATUS_ENUMS ===
@@ -107,19 +102,10 @@ class ArchitectZoneTool extends ChangeNotifier {
   ZoneDraftingPointStatus _pointStatus = ZoneDraftingPointStatus.valid;
 
   // ---------------------------------------------------------------------------
-  // GPS_Mapping-style Zone Edit & Transform State
+  // Zone Editing State
   // ---------------------------------------------------------------------------
   ArchitectZone? _editingZone;
   List<Offset>? _editingPolygon;
-  List<Offset>? _preAlignBackupPolygon;
-  final List<List<Offset>> _editUndoStack = [];
-  final List<List<Offset>> _editRedoStack = [];
-  double _editRotationSlider = 0.0;
-  double _lastAppliedRotationSlider = 0.0;
-  bool _isMoveWholeZoneMode = false;
-  Offset? _moveStartPoint;
-  List<Offset>? _moveStartPolygon;
-  double _moveDistanceMeters = 0.0;
 
   // ---------------------------------------------------------------------------
   // Edge Extrusion State (Midpoint handle drag)
@@ -243,22 +229,14 @@ class ArchitectZoneTool extends ChangeNotifier {
   Offset? get extrudeMidInitial => _extrudeMidInitial;
 
   // ---------------------------------------------------------------------------
-  // GPS_Mapping-style Edit & Transform Getters
+  // Zone Editing Getters
   // ---------------------------------------------------------------------------
   bool get isEditingZone => _editingZone != null;
   ArchitectZone? get editingZone => _editingZone;
   List<Offset>? get editingPolygon => _editingPolygon;
-  bool get canUndoAutoAlign => _preAlignBackupPolygon != null;
-  bool get canUndoEdit => _editUndoStack.isNotEmpty;
-  bool get canRedoEdit => _editRedoStack.isNotEmpty;
-  double get editRotationSlider => _editRotationSlider;
-  bool get isMoveWholeZoneMode => _isMoveWholeZoneMode;
-  bool get isMovingZone => _moveStartPoint != null;
-  double get moveDistanceMeters => _moveDistanceMeters;
 
   /// General flag for whether tool has an active modal interaction.
-  bool get isInteracting =>
-      isDrafting || isExtruding || isMoveWholeZoneMode || isMovingZone;
+  bool get isInteracting => isDrafting || isExtruding;
 
   // Convenient aliases
   void start(Offset startPoint) => startDrafting(startPoint);
@@ -690,7 +668,7 @@ class ArchitectZoneTool extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
-  // GPS_Mapping-style Zone Edit & Transform Methods
+  // Zone Editing Methods (Clean architectural workflow)
   // ---------------------------------------------------------------------------
 
   /// Initiates interactive edit mode for an existing zone.
@@ -699,186 +677,6 @@ class ArchitectZoneTool extends ChangeNotifier {
     cancelExtrude();
     _editingZone = zone;
     _editingPolygon = List<Offset>.from(zone.polygon);
-    _preAlignBackupPolygon = null;
-    _editUndoStack.clear();
-    _editRedoStack.clear();
-    _editRotationSlider = 0.0;
-    _lastAppliedRotationSlider = 0.0;
-    _isMoveWholeZoneMode = false;
-    _moveStartPoint = null;
-    _moveStartPolygon = null;
-    _moveDistanceMeters = 0.0;
-    notifyListeners();
-  }
-
-  void _pushEditUndo() {
-    if (_editingPolygon == null) return;
-    _editUndoStack.add(List<Offset>.from(_editingPolygon!));
-    if (_editUndoStack.length > 25) {
-      _editUndoStack.removeAt(0);
-    }
-    _editRedoStack.clear();
-  }
-
-  void undoEditAction() {
-    if (_editUndoStack.isEmpty || _editingPolygon == null) return;
-    _editRedoStack.add(List<Offset>.from(_editingPolygon!));
-    _editingPolygon = _editUndoStack.removeLast();
-    _editRotationSlider = 0.0;
-    _lastAppliedRotationSlider = 0.0;
-    notifyListeners();
-  }
-
-  void redoEditAction() {
-    if (_editRedoStack.isEmpty || _editingPolygon == null) return;
-    _editUndoStack.add(List<Offset>.from(_editingPolygon!));
-    _editingPolygon = _editRedoStack.removeLast();
-    _editRotationSlider = 0.0;
-    _lastAppliedRotationSlider = 0.0;
-    notifyListeners();
-  }
-
-  /// Automatically squares all corners of the editing polygon to 90° (and closes at 90°),
-  /// preserving centroid and area scale (GPS_Mapping squarify algorithm).
-  bool autoAlignZone() {
-    if (_editingPolygon == null || _editingPolygon!.length < 3) return false;
-    final aligned = ArchitectZoneGeometry.alignPolygonToNearest2D(
-      _editingPolygon!,
-    );
-    if (aligned.length != _editingPolygon!.length) return false;
-
-    bool changed = false;
-    for (int i = 0; i < aligned.length; i++) {
-      if ((aligned[i] - _editingPolygon![i]).distance > 0.005) {
-        changed = true;
-        break;
-      }
-    }
-    if (!changed) return false;
-
-    _pushEditUndo();
-    _preAlignBackupPolygon = List<Offset>.from(_editingPolygon!);
-    _editingPolygon = aligned;
-    notifyListeners();
-    return true;
-  }
-
-  /// Reverts the 90° straightening operation.
-  bool undoAutoAlignZone() {
-    if (_preAlignBackupPolygon == null || _editingPolygon == null) return false;
-    _pushEditUndo();
-    _editingPolygon = List<Offset>.from(_preAlignBackupPolygon!);
-    _preAlignBackupPolygon = null;
-    notifyListeners();
-    return true;
-  }
-
-  /// Live updates polygon rotation using centroid-based rotation matrix.
-  void setRotationSlider(double angleDeg) {
-    if (_editingPolygon == null) return;
-    final delta = angleDeg - _lastAppliedRotationSlider;
-    _editRotationSlider = angleDeg;
-    if (delta.abs() > 0.01) {
-      final centroid = ArchitectZoneGeometry.calculateCentroid(
-        _editingPolygon!,
-      );
-      _editingPolygon = ArchitectZoneGeometry.rotatePolygon(
-        _editingPolygon!,
-        delta,
-        centroid,
-      );
-      _lastAppliedRotationSlider = angleDeg;
-      notifyListeners();
-    }
-  }
-
-  /// Finalizes rotation slider drag gesture and creates an undo restore point.
-  void finishRotationSlider() {
-    if (_editingPolygon == null) return;
-    if (_lastAppliedRotationSlider.abs() > 0.1) {
-      _pushEditUndo();
-    }
-    _editRotationSlider = 0.0;
-    _lastAppliedRotationSlider = 0.0;
-    notifyListeners();
-  }
-
-  /// Incremental rotation step (e.g. ±15°, ±90°).
-  void applyRotationStep(double stepDeg) {
-    if (_editingPolygon == null) return;
-    _pushEditUndo();
-    final centroid = ArchitectZoneGeometry.calculateCentroid(_editingPolygon!);
-    _editingPolygon = ArchitectZoneGeometry.rotatePolygon(
-      _editingPolygon!,
-      stepDeg,
-      centroid,
-    );
-    notifyListeners();
-  }
-
-  /// Boundary offset step (in meters, e.g. ±0.20m).
-  void applyOffsetStep(double distanceMeters) {
-    if (_editingPolygon == null) return;
-    _pushEditUndo();
-    _editingPolygon = ArchitectZoneGeometry.offsetPolygon(
-      _editingPolygon!,
-      distanceMeters,
-    );
-    notifyListeners();
-  }
-
-  /// Toggles whole zone translation drag mode.
-  void toggleMoveWholeZoneMode() {
-    _isMoveWholeZoneMode = !_isMoveWholeZoneMode;
-    _moveStartPoint = null;
-    _moveStartPolygon = null;
-    _moveDistanceMeters = 0.0;
-    notifyListeners();
-  }
-
-  void startMovingZone(Offset modelPoint) {
-    if (!_isMoveWholeZoneMode || _editingPolygon == null) return;
-    _moveStartPoint = modelPoint;
-    _moveStartPolygon = List<Offset>.from(_editingPolygon!);
-    _moveDistanceMeters = 0.0;
-  }
-
-  void updateMovingZone(Offset modelPoint) {
-    if (!_isMoveWholeZoneMode ||
-        _moveStartPoint == null ||
-        _moveStartPolygon == null) {
-      return;
-    }
-    final delta = modelPoint - _moveStartPoint!;
-    _moveDistanceMeters = delta.distance;
-    _editingPolygon = ArchitectZoneGeometry.translatePolygon(
-      _moveStartPolygon!,
-      delta,
-    );
-    notifyListeners();
-  }
-
-  void finishMovingZone() {
-    if (_moveStartPolygon != null && _editingPolygon != null) {
-      if (_moveDistanceMeters > 1e-9) {
-        _editUndoStack.add(_moveStartPolygon!);
-        _editRedoStack.clear();
-      }
-    }
-    _moveStartPoint = null;
-    _moveStartPolygon = null;
-    _moveDistanceMeters = 0.0;
-    notifyListeners();
-  }
-
-  /// Abandon a pointer gesture without applying it or adding an Undo step.
-  void cancelMovingZone() {
-    if (_moveStartPolygon != null) {
-      _editingPolygon = List<Offset>.from(_moveStartPolygon!);
-    }
-    _moveStartPoint = null;
-    _moveStartPolygon = null;
-    _moveDistanceMeters = 0;
     notifyListeners();
   }
 
@@ -888,7 +686,6 @@ class ArchitectZoneTool extends ChangeNotifier {
         index >= _editingPolygon!.length) {
       return;
     }
-    _pushEditUndo();
     _editingPolygon![index] = newPos;
     notifyListeners();
   }
@@ -914,15 +711,6 @@ class ArchitectZoneTool extends ChangeNotifier {
   void cancelEditingZone() {
     _editingZone = null;
     _editingPolygon = null;
-    _preAlignBackupPolygon = null;
-    _editUndoStack.clear();
-    _editRedoStack.clear();
-    _editRotationSlider = 0.0;
-    _lastAppliedRotationSlider = 0.0;
-    _isMoveWholeZoneMode = false;
-    _moveStartPoint = null;
-    _moveStartPolygon = null;
-    _moveDistanceMeters = 0.0;
     notifyListeners();
   }
 
