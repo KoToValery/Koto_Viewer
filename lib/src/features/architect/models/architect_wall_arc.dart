@@ -72,8 +72,9 @@ class ArchitectWallArc {
     }) {
       final p = a + d * t, r = parameter(p);
       if (!finite ||
-          (t >= -1e-8 && t <= 1 + 1e-8 && r >= -1e-8 && r <= 1 + 1e-8))
+          (t >= -1e-8 && t <= 1 + 1e-8 && r >= -1e-8 && r <= 1 + 1e-8)) {
         result.add(p);
+      }
     }
     return result;
   }
@@ -82,8 +83,9 @@ class ArchitectWallArc {
     final d = (other.center - center).distance;
     if (d < 1e-8 ||
         d > radius + other.radius + 1e-8 ||
-        d < (radius - other.radius).abs() - 1e-8)
+        d < (radius - other.radius).abs() - 1e-8) {
       return const [];
+    }
     final a = (radius * radius - other.radius * other.radius + d * d) / (2 * d),
         h = math.sqrt(math.max(0, radius * radius - a * a));
     final u = (other.center - center) / d,

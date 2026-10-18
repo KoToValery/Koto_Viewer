@@ -56,8 +56,7 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
       _LayerDraft(layer, widget.project.units),
   ];
   late ArchitectWallLocation location = widget.type.resolvedLocation;
-  late bool bearing =
-      widget.type.isLoadBearing || widget.type.usage == WallUsage.bearing;
+  late bool bearing = widget.type.isLoadBearing;
   List<ArchitectWallPlinth> get regions => widget.plinths.isEmpty
       ? [if (widget.plinth != null) widget.plinth!]
       : widget.plinths;
@@ -125,8 +124,9 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                   (number(plinthHeight.text) == null ||
                       number(plinthHeight.text)! <= 0)) ||
               (editedRegionFields.contains('base') &&
-                  number(plinthBase.text) == null)))
+                  number(plinthBase.text) == null))) {
         throw ArgumentError('Invalid plinth field');
+      }
       final region = widget.plinth == null
           ? null
           : ArchitectWallPlinthPatch(
@@ -146,10 +146,11 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                   ? plinthFinish
                   : null,
             );
-      if (region != null)
+      if (region != null) {
         for (final value in regions) {
           region.apply(value);
         }
+      }
       final source = pickedType ?? widget.type;
       final type = source.copyWith(
         id: pickedType != null && detailsChanged ? widget.type.id : source.id,
@@ -159,8 +160,9 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
         name: name.text.trim(),
         labelId: source.labelId ?? source.id,
       );
-      if (widget.onApply(type, region, compositionChanged))
+      if (widget.onApply(type, region, compositionChanged)) {
         Navigator.pop(context);
+      }
     } on ArgumentError {
       setState(() => error = l.wallLayerInvalid);
     }
@@ -196,6 +198,8 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
               Text(
                 widget.typeUseCount == null
                     ? l.wallSelectedScope
+                    : widget.typeUseCount == 0
+                    ? l.wallTypesTitle
                     : l.wallTypeApply(widget.typeUseCount!),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -471,11 +475,12 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                                   ),
                               ],
                               onChanged: (v) {
-                                if (v != null)
+                                if (v != null) {
                                   setState(() {
                                     plinthFinish = v;
                                     editedRegionFields.add('finish');
                                   });
+                                }
                               },
                             ),
                             ExpansionTile(

@@ -84,8 +84,9 @@ class ArchitectVerticalClip {
         part.path,
         footprint,
       );
-      if (!outside.getBounds().isEmpty)
+      if (!outside.getBounds().isEmpty) {
         result.add(ArchitectVerticalPart(outside, part.bottom, part.top));
+      }
       if (overlap.getBounds().isEmpty) continue;
       result.addAll(
         cap(ArchitectVerticalPart(overlap, part.bottom, part.top), bottom),

@@ -9,7 +9,7 @@ import 'architect_editing_test.dart' as editing;
 import 'architect_wall_compositions_test.dart' as data;
 
 void main() {
-  for (final language in ['en', 'bg'])
+  for (final language in ['en', 'bg']) {
     for (final dark in [false, true]) {
       testWidgets(
         'Layer editor on a 360px phone: validation, exact thin layers, save ($language $dark)',
@@ -73,6 +73,7 @@ void main() {
         },
       );
     }
+  }
   testWidgets(
     'Mixed plinth fields remain independent when one field is changed',
     (tester) async {

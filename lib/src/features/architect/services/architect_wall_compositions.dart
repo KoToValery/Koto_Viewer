@@ -19,8 +19,9 @@ class SetArchitectWallPlinth extends ArchitectModelCommand {
       for (final wall in storey.walls)
         if (wallIds.contains(wall.id))
           () {
-            if (!wall.isExterior)
+            if (!wall.isExterior) {
               throw ArgumentError('Plinth requires an exterior wall');
+            }
             found.add(wall.id);
             return wall.copyWith(plinth: patch.apply(wall.plinth));
           }()

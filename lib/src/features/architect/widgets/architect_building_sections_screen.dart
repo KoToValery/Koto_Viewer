@@ -1199,7 +1199,7 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
       ..setEntry(1, 3, size.height / 2 + centre.dy * scale);
     canvas.save();
     canvas.clipRect(Offset.zero & size);
-    for (final region in drawing.data.regions) {
+    for (final region in drawing.data.drawingRegions) {
       final path = region.path.transform(matrix.storage);
       final isSelectedRoof =
           drawing.selectedRoofId != null &&

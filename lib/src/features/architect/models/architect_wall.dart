@@ -209,21 +209,48 @@ class ArchitectWall {
                       (centerLineOffset - thickness / 2).abs(),
                       (centerLineOffset + thickness / 2).abs(),
                     ) <=
-                .001))
+                .001)) {
       throw ArgumentError('Invalid wall arc radius');
+    }
+    if (isCurved) {
+      for (final opening in [
+        ...doors.map((o) => (o.offsetRatio, o.width)),
+        ...windows.map((o) => (o.offsetRatio, o.width)),
+      ]) {
+        final half = openingArcSpan(opening.$2) / 2;
+        if (!half.isFinite ||
+            opening.$1 * length < half - 1e-8 ||
+            (1 - opening.$1) * length < half - 1e-8) {
+          throw ArgumentError('Opening does not fit the curved host');
+        }
+      }
+    }
+  }
+
+  /// A straight frame cuts a chord; its occupied angle must fit every skin.
+  double openingArcSpan(double width) {
+    if (!isCurved) return width;
+    final inner = arc!.radius - (centerLineOffset.abs() + thickness / 2);
+    if (!width.isFinite || width <= 0 || inner <= 0 || width >= 2 * inner) {
+      return double.infinity;
+    }
+    return 2 * arc!.radius * math.asin(width / (2 * inner));
   }
 
   List<Offset> intersections(ArchitectWall other, {bool finite = true}) {
-    if (isCurved && other.isCurved)
+    if (isCurved && other.isCurved) {
       return arc!.arcIntersections(other.arc!, finite: finite);
-    if (isCurved)
+    }
+    if (isCurved) {
       return arc!.lineIntersections(
         other.startPoint,
         other.endPoint,
         finite: finite,
       );
-    if (other.isCurved)
+    }
+    if (other.isCurved) {
       return other.arc!.lineIntersections(startPoint, endPoint, finite: finite);
+    }
     final p = BimLineGeometry.intersection(
       startPoint,
       endPoint,
@@ -244,8 +271,9 @@ class ArchitectWall {
         sweep = arc!.sweep * (to - from);
     if (sweep.abs() < .000001 ||
         sweep.abs() >= 2 * math.pi - .0001 ||
-        sweep.sign != arc!.sweep.sign)
+        sweep.sign != arc!.sweep.sign) {
       throw ArgumentError('Invalid arc extension');
+    }
     final result = copyWith(
       startPoint: a,
       endPoint: b,
@@ -599,8 +627,9 @@ class ArchitectWall {
       ...doors.map((o) => (o.offsetRatio, o.width, o.sillHeight, o.height)),
       ...windows.map((o) => (o.offsetRatio, o.width, o.sillHeight, o.height)),
     ]) {
-      if (heightAboveBase <= op.$3 || heightAboveBase >= op.$3 + op.$4)
+      if (heightAboveBase <= op.$3 || heightAboveBase >= op.$3 + op.$4) {
         continue;
+      }
       final center = centerPointAt(op.$1),
           u = tangentAt(op.$1),
           normal = normalAt(op.$1);
@@ -637,13 +666,14 @@ class ArchitectWall {
           to = arc?.pointAt(1, leftOffset: faceOffset) ?? centerEnd + shift;
       final band = plinth.enabled && isExterior && index < firstCore;
       final breaks = <double>[z0, z1];
-      if (band)
+      if (band) {
         for (final z in [
           plinth.baseElevation,
           plinth.baseElevation + plinth.height,
         ]) {
           if (z > z0 && z < z1) breaks.add(z);
         }
+      }
       breaks.sort();
       for (var j = 0; j + 1 < breaks.length; j++) {
         final bottom = breaks[j], top = breaks[j + 1], mid = (bottom + top) / 2;
@@ -728,10 +758,11 @@ class ArchitectWall {
       for (final op in [
         ...doors.map((o) => (o.sillHeight, o.height)),
         ...windows.map((o) => (o.sillHeight, o.height)),
-      ])
+      ]) {
         for (final z in [bottom + op.$1, bottom + op.$1 + op.$2]) {
           if (z > bottom && z < top) breaks.add(z);
         }
+      }
       final levels = breaks.toList()..sort();
       return [
         for (var i = 0; i + 1 < levels.length; i++)

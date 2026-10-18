@@ -59,13 +59,15 @@ class ArchitectWallNetwork {
           // An endpoint on a face still joins even if the saved references differ.
           for (final p in [a.startPoint, a.endPoint]) {
             if (b.containsPoint(p, tolerance: .0001) &&
-                !nodes.any((n) => (n - p).distance < .0001))
+                !nodes.any((n) => (n - p).distance < .0001)) {
               nodes.add(p);
+            }
           }
           for (final p in [b.startPoint, b.endPoint]) {
             if (a.containsPoint(p, tolerance: .0001) &&
-                !nodes.any((n) => (n - p).distance < .0001))
+                !nodes.any((n) => (n - p).distance < .0001)) {
               nodes.add(p);
+            }
           }
           for (final node in nodes) {
             if (!a.connectsAt(node) || !b.connectsAt(node)) continue;

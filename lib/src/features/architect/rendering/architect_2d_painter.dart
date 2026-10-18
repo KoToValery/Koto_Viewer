@@ -878,17 +878,19 @@ class Architect2dPainter extends CustomPainter {
     );
     for (final wall in layers.walls) {
       final region = layers.coreRegions[wall.id];
-      if (region != null && wall.layers.isEmpty) {
+      if (region != null && wall.layers.isEmpty && !wall.plinth.enabled) {
         ArchitectWallHatch.paint(canvas, wall, region, zoomScale, hatchColor);
       }
     }
-    for(final material in layers.materials.where((r)=>r.wall.layers.isNotEmpty)) {
+    for(final material in layers.materials.where((r)=>r.wall.layers.isNotEmpty||r.wall.plinth.enabled)) {
       final region=material.path;
       canvas.drawPath(region,Paint()..color=material.layer.material.color.withValues(alpha:.18));
       if(material.layer.role==ArchitectLayerRole.core) {
         ArchitectWallHatch.paint(canvas,material.wall,region,zoomScale,hatchColor,material:WallCoreMaterial.values.where((m)=>m.name==material.layer.material.name).firstOrNull);
       }
-      canvas.drawPath(region,Paint()..color=border.color..style=PaintingStyle.stroke..strokeWidth=ArchitectLineWeights.cutThin/zoomScale);
+    }
+    for(final contour in layers.materialContours.values) {
+      canvas.drawPath(contour,Paint()..color=border.color..style=PaintingStyle.stroke..strokeWidth=ArchitectLineWeights.cutThin/zoomScale);
     }
     // Thick boundary encloses only the cut core (2.2 px)
     canvas.drawPath(layers.core, border);

@@ -6514,4 +6514,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wallPlinthEnabled => 'Enabled';
+
+  @override
+  String get wallArcMode => 'Arc';
 }

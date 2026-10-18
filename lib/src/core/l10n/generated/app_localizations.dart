@@ -11554,6 +11554,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enabled'**
   String get wallPlinthEnabled;
+
+  /// No description provided for @wallArcMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Arc'**
+  String get wallArcMode;
 }
 
 class _AppLocalizationsDelegate

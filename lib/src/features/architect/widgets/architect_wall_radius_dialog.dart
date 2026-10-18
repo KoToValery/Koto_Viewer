@@ -25,8 +25,9 @@ class _RadiusState extends State<ArchitectWallRadiusDialog> {
   );
   double? get value => double.tryParse(input.text.trim().replaceAll(',', '.'));
   void save() {
-    if (form.currentState!.validate())
+    if (form.currentState!.validate()) {
       Navigator.pop(context, widget.project.units.fromUnit(value!));
+    }
   }
 
   @override

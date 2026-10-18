@@ -34,7 +34,13 @@ void main() {
         );
         await tester.pumpAndSettle();
         await editing.selectTool(tester, 'wall');
-        await tester.tap(find.byKey(const ValueKey('wall-arc-toggle')));
+        if (language == 'bg') {
+          final arc = find.byKey(const ValueKey('architect-wall-arc-mode'));
+          await tester.ensureVisible(arc);
+          await tester.tap(arc);
+        } else {
+          await tester.tap(find.byKey(const ValueKey('wall-arc-toggle')));
+        }
         await tester.pumpAndSettle();
         await tester.tapAt(workspace.screen(tester, const Offset(-1.5, 0)));
         await tester.pumpAndSettle();
@@ -71,6 +77,25 @@ void main() {
         model.undo();
         await tester.pumpAndSettle();
         expect(model.project.activeStorey.walls, isEmpty);
+        await tester.tapAt(workspace.screen(tester, const Offset(-1.5, 0)));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('wall-stop-drawing')));
+        await tester.pumpAndSettle();
+        expect(model.canUndo, isFalse);
+        expect(model.project.activeStorey.walls, isEmpty);
+        for (final p in [
+          const Offset(-1.5, 0),
+          const Offset(1.5, 0),
+          const Offset(0, 1),
+        ]) {
+          await tester.tapAt(workspace.screen(tester, p));
+          await tester.pumpAndSettle();
+        }
+        expect(
+          model.project.activeStorey.walls.single.arc!.radius,
+          closeTo(1.625, .000001),
+        );
+        expect(model.undoCount, 1);
         expect(tester.takeException(), isNull);
       },
     );

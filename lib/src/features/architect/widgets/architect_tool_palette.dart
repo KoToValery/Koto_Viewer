@@ -72,6 +72,8 @@ class ArchitectToolPalette extends StatefulWidget {
   final ValueChanged<double> onWallThicknessChanged;
   final WallDraftingMode wallMode;
   final ValueChanged<WallDraftingMode> onWallModeChanged;
+  final bool curvedWall;
+  final VoidCallback? onArcWallSelected;
   final bool isChainingWall;
   final VoidCallback? onFinishChainedWall;
   final List<ArchitectWallType>? wallTypes;
@@ -135,6 +137,8 @@ class ArchitectToolPalette extends StatefulWidget {
     required this.onWallThicknessChanged,
     required this.wallMode,
     required this.onWallModeChanged,
+    this.curvedWall = false,
+    this.onArcWallSelected,
     this.isChainingWall = false,
     this.onFinishChainedWall,
     this.wallTypes,
@@ -582,6 +586,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
 
   Widget _buildWallSubBar(BuildContext context) {
     final l10n = context.l10n;
+    final curvedWall = widget.curvedWall;
+    final onArcWallSelected = widget.onArcWallSelected;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -670,23 +676,34 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           ChoiceChip(
             avatar: const Icon(Icons.show_chart_rounded, size: 14),
             label: Text(l10n.architectWallSingle),
-            selected: wallMode == WallDraftingMode.singleLine,
+            selected: !curvedWall && wallMode == WallDraftingMode.singleLine,
             onSelected: (sel) {
               if (sel) onWallModeChanged(WallDraftingMode.singleLine);
             },
             visualDensity: VisualDensity.compact,
           ),
+          if (onArcWallSelected != null) ...[
+            const SizedBox(width: 4),
+            ChoiceChip(
+              key: const ValueKey('architect-wall-arc-mode'),
+              avatar: const Icon(Icons.rounded_corner, size: 14),
+              label: Text(l10n.wallArcMode),
+              selected: curvedWall,
+              onSelected: (selected) { if (selected) onArcWallSelected(); },
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
           const SizedBox(width: 4),
           ChoiceChip(
             avatar: const Icon(Icons.linear_scale_rounded, size: 14),
             label: Text(l10n.architectWallChained),
-            selected: wallMode == WallDraftingMode.chained,
+            selected: !curvedWall && wallMode == WallDraftingMode.chained,
             onSelected: (sel) {
               if (sel) onWallModeChanged(WallDraftingMode.chained);
             },
             visualDensity: VisualDensity.compact,
           ),
-          if (isChainingWall && onFinishChainedWall != null) ...[
+          if (!curvedWall && isChainingWall && onFinishChainedWall != null) ...[
             const SizedBox(width: 8),
             ActionChip(
               backgroundColor: const Color(0xFF00E5FF),

@@ -72,12 +72,13 @@ double area(Path path) {
     1,
     const Color(0xffaaaaaa),
   )) {
-    if ([t.v0, t.v1, t.v2].every((v) => v.z == 1))
+    if ([t.v0, t.v1, t.v2].every((v) => v.z == 1)) {
       result +=
           ((t.v1.x - t.v0.x) * (t.v2.y - t.v0.y) -
                   (t.v1.y - t.v0.y) * (t.v2.x - t.v0.x))
               .abs() /
           2;
+    }
   }
   return result;
 }
@@ -245,7 +246,7 @@ void main() {
           layers.materials.fold(0.0, (v, r) => v + area(r.path)),
           closeTo(area(layers.body), .00002),
         );
-        for (var i = 0; i < layers.materials.length; i++)
+        for (var i = 0; i < layers.materials.length; i++) {
           for (final b in layers.materials.skip(i + 1)) {
             expect(
               area(
@@ -258,6 +259,7 @@ void main() {
               lessThan(.000001),
             );
           }
+        }
         final solids = ArchitectWallSolids.build(project(walls).activeStorey, [
           composition,
         ]);
@@ -327,8 +329,9 @@ void main() {
       composition,
     ]);
     for (final s in solids) {
-      if (s.bottom >= 1 && s.top <= 2)
+      if (s.bottom >= 1 && s.top <= 2) {
         expect(s.path.contains(const Offset(2, 0)), isFalse);
+      }
     }
     expect(
       solids.fold(0.0, (v, s) => v + area(s.path) * (s.top - s.bottom)),
@@ -343,7 +346,7 @@ void main() {
     );
     final mesh = ArchitectPathSolid.extrude(p, 0, 3, const Color(0xffaaaaaa));
     var capArea = 0.0;
-    for (final t in mesh)
+    for (final t in mesh) {
       if ([t.v0, t.v1, t.v2].every((v) => (v.z - 3).abs() < 1e-8)) {
         final a = Offset(t.v0.x, t.v0.y),
             b = Offset(t.v1.x, t.v1.y),
@@ -352,8 +355,54 @@ void main() {
         capArea +=
             ((b - a).dx * (c - a).dy - (b - a).dy * (c - a).dx).abs() / 2;
       }
+    }
     expect(capArea, closeTo(16, .00001));
   });
+  test(
+    'Equal materials publish one contour without ownership or height-band seams',
+    () {
+      final a = wall('a', Offset.zero, const Offset(4, 0));
+      final b = wall('b', const Offset(4, 0), const Offset(4, 3));
+      final plan = ArchitectWallLayers.build([a, b], [composition]);
+      final core =
+          plan.materialContours[(
+            ArchitectMaterial.brick,
+            ArchitectLayerRole.core,
+          )]!;
+      expect(core.computeMetrics().length, 1);
+      expect(area(core), closeTo(area(plan.core), .00001));
+      final host = a.copyWith(
+        windows: [
+          const ArchitectWindow(
+            id: 'win',
+            uuid: 'win',
+            wallId: 'a',
+            offsetRatio: .25,
+            width: .6,
+            height: 1.2,
+            sillHeight: .8,
+          ),
+        ],
+      );
+      final section = ArchitectBuildingSection.build(
+        project([host]),
+        const ArchitectSection(
+          id: 'cut',
+          name: 'A',
+          start: Offset(3, -1),
+          end: Offset(3, 1),
+        ),
+      );
+      expect(section.drawingRegions.length, lessThan(section.regions.length));
+      expect(
+        section.drawingRegions.every(
+          (r) => (r.path.getBounds().height - 2.8).abs() < .00001,
+        ),
+        isTrue,
+      );
+      expect(section.elementPaths.keys, contains('a'));
+    },
+  );
   test(
     'A real upper slab trims the wall solids at its underside in 3D and section',
     () {
@@ -423,13 +472,14 @@ void main() {
         composition,
       ], project: p).expand((s) => s.triangles).toList();
       expect(tris, isNotEmpty);
-      for (final v in tris.expand((t) => [t.v0, t.v1, t.v2]))
+      for (final v in tris.expand((t) => [t.v0, t.v1, t.v2])) {
         expect(
           v.z,
           lessThanOrEqualTo(
             roof.undersideElevationAt(Offset(v.x, v.y)) + .000001,
           ),
         );
+      }
       expect(tris.any((t) => [t.v0, t.v1, t.v2].any((v) => v.z > 2.8)), isTrue);
     },
   );

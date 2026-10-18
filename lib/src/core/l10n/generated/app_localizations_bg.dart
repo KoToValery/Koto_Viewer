@@ -6535,4 +6535,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get wallPlinthEnabled => 'Включен';
+
+  @override
+  String get wallArcMode => 'Дъга';
 }

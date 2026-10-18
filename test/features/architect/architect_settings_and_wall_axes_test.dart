@@ -341,6 +341,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('1:50').last);
         await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byKey(const ValueKey('architect-settings-grid')));
         await tester.tap(find.byKey(const ValueKey('architect-settings-grid')));
         await tester.pump();
         await tester.tap(find.byKey(const ValueKey('architect-settings-save')));

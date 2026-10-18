@@ -7205,6 +7205,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if(walls.length!=ids.length||walls.isEmpty)return;
     showDialog<void>(context:context,builder:(_)=>ArchitectWallPlinthDialog(project:seeded,values:walls.map((w)=>w.plinth).toList(),onApply:(patch){
       if(!identical(original,_project)){_operationError();return false;}
+      if(patch.isEmpty&&values.isEmpty&&texts.isEmpty)return true;
       try {_commands.executeBatch([
         SetArchitectElementProperties(storeyId:original.activeStoreyId,elementIds:ids,values:values,textValues:texts),
         SetArchitectWallPlinth(storeyId:original.activeStoreyId,wallIds:ids,patch:patch),
@@ -7228,6 +7229,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       customHeight:previous?.customHeight,parapetFinish:wall.parapetFinish);
     showDialog<void>(context:context,builder:(_)=>ArchitectWallCompositionEditor(project:seeded,type:type,allowTypeSelection:true,onApply:(next,region,changed){
       if(!identical(original,_project)){_operationError();return false;}
+      if(!changed&&(region==null||region.isEmpty)&&values.isEmpty&&texts.isEmpty)return true;
       try {_commands.executeBatch([
         SetArchitectElementProperties(storeyId:original.activeStoreyId,elementIds:ids,values:values,textValues:texts),
         SetArchitectWallComposition(type:next,storeyId:original.activeStoreyId,wallIds:ids,plinthPatch:region,preserveComposition:!changed),
@@ -7403,16 +7405,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         wall: wall,
         onApply: (core, insulation) {
           try {
-            _commands.execute(
-              SetArchitectElementProperties(
-                storeyId: _project.activeStoreyId,
-                elementIds: {id},
-                values: {
-                  'coreThickness': core,
-                  'insulationThicknessOverride': insulation,
-                },
-              ),
+            final edited=SetArchitectElementProperties(
+              storeyId:_project.activeStoreyId,elementIds:{id},
+              values:{'coreThickness':core,'insulationThicknessOverride':insulation},
+            ).apply(_project);
+            final next=edited.activeStorey.walls.firstWhere((w)=>w.id==id);
+            final previous=edited.wallTypes.where((t)=>t.id==wall.wallTypeId).firstOrNull;
+            final variant=ArchitectWallType(
+              id:ArchitectElementId.next('wall_type'),name:previous!=null&&!previous.isFactoryPreset?previous.name:'',
+              labelId:previous?.labelId??previous?.id,
+              usage:previous?.usage??(next.isExterior?WallUsage.exterior:WallUsage.interior),
+              totalThickness:next.thickness,layers:next.resolvedLayers,
+              location:next.isExterior?ArchitectWallLocation.exterior:ArchitectWallLocation.interior,
+              loadBearing:next.isLoadBearing,customHeight:previous?.customHeight,parapetFinish:next.parapetFinish,
             );
+            _commands.commit(SetArchitectWallComposition(type:variant,storeyId:edited.activeStoreyId,wallIds:{id}).apply(edited));
             _saveBiMProjectIfAttached();
             return true;
           } on ArgumentError {
@@ -8863,7 +8870,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   onWallThicknessChanged: (t) =>
                       setState(() => _wallThickness = t),
                   wallMode: _wallMode,
-                  onWallModeChanged: (m) => setState(() => _wallMode = m),
+                  curvedWall: _wallCurved,
+                  onArcWallSelected: () { _finishChainedWall(); setState(() => _wallCurved = true); },
+                  onWallModeChanged: (m) { _finishChainedWall(); setState(() { _wallCurved = false; _wallMode = m; }); },
                   isChainingWall:
                       _draftStart != null &&
                       _wallMode == WallDraftingMode.chained,

@@ -169,7 +169,8 @@ void main() {
       );
 
       expect(project.name, 'Concept Residence');
-      expect(project.storeys.length, 3);
+      expect(project.storeys.where((s)=>!s.isRoof).length, 3);
+      expect(project.storeys.last.isRoof, isTrue);
       expect(project.storeys[0].height, 3.20);
       expect(project.storeys[0].elevation, 0.0);
       expect(project.storeys[1].height, 2.80);
@@ -196,7 +197,8 @@ void main() {
         typicalHeight: 3.00,
       );
 
-      expect(project.storeys.length, 8);
+      expect(project.storeys.where((s)=>!s.isRoof).length, 8);
+      expect(project.storeys.last.isRoof, isTrue);
       final parapet = project.wallTypes.firstWhere((w) => w.id == 'parapet_12');
       expect(parapet.customHeight, 1.20);
     });

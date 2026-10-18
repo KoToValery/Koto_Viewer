@@ -57,8 +57,9 @@ class ArchitectPathSolid {
       points.add(at(metric.length));
       final clean = <Offset>[];
       for (final p in points) {
-        if (clean.isEmpty || (p - clean.last).distance > tolerance)
+        if (clean.isEmpty || (p - clean.last).distance > tolerance) {
           clean.add(p);
+        }
         while (clean.length >= 3) {
           final a = clean[clean.length - 3],
               b = clean[clean.length - 2],
@@ -66,13 +67,15 @@ class ArchitectPathSolid {
           final ab = b - a, bc = c - b;
           if ((ab.dx * bc.dy - ab.dy * bc.dx).abs() >
                   tolerance * math.max(ab.distance, bc.distance) ||
-              ab.dx * bc.dx + ab.dy * bc.dy < 0)
+              ab.dx * bc.dx + ab.dy * bc.dy < 0) {
             break;
+          }
           clean.removeAt(clean.length - 2);
         }
       }
-      if (clean.length > 1 && (clean.last - clean.first).distance < tolerance)
+      if (clean.length > 1 && (clean.last - clean.first).distance < tolerance) {
         clean.removeLast();
+      }
       if (clean.length >= 3) result.add(clean);
     }
     return result;
@@ -159,8 +162,9 @@ class ArchitectPathSolid {
             ..sort((a, b) => y(a, mid).compareTo(y(b, mid)));
       for (var j = 0; j + 1 < crossing.length; j++) {
         final low = crossing[j], high = crossing[j + 1];
-        if (!path.contains(Offset(mid, (y(low, mid) + y(high, mid)) / 2)))
+        if (!path.contains(Offset(mid, (y(low, mid) + y(high, mid)) / 2))) {
           continue;
+        }
         final a = Offset(x0, y(low, x0)),
             b = Offset(x1, y(low, x1)),
             c = Offset(x1, y(high, x1)),

@@ -135,11 +135,12 @@ class _PlinthState extends State<ArchitectWallPlinthDialog> {
                         DropdownMenuItem(value: m, child: Text(m.label(l))),
                     ],
                     onChanged: (v) {
-                      if (v != null)
+                      if (v != null) {
                         setState(() {
                           finish = v;
                           edited.add('finish');
                         });
+                      }
                     },
                   ),
                   ExpansionTile(

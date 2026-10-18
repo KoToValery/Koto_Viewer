@@ -7,6 +7,17 @@ import 'architect_wall_network.dart';
 /// Insulation follows the explicit exterior side. All layers retain the
 /// original reference nodes, so their faces share the same mitred junctions.
 class ArchitectWallLayers {
+  late final Map<(ArchitectMaterial, ArchitectLayerRole), Path>
+  materialContours = () {
+    final result = <(ArchitectMaterial, ArchitectLayerRole), Path>{};
+    for (final region in materials) {
+      final key = (region.layer.material, region.layer.role);
+      result[key] = result.containsKey(key)
+          ? Path.combine(PathOperation.union, result[key]!, region.path)
+          : region.path;
+    }
+    return result;
+  }();
   final List<ArchitectWallMaterialRegion> materials;
   final Path body;
   final Path core;

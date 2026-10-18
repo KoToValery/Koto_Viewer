@@ -175,6 +175,11 @@ class ArchitectWallPlinthPatch {
     this.height,
     this.finish,
   });
+  bool get isEmpty =>
+      enabled == null &&
+      baseElevation == null &&
+      height == null &&
+      finish == null;
   ArchitectWallPlinth apply(ArchitectWallPlinth value) {
     final next = value.copyWith(
       enabled: enabled,

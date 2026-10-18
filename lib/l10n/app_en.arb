@@ -4237,5 +4237,6 @@
   "wallArcPickThrough": "Pick a point on the arc",
   "wallArcInvalidRadius": "Radius is too small for this wall.",
   "wallArcPickStart": "Pick the start of the arc",
-  "wallPlinthEnabled": "Enabled"
+  "wallPlinthEnabled": "Enabled",
+  "wallArcMode": "Arc"
 }

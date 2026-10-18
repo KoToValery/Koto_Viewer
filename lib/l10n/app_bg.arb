@@ -2142,5 +2142,6 @@
   "wallArcPickThrough": "Посочи точка на извивката",
   "wallArcInvalidRadius": "Радиусът е твърде малък за тази стена.",
   "wallArcPickStart": "Посочи началото на дъгата",
-  "wallPlinthEnabled": "Включен"
+  "wallPlinthEnabled": "Включен",
+  "wallArcMode": "Дъга"
 }

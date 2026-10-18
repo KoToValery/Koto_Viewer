@@ -35,9 +35,46 @@ class ArchitectSectionRegion {
 }
 
 class ArchitectBuildingSection {
+  static final _drawingCache = Expando<List<ArchitectSectionRegion>>();
   final List<ArchitectSectionRegion> regions;
   final Rect bounds;
   const ArchitectBuildingSection(this.regions, this.bounds);
+
+  /// Ownership stays in [regions] for picking; equal materials share one
+  /// published contour, including across vertical bands and wall junctions.
+  List<ArchitectSectionRegion> get drawingRegions =>
+      _drawingCache[this] ??= _mergeDrawingRegions();
+  List<ArchitectSectionRegion> _mergeDrawingRegions() {
+    final result = <ArchitectSectionRegion>[],
+        indices = <(SlabMaterial, int?, bool), int>{};
+    for (final region in regions) {
+      if (region.roof || region.timberCrossSectionPolygon != null) {
+        result.add(region);
+        continue;
+      }
+      final key = (
+            region.material,
+            region.customFillColor?.toARGB32(),
+            region.slab,
+          ),
+          index = indices[key];
+      if (index == null) {
+        indices[key] = result.length;
+        result.add(region);
+        continue;
+      }
+      final previous = result[index];
+      result[index] = ArchitectSectionRegion(
+        previous.sourceId,
+        previous.material,
+        Path.combine(PathOperation.union, previous.path, region.path),
+        slab: previous.slab,
+        customFillColor: previous.customFillColor,
+      );
+    }
+    return result;
+  }
+
   Map<String, Path> get elementPaths {
     final result = <String, Path>{};
     for (final region in regions) {
@@ -196,8 +233,16 @@ class ArchitectBuildingSection {
         }
       }
 
-      final useCompositions=floor.walls.any((w)=>w.layers.isNotEmpty||w.plinth.enabled||w.isCurved);
-      final sharedSolids=useCompositions ? ArchitectWallSolids.build(floor,project.wallTypes,project:project) : const <ArchitectWallSolid>[];
+      final useCompositions = floor.walls.any(
+        (w) => w.layers.isNotEmpty || w.plinth.enabled || w.isCurved,
+      );
+      final sharedSolids = useCompositions
+          ? ArchitectWallSolids.build(
+              floor,
+              project.wallTypes,
+              project: project,
+            )
+          : const <ArchitectWallSolid>[];
       for (final wall in floor.walls) {
         final baseWallHeight = wall.effectiveHeight(floor.height);
         final canExtendToRoof = activeRoofSlices.isNotEmpty && !wall.isParapet;
@@ -208,8 +253,18 @@ class ArchitectBuildingSection {
         final sources = <Triangle3D, String>{};
         final wallMesh = wall
             .copyWith(height: prismHeight)
-            .build3D(storeyElevation: floor.elevation, sources: sources,includeSolid:!useCompositions,resolveComposition:!useCompositions);
-        if(useCompositions) wallMesh.addAll([for(final solid in sharedSolids)if(solid.wall.id==wall.id)...solid.triangles]);
+            .build3D(
+              storeyElevation: floor.elevation,
+              sources: sources,
+              includeSolid: !useCompositions,
+              resolveComposition: !useCompositions,
+            );
+        if (useCompositions) {
+          wallMesh.addAll([
+            for (final solid in sharedSolids)
+              if (solid.wall.id == wall.id) ...solid.triangles,
+          ]);
+        }
         var wallPath = sliceMesh(wallMesh);
         if (wallPath == null) continue;
 
@@ -287,19 +342,47 @@ class ArchitectBuildingSection {
           regions.add(ArchitectSectionRegion(id, SlabMaterial.tile, clipped));
         }
         if (!wallPath!.getBounds().isEmpty) {
-          if(useCompositions) {
-            var remaining=wallPath;
-            for(final part in sharedSolids.where((s)=>s.wall.id==wall.id)) {
-              final raw=sliceMesh(part.triangles);
-              if(raw==null)continue;
-              final region=Path.combine(PathOperation.intersect,remaining,raw);
-              remaining=Path.combine(PathOperation.difference,remaining,region);
-              if(region.getBounds().isEmpty)continue;
-              final material=switch(part.layer.material){ArchitectMaterial.concrete=>SlabMaterial.concrete,ArchitectMaterial.xps=>SlabMaterial.xps,ArchitectMaterial.eps=>SlabMaterial.floorInsulation,ArchitectMaterial.stoneWool=>SlabMaterial.mineralWool,ArchitectMaterial.timber=>SlabMaterial.parquet,ArchitectMaterial.tile||ArchitectMaterial.stone=>SlabMaterial.tile,_=>SlabMaterial.plaster};
-              regions.add(ArchitectSectionRegion(wall.id,material,region,customFillColor:part.layer.material.color));
+          if (useCompositions) {
+            var remaining = wallPath;
+            for (final part in sharedSolids.where(
+              (s) => s.wall.id == wall.id,
+            )) {
+              final raw = sliceMesh(part.triangles);
+              if (raw == null) continue;
+              final region = Path.combine(
+                PathOperation.intersect,
+                remaining,
+                raw,
+              );
+              remaining = Path.combine(
+                PathOperation.difference,
+                remaining,
+                region,
+              );
+              if (region.getBounds().isEmpty) continue;
+              final material = switch (part.layer.material) {
+                ArchitectMaterial.concrete => SlabMaterial.concrete,
+                ArchitectMaterial.xps => SlabMaterial.xps,
+                ArchitectMaterial.eps => SlabMaterial.floorInsulation,
+                ArchitectMaterial.stoneWool => SlabMaterial.mineralWool,
+                ArchitectMaterial.timber => SlabMaterial.parquet,
+                ArchitectMaterial.tile ||
+                ArchitectMaterial.stone => SlabMaterial.tile,
+                _ => SlabMaterial.plaster,
+              };
+              regions.add(
+                ArchitectSectionRegion(
+                  wall.id,
+                  material,
+                  region,
+                  customFillColor: part.layer.material.color,
+                ),
+              );
             }
           } else {
-            regions.add(ArchitectSectionRegion(wall.id, SlabMaterial.plaster, wallPath));
+            regions.add(
+              ArchitectSectionRegion(wall.id, SlabMaterial.plaster, wallPath),
+            );
           }
         }
       }

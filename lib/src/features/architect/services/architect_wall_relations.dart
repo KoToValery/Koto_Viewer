@@ -401,7 +401,7 @@ class ArchitectOpeningClearance {
     final len = wall.length;
     if (len < 1e-4) return const [];
     final centerAlong = offsetRatio * len;
-    final halfW = openingWidth / 2.0;
+    final halfW = wall.openingArcSpan(openingWidth) / 2.0;
     final leftJamb = centerAlong - halfW;
     final rightJamb = centerAlong + halfW;
 
@@ -543,8 +543,8 @@ class ArchitectOpeningPlacement {
     for (final d in wall.doors) {
       if (d.id == excludeOpeningId) continue;
       final c = d.offsetRatio * len;
-      final s = (c - d.width / 2.0).clamp(0.0, len);
-      final e = (c + d.width / 2.0).clamp(0.0, len);
+      final s = (c - wall.openingArcSpan(d.width) / 2.0).clamp(0.0, len);
+      final e = (c + wall.openingArcSpan(d.width) / 2.0).clamp(0.0, len);
       if (e > s + 1e-5) {
         obstacles.add((
           start: s,
@@ -557,8 +557,8 @@ class ArchitectOpeningPlacement {
     for (final w in wall.windows) {
       if (w.id == excludeOpeningId) continue;
       final c = w.offsetRatio * len;
-      final s = (c - w.width / 2.0).clamp(0.0, len);
-      final e = (c + w.width / 2.0).clamp(0.0, len);
+      final s = (c - wall.openingArcSpan(w.width) / 2.0).clamp(0.0, len);
+      final e = (c + wall.openingArcSpan(w.width) / 2.0).clamp(0.0, len);
       if (e > s + 1e-5) {
         obstacles.add((
           start: s,
@@ -753,12 +753,12 @@ class ArchitectOpeningPlacement {
       wall: wall,
       walls: walls,
       excludeOpeningId: excludeOpeningId,
-    ).where((s) => s.length >= openingWidth - 1e-5).toList();
+    ).where((s) => s.length >= wall.openingArcSpan(openingWidth) - 1e-5).toList();
     if (spans.isEmpty) return null;
 
     ArchitectOpeningFreeSpan? best;
     var bestDist = double.infinity;
-    final halfW = openingWidth / 2.0;
+    final halfW = wall.openingArcSpan(openingWidth) / 2.0;
     for (final s in spans) {
       final minC = s.leftStation + halfW;
       final maxC = math.max(minC, s.rightStation - halfW);
@@ -811,7 +811,7 @@ class ArchitectOpeningPlacement {
     );
     if (span == null) return null;
 
-    final halfW = openingWidth / 2.0;
+    final halfW = host.openingArcSpan(openingWidth) / 2.0;
     final minCenter = span.leftStation + halfW;
     final maxCenter = math.max(minCenter, span.rightStation - halfW);
     var centerAlong = rawAlong.clamp(minCenter, maxCenter);
@@ -823,7 +823,7 @@ class ArchitectOpeningPlacement {
     if (magnetic && maxCenter > minCenter + 1e-5) {
       final rawLeft = centerAlong - halfW - span.leftStation;
       final rawRight = span.rightStation - (centerAlong + halfW);
-      final maxClearance = span.length - openingWidth;
+      final maxClearance = span.length - host.openingArcSpan(openingWidth);
 
       // Determine whether to measure modular steps from the left reference or right reference:
       // If one side is an existing opening (or mid-wall intersection) and the other is a wall end,

@@ -46,12 +46,14 @@ class _TypesState extends State<ArchitectWallTypesManager> {
         type: draft,
         requireName: copy,
         typeUseCount: copy ? 0 : uses(type.id),
-        onApply: (value, _, _) => apply(
-          SetArchitectWallComposition(
-            type: value,
-            replaceTypeId: copy ? null : type.id,
-          ).apply(project),
-        ),
+        onApply: (value, _, changed) => !copy && !changed
+            ? true
+            : apply(
+                SetArchitectWallComposition(
+                  type: value,
+                  replaceTypeId: copy ? null : type.id,
+                ).apply(project),
+              ),
       ),
     );
   }

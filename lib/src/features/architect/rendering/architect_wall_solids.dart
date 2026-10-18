@@ -28,21 +28,26 @@ class ArchitectWallSolid {
 /// The plan's material ownership is extruded between actual vertical events.
 /// Shared material volumes never overlap at L/T/X junctions.
 class ArchitectWallSolids {
-  static final _cache=Expando<Map<ArchitectStorey,List<ArchitectWallSolid>>>();
+  static final _cache =
+      Expando<Map<ArchitectStorey, List<ArchitectWallSolid>>>();
   static List<ArchitectWallSolid> build(
     ArchitectStorey storey,
     List<ArchitectWallType> types, {
     ArchitectProject? project,
   }) {
-    final cacheable=project!=null&&identical(types,project.wallTypes);
-    if(cacheable){final cached=_cache[project]?[storey];if(cached!=null)return cached;}
+    final cacheable = project != null && identical(types, project.wallTypes);
+    if (cacheable) {
+      final cached = _cache[project]?[storey];
+      if (cached != null) return cached;
+    }
     final roofFloors = [storey];
     if (project != null && storey.roofs.isEmpty) {
       final index = project.storeys.indexWhere((s) => s.id == storey.id);
       if (index >= 0 &&
           index + 1 < project.storeys.length &&
-          project.storeys[index + 1].walls.isEmpty)
+          project.storeys[index + 1].walls.isEmpty) {
         roofFloors.add(project.storeys[index + 1]);
+      }
     }
     final roofEnvelopes = [
       for (final floor in roofFloors)
@@ -57,8 +62,8 @@ class ArchitectWallSolids {
       for (final w in storey.walls)
         () {
           var height = w.effectiveHeight(storey.height);
-          if (w.followStoreyHeight && !w.isParapet)
-            for (final (floor, roof) in roofEnvelopes)
+          if (w.followStoreyHeight && !w.isParapet) {
+            for (final (floor, roof) in roofEnvelopes) {
               for (final point in roof.points) {
                 height = math.max(
                   height,
@@ -68,6 +73,8 @@ class ArchitectWallSolids {
                       w.baseOffset,
                 );
               }
+            }
+          }
           return w.copyWith(height: height, followStoreyHeight: false);
         }(),
     ];
@@ -80,7 +87,7 @@ class ArchitectWallSolids {
       );
     }
     final slabs = <(Path, SlabLayerSurface)>[];
-    if (project != null)
+    if (project != null) {
       for (final floor in project.storeys) {
         for (final slab in floor.slabs) {
           var path = Path()..addPolygon(slab.polygon, true);
@@ -100,18 +107,20 @@ class ArchitectWallSolids {
           }
         }
       }
+    }
     final breaks = <double>{};
     for (final wall in walls) {
       final bottom = storey.elevation + wall.baseOffset,
           top = bottom + wall.height;
       breaks.addAll([bottom, top, nominalTops[wall.id]!]);
-      if (wall.plinth.enabled)
+      if (wall.plinth.enabled) {
         for (final z in [
           wall.plinth.baseElevation,
           wall.plinth.baseElevation + wall.plinth.height,
         ]) {
           if (z > bottom && z < top) breaks.add(z);
         }
+      }
       for (final op in [
         ...wall.doors.map((o) => (o.sillHeight, o.height)),
         ...wall.windows.map((o) => (o.sillHeight, o.height)),
@@ -151,12 +160,13 @@ class ArchitectWallSolids {
         if (path.getBounds().isEmpty) continue;
         final wall = region.wall, plinth = wall.plinth;
         var footprint = path;
-        if (mid > nominalTops[wall.id]! + .000001)
+        if (mid > nominalTops[wall.id]! + .000001) {
           footprint = Path.combine(
             PathOperation.intersect,
             footprint,
             roofFootprint,
           );
+        }
         var parts = [
           ArchitectVerticalPart(footprint, (_) => bottom, (_) => top),
         ];
@@ -204,7 +214,7 @@ class ArchitectWallSolids {
           for (var j = 0; j < tris.length; j++) {
             final t = tris[j];
             bool onFace(Vector3 p) {
-              if (wall.isCurved)
+              if (wall.isCurved) {
                 return ((Offset(p.x, p.y) - wall.arc!.center).distance -
                             (wall.arc!.radius -
                                 wall.arcBulge.sign *
@@ -214,6 +224,7 @@ class ArchitectWallSolids {
                                             2)))
                         .abs() <
                     .0001;
+              }
               return ((Offset(p.x, p.y) - plane).dx * wall.exteriorNormal.dx +
                           (Offset(p.x, p.y) - plane).dy *
                               wall.exteriorNormal.dy)
@@ -221,22 +232,27 @@ class ArchitectWallSolids {
                   .00001;
             }
 
-            if ([t.v0, t.v1, t.v2].every(onFace))
+            if ([t.v0, t.v1, t.v2].every(onFace)) {
               tris[j] = Triangle3D(
                 v0: t.v0,
                 v1: t.v1,
                 v2: t.v2,
                 color: plinth.finish.color,
               );
+            }
           }
         }
-        if(tris.isEmpty)continue;
+        if (tris.isEmpty) continue;
         result.add(
           ArchitectWallSolid(wall, region.layer, path, bottom, top, tris),
         );
       }
     }
-    if(cacheable){(_cache[project]??=<ArchitectStorey,List<ArchitectWallSolid>>{})[storey]=result;}
+    if (cacheable) {
+      (_cache[project] ??=
+              <ArchitectStorey, List<ArchitectWallSolid>>{})[storey] =
+          result;
+    }
     return result;
   }
 }

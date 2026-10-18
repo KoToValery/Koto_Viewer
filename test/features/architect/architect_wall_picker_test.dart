@@ -59,7 +59,8 @@ void main() {
           );
           expect(find.text(l10n.architectWallSingle), findsOneWidget);
           expect(find.text(l10n.architectWallChained), findsOneWidget);
-          expect(find.byType(ChoiceChip), findsNWidgets(2));
+          expect(find.byType(ChoiceChip), findsNWidgets(3));
+          expect(find.byKey(const ValueKey('architect-wall-arc-mode')), findsOneWidget);
           expect(find.text(l10n.architectWallThickness), findsNothing);
 
           final pickerTop = tester.getTopLeft(picker).dy;
@@ -92,7 +93,8 @@ void main() {
           );
           // All types remain available, but only the selected one occupies the toolbar.
           expect(find.byType(PopupMenuItem<ArchitectWallType>), findsNothing);
-          expect(find.byType(ChoiceChip), findsNWidgets(2));
+          expect(find.byType(ChoiceChip), findsNWidgets(3));
+          expect(find.byKey(const ValueKey('architect-wall-arc-mode')), findsOneWidget);
           expect(commands.canUndo, isFalse);
           await tester.pumpWidget(const SizedBox());
           await tester.pumpAndSettle();

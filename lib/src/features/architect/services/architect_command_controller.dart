@@ -227,7 +227,7 @@ class SplitArchitectWall extends ArchitectModelCommand {
       ...wall.doors.map((d) => (d.offsetRatio, d.width)),
       ...wall.windows.map((w) => (w.offsetRatio, w.width)),
     ]) {
-      if ((opening.$1 - ratio).abs() * wall.length < opening.$2 / 2 + .001) {
+      if ((opening.$1 - ratio).abs() * wall.length < wall.openingArcSpan(opening.$2) / 2 + .001) {
         throw ArgumentError('Cannot split through an opening');
       }
     }
@@ -349,7 +349,7 @@ class TrimArchitectWall extends ArchitectModelCommand {
       for (final cut in [span.from, span.to]) {
         if (cut > 0 &&
             cut < 1 &&
-            (cut - opening.$1).abs() * wall.length < opening.$2 / 2 + .001) {
+            (cut - opening.$1).abs() * wall.length < wall.openingArcSpan(opening.$2) / 2 + .001) {
           throw ArgumentError('Cannot cut through an opening');
         }
       }
