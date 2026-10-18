@@ -1,3 +1,4 @@
+import '../rendering/architect_opening_plan_painter.dart';
 import '../rendering/architect_canvas_palette.dart';
 // === SECTION: ARCHITECTURAL WINDOW MODEL & RENDERING ===
 import 'dart:math' as math;
@@ -127,6 +128,20 @@ class ArchitectWindow {
     double insulationThickness = 0.0,
     double exteriorSign = 1.0,
   }) {
+    final wallVec = wallEnd - wallStart;
+    final wallLen = wallVec.distance;
+    if (wallLen < 1e-4) return;
+
+    final u = wallVec / wallLen;
+    final n = Offset(-u.dy, u.dx);
+
+    final centerPos = wallStart + u * (offsetRatio * wallLen);
+    final halfW = width / 2.0;
+    final halfThick = wallThickness / 2.0;
+
+    final pLeftBase = centerPos - u * halfW;
+    final pRightBase = centerPos + u * halfW;
+
     final effectiveStyle = resolvedStyle;
     if (effectiveStyle != null) {
       effectiveStyle.paintPlan2D(
@@ -144,23 +159,23 @@ class ArchitectWindow {
         elementSillHeight: sillHeight,
         zoomScale: zoomScale,
         isSelected: isSelected,
+        showDimensions: false,
+      );
+      ArchitectOpeningPlanPainter.paint(
+        canvas: canvas,
+        centerPos: centerPos,
+        normal: n,
+        wallThickness: wallThickness,
+        width: width,
+        height: height,
+        sillHeight: sillHeight,
+        specId: specId,
+        zoomScale: zoomScale,
+        palette: palette,
+        isSelected: isSelected,
       );
       return;
     }
-
-    final wallVec = wallEnd - wallStart;
-    final wallLen = wallVec.distance;
-    if (wallLen < 1e-4) return;
-
-    final u = wallVec / wallLen;
-    final n = Offset(-u.dy, u.dx);
-
-    final centerPos = wallStart + u * (offsetRatio * wallLen);
-    final halfW = width / 2.0;
-    final halfThick = wallThickness / 2.0;
-
-    final pLeftBase = centerPos - u * halfW;
-    final pRightBase = centerPos + u * halfW;
 
     // Paints
     final openingCutPaint = Paint()
@@ -177,13 +192,6 @@ class ArchitectWindow {
     final glassPaint = Paint()
       ..color = palette.foreground(const Color(0xFF0288D1))
       ..strokeWidth = 1.2 / zoomScale
-      ..style = PaintingStyle.stroke;
-
-    final sillPaint = Paint()
-      ..color = isSelected
-          ? const Color(0xFF00E5FF)
-          : palette.foreground(const Color(0xFF78909C))
-      ..strokeWidth = 1.0 / zoomScale
       ..style = PaintingStyle.stroke;
 
     // 1. Cut wall opening rectangle (fill with white to mask wall fill)
@@ -213,12 +221,17 @@ class ArchitectWindow {
       framePaint,
     );
 
-    // 3. Exterior Sill Line (extended 5cm past jambs)
-    const sillOverhang = 0.05;
-    final sillExt = halfThick + 0.03;
-    final sillP1 = (pLeftBase - u * sillOverhang) + n * sillExt;
-    final sillP2 = (pRightBase + u * sillOverhang) + n * sillExt;
-    canvas.drawLine(sillP1, sillP2, sillPaint);
+    ArchitectOpeningPlanPainter.paintWindowSill(
+      canvas: canvas,
+      center: centerPos,
+      direction: u,
+      exteriorNormal: n * exteriorSign,
+      width: width,
+      wallThickness: wallThickness,
+      zoomScale: zoomScale,
+      palette: palette,
+      isSelected: isSelected,
+    );
 
     // 4. Interior & Exterior Frame Edges
     canvas.drawLine(
@@ -258,47 +271,23 @@ class ArchitectWindow {
       }
     }
 
-    // 6. Dimension Label (Width/Height) & Sill notation
-    if (zoomScale > 15.0) {
-      final wCm = (width * 100).round();
-      final hCm = (height * 100).round();
-      final sillCm = (sillHeight * 100).round();
-      final text = '$wCm/$hCm\nh=$sillCm';
-
-      final tp = TextPainter(
-        text: TextSpan(
-          text: text,
-          style: TextStyle(
-            color: isSelected
-                ? const Color(0xFF00E5FF)
-                : palette.foreground(const Color(0xFF0277BD)),
-            fontFamily: 'Roboto',
-            fontSize: 12.0,
-            fontWeight: FontWeight.bold,
-            height: 1.1,
-          ),
-        ),
-        textAlign: TextAlign.center,
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      canvas.save();
-      final labelPos = centerPos + n * (halfThick + 0.22);
-      canvas.translate(labelPos.dx, labelPos.dy);
-      // Align text orientation with wall baseline
-      double angle = math.atan2(u.dy, u.dx);
-      if (angle > math.pi / 2 || angle < -math.pi / 2) {
-        angle += math.pi;
-      }
-      canvas.rotate(angle);
-      canvas.scale(1.0 / zoomScale);
-      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
-      canvas.restore();
-    }
+    ArchitectOpeningPlanPainter.paint(
+      canvas: canvas,
+      centerPos: centerPos,
+      normal: n,
+      wallThickness: wallThickness,
+      width: width,
+      height: height,
+      sillHeight: sillHeight,
+      specId: specId,
+      zoomScale: zoomScale,
+      palette: palette,
+      isSelected: isSelected,
+    );
   }
 
   /// Returns whether [point] hits any part of this window's 2D representation:
-  /// opening corridor or dimension label.
+  /// opening corridor, dimension line, or specification badge.
   bool containsPoint(
     Offset point, {
     required Offset wallStart,
@@ -319,10 +308,13 @@ class ArchitectWindow {
     if (dOpening <= (wallThickness / 2.0) + tolerance) return true;
 
     final n = Offset(-u.dy, u.dx);
-    final labelPos = centerPos + n * (wallThickness / 2.0 + 0.22);
-    if ((point - labelPos).distance <= 0.25 + tolerance) return true;
-
-    return false;
+    return ArchitectOpeningPlanPainter.containsPoint(
+      point,
+      center: centerPos,
+      normal: n,
+      wallThickness: wallThickness,
+      tolerance: tolerance,
+    );
   }
 
   static double _distToSegment(Offset p, Offset a, Offset b) {

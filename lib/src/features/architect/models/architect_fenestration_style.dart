@@ -1,3 +1,4 @@
+import '../rendering/architect_opening_plan_painter.dart';
 import '../rendering/architect_canvas_palette.dart';
 // === SECTION: ARCHITECTURAL PARAMETRIC FENESTRATION MODEL ===
 // Table of Contents:
@@ -688,6 +689,7 @@ class ArchitectFenestrationStyle {
     required double elementSillHeight,
     required double zoomScale,
     bool isSelected = false,
+    bool showDimensions = true,
   }) {
     final wallVec = wallEnd - wallStart;
     final wallLen = wallVec.distance;
@@ -730,11 +732,6 @@ class ArchitectFenestrationStyle {
     final casingFillPaint = Paint()
       ..color = casingColor.withValues(alpha: 0.85)
       ..style = PaintingStyle.fill;
-
-    final sillPaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF78909C))
-      ..strokeWidth = 1.1 / zoomScale
-      ..style = PaintingStyle.stroke;
 
     // 1. Cut rough wall opening through wall body (Fill with white mask)
     final openingPath = Path()
@@ -864,17 +861,22 @@ class ArchitectFenestrationStyle {
       canvas.drawPath(rightCasingPath, casingPaint);
     }
 
-    // 7. Exterior Sill Line (extended past jambs by 5cm)
     if (kind == FenestrationKind.window) {
-      const sillOverhang = 0.05;
-      final sillExt = halfWallThick + 0.04;
-      final sillP1 = (pLeftBase - u * sillOverhang) + n * (exteriorSign * sillExt);
-      final sillP2 = (pRightBase + u * sillOverhang) + n * (exteriorSign * sillExt);
-      canvas.drawLine(sillP1, sillP2, sillPaint);
+      ArchitectOpeningPlanPainter.paintWindowSill(
+        canvas: canvas,
+        center: centerPos,
+        direction: u,
+        exteriorNormal: n * exteriorSign,
+        width: elementWidth,
+        wallThickness: wallThickness,
+        zoomScale: zoomScale,
+        palette: palette,
+        isSelected: isSelected,
+      );
     }
 
     // 8. Architectural Dimension Notation (W/H, sill)
-    if (zoomScale > 15.0) {
+    if (showDimensions && zoomScale > 15.0) {
       final wCm = (elementWidth * 100).round();
       final hCm = (elementHeight * 100).round();
       final sillCm = (elementSillHeight * 100).round();

@@ -1,3 +1,4 @@
+import '../rendering/architect_opening_plan_painter.dart';
 import '../rendering/architect_canvas_palette.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -248,11 +249,6 @@ class ArchitectDoor {
       ..strokeWidth = (isSelected ? 1.2 : 0.8) / zoomScale
       ..style = PaintingStyle.stroke;
 
-    final dimLinePaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black87)
-      ..strokeWidth = 0.8 / zoomScale
-      ..style = PaintingStyle.stroke;
-
     // 1. Cut rough wall opening through wall body (mask background)
     final openingPath = Path()
       ..moveTo(pLeftBase.dx - n.dx * (halfThick + 0.002), pLeftBase.dy - n.dy * (halfThick + 0.002))
@@ -344,113 +340,19 @@ class ArchitectDoor {
       }
     }
 
-    // 7. Dimension Line & Text Tag (matching door.dxf New_razmer)
-    // Transverse dimension line passing perpendicularly through center of opening
-    const badgeR = 0.16; // 16 cm static radius circle (32 cm diameter, matching door.dxf)
-    final extDist = halfThick + 0.22; // 22 cm compact extension past wall face (matching door.dxf)
-    final dimStart = centerPos - n * (halfThick + 0.08);
-    final dimEnd = centerPos + n * extDist;
-    canvas.drawLine(dimStart, dimEnd, dimLinePaint);
-
-    final wCm = (width * 100).round();
-    final hCm = (height * 100).round();
-    final sillCm = (sillHeight * 100).round();
-
-    // Paint dimension numbers on both sides of the transverse line, parallel to the line
-    // Static architectural size in model space: does not balloon up upon zoom-out
-    final textStyle = TextStyle(
-      color: isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black),
-      fontSize: 10.0,
-      fontWeight: FontWeight.bold,
-      fontFamily: 'Arial',
-      height: 1.0,
+    ArchitectOpeningPlanPainter.paint(
+      canvas: canvas,
+      centerPos: centerPos,
+      normal: n,
+      wallThickness: wallThickness,
+      width: width,
+      height: height,
+      sillHeight: sillHeight,
+      specId: specId,
+      zoomScale: zoomScale,
+      palette: palette,
+      isSelected: isSelected,
     );
-
-    final tpWidth = TextPainter(
-      text: TextSpan(text: '$wCm', style: textStyle),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final tpHeight = TextPainter(
-      text: TextSpan(text: '$hCm', style: textStyle),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    // Static model height ~0.10m (10 cm text height)
-    final dimTextScale = 0.10 / tpWidth.height;
-
-    canvas.save();
-    canvas.translate(centerPos.dx, centerPos.dy);
-    double dimAngle = math.atan2(n.dy, n.dx);
-    if (dimAngle > math.pi / 2) {
-      dimAngle -= math.pi;
-    } else if (dimAngle <= -math.pi / 2) {
-      dimAngle += math.pi;
-    }
-    canvas.rotate(dimAngle);
-    canvas.scale(dimTextScale);
-
-    // Position above and below the dimension line
-    tpWidth.paint(canvas, Offset(-tpWidth.width / 2.0, -tpWidth.height - 2.0));
-    tpHeight.paint(canvas, Offset(-tpHeight.width / 2.0, 3.0));
-
-    // Sill height text if > 0 (e.g. h=15)
-    if (sillCm > 0) {
-      final tpSill = TextPainter(
-        text: TextSpan(
-          text: 'h=$sillCm',
-          style: TextStyle(
-            color: palette.foreground(const Color(0xFF00838F)),
-            fontSize: 9.0,
-            fontWeight: FontWeight.w600,
-            fontFamily: 'Arial',
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tpSill.paint(canvas, Offset(math.max(tpWidth.width, tpHeight.width) / 2.0 + 4.0, -tpSill.height / 2.0));
-    }
-    canvas.restore();
-
-    // 8. Door ID Circle Badge (matching door.dxf New_ID)
-    // Positioned at the end of the extended dimension line touching circumference.
-    // Static in model coordinates: never balloons up upon zoom-out.
-    // Circle interior is transparent (outline only, no solid hatch).
-    final badgeCenter = centerPos + n * (extDist + badgeR);
-
-    // Circle border (outline only, transparent interior)
-    canvas.drawCircle(
-      badgeCenter,
-      badgeR,
-      Paint()
-        ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF263238))
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = (isSelected ? 1.6 : 1.0) / zoomScale,
-    );
-
-    // Text ID inside circle (static ~0.14m height)
-    final idPainter = TextPainter(
-      text: TextSpan(
-        text: specId,
-        style: TextStyle(
-          color: isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black),
-          fontSize: 14.0,
-          fontWeight: FontWeight.bold,
-          fontFamily: 'Arial',
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final idScale = 0.14 / idPainter.height;
-    canvas.save();
-    canvas.translate(badgeCenter.dx, badgeCenter.dy);
-    canvas.scale(idScale);
-    idPainter.paint(
-      canvas,
-      Offset(-idPainter.width / 2.0, -idPainter.height / 2.0),
-    );
-    canvas.restore();
   }
 
   /// Returns whether [point] hits any part of this door's 2D representation:
