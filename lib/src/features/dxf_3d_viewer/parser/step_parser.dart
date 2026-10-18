@@ -7,6 +7,12 @@ import '../models/mesh_3d.dart';
 import 'ifc_parser.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 
+class _UVPoint {
+  final double u;
+  final double v;
+  const _UVPoint(this.u, this.v);
+}
+
 class _StepSubEntity {
   final String type;
   final String params;
@@ -802,27 +808,33 @@ class StepParser {
               var a0 = math.atan2(dFrom.dot(y), dFrom.dot(x));
               var a1 = math.atan2(dTo.dot(y), dTo.dot(x));
 
-              var diff = a1 - a0;
-              if (!effOrientation) {
-                while (diff > 0) {
-                  diff -= 2 * math.pi;
-                }
-                while (diff < -2 * math.pi) {
-                  diff += 2 * math.pi;
-                }
+              final double diff;
+              if ((vFrom - vTo).lengthSquared < 1e-8) {
+                diff = effOrientation ? 2 * math.pi : -2 * math.pi;
               } else {
-                while (diff < 0) {
-                  diff += 2 * math.pi;
+                var d = a1 - a0;
+                if (!effOrientation) {
+                  while (d > 0) {
+                    d -= 2 * math.pi;
+                  }
+                  while (d < -2 * math.pi) {
+                    d += 2 * math.pi;
+                  }
+                } else {
+                  while (d < 0) {
+                    d += 2 * math.pi;
+                  }
+                  while (d > 2 * math.pi) {
+                    d -= 2 * math.pi;
+                  }
                 }
-                while (diff > 2 * math.pi) {
-                  diff -= 2 * math.pi;
-                }
+                diff = d;
               }
 
               if (pts.isEmpty || (pts.last - vFrom).lengthSquared > 1e-8) {
                 pts.add(vFrom);
               }
-              const samples = 8;
+              const samples = 16;
               for (int s = 1; s < samples; s++) {
                 final t = s / samples;
                 final ang = a0 + diff * t;
@@ -915,96 +927,231 @@ class StepParser {
         return stripTris;
       }
 
-      // Handle featured extruded tile surfaces with rib / lug cutouts and nail holes
-      if (faceId == 30595) {
-        final prof500 = outerPts.where((p) => (p.y - 500.0).abs() < 1.0).toList();
-        prof500.sort((a, b) => a.x.compareTo(b.x));
-        final profile = prof500;
-
-        List<Vector3> profileAtY(double y) =>
-            profile.map((p) => transform.transformPoint(Vector3(p.x, y, p.z))).toList();
-
-        // Zone 1: Main body of tile, Y in [45, 447], full X [0..259]
-        result.addAll(makeQuadStrip(profileAtY(45), profileAtY(447)));
-
-        // Zone 2: Margin next to Rib 1, Y in [447, 454], X in [0..41]
-        final prof41 = profile.where((p) => p.x <= 41.01).toList();
-        final p447_41 = prof41.map((p) => transform.transformPoint(Vector3(p.x, 447, p.z))).toList();
-        final p454_41 = prof41.map((p) => transform.transformPoint(Vector3(p.x, 454, p.z))).toList();
-        result.addAll(makeQuadStrip(p447_41, p454_41));
-
-        // Zone 3: Surface between Rib 1 and Rib 2, Y in [454, 464], X in [41..259]
-        final profRib = profile.where((p) => p.x >= 40.99).toList();
-        final p454Rib = profRib.map((p) => transform.transformPoint(Vector3(p.x, 454, p.z))).toList();
-        final p464Rib = profRib.map((p) => transform.transformPoint(Vector3(p.x, 464, p.z))).toList();
-        result.addAll(makeQuadStrip(p454Rib, p464Rib));
-
-        // Zone 4: Margin next to Rib 2, Y in [464, 471], X in [0..41]
-        final p464_41 = prof41.map((p) => transform.transformPoint(Vector3(p.x, 464, p.z))).toList();
-        final p471_41 = prof41.map((p) => transform.transformPoint(Vector3(p.x, 471, p.z))).toList();
-        result.addAll(makeQuadStrip(p464_41, p471_41));
-
-        // Zone 5: Top header, Y in [471, 500], full X [0..259], with two holes
-        final p471 = profileAtY(471);
-        final p500 = profileAtY(500);
-        final outerZone5 = <Vector3>[
-          ...p471,
-          ...p500.reversed,
-        ];
-        final worldHoles = innerHoles.map((h) => h.map((p) => transform.transformPoint(p)).toList()).toList();
-        final bridged = IfcParser.bridgePolygonWithHoles(outerZone5, worldHoles);
-        result.addAll(IfcParser.triangulatePolygon3D(bridged, color: faceColor));
-
-        return result;
-      }
-
-      if (faceId == 25524) {
-        // Bottom surface of the tile
-        final profile = outerPts.where((p) => (p.y - 45.0).abs() < 1.0).toList();
-        profile.sort((a, b) => a.x.compareTo(b.x));
-
-        List<Vector3> profileAtY(double y) =>
-            profile.map((p) => transform.transformPoint(Vector3(p.x, y, p.z))).toList();
-
-        // Zone 1: Main body, Y in [45, 442], full X [0..259]
-        result.addAll(makeQuadStrip(profileAtY(45), profileAtY(442)));
-
-        // Zone 2: Around hanging lug cutout, Y in [442, 456]
-        final profL = profile.where((p) => p.x <= 135.01).toList();
-        final p442Left = profL.map((p) => transform.transformPoint(Vector3(p.x, 442, p.z))).toList();
-        final p456Left = profL.map((p) => transform.transformPoint(Vector3(p.x, 456, p.z))).toList();
-        result.addAll(makeQuadStrip(p442Left, p456Left));
-
-        final profR = profile.where((p) => p.x >= 164.99).toList();
-        final p442Right = profR.map((p) => transform.transformPoint(Vector3(p.x, 442, p.z))).toList();
-        final p456Right = profR.map((p) => transform.transformPoint(Vector3(p.x, 456, p.z))).toList();
-        result.addAll(makeQuadStrip(p442Right, p456Right));
-
-        // Zone 3: Between lug and header, Y in [456, 471], full X [0..259]
-        result.addAll(makeQuadStrip(profileAtY(456), profileAtY(471)));
-
-        // Zone 4: Top header, Y in [471, 500], full X [0..259], with two holes
-        final p471 = profileAtY(471);
-        final p500 = profileAtY(500);
-        final outerZone4 = <Vector3>[
-          ...p471,
-          ...p500.reversed,
-        ];
-        final worldHoles = innerHoles
-            .map((h) => h.map((p) => transform.transformPoint(p)).toList())
-            .where((h) => h.every((p) => p.y >= 470.0))
-            .toList();
-        final bridged = IfcParser.bridgePolygonWithHoles(outerZone4, worldHoles);
-        result.addAll(IfcParser.triangulatePolygon3D(bridged, color: faceColor));
-
-        return result;
-      }
-
       final worldOuter = outerPts.map((p) => transform.transformPoint(p)).toList();
       final n = worldOuter.length;
 
       final isExtrudedSurface = (isCylindrical && cylPlacement != null) ||
           (isExtrusion && extrusionAxis != null);
+
+      // Generalized geometric triangulation for any face on a SURFACE_OF_LINEAR_EXTRUSION
+      // (handles steps, L-shapes, cutouts, ribs, and through-holes without hardcoded face IDs)
+      if (isExtrusion && extrusionAxis != null && worldOuter.length >= 4) {
+        final d = (transform.transformPoint(extrusionAxis) -
+                transform.transformPoint(Vector3.zero))
+            .normalized();
+
+        Vector3 uAxis = Vector3(1, 0, 0);
+        if (d.dot(uAxis).abs() > 0.8) {
+          uAxis = Vector3(0, 0, 1);
+        }
+        uAxis = (uAxis - d * d.dot(uAxis)).normalized();
+
+        // 1. Obtain master profile curve points in transverse plane
+        List<Vector3> masterProfile = [];
+        final extData = extrusionSurfaceMap[surfId];
+        if (extData != null) {
+          final cId = extData.$1;
+          final bSpline = bSplineCurveMap[cId];
+          if (bSpline != null) {
+            masterProfile = bSpline
+                .sample(pointMap, minSamples: 32, maxSamples: 64)
+                .map((p) => transform.transformPoint(p))
+                .toList();
+          }
+        }
+
+        if (masterProfile.length < 2) {
+          final candidateMap = <int, Vector3>{};
+          for (int i = 0; i < worldOuter.length; i++) {
+            final p0 = worldOuter[i];
+            final p1 = worldOuter[(i + 1) % worldOuter.length];
+            final edge = p1 - p0;
+            if (edge.lengthSquared > 1e-6 && edge.dot(d).abs() < 0.2 * edge.length) {
+              candidateMap[(p0.dot(uAxis) * 10).round()] ??= p0;
+              candidateMap[(p1.dot(uAxis) * 10).round()] ??= p1;
+            }
+          }
+          masterProfile = candidateMap.values.toList();
+        }
+
+        // Project masterProfile to transverse plane (v = 0)
+        masterProfile = masterProfile.map((p) => p - d * p.dot(d)).toList();
+        masterProfile.sort((a, b) => a.dot(uAxis).compareTo(b.dot(uAxis)));
+
+        final uniqueProfile = <Vector3>[];
+        for (final p in masterProfile) {
+          if (uniqueProfile.isEmpty || (uniqueProfile.last - p).lengthSquared > 1e-4) {
+            uniqueProfile.add(p);
+          }
+        }
+        masterProfile = uniqueProfile;
+
+        // Accurate continuous 3D profile evaluator along u
+        Vector3 evaluateProfileAt(double u) {
+          if (masterProfile.isEmpty) return uAxis * u;
+          if (u <= masterProfile.first.dot(uAxis)) {
+            return masterProfile.first + uAxis * (u - masterProfile.first.dot(uAxis));
+          }
+          if (u >= masterProfile.last.dot(uAxis)) {
+            return masterProfile.last + uAxis * (u - masterProfile.last.dot(uAxis));
+          }
+          for (int i = 0; i < masterProfile.length - 1; i++) {
+            final uA = masterProfile[i].dot(uAxis);
+            final uB = masterProfile[i + 1].dot(uAxis);
+            if (u >= uA && u <= uB) {
+              final t = (uB - uA).abs() > 1e-6 ? (u - uA) / (uB - uA) : 0.0;
+              return masterProfile[i] * (1.0 - t) + masterProfile[i + 1] * t;
+            }
+          }
+          return masterProfile.last;
+        }
+
+        // 2. Project 2D polygon of outer boundary in (u, v)
+        final uvPoly = worldOuter.map((p) => _UVPoint(p.dot(uAxis), p.dot(d))).toList();
+
+        final worldHoles = innerHoles
+            .map((h) => h.map((p) => transform.transformPoint(p)).toList())
+            .toList();
+
+        // 3. Compute protected v-spans for all inner holes so intervals never slice through holes
+        final holeVIntervals = <(double, double)>[];
+        for (final h in worldHoles) {
+          if (h.isEmpty) continue;
+          final hVs = h.map((p) => p.dot(d)).toList();
+          final vMin = hVs.reduce(math.min) - 1.5;
+          final vMax = hVs.reduce(math.max) + 1.5;
+          holeVIntervals.add((vMin, vMax));
+        }
+
+        // Collect distinct feature heights v_k, ensuring hole ranges are unbroken
+        final rawHeights = uvPoly.map((p) => p.v).toList()..sort();
+        final candidateLevels = <double>[rawHeights.first, rawHeights.last];
+        for (final p in uvPoly) {
+          final inHole = holeVIntervals.any((span) => p.v > span.$1 + 0.1 && p.v < span.$2 - 0.1);
+          if (!inHole) {
+            candidateLevels.add(p.v);
+          }
+        }
+        for (final span in holeVIntervals) {
+          if (span.$1 > rawHeights.first && span.$1 < rawHeights.last) {
+            candidateLevels.add(span.$1);
+          }
+          if (span.$2 > rawHeights.first && span.$2 < rawHeights.last) {
+            candidateLevels.add(span.$2);
+          }
+        }
+        candidateLevels.sort();
+
+        final vLevels = <double>[candidateLevels.first];
+        for (int i = 1; i < candidateLevels.length; i++) {
+          if (candidateLevels[i] - vLevels.last > 0.5) {
+            vLevels.add(candidateLevels[i]);
+          }
+        }
+
+        // 4. Scanline intersection helper on 2D polygon
+        List<(double, double)> scanlineIntervals(List<_UVPoint> poly, double y) {
+          final xIntersects = <double>[];
+          final nPts = poly.length;
+          for (int i = 0; i < nPts; i++) {
+            final p0 = poly[i];
+            final p1 = poly[(i + 1) % nPts];
+            if ((p0.v <= y && p1.v > y) || (p1.v <= y && p0.v > y)) {
+              final t = (y - p0.v) / (p1.v - p0.v);
+              xIntersects.add(p0.u + (p1.u - p0.u) * t);
+            }
+          }
+          xIntersects.sort();
+          final intervals = <(double, double)>[];
+          for (int i = 0; i < xIntersects.length - 1; i += 2) {
+            if (xIntersects[i + 1] - xIntersects[i] > 1e-2) {
+              intervals.add((xIntersects[i], xIntersects[i + 1]));
+            }
+          }
+          return intervals;
+        }
+
+        // 5. Helper to get 3D profile points at height v for range [u0, u1]
+        List<Vector3> profileAt(double u0, double u1, double v) {
+          final pts = <Vector3>[evaluateProfileAt(u0) + d * v];
+          for (final p in masterProfile) {
+            final pu = p.dot(uAxis);
+            if (pu > u0 + 1e-3 && pu < u1 - 1e-3) {
+              pts.add(p + d * v);
+            }
+          }
+          if ((evaluateProfileAt(u1) - evaluateProfileAt(u0)).lengthSquared > 1e-6) {
+            pts.add(evaluateProfileAt(u1) + d * v);
+          }
+          return pts;
+        }
+
+        // 6. Triangulate intervals
+        if (vLevels.length >= 2 && masterProfile.length >= 2) {
+          bool anyTri = false;
+          for (int k = 0; k < vLevels.length - 1; k++) {
+            final v0 = vLevels[k];
+            final v1 = vLevels[k + 1];
+            final vMid = (v0 + v1) * 0.5;
+            final intervals = scanlineIntervals(uvPoly, vMid);
+
+            for (final (u0, u1) in intervals) {
+              // Check for holes in this interval
+              final holesInInterval = worldHoles.where((h) {
+                final hV = h.map((p) => p.dot(d)).reduce((a, b) => a + b) / h.length;
+                final hU = h.map((p) => p.dot(uAxis)).reduce((a, b) => a + b) / h.length;
+                return (hV >= v0 - 1e-2 && hV <= v1 + 1e-2) && (hU >= u0 - 1e-2 && hU <= u1 + 1e-2);
+              }).toList();
+
+              final pBot = profileAt(u0, u1, v0);
+              final pTop = profileAt(u0, u1, v1);
+
+              if (holesInInterval.isEmpty) {
+                result.addAll(makeQuadStrip(pBot, pTop));
+                anyTri = true;
+              } else {
+                // Split u-range around each hole: pure quad strips outside, local convex patch around hole
+                final holeSpans = holesInInterval.map((h) {
+                  final uMin = h.map((p) => p.dot(uAxis)).reduce(math.min);
+                  final uMax = h.map((p) => p.dot(uAxis)).reduce(math.max);
+                  return (uMin - 2.0, uMax + 2.0, h);
+                }).toList();
+                holeSpans.sort((a, b) => a.$1.compareTo(b.$1));
+
+                var curU = u0;
+                for (final (hU0, hU1, h) in holeSpans) {
+                  final clampedHU0 = math.max(curU, hU0);
+                  final clampedHU1 = math.min(u1, hU1);
+                  if (clampedHU0 > curU + 1e-2) {
+                    result.addAll(makeQuadStrip(
+                      profileAt(curU, clampedHU0, v0),
+                      profileAt(curU, clampedHU0, v1),
+                    ));
+                  }
+                  final sw = evaluateProfileAt(clampedHU0) + d * v0;
+                  final se = evaluateProfileAt(clampedHU1) + d * v0;
+                  final ne = evaluateProfileAt(clampedHU1) + d * v1;
+                  final nw = evaluateProfileAt(clampedHU0) + d * v1;
+                  final rectOuter = <Vector3>[sw, se, ne, nw];
+                  final bridged = IfcParser.bridgePolygonWithHoles(rectOuter, [h]);
+                  result.addAll(IfcParser.triangulatePolygon3D(bridged, color: faceColor));
+                  curU = clampedHU1;
+                }
+                if (u1 > curU + 1e-2) {
+                  result.addAll(makeQuadStrip(
+                    profileAt(curU, u1, v0),
+                    profileAt(curU, u1, v1),
+                  ));
+                }
+                anyTri = true;
+              }
+            }
+          }
+          if (anyTri && result.isNotEmpty) {
+            return result;
+          }
+        }
+      }
 
       // If face is on a CYLINDRICAL_SURFACE or SURFACE_OF_LINEAR_EXTRUSION with two rim profiles:
       if (innerHoles.isEmpty && isExtrudedSurface && n >= 6) {
@@ -1071,16 +1218,33 @@ class StepParser {
             return run;
           }
 
-          final topPts = extractContiguousRun((i) => (maxH - heights[i]) <= tolH);
-          final botPts = extractContiguousRun((i) => (heights[i] - minH) <= tolH);
+          final List<Vector3> topPts;
+          final List<Vector3> botPts;
+
+          if (isCylindrical) {
+            final midH = (minH + maxH) * 0.5;
+            topPts = extractContiguousRun((i) => heights[i] > midH);
+            botPts = extractContiguousRun((i) => heights[i] < midH);
+          } else {
+            topPts = extractContiguousRun((i) => (maxH - heights[i]) <= tolH);
+            botPts = extractContiguousRun((i) => (heights[i] - minH) <= tolH);
+          }
 
           if (botPts.length >= 2 &&
               topPts.length >= 2 &&
               (topPts.length + botPts.length) >= (n * 0.5)) {
             // Match orientation of topPts to botPts if reversed along loop
-            final d00 = (botPts.first - topPts.first).lengthSquared;
-            final d0N = (botPts.first - topPts.last).lengthSquared;
-            final orderedTop = d0N < d00 ? topPts.reversed.toList() : topPts;
+            final bool isClosed = (botPts.first - botPts.last).lengthSquared < 1e-4;
+            final List<Vector3> orderedTop;
+            if (isClosed && botPts.length >= 2 && topPts.length >= 2) {
+              final tBot = botPts[1] - botPts.first;
+              final tTop = topPts[1] - topPts.first;
+              orderedTop = (tBot.dot(tTop) < 0) ? topPts.reversed.toList() : topPts;
+            } else {
+              final d00 = (botPts.first - topPts.first).lengthSquared;
+              final d0N = (botPts.first - topPts.last).lengthSquared;
+              orderedTop = d0N < d00 ? topPts.reversed.toList() : topPts;
+            }
 
             List<Vector3> resample(List<Vector3> pts, int targetCount) {
               if (pts.length == targetCount) return pts;
