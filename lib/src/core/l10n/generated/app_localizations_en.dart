@@ -4948,6 +4948,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectSnap => 'Snap';
 
   @override
+  String get architectHandleOffsetLength => 'Handle leader line length';
+
+  @override
   String get architectAxesWallThickness => 'Wall core for axes';
 
   @override

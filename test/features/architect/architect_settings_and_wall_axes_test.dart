@@ -13,6 +13,7 @@ import 'package:kotoview/src/features/architect/rendering/architect_ghost_storey
 import 'package:kotoview/src/features/architect/services/architect_grid_axis_tool.dart';
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_workspace_settings_dialog.dart';
 import 'architect_editing_test.dart' as editing;
 import 'architect_workspace_interaction_test.dart' as workspace;
 
@@ -457,6 +458,42 @@ void main() {
       await tester.pumpAndSettle();
       expect(model.project.gridAxes, hasLength(1));
       expect(model.undoCount, 1);
+    },
+  );
+
+  testWidgets(
+    'Settings dialog displays and updates handleOffsetLength slider in en and bg',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('bg'),
+          home: Scaffold(
+            body: ArchitectWorkspaceSettingsDialog(
+              hasUnderlay: false,
+              settings: const ArchitectWorkspaceSettings(
+                units: ArchitectUnit.meters,
+                ghostStoreys: false,
+                grid: true,
+                magnetic: true,
+                underlay: false,
+                darkCanvas: false,
+                axisCoreThickness: 0.25,
+                handleOffsetLength: 65.0,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify Bulgarian label and readout
+      expect(find.text('Дължина на изнесената линия'), findsOneWidget);
+      expect(find.text('65 px'), findsOneWidget);
+
+      // Verify slider exists
+      expect(find.byType(Slider), findsOneWidget);
     },
   );
 }

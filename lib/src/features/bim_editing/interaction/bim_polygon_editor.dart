@@ -66,13 +66,23 @@ class BimPolygonEditor<TSnap> {
     return curr;
   }
 
-  static Offset offsetVertexHandle(List<Offset> polygon, int i, double scale) {
-    final clearance = 30.0 / scale;
+  static Offset offsetVertexHandle(
+    List<Offset> polygon,
+    int i,
+    double scale, [
+    double offsetLengthPx = 50.0,
+  ]) {
+    final clearance = offsetLengthPx / scale;
     return polygon[i] + vertexNormal(polygon, i) * clearance;
   }
 
-  static Offset offsetEdgeHandle(List<Offset> polygon, int i, double scale) {
-    final clearance = 30.0 / scale;
+  static Offset offsetEdgeHandle(
+    List<Offset> polygon,
+    int i,
+    double scale, [
+    double offsetLengthPx = 50.0,
+  ]) {
+    final clearance = offsetLengthPx / scale;
     final mid = (polygon[i] + polygon[(i + 1) % polygon.length]) / 2;
     return mid + BimPolygonGeometry.normal(polygon, i) * clearance;
   }
@@ -84,12 +94,13 @@ class BimPolygonEditor<TSnap> {
     Offset raw,
     double scale, {
     BimPolygonEdgeMode mode = BimPolygonEdgeMode.move,
+    double offsetLengthPx = 50.0,
   }) {
     if (selectedEdge < 0 || selectedEdge >= polygon.length) return false;
     final midpoint =
         (polygon[selectedEdge] + polygon[(selectedEdge + 1) % polygon.length]) /
         2;
-    if (!start(id, polygon, midpoint, scale, mode: mode)) return false;
+    if (!start(id, polygon, midpoint, scale, mode: mode, offsetLengthPx: offsetLengthPx)) return false;
     index = selectedEdge;
     edge = true;
     isOffsetHandle = false;
@@ -106,6 +117,7 @@ class BimPolygonEditor<TSnap> {
     Offset raw,
     double scale, {
     BimPolygonEdgeMode mode = BimPolygonEdgeMode.pull,
+    double offsetLengthPx = 50.0,
   }) {
     if (!BimPolygonGeometry.valid(polygon)) return false;
     final directRadius = 18.0 / scale;
@@ -144,36 +156,38 @@ class BimPolygonEditor<TSnap> {
     }
 
     // 3. Offset vertex handle check (outward leader handles)
-    for (var i = 0; i < polygon.length; i++) {
-      final h = offsetVertexHandle(polygon, i, scale);
-      final d = (raw - h).distance;
-      if (d < offsetRadius && d < best) {
-        hit = i;
-        best = d;
-        hitIsEdge = false;
-        hitIsOffset = true;
-        chosenHandle = h;
+    if (offsetLengthPx > 0) {
+      for (var i = 0; i < polygon.length; i++) {
+        final h = offsetVertexHandle(polygon, i, scale, offsetLengthPx);
+        final d = (raw - h).distance;
+        if (d < offsetRadius && d < best) {
+          hit = i;
+          best = d;
+          hitIsEdge = false;
+          hitIsOffset = true;
+          chosenHandle = h;
+        }
       }
-    }
 
-    // 4. Offset edge midpoint handle check (outward edge pull handles)
-    for (var i = 0; i < polygon.length; i++) {
-      final h = offsetEdgeHandle(polygon, i, scale);
-      final d = (raw - h).distance;
-      if (d < offsetRadius && d < best) {
-        hit = i;
-        best = d;
-        hitIsEdge = true;
-        hitIsOffset = true;
-        chosenHandle = h;
+      // 4. Offset edge midpoint handle check (outward edge pull handles)
+      for (var i = 0; i < polygon.length; i++) {
+        final h = offsetEdgeHandle(polygon, i, scale, offsetLengthPx);
+        final d = (raw - h).distance;
+        if (d < offsetRadius && d < best) {
+          hit = i;
+          best = d;
+          hitIsEdge = true;
+          hitIsOffset = true;
+          chosenHandle = h;
+        }
       }
     }
 
     // 5. Proximity outside tap fallback (tap near contour to activate closest handle)
-    if (hit == null) {
+    if (hit == null && offsetLengthPx > 0) {
       var proximityBest = proximityRadius;
       for (var i = 0; i < polygon.length; i++) {
-        final hv = offsetVertexHandle(polygon, i, scale);
+        final hv = offsetVertexHandle(polygon, i, scale, offsetLengthPx);
         final dv = (raw - hv).distance;
         if (dv < proximityBest) {
           hit = i;
@@ -183,7 +197,7 @@ class BimPolygonEditor<TSnap> {
           chosenHandle = hv;
         }
 
-        final he = offsetEdgeHandle(polygon, i, scale);
+        final he = offsetEdgeHandle(polygon, i, scale, offsetLengthPx);
         final de = (raw - he).distance;
         if (de < proximityBest) {
           hit = i;

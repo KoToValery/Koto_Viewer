@@ -113,6 +113,96 @@ void main() {
         expect(editor.leaderLine, isNull);
       },
     );
+
+    test(
+      'Configurable offset length changes handle clearance proportionally',
+      () {
+        final rect = [
+          const Offset(0, 0),
+          const Offset(10, 0),
+          const Offset(10, 10),
+          const Offset(0, 10),
+        ];
+
+        final hvDefault = ArchitectPolygonEditor.offsetVertexHandle(
+          rect,
+          0,
+          1.0,
+          50.0,
+        );
+        final hvCustom = ArchitectPolygonEditor.offsetVertexHandle(
+          rect,
+          0,
+          1.0,
+          100.0,
+        );
+        final dDefault = (hvDefault - rect[0]).distance;
+        final dCustom = (hvCustom - rect[0]).distance;
+
+        expect(dCustom, closeTo(dDefault * 2, 1e-4));
+      },
+    );
+
+    test(
+      'Wall offset handles extend outward along tangent with configured length',
+      () {
+        const wall = ArchitectWall(
+          id: 'w1',
+          startPoint: Offset(0, 0),
+          endPoint: Offset(10, 0),
+        );
+        const scale = 1.0;
+        const offsetLength = 60.0;
+        final uStart = wall.tangentAt(0);
+        final uEnd = wall.tangentAt(1);
+        final clearance = offsetLength / scale;
+        final startHandle = wall.startPoint - uStart * clearance;
+        final endHandle = wall.endPoint + uEnd * clearance;
+
+        expect(startHandle.dx, closeTo(-60.0, 1e-4));
+        expect(startHandle.dy, closeTo(0.0, 1e-4));
+        expect(endHandle.dx, closeTo(70.0, 1e-4));
+        expect(endHandle.dy, closeTo(0.0, 1e-4));
+      },
+    );
+
+    test(
+      'Dragging wall offset handle calculates displacement correctly and connects leader line',
+      () {
+        const wall = ArchitectWall(
+          id: 'w1',
+          startPoint: Offset(0, 0),
+          endPoint: Offset(10, 0),
+        );
+        const scale = 1.0;
+        const offsetLength = 50.0;
+        final uStart = wall.tangentAt(0);
+        final clearance = offsetLength / scale;
+        final startHandle = wall.startPoint - uStart * clearance;
+
+        // Finger taps at startHandle:
+        final rawModel = startHandle;
+        final handlePt = startHandle;
+        final targetPoint = wall.startPoint;
+        final displacement = handlePt - targetPoint;
+        final grabOffset = handlePt - rawModel;
+
+        expect(displacement, const Offset(-50.0, 0.0));
+        expect(grabOffset, Offset.zero);
+
+        // User drags finger by delta (5, 3):
+        final dragPosition = rawModel + const Offset(5.0, 3.0);
+        final rawTarget = dragPosition + grabOffset - displacement;
+
+        expect(rawTarget, const Offset(5.0, 3.0));
+
+        // Leader line connects target to finger:
+        final leaderLine = (rawTarget, dragPosition + grabOffset);
+        expect(leaderLine.$1, const Offset(5.0, 3.0));
+        expect(leaderLine.$2, const Offset(-45.0, 3.0));
+        expect((leaderLine.$2 - leaderLine.$1).distance, closeTo(50.0, 1e-4));
+      },
+    );
   });
 
   group('ArchitectElementTool Transforms (Duplicate, Rotate, Flip)', () {

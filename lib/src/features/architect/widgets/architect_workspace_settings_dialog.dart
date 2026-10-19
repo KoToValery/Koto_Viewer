@@ -9,6 +9,7 @@ class ArchitectWorkspaceSettings {
   final ArchitectDimensionScale dimensionScale;
   final bool ghostStoreys, upperOverhangs, grid, magnetic, underlay, darkCanvas;
   final double axisCoreThickness;
+  final double handleOffsetLength;
   const ArchitectWorkspaceSettings({
     required this.units,
     this.distanceDecimals = 2,
@@ -20,6 +21,7 @@ class ArchitectWorkspaceSettings {
     required this.underlay,
     required this.darkCanvas,
     required this.axisCoreThickness,
+    this.handleOffsetLength = 50.0,
   });
 }
 
@@ -49,6 +51,7 @@ class _ArchitectWorkspaceSettingsDialogState
       underlay = widget.settings.underlay,
       dark = widget.settings.darkCanvas;
   late double core = widget.settings.axisCoreThickness;
+  late double handleOffsetLength = widget.settings.handleOffsetLength;
 
   Future<void> editCore() async {
     var value = units.toUnit(core);
@@ -190,6 +193,41 @@ class _ArchitectWorkspaceSettingsDialogState
                   onTap: editCore,
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l.architectHandleOffsetLength,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Slider(
+                            key: const ValueKey('architect-settings-handle-offset'),
+                            value: handleOffsetLength.clamp(20.0, 120.0),
+                            min: 20.0,
+                            max: 120.0,
+                            divisions: 20,
+                            label: '${handleOffsetLength.round()} px',
+                            onChanged: (val) => setState(() => handleOffsetLength = val),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 45,
+                          child: Text(
+                            '${handleOffsetLength.round()} px',
+                            textAlign: TextAlign.end,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -214,6 +252,7 @@ class _ArchitectWorkspaceSettingsDialogState
               underlay: underlay,
               darkCanvas: dark,
               axisCoreThickness: core,
+              handleOffsetLength: handleOffsetLength,
             ),
           ),
           child: Text(l.save),

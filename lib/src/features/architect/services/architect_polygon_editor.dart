@@ -8,8 +8,19 @@ class ArchitectPolygonEditor extends BimPolygonEditor<ArchitectSnapResult> {
     : super(pointOf: (snap) => snap.point, isSnapped: (snap) => snap.isSnapped);
   static Offset vertexNormal(List<Offset> polygon, int i) =>
       BimPolygonEditor.vertexNormal(polygon, i);
-  static Offset offsetVertexHandle(List<Offset> polygon, int i, double scale) =>
-      BimPolygonEditor.offsetVertexHandle(polygon, i, scale);
-  static Offset offsetEdgeHandle(List<Offset> polygon, int i, double scale) =>
-      BimPolygonEditor.offsetEdgeHandle(polygon, i, scale);
+  static Offset offsetVertexHandle(
+    List<Offset> polygon,
+    int i,
+    double scale, [
+    double offsetLengthPx = 50.0,
+  ]) =>
+      BimPolygonEditor.offsetVertexHandle(polygon, i, scale, offsetLengthPx);
+  static Offset offsetEdgeHandle(
+    List<Offset> polygon,
+    int i,
+    double scale, [
+    double offsetLengthPx = 50.0,
+  ]) =>
+      BimPolygonEditor.offsetEdgeHandle(polygon, i, scale, offsetLengthPx);
 }
+

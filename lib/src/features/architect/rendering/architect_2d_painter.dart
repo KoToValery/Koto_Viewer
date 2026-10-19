@@ -164,6 +164,8 @@ class Architect2dPainter extends CustomPainter {
   final ArchitectRoofTool? roofTool;
   final bool polygonEditInvalid;
   final (Offset, Offset)? polygonLeaderLine;
+  final double handleOffsetLength;
+  final (Offset, Offset)? wallEndpointLeaderLine;
   final ArchitectWallOvershoot? activeOvershoot;
   final List<ArchitectOverhang>? upperOverhangs;
   final bool showUpperOverhangs;
@@ -254,6 +256,8 @@ class Architect2dPainter extends CustomPainter {
     this.roofTool,
     this.polygonEditInvalid = false,
     this.polygonLeaderLine,
+    this.handleOffsetLength = 50.0,
+    this.wallEndpointLeaderLine,
   }) : _project = project,
        _zoomScale = zoomScale,
        super(repaint: viewport);
@@ -381,6 +385,7 @@ class Architect2dPainter extends CustomPainter {
         _drawSelectedElement(canvas);
       }
       _drawPolygonEditing(canvas);
+      _drawWallEndpointLeaderLine(canvas);
       _drawActiveDrafting(canvas);
       for (final id in selectedElementIds) {
         canvas.drawPath(
@@ -515,9 +520,7 @@ class Architect2dPainter extends CustomPainter {
           ..color = Colors.cyan
           ..strokeWidth = 2 / zoomScale,
       );
-      for (final point in [wall.startPoint, wall.endPoint]) {
-        canvas.drawCircle(point, 3 / zoomScale, Paint()..color = Colors.cyan);
-      }
+      _drawSelectedWallHandles(canvas, wall);
       return;
     }
     final selected = _filterElements(project.activeStorey, selectedOnly: true);
@@ -563,21 +566,113 @@ class Architect2dPainter extends CustomPainter {
     ).paint(canvas, Size.zero);
   }
 
+  void _drawSelectedWallHandles(Canvas canvas, ArchitectWall wall) {
+    final draftingScale = math.max(zoomScale, 80.0);
+    const vertexColor = Color(0xFF00BCD4);
+
+    // Direct endpoint dots
+    for (final point in [wall.startPoint, wall.endPoint]) {
+      canvas.drawCircle(point, 3.5 / draftingScale, Paint()..color = vertexColor);
+    }
+
+    if (handleOffsetLength > 0) {
+      final uStart = wall.tangentAt(0);
+      final uEnd = wall.tangentAt(1);
+      final clearance = handleOffsetLength / zoomScale;
+      final startHandle = wall.startPoint - uStart * clearance;
+      final endHandle = wall.endPoint + uEnd * clearance;
+
+      final leaderPaint = Paint()
+        ..color = const Color(0x9900BCD4)
+        ..strokeWidth = 1.0 / draftingScale
+        ..style = PaintingStyle.stroke;
+
+      // Start handle leader & touch grip
+      canvas.drawLine(wall.startPoint, startHandle, leaderPaint);
+      _drawTouchGrip(canvas, startHandle, draftingScale, vertexColor);
+
+      // End handle leader & touch grip
+      canvas.drawLine(wall.endPoint, endHandle, leaderPaint);
+      _drawTouchGrip(canvas, endHandle, draftingScale, vertexColor);
+    }
+  }
+
+  void _drawTouchGrip(
+    Canvas canvas,
+    Offset handle,
+    double draftingScale,
+    Color color,
+  ) {
+    canvas.drawCircle(
+      handle,
+      5.5 / draftingScale,
+      Paint()..color = const Color(0xFF1E1E26),
+    );
+    canvas.drawCircle(
+      handle,
+      5.5 / draftingScale,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5 / draftingScale,
+    );
+    canvas.drawCircle(handle, 2.5 / draftingScale, Paint()..color = color);
+  }
+
+  void _drawWallEndpointLeaderLine(Canvas canvas) {
+    if (wallEndpointLeaderLine == null) return;
+    final draftingScale = math.max(zoomScale, 80.0);
+    final (from, to) = wallEndpointLeaderLine!;
+    final leaderPaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..strokeWidth = 1.8 / draftingScale
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(from, to, leaderPaint);
+    canvas.drawCircle(
+      from,
+      3.5 / draftingScale,
+      Paint()..color = const Color(0xFF00E5FF),
+    );
+    canvas.drawCircle(
+      to,
+      8.0 / draftingScale,
+      Paint()..color = const Color(0x3300E5FF),
+    );
+    canvas.drawCircle(
+      to,
+      5.5 / draftingScale,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8 / draftingScale,
+    );
+    canvas.drawCircle(
+      to,
+      3.0 / draftingScale,
+      Paint()..color = const Color(0xFF00E5FF),
+    );
+  }
+
   void _drawPolygonEditing(Canvas canvas) {
+    final targetId = selectedElementId ?? selectedZoneId;
+    if (targetId == null) return;
     List<Offset>? polygon;
     for (final p in _project.activeStorey.cadPrimitives) {
-      if (p.id == selectedElementId && p.type == CadPrimitiveType.rect) {
+      if (p.id == targetId && p.type == CadPrimitiveType.rect) {
         polygon = p.polygonCorners;
       }
     }
     for (final slab in _project.activeStorey.slabs) {
-      if (slab.id == selectedElementId) polygon = slab.polygon;
+      if (slab.id == targetId) polygon = slab.polygon;
     }
     for (final roof in _project.activeStorey.roofs) {
-      if (roof.id == selectedElementId) polygon = roof.points;
+      if (roof.id == targetId) polygon = roof.points;
+    }
+    for (final zone in _project.activeStorey.zones) {
+      if (zone.id == targetId) polygon = zone.polygon;
     }
     for (final opening in _project.activeStorey.openings) {
-      if (opening.id == selectedElementId) polygon = opening.boundary;
+      if (opening.id == targetId) polygon = opening.boundary;
     }
     if (polygon == null) return;
     ArchitectPolygonPainter.draw(
@@ -589,6 +684,7 @@ class Architect2dPainter extends CustomPainter {
       handles: true,
       invalid: polygonEditInvalid,
       leaderLine: polygonLeaderLine,
+      offsetLengthPx: handleOffsetLength,
       obstacles:
           dimensionWallObstacles ??
           ArchitectWallNetwork.body(_project.activeStorey.walls),
@@ -1476,6 +1572,8 @@ class Architect2dPainter extends CustomPainter {
       openingClearances != oldDelegate.openingClearances ||
       showOpeningClearanceBadges != oldDelegate.showOpeningClearanceBadges ||
       polygonLeaderLine != oldDelegate.polygonLeaderLine ||
+      wallEndpointLeaderLine != oldDelegate.wallEndpointLeaderLine ||
+      handleOffsetLength != oldDelegate.handleOffsetLength ||
       wallCutGuideLine != oldDelegate.wallCutGuideLine ||
       wallCutAnchor != oldDelegate.wallCutAnchor ||
       wallCutLine != oldDelegate.wallCutLine ||

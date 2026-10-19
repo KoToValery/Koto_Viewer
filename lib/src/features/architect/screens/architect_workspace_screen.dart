@@ -880,6 +880,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _showUpperOverhangs = true;
   bool _showDrawingGrid = true;
   double _axisWallCoreThickness = .25;
+  double _handleOffsetLength = 50.0;
   bool _viewPreferencesChanged = false;
 
   Future<void> _loadWorkspacePreferences() async {
@@ -897,6 +898,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _showUnderlay = preferences.getBool('architect_show_underlay') ?? true;
         final core = preferences.getDouble('architect_axis_wall_core') ?? .25;
         _axisWallCoreThickness = core.isFinite && core >= .001 ? core : .25;
+        final handleOffset =
+            preferences.getDouble('architect_handle_offset_length') ?? 50.0;
+        _handleOffsetLength =
+            handleOffset.isFinite && handleOffset >= 0.0 ? handleOffset : 50.0;
       });
       if (widget.initialProject == null &&
           widget.commandController == null &&
@@ -926,6 +931,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       await preferences.setDouble(
         'architect_axis_wall_core',
         _axisWallCoreThickness,
+      );
+      await preferences.setDouble(
+        'architect_handle_offset_length',
+        _handleOffsetLength,
       );
       await preferences.setString(
         'architect_display_units',
@@ -966,6 +975,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           underlay: _showUnderlay,
           darkCanvas: _canvasPalette.isDark,
           axisCoreThickness: _axisWallCoreThickness,
+          handleOffsetLength: _handleOffsetLength,
         ),
       ),
     );
@@ -981,6 +991,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _magnetEnabled = result.magnetic;
       _showUnderlay = result.underlay;
       _axisWallCoreThickness = result.axisCoreThickness;
+      _handleOffsetLength = result.handleOffsetLength;
       _canvasPalette = result.darkCanvas
           ? const ArchitectCanvasPalette.dark()
           : const ArchitectCanvasPalette.light();
@@ -1405,6 +1416,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   ArchitectProject? _wallSnapProject;
   bool _wallDragStart = false;
   Offset _wallGrabOffset = Offset.zero;
+  bool _wallEndpointIsOffset = false;
+  Offset _wallEndpointDisplacement = Offset.zero;
+  (Offset, Offset)? _wallEndpointLeaderLine;
   bool _wallParallelMove = false;
   String? _wallEndpointClearanceId;
   void _toggleParallelMove() {
@@ -2044,6 +2058,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 mode: isRoofDirect
                     ? ArchitectPolygonEdgeMode.extendCatheti
                     : _polygonEdgeMode,
+                offsetLengthPx: _handleOffsetLength,
               )
             : _polygonEditor.start(
                 (_selectedElementId ?? _selectedZoneId)!,
@@ -2055,6 +2070,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           ? ArchitectPolygonEdgeMode.extendCatheti
                           : ArchitectPolygonEdgeMode.pull)
                     : _polygonEdgeMode,
+                offsetLengthPx: _handleOffsetLength,
               ))) {
       _elementMoveOriginal = _project;
       _elementMovePreview = _project;
@@ -2076,24 +2092,52 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         !_mirrorActive &&
         !_splitActive) {
       final wall = _selectedWall!;
-      final hitStart = _hitTestWallEndpoint(rawModel, wall, atStart: true);
-      final hitEnd = _hitTestWallEndpoint(rawModel, wall, atStart: false);
-      if (hitStart || hitEnd) {
-        final atStart = (hitStart && hitEnd)
-            ? (rawModel - wall.startPoint).distance <=
-                (rawModel - wall.endPoint).distance
-            : hitStart;
+      final uStart = wall.tangentAt(0);
+      final uEnd = wall.tangentAt(1);
+      final clearance = _handleOffsetLength / _currentScale;
+      final startHandle = wall.startPoint - uStart * clearance;
+      final endHandle = wall.endPoint + uEnd * clearance;
+      final offsetTol = math.max(28.0 / _currentScale, 0.35);
+
+      final dStartHandle = (rawModel - startHandle).distance;
+      final dEndHandle = (rawModel - endHandle).distance;
+      final hitOffsetStart = _handleOffsetLength > 0 && dStartHandle <= offsetTol;
+      final hitOffsetEnd = _handleOffsetLength > 0 && dEndHandle <= offsetTol;
+
+      final hitDirectStart = _hitTestWallEndpoint(rawModel, wall, atStart: true);
+      final hitDirectEnd = _hitTestWallEndpoint(rawModel, wall, atStart: false);
+
+      if (hitOffsetStart || hitOffsetEnd || hitDirectStart || hitDirectEnd) {
+        final bool isOffset;
+        final bool atStart;
+        if (hitOffsetStart || hitOffsetEnd) {
+          isOffset = true;
+          atStart = (hitOffsetStart && hitOffsetEnd)
+              ? dStartHandle <= dEndHandle
+              : hitOffsetStart;
+        } else {
+          isOffset = false;
+          atStart = (hitDirectStart && hitDirectEnd)
+              ? (rawModel - wall.startPoint).distance <=
+                  (rawModel - wall.endPoint).distance
+              : hitDirectStart;
+        }
         final point = atStart ? wall.startPoint : wall.endPoint;
+        final handlePt = isOffset ? (atStart ? startHandle : endHandle) : point;
+
         _wallEndpointOriginal = wall;
         _wallDragStart = atStart;
-        _wallGrabOffset = point - rawModel;
+        _wallEndpointIsOffset = isOffset;
+        _wallEndpointDisplacement = isOffset ? (handlePt - point) : Offset.zero;
+        _wallGrabOffset = handlePt - rawModel;
+        _wallEndpointLeaderLine = isOffset ? (point, handlePt) : null;
         _elementMoveOriginal = _project;
         _elementMovePreview = _project;
         _isHandleEngaged = true;
         HapticFeedback.selectionClick();
         ArchitectLogger.log(
           'HANDLE',
-          'Wall ${wall.id} endpoint ${atStart ? "start" : "end"} drag engaged',
+          'Wall ${wall.id} endpoint ${atStart ? "start" : "end"} drag engaged (offset=$isOffset)',
         );
         return;
       }
@@ -2915,8 +2959,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               .toList(),
         ),
       );
+      final rawTarget = rawModel + _wallGrabOffset - _wallEndpointDisplacement;
       final snap = ArchitectWallSnap.resolve(
-        raw: rawModel + _wallGrabOffset,
+        raw: rawTarget,
         magnetic: _magnetEnabled,
         anchor: _wallDragStart ? original.endPoint : original.startPoint,
         project: snapProject,
@@ -2929,6 +2974,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         startPoint: _wallDragStart ? snap.point : null,
         endPoint: _wallDragStart ? null : snap.point,
       );
+      if (_wallEndpointIsOffset) {
+        _wallEndpointLeaderLine = (snap.point, rawModel + _wallGrabOffset);
+      }
       try {
         _elementMovePreview = UpdateArchitectWall(
           storeyId: _project.activeStorey.id,
@@ -3541,6 +3589,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _touchPosition = null;
     _wallEndpointOriginal = null;
     _wallSnapProject = null;
+    _wallEndpointIsOffset = false;
+    _wallEndpointDisplacement = Offset.zero;
+    _wallEndpointLeaderLine = null;
     _handleMoved = false;
     _handlePointerDown = null;
     _draggingElementId = null;
@@ -11534,6 +11585,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         roofTool: _roofTool,
         polygonEditInvalid: _polygonEditor.invalid,
         polygonLeaderLine: _polygonEditor.leaderLine,
+        handleOffsetLength: _handleOffsetLength,
+        wallEndpointLeaderLine: _wallEndpointLeaderLine,
         wallJoinLeaderLine: _wallJoinLeaderLine,
         activeOvershoot: _activeOvershoot,
       );

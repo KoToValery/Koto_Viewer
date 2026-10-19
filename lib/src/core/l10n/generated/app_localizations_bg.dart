@@ -4971,6 +4971,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectSnap => 'Прилепване';
 
   @override
+  String get architectHandleOffsetLength => 'Дължина на изнесената линия';
+
+  @override
   String get architectAxesWallThickness => 'Ядро за оси';
 
   @override

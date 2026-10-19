@@ -8705,6 +8705,12 @@ abstract class AppLocalizations {
   /// **'Snap'**
   String get architectSnap;
 
+  /// Setting label for the length of offset handles when editing points of walls, slabs, roofs and other elements
+  ///
+  /// In en, this message translates to:
+  /// **'Handle leader line length'**
+  String get architectHandleOffsetLength;
+
   /// No description provided for @architectAxesWallThickness.
   ///
   /// In en, this message translates to:

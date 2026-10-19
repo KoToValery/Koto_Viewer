@@ -3583,6 +3583,10 @@
   },
   "architectDrawingGrid": "Grid",
   "architectSnap": "Snap",
+  "architectHandleOffsetLength": "Handle leader line length",
+  "@architectHandleOffsetLength": {
+    "description": "Setting label for the length of offset handles when editing points of walls, slabs, roofs and other elements"
+  },
   "architectAxesWallThickness": "Wall core for axes",
   "architectAxesFromWallsHelp": "Create axes through wall cores on this storey. Set the core thickness in Settings.",
   "architectAxesNoMatchingWalls": "No walls match the selected core thickness.",
