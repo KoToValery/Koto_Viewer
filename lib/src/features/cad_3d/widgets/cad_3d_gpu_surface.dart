@@ -14,6 +14,7 @@ import 'package:thermion_dart/src/filament/src/implementation/ffi_indirect_light
 import '../cad_3d_controller.dart';
 import '../models/mesh_3d.dart';
 import '../rendering/cad_3d_feature_edges.dart';
+import '../rendering/cad_3d_gltf_encoder.dart';
 import '../rendering/cad_3d_filament_camera.dart';
 import '../rendering/cad_3d_mesh_painter.dart';
 
@@ -51,6 +52,18 @@ class Cad3DGpuSurface extends StatefulWidget {
 
 class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
     with WidgetsBindingObserver {
+  // Desktop viewers share one engine. Keep surface binding and orphan cleanup
+  // atomic across sibling viewports, including a quick close/reopen.
+  static Future<void> _surfaceWork = Future.value();
+  static Future<T> _serializeSurface<T>(Future<T> Function() operation) {
+    final result = _surfaceWork.then((_) => operation());
+    _surfaceWork = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return result;
+  }
+
   gpu.ThermionViewer? _viewer;
   gpu.ToneMapper? _toneMapper;
   final _assets = <gpu.ThermionAsset>[];
@@ -69,7 +82,7 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
     super.initState();
     widget.controller.addListener(_schedule);
     WidgetsBinding.instance.addObserver(this);
-    _work = _initialize().catchError(_fail);
+    _work = _serializeSurface(_initialize).catchError(_fail);
   }
 
   Future<void> _initialize() async {
@@ -129,7 +142,7 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
     if (_queued || _closed || _failed) return;
     _queued = true;
     _work = _work
-        .then((_) async {
+        .then<void>((_) async {
           try {
             var processed = -1;
             while (!_closed && !_failed && processed != _revision) {
@@ -140,7 +153,7 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
                 _sceneDirty = false;
                 await _upload(viewer);
               }
-              if (!_closed) await _resize(viewer);
+              if (!_closed) await _serializeSurface(() => _resize(viewer));
               if (!_closed) await _camera(viewer);
             }
           } finally {
@@ -171,6 +184,22 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
     // Even an allocation completed after unmount belongs to queued cleanup.
     _texture = texture;
     _textureSize = size;
+    // Thermion creates a headless swapchain for every new desktop viewer, then
+    // binds the platform render target to the engine's first swapchain. Remove
+    // the redundant association instead of rendering the same view twice.
+    final attached = viewer.app.renderManager
+        .getAttachedSwapChains(viewer.view)
+        .toList();
+    if (attached.length > 1) {
+      final primary = (await viewer.app.getSwapChains()).first;
+      for (final chain in attached) {
+        if (chain.getNativeHandle() == primary.getNativeHandle()) continue;
+        await viewer.app.renderManager.detach(viewer.view, swapChain: chain);
+        if (viewer.app.renderManager.getAttachedViews(chain).isEmpty) {
+          await viewer.app.destroySwapChain(chain);
+        }
+      }
+    }
     if (_closed) return;
     await viewer.view.setViewport(texture.width, texture.height);
     _textureReady = true;
@@ -202,16 +231,38 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
     final scale = 20 / math.max(mesh.bounds.maxDimension, 1e-4);
     final wire = widget.shadingMode == Cad3DShadingMode.wireframe;
     final xray = widget.shadingMode == Cad3DShadingMode.xray;
+    final useMaterials =
+        !wire &&
+        !xray &&
+        widget.modelColor == null &&
+        mesh.triangles.any((t) => t.material != null);
     final batches = <(bool, bool), List<Triangle3D>>{};
-    for (final t in mesh.triangles) {
-      if (t.area < 1e-16) continue;
-      final color =
-          widget.modelColor ?? t.color ?? widget.theme.defaultMeshColor;
-      (batches[(t.isDoubleSided || xray, color.a < .999 || xray)] ??= []).add(
-        t,
-      );
+    if (!useMaterials) {
+      for (final t in mesh.triangles) {
+        if (t.area < 1e-16) continue;
+        final color =
+            widget.modelColor ?? t.color ?? widget.theme.defaultMeshColor;
+        (batches[(t.isDoubleSided || xray, color.a < .999 || xray)] ??= []).add(
+          t,
+        );
+      }
     }
-    if (!wire) {
+    if (useMaterials) {
+      // gltfio owns the PBR textures, samplers and material instances together.
+      // It also generates tangent frames for normal maps and handles alpha masks
+      // and UV transforms. Camera motion does not repeat this upload.
+      final data = Cad3DGltfEncoder.encode(
+        mesh,
+        flatShaded: widget.shadingMode == Cad3DShadingMode.flatShaded,
+        defaultColor: widget.theme.defaultMeshColor,
+      );
+      if (_closed) return;
+      final asset = await viewer.loadGltfFromBuffer(
+        data,
+        releaseSourceData: true,
+      );
+      _assets.add(asset);
+    } else if (!wire) {
       for (final entry in batches.entries) {
         if (_closed) return;
         final material = await viewer.app.createUbershaderMaterial(
@@ -238,15 +289,31 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
             final n = (t.v1 - t.v0).cross(t.v2 - t.v0).normalized();
             final c =
                 widget.modelColor ?? t.color ?? widget.theme.defaultMeshColor;
-            for (final p in [t.v0, t.v1, t.v2]) {
+            final points = [t.v0, t.v1, t.v2];
+            for (var corner = 0; corner < 3; corner++) {
+              final p = points[corner];
+              final authoredNormal = t.vertexNormals?[corner];
+              final vertexNormal =
+                  widget.shadingMode != Cad3DShadingMode.flatShaded &&
+                      authoredNormal != null &&
+                      authoredNormal.lengthSquared > 1e-12
+                  ? authoredNormal.normalized()
+                  : n;
+              final vertexColor = widget.modelColor == null
+                  ? (t.vertexColors?[corner] ?? c)
+                  : c;
               final local = (p - center) * scale;
               positions.setAll(vertex * 3, [local.x, local.y, local.z]);
-              normals.setAll(vertex * 3, [n.x, n.y, n.z]);
+              normals.setAll(vertex * 3, [
+                vertexNormal.x,
+                vertexNormal.y,
+                vertexNormal.z,
+              ]);
               colors.setAll(vertex * 4, [
-                _linear(c.r),
-                _linear(c.g),
-                _linear(c.b),
-                xray ? c.a * .22 : c.a,
+                _linear(vertexColor.r),
+                _linear(vertexColor.g),
+                _linear(vertexColor.b),
+                xray ? vertexColor.a * .22 : vertexColor.a,
               ]);
               vertex++;
             }
@@ -413,22 +480,42 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
     // in-flight allocation cannot attach to a view that has already been freed.
     unawaited(
       _work
-          .then((_) async {
-            final viewer = _viewer;
-            if (viewer == null) return;
-            try {
-              await viewer.setRendering(false);
-              await gpu.ThermionFlutterPlugin.instance.destroyTextureForView(
-                viewer.view,
-              );
-            } finally {
+          .then<void>(
+            (_) => _serializeSurface(() async {
+              final viewer = _viewer;
+              if (viewer == null) return;
+              final chains = viewer.app.renderManager
+                  .getAttachedSwapChains(viewer.view)
+                  .toList();
               try {
-                await _clear(viewer);
+                await viewer.setRendering(false);
+                await gpu.ThermionFlutterPlugin.instance.destroyTextureForView(
+                  viewer.view,
+                );
               } finally {
-                await viewer.dispose();
+                try {
+                  await _clear(viewer);
+                } finally {
+                  await viewer.dispose();
+                  await _toneMapper?.dispose();
+                  _toneMapper = null;
+                  final remaining = await viewer.app.getSwapChains();
+                  for (final chain in chains) {
+                    if (remaining.any(
+                          (current) =>
+                              current.getNativeHandle() ==
+                              chain.getNativeHandle(),
+                        ) &&
+                        viewer.app.renderManager
+                            .getAttachedViews(chain)
+                            .isEmpty) {
+                      await viewer.app.destroySwapChain(chain);
+                    }
+                  }
+                }
               }
-            }
-          })
+            }),
+          )
           .catchError((Object error) {
             debugPrint('CAD texture cleanup: $error');
           }),

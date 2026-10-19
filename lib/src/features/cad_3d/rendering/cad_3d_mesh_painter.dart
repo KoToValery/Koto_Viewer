@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models/mesh_3d.dart';
@@ -43,6 +44,10 @@ class _RenderTriangle {
   final double depth;
   final Color color;
   final int edgeMask;
+  final MeshTextureBinding? texture;
+  final List<Offset>? uvs;
+  final List<Color>? vertexColors;
+  final String alphaMode;
 
   const _RenderTriangle({
     required this.p0,
@@ -51,6 +56,10 @@ class _RenderTriangle {
     required this.depth,
     required this.color,
     this.edgeMask = 7,
+    this.texture,
+    this.uvs,
+    this.vertexColors,
+    this.alphaMode = 'OPAQUE',
   });
 }
 
@@ -65,6 +74,7 @@ class Cad3DMeshPainter extends CustomPainter {
   final bool isInteracting;
   final ui.Image? gpuImage;
   final bool overlayOnly;
+  final Map<MeshTexture, ui.Image> textureImages;
 
   const Cad3DMeshPainter({
     required this.mesh,
@@ -76,6 +86,7 @@ class Cad3DMeshPainter extends CustomPainter {
     this.isInteracting = false,
     this.gpuImage,
     this.overlayOnly = false,
+    this.textureImages = const {},
   });
 
   @override
@@ -284,24 +295,29 @@ class Cad3DMeshPainter extends CustomPainter {
       }
 
       final effectiveColor = customModelColor ?? tri.color ?? baseColor;
-      Color faceColor;
-      if (shadingMode == Cad3DShadingMode.xray) {
-        faceColor = effectiveColor.withValues(alpha: 0.25);
-      } else if (shadingMode == Cad3DShadingMode.wireframe) {
-        faceColor = Colors.transparent;
-      } else {
-        final double rLit = (effectiveColor.r * diffuseFactor + specTotal)
-            .clamp(0.0, 1.0);
-        final double gLit = (effectiveColor.g * diffuseFactor + specTotal)
-            .clamp(0.0, 1.0);
-        final double bLit = (effectiveColor.b * diffuseFactor + specTotal)
-            .clamp(0.0, 1.0);
-        faceColor = Color.from(
-          alpha: effectiveColor.a,
-          red: rLit,
-          green: gLit,
-          blue: bLit,
+      Color shade(Color color) {
+        if (shadingMode == Cad3DShadingMode.xray) {
+          return color.withValues(alpha: 0.25);
+        }
+        if (shadingMode == Cad3DShadingMode.wireframe) {
+          return Colors.transparent;
+        }
+        if (tri.material?.unlit == true && customModelColor == null) {
+          return color;
+        }
+        final double rLit = (color.r * diffuseFactor + specTotal).clamp(
+          0.0,
+          1.0,
         );
+        final double gLit = (color.g * diffuseFactor + specTotal).clamp(
+          0.0,
+          1.0,
+        );
+        final double bLit = (color.b * diffuseFactor + specTotal).clamp(
+          0.0,
+          1.0,
+        );
+        return Color.from(alpha: color.a, red: rLit, green: gLit, blue: bLit);
       }
 
       renderList.add(
@@ -310,8 +326,19 @@ class Cad3DMeshPainter extends CustomPainter {
           p1: p1,
           p2: p2,
           depth: depth,
-          color: faceColor,
+          color: shade(effectiveColor),
+          alphaMode: tri.material?.alphaMode ?? 'OPAQUE',
+          vertexColors: customModelColor == null
+              ? tri.vertexColors?.map(shade).toList()
+              : null,
           edgeMask: featureEdges?[tri] ?? 7,
+          texture:
+              customModelColor == null &&
+                  shadingMode != Cad3DShadingMode.xray &&
+                  shadingMode != Cad3DShadingMode.wireframe
+              ? tri.material?.baseColorTexture
+              : null,
+          uvs: tri.textureCoordinates[tri.material?.baseColorTexture?.texCoord],
         ),
       );
     }
@@ -339,7 +366,103 @@ class Cad3DMeshPainter extends CustomPainter {
       edgePaint.color = Colors.black.withValues(alpha: 0.25);
     }
 
-    if (!drawEdges && shadingMode != Cad3DShadingMode.wireframe) {
+    final hasTextures = renderList.any(
+      (t) => textureImages.containsKey(t.texture?.texture),
+    );
+    final shaders = <MeshTexture, ui.ImageShader>{};
+    bool drawTexture(_RenderTriangle tri) {
+      final binding = tri.texture;
+      final image = textureImages[binding?.texture];
+      final uvs = tri.uvs;
+      if (binding == null || image == null || uvs == null) return false;
+      ui.TileMode tileMode(int wrap) => switch (wrap) {
+        33071 => ui.TileMode.clamp,
+        33648 => ui.TileMode.mirror,
+        _ => ui.TileMode.repeated,
+      };
+      final shader = shaders.putIfAbsent(
+        binding.texture,
+        () => ui.ImageShader(
+          image,
+          tileMode(binding.texture.wrapS),
+          tileMode(binding.texture.wrapT),
+          Float64List.fromList([
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+          ]),
+          filterQuality: binding.texture.magFilter == 9728
+              ? FilterQuality.none
+              : FilterQuality.low,
+        ),
+      );
+      final cos = math.cos(binding.rotation), sin = math.sin(binding.rotation);
+      final mapped = [
+        for (final uv in uvs)
+          Offset(
+            (binding.offset.dx +
+                    cos * uv.dx * binding.scale.dx -
+                    sin * uv.dy * binding.scale.dy) *
+                image.width,
+            (binding.offset.dy +
+                    sin * uv.dx * binding.scale.dx +
+                    cos * uv.dy * binding.scale.dy) *
+                image.height,
+          ),
+      ];
+      final vertices = ui.Vertices(
+        ui.VertexMode.triangles,
+        [tri.p0, tri.p1, tri.p2],
+        textureCoordinates: mapped,
+        colors: tri.vertexColors ?? [tri.color, tri.color, tri.color],
+      );
+      final paint = Paint()..shader = shader;
+      if (tri.alphaMode == 'OPAQUE') {
+        // OPAQUE glTF materials ignore texture alpha, even for PNG images.
+        paint.colorFilter = const ColorFilter.matrix([
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          255,
+        ]);
+      }
+      canvas.drawVertices(vertices, BlendMode.modulate, paint);
+      vertices.dispose();
+      return true;
+    }
+
+    if (!hasTextures &&
+        !drawEdges &&
+        shadingMode != Cad3DShadingMode.wireframe) {
       // GPU Batched Rendering via Canvas.drawVertices in chunks of up to 10,000 triangles
       const int batchSize = 10000;
       final positions = <Offset>[];
@@ -350,9 +473,7 @@ class Cad3DMeshPainter extends CustomPainter {
         positions.add(tri.p0);
         positions.add(tri.p1);
         positions.add(tri.p2);
-        colors.add(tri.color);
-        colors.add(tri.color);
-        colors.add(tri.color);
+        colors.addAll(tri.vertexColors ?? [tri.color, tri.color, tri.color]);
 
         if ((i + 1) % batchSize == 0 || i == renderList.length - 1) {
           final vertices = ui.Vertices(
@@ -375,8 +496,20 @@ class Cad3DMeshPainter extends CustomPainter {
           ..close();
 
         if (shadingMode != Cad3DShadingMode.wireframe) {
-          fillPaint.color = tri.color;
-          canvas.drawPath(path, fillPaint);
+          if (!drawTexture(tri)) {
+            if (tri.vertexColors != null) {
+              final vertices = ui.Vertices(ui.VertexMode.triangles, [
+                tri.p0,
+                tri.p1,
+                tri.p2,
+              ], colors: tri.vertexColors);
+              canvas.drawVertices(vertices, BlendMode.srcOver, fillPaint);
+              vertices.dispose();
+            } else {
+              fillPaint.color = tri.color;
+              canvas.drawPath(path, fillPaint);
+            }
+          }
         }
 
         if (drawEdges) {
@@ -396,6 +529,10 @@ class Cad3DMeshPainter extends CustomPainter {
           canvas.drawPath(edges, edgePaint);
         }
       }
+    }
+
+    for (final shader in shaders.values) {
+      shader.dispose();
     }
 
     // 4. Draw 3D Orientation XYZ Axis Gizmo in corner
@@ -510,6 +647,8 @@ class Cad3DMeshPainter extends CustomPainter {
 
   static final Expando<List<Triangle3D>> _subdivisionCache =
       Expando<List<Triangle3D>>();
+  static final Expando<List<Triangle3D>> _textureSubdivisionCache =
+      Expando<List<Triangle3D>>();
 
   static List<Triangle3D> _getDisplayTriangles(Mesh3D mesh) {
     final cached = _subdivisionCache[mesh];
@@ -585,6 +724,30 @@ class Cad3DMeshPainter extends CustomPainter {
     final e20 = (tri.v0 - tri.v2).lengthSquared;
     if (e01 <= maxEdgeLenSq && e12 <= maxEdgeLenSq && e20 <= maxEdgeLenSq) {
       out.add(tri);
+      return;
+    }
+    if (tri.textureCoordinates.isNotEmpty ||
+        tri.material != null ||
+        tri.vertexNormals != null ||
+        tri.vertexColors != null) {
+      const a = Vector3(1, 0, 0), b = Vector3(0, 1, 0), c = Vector3(0, 0, 1);
+      final (left, right) = e01 >= e12 && e01 >= e20
+          ? ([a, (a + b) * .5, c], [(a + b) * .5, b, c])
+          : e12 >= e01 && e12 >= e20
+          ? ([a, b, (b + c) * .5], [a, (b + c) * .5, c])
+          : ([a, b, (c + a) * .5], [(c + a) * .5, b, c]);
+      _subdivideSingle(
+        _interpolatedPart(tri, left),
+        maxEdgeLenSq,
+        depth + 1,
+        out,
+      );
+      _subdivideSingle(
+        _interpolatedPart(tri, right),
+        maxEdgeLenSq,
+        depth + 1,
+        out,
+      );
       return;
     }
     if (e01 >= e12 && e01 >= e20) {
@@ -680,6 +843,57 @@ class Cad3DMeshPainter extends CustomPainter {
     }
   }
 
+  static Triangle3D _interpolatedPart(Triangle3D t, List<Vector3> weights) {
+    Vector3 vector(List<Vector3> values, Vector3 w) =>
+        values[0] * w.x + values[1] * w.y + values[2] * w.z;
+    final points = [
+      for (final w in weights) vector([t.v0, t.v1, t.v2], w),
+    ];
+    List<List<double>> interpolate(List<List<double>> values) => [
+      for (final w in weights)
+        [
+          for (var i = 0; i < 4; i++)
+            values[0][i] * w.x + values[1][i] * w.y + values[2][i] * w.z,
+        ],
+    ];
+    final colorValues = t.vertexColors == null
+        ? null
+        : interpolate([
+            for (final c in t.vertexColors!) [c.r, c.g, c.b, c.a],
+          ]);
+    return Triangle3D(
+      v0: points[0],
+      v1: points[1],
+      v2: points[2],
+      normal: t.normal,
+      color: t.color,
+      isDoubleSided: t.isDoubleSided,
+      depthBias: t.depthBias,
+      material: t.material,
+      vertexNormals: t.vertexNormals == null
+          ? null
+          : [for (final w in weights) vector(t.vertexNormals!, w).normalized()],
+      vertexColors: colorValues == null
+          ? null
+          : [
+              for (final c in colorValues)
+                Color.from(red: c[0], green: c[1], blue: c[2], alpha: c[3]),
+            ],
+      linearVertexColors: t.linearVertexColors == null
+          ? null
+          : interpolate(t.linearVertexColors!),
+      textureCoordinates: {
+        for (final entry in t.textureCoordinates.entries)
+          entry.key: [
+            for (final w in weights)
+              entry.value[0] * w.x +
+                  entry.value[1] * w.y +
+                  entry.value[2] * w.z,
+          ],
+      },
+    );
+  }
+
   List<Triangle3D> _getActiveDisplayTriangles(
     Mesh3D mesh,
     Vector3 center,
@@ -698,7 +912,19 @@ class Cad3DMeshPainter extends CustomPainter {
           modelScale,
           margin,
         )) {
-          active.addAll(group.triangles);
+          final textured =
+              textureImages.isNotEmpty &&
+              (shadingMode == Cad3DShadingMode.smoothShaded ||
+                  shadingMode == Cad3DShadingMode.flatShaded) &&
+              group.triangles.any((t) => t.material?.baseColorTexture != null);
+          active.addAll(
+            textured
+                ? _textureSubdivisionCache[group] ??= _subdivideTris(
+                    group.triangles,
+                    math.max(mesh.bounds.maxDimension, 1e-4) * .08,
+                  )
+                : group.triangles,
+          );
         }
       }
       return active;

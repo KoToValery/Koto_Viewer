@@ -15,6 +15,7 @@ import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.d
 import 'package:kotoview/src/features/cad_3d/cad_3d_controller.dart';
 import 'package:kotoview/src/features/cad_3d/rendering/cad_3d_mesh_painter.dart';
 import 'package:kotoview/src/features/cad_3d/widgets/cad_3d_gpu_surface.dart';
+import 'cad_3d_material_fixture.dart';
 
 final output = Directory('build/cad-3d-qa')..createSync(recursive: true);
 void report(Object value) => File(
@@ -46,48 +47,50 @@ class Smoke extends StatefulWidget {
 
 class _SmokeState extends State<Smoke> {
   final controller = Cad3DController();
-  final mesh = Architect3dBuilder.buildProjectMesh(
-    ArchitectProject(
-      id: 'gpu-qa',
-      name: 'QA',
-      createdAt: DateTime(2026),
-      updatedAt: DateTime(2026),
-      activeStoreyId: 's',
-      storeys: const [
-        ArchitectStorey(
-          id: 's',
-          name: '0',
-          walls: [
-            ArchitectWall(
-              id: 'a',
-              startPoint: Offset.zero,
-              endPoint: Offset(8, 0),
-            ),
-            ArchitectWall(
-              id: 'b',
-              startPoint: Offset(8, 0),
-              endPoint: Offset(8, 5),
-            ),
-            ArchitectWall(
-              id: 'c',
-              startPoint: Offset(8, 5),
-              endPoint: Offset(0, 5),
-            ),
-            ArchitectWall(
-              id: 'd',
-              startPoint: Offset(0, 5),
-              endPoint: Offset.zero,
-            ),
-            ArchitectWall(
-              id: 'e',
-              startPoint: Offset(4, 0),
-              endPoint: Offset(4, 3),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
+  final mesh = const bool.fromEnvironment('CAD_3D_MATERIAL_QA')
+      ? materialFixture()
+      : Architect3dBuilder.buildProjectMesh(
+          ArchitectProject(
+            id: 'gpu-qa',
+            name: 'QA',
+            createdAt: DateTime(2026),
+            updatedAt: DateTime(2026),
+            activeStoreyId: 's',
+            storeys: const [
+              ArchitectStorey(
+                id: 's',
+                name: '0',
+                walls: [
+                  ArchitectWall(
+                    id: 'a',
+                    startPoint: Offset.zero,
+                    endPoint: Offset(8, 0),
+                  ),
+                  ArchitectWall(
+                    id: 'b',
+                    startPoint: Offset(8, 0),
+                    endPoint: Offset(8, 5),
+                  ),
+                  ArchitectWall(
+                    id: 'c',
+                    startPoint: Offset(8, 5),
+                    endPoint: Offset(0, 5),
+                  ),
+                  ArchitectWall(
+                    id: 'd',
+                    startPoint: Offset(0, 5),
+                    endPoint: Offset.zero,
+                  ),
+                  ArchitectWall(
+                    id: 'e',
+                    startPoint: Offset(4, 0),
+                    endPoint: Offset(4, 3),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
   gpu.ThermionViewer? viewer;
   bool started = false;
   bool visible = true;
@@ -128,6 +131,18 @@ class _SmokeState extends State<Smoke> {
     }
     if (unique.length < 50) {
       throw StateError('GPU capture appears empty: ${unique.length} colors');
+    }
+    if (const bool.fromEnvironment('CAD_3D_MATERIAL_QA') && cycle == 0) {
+      var red = 0, green = 0, blue = 0;
+      for (var i = 0; i < pixels.length; i += 4) {
+        final r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+        if (r > g * 1.5 && r > b * 1.5) red++;
+        if (g > r * 1.5 && g > b * 1.5) green++;
+        if (b > r * 1.5 && b > g * 1.5) blue++;
+      }
+      if (red < 500 || green < 500 || blue < 500) {
+        throw StateError('Texture quadrants missing: $red/$green/$blue');
+      }
     }
     final completer = Completer<ui.Image>();
     ui.decodeImageFromPixels(
@@ -171,6 +186,13 @@ class _SmokeState extends State<Smoke> {
       if ((await v.app.getSwapChains()).isNotEmpty) {
         throw StateError('Swapchains survived viewport teardown');
       }
+      // Drain the plugin scheduler before destroying the shared test engine;
+      // native window/plugin teardown must happen only after its render thread.
+      gpu.ThermionFlutterPlugin.instance.pauseFrameScheduler();
+      while (FrameScheduler.instance.isRendering) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      await v.app.flush();
       await v.app.destroy();
       report({
         'passed': true,
@@ -181,7 +203,9 @@ class _SmokeState extends State<Smoke> {
         'captures': captures,
         'cycles': cycle + 1,
       });
-      exit(0);
+      // Let the Flutter engine perform native window/plugin teardown. dart:io
+      // exit can make a successful Windows run terminate as a native crash.
+      await WidgetsBinding.instance.exitApplication(ui.AppExitType.required);
     }
   }
 

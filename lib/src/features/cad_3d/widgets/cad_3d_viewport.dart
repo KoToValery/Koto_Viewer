@@ -77,6 +77,10 @@ class _Cad3DViewportState extends State<Cad3DViewport>
   Cad3DCamera? _frameCamera;
   Mesh3D? _uploadedMesh;
   Color? _uploadedColor;
+  Mesh3D? _textureMesh;
+  final _textureImages = <MeshTexture, ui.Image>{};
+  bool _hasBaseColorTextures = false;
+  int _textureRevision = 0;
 
   Cad3DController get _controller => widget.controller;
   bool get _useGpu =>
@@ -89,6 +93,7 @@ class _Cad3DViewportState extends State<Cad3DViewport>
       widget.preferNativeDepth &&
       !(_useGpu && _gpuReady) &&
       !_backendFailed &&
+      !_hasBaseColorTextures &&
       _backend.isAvailable &&
       _backend.supports(widget.shadingMode) &&
       widget.mesh.triangles.isNotEmpty;
@@ -107,6 +112,47 @@ class _Cad3DViewportState extends State<Cad3DViewport>
     _controller.maxDimension = widget.mesh.bounds.maxDimension;
     _controller.unitsPerMeter = widget.unitsPerMeter;
     _controller.viewport = _size;
+    if (_textureMesh != widget.mesh) {
+      _textureMesh = widget.mesh;
+      unawaited(_loadTextures());
+    }
+  }
+
+  Future<void> _loadTextures() async {
+    final revision = ++_textureRevision;
+    for (final image in _textureImages.values) {
+      image.dispose();
+    }
+    _textureImages.clear();
+    final textures = <MeshTexture>{
+      for (final t in widget.mesh.triangles)
+        if (t.material?.baseColorTexture != null)
+          t.material!.baseColorTexture!.texture,
+    };
+    _hasBaseColorTextures = textures.isNotEmpty;
+    for (final texture in textures) {
+      if (!mounted || revision != _textureRevision) return;
+      try {
+        final codec = await ui.instantiateImageCodec(
+          texture.bytes,
+          targetWidth: 2048,
+          allowUpscaling: false,
+        );
+        ui.Image image;
+        try {
+          image = (await codec.getNextFrame()).image;
+        } finally {
+          codec.dispose();
+        }
+        if (!mounted || revision != _textureRevision) {
+          image.dispose();
+          return;
+        }
+        setState(() => _textureImages[texture] = image);
+      } catch (error) {
+        debugPrint('CAD fallback texture decode: $error');
+      }
+    }
   }
 
   @override
@@ -268,6 +314,10 @@ class _Cad3DViewportState extends State<Cad3DViewport>
     _scrollEnd?.cancel();
     _backend.dispose();
     _frame?.dispose();
+    _textureRevision++;
+    for (final image in _textureImages.values) {
+      image.dispose();
+    }
     super.dispose();
   }
 
@@ -439,6 +489,7 @@ class _Cad3DViewportState extends State<Cad3DViewport>
                           customModelColor: widget.modelColor,
                           isInteracting: _interacting,
                           gpuImage: useFrame ? _frame : null,
+                          textureImages: _textureImages,
                         ),
                       ),
                     ),

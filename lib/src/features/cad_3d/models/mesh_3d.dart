@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui';
 
 /// 3D Vector representation with mathematical operations.
@@ -93,6 +94,83 @@ class BoundingBox3D {
   }
 }
 
+/// Encoded image and sampler data. Decoding/upload belongs to the renderer.
+class MeshTexture {
+  final Uint8List bytes;
+  final String? mimeType;
+  final int wrapS;
+  final int wrapT;
+  final int? magFilter;
+  final int? minFilter;
+
+  const MeshTexture({
+    required this.bytes,
+    this.mimeType,
+    this.wrapS = 10497,
+    this.wrapT = 10497,
+    this.magFilter,
+    this.minFilter,
+  });
+}
+
+/// A texture binding, including its selected UV set and optional UV transform.
+class MeshTextureBinding {
+  final MeshTexture texture;
+  final int texCoord;
+  final Offset offset;
+  final Offset scale;
+  final double rotation;
+
+  const MeshTextureBinding({
+    required this.texture,
+    this.texCoord = 0,
+    this.offset = Offset.zero,
+    this.scale = const Offset(1, 1),
+    this.rotation = 0,
+  });
+}
+
+/// glTF metallic/roughness data, retained independently of display shading.
+class MeshMaterial {
+  final String? name;
+
+  /// Linear RGBA factors (display colors on triangles are sRGB).
+  final List<double> baseColorFactor;
+  final double metallicFactor;
+  final double roughnessFactor;
+  final List<double> emissiveFactor;
+  final String alphaMode;
+  final double alphaCutoff;
+  final bool doubleSided;
+  final bool unlit;
+  final MeshTextureBinding? baseColorTexture;
+  final MeshTextureBinding? metallicRoughnessTexture;
+  final MeshTextureBinding? normalTexture;
+  final MeshTextureBinding? occlusionTexture;
+  final MeshTextureBinding? emissiveTexture;
+  final double normalScale;
+  final double occlusionStrength;
+
+  const MeshMaterial({
+    this.name,
+    this.baseColorFactor = const [1, 1, 1, 1],
+    this.metallicFactor = 1,
+    this.roughnessFactor = 1,
+    this.emissiveFactor = const [0, 0, 0],
+    this.alphaMode = 'OPAQUE',
+    this.alphaCutoff = 0.5,
+    this.doubleSided = false,
+    this.unlit = false,
+    this.baseColorTexture,
+    this.metallicRoughnessTexture,
+    this.normalTexture,
+    this.occlusionTexture,
+    this.emissiveTexture,
+    this.normalScale = 1,
+    this.occlusionStrength = 1,
+  });
+}
+
 /// Single 3D Triangle face in a 3D mesh.
 class Triangle3D {
   final Vector3 v0;
@@ -102,6 +180,18 @@ class Triangle3D {
   final Color? color;
   final bool isDoubleSided;
   final double depthBias;
+  final MeshMaterial? material;
+
+  /// Three UVs per set, in the same order as v0/v1/v2.
+  final Map<int, List<Offset>> textureCoordinates;
+  final List<Vector3>? vertexNormals;
+
+  /// Display colors, with material and vertex factors already multiplied.
+  final List<Color>? vertexColors;
+
+  /// Original linear vertex RGBA factors, before material multiplication and
+  /// alpha masking. Retained for physically based rendering.
+  final List<List<double>>? linearVertexColors;
 
   Triangle3D({
     required this.v0,
@@ -111,6 +201,11 @@ class Triangle3D {
     this.color,
     this.isDoubleSided = false,
     this.depthBias = 0.0,
+    this.material,
+    this.textureCoordinates = const {},
+    this.vertexNormals,
+    this.vertexColors,
+    this.linearVertexColors,
   }) : normal = normal ?? _calculateNormal(v0, v1, v2);
 
   static Vector3 _calculateNormal(Vector3 a, Vector3 b, Vector3 c) {

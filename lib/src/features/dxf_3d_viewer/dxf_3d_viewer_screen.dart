@@ -65,6 +65,11 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
   late String _fileName;
   int _fileSizeBytes = 0;
 
+  bool get _isGltf {
+    final lower = widget.filePath.toLowerCase();
+    return lower.endsWith('.glb') || lower.endsWith('.gltf');
+  }
+
   final Cad3DShadingMode _shadingMode = Cad3DShadingMode.smoothShaded;
   Cad3DTheme _theme = Cad3DTheme.darkCad;
   final bool _showGrid = true;
@@ -155,7 +160,10 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
       } else if (lower.endsWith('.obj')) {
         mesh = await ObjParser.parseFromFile(widget.filePath);
       } else if (lower.endsWith('.glb') || lower.endsWith('.gltf')) {
-        mesh = await GlbGltfParser.parseFromFile(widget.filePath);
+        mesh = await GlbGltfParser.parseFromFile(
+          widget.filePath,
+          convertToZUp: true,
+        );
       } else if (lower.endsWith('.fbx')) {
         mesh = await FbxParser.parseFromFile(widget.filePath);
       } else if (lower.endsWith('.3mf')) {
@@ -243,9 +251,11 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
       if (mounted) {
         final l10n = AppLocalizations.of(context);
         setState(() {
-          _errorMessage =
-              l10n?.errorLoading3dModel(e.message) ??
-              'Error loading 3D model: ${e.message}';
+          // Parser diagnostics are recorded above; product text stays localized.
+          _errorMessage = _isGltf
+              ? l10n!.failedToParse3dMesh
+              : l10n?.errorLoading3dModel(e.message) ??
+                    'Error loading 3D model: ${e.message}';
           _isLoading = false;
         });
       }
@@ -836,6 +846,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                     Positioned.fill(
                       child: Cad3DViewport(
                         mesh: _mesh!,
+                        unitsPerMeter: _isGltf ? 1 : null,
                         controller: _navigation,
                         theme: _theme,
                         shadingMode: _shadingMode,
