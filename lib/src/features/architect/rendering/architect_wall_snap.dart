@@ -218,11 +218,23 @@ class ArchitectWallSnap {
           tolerance: math.max(directionRadius, 24 / scale),
         );
         if (axisCrossing != null) return axisCrossing;
+        final perpCrossing = _perpendicularWallCrossingOnRay(
+          anchor: anchor,
+          u: u,
+          projected: projected,
+          degrees: degrees,
+          walls: project.activeStorey.walls,
+          tolerance: math.max(directionRadius, 24 / scale),
+        );
+        if (perpCrossing != null) return perpCrossing;
+        final guideLength = math.max(delta.distance + 40.0 / scale, 60.0 / scale);
+        final guideEnd = anchor + u * guideLength;
         return ArchitectSnapResult(
           point: projected,
           isSnapped: true,
           snapLabel: '${degrees.round()}°',
           angleDeg: degrees,
+          magneticGuides: [(anchor, guideEnd)],
         );
       }
     }
@@ -248,12 +260,23 @@ class ArchitectWallSnap {
               tolerance: math.max(radius, 24 / scale),
             );
             if (axisCrossing != null) return axisCrossing;
+            final perpCrossing = _perpendicularWallCrossingOnRay(
+              anchor: anchor,
+              u: direction,
+              projected: projected,
+              degrees: degrees,
+              walls: project.activeStorey.walls,
+              tolerance: math.max(radius, 24 / scale),
+            );
+            if (perpCrossing != null) return perpCrossing;
+            final guideLength = math.max(along.abs() + 40.0 / scale, 60.0 / scale);
+            final guideEnd = anchor + direction * guideLength;
             return ArchitectSnapResult(
               point: projected,
               isSnapped: true,
               snapLabel: '${degrees.round()}°',
               angleDeg: degrees,
-              magneticGuides: [(anchor, projected)],
+              magneticGuides: [(anchor, guideEnd)],
             );
           }
         }
@@ -310,6 +333,80 @@ class ArchitectWallSnap {
           angleDeg: degrees,
           magneticGuides: [(anchor, inter), (axis.start, axis.end)],
         );
+      }
+    }
+    return best;
+  }
+
+  static ArchitectSnapResult? _perpendicularWallCrossingOnRay({
+    required Offset anchor,
+    required Offset u,
+    required Offset projected,
+    required double degrees,
+    required List<ArchitectWall> walls,
+    required double tolerance,
+    double maxDistance = 15.0,
+  }) {
+    ArchitectSnapResult? best;
+    double bestDist = tolerance;
+
+    for (final wall in walls) {
+      if ((wall.startPoint - anchor).distance < 1e-3 ||
+          (wall.endPoint - anchor).distance < 1e-3) {
+        continue;
+      }
+      final v = wall.unitVector;
+      final dot = (u.dx * v.dx + u.dy * v.dy).abs();
+      // Must be perpendicular within ~3 degrees
+      if (dot > 0.05) continue;
+
+      final lines = <(Offset, Offset)>[
+        (wall.startPoint, wall.endPoint),
+        if (wall.polygonCorners.length >= 4) ...[
+          (wall.polygonCorners[0], wall.polygonCorners[1]),
+          (wall.polygonCorners[3], wall.polygonCorners[2]),
+        ],
+      ];
+
+      for (final (w1, w2) in lines) {
+        final inter = BimLineGeometry.intersection(
+          anchor,
+          anchor + u,
+          w1,
+          w2,
+          firstFinite: false,
+          secondFinite: false,
+        );
+        if (inter == null) continue;
+        final t = (inter - anchor).dx * u.dx + (inter - anchor).dy * u.dy;
+        if (t <= 1e-3) continue;
+
+        // Closest point on the perpendicular wall segment to inter
+        final seg = w2 - w1;
+        final segLen = seg.distance;
+        if (segLen < 1e-4) continue;
+        final segU = seg / segLen;
+        final s = ((inter - w1).dx * segU.dx + (inter - w1).dy * segU.dy)
+            .clamp(0.0, segLen);
+        final closestOnWall = w1 + segU * s;
+
+        final gap = (closestOnWall - inter).distance;
+        if (gap > maxDistance) continue;
+
+        final d = (inter - projected).distance;
+        if (d <= bestDist) {
+          bestDist = d;
+          best = ArchitectSnapResult(
+            point: inter,
+            isSnapped: true,
+            snapLabel: 'Perpendicular',
+            angleDeg: degrees,
+            magneticGuides: [
+              (anchor, inter),
+              (closestOnWall, inter),
+            ],
+          );
+        }
       }
     }
     return best;

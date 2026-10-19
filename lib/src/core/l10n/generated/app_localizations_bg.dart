@@ -4897,7 +4897,11 @@ class AppLocalizationsBg extends AppLocalizations {
   String get bimNewPoint => 'Нова точка';
 
   @override
-  String get bimNewPointHint => 'Добави точка в средата на посочения ръб';
+  String get bimNewPointHint => 'Посочете позиция по ръба за новата точка';
+
+  @override
+  String get architectNewPointPrompt =>
+      'Посочете позиция по ръба за новата точка';
 
   @override
   String get bimWallNewPointHelp =>

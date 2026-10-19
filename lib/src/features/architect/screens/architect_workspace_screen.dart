@@ -458,7 +458,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   List<String> _selectionCandidates(Offset point) {
-    if (_activeTool == ArchitectTool.select) {
+    if (_activeTool == ArchitectTool.select ||
+        _activeTool == ArchitectTool.zone) {
       final first = _hitSelection(point);
       return <String>{
         ?first,
@@ -1408,6 +1409,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   (Offset, Offset)? _splitGuidePerpendicular;
   bool _splitWaitingForSide = false;
 
+  String? _newPointTargetId;
+  Offset? _newPointCandidate;
+  (Offset, Offset)? _newPointLeaderLine;
+
   bool _touchInput = false;
   bool _placingWithHold = false;
   bool _wallPrecisionMode = true;
@@ -1939,6 +1944,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _isHandleEngaged = false;
 
     final rawModel = _screenToModel(event.localPosition);
+    if (_newPointTargetId != null) {
+      _touchPosition = event.localPosition;
+      _placingWithHold = true;
+      _updateNewPointCandidate(rawModel, isTouch: _touchInput);
+      return;
+    }
     if (_commands.view == ArchitectWorkspaceView.section &&
         _selectedSectionRoofId != null) {
       _cacheProjection();
@@ -2419,7 +2430,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   bool get _canPlaceWithMarker =>
-      (_activeTool != ArchitectTool.select || _mirrorActive || _splitActive) &&
+      (_activeTool != ArchitectTool.select ||
+          _mirrorActive ||
+          _splitActive ||
+          _newPointTargetId != null) &&
       !_wallDirectionLocked &&
       _polygonEditId == null &&
       _pendingShape == null &&
@@ -3338,6 +3352,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
+    if (_newPointTargetId != null) {
+      _updateNewPointCandidate(rawModel, isTouch: _touchInput);
+      return;
+    }
+
     // 7. Slab or Roof drafting candidate
     if (_activeTool == ArchitectTool.slab &&
         _elementTool.slabDraftPoints.isNotEmpty) {
@@ -3497,6 +3516,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     if (_controlTrimClick) {
       _controlTrimClick = false;
+      return;
+    }
+    if (_newPointTargetId != null) {
+      _commitNewPoint();
       return;
     }
     if (_isDraggingVertexOrHandle && !_handleMoved) {
@@ -3916,6 +3939,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_splitActive) {
       _handleSplitTap(rawModel);
+      return;
+    }
+
+    if (_newPointTargetId != null) {
+      _commitNewPoint();
       return;
     }
 
@@ -7313,47 +7341,222 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return items;
   }
 
-  void _insertMidpoint(String id, {Offset? pick}) {
+  void _startNewPointSession(String id, {Offset? initialPick}) {
     final path = InsertArchitectElementPoint.pathOf(_project.activeStorey, id);
     if (path == null || path.points.length < 2) return;
+    _cancelActiveDrags();
+    setState(() {
+      _newPointTargetId = id;
+      _newPointCandidate = null;
+      _newPointLeaderLine = null;
+      _radialMenuScreenPosition = null;
+      _activeSnapLabel = null;
+    });
+    if (initialPick != null) {
+      _updateNewPointCandidate(initialPick, isTouch: false);
+    }
+  }
+
+  void _cancelNewPointSession() {
+    setState(() {
+      _newPointTargetId = null;
+      _newPointCandidate = null;
+      _newPointLeaderLine = null;
+      _activeSnapLabel = null;
+      _activeMagneticGuides = [];
+    });
+    _repaintPreview();
+  }
+
+  void _updateNewPointCandidate(Offset rawModel, {required bool isTouch}) {
+    if (_newPointTargetId == null) return;
+    final path =
+        InsertArchitectElementPoint.pathOf(_project.activeStorey, _newPointTargetId!);
+    if (path == null || path.points.length < 2) return;
+
     final hit = BimLineGeometry.insertion(
       path.points,
-      pick ?? (path.points.first + path.points[1]) / 2,
+      rawModel,
       closed: path.closed,
     );
     if (hit == null) return;
-    _cancelActiveDrags();
+
+    Offset candidate = hit.point;
+    String? snapLabel;
+    List<(Offset, Offset)> guides = [];
+
+    final edgeP1 = path.points[hit.edge];
+    final edgeP2 = path.points[(hit.edge + 1) % path.points.length];
+    final snapTol = 24.0 / _currentScale;
+
+    // Snapping to intersections with outer face lines and centerline of other walls
+    for (final other in _project.activeStorey.walls) {
+      if (other.id == _newPointTargetId) continue;
+      final lines = <(Offset, Offset)>[
+        (other.startPoint, other.endPoint),
+        if (other.polygonCorners.length >= 4) ...[
+          (other.polygonCorners[0], other.polygonCorners[1]),
+          (other.polygonCorners[3], other.polygonCorners[2]),
+          (other.polygonCorners[0], other.polygonCorners[3]),
+          (other.polygonCorners[1], other.polygonCorners[2]),
+        ],
+      ];
+      for (final (w1, w2) in lines) {
+        final inter = BimLineGeometry.intersection(
+          edgeP1,
+          edgeP2,
+          w1,
+          w2,
+          firstFinite: true,
+          secondFinite: false,
+        );
+        if (inter != null && (inter - hit.point).distance <= snapTol) {
+          candidate = inter;
+          snapLabel = 'Intersection';
+          guides = [(w1, w2)];
+          break;
+        }
+      }
+      if (snapLabel != null) break;
+    }
+
+    // Snapping to intersection with grid axes
+    if (snapLabel == null) {
+      for (final axis in _project.gridAxes) {
+        final inter = BimLineGeometry.intersection(
+          edgeP1,
+          edgeP2,
+          axis.start,
+          axis.end,
+          firstFinite: true,
+          secondFinite: false,
+        );
+        if (inter != null && (inter - hit.point).distance <= snapTol) {
+          candidate = inter;
+          snapLabel = 'Axis intersection';
+          guides = [(axis.start, axis.end)];
+          break;
+        }
+      }
+    }
+
+    // Midpoint of the edge
+    if (snapLabel == null) {
+      final mid = (edgeP1 + edgeP2) / 2;
+      if ((mid - hit.point).distance <= 16.0 / _currentScale) {
+        candidate = mid;
+        snapLabel = 'Midpoint';
+      }
+    }
+
+    (Offset, Offset)? leaderLine;
+    if (_handleOffsetLength > 0 && (rawModel - candidate).distance > 1e-3) {
+      leaderLine = (candidate, rawModel);
+    }
+
+    _newPointCandidate = candidate;
+    _newPointLeaderLine = leaderLine;
+    _activeSnapLabel = snapLabel;
+    _activeMagneticGuides = guides;
+    _cursorModel = candidate;
+    _repaintPreview();
+  }
+
+  void _commitNewPoint() {
+    if (_newPointTargetId == null) return;
+    final targetId = _newPointTargetId!;
+    final pt = _newPointCandidate;
+    if (pt == null) {
+      _cancelNewPointSession();
+      return;
+    }
+
+    final path = InsertArchitectElementPoint.pathOf(
+      _project.activeStorey,
+      targetId,
+    );
+    final hit = path == null
+        ? null
+        : BimLineGeometry.insertion(
+            path.points,
+            pt,
+            closed: path.closed,
+          );
+
     final before = _project;
     _executeWallEdit(
       InsertArchitectElementPoint(
         storeyId: _project.activeStoreyId,
-        elementId: id,
-        point: hit.point,
+        elementId: targetId,
+        point: pt,
         newElementId: ArchitectElementId.next('point'),
-        atMidpoint: true,
+        atMidpoint: false,
       ),
     );
-    if (identical(before, _project)) return;
+    if (identical(before, _project)) {
+      _cancelNewPointSession();
+      return;
+    }
+
     setState(() {
-      if (path.closed) {
-        _polygonEditId = id;
+      _newPointTargetId = null;
+      _newPointCandidate = null;
+      _newPointLeaderLine = null;
+      _activeSnapLabel = null;
+      _activeMagneticGuides = [];
+      if (path != null && path.closed && hit != null) {
+        _polygonEditId = targetId;
         _polygonSelectedEdge = hit.edge;
-        if (_selectedZoneId == id) {
+        if (_selectedZoneId == targetId) {
           _zoneTool.startEditingZone(
-            _project.activeStorey.zones.firstWhere((z) => z.id == id),
+            _project.activeStorey.zones.firstWhere((z) => z.id == targetId),
           );
         }
       }
-      _moveSelection = false;
-      _wallCutIds = {};
-      _wallCutStart = null;
-      _wallCutConfirmedDir = null;
-      _wallExtendId = null;
-      _draftStart = null;
-      _wallArcEnd=null;
-      _draftEnd = null;
     });
     HapticFeedback.selectionClick();
+    _repaintPreview();
+  }
+
+  Widget _buildNewPointPromptBanner() {
+    return Material(
+      key: const ValueKey('architect-new-point-banner'),
+      color: const Color(0xE61E1E26),
+      borderRadius: BorderRadius.circular(8),
+      elevation: 4,
+      shadowColor: Colors.black54,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const BimEditingSymbol(
+                BimEditAction.newPoint,
+                color: Color(0xFF00E5FF),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                context.l10n.architectNewPointPrompt,
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                key: const ValueKey('architect-new-point-cancel'),
+                onTap: _cancelNewPointSession,
+                child: const Icon(Icons.close, color: Colors.white70, size: 18),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _handleRadialAction(ArchitectRadialAction action) {
@@ -7529,7 +7732,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           });
           break;
         }
-        _insertMidpoint(id, pick: pick);
+        _startNewPointSession(id, initialPick: pick);
         break;
 
       case ArchitectRadialAction.split:
@@ -8259,7 +8462,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ),
                     onPressed: () {
                       _cancelActiveDrags();
-                      _insertMidpoint(wallIds.single);
+                      _startNewPointSession(wallIds.single);
                     },
                   ),
                   IconButton(
@@ -9130,7 +9333,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ),
                     onPressed: () {
                       _cancelActiveDrags();
-                      _insertMidpoint(ids.single);
+                      _startNewPointSession(ids.single);
                     },
                   ),
                 if (wallIds.isNotEmpty)
@@ -9169,7 +9372,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       } else if (action == 'length') {
                         _editWallLength();
                       } else if (action == 'point') {
-                        _insertMidpoint(wallIds.single);
+                        _startNewPointSession(wallIds.single);
                       }
                     },
                     itemBuilder: (_) => [
@@ -9948,7 +10151,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         ? Center(child: Text(l10n.architectViewDrawingEmpty))
                         : _build2DCanvas(),
                     if (_activeTool == ArchitectTool.zone &&
-                        !_is3DView)
+                        !_is3DView &&
+                        _radialMenuScreenPosition == null &&
+                        _newPointTargetId == null)
                       Positioned(
                         top: 10,
                         left: 0,
@@ -9970,7 +10175,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               setState(() => _activeTool = ArchitectTool.zoneTable),
                         ),
                       ),
-                    if (_activeTool == ArchitectTool.zoneTable && !_is3DView)
+                    if (_activeTool == ArchitectTool.zoneTable &&
+                        !_is3DView &&
+                        _radialMenuScreenPosition == null &&
+                        _newPointTargetId == null)
                       Positioned(
                         top: 10,
                         left: 0,
@@ -10340,7 +10548,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 ),
 
               if ((_effectiveSelection.isNotEmpty || _multiSelect) &&
-                  !_is3DView)
+                  !_is3DView &&
+                  _radialMenuScreenPosition == null &&
+                  _newPointTargetId == null)
                 _buildSelectionBar(),
             ],
           ),
@@ -10628,11 +10838,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             !_moveSelection &&
             _wallCutIds.isEmpty &&
             _wallExtendId == null &&
-            _wallJoinSourceId == null,
+            _wallJoinSourceId == null &&
+            _radialMenuScreenPosition == null &&
+            _newPointTargetId == null,
         touchHoldToPlace: _canPlaceWithMarker,
         onToolHoldStart: _beginPlacementHold,
-        onSelectionHold: _duplicateMove == null ? _onSelectionHold : null,
-        onContextHold: _duplicateMove == null ? _onContextHold : null,
+        onSelectionHold:
+            _duplicateMove == null && _newPointTargetId == null
+                ? _onSelectionHold
+                : null,
+        onContextHold:
+            _duplicateMove == null && _newPointTargetId == null
+                ? _onContextHold
+                : null,
         onEditTap: _polygonEditId == null
             ? null
             : (position) => _selectPolygonEdge(_screenToModel(position)),
@@ -10946,7 +11164,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           ),
         ),
-      if (_selectedWallIds.isNotEmpty && !_mirrorActive && !_splitActive)
+      if (_selectedWallIds.isNotEmpty &&
+          !_mirrorActive &&
+          !_splitActive &&
+          _radialMenuScreenPosition == null &&
+          _newPointTargetId == null)
         Positioned(
           top: 8,
           left: 8,
@@ -10976,6 +11198,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           left: 8,
           right: 64,
           child: _buildSplitPromptBanner(),
+        ),
+      if (_newPointTargetId != null)
+        Positioned(
+          top: 8,
+          left: 8,
+          right: 64,
+          child: _buildNewPointPromptBanner(),
         ),
       if (_activeTool == ArchitectTool.wall && _effectiveSelection.isEmpty)
         Positioned(
@@ -11588,6 +11817,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         handleOffsetLength: _handleOffsetLength,
         wallEndpointLeaderLine: _wallEndpointLeaderLine,
         wallJoinLeaderLine: _wallJoinLeaderLine,
+        newPointCandidate: _newPointCandidate,
+        newPointLeaderLine: _newPointLeaderLine,
         activeOvershoot: _activeOvershoot,
       );
 

@@ -3547,7 +3547,11 @@
   "bimUnderlayReviewCompleteAction": "Reviewed",
   "bimUnderlayReviewCompleteTooltip": "Mark the preserved elements and openings as reviewed",
   "bimNewPoint": "New point",
-  "bimNewPointHint": "Add a point at the middle of the indicated edge",
+  "bimNewPointHint": "Specify position along the edge for the new point",
+  "architectNewPointPrompt": "Specify position along the edge for the new point",
+  "@architectNewPointPrompt": {
+    "description": "Prompt message shown in banner when manually placing a new point on an element edge"
+  },
   "bimWallNewPointHelp": "Adds connected wall segments. Split cuts and disconnects them.",
   "architectCanvasLight": "Light background",
   "architectCanvasDark": "Dark background",

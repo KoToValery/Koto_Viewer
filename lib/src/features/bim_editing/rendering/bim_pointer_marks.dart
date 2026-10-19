@@ -207,15 +207,20 @@ class BimPointerMarks {
             snapPaint,
           );
         } else {
+          final perpPaint = Paint()
+            ..color = color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.0;
+          const double sp = 4.5;
           canvas.drawPath(
             Path()
-              ..moveTo(pos.dx - s, pos.dy - s)
-              ..lineTo(pos.dx - s, pos.dy + s)
-              ..lineTo(pos.dx + s, pos.dy + s)
-              ..moveTo(pos.dx - s, pos.dy)
+              ..moveTo(pos.dx - sp, pos.dy - sp)
+              ..lineTo(pos.dx - sp, pos.dy + sp)
+              ..lineTo(pos.dx + sp, pos.dy + sp)
+              ..moveTo(pos.dx - sp, pos.dy)
               ..lineTo(pos.dx, pos.dy)
-              ..lineTo(pos.dx, pos.dy + s),
-            snapPaint,
+              ..lineTo(pos.dx, pos.dy + sp),
+            perpPaint,
           );
         }
         break;

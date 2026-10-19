@@ -4874,7 +4874,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bimNewPointHint =>
-      'Add a point at the middle of the indicated edge';
+      'Specify position along the edge for the new point';
+
+  @override
+  String get architectNewPointPrompt =>
+      'Specify position along the edge for the new point';
 
   @override
   String get bimWallNewPointHelp =>

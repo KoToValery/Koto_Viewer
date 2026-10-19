@@ -8564,8 +8564,14 @@ abstract class AppLocalizations {
   /// No description provided for @bimNewPointHint.
   ///
   /// In en, this message translates to:
-  /// **'Add a point at the middle of the indicated edge'**
+  /// **'Specify position along the edge for the new point'**
   String get bimNewPointHint;
+
+  /// Prompt message shown in banner when manually placing a new point on an element edge
+  ///
+  /// In en, this message translates to:
+  /// **'Specify position along the edge for the new point'**
+  String get architectNewPointPrompt;
 
   /// No description provided for @bimWallNewPointHelp.
   ///

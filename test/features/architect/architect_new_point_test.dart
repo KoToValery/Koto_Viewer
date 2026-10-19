@@ -299,14 +299,28 @@ void main() {
           await tester.pumpAndSettle();
         }
         // For polygons select inside; for native lines select the body.
-        final select = ['rect', 'slab', 'zone', 'opening'].contains(kind)
+        final select = ['rect', 'slab', 'opening'].contains(kind)
             ? const Offset(3, .1)
-            : const Offset(1, 0);
+            : kind == 'zone'
+                ? const Offset(3, 2)
+                : const Offset(1, 0);
         final original = model.project;
         await editing.contextHold(tester, select);
         final action = find.byKey(const ValueKey('architect-radial-newPoint'));
         expect(action, findsOneWidget);
         await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('architect-new-point-banner')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-new-point-cancel')),
+          findsOneWidget,
+        );
+        workspace.camera(tester).fit(const Rect.fromLTWH(-1, -1, 10, 8));
+        await tester.pumpAndSettle();
+        await tester.tapAt(workspace.screen(tester, const Offset(4, 0)));
         await tester.pumpAndSettle();
         final path = InsertArchitectElementPoint.pathOf(
           model.project.activeStorey,
@@ -364,13 +378,13 @@ void main() {
             w.key is ValueKey<String> &&
             (w.key as ValueKey<String>).value.startsWith('architect-radial-'),
       );
-      expect(buttons, findsNWidgets(8));
+      expect(buttons, findsNWidgets(10));
       final rects = tester.getRect(buttons.at(0));
       expect(rects.left, greaterThanOrEqualTo(0));
-      for (var i = 0; i < 8; i++) {
+      for (var i = 0; i < 10; i++) {
         final a = tester.getRect(buttons.at(i));
         expect(a.right, lessThanOrEqualTo(360));
-        for (var j = i + 1; j < 8; j++) {
+        for (var j = i + 1; j < 10; j++) {
           expect(
             (a.center - tester.getRect(buttons.at(j)).center).distance,
             greaterThanOrEqualTo(50 - 1e-8),
@@ -378,6 +392,9 @@ void main() {
         }
       }
       await tester.tap(find.byKey(const ValueKey('architect-radial-newPoint')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('architect-new-point-banner')), findsOneWidget);
+      await tester.tapAt(workspace.screen(tester, const Offset(4, 0)));
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.walls, hasLength(2));
       expect(model.project.activeStorey.walls.first.connectEnd, isTrue);

@@ -166,6 +166,8 @@ class Architect2dPainter extends CustomPainter {
   final (Offset, Offset)? polygonLeaderLine;
   final double handleOffsetLength;
   final (Offset, Offset)? wallEndpointLeaderLine;
+  final Offset? newPointCandidate;
+  final (Offset, Offset)? newPointLeaderLine;
   final ArchitectWallOvershoot? activeOvershoot;
   final List<ArchitectOverhang>? upperOverhangs;
   final bool showUpperOverhangs;
@@ -258,6 +260,8 @@ class Architect2dPainter extends CustomPainter {
     this.polygonLeaderLine,
     this.handleOffsetLength = 50.0,
     this.wallEndpointLeaderLine,
+    this.newPointCandidate,
+    this.newPointLeaderLine,
   }) : _project = project,
        _zoomScale = zoomScale,
        super(repaint: viewport);
@@ -386,6 +390,7 @@ class Architect2dPainter extends CustomPainter {
       }
       _drawPolygonEditing(canvas);
       _drawWallEndpointLeaderLine(canvas);
+      _drawNewPointPreview(canvas);
       _drawActiveDrafting(canvas);
       for (final id in selectedElementIds) {
         canvas.drawPath(
@@ -582,16 +587,22 @@ class Architect2dPainter extends CustomPainter {
       final startHandle = wall.startPoint - uStart * clearance;
       final endHandle = wall.endPoint + uEnd * clearance;
 
+      final bgLeaderPaint = Paint()
+        ..color = const Color(0x66000000)
+        ..strokeWidth = 2.6 / draftingScale
+        ..style = PaintingStyle.stroke;
       final leaderPaint = Paint()
-        ..color = const Color(0x9900BCD4)
-        ..strokeWidth = 1.0 / draftingScale
+        ..color = const Color(0xFF00E5FF)
+        ..strokeWidth = 1.6 / draftingScale
         ..style = PaintingStyle.stroke;
 
       // Start handle leader & touch grip
+      canvas.drawLine(wall.startPoint, startHandle, bgLeaderPaint);
       canvas.drawLine(wall.startPoint, startHandle, leaderPaint);
       _drawTouchGrip(canvas, startHandle, draftingScale, vertexColor);
 
       // End handle leader & touch grip
+      canvas.drawLine(wall.endPoint, endHandle, bgLeaderPaint);
       canvas.drawLine(wall.endPoint, endHandle, leaderPaint);
       _drawTouchGrip(canvas, endHandle, draftingScale, vertexColor);
     }
@@ -650,6 +661,40 @@ class Architect2dPainter extends CustomPainter {
       to,
       3.0 / draftingScale,
       Paint()..color = const Color(0xFF00E5FF),
+    );
+  }
+
+  void _drawNewPointPreview(Canvas canvas) {
+    if (newPointCandidate == null) return;
+    final draftingScale = math.max(zoomScale, 80.0);
+    const candidateColor = Color(0xFF00E5FF);
+
+    if (newPointLeaderLine != null) {
+      final (from, to) = newPointLeaderLine!;
+      final bgLeaderPaint = Paint()
+        ..color = const Color(0x66000000)
+        ..strokeWidth = 2.6 / draftingScale
+        ..style = PaintingStyle.stroke;
+      final leaderPaint = Paint()
+        ..color = candidateColor
+        ..strokeWidth = 1.6 / draftingScale
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawLine(from, to, bgLeaderPaint);
+      canvas.drawLine(from, to, leaderPaint);
+      _drawTouchGrip(canvas, to, draftingScale, candidateColor);
+    }
+
+    // Direct candidate point dot
+    canvas.drawCircle(
+      newPointCandidate!,
+      5.0 / draftingScale,
+      Paint()..color = const Color(0x66000000),
+    );
+    canvas.drawCircle(
+      newPointCandidate!,
+      4.0 / draftingScale,
+      Paint()..color = candidateColor,
     );
   }
 
@@ -1573,6 +1618,8 @@ class Architect2dPainter extends CustomPainter {
       showOpeningClearanceBadges != oldDelegate.showOpeningClearanceBadges ||
       polygonLeaderLine != oldDelegate.polygonLeaderLine ||
       wallEndpointLeaderLine != oldDelegate.wallEndpointLeaderLine ||
+      newPointCandidate != oldDelegate.newPointCandidate ||
+      newPointLeaderLine != oldDelegate.newPointLeaderLine ||
       handleOffsetLength != oldDelegate.handleOffsetLength ||
       wallCutGuideLine != oldDelegate.wallCutGuideLine ||
       wallCutAnchor != oldDelegate.wallCutAnchor ||
