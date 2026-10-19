@@ -11,6 +11,8 @@ import '../models/architect_door.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_window.dart';
 import '../models/architect_fenestration_style.dart';
+import '../models/architect_zone.dart';
+import '../../bim_editing/geometry/bim_transform_2d.dart';
 import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 import 'architect_wall_relations.dart';
 
@@ -934,6 +936,354 @@ class ArchitectElementTool extends ChangeNotifier {
       currentStorey = flipElementById(currentStorey, id);
     }
     return currentStorey;
+  }
+
+  (ArchitectStorey, String?) mirrorElementById(
+    ArchitectStorey storey,
+    String elementId, {
+    required Offset origin,
+    required Offset direction,
+    bool isDuplicate = false,
+    String? newId,
+  }) {
+    if (direction.distanceSquared < 1e-12) return (storey, null);
+    final targetId =
+        isDuplicate ? (newId ?? ArchitectElementId.next('mirror')) : elementId;
+
+    // 1. Column
+    final colIndex = storey.columns.indexWhere((c) => c.id == elementId);
+    if (colIndex != -1) {
+      final col = storey.columns[colIndex];
+      final newPos = BimTransform2D.mirror(col.position, origin, direction);
+      final rad = col.rotationDeg * math.pi / 180;
+      final u = Offset(math.cos(rad), math.sin(rad));
+      final mu = BimTransform2D.mirror(u, Offset.zero, direction);
+      final newRot = (math.atan2(mu.dy, mu.dx) * 180 / math.pi) % 360;
+      final newCol = col.copyWith(
+        id: targetId,
+        position: newPos,
+        rotationDeg: newRot < 0 ? newRot + 360 : newRot,
+        label: isDuplicate ? nextColumnLabel(storey.columns) : col.label,
+      );
+      if (isDuplicate) {
+        return (
+          storey.copyWith(columns: [...storey.columns, newCol]),
+          targetId,
+        );
+      } else {
+        final cols = List<ArchitectColumn>.from(storey.columns);
+        cols[colIndex] = newCol;
+        return (storey.copyWith(columns: cols), targetId);
+      }
+    }
+
+    // 2. Wall
+    final wallIndex = storey.walls.indexWhere((w) => w.id == elementId);
+    if (wallIndex != -1) {
+      final wall = storey.walls[wallIndex];
+      final newStart = BimTransform2D.mirror(
+        wall.startPoint,
+        origin,
+        direction,
+      );
+      final newEnd = BimTransform2D.mirror(wall.endPoint, origin, direction);
+      final newDoors = [
+        for (final d in wall.doors)
+          d.copyWith(
+            id: isDuplicate ? ArchitectElementId.next('door') : d.id,
+            wallId: targetId,
+            uuid: isDuplicate ? ArchitectElementId.next('UUID') : d.uuid,
+            isHingeLeft: !d.isHingeLeft,
+          ),
+      ];
+      final newWindows = [
+        for (final w in wall.windows)
+          w.copyWith(
+            id: isDuplicate ? ArchitectElementId.next('window') : w.id,
+            wallId: targetId,
+            uuid: isDuplicate ? ArchitectElementId.next('UUID') : w.uuid,
+          ),
+      ];
+      final newWall = wall.copyWith(
+        id: targetId,
+        startPoint: newStart,
+        endPoint: newEnd,
+        arcBulge: -wall.arcBulge,
+        exteriorSide: wall.exteriorSide == WallExteriorSide.left
+            ? WallExteriorSide.right
+            : WallExteriorSide.left,
+        doors: newDoors,
+        windows: newWindows,
+      );
+      if (isDuplicate) {
+        return (storey.copyWith(walls: [...storey.walls, newWall]), targetId);
+      } else {
+        final walls = List<ArchitectWall>.from(storey.walls);
+        walls[wallIndex] = newWall;
+        return (storey.copyWith(walls: walls), targetId);
+      }
+    }
+
+    // 3. Beam
+    final beamIndex = storey.beams.indexWhere((b) => b.id == elementId);
+    if (beamIndex != -1) {
+      final beam = storey.beams[beamIndex];
+      final newBeam = beam.copyWith(
+        id: targetId,
+        startPoint: BimTransform2D.mirror(beam.startPoint, origin, direction),
+        endPoint: BimTransform2D.mirror(beam.endPoint, origin, direction),
+      );
+      if (isDuplicate) {
+        return (storey.copyWith(beams: [...storey.beams, newBeam]), targetId);
+      } else {
+        final beams = List<ArchitectBeam>.from(storey.beams);
+        beams[beamIndex] = newBeam;
+        return (storey.copyWith(beams: beams), targetId);
+      }
+    }
+
+    // 4. Slab
+    final slabIndex = storey.slabs.indexWhere((s) => s.id == elementId);
+    if (slabIndex != -1) {
+      final slab = storey.slabs[slabIndex];
+      final newPoly = [
+        for (final p in slab.polygon)
+          BimTransform2D.mirror(p, origin, direction),
+      ].reversed.toList();
+      double? newSlope;
+      if (slab.slopeDirection != null) {
+        final su = Offset(
+          math.cos(slab.slopeDirection!),
+          math.sin(slab.slopeDirection!),
+        );
+        final mu = BimTransform2D.mirror(su, Offset.zero, direction);
+        newSlope = math.atan2(mu.dy, mu.dx);
+      }
+      final newSlab = slab.copyWith(
+        id: targetId,
+        polygon: newPoly,
+        slopeDirection: newSlope,
+      );
+      if (isDuplicate) {
+        return (storey.copyWith(slabs: [...storey.slabs, newSlab]), targetId);
+      } else {
+        final slabs = List<ArchitectSlab>.from(storey.slabs);
+        slabs[slabIndex] = newSlab;
+        return (storey.copyWith(slabs: slabs), targetId);
+      }
+    }
+
+    // 5. Roof
+    final roofIndex = storey.roofs.indexWhere((r) => r.id == elementId);
+    if (roofIndex != -1) {
+      final roof = storey.roofs[roofIndex];
+      final newPoints = [
+        for (final p in roof.points)
+          BimTransform2D.mirror(p, origin, direction),
+      ].reversed.toList();
+      final n = roof.points.length;
+      final newEaves = n > 0 ? (n - 2 - roof.eavesEdgeIndex) % n : 0;
+      final safeEaves = newEaves < 0 ? newEaves + n : newEaves;
+      final newRoof = roof.copyWith(
+        id: targetId,
+        points: newPoints,
+        eavesEdgeIndex: safeEaves,
+      );
+      if (isDuplicate) {
+        return (storey.copyWith(roofs: [...storey.roofs, newRoof]), targetId);
+      } else {
+        final roofs = List<ArchitectRoofPlane>.from(storey.roofs);
+        roofs[roofIndex] = newRoof;
+        return (storey.copyWith(roofs: roofs), targetId);
+      }
+    }
+
+    // 6. Zone
+    final zoneIndex = storey.zones.indexWhere((z) => z.id == elementId);
+    if (zoneIndex != -1) {
+      final zone = storey.zones[zoneIndex];
+      final newPoly = [
+        for (final p in zone.polygon)
+          BimTransform2D.mirror(p, origin, direction),
+      ].reversed.toList();
+      final newZone = zone.copyWith(id: targetId, polygon: newPoly);
+      if (isDuplicate) {
+        return (storey.copyWith(zones: [...storey.zones, newZone]), targetId);
+      } else {
+        final zones = List<ArchitectZone>.from(storey.zones);
+        zones[zoneIndex] = newZone;
+        return (storey.copyWith(zones: zones), targetId);
+      }
+    }
+
+    // 7. Opening
+    final openingIndex = storey.openings.indexWhere((o) => o.id == elementId);
+    if (openingIndex != -1) {
+      final opening = storey.openings[openingIndex];
+      final newBoundary = [
+        for (final p in opening.boundary)
+          BimTransform2D.mirror(p, origin, direction),
+      ].reversed.toList();
+      final newOpening = opening.copyWith(
+        id: targetId,
+        boundary: newBoundary,
+      );
+      if (isDuplicate) {
+        return (
+          storey.copyWith(openings: [...storey.openings, newOpening]),
+          targetId,
+        );
+      } else {
+        final openings = List<ArchitectOpening>.from(storey.openings);
+        openings[openingIndex] = newOpening;
+        return (storey.copyWith(openings: openings), targetId);
+      }
+    }
+
+    // 8. Stair
+    final stairIndex = storey.stairs.indexWhere((s) => s.id == elementId);
+    if (stairIndex != -1) {
+      final stair = storey.stairs[stairIndex];
+      final newStair = stair.copyWith(
+        id: targetId,
+        startPoint: BimTransform2D.mirror(stair.startPoint, origin, direction),
+        endPoint: BimTransform2D.mirror(stair.endPoint, origin, direction),
+      );
+      if (isDuplicate) {
+        return (storey.copyWith(stairs: [...storey.stairs, newStair]), targetId);
+      } else {
+        final stairs = List<ArchitectStair>.from(storey.stairs);
+        stairs[stairIndex] = newStair;
+        return (storey.copyWith(stairs: stairs), targetId);
+      }
+    }
+
+    // 9. Dimension
+    final dimIndex = storey.dimensions.indexWhere((d) => d.id == elementId);
+    if (dimIndex != -1) {
+      final dim = storey.dimensions[dimIndex];
+      final newDim = dim.copyWith(
+        id: targetId,
+        startPoint: BimTransform2D.mirror(dim.startPoint, origin, direction),
+        endPoint: BimTransform2D.mirror(dim.endPoint, origin, direction),
+        anchors: [
+          for (final a in dim.anchors)
+            a.at(BimTransform2D.mirror(a.point, origin, direction)),
+        ],
+      );
+      if (isDuplicate) {
+        return (
+          storey.copyWith(dimensions: [...storey.dimensions, newDim]),
+          targetId,
+        );
+      } else {
+        final dims = List<ArchitectDimension>.from(storey.dimensions);
+        dims[dimIndex] = newDim;
+        return (storey.copyWith(dimensions: dims), targetId);
+      }
+    }
+
+    // 10. Annotation
+    final annIndex = storey.annotations.indexWhere((a) => a.id == elementId);
+    if (annIndex != -1) {
+      final ann = storey.annotations[annIndex];
+      final newAnn = ann.copyWith(
+        id: targetId,
+        position: BimTransform2D.mirror(ann.position, origin, direction),
+      );
+      if (isDuplicate) {
+        return (
+          storey.copyWith(annotations: [...storey.annotations, newAnn]),
+          targetId,
+        );
+      } else {
+        final anns = List<ArchitectAnnotation>.from(storey.annotations);
+        anns[annIndex] = newAnn;
+        return (storey.copyWith(annotations: anns), targetId);
+      }
+    }
+
+    // 11. Elevation Marker
+    final elevIndex = storey.elevationMarkers.indexWhere(
+      (e) => e.id == elementId,
+    );
+    if (elevIndex != -1) {
+      final elev = storey.elevationMarkers[elevIndex];
+      final newElev = elev.copyWith(
+        id: targetId,
+        position: BimTransform2D.mirror(elev.position, origin, direction),
+      );
+      if (isDuplicate) {
+        return (
+          storey.copyWith(
+            elevationMarkers: [...storey.elevationMarkers, newElev],
+          ),
+          targetId,
+        );
+      } else {
+        final elevs = List<ArchitectElevationMarker>.from(
+          storey.elevationMarkers,
+        );
+        elevs[elevIndex] = newElev;
+        return (storey.copyWith(elevationMarkers: elevs), targetId);
+      }
+    }
+
+    // 12. CAD Primitive
+    final cadIndex = storey.cadPrimitives.indexWhere((c) => c.id == elementId);
+    if (cadIndex != -1) {
+      final prim = storey.cadPrimitives[cadIndex];
+      final newPrim = prim.copyWith(
+        id: targetId,
+        startPoint: BimTransform2D.mirror(prim.startPoint, origin, direction),
+        endPoint: BimTransform2D.mirror(prim.endPoint, origin, direction),
+        polygon: prim.polygon != null
+            ? [
+                for (final p in prim.polygon!)
+                  BimTransform2D.mirror(p, origin, direction),
+              ].reversed.toList()
+            : null,
+      );
+      if (isDuplicate) {
+        return (
+          storey.copyWith(cadPrimitives: [...storey.cadPrimitives, newPrim]),
+          targetId,
+        );
+      } else {
+        final cads = List<ArchitectCadPrimitive>.from(storey.cadPrimitives);
+        cads[cadIndex] = newPrim;
+        return (storey.copyWith(cadPrimitives: cads), targetId);
+      }
+    }
+
+    return (storey, null);
+  }
+
+  (ArchitectStorey, List<String>) mirrorElementsByIds(
+    ArchitectStorey storey,
+    Set<String> elementIds, {
+    required Offset origin,
+    required Offset direction,
+    bool isDuplicate = false,
+    Map<String, String>? idMap,
+  }) {
+    var currentStorey = storey;
+    final affectedIds = <String>[];
+    for (final id in elementIds) {
+      final (updated, affectedId) = mirrorElementById(
+        currentStorey,
+        id,
+        origin: origin,
+        direction: direction,
+        isDuplicate: isDuplicate,
+        newId: idMap?[id],
+      );
+      if (affectedId != null) {
+        currentStorey = updated;
+        affectedIds.add(affectedId);
+      }
+    }
+    return (currentStorey, affectedIds);
   }
 
   ArchitectStorey deleteElementsByIds(

@@ -617,7 +617,8 @@ class ArchitectZonePainterHelper {
     }
 
     // 5. Committed vertex nodes (Numbered 1..N GPS_Mapping style)
-    final nodeRadius = 13.0 / zoomScale;
+    final draftingScale = math.max(zoomScale, 80.0);
+    final nodeRadius = 13.0 / draftingScale;
     final nodeShadow = Paint()..color = Colors.black54;
 
     for (int i = 0; i < points.length; i++) {
@@ -626,7 +627,7 @@ class ArchitectZonePainterHelper {
 
       if (isStartNode) {
         // --- POINT 1: SPECIAL START BEACON & CLOSING TARGET ---
-        final beaconRadius = (isClosingSnap ? 24.0 : 20.0) / zoomScale;
+        final beaconRadius = (isClosingSnap ? 24.0 : 20.0) / draftingScale;
         final beaconColor = isClosingSnap
             ? const Color(0xFF00E676)
             : const Color(0xFF00E5FF);
@@ -646,7 +647,7 @@ class ArchitectZonePainterHelper {
           beaconRadius,
           Paint()
             ..color = beaconColor
-            ..strokeWidth = (isClosingSnap ? 2.5 : 1.8) / zoomScale
+            ..strokeWidth = (isClosingSnap ? 2.5 : 1.8) / draftingScale
             ..style = PaintingStyle.stroke,
         );
 
@@ -656,12 +657,12 @@ class ArchitectZonePainterHelper {
           beaconRadius * 0.72,
           Paint()
             ..color = beaconColor.withValues(alpha: 0.5)
-            ..strokeWidth = 1.0 / zoomScale
+            ..strokeWidth = 1.0 / draftingScale
             ..style = PaintingStyle.stroke,
         );
 
         // Drop shadow for core node
-        canvas.drawCircle(pt, nodeRadius + 1.5 / zoomScale, nodeShadow);
+        canvas.drawCircle(pt, nodeRadius + 1.5 / draftingScale, nodeShadow);
 
         // Start core circle (solid high-contrast neon)
         canvas.drawCircle(
@@ -676,7 +677,7 @@ class ArchitectZonePainterHelper {
           nodeRadius,
           Paint()
             ..color = Colors.white
-            ..strokeWidth = 2.4 / zoomScale
+            ..strokeWidth = 2.4 / draftingScale
             ..style = PaintingStyle.stroke,
         );
 
@@ -687,7 +688,7 @@ class ArchitectZonePainterHelper {
             style: TextStyle(
               color: Colors.black87,
               fontFamily: 'Roboto',
-              fontSize: 12.0 / zoomScale,
+              fontSize: 12.0 / draftingScale,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -703,7 +704,7 @@ class ArchitectZonePainterHelper {
               style: TextStyle(
                 color: const Color(0xFF00E5FF),
                 fontFamily: 'Roboto',
-                fontSize: 9.5 / zoomScale,
+                fontSize: 9.5 / draftingScale,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -711,28 +712,28 @@ class ArchitectZonePainterHelper {
           )..layout();
 
           final labelPos =
-              pt + Offset(-tpLabel.width / 2, beaconRadius + 4.0 / zoomScale);
+              pt + Offset(-tpLabel.width / 2, beaconRadius + 4.0 / draftingScale);
           final labelRect = Rect.fromLTWH(
-            labelPos.dx - 6.0 / zoomScale,
-            labelPos.dy - 3.0 / zoomScale,
-            tpLabel.width + 12.0 / zoomScale,
-            tpLabel.height + 6.0 / zoomScale,
+            labelPos.dx - 6.0 / draftingScale,
+            labelPos.dy - 3.0 / draftingScale,
+            tpLabel.width + 12.0 / draftingScale,
+            tpLabel.height + 6.0 / draftingScale,
           );
           canvas.drawRRect(
             RRect.fromRectAndRadius(
               labelRect,
-              Radius.circular(5.0 / zoomScale),
+              Radius.circular(5.0 / draftingScale),
             ),
             Paint()..color = const Color(0xEE1A1C24),
           );
           canvas.drawRRect(
             RRect.fromRectAndRadius(
               labelRect,
-              Radius.circular(5.0 / zoomScale),
+              Radius.circular(5.0 / draftingScale),
             ),
             Paint()
               ..color = const Color(0xFF00E5FF)
-              ..strokeWidth = 1.0 / zoomScale
+              ..strokeWidth = 1.0 / draftingScale
               ..style = PaintingStyle.stroke,
           );
           tpLabel.paint(canvas, labelPos);
@@ -747,7 +748,7 @@ class ArchitectZonePainterHelper {
               style: TextStyle(
                 color: const Color(0xFF00E676),
                 fontFamily: 'Roboto',
-                fontSize: 10.5 / zoomScale,
+                fontSize: 10.5 / draftingScale,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -758,29 +759,29 @@ class ArchitectZonePainterHelper {
               pt -
               Offset(
                 tpClose.width / 2,
-                (beaconRadius + tpClose.height + 6.0 / zoomScale),
+                (beaconRadius + tpClose.height + 6.0 / draftingScale),
               );
           final badgeRect = Rect.fromLTWH(
-            badgePos.dx - 7.0 / zoomScale,
-            badgePos.dy - 4.0 / zoomScale,
-            tpClose.width + 14.0 / zoomScale,
-            tpClose.height + 8.0 / zoomScale,
+            badgePos.dx - 7.0 / draftingScale,
+            badgePos.dy - 4.0 / draftingScale,
+            tpClose.width + 14.0 / draftingScale,
+            tpClose.height + 8.0 / draftingScale,
           );
           canvas.drawRRect(
             RRect.fromRectAndRadius(
               badgeRect,
-              Radius.circular(6.0 / zoomScale),
+              Radius.circular(6.0 / draftingScale),
             ),
             Paint()..color = const Color(0xF2161822),
           );
           canvas.drawRRect(
             RRect.fromRectAndRadius(
               badgeRect,
-              Radius.circular(6.0 / zoomScale),
+              Radius.circular(6.0 / draftingScale),
             ),
             Paint()
               ..color = const Color(0xFF00E676)
-              ..strokeWidth = 1.5 / zoomScale
+              ..strokeWidth = 1.5 / draftingScale
               ..style = PaintingStyle.stroke,
           );
           tpClose.paint(canvas, badgePos);
@@ -788,7 +789,7 @@ class ArchitectZonePainterHelper {
 
       } else {
         // --- SUBSEQUENT POINTS 2..N: HIGH CONTRAST BADGES ---
-        canvas.drawCircle(pt, nodeRadius + 1.5 / zoomScale, nodeShadow);
+        canvas.drawCircle(pt, nodeRadius + 1.5 / draftingScale, nodeShadow);
 
         canvas.drawCircle(
           pt,
@@ -802,7 +803,7 @@ class ArchitectZonePainterHelper {
           nodeRadius,
           Paint()
             ..color = Colors.white
-            ..strokeWidth = 2.0 / zoomScale
+            ..strokeWidth = 2.0 / draftingScale
             ..style = PaintingStyle.stroke,
         );
 
@@ -812,7 +813,7 @@ class ArchitectZonePainterHelper {
             style: TextStyle(
               color: Colors.white,
               fontFamily: 'Roboto',
-              fontSize: 11.0 / zoomScale,
+              fontSize: 11.0 / draftingScale,
               fontWeight: FontWeight.bold,
             ),
           ),

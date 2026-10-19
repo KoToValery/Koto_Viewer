@@ -34,9 +34,10 @@ class ArchitectPolygonPainter {
       final n = ArchitectPolygonGeometry.normal(polygon, i);
       dimension(canvas, a, b, n, scale, unit, obstacles: obstacles, decimals: decimals);
       if (handles) {
+        final draftingScale = math.max(scale, 80.0);
         // Direct vertex & midpoint handles
-        canvas.drawCircle(a, 3.5 / scale, Paint()..color = vertexColor);
-        canvas.drawCircle((a + b) / 2, 3.5 / scale, Paint()..color = edgeColor);
+        canvas.drawCircle(a, 3.5 / draftingScale, Paint()..color = vertexColor);
+        canvas.drawCircle((a + b) / 2, 3.5 / draftingScale, Paint()..color = edgeColor);
 
         // Offset leader handles (изнесена линия с точка за селекция и редакция)
         final hv = ArchitectPolygonEditor.offsetVertexHandle(polygon, i, scale);
@@ -44,77 +45,78 @@ class ArchitectPolygonPainter {
 
         final extLinePaintV = Paint()
           ..color = const Color(0x9900BCD4)
-          ..strokeWidth = 1.0 / scale
+          ..strokeWidth = 1.0 / draftingScale
           ..style = PaintingStyle.stroke;
         canvas.drawLine(a, hv, extLinePaintV);
 
         final extLinePaintE = Paint()
           ..color = const Color(0x99FF9800)
-          ..strokeWidth = 1.0 / scale
+          ..strokeWidth = 1.0 / draftingScale
           ..style = PaintingStyle.stroke;
         canvas.drawLine((a + b) / 2, he, extLinePaintE);
 
         // Offset vertex handle (touch grip)
         canvas.drawCircle(
           hv,
-          5.5 / scale,
+          5.5 / draftingScale,
           Paint()..color = const Color(0xFF1E1E26),
         );
         canvas.drawCircle(
           hv,
-          5.5 / scale,
+          5.5 / draftingScale,
           Paint()
             ..color = vertexColor
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5 / scale,
+            ..strokeWidth = 1.5 / draftingScale,
         );
-        canvas.drawCircle(hv, 2.5 / scale, Paint()..color = vertexColor);
+        canvas.drawCircle(hv, 2.5 / draftingScale, Paint()..color = vertexColor);
 
         // Offset edge handle (touch grip)
         canvas.drawCircle(
           he,
-          5.5 / scale,
+          5.5 / draftingScale,
           Paint()..color = const Color(0xFF1E1E26),
         );
         canvas.drawCircle(
           he,
-          5.5 / scale,
+          5.5 / draftingScale,
           Paint()
             ..color = edgeColor
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5 / scale,
+            ..strokeWidth = 1.5 / draftingScale,
         );
-        canvas.drawCircle(he, 2.5 / scale, Paint()..color = edgeColor);
+        canvas.drawCircle(he, 2.5 / draftingScale, Paint()..color = edgeColor);
       }
     }
 
     // Active leader line during drag
     if (leaderLine != null) {
+      final draftingScale = math.max(scale, 80.0);
       final (from, to) = leaderLine;
       final leaderPaint = Paint()
         ..color = const Color(0xFF00E5FF)
-        ..strokeWidth = 1.8 / scale
+        ..strokeWidth = 1.8 / draftingScale
         ..style = PaintingStyle.stroke;
       canvas.drawLine(from, to, leaderPaint);
       canvas.drawCircle(
         from,
-        3.5 / scale,
+        3.5 / draftingScale,
         Paint()..color = const Color(0xFF00E5FF),
       );
       canvas.drawCircle(
         to,
-        8.0 / scale,
+        8.0 / draftingScale,
         Paint()..color = const Color(0x3300E5FF),
       );
       canvas.drawCircle(
         to,
-        5.5 / scale,
+        5.5 / draftingScale,
         Paint()
           ..color = Colors.white
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.8 / scale,
+          ..strokeWidth = 1.8 / draftingScale,
       );
-      canvas.drawCircle(to, 3.0 / scale, Paint()..color = const Color(0xFF00E5FF));
+      canvas.drawCircle(to, 3.0 / draftingScale, Paint()..color = const Color(0xFF00E5FF));
     }
   }
 

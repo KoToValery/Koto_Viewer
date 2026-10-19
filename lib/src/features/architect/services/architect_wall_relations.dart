@@ -899,5 +899,104 @@ class ArchitectOpeningPlacement {
       isHingeLeft: isHingeLeft,
     );
   }
+
+  /// Checks whether a station along the wall is within an existing opening (with tolerance).
+  static bool isPointInsideExistingOpening({
+    required ArchitectWall wall,
+    required double along,
+    String? excludeOpeningId,
+    double tolerance = 0.05,
+  }) {
+    for (final d in wall.doors) {
+      if (d.id == excludeOpeningId) continue;
+      final c = d.offsetRatio * wall.length;
+      final half = wall.openingArcSpan(d.width) / 2.0;
+      if (along >= c - half - tolerance && along <= c + half + tolerance) {
+        return true;
+      }
+    }
+    for (final w in wall.windows) {
+      if (w.id == excludeOpeningId) continue;
+      final c = w.offsetRatio * wall.length;
+      final half = wall.openingArcSpan(w.width) / 2.0;
+      if (along >= c - half - tolerance && along <= c + half + tolerance) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Checks whether placing an opening of [openingWidth] at [candidateAlong]
+  /// would overlap with any existing door or window on [wall].
+  static bool doesOpeningOverlapExisting({
+    required ArchitectWall wall,
+    required double candidateAlong,
+    required double openingWidth,
+    String? excludeOpeningId,
+    double safetyMargin = 0.02,
+  }) {
+    final candHalf = wall.openingArcSpan(openingWidth) / 2.0;
+    final candStart = candidateAlong - candHalf;
+    final candEnd = candidateAlong + candHalf;
+
+    for (final d in wall.doors) {
+      if (d.id == excludeOpeningId) continue;
+      final c = d.offsetRatio * wall.length;
+      final half = wall.openingArcSpan(d.width) / 2.0;
+      final dStart = c - half;
+      final dEnd = c + half;
+      if (candStart < dEnd - safetyMargin && candEnd > dStart + safetyMargin) {
+        return true;
+      }
+    }
+    for (final w in wall.windows) {
+      if (w.id == excludeOpeningId) continue;
+      final c = w.offsetRatio * wall.length;
+      final half = wall.openingArcSpan(w.width) / 2.0;
+      final wStart = c - half;
+      final wEnd = c + half;
+      if (candStart < wEnd - safetyMargin && candEnd > wStart + safetyMargin) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Checks whether an attempted opening placement is blocked or would produce a duplicate/overlapping opening.
+  static bool isPlacementBlockedOrOverlapping({
+    required ArchitectWall wall,
+    required double candidateAlong,
+    required double rawAlong,
+    required double openingWidth,
+    String? excludeOpeningId,
+    double safetyMargin = 0.02,
+  }) {
+    // 1. Raw point is directly on an existing door or window on this wall
+    if (isPointInsideExistingOpening(
+      wall: wall,
+      along: rawAlong,
+      excludeOpeningId: excludeOpeningId,
+    )) {
+      return true;
+    }
+
+    // 2. Candidate center was clamped excessively far from the raw tap point
+    if ((candidateAlong - rawAlong).abs() > openingWidth * 0.75) {
+      return true;
+    }
+
+    // 3. Candidate opening overlaps any existing door or window
+    if (doesOpeningOverlapExisting(
+      wall: wall,
+      candidateAlong: candidateAlong,
+      openingWidth: openingWidth,
+      excludeOpeningId: excludeOpeningId,
+      safetyMargin: safetyMargin,
+    )) {
+      return true;
+    }
+
+    return false;
+  }
 }
 

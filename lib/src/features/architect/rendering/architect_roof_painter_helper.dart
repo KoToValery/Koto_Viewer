@@ -218,7 +218,8 @@ class ArchitectRoofPainterHelper {
     final end = center + dir * arrowHalfLen;
 
     if (isSelected) {
-      final haloRadius = 16.0 / scale;
+      final draftingScale = math.max(scale, 80.0);
+      final haloRadius = 16.0 / draftingScale;
       canvas.drawCircle(
         center,
         haloRadius,
@@ -231,7 +232,7 @@ class ArchitectRoofPainterHelper {
         haloRadius,
         Paint()
           ..color = const Color(0xAA00E5FF)
-          ..strokeWidth = 1.2 / scale
+          ..strokeWidth = 1.2 / draftingScale
           ..style = PaintingStyle.stroke,
       );
     }
@@ -366,11 +367,12 @@ class ArchitectRoofPainterHelper {
     }
 
     // Draw vertices and live edge lengths
+    final draftingScale = math.max(scale, 80.0);
     for (var i = 0; i < poly.length; i++) {
       final a = poly[i];
       canvas.drawCircle(
         a,
-        4.5 / scale,
+        4.5 / draftingScale,
         Paint()..color = i == 0 ? const Color(0xFF00E676) : accent,
       );
       if (i + 1 < poly.length || poly.length >= 3) {

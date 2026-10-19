@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
 import 'package:kotoview/src/features/architect/services/architect_wall_relations.dart';
+import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'architect_editing_test.dart' as editing;
 import 'architect_manual_selection_test.dart' as selection;
 import 'architect_workspace_interaction_test.dart' as workspace;
@@ -153,5 +155,209 @@ void main() {
       // gap.distance is the true visual clearance along the support face
       expect(gapStart.distance, closeTo(gapStart.end.dx - gapStart.start.dx, 1e-4));
     });
+  });
+
+  group('Drafting Scale & Auxiliary Indicators', () {
+    test('Drafting scale prevents dynamic enlargement of auxiliary indicators when zooming out', () {
+      final project = editing.seeded(ArchitectStorey(id: 's', name: 'Floor')).project;
+      final painterAt100 = Architect2dPainter(
+        project: project,
+        activeTool: ArchitectTool.select,
+        zoomScale: 100.0,
+      );
+      final painterAt40 = Architect2dPainter(
+        project: project,
+        activeTool: ArchitectTool.select,
+        zoomScale: 40.0,
+      );
+      final painterAt10 = Architect2dPainter(
+        project: project,
+        activeTool: ArchitectTool.select,
+        zoomScale: 10.0,
+      );
+
+      // At zoom >= minDraftingScale (80.0), scale follows zoomScale
+      expect(painterAt100.draftingScale, 100.0);
+
+      // When zooming out below minDraftingScale, draftingScale is clamped to minDraftingScale
+      // so model-space dimensions of dots and indicators NEVER blow up
+      expect(painterAt40.draftingScale, Architect2dPainter.minDraftingScale);
+      expect(painterAt10.draftingScale, Architect2dPainter.minDraftingScale);
+
+      // Orange dot radius at zoomScale = 10 must NOT blow up to 7 / 10 = 0.70m!
+      // It must be capped at 7 / 80 = 0.0875m
+      const baseDotRadius = 7.0;
+      final worldRadiusAt10 = baseDotRadius / painterAt10.draftingScale;
+      expect(worldRadiusAt10, closeTo(0.0875, 1e-4));
+      expect(worldRadiusAt10, isNot(closeTo(0.70, 1e-2)));
+    });
+  });
+
+  group('Wall Extend Tool Behavior', () {
+    test('ExtendArchitectWall modifies only the selected wall and keeps perpendicularly connected walls fixed', () {
+      // Main wall w1 from (0,0) to (10,0)
+      // Perpendicular T-junction wall w2 from (5,0) to (5,5)
+      // Perpendicular end-connected wall w3 from (10,0) to (10,5)
+      final w1 = editing.wall('w1', const Offset(0, 0), const Offset(10, 0));
+      final w2 = editing.wall('w2', const Offset(5, 0), const Offset(5, 5));
+      final w3 = editing.wall('w3', const Offset(10, 0), const Offset(10, 5));
+
+      final storey = ArchitectStorey(id: 's', name: 'Floor', walls: [w1, w2, w3]);
+      final model = editing.seeded(storey);
+      addTearDown(model.dispose);
+
+      // Extend w1 from (10,0) to (15,0)
+      model.execute(
+        const ExtendArchitectWall(
+          storeyId: 's',
+          wallId: 'w1',
+          target: Offset(15, 0),
+        ),
+      );
+
+      final updatedStorey = model.project.activeStorey;
+      final updatedW1 = updatedStorey.walls.firstWhere((w) => w.id == 'w1');
+      final updatedW2 = updatedStorey.walls.firstWhere((w) => w.id == 'w2');
+      final updatedW3 = updatedStorey.walls.firstWhere((w) => w.id == 'w3');
+
+      // w1 endPoint extended to (15, 0)
+      expect(updatedW1.startPoint, const Offset(0, 0));
+      expect(updatedW1.endPoint, const Offset(15, 0));
+
+      // w2 (perpendicular wall hitting w1 at (5,0)) MUST NOT be moved or dragged
+      expect(updatedW2.startPoint, const Offset(5, 0));
+      expect(updatedW2.endPoint, const Offset(5, 5));
+
+      // w3 (perpendicular wall meeting w1 at original end (10,0)) MUST NOT be dragged
+      expect(updatedW3.startPoint, const Offset(10, 0));
+      expect(updatedW3.endPoint, const Offset(10, 5));
+    });
+
+    test('ExtendArchitectWall at start point does not drag perpendicularly connected walls', () {
+      final w1 = editing.wall('w1', const Offset(0, 0), const Offset(10, 0));
+      final w2 = editing.wall('w2', const Offset(5, 0), const Offset(5, 5));
+
+      final storey = ArchitectStorey(id: 's', name: 'Floor', walls: [w1, w2]);
+      final model = editing.seeded(storey);
+      addTearDown(model.dispose);
+
+      // Extend w1 at start to (-5, 0)
+      model.execute(
+        const ExtendArchitectWall(
+          storeyId: 's',
+          wallId: 'w1',
+          target: Offset(-5, 0),
+        ),
+      );
+
+      final updatedStorey = model.project.activeStorey;
+      final updatedW1 = updatedStorey.walls.firstWhere((w) => w.id == 'w1');
+      final updatedW2 = updatedStorey.walls.firstWhere((w) => w.id == 'w2');
+
+      expect(updatedW1.startPoint, const Offset(-5, 0));
+      expect(updatedW1.endPoint, const Offset(10, 0));
+
+      // w2 remains anchored at (5, 0)
+      expect(updatedW2.startPoint, const Offset(5, 0));
+      expect(updatedW2.endPoint, const Offset(5, 5));
+    });
+
+    testWidgets(
+      'Interactive Extend tool extends selected wall to target without dragging perpendicular wall',
+      (tester) async {
+        final w1 = editing.wall('w1', const Offset(0, 0), const Offset(2, 0));
+        final w2 = editing.wall('w2', const Offset(1, 0), const Offset(1, 2));
+        final targetWall = editing.wall('wTarget', const Offset(3, -2), const Offset(3, 2));
+
+        final storey = ArchitectStorey(id: 's', name: 'Floor', walls: [w1, w2, targetWall]);
+        final model = editing.seeded(storey);
+        addTearDown(model.dispose);
+
+        await workspace.open(tester, model);
+        await selection.selectTool(tester);
+
+        // Select w1
+        await workspace.wallTap(tester, const Offset(0.5, 0));
+        await tester.pumpAndSettle();
+        expect(workspace.overlay(tester).selectedElementIds, {'w1'});
+
+        // Tap more actions -> extend
+        await tester.tap(find.byKey(const ValueKey('architect-wall-actions')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('wall-extend')));
+        await tester.pumpAndSettle();
+
+        // Tap on targetWall at (3, 1) to extend w1 to it
+        await tester.tapAt(workspace.screen(tester, const Offset(3, 1)));
+        await tester.pumpAndSettle();
+
+        final updatedStorey = model.project.activeStorey;
+        final updatedW1 = updatedStorey.walls.firstWhere((w) => w.id == 'w1');
+        final updatedW2 = updatedStorey.walls.firstWhere((w) => w.id == 'w2');
+
+        // w1 extended to intersection with targetWall at (3, 0)
+        expect(updatedW1.endPoint, const Offset(3, 0));
+        // Perpendicular wall w2 at (1, 0) must remain fixed and NOT be pulled
+        expect(updatedW2.startPoint, const Offset(1, 0));
+        expect(updatedW2.endPoint, const Offset(1, 2));
+      },
+    );
+  });
+
+  group('Floating Quick Menu - Wall Reference Line Choice', () {
+    testWidgets(
+      'Wall selection displays reference line selector in floating actions and changes wall reference line',
+      (tester) async {
+        final w1 = editing.wall('w1', const Offset(0, 0), const Offset(4, 0))
+            .copyWith(referenceLine: WallReferenceLine.center);
+
+        final storey = ArchitectStorey(id: 's', name: 'Floor', walls: [w1]);
+        final model = editing.seeded(storey);
+        addTearDown(model.dispose);
+
+        await workspace.open(tester, model);
+        await selection.selectTool(tester);
+
+        // Select w1
+        await workspace.wallTap(tester, const Offset(2, 0));
+        await tester.pumpAndSettle();
+        expect(workspace.overlay(tester).selectedElementIds, {'w1'});
+
+        // Floating quick menu must contain the reference line selector
+        final refSelector = find.byKey(const ValueKey('architect-wall-reference-line'));
+        expect(refSelector, findsOneWidget);
+
+        // Initially shows "Axis" (English)
+        expect(find.descendant(of: refSelector, matching: find.text('Axis')), findsOneWidget);
+
+        // Tap the selector to open popup menu
+        await tester.tap(refSelector);
+        await tester.pumpAndSettle();
+
+        // Check options are displayed
+        expect(find.byKey(const ValueKey('architect-wall-ref-center')), findsOneWidget);
+        expect(find.byKey(const ValueKey('architect-wall-ref-inner')), findsOneWidget);
+        expect(find.byKey(const ValueKey('architect-wall-ref-outer')), findsOneWidget);
+
+        // Select "Outside" (WallReferenceLine.outer)
+        await tester.tap(find.byKey(const ValueKey('architect-wall-ref-outer')));
+        await tester.pumpAndSettle();
+
+        // Wall reference line should now be outer
+        var wall = model.project.activeStorey.walls.firstWhere((w) => w.id == 'w1');
+        expect(wall.referenceLine, WallReferenceLine.outer);
+        expect(find.descendant(of: refSelector, matching: find.text('Outside')), findsOneWidget);
+
+        // Tap again and select "Inside" (WallReferenceLine.inner)
+        await tester.tap(refSelector);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('architect-wall-ref-inner')));
+        await tester.pumpAndSettle();
+
+        wall = model.project.activeStorey.walls.firstWhere((w) => w.id == 'w1');
+        expect(wall.referenceLine, WallReferenceLine.inner);
+        expect(find.descendant(of: refSelector, matching: find.text('Inside')), findsOneWidget);
+      },
+    );
   });
 }

@@ -16,6 +16,8 @@ enum BimEditAction {
   rename,
   join,
   straighten,
+  mirrorMove,
+  mirrorCopy,
 }
 
 class BimEditActions {
@@ -34,6 +36,8 @@ class BimEditActions {
         BimEditAction.rename => l.architectRadialRename,
         BimEditAction.join => l.architectRadialJoin,
         BimEditAction.straighten => l.architectWallStraighten,
+        BimEditAction.mirrorMove => l.architectMirrorMove,
+        BimEditAction.mirrorCopy => l.architectMirrorCopy,
       };
   static IconData icon(BimEditAction action) => switch (action) {
     BimEditAction.move => Icons.open_with_rounded,
@@ -49,6 +53,8 @@ class BimEditActions {
     BimEditAction.rename => Icons.drive_file_rename_outline_rounded,
     BimEditAction.join => Icons.polyline_outlined,
     BimEditAction.straighten => Icons.square_foot,
+    BimEditAction.mirrorMove => Icons.flip,
+    BimEditAction.mirrorCopy => Icons.copy_all,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};

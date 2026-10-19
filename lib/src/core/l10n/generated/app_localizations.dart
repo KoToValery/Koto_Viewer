@@ -7811,6 +7811,48 @@ abstract class AppLocalizations {
   /// **'Click for cut direction'**
   String get architectWallSplitDirectionHint;
 
+  /// Prompt to pick the first point of the split cut line
+  ///
+  /// In en, this message translates to:
+  /// **'Specify first split point'**
+  String get architectWallSplitPromptPickFirst;
+
+  /// Prompt to pick the second point of the split cut line
+  ///
+  /// In en, this message translates to:
+  /// **'Specify second split point'**
+  String get architectWallSplitPromptPickSecond;
+
+  /// Prompt to select which side remains selected after split
+  ///
+  /// In en, this message translates to:
+  /// **'Click the side to keep selected'**
+  String get architectWallSplitPromptPickSide;
+
+  /// Button to snap split cut line perpendicular to the wall
+  ///
+  /// In en, this message translates to:
+  /// **'Perpendicular'**
+  String get architectWallSplitPerpendicular;
+
+  /// Button to keep side 1 selected after split
+  ///
+  /// In en, this message translates to:
+  /// **'Side 1'**
+  String get architectWallSplitSide1;
+
+  /// Button to keep side 2 selected after split
+  ///
+  /// In en, this message translates to:
+  /// **'Side 2'**
+  String get architectWallSplitSide2;
+
+  /// Button to keep both sides selected after split
+  ///
+  /// In en, this message translates to:
+  /// **'Both'**
+  String get architectWallSplitBoth;
+
   /// No description provided for @architectWallClearance.
   ///
   /// In en, this message translates to:
@@ -8404,6 +8446,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Offset'**
   String get architectRadialOffset;
+
+  /// Mirror move action label
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror'**
+  String get architectMirrorMove;
+
+  /// Mirror move action tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror move'**
+  String get architectMirrorMoveTooltip;
+
+  /// Mirror copy action label
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror+'**
+  String get architectMirrorCopy;
+
+  /// Mirror copy action tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror copy'**
+  String get architectMirrorCopyTooltip;
+
+  /// Prompt for picking mirror reference anchor point
+  ///
+  /// In en, this message translates to:
+  /// **'Specify mirror anchor point'**
+  String get architectMirrorPromptPickAnchor;
+
+  /// Prompt for specifying second point or mirror axis direction
+  ///
+  /// In en, this message translates to:
+  /// **'Specify mirror axis direction'**
+  String get architectMirrorPromptPickAxis;
+
+  /// Button to mirror across a vertical axis through anchor
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical'**
+  String get architectMirrorAxisVertical;
+
+  /// Button to mirror across a horizontal axis through anchor
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal'**
+  String get architectMirrorAxisHorizontal;
 
   /// No description provided for @architectEdgeDistance.
   ///

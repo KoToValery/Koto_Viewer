@@ -418,8 +418,9 @@ class ArchitectElementsPainterHelper {
         canvas.drawLine(segment.$1, segment.$2, witnessPaint);
       }
       if (isSelected) {
+        final draftingScale = math.max(zoomScale, 80.0);
         for (final witness in dim.witnessPoints) {
-          canvas.drawCircle(witness, 3 / zoomScale, dimPaint);
+          canvas.drawCircle(witness, 3 / draftingScale, dimPaint);
         }
       }
 
@@ -737,9 +738,10 @@ class ArchitectElementsPainterHelper {
   }) {
     if (points.isEmpty) return;
 
+    final draftingScale = math.max(zoomScale, 80.0);
     final linePaint = Paint()
       ..color = const Color(0xFF00E5FF)
-      ..strokeWidth = 1.8 / zoomScale
+      ..strokeWidth = 1.8 / draftingScale
       ..style = PaintingStyle.stroke;
 
     final vertexPaint = Paint()
@@ -747,7 +749,7 @@ class ArchitectElementsPainterHelper {
       ..style = PaintingStyle.fill;
 
     for (int i = 0; i < points.length; i++) {
-      canvas.drawCircle(points[i], 4.5 / zoomScale, vertexPaint);
+      canvas.drawCircle(points[i], 4.5 / draftingScale, vertexPaint);
       if (i > 0) {
         canvas.drawLine(points[i - 1], points[i], linePaint);
       }
@@ -756,10 +758,10 @@ class ArchitectElementsPainterHelper {
     if (candidatePoint != null && points.isNotEmpty) {
       final dashPaint = Paint()
         ..color = const Color(0xFFFFD600)
-        ..strokeWidth = 1.4 / zoomScale
+        ..strokeWidth = 1.4 / draftingScale
         ..style = PaintingStyle.stroke;
       canvas.drawLine(points.last, candidatePoint, dashPaint);
-      canvas.drawCircle(candidatePoint, 3.5 / zoomScale, dashPaint);
+      canvas.drawCircle(candidatePoint, 3.5 / draftingScale, dashPaint);
     }
   }
 }

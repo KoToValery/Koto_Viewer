@@ -4503,6 +4503,30 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallSplitDirectionHint => 'Кликнете за посока на среза';
 
   @override
+  String get architectWallSplitPromptPickFirst =>
+      'Посочете първа точка на среза';
+
+  @override
+  String get architectWallSplitPromptPickSecond =>
+      'Посочете втора точка на среза';
+
+  @override
+  String get architectWallSplitPromptPickSide =>
+      'Кликнете от страната, която да остане селектирана';
+
+  @override
+  String get architectWallSplitPerpendicular => 'Перпендикуляр';
+
+  @override
+  String get architectWallSplitSide1 => 'Страна 1';
+
+  @override
+  String get architectWallSplitSide2 => 'Страна 2';
+
+  @override
+  String get architectWallSplitBoth => 'И двете';
+
+  @override
   String get architectWallClearance => 'Светло';
 
   @override
@@ -4808,6 +4832,32 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectRadialOffset => 'Офсет';
+
+  @override
+  String get architectMirrorMove => 'Огледало';
+
+  @override
+  String get architectMirrorMoveTooltip => 'Огледално преместване';
+
+  @override
+  String get architectMirrorCopy => 'Огледало+';
+
+  @override
+  String get architectMirrorCopyTooltip => 'Огледално копиране';
+
+  @override
+  String get architectMirrorPromptPickAnchor =>
+      'Посочете опорна точка за огледално отразяване';
+
+  @override
+  String get architectMirrorPromptPickAxis =>
+      'Посочете второ направление за огледална ос';
+
+  @override
+  String get architectMirrorAxisVertical => 'Вертикална';
+
+  @override
+  String get architectMirrorAxisHorizontal => 'Хоризонтална';
 
   @override
   String get architectEdgeDistance => 'Разстояние';

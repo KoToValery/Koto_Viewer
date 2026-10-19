@@ -4485,6 +4485,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallSplitDirectionHint => 'Click for cut direction';
 
   @override
+  String get architectWallSplitPromptPickFirst => 'Specify first split point';
+
+  @override
+  String get architectWallSplitPromptPickSecond => 'Specify second split point';
+
+  @override
+  String get architectWallSplitPromptPickSide =>
+      'Click the side to keep selected';
+
+  @override
+  String get architectWallSplitPerpendicular => 'Perpendicular';
+
+  @override
+  String get architectWallSplitSide1 => 'Side 1';
+
+  @override
+  String get architectWallSplitSide2 => 'Side 2';
+
+  @override
+  String get architectWallSplitBoth => 'Both';
+
+  @override
   String get architectWallClearance => 'Clearance';
 
   @override
@@ -4788,6 +4810,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectRadialOffset => 'Offset';
+
+  @override
+  String get architectMirrorMove => 'Mirror';
+
+  @override
+  String get architectMirrorMoveTooltip => 'Mirror move';
+
+  @override
+  String get architectMirrorCopy => 'Mirror+';
+
+  @override
+  String get architectMirrorCopyTooltip => 'Mirror copy';
+
+  @override
+  String get architectMirrorPromptPickAnchor => 'Specify mirror anchor point';
+
+  @override
+  String get architectMirrorPromptPickAxis => 'Specify mirror axis direction';
+
+  @override
+  String get architectMirrorAxisVertical => 'Vertical';
+
+  @override
+  String get architectMirrorAxisHorizontal => 'Horizontal';
 
   @override
   String get architectEdgeDistance => 'Distance';

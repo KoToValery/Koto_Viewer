@@ -3312,6 +3312,34 @@
   "@architectWallSplitDirectionHint": {
     "description": "Hint for second click in split tool for cut direction"
   },
+  "architectWallSplitPromptPickFirst": "Specify first split point",
+  "@architectWallSplitPromptPickFirst": {
+    "description": "Prompt to pick the first point of the split cut line"
+  },
+  "architectWallSplitPromptPickSecond": "Specify second split point",
+  "@architectWallSplitPromptPickSecond": {
+    "description": "Prompt to pick the second point of the split cut line"
+  },
+  "architectWallSplitPromptPickSide": "Click the side to keep selected",
+  "@architectWallSplitPromptPickSide": {
+    "description": "Prompt to select which side remains selected after split"
+  },
+  "architectWallSplitPerpendicular": "Perpendicular",
+  "@architectWallSplitPerpendicular": {
+    "description": "Button to snap split cut line perpendicular to the wall"
+  },
+  "architectWallSplitSide1": "Side 1",
+  "@architectWallSplitSide1": {
+    "description": "Button to keep side 1 selected after split"
+  },
+  "architectWallSplitSide2": "Side 2",
+  "@architectWallSplitSide2": {
+    "description": "Button to keep side 2 selected after split"
+  },
+  "architectWallSplitBoth": "Both",
+  "@architectWallSplitBoth": {
+    "description": "Button to keep both sides selected after split"
+  },
   "architectWallClearance": "Clearance",
   "architectGridNone": "None",
   "architectGridCustom": "Custom",
@@ -3492,6 +3520,22 @@
   "@architectRadialSplit": { "description": "Radial menu split action" },
   "architectRadialOffset": "Offset",
   "@architectRadialOffset": { "description": "Radial menu offset action" },
+  "architectMirrorMove": "Mirror",
+  "@architectMirrorMove": { "description": "Mirror move action label" },
+  "architectMirrorMoveTooltip": "Mirror move",
+  "@architectMirrorMoveTooltip": { "description": "Mirror move action tooltip" },
+  "architectMirrorCopy": "Mirror+",
+  "@architectMirrorCopy": { "description": "Mirror copy action label" },
+  "architectMirrorCopyTooltip": "Mirror copy",
+  "@architectMirrorCopyTooltip": { "description": "Mirror copy action tooltip" },
+  "architectMirrorPromptPickAnchor": "Specify mirror anchor point",
+  "@architectMirrorPromptPickAnchor": { "description": "Prompt for picking mirror reference anchor point" },
+  "architectMirrorPromptPickAxis": "Specify mirror axis direction",
+  "@architectMirrorPromptPickAxis": { "description": "Prompt for specifying second point or mirror axis direction" },
+  "architectMirrorAxisVertical": "Vertical",
+  "@architectMirrorAxisVertical": { "description": "Button to mirror across a vertical axis through anchor" },
+  "architectMirrorAxisHorizontal": "Horizontal",
+  "@architectMirrorAxisHorizontal": { "description": "Button to mirror across a horizontal axis through anchor" },
   "architectEdgeDistance": "Distance",
   "architectEdgeSelectHint": "Select an edge",
   "architectEdgeDistanceHint": "Set the distance by moving the selected edge.",

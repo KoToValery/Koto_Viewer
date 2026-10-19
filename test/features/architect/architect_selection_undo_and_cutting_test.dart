@@ -209,8 +209,13 @@ void main() {
       // Wall is not yet split after click 1 (waiting for cut direction)
       expect(model.project.activeStorey.walls.length, 1);
 
-      // Click 2 sets cut direction (perpendicular cut across the wall towards (1, 1))
+      // Click 2 sets cut direction (towards (1, 1))
       await tester.tapAt(screen(tester, const Offset(1, 1)));
+      await tester.pumpAndSettle();
+
+      // Step 3: Pick selection side via HUD banner button
+      expect(find.byKey(const ValueKey('architect-split-side1-btn')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('architect-split-side1-btn')));
       await tester.pumpAndSettle();
 
       // Wall is split into 2 walls!

@@ -6,6 +6,8 @@ import 'dart:ui';
 import '../adapters/architect_element_adapters.dart';
 import '../../bim_editing/commands/bim_edit_history.dart';
 import '../../bim_editing/geometry/bim_line_geometry.dart';
+import '../../bim_editing/geometry/bim_transform_2d.dart';
+import 'architect_element_tool.dart';
 import '../models/architect_column.dart';
 import '../models/architect_project.dart';
 import '../models/architect_elements.dart';
@@ -296,34 +298,104 @@ class CutArchitectWalls extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     ArchitectModelCommand.point(start);
     ArchitectModelCommand.point(end);
-    if ((end - start).distance < .001) throw ArgumentError('Cut too short');
+    final delta = end - start;
+    final len = delta.distance;
+    if (len < .001) throw ArgumentError('Cut too short');
+    final u = delta / len;
+    final extendedStart = start - u * 50.0;
+    final extendedEnd = end + u * 50.0;
+    final cutter = ArchitectWall(
+      id: 'cutter',
+      startPoint: extendedStart,
+      endPoint: extendedEnd,
+    );
     var result = project;
     var cuts = 0;
     for (final wall in ArchitectModelCommand.storey(project, storeyId).walls) {
       if (!wallIds.contains(wall.id)) continue;
-      final points=wall.intersections(ArchitectWall(id:'cutter',startPoint:start,endPoint:end));
-      if(points.isEmpty)continue;
+      final points = wall.intersections(cutter);
+      if (points.isEmpty) continue;
       // Process from the far end so all earlier offsets stay on the retained first wall.
-      final ratios=[for(final p in points)wall.isCurved?wall.arc!.parameter(p):BimLineGeometry.parameter(p,wall.startPoint,wall.endPoint)]..sort((a,b)=>b.compareTo(a));
-      var retained=1.0;
-      for(final originalRatio in ratios) {
-      final ratio=originalRatio/retained;
-      if (ratio * wall.length < .001 || (1 - ratio) * wall.length < .001) {
-        continue;
-      }
-      result = SplitArchitectWall(
-        storeyId: storeyId,
-        wallId: wall.id,
-        newWallId: ArchitectElementId.next('wall'),
-        ratio: ratio,
-        detachCut: true,
-      ).apply(result);
-      cuts++;
-      retained=originalRatio;
+      final ratios = [
+        for (final p in points)
+          wall.isCurved
+              ? wall.arc!.parameter(p)
+              : BimLineGeometry.parameter(p, wall.startPoint, wall.endPoint),
+      ]..sort((a, b) => b.compareTo(a));
+      var retained = 1.0;
+      for (final originalRatio in ratios) {
+        final ratio = originalRatio / retained;
+        if (ratio * wall.length < .001 || (1 - ratio) * wall.length < .001) {
+          continue;
+        }
+        result = SplitArchitectWall(
+          storeyId: storeyId,
+          wallId: wall.id,
+          newWallId: ArchitectElementId.next('wall'),
+          ratio: ratio,
+          detachCut: true,
+        ).apply(result);
+        cuts++;
+        retained = originalRatio;
       }
     }
     if (cuts == 0) throw ArgumentError('No wall crossed');
     return result;
+  }
+
+  /// Returns the IDs of the resulting wall segments that lie on the chosen side of the cut line [start] -> [end].
+  /// If [pickSide] is null, all resulting wall segments are returned.
+  static Set<String> resolveSelectedWallIds({
+    required ArchitectProject before,
+    required ArchitectProject after,
+    required String storeyId,
+    required Set<String> cutWallIds,
+    required Offset start,
+    required Offset end,
+    Offset? pickSide,
+    int? targetSide,
+  }) {
+    final sAfter = ArchitectModelCommand.storey(after, storeyId);
+    final sBefore = ArchitectModelCommand.storey(before, storeyId);
+    final beforeIds = sBefore.walls.map((w) => w.id).toSet();
+    final resultingWalls = sAfter.walls
+        .where((w) => cutWallIds.contains(w.id) || !beforeIds.contains(w.id))
+        .toList();
+    if (resultingWalls.isEmpty) return cutWallIds;
+    if (targetSide == 0) return resultingWalls.map((w) => w.id).toSet();
+    if (pickSide == null && targetSide == null) {
+      return resultingWalls.map((w) => w.id).toSet();
+    }
+
+    final v = end - start;
+    double sideOf(Offset p) =>
+        v.dx * (p.dy - start.dy) - v.dy * (p.dx - start.dx);
+
+    final int resolvedTarget;
+    if (targetSide != null && targetSide != 0) {
+      resolvedTarget = targetSide > 0 ? 1 : -1;
+    } else if (pickSide != null) {
+      final pickSign = sideOf(pickSide);
+      if (pickSign.abs() < 1e-6) {
+        return resultingWalls.map((w) => w.id).toSet();
+      }
+      resolvedTarget = pickSign > 0 ? 1 : -1;
+    } else {
+      return resultingWalls.map((w) => w.id).toSet();
+    }
+
+    final selected = <String>{};
+    for (final w in resultingWalls) {
+      final mid = w.referencePointAt(0.5);
+      final s = sideOf(mid);
+      final wSign = s >= 0 ? 1 : -1;
+      if (wSign == resolvedTarget) {
+        selected.add(w.id);
+      }
+    }
+    return selected.isEmpty
+        ? resultingWalls.map((w) => w.id).toSet()
+        : selected;
   }
 }
 
@@ -654,6 +726,67 @@ class MirrorArchitectWalls extends ArchitectModelCommand {
         ],
       ),
     );
+  }
+}
+
+class MirrorArchitectElements extends ArchitectModelCommand {
+  final String storeyId;
+  final Set<String> elementIds;
+  final Offset origin;
+  final Offset direction;
+  final bool isDuplicate;
+  final Map<String, String>? idMap;
+
+  const MirrorArchitectElements({
+    required this.storeyId,
+    required this.elementIds,
+    required this.origin,
+    required this.direction,
+    this.isDuplicate = false,
+    this.idMap,
+  });
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectModelCommand.point(origin);
+    ArchitectModelCommand.point(direction);
+    if (direction.distanceSquared < 1e-12) {
+      throw ArgumentError('Invalid mirror axis');
+    }
+    final storey = ArchitectModelCommand.storey(project, storeyId);
+    final (nextStorey, _) = ArchitectElementTool().mirrorElementsByIds(
+      storey,
+      elementIds,
+      origin: origin,
+      direction: direction,
+      isDuplicate: isDuplicate,
+      idMap: idMap,
+    );
+    var axes = project.gridAxes;
+    if (axes.any((a) => elementIds.contains(a.id))) {
+      axes = [
+        for (final a in project.gridAxes)
+          if (elementIds.contains(a.id))
+            if (isDuplicate) ...[
+              a,
+              a.copyWith(
+                id: idMap?[a.id] ?? ArchitectElementId.next('axis'),
+                start: BimTransform2D.mirror(a.start, origin, direction),
+                end: BimTransform2D.mirror(a.end, origin, direction),
+              ),
+            ] else
+              a.copyWith(
+                start: BimTransform2D.mirror(a.start, origin, direction),
+                end: BimTransform2D.mirror(a.end, origin, direction),
+              )
+          else
+            a,
+      ];
+    }
+    return ArchitectModelCommand.replace(
+      project,
+      nextStorey,
+    ).copyWithGridAxes(axes);
   }
 }
 
@@ -1243,6 +1376,7 @@ class ExtendArchitectWall extends ArchitectModelCommand {
     final updated = UpdateArchitectWall(
       storeyId: storeyId,
       wall: next,
+      carryConnections: false,
     ).apply(project);
     return ArchitectModelCommand.replace(
       updated,
@@ -1343,6 +1477,7 @@ class JoinArchitectWalls extends ArchitectModelCommand {
       result = UpdateArchitectWall(
         storeyId: storeyId,
         wall: next,
+        carryConnections: false,
       ).apply(result);
     }
     return ArchitectModelCommand.replace(

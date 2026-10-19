@@ -7,6 +7,7 @@ import 'architect_canvas_palette.dart';
 // 5. DASH-DOT & BUBBLE ROUTINES
 // ===================================
 
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../models/architect_grid_axis.dart';
@@ -195,16 +196,17 @@ class ArchitectGridAxisPainterHelper {
     required Offset end,
     required double zoomScale,
   }) {
+    final draftingScale = math.max(zoomScale, 80.0);
     final handlePaint = Paint()
       ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.fill;
 
     final handleBorder = Paint()
       ..color = Colors.white
-      ..strokeWidth = 1.5 / zoomScale
+      ..strokeWidth = 1.5 / draftingScale
       ..style = PaintingStyle.stroke;
 
-    final double handleRadius = 6.0 / zoomScale;
+    final double handleRadius = 6.0 / draftingScale;
 
     canvas.drawCircle(start, handleRadius, handlePaint);
     canvas.drawCircle(start, handleRadius, handleBorder);
@@ -270,11 +272,12 @@ class ArchitectGridAxisPainterHelper {
     _drawDashDotLine(canvas, start, end, draftPaint, zoomScale);
 
     // Endpoints circles
+    final pointDraftingScale = math.max(zoomScale, 80.0);
     final pointPaint = Paint()
       ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(start, 4.0 / zoomScale, pointPaint);
-    canvas.drawCircle(end, 4.0 / zoomScale, pointPaint);
+    canvas.drawCircle(start, 4.0 / pointDraftingScale, pointPaint);
+    canvas.drawCircle(end, 4.0 / pointDraftingScale, pointPaint);
 
     // Dimension length badge at midpoint
     final mid = (start + end) / 2.0;

@@ -84,6 +84,11 @@ class Architect2dPainter extends CustomPainter {
   final (Offset, Offset)? wallCutGuideLine;
   final Offset? wallCutAnchor;
   final (Offset, Offset)? wallCutLine;
+  final Offset? mirrorAnchor;
+  final (Offset, Offset)? mirrorAxisLine;
+  final Offset? splitPoint1;
+  final (Offset, Offset)? splitPerpendicularGuide;
+  final (Offset, Offset)? splitCutLine;
   final (Offset, Offset)? wallJoinLeaderLine;
   final ArchitectWallTrimSpan? wallTrimSpan;
   final List<ArchitectWallClearance> wallClearances;
@@ -103,6 +108,11 @@ class Architect2dPainter extends CustomPainter {
   final List<(Offset, Offset)> magneticGuides;
   final double _zoomScale;
   double get zoomScale => viewport?.scale ?? _zoomScale;
+
+  /// Clamped scale for auxiliary drafting indicators (dots, handles, ticks, badges)
+  /// so they never dynamically enlarge in model/world space when zooming out.
+  static const double minDraftingScale = 80.0;
+  double get draftingScale => math.max(zoomScale, minDraftingScale);
   final Offset? cursorPosition;
   final ArchitectColumn? columnPreview;
 
@@ -183,6 +193,11 @@ class Architect2dPainter extends CustomPainter {
     this.wallCutGuideLine,
     this.wallCutAnchor,
     this.wallCutLine,
+    this.mirrorAnchor,
+    this.mirrorAxisLine,
+    this.splitPoint1,
+    this.splitPerpendicularGuide,
+    this.splitCutLine,
     this.wallJoinLeaderLine,
     this.wallTrimSpan,
     this.wallClearances = const [],
@@ -776,7 +791,7 @@ class Architect2dPainter extends CustomPainter {
     final midBorderPaint = Paint()
       ..color = palette.foreground(const Color(0x66000000))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8 / zoomScale;
+      ..strokeWidth = 0.8 / draftingScale;
 
     for (final wall in activeStorey.walls) {
       final isSelected =
@@ -796,27 +811,27 @@ class Architect2dPainter extends CustomPainter {
         for (final point in [wall.startPoint, wall.endPoint]) {
           canvas.drawCircle(
             point,
-            6.0 / zoomScale,
+            6.0 / draftingScale,
             Paint()..color = Colors.black45,
           );
           canvas.drawCircle(
             point,
-            4.5 / zoomScale,
+            4.5 / draftingScale,
             Paint()
               ..color = const Color(0xFF00E5FF)
               ..style = PaintingStyle.fill,
           );
           canvas.drawCircle(
             point,
-            4.5 / zoomScale,
+            4.5 / draftingScale,
             Paint()
               ..color = Colors.white
-              ..strokeWidth = 1.6 / zoomScale
+              ..strokeWidth = 1.6 / draftingScale
               ..style = PaintingStyle.stroke,
           );
           canvas.drawCircle(
             point,
-            1.6 / zoomScale,
+            1.6 / draftingScale,
             Paint()..color = Colors.white,
           );
         }
@@ -824,8 +839,8 @@ class Architect2dPainter extends CustomPainter {
 
       // Unobtrusive midpoint edit handle for extrusion/step move
       final midPoint = wall.referencePointAt(.5);
-      canvas.drawCircle(midPoint, 3.2 / zoomScale, midDotPaint);
-      canvas.drawCircle(midPoint, 3.2 / zoomScale, midBorderPaint);
+      canvas.drawCircle(midPoint, 3.2 / draftingScale, midDotPaint);
+      canvas.drawCircle(midPoint, 3.2 / draftingScale, midBorderPaint);
 
       for (final door in wall.doors) {
         door.paint2D(
@@ -921,36 +936,39 @@ class Architect2dPainter extends CustomPainter {
           (direction.distance < 1e-8
               ? wall.unitVector
               : Offset(-direction.dy, direction.dx) / direction.distance) *
-          (4 / zoomScale);
+          (4 / draftingScale);
       final paint = Paint()
         ..color = palette.foreground(const Color(0xFF008C9E))
-        ..strokeWidth = 1 / zoomScale;
+        ..strokeWidth = 1 / draftingScale;
       canvas.drawLine(gap.start, gap.end, paint);
       for (final point in [gap.start, gap.end]) {
         canvas.drawLine(point - tick, point + tick, paint);
       }
       if (gap.atStart != null) {
+        final dotRadius = 7 / draftingScale;
         canvas.drawCircle(
           gap.start,
-          7 / zoomScale,
+          dotRadius,
           Paint()..color = const Color(0xFFFFB74D),
         );
-        final marker = TextPainter(
-          text: TextSpan(
-            text: gap.atStart! ? '1' : '2',
-            style: TextStyle(
-              color: Colors.black,
-              fontFamily: 'Roboto',
-              fontWeight: FontWeight.bold,
-              fontSize: 10 / zoomScale,
+        if (dotRadius * zoomScale >= 4.5) {
+          final marker = TextPainter(
+            text: TextSpan(
+              text: gap.atStart! ? '1' : '2',
+              style: TextStyle(
+                color: Colors.black,
+                fontFamily: 'Roboto',
+                fontWeight: FontWeight.bold,
+                fontSize: 10 / draftingScale,
+              ),
             ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        marker.paint(
-          canvas,
-          gap.start - Offset(marker.width / 2, marker.height / 2),
-        );
+            textDirection: TextDirection.ltr,
+          )..layout();
+          marker.paint(
+            canvas,
+            gap.start - Offset(marker.width / 2, marker.height / 2),
+          );
+        }
       }
     }
 
@@ -1005,7 +1023,7 @@ class Architect2dPainter extends CustomPainter {
           : palette.foreground(const Color(0xFF008C9E));
       final witnessPaint = Paint()
         ..color = lineColor.withValues(alpha: 0.55)
-        ..strokeWidth = 0.85 / zoomScale;
+        ..strokeWidth = 0.85 / draftingScale;
       canvas.drawLine(gap.referencePoint, gap.start, witnessPaint);
       canvas.drawLine(gap.jambPoint, gap.end, witnessPaint);
 
@@ -1014,10 +1032,10 @@ class Architect2dPainter extends CustomPainter {
           (direction.distance < 1e-8
               ? hostWall.normalVector
               : Offset(-direction.dy, direction.dx) / direction.distance) *
-          (4 / zoomScale);
+          (4 / draftingScale);
       final dimPaint = Paint()
         ..color = lineColor
-        ..strokeWidth = (gap.isModularSnap ? 1.5 : 1.1) / zoomScale;
+        ..strokeWidth = (gap.isModularSnap ? 1.5 : 1.1) / draftingScale;
       canvas.drawLine(gap.start, gap.end, dimPaint);
       for (final point in [gap.start, gap.end]) {
         canvas.drawLine(point - tick, point + tick, dimPaint);
@@ -1073,17 +1091,17 @@ class Architect2dPainter extends CustomPainter {
         stubEnd,
         Paint()
           ..color = Colors.amberAccent
-          ..strokeWidth = 2.5 / zoomScale,
-        zoomScale,
+          ..strokeWidth = 2.5 / draftingScale,
+        draftingScale,
       );
       canvas.drawCircle(
         stubStart,
-        4.0 / zoomScale,
+        4.0 / draftingScale,
         Paint()..color = Colors.amberAccent,
       );
       canvas.drawCircle(
         stubEnd,
-        2.5 / zoomScale,
+        2.5 / draftingScale,
         Paint()..color = Colors.amberAccent,
       );
     }
@@ -1091,15 +1109,15 @@ class Architect2dPainter extends CustomPainter {
       final (from, to) = wallJoinLeaderLine!;
       final linePaint = Paint()
         ..color = const Color(0xFF00E5FF)
-        ..strokeWidth = 2.0 / zoomScale
+        ..strokeWidth = 2.0 / draftingScale
         ..style = PaintingStyle.stroke;
-      _drawDashedLine(canvas, from, to, linePaint, zoomScale);
+      _drawDashedLine(canvas, from, to, linePaint, draftingScale);
       canvas.drawCircle(
         from,
-        4.0 / zoomScale,
+        4.0 / draftingScale,
         Paint()..color = const Color(0xFF00E5FF),
       );
-      final handleRadius = 13.0 / zoomScale;
+      final handleRadius = 13.0 / draftingScale;
       canvas.drawCircle(
         to,
         handleRadius,
@@ -1111,13 +1129,13 @@ class Architect2dPainter extends CustomPainter {
         Paint()
           ..color = const Color(0xFF00E5FF)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.8 / zoomScale,
+          ..strokeWidth = 1.8 / draftingScale,
       );
       final plusPaint = Paint()
         ..color = Colors.white
-        ..strokeWidth = 2.0 / zoomScale
+        ..strokeWidth = 2.0 / draftingScale
         ..strokeCap = StrokeCap.round;
-      final arm = 5.5 / zoomScale;
+      final arm = 5.5 / draftingScale;
       canvas.drawLine(
         Offset(to.dx - arm, to.dy),
         Offset(to.dx + arm, to.dy),
@@ -1148,12 +1166,12 @@ class Architect2dPainter extends CustomPainter {
         span.end,
         Paint()
           ..color = Colors.redAccent
-          ..strokeWidth = 2 / zoomScale,
+          ..strokeWidth = 2 / draftingScale,
       );
       for (final point in [span.start, span.end]) {
         canvas.drawCircle(
           point,
-          3 / zoomScale,
+          3 / draftingScale,
           Paint()..color = Colors.redAccent,
         );
       }
@@ -1165,22 +1183,22 @@ class Architect2dPainter extends CustomPainter {
         wallCutGuideLine!.$2,
         Paint()
           ..color = const Color(0xFFFF9100)
-          ..strokeWidth = 1.8 / zoomScale,
-        zoomScale,
+          ..strokeWidth = 1.8 / draftingScale,
+        draftingScale,
       );
     }
     if (wallCutAnchor != null) {
       canvas.drawCircle(
         wallCutAnchor!,
-        5 / zoomScale,
+        5 / draftingScale,
         Paint()
           ..color = const Color(0xFFFF9100)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5 / zoomScale,
+          ..strokeWidth = 1.5 / draftingScale,
       );
       canvas.drawCircle(
         wallCutAnchor!,
-        2.5 / zoomScale,
+        2.5 / draftingScale,
         Paint()..color = const Color(0xFFFF9100),
       );
     }
@@ -1191,21 +1209,93 @@ class Architect2dPainter extends CustomPainter {
         wallCutLine!.$2,
         Paint()
           ..color = const Color(0xFFFF3D00)
-          ..strokeWidth = 2.0 / zoomScale,
-        zoomScale,
+          ..strokeWidth = 2.0 / draftingScale,
+        draftingScale,
       );
       canvas.drawCircle(
         wallCutLine!.$1,
-        4 / zoomScale,
+        4 / draftingScale,
         Paint()..color = const Color(0xFFFF3D00),
       );
       canvas.drawCircle(
         wallCutLine!.$2,
-        3 / zoomScale,
+        3 / draftingScale,
         Paint()
           ..color = const Color(0xFFFF3D00)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5 / zoomScale,
+          ..strokeWidth = 1.5 / draftingScale,
+      );
+    }
+    if (mirrorAxisLine != null) {
+      _drawDashedLine(
+        canvas,
+        mirrorAxisLine!.$1,
+        mirrorAxisLine!.$2,
+        Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..strokeWidth = 1.8 / draftingScale,
+        draftingScale,
+      );
+    }
+    if (mirrorAnchor != null) {
+      canvas.drawCircle(
+        mirrorAnchor!,
+        5.5 / draftingScale,
+        Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8 / draftingScale,
+      );
+      canvas.drawCircle(
+        mirrorAnchor!,
+        2.5 / draftingScale,
+        Paint()..color = const Color(0xFF00E5FF),
+      );
+    }
+    if (splitPerpendicularGuide != null) {
+      _drawDashedLine(
+        canvas,
+        splitPerpendicularGuide!.$1,
+        splitPerpendicularGuide!.$2,
+        Paint()
+          ..color = const Color(0x9900E5FF)
+          ..strokeWidth = 1.5 / draftingScale,
+        draftingScale,
+      );
+    }
+    if (splitCutLine != null) {
+      _drawDashedLine(
+        canvas,
+        splitCutLine!.$1,
+        splitCutLine!.$2,
+        Paint()
+          ..color = const Color(0xFFFF9100)
+          ..strokeWidth = 2.0 / draftingScale,
+        draftingScale,
+      );
+      canvas.drawCircle(
+        splitCutLine!.$1,
+        4.5 / draftingScale,
+        Paint()..color = const Color(0xFFFF9100),
+      );
+      canvas.drawCircle(
+        splitCutLine!.$2,
+        4.5 / draftingScale,
+        Paint()..color = const Color(0xFFFF9100),
+      );
+    } else if (splitPoint1 != null) {
+      canvas.drawCircle(
+        splitPoint1!,
+        5.5 / draftingScale,
+        Paint()
+          ..color = const Color(0xFFFF9100)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8 / draftingScale,
+      );
+      canvas.drawCircle(
+        splitPoint1!,
+        2.5 / draftingScale,
+        Paint()..color = const Color(0xFFFF9100),
       );
     }
     if (cursorPosition != null &&
@@ -1216,22 +1306,22 @@ class Architect2dPainter extends CustomPainter {
       final aim = activeDraftEnd ?? cursorPosition!;
       canvas.drawCircle(
         aim,
-        3.5 / zoomScale,
+        3.5 / draftingScale,
         Paint()..color = const Color(0xFF00E5FF),
       );
       canvas.drawCircle(
         aim,
-        3.5 / zoomScale,
+        3.5 / draftingScale,
         Paint()
           ..color = Colors.white
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.0 / zoomScale,
+          ..strokeWidth = 1.0 / draftingScale,
       );
     }
     if (activeTool == ArchitectTool.wall && activeDraftStart != null) {
       canvas.drawCircle(
         activeDraftStart!,
-        3 / zoomScale,
+        3 / draftingScale,
         Paint()..color = Colors.orangeAccent,
       );
     }
@@ -1241,9 +1331,9 @@ class Architect2dPainter extends CustomPainter {
       final target = activeDraftEnd ?? cursorPosition!;
       final paint = Paint()
         ..color = activeSnapLabel == null ? Colors.orange : Colors.cyan
-        ..strokeWidth = 1.5 / zoomScale
+        ..strokeWidth = 1.5 / draftingScale
         ..style = PaintingStyle.stroke;
-      canvas.drawCircle(target, 5 / zoomScale, paint);
+      canvas.drawCircle(target, 5 / draftingScale, paint);
     }
     if (activeTool == ArchitectTool.column && columnPreview != null) {
       ArchitectElementsPainterHelper.drawColumns(
@@ -1302,10 +1392,10 @@ class Architect2dPainter extends CustomPainter {
 
       canvas.drawCircle(
         p1,
-        3 / zoomScale,
+        3 / draftingScale,
         Paint()..color = Colors.orangeAccent,
       );
-      canvas.drawCircle(p2, 2 / zoomScale, Paint()..color = Colors.cyanAccent);
+      canvas.drawCircle(p2, 2 / draftingScale, Paint()..color = Colors.cyanAccent);
       // Keep a single target marker and a length-only badge outside the body.
       final textSpan = TextSpan(
         text: project.formatLength(wall.length),
@@ -1359,8 +1449,9 @@ class Architect2dPainter extends CustomPainter {
     final totalLen = diff.distance;
     if (totalLen <= 0.0001) return;
     final dir = diff / totalLen;
-    final dashLen = 8.0 / zoomScale;
-    final gapLen = 5.0 / zoomScale;
+    final effectiveScale = math.max(zoomScale, minDraftingScale);
+    final dashLen = 8.0 / effectiveScale;
+    final gapLen = 5.0 / effectiveScale;
     double current = 0.0;
     while (current < totalLen) {
       final next = math.min(current + dashLen, totalLen);
@@ -1388,6 +1479,11 @@ class Architect2dPainter extends CustomPainter {
       wallCutGuideLine != oldDelegate.wallCutGuideLine ||
       wallCutAnchor != oldDelegate.wallCutAnchor ||
       wallCutLine != oldDelegate.wallCutLine ||
+      mirrorAnchor != oldDelegate.mirrorAnchor ||
+      mirrorAxisLine != oldDelegate.mirrorAxisLine ||
+      splitPoint1 != oldDelegate.splitPoint1 ||
+      splitPerpendicularGuide != oldDelegate.splitPerpendicularGuide ||
+      splitCutLine != oldDelegate.splitCutLine ||
       activeOvershoot != oldDelegate.activeOvershoot ||
       showUpperOverhangs != oldDelegate.showUpperOverhangs ||
       upperOverhangs != oldDelegate.upperOverhangs ||
