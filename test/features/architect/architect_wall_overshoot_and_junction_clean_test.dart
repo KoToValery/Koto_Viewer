@@ -295,6 +295,87 @@ void main() {
       final os2 = ArchitectWallOvershootDetector.detectForWall(wall2, storey.walls);
       expect(os2, isEmpty);
     });
+
+    test('wall cut flush with outer face/insulation of perpendicular wall is NOT flagged as overshoot', () {
+      // Vertical wall along x = 2.0 with outer face at x = 1.75 (25 cm thick, or core + insulation)
+      final wallV = ArchitectWall(
+        id: 'wallV',
+        startPoint: const Offset(2.0, 0.0),
+        endPoint: const Offset(2.0, 3.0),
+        thickness: 0.25,
+        referenceLine: WallReferenceLine.inner, // inner face at x = 2.0, outer face at x = 1.75
+        exteriorSide: WallExteriorSide.left,
+      );
+      // Horizontal wall spanning across the top, starting flush with the outer face at x = 1.75
+      final wallH = ArchitectWall(
+        id: 'wallH',
+        startPoint: const Offset(1.75, 3.125),
+        endPoint: const Offset(6.0, 3.125),
+        thickness: 0.25,
+      );
+
+      final storey = ArchitectStorey(
+        id: 's1',
+        name: 'Floor 1',
+        elevation: 0,
+        height: 2.8,
+        walls: [wallV, wallH],
+      );
+
+      final overshoots = ArchitectWallOvershootDetector.detectForWall(wallH, storey.walls);
+      expect(overshoots, isEmpty, reason: 'Flush cut along insulation must not trigger overshoot banner');
+    });
+
+    test('wall protruding beyond outer face is trimmed flush to the face avoiding a gap', () {
+      // Vertical wall along x = 2.0 with outer face at x = 1.75 (thickness: 0.25, referenceLine: inner)
+      final wallV = ArchitectWall(
+        id: 'wallV',
+        startPoint: const Offset(2.0, 0.0),
+        endPoint: const Offset(2.0, 3.0),
+        thickness: 0.25,
+        referenceLine: WallReferenceLine.inner,
+        exteriorSide: WallExteriorSide.left,
+      );
+      // Horizontal wall carelessly drawn 20 cm past the outer face (startPoint at x = 1.55 instead of 1.75)
+      final wallH = ArchitectWall(
+        id: 'wallH',
+        startPoint: const Offset(1.55, 3.125),
+        endPoint: const Offset(6.0, 3.125),
+        thickness: 0.25,
+      );
+
+      final storey = ArchitectStorey(
+        id: 's1',
+        name: 'Floor 1',
+        elevation: 0,
+        height: 2.8,
+        walls: [wallV, wallH],
+      );
+
+      final overshoots = ArchitectWallOvershootDetector.detectForWall(wallH, storey.walls);
+      expect(overshoots.length, 1);
+      final os = overshoots.first;
+      // Overshoot should be 20 cm (the distance protruding into open air past outer face), not 45 cm
+      expect(os.overshootCm, 20);
+      // Trim point should be at the outer face x = 1.75, NOT at axis x = 2.0 which would leave a hole
+      expect(os.intersectionPoint.dx, closeTo(1.75, 0.001));
+
+      final commands = ArchitectWallOvershootDetector.createTrimCommands(
+        storeyId: storey.id,
+        overshoot: os,
+      );
+      final project = ArchitectProject(
+        id: 'p1',
+        name: 'Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: [storey],
+        activeStoreyId: 's1',
+      );
+      final updated = commands.first.apply(project);
+      final trimmed = updated.activeStorey.walls.firstWhere((w) => w.id == 'wallH');
+      expect(trimmed.startPoint.dx, closeTo(1.75, 0.001));
+    });
   });
 
   group('ArchitectWallOvershootBanner widget', () {
