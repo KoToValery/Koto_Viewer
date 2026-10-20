@@ -2102,6 +2102,7 @@
   "architectProjectionAlignLeft": "Подравни вляво",
   "architectProjectionAlignRight": "Подравни вдясно",
   "architectDistancePrecision": "Знаци след запетаята",
+  "architectWizardExample": "Пример:",
   "architectWizardStoreysShort": "Етажи",
   "architectWizardElevation": "Кота",
   "architectWizardHeight": "H=",

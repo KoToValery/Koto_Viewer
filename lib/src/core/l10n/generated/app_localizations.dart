@@ -11333,6 +11333,12 @@ abstract class AppLocalizations {
   /// **'Decimal places'**
   String get architectDistancePrecision;
 
+  /// Example label in architect wizard
+  ///
+  /// In en, this message translates to:
+  /// **'Example:'**
+  String get architectWizardExample;
+
   /// No description provided for @architectWizardStoreysShort.
   ///
   /// In en, this message translates to:

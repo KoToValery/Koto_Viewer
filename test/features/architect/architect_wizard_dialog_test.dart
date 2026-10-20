@@ -252,4 +252,34 @@ void main() {
     expect(preview.triangles.isNotEmpty, isTrue);
     expect(Architect3dBuilder.buildProjectMesh(base).triangles, isEmpty);
   });
+
+  testWidgets('Wizard decimal places defaults to 1 and displays responsive example', (tester) async {
+    await tester.pumpWidget(
+      app(
+        const ArchitectProjectWizardDialog(),
+        locale: const Locale('bg'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Chip 1 is selected by default
+    final chip1 = tester.widget<ChoiceChip>(find.byKey(const ValueKey('architect-wizard-precision-1')));
+    expect(chip1.selected, isTrue);
+
+    // Example shows 0.0
+    final exampleFinder = find.byKey(const ValueKey('architect-wizard-precision-example'));
+    expect(exampleFinder, findsOneWidget);
+    expect(tester.widget<Text>(exampleFinder).data, '0.0');
+    expect(find.text('Пример: '), findsOneWidget);
+
+    // Tap 0
+    await tester.tap(find.byKey(const ValueKey('architect-wizard-precision-0')));
+    await tester.pump();
+    expect(tester.widget<Text>(exampleFinder).data, '0');
+
+    // Tap 2
+    await tester.tap(find.byKey(const ValueKey('architect-wizard-precision-2')));
+    await tester.pump();
+    expect(tester.widget<Text>(exampleFinder).data, '0.00');
+  });
 }

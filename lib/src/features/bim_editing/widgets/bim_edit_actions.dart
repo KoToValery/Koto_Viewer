@@ -52,7 +52,7 @@ class BimEditActions {
     BimEditAction.split => Icons.call_split,
     BimEditAction.cut => Icons.content_cut,
     BimEditAction.offset => Icons.straighten_rounded,
-    BimEditAction.newPoint => Icons.fiber_manual_record,
+    BimEditAction.newPoint => Icons.adjust,
     BimEditAction.rename => Icons.drive_file_rename_outline_rounded,
     BimEditAction.join => Icons.polyline_outlined,
     BimEditAction.straighten => Icons.square_foot,
@@ -177,6 +177,11 @@ class _DraftingSymbolPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     if (action == BimEditAction.newPoint) {
       canvas.drawCircle(const Offset(12, 12), 3, paint);
+      final ringPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8;
+      canvas.drawCircle(const Offset(12, 12), 7.5, ringPaint);
     } else {
       // Existing halves are solid; the proposed perpendicular junction is dashed.
       canvas.drawLine(const Offset(5, 3), const Offset(5, 11), paint);

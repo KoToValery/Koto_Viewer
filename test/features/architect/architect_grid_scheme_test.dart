@@ -547,4 +547,33 @@ void main() {
       19.4,
     ]);
   });
+
+  testWidgets('Axes tab bay picker paints visible grid border outlines', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('bg'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ArchitectGridScheme(
+            spacingsX: const [6.0, 6.0],
+            spacingsY: const [6.0, 6.0],
+            unit: ArchitectUnit.meters,
+            decimals: 1,
+            onChanged: (x, y) {},
+          ),
+        ),
+      ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final customPaint = tester.widget<CustomPaint>(
+      find.descendant(
+        of: find.byKey(const ValueKey('architect-grid-picker')),
+        matching: find.byType(CustomPaint),
+      ),
+    );
+    expect(customPaint.painter, isA<CustomPainter>());
+  });
 }

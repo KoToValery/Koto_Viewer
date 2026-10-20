@@ -6393,6 +6393,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectDistancePrecision => 'Decimal places';
 
   @override
+  String get architectWizardExample => 'Example:';
+
+  @override
   String get architectWizardStoreysShort => 'Storeys';
 
   @override

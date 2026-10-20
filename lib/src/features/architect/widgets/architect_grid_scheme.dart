@@ -94,16 +94,25 @@ class ArchitectGridScheme extends StatelessWidget {
                 onTapDown: (d) => pick(d.localPosition),
                 onPanStart: (d) => pick(d.localPosition),
                 onPanUpdate: (d) => pick(d.localPosition),
-                child: SizedBox(
-                  height: height,
-                  child: CustomPaint(
-                    painter: _BayPickerPainter(
-                      spacingsX.length,
-                      spacingsY.length,
-                      columns,
-                      rows,
-                      colors.primary,
-                      colors.surfaceContainerHighest,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colors.outline.withValues(alpha: 0.35)),
+                  ),
+                  child: SizedBox(
+                    height: height,
+                    child: CustomPaint(
+                      painter: _BayPickerPainter(
+                        spacingsX.length,
+                        spacingsY.length,
+                        columns,
+                        rows,
+                        colors.primary,
+                        colors.surfaceContainerHighest.withValues(alpha: 0.5),
+                        borderColor: colors.outline.withValues(alpha: 0.5),
+                      ),
                     ),
                   ),
                 ),
@@ -192,29 +201,44 @@ class ArchitectGridScheme extends StatelessWidget {
 class _BayPickerPainter extends CustomPainter {
   final int x, y, columns, rows;
   final Color selectedColor, backgroundColor;
+  final Color? borderColor;
   _BayPickerPainter(
     this.x,
     this.y,
     this.columns,
     this.rows,
     this.selectedColor,
-    this.backgroundColor,
-  );
+    this.backgroundColor, {
+    this.borderColor,
+  });
   @override
   void paint(Canvas canvas, Size size) {
     final cell = Size(size.width / columns, size.height / rows);
+    final fillPaint = Paint();
+    final strokePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
     for (var row = 0; row < rows; row++) {
       for (var col = 0; col < columns; col++) {
+        final isSelected = col < x && row < y;
         final rect = Rect.fromLTWH(
           col * cell.width + 2,
           row * cell.height + 2,
           cell.width - 4,
           cell.height - 4,
         );
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(rect, const Radius.circular(3)),
-          Paint()..color = col < x && row < y ? selectedColor : backgroundColor,
-        );
+        final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(3));
+
+        // Fill cell
+        fillPaint.color = isSelected ? selectedColor : backgroundColor;
+        canvas.drawRRect(rrect, fillPaint);
+
+        // Explicit grid line / cell border
+        strokePaint.color = isSelected
+            ? selectedColor.withValues(alpha: 0.9)
+            : (borderColor ?? Colors.white24);
+        canvas.drawRRect(rrect, strokePaint);
       }
     }
   }
@@ -224,7 +248,8 @@ class _BayPickerPainter extends CustomPainter {
       x != old.x ||
       y != old.y ||
       selectedColor != old.selectedColor ||
-      backgroundColor != old.backgroundColor;
+      backgroundColor != old.backgroundColor ||
+      borderColor != old.borderColor;
 }
 
 class _GridSchemeLayout {

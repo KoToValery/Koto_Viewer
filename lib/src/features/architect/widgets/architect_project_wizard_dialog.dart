@@ -42,7 +42,7 @@ class _ArchitectProjectWizardDialogState
   late final TextEditingController _name;
   final _levelsForm = GlobalKey<FormState>();
   final _levels = [_LevelDraft(0, 3)];
-  int _step = 0, _decimals = 0;
+  int _step = 0, _decimals = 1;
   ArchitectUnit _unit = ArchitectUnit.centimeters;
   ArchitectGridPreset _grid = ArchitectGridPreset.standardPresets().first;
   List<double> _spacingsX = [7.2, 7.2, 7.2], _spacingsY = [6.6, 6.6];
@@ -319,18 +319,55 @@ class _ArchitectProjectWizardDialogState
         ),
         const SizedBox(height: 8),
         Wrap(
-          spacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 8,
           children: [
-            for (final decimals in [0, 1, 2])
-              ChoiceChip(
-                key: ValueKey('architect-wizard-precision-$decimals'),
-                label: Text('$decimals'),
-                selected: _decimals == decimals,
-                onSelected: (_) => setState(() {
-                  _decimals = decimals;
-                  _refreshLevelInputs();
-                }),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final decimals in [0, 1, 2])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      key: ValueKey('architect-wizard-precision-$decimals'),
+                      label: Text('$decimals'),
+                      selected: _decimals == decimals,
+                      onSelected: (_) => setState(() {
+                        _decimals = decimals;
+                        _refreshLevelInputs();
+                      }),
+                    ),
+                  ),
+              ],
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white24),
               ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${l.architectWizardExample} ',
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                  Text(
+                    _decimals == 0 ? '0' : '0.${'0' * _decimals}',
+                    key: const ValueKey('architect-wizard-precision-example'),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.cyanAccent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ],

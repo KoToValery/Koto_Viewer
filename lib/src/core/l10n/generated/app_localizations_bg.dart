@@ -6420,6 +6420,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectDistancePrecision => 'Знаци след запетаята';
 
   @override
+  String get architectWizardExample => 'Пример:';
+
+  @override
   String get architectWizardStoreysShort => 'Етажи';
 
   @override

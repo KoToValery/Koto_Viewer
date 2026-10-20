@@ -4233,6 +4233,8 @@
   "architectProjectionAlignLeft": "Align left edges",
   "architectProjectionAlignRight": "Align right edges",
   "architectDistancePrecision": "Decimal places",
+  "architectWizardExample": "Example:",
+  "@architectWizardExample": { "description": "Example label in architect wizard" },
   "architectWizardStoreysShort": "Storeys",
   "architectWizardElevation": "Elevation",
   "architectWizardHeight": "H=",

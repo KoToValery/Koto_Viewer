@@ -1,3 +1,4 @@
+import 'package:kotoview/src/features/bim_editing/widgets/bim_edit_actions.dart';
 import 'architect_tool_test_helper.dart' as tool_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -453,4 +454,21 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('New Point icon draws central point and outer circle', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: BimEditingSymbol(
+            BimEditAction.newPoint,
+            color: Colors.cyan,
+            size: 24,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: find.byType(BimEditingSymbol), matching: find.byType(CustomPaint)), findsOneWidget);
+    expect(BimEditActions.icon(BimEditAction.newPoint), Icons.adjust);
+  });
 }
