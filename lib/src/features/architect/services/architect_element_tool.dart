@@ -7,6 +7,7 @@ import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
 import '../rendering/architect_dimension_layout.dart';
 import '../models/architect_project.dart';
+import '../models/architect_grid_axis.dart';
 import '../models/architect_door.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_window.dart';
@@ -422,8 +423,9 @@ class ArchitectElementTool extends ChangeNotifier {
     ArchitectStorey storey,
     Offset point,
     double scale,
-    ArchitectTool tool,
-  ) {
+    ArchitectTool tool, {
+    List<StructuralGridAxis> gridAxes = const [],
+  }) {
     final scoped = storey.copyWith(
       walls: [
         if ([
@@ -458,21 +460,40 @@ class ArchitectElementTool extends ChangeNotifier {
           )
           .toList(),
     );
-    final id = hitTestElement(scoped, point, scale);
+    final id = hitTestElement(
+      scoped,
+      point,
+      scale,
+      gridAxes: gridAxes,
+      dimensionStorey: storey,
+    );
     if (tool != ArchitectTool.wall && scoped.walls.any((w) => w.id == id)) {
       return null;
     }
     return id;
   }
 
-  String? hitTestElement(ArchitectStorey storey, Offset point, double scale) =>
-      hitTestElements(storey, point, scale).firstOrNull;
+  String? hitTestElement(
+    ArchitectStorey storey,
+    Offset point,
+    double scale, {
+    List<StructuralGridAxis> gridAxes = const [],
+    ArchitectStorey? dimensionStorey,
+  }) => hitTestElements(
+    storey,
+    point,
+    scale,
+    gridAxes: gridAxes,
+    dimensionStorey: dimensionStorey,
+  ).firstOrNull;
 
   Iterable<String> hitTestElements(
     ArchitectStorey storey,
     Offset point,
-    double scale,
-  ) sync* {
+    double scale, {
+    List<StructuralGridAxis> gridAxes = const [],
+    ArchitectStorey? dimensionStorey,
+  }) sync* {
     final tolerance = 14.0 / scale;
 
     // Check Columns
@@ -545,7 +566,8 @@ class ArchitectElementTool extends ChangeNotifier {
       final tiers = ArchitectDimensionLayout.layoutTiers(
         dimension: dim,
         scale: scale,
-        storey: storey,
+        storey: dimensionStorey ?? storey,
+        gridAxes: gridAxes,
       );
       bool hit = false;
       for (final tier in tiers) {

@@ -468,6 +468,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _project.activeStorey,
           point,
           _currentScale,
+          gridAxes: _project.gridAxes,
         ),
         for (final zone in _project.activeStorey.zones)
           if ((Path()..addPolygon(zone.polygon, true)).contains(point)) zone.id,
@@ -555,6 +556,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           point,
           wall.coreCenterStart,
           wall.coreCenterEnd,
+          finite: false,
         );
         final center =
             wall.coreCenterStart +
@@ -571,7 +573,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
       final anchor = ArchitectDimensionChain.pickElement(_project, id, point);
       if (anchor != null &&
-          (anchor.point - point).distance <= 16 / _currentScale) {
+          (anchor.point - point).distance <= 1e-6) {
         return anchor;
       }
     }
@@ -710,12 +712,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         .where((w) => ids.contains(w.id))
         .toList();
 
-    if (openingId != null && openingHostWall != null) {
-      _dimensionDirection ??= openingHostWall.unitVector;
-      anchors.addAll(
-        ArchitectDimensionChain.openingAnchors(openingHostWall, openingId),
-      );
-    } else if (_dimensionAllowPoint) {
+    if (_dimensionAllowPoint) {
       if (snap.isSnapped) {
         anchors.add(_dimensionPointAnchor(snap.point));
       } else {
@@ -726,6 +723,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           anchors.add(ArchitectDimensionAnchor(point: raw));
         }
       }
+    } else if (openingId != null && openingHostWall != null) {
+      _dimensionDirection ??= openingHostWall.unitVector;
+      anchors.addAll(
+        ArchitectDimensionChain.openingAnchors(openingHostWall, openingId),
+      );
     } else if (candidateWalls.isNotEmpty) {
       final previousWall = _project.activeStorey.walls
           .where(
@@ -793,7 +795,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               snap.snapLabel == 'Corner') &&
           (snap.point - raw).distance <= 20 / _currentScale;
 
-      if (isCornerSnap) {
+      final isEdgeSnap = snap.snapLabel == 'Edge' ||
+          snap.snapLabel == 'Nearest' || snap.snapLabel == 'Midpoint';
+      if (snap.isSnapped && isEdgeSnap) {
+        anchors.add(_dimensionPointAnchor(snap.point));
+      } else if (isCornerSnap) {
         final cornerWall = _project.activeStorey.walls
             .where((w) => w.containsPoint(snap.point, tolerance: 0.15))
             .firstOrNull;
@@ -2639,6 +2645,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   ArchitectSnapResult _snapDimensionPoint(Offset raw, {Offset? anchor}) {
+    final excludedIds = <String>{
+      if (_dimensionEditing != null) _dimensionEditing!.id,
+    };
     final snap = anchor == null
         ? ArchitectSnapHelper.snapFree(
             rawPoint: raw,
@@ -2647,6 +2656,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             magnetic: _magnetEnabled,
             alignment: true,
             excludeWallAxes: true,
+            preferIntersections: _dimensionAllowPoint,
+            excludedIds: excludedIds,
             underlay: _currentUnderlayDoc,
             frame: widget.underlayFrame,
             visibility: _underlayLayerVisibility,
@@ -2659,6 +2670,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             magnetic: _magnetEnabled,
             alignment: true,
             excludeWallAxes: true,
+            preferIntersections: _dimensionAllowPoint,
+            excludedIds: excludedIds,
             underlay: _currentUnderlayDoc,
             frame: widget.underlayFrame,
             visibility: _underlayLayerVisibility,
@@ -2905,11 +2918,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _dimensionOffset = snap.offset;
         _activeSnapLabel = snap.label;
         _activeMagneticGuides = snap.guides;
+      } else if (!_dimensionPlacing && !_dimensionChoosingDirection) {
+        final snap = _snapDimensionPoint(rawModel);
+        _cursorModel = snap.point;
       }
       _repaintPreview();
       return;
     }
-    if (_activeTool == ArchitectTool.dimension && !_dimensionPlacing) {
+    if (_activeTool == ArchitectTool.dimension &&
+        !_dimensionPlacing &&
+        !_isActivelyDraggingHandle) {
       final snap = _snapDimensionPoint(rawModel, anchor: _draftStart);
       _cursorModel = snap.point;
       _activeSnapLabel = snap.snapLabel;
@@ -3181,6 +3199,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           final snappedDelta =
               dimension.normal * (snap.offset - dimension.offsetDistance);
           delta = snappedDelta;
+          _elementMoveDelta = delta;
           _activeSnapLabel = snap.label;
           _activeMagneticGuides = snap.guides;
         }
@@ -6817,6 +6836,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _project.activeStorey,
             point,
             _currentScale,
+            gridAxes: _project.gridAxes,
           ) ??
           _axisTool
               .hitTestAxis(
@@ -6838,6 +6858,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       point,
       _currentScale,
       _activeTool,
+      gridAxes: _project.gridAxes,
     );
   }
 
@@ -9193,7 +9214,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ArchitectDimensionStyle.single =>
                       l.architectDimensionEndHint,
                     ArchitectDimensionStyle.exterior =>
-                      l.architectDimensionChainHint,
+                      l.architectDimensionExteriorHelp,
                     ArchitectDimensionStyle.interior =>
                       l.architectDimensionInteriorHelp,
                   },
@@ -11265,6 +11286,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       dimensionScale: _project.dimensionScale,
                       palette: _canvasPalette,
                       storey: _project.activeStorey,
+                      gridAxes: _project.gridAxes,
                     ),
                   ),
                 ),

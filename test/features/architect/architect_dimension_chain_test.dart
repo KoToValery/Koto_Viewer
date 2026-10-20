@@ -1092,7 +1092,7 @@ void main() {
   );
 
   test(
-    '3-tier dimension layout produces base, openings from outer corner, and overall tiers',
+    'Exterior dimensions put openings before wall sections and overall',
     () {
       const wall = ArchitectWall(
         id: 'host_wall',
@@ -1143,17 +1143,17 @@ void main() {
       );
 
       expect(tiers, hasLength(3));
-      expect(tiers[0].tierIndex, 1); // Base row
-      expect(tiers[1].tierIndex, 2); // Openings row
+      expect(tiers[0].tierIndex, 1); // Openings row
+      expect(tiers[1].tierIndex, 2); // Wall sections
       expect(tiers[2].tierIndex, 3); // Overall row
 
-      // Tier 2 should start at wall exterior corner (0) and end at (6)
-      final t2Points = tiers[1].points;
+      // The first row starts at the facade corner and includes every jamb.
+      final t2Points = tiers[0].points;
       expect(t2Points.first.dx, closeTo(0.0, 1e-4));
       expect(t2Points.last.dx, closeTo(6.0, 1e-4));
 
-      // Segments on Tier 2: pier1, win1, pier2, win2, pier3
-      final t2Segments = tiers[1].segments;
+      // First row: pier1, win1, pier2, win2, pier3.
+      final t2Segments = tiers[0].segments;
       expect(t2Segments, hasLength(5));
       final segLengths = [for (final s in t2Segments) (s.$2 - s.$1).distance];
       // sum of all segments must equal wall length (6.0)

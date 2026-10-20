@@ -2,11 +2,13 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_wall.dart';
 import '../models/architect_elements.dart';
+import '../models/architect_grid_axis.dart';
+import '../services/architect_dimension_chain.dart';
 
 import '../models/architect_project.dart';
 
 class DimensionTier {
-  final int tierIndex; // 1 = structural/base, 2 = openings, 3 = overall
+  final int tierIndex; // 1 = openings, 2 = wall sections, 3 = overall, 4 = axes
   final List<Offset> points;
   final List<(Offset, Offset)> segments;
   final (Offset, Offset) line;
@@ -19,6 +21,17 @@ class DimensionTier {
 }
 
 class ArchitectDimensionLayout {
+  /// Row spacing in model metres; camera zoom must not alter drawing geometry.
+  static const double rowSpacing = .45;
+
+  /// Keep vertical text readable from the right, regardless of pick direction.
+  static double textAngle(Offset direction) {
+    var angle = math.atan2(direction.dy, direction.dx);
+    if (angle >= math.pi / 2 - 1e-9) angle -= math.pi;
+    if (angle < -math.pi / 2 - 1e-9) angle += math.pi;
+    return angle;
+  }
+
   static List<(Offset, Offset)> witnessSegments(
     ArchitectDimension dimension,
     List<DimensionTier> tiers, {
@@ -40,11 +53,10 @@ class ArchitectDimensionLayout {
   }) {
     if (dimension.style != ArchitectDimensionStyle.exterior ||
         !dimension.showOverall ||
-        dimension.dimensionPoints.length < 3) {
+        dimension.dimensionPoints.length < 2) {
       return null;
     }
     final outward = dimension.normal * (dimension.offsetDistance < 0 ? -1 : 1);
-    final rowSpacing = math.max(.45, 36 / scale);
     final shift = outward * (hasOpenings ? rowSpacing * 2 : rowSpacing);
     return (dimension.lineStart + shift, dimension.lineEnd + shift);
   }
@@ -53,144 +65,157 @@ class ArchitectDimensionLayout {
     required ArchitectDimension dimension,
     required double scale,
     ArchitectStorey? storey,
+    List<StructuralGridAxis> gridAxes = const [],
   }) {
     if (dimension.length < 1e-4) return const [];
     final u = dimension.unitVector;
-    final n = dimension.normal;
-    final outward = n * (dimension.offsetDistance < 0 ? -1 : 1);
-    final rowSpacing = math.max(.45, 36 / scale);
-
-    final openingAnchors = dimension.anchors
-        .where((a) => a.feature == 'opening')
-        .toList();
-    final hasOpenings =
-        dimension.style == ArchitectDimensionStyle.exterior &&
-        openingAnchors.isNotEmpty;
-
+    final outward = dimension.normal * (dimension.offsetDistance < 0 ? -1 : 1);
+    double along(Offset p) =>
+        ArchitectDimensionChain.dot(p - dimension.startPoint, u);
     final tiers = <DimensionTier>[];
 
-    // --- Tier 1: Base / Structural row ---
-    final basePoints = <Offset>[];
-    if (hasOpenings) {
-      final structuralAnchors = dimension.anchors
-          .where((a) => a.feature != 'opening')
-          .toList();
-      if (structuralAnchors.length >= 2) {
-        final origin = dimension.startPoint;
-        final values = structuralAnchors.map((a) {
-          final d = a.point - origin;
-          return d.dx * u.dx + d.dy * u.dy;
-        }).toList()..sort();
-        final unique = <double>[];
-        for (final v in values) {
-          if (unique.isEmpty || (v - unique.last).abs() > 1e-6) {
-            unique.add(v);
-          }
+    void row(int tier, Iterable<double> positions, {bool overall = false}) {
+      final values = positions.toList()..sort();
+      final unique = <double>[];
+      for (final value in values) {
+        if (unique.isEmpty || (value - unique.last).abs() > 1e-6) {
+          unique.add(value);
         }
-        basePoints.addAll(unique.map((t) => dimension.lineStart + u * t));
       }
-    }
-    if (basePoints.length < 2) {
-      basePoints.clear();
-      basePoints.addAll(dimension.dimensionPoints);
-    }
-
-    if (basePoints.length >= 2) {
+      if (unique.length < 2) return;
+      final origin =
+          dimension.lineStart + outward * (tiers.length * rowSpacing);
+      final points = [for (final value in unique) origin + u * value];
       tiers.add(
         DimensionTier(
-          tierIndex: 1,
-          points: basePoints,
-          line: (basePoints.first, basePoints.last),
-          segments: [
-            for (var i = 0; i < basePoints.length - 1; i++)
-              (basePoints[i], basePoints[i + 1]),
-          ],
+          tierIndex: tier,
+          points: overall ? [points.first, points.last] : points,
+          line: (points.first, points.last),
+          segments: overall
+              ? [(points.first, points.last)]
+              : [
+                  for (var i = 1; i < points.length; i++)
+                    (points[i - 1], points[i]),
+                ],
         ),
       );
     }
 
-    // --- Tier 2: Openings row (starts from exterior corner of containing wall) ---
-    if (hasOpenings) {
-      final lineStart2 = dimension.lineStart + outward * rowSpacing;
-      final hostWall = storey?.walls.where((w) {
-        return w.doors.any(
-              (d) => openingAnchors.any((a) => a.elementId == d.id),
-            ) ||
-            w.windows.any(
-              (win) => openingAnchors.any((a) => a.elementId == win.id),
-            );
-      }).firstOrNull;
+    if (dimension.style != ArchitectDimensionStyle.exterior) {
+      row(1, dimension.witnessPoints.map(along));
+      return tiers;
+    }
 
-      final openingPoints = <Offset>[];
-      final origin = dimension.startPoint;
+    final low = 0.0, high = dimension.length;
+    bool inSpan(double t) => t >= low - 1e-6 && t <= high + 1e-6;
+    final structural = [
+      if (!dimension.isChain) ...[low, high],
+      for (final a in dimension.anchors)
+        if (a.feature != 'opening') along(a.point),
+    ];
+    if (structural.length < 2) structural.addAll([low, high]);
+    final openings = [
+      for (final a in dimension.anchors)
+        if (a.feature == 'opening') along(a.point),
+    ];
 
-      if (hostWall != null) {
-        final corner1 =
-            hostWall.coreCenterStart +
-            hostWall.exteriorNormal * (hostWall.coreThickness / 2);
-        final corner2 =
-            hostWall.coreCenterEnd +
-            hostWall.exteriorNormal * (hostWall.coreThickness / 2);
-
-        final rawPoints = <Offset>[
-          corner1,
-          corner2,
-          for (final a in openingAnchors) a.point,
-        ];
-        final values = rawPoints.map((p) {
-          final d = p - origin;
-          return d.dx * u.dx + d.dy * u.dy;
-        }).toList()..sort();
-
-        final unique = <double>[];
-        for (final v in values) {
-          if (unique.isEmpty || (v - unique.last).abs() > 1e-6) {
-            unique.add(v);
+    // Only parallel walls behind the placed line can belong to this facade.
+    // At each opening, the nearest wall masks openings on walls behind it.
+    final candidates = <ArchitectWall>[
+      for (final wall in storey?.walls ?? const <ArchitectWall>[])
+        if (!wall.isCurved &&
+            ArchitectDimensionChain.dot(wall.unitVector, u).abs() > .9999 &&
+            math.max(along(wall.coreCenterStart), along(wall.coreCenterEnd)) >=
+                low - 1e-6 &&
+            math.min(along(wall.coreCenterStart), along(wall.coreCenterEnd)) <=
+                high + 1e-6 &&
+            ArchitectDimensionChain.dot(
+                  dimension.lineStart - wall.coreCenterStart,
+                  outward,
+                ) >=
+                -1e-6)
+          wall,
+    ];
+    double depth(ArchitectWall wall) =>
+        ArchitectDimensionChain.dot(
+          dimension.lineStart - wall.coreCenterStart,
+          outward,
+        ) -
+        wall.coreThickness / 2;
+    bool visibleAt(ArchitectWall wall, double position) => !candidates.any(
+      (other) =>
+          other.id != wall.id &&
+          depth(other) < depth(wall) - 1e-6 &&
+          position >
+              math.min(
+                    along(other.coreCenterStart),
+                    along(other.coreCenterEnd),
+                  ) +
+                  1e-6 &&
+          position <
+              math.max(
+                    along(other.coreCenterStart),
+                    along(other.coreCenterEnd),
+                  ) -
+                  1e-6,
+    );
+    for (final wall in candidates) {
+      final start = along(wall.coreCenterStart),
+          end = along(wall.coreCenterEnd);
+      final middle =
+          (math.max(low, math.min(start, end)) +
+              math.min(high, math.max(start, end))) /
+          2;
+      if (visibleAt(wall, middle)) {
+        // Centerline ends at wall junctions must not add tiny duplicate spans
+        // beside the already selected wall faces.
+        for (final position in [start, end]) {
+          if (inSpan(position) &&
+              !structural.any(
+                (p) => (p - position).abs() <= wall.coreThickness / 2 + 1e-6,
+              )) {
+            structural.add(position);
           }
         }
-        openingPoints.addAll(unique.map((t) => lineStart2 + u * t));
-      } else {
-        final values = openingAnchors.map((a) {
-          final d = a.point - origin;
-          return d.dx * u.dx + d.dy * u.dy;
-        }).toList()..sort();
-        final unique = <double>[];
-        for (final v in values) {
-          if (unique.isEmpty || (v - unique.last).abs() > 1e-6) {
-            unique.add(v);
-          }
-        }
-        openingPoints.addAll(unique.map((t) => lineStart2 + u * t));
       }
-
-      if (openingPoints.length >= 2) {
-        tiers.add(
-          DimensionTier(
-            tierIndex: 2,
-            points: openingPoints,
-            line: (openingPoints.first, openingPoints.last),
-            segments: [
-              for (var i = 0; i < openingPoints.length - 1; i++)
-                (openingPoints[i], openingPoints[i + 1]),
-            ],
-          ),
+      for (final opening in [
+        ...wall.doors.map((d) => (d.id, d.offsetRatio, d.width)),
+        ...wall.windows.map((w) => (w.id, w.offsetRatio, w.width)),
+      ]) {
+        final center = along(
+          wall.centerStart + wall.unitVector * (opening.$2 * wall.length),
+        );
+        final half = opening.$3 / 2;
+        if (!inSpan(center - half) ||
+            !inSpan(center + half) ||
+            !visibleAt(wall, center)) {
+          continue;
+        }
+        openings.addAll(
+          ArchitectDimensionChain.openingAnchors(
+            wall,
+            opening.$1,
+          ).map((a) => along(a.point)),
         );
       }
     }
 
-    // --- Tier 3: Overall row ---
-    final overall = overallSegment(dimension, scale, hasOpenings: hasOpenings);
-    if (overall != null) {
-      tiers.add(
-        DimensionTier(
-          tierIndex: 3,
-          points: [overall.$1, overall.$2],
-          line: overall,
-          segments: [overall],
-        ),
-      );
-    }
+    if (openings.isNotEmpty) row(1, [low, ...openings, high]);
+    row(2, structural);
+    if (dimension.showOverall) row(3, [low, high], overall: true);
 
+    // Grid axes are infinite references; only the perpendicular family in the
+    // measured span contributes to the outermost row.
+    final axisPositions = <double>[];
+    for (final axis in gridAxes) {
+      if (axis.length < 1e-6 ||
+          ArchitectDimensionChain.dot(axis.direction, u).abs() > 1e-4) {
+        continue;
+      }
+      final position = along(axis.start);
+      if (inSpan(position)) axisPositions.add(position);
+    }
+    row(4, axisPositions);
     return tiers;
   }
 

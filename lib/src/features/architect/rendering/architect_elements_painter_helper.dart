@@ -9,6 +9,7 @@ import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/rendering/dxf_quadtree.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
+import '../models/architect_grid_axis.dart';
 import 'architect_2d_painter.dart';
 import 'architect_dimension_layout.dart';
 
@@ -376,6 +377,8 @@ class ArchitectElementsPainterHelper {
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectStorey storey,
+    ArchitectStorey? dimensionStorey,
+    List<StructuralGridAxis> gridAxes = const [],
     required double zoomScale,
     String? selectedElementId,
     Path? wallObstacles,
@@ -394,7 +397,8 @@ class ArchitectElementsPainterHelper {
       final tiers = ArchitectDimensionLayout.layoutTiers(
         dimension: dim,
         scale: zoomScale,
-        storey: storey,
+        storey: dimensionStorey ?? storey,
+        gridAxes: gridAxes,
       );
       if (tiers.isEmpty) continue;
 
@@ -447,7 +451,9 @@ class ArchitectElementsPainterHelper {
         for (final segment in tier.segments) {
           final p1 = segment.$1, p2 = segment.$2;
           final isSingleSegment =
-              tier.segments.length == 1 && tier.tierIndex == 1;
+              tier.segments.length == 1 &&
+              (dim.style != ArchitectDimensionStyle.exterior ||
+                  tier.tierIndex == 2);
           final text =
               isSingleSegment && dim.customText?.trim().isNotEmpty == true
               ? dim.customText!
@@ -476,9 +482,7 @@ class ArchitectElementsPainterHelper {
           final mid = (p1 + p2) / 2.0 + textOffset;
           canvas.save();
           canvas.translate(mid.dx, mid.dy);
-          double angle = math.atan2(u.dy, u.dx);
-          if (angle > math.pi / 2 || angle < -math.pi / 2) angle += math.pi;
-          canvas.rotate(angle);
+          canvas.rotate(ArchitectDimensionLayout.textAngle(u));
           canvas.scale(textScale);
           tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
           canvas.restore();

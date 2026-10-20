@@ -4986,6 +4986,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectDimensionExterior => 'Exterior';
 
   @override
+  String get architectDimensionExteriorHelp =>
+      'Rows from the building outward: openings and gaps, wall sections, overall dimensions, then axis spacing. Facade openings and perpendicular axes in the measured span are included automatically.';
+
+  @override
   String get architectDimensionInterior => 'Interior';
 
   @override

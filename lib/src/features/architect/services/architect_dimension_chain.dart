@@ -350,6 +350,35 @@ class ArchitectDimensionChain {
         index = i;
       }
     }
+    // A snapped point along a polygon edge must retain that position instead
+    // of jumping to the nearest corner. Preserve the edge association on edits.
+    final polygon = record['polygon'] ?? record['boundary'];
+    if (polygon is List || record['type'] == 'rect') {
+      var nearest = points[index];
+      var edgeIndex = -1;
+      var edgeRatio = 0.0;
+      for (var i = 0; i < points.length; i++) {
+        final delta = points[(i + 1) % points.length] - points[i];
+        if (delta.distanceSquared < 1e-12) continue;
+        final ratio = (dot(pick - points[i], delta) / delta.distanceSquared)
+            .clamp(0.0, 1.0);
+        final projected = points[i] + delta * ratio;
+        if ((projected - pick).distance + 1e-9 < (nearest - pick).distance) {
+          nearest = projected;
+          edgeIndex = i;
+          edgeRatio = ratio;
+        }
+      }
+      if (edgeIndex >= 0) {
+        return ArchitectDimensionAnchor(
+          point: nearest,
+          elementId: id,
+          feature: 'edgePoint',
+          index: edgeIndex,
+          ratio: edgeRatio,
+        );
+      }
+    }
     return ArchitectDimensionAnchor(
       point: points[index],
       elementId: id,
@@ -396,6 +425,11 @@ class ArchitectDimensionChain {
     final record = records[anchor.elementId];
     if (record == null) return null;
     final points = vertices(record);
+    if (anchor.feature == 'edgePoint' && anchor.index < points.length) {
+      final start = points[anchor.index];
+      return start +
+          (points[(anchor.index + 1) % points.length] - start) * anchor.ratio;
+    }
     if (anchor.feature == 'linePoint' && points.length == 2) {
       return points.first + (points.last - points.first) * anchor.ratio;
     }

@@ -42,6 +42,7 @@ class ArchitectSnapHelper {
     bool magnetic = true,
     bool alignment = false,
     bool excludeWallAxes = false,
+    bool preferIntersections = false,
     Set<String> excludedIds = const {},
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
@@ -54,6 +55,7 @@ class ArchitectSnapHelper {
     magnetic: magnetic,
     alignment: alignment,
     excludeWallAxes: excludeWallAxes,
+    preferIntersections: preferIntersections,
     excludedIds: excludedIds,
     underlay: underlay,
     frame: frame,
@@ -67,6 +69,7 @@ class ArchitectSnapHelper {
     bool magnetic = true,
     bool alignment = false,
     bool excludeWallAxes = false,
+    bool preferIntersections = false,
     Set<String> excludedIds = const {},
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
@@ -78,6 +81,7 @@ class ArchitectSnapHelper {
     magnetic: magnetic,
     alignment: alignment,
     excludeWallAxes: excludeWallAxes,
+    preferIntersections: preferIntersections,
     excludedIds: excludedIds,
     underlay: underlay,
     frame: frame,
@@ -157,6 +161,7 @@ class ArchitectSnapHelper {
     required bool magnetic,
     required bool alignment,
     bool excludeWallAxes = false,
+    bool preferIntersections = false,
     required Set<String> excludedIds,
     DxfDocument? underlay,
     required BimCoordinateFrame frame,
@@ -191,9 +196,22 @@ class ArchitectSnapHelper {
       radius: radius,
       anchor: anchor,
     );
-    void consider(Offset point, String label) => resolver.consider(
-      BimSnapCandidate(point: point, kind: _kind(label), source: label),
+    final intersections = BimSnapResolver<String>(
+      raw: raw,
+      radius: radius,
+      anchor: anchor,
     );
+    void consider(Offset point, String label) {
+      final candidate = BimSnapCandidate(
+        point: point,
+        kind: _kind(label),
+        source: label,
+      );
+      resolver.consider(candidate);
+      if (preferIntersections && candidate.kind == BimSnapKind.intersection) {
+        intersections.consider(candidate);
+      }
+    }
 
     for (final candidate in geometry.query(raw, radius)) {
       if (!excluded(candidate.owner)) {
@@ -289,7 +307,7 @@ class ArchitectSnapHelper {
         if (p != null) consider(p, 'Intersection');
       }
     }
-    final best = resolver.best;
+    final best = intersections.best ?? resolver.best;
     if (best != null) {
       return ArchitectSnapResult(
         point: best.point,
@@ -372,7 +390,9 @@ class ArchitectSnapHelper {
           point: proj,
           isSnapped: true,
           snapLabel: 'Axis ${axis.name}',
-          magneticGuides: anchor == null ? [(axis.start, axis.end)] : [(anchor, proj), (axis.start, axis.end)],
+          magneticGuides: anchor == null
+              ? [(axis.start, axis.end)]
+              : [(anchor, proj), (axis.start, axis.end)],
         );
       }
     }

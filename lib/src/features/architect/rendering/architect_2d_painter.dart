@@ -415,6 +415,8 @@ class Architect2dPainter extends CustomPainter {
     }
     if (layer != ArchitectPaintLayer.interaction) {
       ArchitectElementsPainterHelper.drawDimensions(
+        dimensionStorey: _project.activeStorey,
+        gridAxes: _project.gridAxes,
         unit: _project.units,
         decimals: _project.distanceDecimals,
         dimensionScale: _project.dimensionScale,

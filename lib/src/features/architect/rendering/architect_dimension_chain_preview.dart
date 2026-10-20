@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../bim_projects/controllers/bim_viewport_controller.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
+import '../models/architect_grid_axis.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_elements_painter_helper.dart';
 
@@ -13,6 +14,7 @@ class ArchitectDimensionChainPreview extends CustomPainter {
   final ArchitectDimensionScale dimensionScale;
   final ArchitectCanvasPalette palette;
   final ArchitectStorey? storey;
+  final List<StructuralGridAxis> gridAxes;
   ArchitectDimensionChainPreview({
     required this.dimension,
     required this.viewport,
@@ -21,6 +23,7 @@ class ArchitectDimensionChainPreview extends CustomPainter {
     this.dimensionScale = ArchitectDimensionScale.scale100,
     required this.palette,
     this.storey,
+    this.gridAxes = const [],
   }) : super(repaint: viewport);
   @override
   void paint(Canvas canvas, Size size) {
@@ -29,6 +32,7 @@ class ArchitectDimensionChainPreview extends CustomPainter {
     canvas.translate(viewport.translation.dx, viewport.translation.dy);
     canvas.scale(viewport.scale);
     ArchitectElementsPainterHelper.drawDimensions(
+      gridAxes: gridAxes,
       canvas: canvas,
       storey: (storey ?? const ArchitectStorey(id: 'preview', name: ''))
           .copyWith(dimensions: [dimension!]),
@@ -47,6 +51,7 @@ class ArchitectDimensionChainPreview extends CustomPainter {
   bool shouldRepaint(ArchitectDimensionChainPreview old) =>
       old.dimension != dimension ||
       old.storey != storey ||
+      old.gridAxes != gridAxes ||
       old.units != units ||
       old.decimals != decimals ||
       old.dimensionScale != dimensionScale ||

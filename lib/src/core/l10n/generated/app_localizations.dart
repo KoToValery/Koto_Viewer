@@ -8771,6 +8771,12 @@ abstract class AppLocalizations {
   /// **'Exterior'**
   String get architectDimensionExterior;
 
+  /// No description provided for @architectDimensionExteriorHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows from the building outward: openings and gaps, wall sections, overall dimensions, then axis spacing. Facade openings and perpendicular axes in the measured span are included automatically.'**
+  String get architectDimensionExteriorHelp;
+
   /// No description provided for @architectDimensionInterior.
   ///
   /// In en, this message translates to:

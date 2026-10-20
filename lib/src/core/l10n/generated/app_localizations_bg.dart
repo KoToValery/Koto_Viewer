@@ -5009,6 +5009,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectDimensionExterior => 'Външен';
 
   @override
+  String get architectDimensionExteriorHelp =>
+      'Редове от сградата навън: отвори и разстояния между тях, стенни участъци, общ габарит и разстояния между осите. Фасадните отвори и перпендикулярните оси в измервания обхват се включват автоматично.';
+
+  @override
   String get architectDimensionInterior => 'Вътрешен';
 
   @override

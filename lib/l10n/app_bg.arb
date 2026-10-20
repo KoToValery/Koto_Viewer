@@ -1621,6 +1621,7 @@
   "architectDimensionScale": "Мащаб на размерите",
   "architectDimensionSingle": "Единичен",
   "architectDimensionExterior": "Външен",
+  "architectDimensionExteriorHelp": "Редове от сградата навън: отвори и разстояния между тях, стенни участъци, общ габарит и разстояния между осите. Фасадните отвори и перпендикулярните оси в измервания обхват се включват автоматично.",
   "architectDimensionInterior": "Вътрешен",
   "architectDimensionInteriorHint": "Избери крайни стени и прегради, после постави линията.",
   "architectDimensionInteriorHelp": "Една линия измерва между вътрешните лица на крайните успоредни стени, с двете лица на междинните прегради.",
