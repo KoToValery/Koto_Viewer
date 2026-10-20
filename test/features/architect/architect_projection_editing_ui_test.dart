@@ -12,20 +12,91 @@ import 'architect_elevation_test.dart' as fixture;
 import 'architect_elevation_ui_test.dart' as qa;
 import 'architect_workspace_interaction_test.dart' as workspace;
 import 'architect_workspace_views_test.dart' as views;
+import 'architect_projection_snap_test.dart' as roof_fixture;
 
 Future<void> enterNumber(WidgetTester tester, String value) async {
   await tester.pumpAndSettle();
-  await tester.enterText(
-    find.byKey(const ValueKey('projection-number')),
-    value,
+  final dialog = find.byType(Dialog).last;
+  for (final key in value.replaceFirst('-', '').split('')) {
+    await tester.tap(
+      find.descendant(
+        of: dialog,
+        matching: find.byKey(ValueKey('wall-key-$key')),
+      ),
+    );
+    await tester.pump();
+  }
+  if (value.startsWith('-')) {
+    await tester.tap(find.descendant(of: dialog, matching: find.text('±')));
+    await tester.pump();
+  }
+  await tester.tap(
+    find.descendant(
+      of: dialog,
+      matching: find.byKey(const ValueKey('wall-end')),
+    ),
   );
-  await tester.tap(find.byKey(const ValueKey('projection-number-save')));
   await tester.pumpAndSettle();
 }
 
 void main() {
   setUpAll(qa.loadQaFonts);
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  testWidgets('workspace roof drag snaps the ridge with one undo entry', (
+    tester,
+  ) async {
+    final source = ArchitectCommandController(
+      roof_fixture.roofSnapProject().copyWith(
+        sections: const [roof_fixture.roofSnapCut],
+      ),
+    );
+    addTearDown(source.dispose);
+    await workspace.open(tester, source);
+    await views.select(tester, 'section', 'cut');
+    final roof = source.project.activeStorey.roofs.last;
+    final z = roof.undersideElevationAt(const Offset(6, 2)) + .1;
+    await workspace.wallTap(tester, Offset(7, -z));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('projection-roof-snap')), findsOneWidget);
+    final start = workspace.screen(tester, Offset(7, -z));
+    final scale = workspace.camera(tester).scale;
+    final gesture = await tester.startGesture(start);
+    await gesture.moveTo(start + Offset(0, .1 * scale));
+    await tester.pump();
+    await gesture.moveTo(start + Offset(0, .22 * scale));
+    await tester.pump();
+    expect(source.canUndo, isFalse);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(source.undoCount, 1);
+    expect(
+      source.project.activeStorey.roofs.last.baseElevationOffset,
+      closeTo(3, 1e-5),
+    );
+    source.undo();
+    await tester.pumpAndSettle();
+    expect(source.project.activeStorey.roofs.last.baseElevationOffset, 3.25);
+    // The toggle is local UI state and never creates model history.
+    await tester.tap(find.byKey(const ValueKey('projection-roof-snap')));
+    await tester.pumpAndSettle();
+    expect(source.canUndo, isFalse);
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byKey(const ValueKey('projection-roof-snap')),
+          )
+          .isSelected,
+      isFalse,
+    );
+    final canceled = await tester.startGesture(start);
+    await canceled.moveTo(start + Offset(0, .3 * scale));
+    await tester.pump();
+    await canceled.cancel();
+    await tester.pumpAndSettle();
+    expect(source.canUndo, isFalse);
+    expect(source.project.activeStorey.roofs.last.baseElevationOffset, 3.25);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
     'main facade edits actual opening and rejects a move through its neighbour',
     (tester) async {
@@ -125,6 +196,91 @@ void main() {
     },
   );
   for (final locale in ['bg', 'en']) {
+    testWidgets(
+      'phone section snaps roof edges and allows free movement ($locale)',
+      (tester) async {
+        await qa.phone(tester);
+        final source = ArchitectCommandController(
+          roof_fixture.roofSnapProject().copyWith(
+            sections: const [roof_fixture.roofSnapCut],
+          ),
+        );
+        addTearDown(source.dispose);
+        final capture = GlobalKey();
+        await tester.pumpWidget(
+          qa.host(
+            ArchitectBuildingSectionsScreen(controller: source),
+            locale,
+            capture,
+          ),
+        );
+        await tester.pumpAndSettle();
+        var editor = tester.widget<ArchitectProjectionEditor>(
+          find.byType(ArchitectProjectionEditor),
+        );
+        final roof = source.project.activeStorey.roofs.last;
+        final point = Offset(
+          7,
+          roof.undersideElevationAt(const Offset(6, 2)) + .1,
+        );
+        final viewer = tester.widget<InteractiveViewer>(
+          find.ancestor(
+            of: find.byKey(const ValueKey('building-section-view')),
+            matching: find.byType(InteractiveViewer),
+          ),
+        );
+        navigateArchitectProjection(
+          viewer.transformationController!,
+          Offset.zero,
+          3,
+          editor.toScreen(point),
+        );
+        await tester.pumpAndSettle();
+        editor = tester.widget<ArchitectProjectionEditor>(
+          find.byType(ArchitectProjectionEditor),
+        );
+        final origin = tester.getTopLeft(
+          find.byType(ArchitectProjectionEditor),
+        );
+        await tester.tapAt(origin + editor.toScreen(point));
+        await tester.pumpAndSettle();
+        final snapButton = find.byKey(const ValueKey('projection-roof-snap'));
+        expect(tester.widget<IconButton>(snapButton).isSelected, isTrue);
+        expect(
+          tester.widget<IconButton>(snapButton).tooltip,
+          locale == 'bg' ? 'Прилепване (Snap): Включено' : 'Snap: Enabled',
+        );
+        for (final snapEnabled in [true, false]) {
+          if (!snapEnabled) {
+            await tester.tap(snapButton);
+            await tester.pumpAndSettle();
+          }
+          editor = tester.widget<ArchitectProjectionEditor>(
+            find.byType(ArchitectProjectionEditor),
+          );
+          final start = origin + editor.toScreen(point);
+          final gesture = await tester.startGesture(start);
+          await gesture.moveTo(start + Offset(0, .1 * editor.scale));
+          await tester.pump();
+          await gesture.moveTo(start + Offset(0, .22 * editor.scale));
+          await tester.pump();
+          expect(source.canUndo, isFalse);
+          if (snapEnabled) {
+            await qa.capturePhone(tester, capture, 'roof-edge-snap-$locale');
+          }
+          await gesture.up();
+          await tester.pumpAndSettle();
+          expect(source.undoCount, 1);
+          expect(
+            source.project.activeStorey.roofs.last.baseElevationOffset,
+            closeTo(snapEnabled ? 3 : 3.03, 1e-5),
+          );
+          source.undo();
+          await tester.pumpAndSettle();
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
     testWidgets(
       'phone standalone facade exposes editable clearances ($locale)',
       (tester) async {

@@ -1,3 +1,4 @@
+import '../rendering/architect_path_solid.dart';
 import '../rendering/architect_opening_plan_painter.dart';
 import '../rendering/architect_canvas_palette.dart';
 import 'dart:math' as math;
@@ -53,6 +54,31 @@ class ArchitectDoor {
 
   /// Clear passage width between jamb frames in meters.
   double get clearWidth => math.max(0.20, width - 2 * frameThickness);
+
+  /// One hinge and leaf basis shared by the plan, picking, and solid model.
+  /// Mirroring the opening side also mirrors the leaf thickness into the jamb.
+  ({Offset hinge, Offset direction, Offset normal}) _leafGeometry(
+    Offset left,
+    Offset right,
+    Offset u,
+    Offset n,
+    double halfWallThickness,
+  ) {
+    final sign = openInward ? 1.0 : -1.0;
+    final hinge = (isHingeLeft
+            ? left + u * frameThickness
+            : right - u * frameThickness) +
+        n * (sign * halfWallThickness);
+    final angle = openAngleDeg * math.pi / 180;
+    final rotation = math.atan2(u.dy, u.dx) +
+        (isHingeLeft
+            ? sign * angle
+            : math.pi - sign * angle);
+    final direction = Offset(math.cos(rotation), math.sin(rotation));
+    final normal = Offset(-direction.dy, direction.dx) *
+        (sign * (isHingeLeft ? -1 : 1));
+    return (hinge: hinge, direction: direction, normal: normal);
+  }
 
   /// Formats the parametric spec ID based on base number and hinge orientation.
   /// Left-hinged doors append a prime (') symbol to distinguish from right-hinged doors.
@@ -288,25 +314,14 @@ class ArchitectDoor {
     drawJamb(pLeftBase, true);
     drawJamb(pRightBase, false);
 
-    // 4. Clear Opening & Hinge Positioning
-    final hingeJambBase = isHingeLeft
-        ? pLeftBase + u * frameThickness
-        : pRightBase - u * frameThickness;
-
-    final hingePos = hingeJambBase + n * halfThick;
+    // The hinge follows the selected opening face of the frame.
+    final leaf = _leafGeometry(pLeftBase, pRightBase, u, n, halfThick);
+    final hingePos = leaf.hinge;
     final leafLen = clearWidth;
-
-    // 5. Door Leaf (matching door.dxf ploskost_vrata)
-    // Transparent interior, thin stroke outline only (no solid hatch)
+    final leafU = leaf.direction;
+    final leafN = leaf.normal;
     final angleRad = openAngleDeg * math.pi / 180.0;
     final baseAngle = math.atan2(u.dy, u.dx);
-    final rotAngle = baseAngle +
-        (isHingeLeft
-            ? (openInward ? angleRad : -angleRad)
-            : (openInward ? math.pi - angleRad : math.pi + angleRad));
-
-    final leafU = Offset(math.cos(rotAngle), math.sin(rotAngle));
-    final leafN = Offset(-leafU.dy, leafU.dx) * (isHingeLeft ? -1.0 : 1.0);
 
     final leafP1 = hingePos;
     final leafP2 = hingePos + leafU * leafLen;
@@ -373,7 +388,7 @@ class ArchitectDoor {
     if (wallLen < 1e-4) return false;
 
     final u = wallDelta / wallLen;
-    final n = Offset(-u.dy, u.dx) * (openInward ? 1.0 : -1.0);
+    final n = Offset(-u.dy, u.dx);
     final halfThick = wallThickness / 2.0;
 
     final centerPos = wallStart + wallDelta * offsetRatio;
@@ -384,22 +399,10 @@ class ArchitectDoor {
     final dOpening = _distToSegment(point, pLeftBase, pRightBase);
     if (dOpening <= halfThick + tolerance) return true;
 
-    // 2. Door leaf
-    const frameThickness = 0.05;
-    final clearWidth = math.max(0.10, width - 2 * frameThickness);
-    final hingeJambBase = isHingeLeft
-        ? pLeftBase + u * frameThickness
-        : pRightBase - u * frameThickness;
-    final hingePos = hingeJambBase + n * halfThick;
-
-    final angleRad = openAngleDeg * math.pi / 180.0;
-    final baseAngle = math.atan2(u.dy, u.dx);
-    final rotAngle = baseAngle +
-        (isHingeLeft
-            ? (openInward ? angleRad : -angleRad)
-            : (openInward ? math.pi - angleRad : math.pi + angleRad));
-    final leafU = Offset(math.cos(rotAngle), math.sin(rotAngle));
-    final leafEnd = hingePos + leafU * clearWidth;
+    // Use the exact leaf and jamb dimensions that are drawn.
+    final leaf = _leafGeometry(pLeftBase, pRightBase, u, n, halfThick);
+    final hingePos = leaf.hinge;
+    final leafEnd = hingePos + leaf.direction * clearWidth;
     if (_distToSegment(point, hingePos, leafEnd) <= tolerance + 0.06) {
       return true;
     }
@@ -539,19 +542,10 @@ class ArchitectDoor {
 
     // 4. 3D Door Leaf (4cm thick, swung open)
     final swingSign = openInward ? 1.0 : -1.0;
-    final hingePos = (isHingeLeft
-            ? pLeft + u * frameThickness
-            : pRight - u * frameThickness) +
-        n * (swingSign * halfThick);
-
-    final angleRad = openAngleDeg * math.pi / 180.0;
-    final baseAngle = math.atan2(u.dy, u.dx);
-    final rotAngle = baseAngle +
-        (isHingeLeft ? (openInward ? angleRad : -angleRad) : (openInward ? math.pi - angleRad : math.pi + angleRad));
-
-    final leafU = Offset(math.cos(rotAngle), math.sin(rotAngle));
-    final swingDir = isHingeLeft ? 1.0 : -1.0;
-    final leafN = Offset(-leafU.dy, leafU.dx) * (swingSign * swingDir);
+    final leaf = _leafGeometry(pLeft, pRight, u, n, halfThick);
+    final hingePos = leaf.hinge;
+    final leafU = leaf.direction;
+    final leafN = leaf.normal;
 
     final leafStart = hingePos;
     final leafEnd = hingePos + leafU * clearWidth;
@@ -565,26 +559,12 @@ class ArchitectDoor {
     final lzMin = zBottom + 0.01;
     final lzMax = zTop - frameThickness - 0.01;
 
-    final lv1B = Vector3(lp1.dx, lp1.dy, lzMin);
-    final lv2B = Vector3(lp2.dx, lp2.dy, lzMin);
-    final lv3B = Vector3(lp3.dx, lp3.dy, lzMin);
-    final lv4B = Vector3(lp4.dx, lp4.dy, lzMin);
-
-    final lv1T = Vector3(lp1.dx, lp1.dy, lzMax);
-    final lv2T = Vector3(lp2.dx, lp2.dy, lzMax);
-    final lv3T = Vector3(lp3.dx, lp3.dy, lzMax);
-    final lv4T = Vector3(lp4.dx, lp4.dy, lzMax);
-
-    tris.add(Triangle3D(v0: lv1B, v1: lv2B, v2: lv2T, color: leafColor));
-    tris.add(Triangle3D(v0: lv1B, v1: lv2T, v2: lv1T, color: leafColor));
-    tris.add(Triangle3D(v0: lv2B, v1: lv3B, v2: lv3T, color: leafColor));
-    tris.add(Triangle3D(v0: lv2B, v1: lv3T, v2: lv2T, color: leafColor));
-    tris.add(Triangle3D(v0: lv3B, v1: lv4B, v2: lv4T, color: leafColor));
-    tris.add(Triangle3D(v0: lv3B, v1: lv4T, v2: lv3T, color: leafColor));
-    tris.add(Triangle3D(v0: lv4B, v1: lv1B, v2: lv1T, color: leafColor));
-    tris.add(Triangle3D(v0: lv4B, v1: lv1T, v2: lv4T, color: leafColor));
-    tris.add(Triangle3D(v0: lv1T, v1: lv2T, v2: lv3T, color: leafColor));
-    tris.add(Triangle3D(v0: lv1T, v1: lv3T, v2: lv4T, color: leafColor));
+    tris.addAll(ArchitectPathSolid.extrude(
+      Path()..addPolygon([lp1, lp2, lp3, lp4], true),
+      lzMin,
+      lzMax,
+      leafColor,
+    ));
 
     // 5. 3D Lever Handle on Door Leaf
     final handleStation = leafStart + leafU * (clearWidth - 0.08);

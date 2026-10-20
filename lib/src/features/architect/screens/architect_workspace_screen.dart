@@ -339,7 +339,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final cut = original.sections.where((e) => e.id == _commands.viewId).firstOrNull;
       final paths = _facadeGeometry?.elementPaths ?? _sectionGeometry?.elementPaths ?? <String, Path>{};
       return ArchitectProjectionEditor(key: ValueKey('workspace-editor:$_workspaceViewKey'),
-        controller: _modelCommands, paths: paths, elevation: _commands.view == ArchitectWorkspaceView.elevation,
+        controller: _modelCommands, paths: paths, roofProfiles: _sectionGeometry?.roofProfiles ?? const {}, elevation: _commands.view == ArchitectWorkspaceView.elevation,
         origin: facade?.centre ?? cut?.start ?? Offset.zero, right: facade?.right ?? cut?.axis ?? const Offset(1, 0),
         scale: _viewport.scale, toView: (p) => _modelToSection(_screenToModel(p)),
         toScreen: (p) => _viewport.toScreen(Offset(p.dx, -p.dy)),

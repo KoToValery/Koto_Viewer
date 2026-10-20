@@ -149,7 +149,7 @@ class ArchitectWindow {
       effectiveStyle.paintPlan2D(
         palette: palette,
         canvas: canvas,
-        wallGeometryProvided:wallGeometryProvided,
+        wallGeometryProvided: wallGeometryProvided,
         wallStart: wallStart,
         wallEnd: wallEnd,
         wallThickness: wallThickness,
@@ -174,6 +174,7 @@ class ArchitectWindow {
         height: height,
         sillHeight: sillHeight,
         specId: specId,
+        outsideWall: true,
         zoomScale: zoomScale,
         palette: palette,
         isSelected: isSelected,
@@ -193,45 +194,41 @@ class ArchitectWindow {
       ..strokeWidth = (isSelected ? 2.5 : 1.5) / zoomScale
       ..style = PaintingStyle.stroke;
 
-    final glassPaint = Paint()
-      ..color = palette.foreground(const Color(0xFF0288D1))
-      ..strokeWidth = 1.2 / zoomScale
-      ..style = PaintingStyle.stroke;
-
     // 1. Cut wall opening rectangle (fill with white to mask wall fill)
+    final maskHalfThick = halfThick + 1.5 / zoomScale;
     final openingPath = Path()
-      ..moveTo(pLeftBase.dx - n.dx * halfThick, pLeftBase.dy - n.dy * halfThick)
+      ..moveTo(pLeftBase.dx - n.dx * maskHalfThick, pLeftBase.dy - n.dy * maskHalfThick)
       ..lineTo(
-        pRightBase.dx - n.dx * halfThick,
-        pRightBase.dy - n.dy * halfThick,
+        pRightBase.dx - n.dx * maskHalfThick,
+        pRightBase.dy - n.dy * maskHalfThick,
       )
       ..lineTo(
-        pRightBase.dx + n.dx * halfThick,
-        pRightBase.dy + n.dy * halfThick,
+        pRightBase.dx + n.dx * maskHalfThick,
+        pRightBase.dy + n.dy * maskHalfThick,
       )
-      ..lineTo(pLeftBase.dx + n.dx * halfThick, pLeftBase.dy + n.dy * halfThick)
+      ..lineTo(pLeftBase.dx + n.dx * maskHalfThick, pLeftBase.dy + n.dy * maskHalfThick)
       ..close();
-    if(!wallGeometryProvided)canvas.drawPath(openingPath, openingCutPaint);
+    if (!wallGeometryProvided) canvas.drawPath(openingPath, openingCutPaint);
 
     // 2. Window jamb lines
-    if(!wallGeometryProvided) {
-    canvas.drawLine(
-      pLeftBase - n * halfThick,
-      pLeftBase + n * halfThick,
-      framePaint,
-    );
-    canvas.drawLine(
-      pRightBase - n * halfThick,
-      pRightBase + n * halfThick,
-      framePaint,
-    );
-
+    if (!wallGeometryProvided) {
+      canvas.drawLine(
+        pLeftBase - n * halfThick,
+        pLeftBase + n * halfThick,
+        framePaint,
+      );
+      canvas.drawLine(
+        pRightBase - n * halfThick,
+        pRightBase + n * halfThick,
+        framePaint,
+      );
     }
     ArchitectOpeningPlanPainter.paintWindowSill(
       canvas: canvas,
       center: centerPos,
       direction: u,
       exteriorNormal: n * exteriorSign,
+      sillHeight: sillHeight,
       width: width,
       wallThickness: wallThickness,
       zoomScale: zoomScale,
@@ -239,42 +236,53 @@ class ArchitectWindow {
       isSelected: isSelected,
     );
 
-    // 4. Interior & Exterior Frame Edges
-    canvas.drawLine(
-      pLeftBase - n * (halfThick * 0.7),
-      pRightBase - n * (halfThick * 0.7),
-      framePaint,
-    );
-    canvas.drawLine(
-      pLeftBase + n * (halfThick * 0.7),
-      pRightBase + n * (halfThick * 0.7),
-      framePaint,
-    );
+    // A compact frame sits in the masonry core; its profiles do not span
+    // the entire wall depth. Each closed sash has its own glazing and end caps.
+    final frameDepth = math.min(.07, wallThickness);
+    final shift =
+        coreCenterShift ?? -(wallThickness - coreThickness) / 2 * exteriorSign;
+    final frameCenter = centerPos + n * shift;
+    void profile(double station, double faceWidth) {
+      final point = frameCenter + u * station;
+      final a = point - n * (frameDepth / 2);
+      final b = point + n * (frameDepth / 2);
+      final across = u * faceWidth;
+      canvas.drawPath(
+        Path()
+          ..moveTo(a.dx, a.dy)
+          ..lineTo(b.dx, b.dy)
+          ..lineTo((b + across).dx, (b + across).dy)
+          ..lineTo((a + across).dx, (a + across).dy)
+          ..close(),
+        framePaint,
+      );
+    }
 
-    // 5. Center Glass Lines (Glazing)
-    final glassOffset = 0.02;
-    canvas.drawLine(
-      pLeftBase - n * glassOffset,
-      pRightBase - n * glassOffset,
-      glassPaint,
-    );
-    canvas.drawLine(
-      pLeftBase + n * glassOffset,
-      pRightBase + n * glassOffset,
-      glassPaint,
-    );
-
-    // If multiple panes, draw mullion dividers
-    if (panesCount >= 2) {
-      for (int i = 1; i < panesCount; i++) {
-        final ratio = i / panesCount;
-        final mullionP = pLeftBase + u * (width * ratio);
-        canvas.drawLine(
-          mullionP - n * (halfThick * 0.7),
-          mullionP + n * (halfThick * 0.7),
-          framePaint,
-        );
-      }
+    final face = frameThickness.clamp(.005, width / 4);
+    profile(-halfW, face);
+    profile(halfW - face, face);
+    final count = math.max(1, panesCount);
+    for (var i = 1; i < count; i++) {
+      profile(-halfW + width * i / count - face / 2, face);
+    }
+    for (var i = 0; i < count; i++) {
+      final left = -halfW + width * i / count + (i == 0 ? face : face / 2);
+      final right =
+          -halfW + width * (i + 1) / count - (i == count - 1 ? face : face / 2);
+      if (right <= left) continue;
+      ArchitectOpeningPlanPainter.paintWindowPane(
+        canvas: canvas,
+        left: frameCenter + u * left,
+        right: frameCenter + u * right,
+        direction: u,
+        normal: n,
+        frameDepth: frameDepth,
+        glazingThickness: .024,
+        openable: count > 1,
+        zoomScale: zoomScale,
+        palette: palette,
+        isSelected: isSelected,
+      );
     }
 
     ArchitectOpeningPlanPainter.paint(
@@ -286,6 +294,7 @@ class ArchitectWindow {
       height: height,
       sillHeight: sillHeight,
       specId: specId,
+      outsideWall: true,
       zoomScale: zoomScale,
       palette: palette,
       isSelected: isSelected,
@@ -320,6 +329,10 @@ class ArchitectWindow {
       normal: n,
       wallThickness: wallThickness,
       tolerance: tolerance,
+      width: width,
+      height: height,
+      outsideWall: true,
+      sillHeight: sillHeight,
     );
   }
 

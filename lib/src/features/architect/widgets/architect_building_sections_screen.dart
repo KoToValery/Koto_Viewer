@@ -954,6 +954,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                                             ),
                                             controller: widget.controller,
                                             paths: data.elementPaths,
+                                            roofProfiles: data.roofProfiles,
                                             origin: value.start,
                                             right: value.axis,
                                             elevation: false,

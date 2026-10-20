@@ -721,11 +721,6 @@ class ArchitectFenestrationStyle {
       ..color = const Color(0xFFECEFF1)
       ..style = PaintingStyle.fill;
 
-    final glassPaint = Paint()
-      ..color = palette.foreground(const Color(0xFF0288D1))
-      ..strokeWidth = 1.2 / zoomScale
-      ..style = PaintingStyle.stroke;
-
     final casingPaint = Paint()
       ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF546E7A))
       ..strokeWidth = 1.5 / zoomScale
@@ -736,11 +731,12 @@ class ArchitectFenestrationStyle {
       ..style = PaintingStyle.fill;
 
     // 1. Cut rough wall opening through wall body (Fill with white mask)
+    final maskHalfThick = halfWallThick + 1.5 / zoomScale;
     final openingPath = Path()
-      ..moveTo(pLeftBase.dx - n.dx * halfWallThick, pLeftBase.dy - n.dy * halfWallThick)
-      ..lineTo(pRightBase.dx - n.dx * halfWallThick, pRightBase.dy - n.dy * halfWallThick)
-      ..lineTo(pRightBase.dx + n.dx * halfWallThick, pRightBase.dy + n.dy * halfWallThick)
-      ..lineTo(pLeftBase.dx + n.dx * halfWallThick, pLeftBase.dy + n.dy * halfWallThick)
+      ..moveTo(pLeftBase.dx - n.dx * maskHalfThick, pLeftBase.dy - n.dy * maskHalfThick)
+      ..lineTo(pRightBase.dx - n.dx * maskHalfThick, pRightBase.dy - n.dy * maskHalfThick)
+      ..lineTo(pRightBase.dx + n.dx * maskHalfThick, pRightBase.dy + n.dy * maskHalfThick)
+      ..lineTo(pLeftBase.dx + n.dx * maskHalfThick, pLeftBase.dy + n.dy * maskHalfThick)
       ..close();
     if(!wallGeometryProvided)canvas.drawPath(openingPath, openingCutPaint);
 
@@ -786,26 +782,28 @@ class ArchitectFenestrationStyle {
     drawFrameJamb(frameCenter - u * halfW, true);
     drawFrameJamb(frameCenter + u * halfW, false);
 
-    // 4. Glazing Unit (Double glass: 2 parallel lines separated by 16mm spacer)
-    final halfGlassThick = (glazingThickness / 2.0).clamp(0.008, 0.02);
-    final glassPLeft = (frameCenter - u * (halfW - frameFaceWidth));
-    final glassPRight = (frameCenter + u * (halfW - frameFaceWidth));
-
-    // First pane (interior facing)
-    canvas.drawLine(
-      glassPLeft - n * halfGlassThick,
-      glassPRight - n * halfGlassThick,
-      glassPaint,
-    );
-    // Second pane (exterior facing)
-    canvas.drawLine(
-      glassPLeft + n * halfGlassThick,
-      glassPRight + n * halfGlassThick,
-      glassPaint,
-    );
-
-    // 5. Vertical Mullion Profiles in 2D Plan
+    // Closed sashes and glazing beads are drawn separately in each clear bay.
     final leaves = _collectVerticalSlices(rootSubdivision, elementWidth);
+    for (final slice in leaves) {
+      final left = slice.left + (slice.left == 0 ? frameFaceWidth : frameFaceWidth / 2);
+      final right = slice.right -
+          (slice.right == elementWidth ? frameFaceWidth : frameFaceWidth / 2);
+      if (right <= left) continue;
+      ArchitectOpeningPlanPainter.paintWindowPane(
+        canvas: canvas,
+        left: frameCenter + u * (left - halfW),
+        right: frameCenter + u * (right - halfW),
+        direction: u,
+        normal: n,
+        frameDepth: frameDepth,
+        glazingThickness: glazingThickness,
+        openable: slice.pane?.isOpenable ?? false,
+        zoomScale: zoomScale,
+        palette: palette,
+        isSelected: isSelected,
+      );
+    }
+
     for (final slice in leaves) {
       if (slice.hasDividerAfter) {
         final mullionPos = frameCenter - u * halfW + u * slice.right;
@@ -871,6 +869,7 @@ class ArchitectFenestrationStyle {
         center: centerPos,
         direction: u,
         exteriorNormal: n * exteriorSign,
+        sillHeight: elementSillHeight,
         width: elementWidth,
         wallThickness: wallThickness,
         zoomScale: zoomScale,
@@ -1756,9 +1755,9 @@ class ArchitectFenestrationStyle {
       );
 
   // Helper for 2D vertical divider plan projection
-  static List<({double left, double right, bool hasDividerAfter})>
+  static List<({double left, double right, bool hasDividerAfter, FenestrationPane? pane})>
       _collectVerticalSlices(FenestrationSubdivision node, double totalWidth) {
-    final List<({double left, double right, bool hasDividerAfter})> result = [];
+    final List<({double left, double right, bool hasDividerAfter, FenestrationPane? pane})> result = [];
 
     void recurse(FenestrationSubdivision curr, double curLeft, double curW) {
       if (!curr.isSplit || !curr.isVertical) {
@@ -1766,6 +1765,7 @@ class ArchitectFenestrationStyle {
           left: curLeft,
           right: curLeft + curW,
           hasDividerAfter: false,
+          pane: curr.pane,
         ));
         return;
       }
@@ -1778,6 +1778,7 @@ class ArchitectFenestrationStyle {
             left: x,
             right: x + w,
             hasDividerAfter: i < curr.children.length - 1,
+            pane: curr.children[i].pane,
           ));
         } else {
           recurse(curr.children[i], x, w);

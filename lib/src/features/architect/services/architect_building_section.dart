@@ -38,7 +38,12 @@ class ArchitectBuildingSection {
   static final _drawingCache = Expando<List<ArchitectSectionRegion>>();
   final List<ArchitectSectionRegion> regions;
   final Rect bounds;
-  const ArchitectBuildingSection(this.regions, this.bounds);
+  final Map<String, Path> roofProfiles;
+  const ArchitectBuildingSection(
+    this.regions,
+    this.bounds, {
+    this.roofProfiles = const {},
+  });
 
   /// Ownership stays in [regions] for picking; equal materials share one
   /// published contour, including across vertical bands and wall junctions.
@@ -141,6 +146,7 @@ class ArchitectBuildingSection {
   ) {
     final regions = <ArchitectSectionRegion>[];
     final highPriorityCutouts = <Path>[];
+    final roofProfiles = <String, Path>{};
 
     // 1. Pre-build roof section slices per storey
     final storeyRoofSlices = <String, List<ArchitectRoofSectionSlice>>{};
@@ -156,6 +162,20 @@ class ArchitectBuildingSection {
         storeyRoofSlices[floor.id] = slices;
         for (final s in slices) {
           highPriorityCutouts.add(s.envelopePath);
+          final roof = floor.roofs.firstWhere((r) => r.id == s.roofId);
+          final a = s.bottomProfile.first, b = s.bottomProfile.last;
+          (roofProfiles[s.roofId] ??= Path()).addPolygon([
+            a,
+            b,
+            Offset(
+              b.dx,
+              floor.elevation + roof.topElevationAt(cut.pointAt(b.dx)),
+            ),
+            Offset(
+              a.dx,
+              floor.elevation + roof.topElevationAt(cut.pointAt(a.dx)),
+            ),
+          ], true);
         }
       }
     }
@@ -259,13 +279,38 @@ class ArchitectBuildingSection {
               includeSolid: !useCompositions,
               resolveComposition: !useCompositions,
             );
-        if (useCompositions) {
-          wallMesh.addAll([
-            for (final solid in sharedSolids)
-              if (solid.wall.id == wall.id) ...solid.triangles,
-          ]);
+        // Each material/height band is a closed solid. Slicing their joined
+        // triangle soup makes shared cap edges branch, so contour tracing can
+        // discard all but the lowest band (for example a 0.85 m plinth).
+        // Intersect the closed solids separately, then unite their 2D regions.
+        final materialSections = <ArchitectWallSolid, Path>{};
+        Path? accumulated;
+        void addWallSection(Path? path) {
+          if (path == null) return;
+          accumulated = accumulated == null
+              ? path
+              : Path.combine(PathOperation.union, accumulated!, path);
         }
-        var wallPath = sliceMesh(wallMesh);
+
+        if (useCompositions) {
+          for (final solid in sharedSolids.where((s) => s.wall.id == wall.id)) {
+            final path = sliceMesh(solid.triangles);
+            if (path == null) continue;
+            materialSections[solid] = path;
+            addWallSection(path);
+          }
+          for (final id in sources.values.toSet()) {
+            addWallSection(
+              sliceMesh([
+                for (final t in wallMesh)
+                  if (sources[t] == id) t,
+              ]),
+            );
+          }
+        } else {
+          accumulated = sliceMesh(wallMesh);
+        }
+        var wallPath = accumulated;
         if (wallPath == null) continue;
 
         // If extended to meet a sloped roof, clip the wall top to the underside of the roof slices
@@ -347,7 +392,7 @@ class ArchitectBuildingSection {
             for (final part in sharedSolids.where(
               (s) => s.wall.id == wall.id,
             )) {
-              final raw = sliceMesh(part.triangles);
+              final raw = materialSections[part];
               if (raw == null) continue;
               final region = Path.combine(
                 PathOperation.intersect,
@@ -479,6 +524,7 @@ class ArchitectBuildingSection {
     return ArchitectBuildingSection(
       regions,
       Rect.fromLTRB(0, vertical.top, cut.length, vertical.bottom),
+      roofProfiles: roofProfiles,
     );
   }
 

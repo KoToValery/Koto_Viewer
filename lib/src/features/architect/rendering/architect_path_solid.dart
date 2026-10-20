@@ -121,11 +121,17 @@ class ArchitectPathSolid {
     }
 
     for (final loop in loops) {
+      // Determine orientation in double precision. Path.contains stores its
+      // probe as float32: a sub-micron probe can round onto the edge and flip
+      // a wall face inward, especially away from the model origin.
+      final edge = loop[1] - loop[0];
+      final probe =
+          (loop[0] + loop[1]) / 2 +
+          Offset(-edge.dy, edge.dx) / edge.distance * .0000001;
+      final insideLeft = _contains(loops, probe, path.fillType);
       for (var i = 0; i < loop.length; i++) {
         final a = loop[i], b = loop[(i + 1) % loop.length];
         edges.add((a, b));
-        final d = b - a, n = Offset(-d.dy, d.dx) / d.distance;
-        final insideLeft = path.contains((a + b) / 2 + n * .0000001);
         final p = insideLeft ? a : b, q = insideLeft ? b : a;
         tris.add(
           Triangle3D(
@@ -169,12 +175,31 @@ class ArchitectPathSolid {
             b = Offset(x1, y(low, x1)),
             c = Offset(x1, y(high, x1)),
             d = Offset(x0, y(high, x0));
-        for (final z in [bottom, top]) {
-          triangle(a, b, c, z, reverse: z == bottom);
-          triangle(a, c, d, z, reverse: z == bottom);
-        }
+        triangle(a, b, c, bottom, reverse: true);
+        triangle(a, c, d, bottom, reverse: true);
+        triangle(a, b, c, top);
+        triangle(a, c, d, top);
       }
     }
     return tris;
+  }
+
+  static bool _contains(
+    List<List<Offset>> loops,
+    Offset point,
+    PathFillType fillType,
+  ) {
+    var winding = 0;
+    for (final loop in loops) {
+      for (var i = 0; i < loop.length; i++) {
+        final a = loop[i], b = loop[(i + 1) % loop.length];
+        final cross =
+            (b.dx - a.dx) * (point.dy - a.dy) -
+            (b.dy - a.dy) * (point.dx - a.dx);
+        if (a.dy <= point.dy && b.dy > point.dy && cross > 0) winding++;
+        if (a.dy > point.dy && b.dy <= point.dy && cross < 0) winding--;
+      }
+    }
+    return fillType == PathFillType.evenOdd ? winding.isOdd : winding != 0;
   }
 }

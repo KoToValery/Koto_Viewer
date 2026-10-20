@@ -11,19 +11,32 @@ class _PlanCanvas implements Canvas {
   final lines = <(Offset, Offset, double)>[];
   final circles = <(Offset, double)>[];
   final texts = <(double, double, double)>[];
-  final stack = <(double, double)>[];
+  final stack = <(double, double, Offset)>[];
+  final textCorners = <List<Offset>>[];
+  final paths = <Path>[];
+  Offset origin = Offset.zero;
+  Offset rotatePoint(Offset p) => Offset(
+    p.dx * math.cos(angle) - p.dy * math.sin(angle),
+    p.dx * math.sin(angle) + p.dy * math.cos(angle),
+  );
   double textScale = 1;
   double angle = 0;
 
   @override
-  void save() => stack.add((textScale, angle));
+  void save() => stack.add((textScale, angle, origin));
   @override
   void restore() {
     final state = stack.removeLast();
     textScale = state.$1;
     angle = state.$2;
+    origin = state.$3;
   }
 
+  @override
+  void translate(double x, double y) =>
+      origin += rotatePoint(Offset(x, y) * textScale);
+  @override
+  void drawPath(Path path, Paint paint) => paths.add(path);
   @override
   void scale(double sx, [double? sy]) => textScale *= sx;
   @override
@@ -35,11 +48,29 @@ class _PlanCanvas implements Canvas {
   void drawCircle(Offset center, double radius, Paint paint) =>
       circles.add((center, radius));
   @override
-  void drawParagraph(ui.Paragraph paragraph, Offset offset) => texts.add((
-    paragraph.maxIntrinsicWidth * textScale,
-    paragraph.height * textScale,
-    angle,
-  ));
+  void drawParagraph(ui.Paragraph paragraph, Offset offset) {
+    texts.add((
+      paragraph.maxIntrinsicWidth * textScale,
+      paragraph.height * textScale,
+      angle,
+    ));
+    final rect = Rect.fromLTWH(
+      offset.dx,
+      offset.dy,
+      paragraph.maxIntrinsicWidth,
+      paragraph.height,
+    );
+    textCorners.add([
+      for (final p in [
+        rect.topLeft,
+        rect.topRight,
+        rect.bottomLeft,
+        rect.bottomRight,
+      ])
+        origin + rotatePoint(p * textScale),
+    ]);
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }
@@ -102,10 +133,38 @@ void main() {
               wallThickness: .37,
               zoomScale: zoom,
             );
-            expect(canvas.texts, reference.texts);
-            expect(canvas.circles, reference.circles);
-            // The last line is the transverse dimension, followed by the ID circle.
-            expect(canvas.lines.last, reference.lines.last);
+            expect(canvas.texts, hasLength(4));
+            for (var i = 0; i < 4; i++) {
+              expect(canvas.texts[i].$1, reference.texts[i].$1);
+              expect(canvas.texts[i].$2, reference.texts[i].$2);
+            }
+            final n = Offset(-math.sin(angle), math.cos(angle));
+            double along(Offset p) =>
+                (p - end / 2).dx * n.dx + (p - end / 2).dy * n.dy;
+            // Every dimension glyph clears the wall; sill height is opposite.
+            for (final corners in canvas.textCorners.take(2)) {
+              expect(corners.every((p) => along(p) > .37 / 2 + .07), isTrue);
+            }
+            expect(
+              canvas.textCorners[2].every((p) => along(p) < -.37 / 2 - .07),
+              isTrue,
+            );
+            expect(canvas.circles.single.$2, reference.circles.single.$2);
+            for (final point in [
+              canvas.circles.single.$1,
+              canvas.textCorners[2].reduce((a, b) => a + b) / 4,
+            ]) {
+              expect(
+                candidate.containsPoint(
+                  point,
+                  wallStart: Offset.zero,
+                  wallEnd: end,
+                  wallThickness: .37,
+                  tolerance: 0,
+                ),
+                isTrue,
+              );
+            }
             expect(canvas.stack, isEmpty);
           }
         }
@@ -151,9 +210,17 @@ void main() {
       final u = Offset(math.cos(angle), math.sin(angle));
       final n = Offset(-u.dy, u.dx);
       final center = u * 2;
+      final drawn = _PlanCanvas();
+      window.paint2D(
+        canvas: drawn,
+        wallStart: Offset.zero,
+        wallEnd: u * 4,
+        wallThickness: .37,
+        zoomScale: 100,
+      );
       expect(
         window.containsPoint(
-          center + n * (.37 / 2 + .22 + .16 + .10),
+          drawn.circles.single.$1 + n * .10,
           wallStart: Offset.zero,
           wallEnd: u * 4,
           wallThickness: .37,
@@ -182,4 +249,63 @@ void main() {
       isFalse,
     );
   });
+
+  test('Floor-level windows omit wall-face projection and raised sill', () {
+    for (final candidate in [window, window.copyWith(style: style)]) {
+      for (final sill in [0.0, .15, .85]) {
+        final canvas = _PlanCanvas();
+        candidate
+            .copyWith(sillHeight: sill)
+            .paint2D(
+              canvas: canvas,
+              wallStart: Offset.zero,
+              wallEnd: const Offset(4, 0),
+              wallThickness: .37,
+              zoomScale: 100,
+            );
+        for (final y in [-.185, .185]) {
+          final faces = canvas.lines.where(
+            (l) =>
+                (l.$1 - Offset(1.4, y)).distance < 1e-8 &&
+                (l.$2 - Offset(2.6, y)).distance < 1e-8,
+          );
+          expect(faces.length, sill > 0 ? 1 : 0);
+        }
+        expect(canvas.texts.length, sill > 0 ? 4 : 3);
+      }
+    }
+  });
+
+  test(
+    'Operable library panes show sash profiles that fixed glazing omits',
+    () {
+      final fixed = _PlanCanvas(), operable = _PlanCanvas();
+      final opening = window.copyWith(style: style);
+      opening.paint2D(
+        canvas: fixed,
+        wallStart: Offset.zero,
+        wallEnd: const Offset(4, 0),
+        wallThickness: .37,
+        zoomScale: 100,
+      );
+      opening
+          .copyWith(
+            style: style.copyWith(
+              rootSubdivision: const FenestrationSubdivision(
+                id: 'root',
+                pane: FenestrationPane(id: 'p', paneType: PaneType.tiltAndTurn),
+              ),
+            ),
+          )
+          .paint2D(
+            canvas: operable,
+            wallStart: Offset.zero,
+            wallEnd: const Offset(4, 0),
+            wallThickness: .37,
+            zoomScale: 100,
+          );
+      expect(operable.paths.length, fixed.paths.length + 2);
+      expect(operable.lines.length, fixed.lines.length + 2);
+    },
+  );
 }

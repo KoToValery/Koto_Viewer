@@ -6,6 +6,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../services/architect_command_controller.dart';
 import '../services/architect_projection_editing.dart';
+import '../services/architect_projection_snap.dart';
 import 'architect_element_properties_dialog.dart';
 import 'architect_roof_layers_dialog.dart';
 import 'architect_slab_layers_dialog.dart';
@@ -32,6 +33,7 @@ void navigateArchitectProjection(
 class ArchitectProjectionEditor extends StatefulWidget {
   final ArchitectCommandController controller;
   final Map<String, Path> paths;
+  final Map<String, Path> roofProfiles;
   final Offset origin, right;
   final bool elevation;
   final Offset Function(Offset) toView, toScreen;
@@ -42,6 +44,7 @@ class ArchitectProjectionEditor extends StatefulWidget {
     super.key,
     required this.controller,
     required this.paths,
+    this.roofProfiles = const {},
     required this.origin,
     required this.right,
     required this.elevation,
@@ -60,9 +63,30 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   Offset? dragStart;
   Offset delta = Offset.zero;
   double lastScale = 1;
+  bool roofSnapEnabled = true;
+  ArchitectProjectionSnap? roofSnap;
+  Offset? snapContact;
+  Path? dragPath;
+  final _pointers = <int>{};
+  Offset? _pointerDownView;
+  String? _pointerDownHit;
   String? error;
   Timer? _errorTimer;
   final measureRects = <ArchitectOpeningMeasure, Rect>{};
+  void updateDrag(Offset point) {
+    final raw = point - dragStart!;
+    delta = Offset(widget.elevation ? raw.dx : 0, raw.dy);
+    final snap = roofSnapEnabled
+        ? roofSnap?.resolve(
+            delta,
+            10 / widget.scale,
+            horizontal: widget.elevation,
+          )
+        : null;
+    snapContact = snap?.contact;
+    delta = snap?.delta ?? delta;
+  }
+
   ArchitectProject get project => widget.controller.project;
   ArchitectProjectedElement? get selected =>
       id == null ? null : ArchitectProjectionEditing.find(project, id!);
@@ -291,6 +315,27 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
       fit: StackFit.expand,
       children: [
         Listener(
+          onPointerDown: (event) {
+            if (_pointers.isEmpty) {
+              _pointerDownView = widget.toView(event.localPosition);
+              _pointerDownHit = ArchitectProjectionEditing.pick(
+                project,
+                widget.paths,
+                _pointerDownView!,
+                10 / widget.scale,
+              );
+            }
+            _pointers.add(event.pointer);
+          },
+          onPointerUp: (event) => _pointers.remove(event.pointer),
+          onPointerCancel: (event) => setState(() {
+            _pointers.remove(event.pointer);
+            dragStart = null;
+            delta = Offset.zero;
+            snapContact = null;
+            roofSnap = null;
+            dragPath = null;
+          }),
           onPointerSignal: widget.onNavigate == null
               ? null
               : (event) {
@@ -328,15 +373,46 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                 ? null
                 : (d) {
                     lastScale = 1;
-                    final p = widget.toView(d.localFocalPoint);
-                    final hit = ArchitectProjectionEditing.pick(
-                      project,
-                      widget.paths,
-                      p,
-                      10 / widget.scale,
-                    );
-                    dragStart = hit == id ? p : null;
+                    // Gesture recognition can begin outside a thin roof after
+                    // touch slop. Keep the element and point from pointer-down.
+                    dragStart =
+                        d.pointerCount == 1 &&
+                            ref != null &&
+                            _pointerDownHit == id
+                        ? _pointerDownView
+                        : null;
                     delta = Offset.zero;
+                    snapContact = null;
+                    roofSnap =
+                        dragStart != null &&
+                            ref?.kind == ArchitectProjectionKind.roof
+                        ? ArchitectProjectionSnap(
+                            project,
+                            widget.paths,
+                            id!,
+                            roofProfiles: widget.roofProfiles,
+                          )
+                        : null;
+                    dragPath = widget.paths[id];
+                    if (roofSnap != null) {
+                      for (final member in roofSnap!.movingIds.where(
+                        (member) => member != id,
+                      )) {
+                        final path = widget.paths[member];
+                        if (path != null && dragPath != null) {
+                          dragPath = Path.combine(
+                            PathOperation.union,
+                            dragPath!,
+                            path,
+                          );
+                        }
+                      }
+                    }
+                    if (dragStart != null) {
+                      setState(
+                        () => updateDrag(widget.toView(d.localFocalPoint)),
+                      );
+                    }
                   },
             onScaleUpdate: ref == null && widget.onNavigate == null
                 ? null
@@ -344,14 +420,13 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                     if (dragStart != null &&
                         d.pointerCount == 1 &&
                         ref != null) {
-                      setState(() {
-                        final raw =
-                            widget.toView(d.localFocalPoint) - dragStart!;
-                        delta = Offset(widget.elevation ? raw.dx : 0, raw.dy);
-                      });
+                      setState(
+                        () => updateDrag(widget.toView(d.localFocalPoint)),
+                      );
                     } else {
                       dragStart = null;
                       delta = Offset.zero;
+                      snapContact = null;
                       widget.onNavigate?.call(
                         d.focalPointDelta,
                         d.scale / lastScale,
@@ -379,11 +454,18 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                     setState(() {
                       dragStart = null;
                       delta = Offset.zero;
+                      snapContact = null;
+                      roofSnap = null;
+                      dragPath = null;
                     });
                   },
             child: CustomPaint(
               painter: _ProjectionSelectionPainter(
-                id == null ? null : widget.paths[id],
+                id == null
+                    ? null
+                    : dragStart != null
+                    ? dragPath
+                    : widget.paths[id],
                 delta,
                 widget.toScreen,
                 measures,
@@ -391,6 +473,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                 project.units,
                 Theme.of(context).textTheme.bodyMedium?.fontFamily,
                 ref?.isOpening == true && widget.elevation,
+                snapContact: snapContact,
               ),
             ),
           ),
@@ -419,95 +502,105 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                           ),
                         ),
                       Wrap(
+                        alignment: WrapAlignment.center,
+                        children: [
+                          TextButton.icon(
+                            key: const ValueKey('projection-properties'),
+                            onPressed: properties,
+                            icon: const Icon(Icons.tune, size: 18),
+                            label: Text(l.architectProperties),
+                          ),
+                          IconButton(
+                            key: const ValueKey('projection-move-z'),
+                            tooltip: l.architectRoofMoveVerticalAction,
+                            onPressed: () => moveNumber(false),
+                            icon: const Icon(Icons.swap_vert),
+                          ),
+                          if (ref.kind == ArchitectProjectionKind.roof)
+                            IconButton(
+                              key: const ValueKey('projection-roof-snap'),
+                              tooltip: roofSnapEnabled
+                                  ? l.snapEnabledTooltip
+                                  : l.snapDisabledTooltip,
+                              isSelected: roofSnapEnabled,
+                              onPressed: () => setState(
+                                () => roofSnapEnabled = !roofSnapEnabled,
+                              ),
+                              icon: const Icon(Icons.grid_off),
+                              selectedIcon: const Icon(Icons.grid_on),
+                            ),
+                          if (widget.elevation)
+                            IconButton(
+                              key: const ValueKey('projection-move-x'),
+                              tooltip: l.architectProjectionHorizontal,
+                              onPressed: () => moveNumber(true),
+                              icon: const Icon(Icons.swap_horiz),
+                            ),
+                          if (ref.isOpening && widget.elevation)
+                            PopupMenuButton<String>(
+                              tooltip: l.architectWallAlign,
+                              icon: const Icon(Icons.align_horizontal_left),
+                              onSelected: align,
+                              itemBuilder: (_) => [
+                                PopupMenuItem(
+                                  value: 'left',
+                                  child: Text(l.architectProjectionAlignLeft),
+                                ),
+                                PopupMenuItem(
+                                  value: 'right',
+                                  child: Text(l.architectProjectionAlignRight),
+                                ),
+                                PopupMenuItem(
+                                  value: 'sill',
+                                  child: Text(l.architectProjectionAlignSill),
+                                ),
+                                PopupMenuItem(
+                                  value: 'head',
+                                  child: Text(l.architectProjectionAlignHead),
+                                ),
+                              ],
+                            ),
+                          IconButton(
+                            tooltip: l.architectDeselect,
+                            onPressed: () => setState(() {
+                              id = null;
+                              error = null;
+                            }),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                      if (ref.isOpening)
+                        Wrap(
                           alignment: WrapAlignment.center,
+                          spacing: 4,
                           children: [
-                            TextButton.icon(
-                              key: const ValueKey('projection-properties'),
-                              onPressed: properties,
-                              icon: const Icon(Icons.tune, size: 18),
-                              label: Text(l.architectProperties),
-                            ),
-                            IconButton(
-                              key: const ValueKey('projection-move-z'),
-                              tooltip: l.architectRoofMoveVerticalAction,
-                              onPressed: () => moveNumber(false),
-                              icon: const Icon(Icons.swap_vert),
-                            ),
-                            if (widget.elevation)
-                              IconButton(
-                                key: const ValueKey('projection-move-x'),
-                                tooltip: l.architectProjectionHorizontal,
-                                onPressed: () => moveNumber(true),
-                                icon: const Icon(Icons.swap_horiz),
-                              ),
-                            if (ref.isOpening && widget.elevation)
-                              PopupMenuButton<String>(
-                                tooltip: l.architectWallAlign,
-                                icon: const Icon(Icons.align_horizontal_left),
-                                onSelected: align,
-                                itemBuilder: (_) => [
-                                  PopupMenuItem(
-                                    value: 'left',
-                                    child: Text(l.architectProjectionAlignLeft),
+                            for (final measure in measures)
+                              if (widget.elevation ||
+                                  measure.kind ==
+                                      ArchitectOpeningDistance.sill ||
+                                  measure.kind == ArchitectOpeningDistance.head)
+                                TextButton(
+                                  key: ValueKey(
+                                    'projection-distance-${measure.kind.name}',
                                   ),
-                                  PopupMenuItem(
-                                    value: 'right',
-                                    child: Text(
-                                      l.architectProjectionAlignRight,
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'sill',
-                                    child: Text(l.architectProjectionAlignSill),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'head',
-                                    child: Text(l.architectProjectionAlignHead),
-                                  ),
-                                ],
-                              ),
-                            IconButton(
-                              tooltip: l.architectDeselect,
-                              onPressed: () => setState(() {
-                                id = null;
-                                error = null;
-                              }),
-                              icon: const Icon(Icons.close),
-                            ),
-                          ],
-                        ),
-                        if (ref.isOpening)
-                          Wrap(
-                            alignment: WrapAlignment.center,
-                            spacing: 4,
-                            children: [
-                              for (final measure in measures)
-                                if (widget.elevation ||
-                                    measure.kind ==
-                                        ArchitectOpeningDistance.sill ||
-                                    measure.kind ==
-                                        ArchitectOpeningDistance.head)
-                                  TextButton(
-                                    key: ValueKey(
-                                      'projection-distance-${measure.kind.name}',
-                                    ),
-                                    onPressed: () => editDistance(measure),
-                                    child: Text(
-                                      '${label(measure.kind)} ${project.formatLength(measure.value)}',
-                                    ),
-                                  ),
-                              if (!measures.any(
-                                (m) => m.kind == ArchitectOpeningDistance.head,
-                              ))
-                                Tooltip(
-                                  message: l.architectProjectionNoSlab,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8),
-                                    child: Text(l.architectProjectionNoSlab),
+                                  onPressed: () => editDistance(measure),
+                                  child: Text(
+                                    '${label(measure.kind)} ${project.formatLength(measure.value)}',
                                   ),
                                 ),
-                            ],
-                          ),
+                            if (!measures.any(
+                              (m) => m.kind == ArchitectOpeningDistance.head,
+                            ))
+                              Tooltip(
+                                message: l.architectProjectionNoSlab,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Text(l.architectProjectionNoSlab),
+                                ),
+                              ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -528,6 +621,7 @@ class _ProjectionSelectionPainter extends CustomPainter {
   final ArchitectUnit unit;
   final String? fontFamily;
   final bool horizontal;
+  final Offset? snapContact;
   _ProjectionSelectionPainter(
     this.path,
     this.delta,
@@ -536,8 +630,9 @@ class _ProjectionSelectionPainter extends CustomPainter {
     this.rects,
     this.unit,
     this.fontFamily,
-    this.horizontal,
-  );
+    this.horizontal, {
+    this.snapContact,
+  });
   @override
   void paint(Canvas canvas, Size size) {
     rects.clear();
@@ -564,6 +659,19 @@ class _ProjectionSelectionPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
+    if (snapContact != null) {
+      final at = screen(snapContact!);
+      final paint = Paint()
+        ..color = Colors.cyan
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+      canvas.drawRect(
+        Rect.fromCenter(center: at, width: 12, height: 12),
+        paint,
+      );
+      canvas.drawLine(at - const Offset(9, 0), at + const Offset(9, 0), paint);
+      canvas.drawLine(at - const Offset(0, 9), at + const Offset(0, 9), paint);
+    }
     for (final m in measures) {
       if (!horizontal &&
           (m.kind == ArchitectOpeningDistance.left ||

@@ -86,6 +86,54 @@ double area(Path path) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
+    'Three metre walls retain every height band in a transverse section',
+    () {
+      final walls = [
+        for (var i = 0; i < 4; i++)
+          wall('wall-$i', Offset(0, i * 2), Offset(4, i * 2)).copyWith(
+            plinth: const ArchitectWallPlinth(enabled: true, height: .85),
+            windows: i != 2
+                ? []
+                : [
+                    const ArchitectWindow(
+                      id: 'window',
+                      uuid: 'window',
+                      wallId: 'wall-2',
+                      offsetRatio: .5,
+                      width: 1.2,
+                      height: 1.2,
+                      sillHeight: .85,
+                    ),
+                  ],
+          ),
+      ];
+      final p = project(walls);
+      final next = p.copyWith(storeys: [p.activeStorey.copyWith(height: 3)]);
+      for (final x in [1.0, 2.0, 3.0]) {
+        final section = ArchitectBuildingSection.build(
+          next,
+          ArchitectSection(id: 'cut', start: Offset(x, -1), end: Offset(x, 7)),
+        );
+        for (final w in walls) {
+          final path = section.elementPaths[w.id]!;
+          expect(path.getBounds().top, closeTo(0, 1e-5));
+          expect(
+            path.getBounds().bottom,
+            closeTo(3, 1e-5),
+            reason: '${w.id} at $x',
+          );
+          for (final z in [.4, 2.5, 2.9]) {
+            expect(
+              path.contains(Offset(w.startPoint.dy + 1, z)),
+              isTrue,
+              reason: '${w.id} at $x, height $z',
+            );
+          }
+        }
+      }
+    },
+  );
+  test(
     'Legacy override is promoted without changing core or adding finishes',
     () {
       const old = ArchitectWall(

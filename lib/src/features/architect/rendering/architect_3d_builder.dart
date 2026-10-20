@@ -1,3 +1,4 @@
+import 'architect_solid_shell.dart';
 import '../services/architect_slab_geometry.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -28,20 +29,40 @@ class Architect3dBuilder {
         for (final wall in storey.walls)
           wall.copyWith(height: wall.effectiveHeight(storey.height)),
       ];
-      final composed = walls.any((w)=>w.layers.isNotEmpty||w.plinth.enabled||w.isCurved);
-      if(composed) {
-        for(final solid in ArchitectWallSolids.build(storey,project.wallTypes,project:project)) {
-          final first=allTris.length;
-          allTris.addAll(solid.triangles);
-          mark(solid.wall.id,first);
-        }
+      final composed = walls.any(
+        (w) => w.layers.isNotEmpty || w.plinth.enabled || w.isCurved,
+      );
+      final wallSolids = <(String, List<Triangle3D>)>[
+        if (composed)
+          for (final solid in ArchitectWallSolids.build(
+            storey,
+            project.wallTypes,
+            project: project,
+          ))
+            (solid.wall.id, solid.triangles)
+        else
+          for (final wall in walls)
+            (wall.id, wall.build3D(
+              storeyElevation: storey.elevation,
+              includeOpeningMeshes: false,
+            )),
+      ];
+      final shell = ArchitectSolidShell.build([
+        for (final solid in wallSolids) solid.$2,
+      ]);
+      for (var i = 0; i < wallSolids.length; i++) {
+        final first = allTris.length;
+        allTris.addAll(shell[i]);
+        mark(wallSolids[i].$1, first);
       }
       for (final wall in walls) {
-        // Add 3D wall geometry with boolean door cutouts
         final first = allTris.length;
-        allTris.addAll(
-          wall.build3D(storeyElevation: storey.elevation, sources: sources,includeSolid:!composed,resolveComposition:!composed),
-        );
+        allTris.addAll(wall.build3D(
+          storeyElevation: storey.elevation,
+          sources: sources,
+          includeSolid: false,
+          resolveComposition: false,
+        ));
         mark(wall.id, first);
       }
 
