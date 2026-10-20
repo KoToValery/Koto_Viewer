@@ -24,12 +24,79 @@ class ArchitectDimensionLayout {
   /// Row spacing in model metres; camera zoom must not alter drawing geometry.
   static const double rowSpacing = .45;
 
+  /// Resolve finish picks against the real wall faces, without changing the
+  /// saved snap point or moving the positioned dimension line.
+  static ({Offset core, Offset finish}) _wallReference(
+    Offset point,
+    Offset direction,
+    List<ArchitectWall> walls,
+  ) {
+    ({Offset core, Offset finish}) result = (core: point, finish: point);
+    var bestAlignment = 1e-6;
+    for (final wall in walls) {
+      if (wall.isCurved || wall.length < 1e-6) continue;
+      final n = wall.exteriorNormal;
+      final alignment = ArchitectDimensionChain.dot(direction, n);
+      if (alignment.abs() <= bestAlignment) continue;
+      final along = ArchitectDimensionChain.dot(
+        point - wall.centerStart,
+        wall.unitVector,
+      );
+      // Joined corners can extend past the individual wall rectangle.
+      if (along < -wall.thickness - 1e-6 ||
+          along > wall.length + wall.thickness + 1e-6) {
+        continue;
+      }
+      for (final side in [-1.0, 1.0]) {
+        final core = wall.coreCenterStart + n * (wall.coreThickness / 2 * side);
+        final finish = wall.centerStart + n * (wall.thickness / 2 * side);
+        final toCore = ArchitectDimensionChain.dot(core - point, n);
+        final toFinish = ArchitectDimensionChain.dot(finish - point, n);
+        if (math.min(toCore.abs(), toFinish.abs()) > 1e-6 &&
+            toCore * toFinish > 0) {
+          continue;
+        }
+        bestAlignment = alignment.abs();
+        result = (
+          core: point + direction * (toCore / alignment),
+          finish: point + direction * (toFinish / alignment),
+        );
+      }
+    }
+    return result;
+  }
+
   /// Keep vertical text readable from the right, regardless of pick direction.
   static double textAngle(Offset direction) {
     var angle = math.atan2(direction.dy, direction.dx);
     if (angle >= math.pi / 2 - 1e-9) angle -= math.pi;
     if (angle < -math.pi / 2 - 1e-9) angle += math.pi;
     return angle;
+  }
+
+  /// Short insulation labels sit beyond the end ticks on the same row instead
+  /// of overlapping their ticks or the main core dimension text.
+  static Offset segmentTextCenter({
+    required DimensionTier tier,
+    required int segmentIndex,
+    required Offset direction,
+    required double textWidth,
+    required double clearance,
+  }) {
+    final segment = tier.segments[segmentIndex];
+    final center = (segment.$1 + segment.$2) / 2;
+    if (tier.tierIndex != 3 ||
+        tier.segments.length < 2 ||
+        (segment.$2 - segment.$1).distance >= textWidth + clearance * 2) {
+      return center;
+    }
+    if (segmentIndex == 0) {
+      return segment.$1 - direction * (textWidth / 2 + clearance);
+    }
+    if (segmentIndex == tier.segments.length - 1) {
+      return segment.$2 + direction * (textWidth / 2 + clearance);
+    }
+    return center;
   }
 
   static List<(Offset, Offset)> witnessSegments(
@@ -74,7 +141,7 @@ class ArchitectDimensionLayout {
         ArchitectDimensionChain.dot(p - dimension.startPoint, u);
     final tiers = <DimensionTier>[];
 
-    void row(int tier, Iterable<double> positions, {bool overall = false}) {
+    void row(int tier, Iterable<double> positions) {
       final values = positions.toList()..sort();
       final unique = <double>[];
       for (final value in values) {
@@ -89,14 +156,11 @@ class ArchitectDimensionLayout {
       tiers.add(
         DimensionTier(
           tierIndex: tier,
-          points: overall ? [points.first, points.last] : points,
+          points: points,
           line: (points.first, points.last),
-          segments: overall
-              ? [(points.first, points.last)]
-              : [
-                  for (var i = 1; i < points.length; i++)
-                    (points[i - 1], points[i]),
-                ],
+          segments: [
+            for (var i = 1; i < points.length; i++) (points[i - 1], points[i]),
+          ],
         ),
       );
     }
@@ -106,14 +170,32 @@ class ArchitectDimensionLayout {
       return tiers;
     }
 
-    final low = 0.0, high = dimension.length;
-    bool inSpan(double t) => t >= low - 1e-6 && t <= high + 1e-6;
-    final structural = [
-      if (!dimension.isChain) ...[low, high],
-      for (final a in dimension.anchors)
-        if (a.feature != 'opening') along(a.point),
+    final references = [
+      if (!dimension.isChain)
+        for (final point in [dimension.startPoint, dimension.endPoint])
+          _wallReference(point, u, storey?.walls ?? const []),
+      for (final anchor in dimension.anchors)
+        if (anchor.feature != 'opening')
+          _wallReference(anchor.point, u, storey?.walls ?? const []),
     ];
-    if (structural.length < 2) structural.addAll([low, high]);
+    if (references.length < 2) {
+      references.addAll([
+        (core: dimension.startPoint, finish: dimension.startPoint),
+        (core: dimension.endPoint, finish: dimension.endPoint),
+      ]);
+    }
+    final corePositions = references.map((r) => along(r.core)).toList()..sort();
+    final low = corePositions.first, high = corePositions.last;
+    final finishLow = references
+        .where((r) => (along(r.core) - low).abs() < 1e-6)
+        .map((r) => math.min(low, along(r.finish)))
+        .reduce(math.min);
+    final finishHigh = references
+        .where((r) => (along(r.core) - high).abs() < 1e-6)
+        .map((r) => math.max(high, along(r.finish)))
+        .reduce(math.max);
+    bool inSpan(double t) => t >= low - 1e-6 && t <= high + 1e-6;
+    final structural = List<double>.of(corePositions);
     final openings = [
       for (final a in dimension.anchors)
         if (a.feature == 'opening') along(a.point),
@@ -202,7 +284,7 @@ class ArchitectDimensionLayout {
 
     if (openings.isNotEmpty) row(1, [low, ...openings, high]);
     row(2, structural);
-    if (dimension.showOverall) row(3, [low, high], overall: true);
+    if (dimension.showOverall) row(3, [finishLow, low, high, finishHigh]);
 
     // Grid axes are infinite references; only the perpendicular family in the
     // measured span contributes to the outermost row.

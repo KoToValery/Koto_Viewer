@@ -448,7 +448,12 @@ class ArchitectElementsPainterHelper {
         }
 
         // Dimension text
-        for (final segment in tier.segments) {
+        for (
+          var segmentIndex = 0;
+          segmentIndex < tier.segments.length;
+          segmentIndex++
+        ) {
+          final segment = tier.segments[segmentIndex];
           final p1 = segment.$1, p2 = segment.$2;
           final isSingleSegment =
               tier.segments.length == 1 &&
@@ -479,7 +484,27 @@ class ArchitectElementsPainterHelper {
             textDirection: TextDirection.ltr,
           )..layout();
 
-          final mid = (p1 + p2) / 2.0 + textOffset;
+          final textWidth = tp.width * textScale;
+          final clearance = dimensionScale.paperToModel(.6);
+          final center = ArchitectDimensionLayout.segmentTextCenter(
+            tier: tier,
+            segmentIndex: segmentIndex,
+            direction: u,
+            textWidth: textWidth,
+            clearance: clearance,
+          );
+          final displacement = center - (p1 + p2) / 2;
+          if (displacement.distance > 1e-9) {
+            final sign = displacement.dx * u.dx + displacement.dy * u.dy < 0
+                ? -1.0
+                : 1.0;
+            canvas.drawLine(
+              sign < 0 ? p1 : p2,
+              center + u * sign * (textWidth / 2 + clearance / 2),
+              dimPaint,
+            );
+          }
+          final mid = center + textOffset;
           canvas.save();
           canvas.translate(mid.dx, mid.dy);
           canvas.rotate(ArchitectDimensionLayout.textAngle(u));

@@ -3602,7 +3602,7 @@
   "architectDimensionScale": "Dimension scale",
   "architectDimensionSingle": "Single",
   "architectDimensionExterior": "Exterior",
-  "architectDimensionExteriorHelp": "Rows from the building outward: openings and gaps, wall sections, overall dimensions, then axis spacing. Facade openings and perpendicular axes in the measured span are included automatically.",
+  "architectDimensionExteriorHelp": "Rows from the building outward: openings and wall sections measured to the core, overall core size with separate end insulation dimensions, then axis spacing. Picks on insulation reference the core. Facade openings and perpendicular axes are included automatically.",
   "architectDimensionInterior": "Interior",
   "architectDimensionInteriorHint": "Select end walls and partitions, then position the line.",
   "architectDimensionInteriorHelp": "One row measures between the inner faces of parallel end walls, including both faces of intermediate partitions.",
