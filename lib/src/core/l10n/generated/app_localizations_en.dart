@@ -6021,6 +6021,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectRoofOverhang => 'Eaves';
 
   @override
+  String get architectRoofManualSupport => 'Manual support position';
+
+  @override
+  String get architectRoofSupportDistance => 'From eaves';
+
+  @override
+  String get architectRoofManualSupportHelp =>
+      'Horizontal distance from the eaves edge to the centre of the ring beam and wall plate. Uncheck to follow the supporting wall automatically.';
+
+  @override
+  String get architectRoofSupportDistanceInvalid =>
+      'Enter a distance within the roof plane.';
+
+  @override
   String get architectRoofBaseElev => 'Eaves Z';
 
   @override

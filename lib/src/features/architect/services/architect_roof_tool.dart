@@ -9,11 +9,7 @@ import 'architect_roof_geometry.dart';
 
 // === SECTION: ROOF DRAW MODE ===
 
-enum RoofDrawMode {
-  rectangle,
-  polygon,
-  multiPitch,
-}
+enum RoofDrawMode { rectangle, polygon, multiPitch }
 
 // === SECTION: ARCHITECT ROOF TOOL ===
 
@@ -21,6 +17,7 @@ class ArchitectRoofTool extends ChangeNotifier {
   RoofDrawMode drawMode = RoofDrawMode.rectangle;
   double slopeDegrees = 22.0;
   double eavesOverhang = 0.50;
+  double? manualSupportDistance;
   ArchitectRoofEavesCut eavesCut = ArchitectRoofEavesCut.plumb;
   ArchitectRoofAssembly activeAssembly = ArchitectRoofAssembly.fromPreset(
     ArchitectRoofPreset.pitchedTiles,
@@ -51,6 +48,11 @@ class ArchitectRoofTool extends ChangeNotifier {
 
   void setEavesCut(ArchitectRoofEavesCut value) {
     eavesCut = value;
+    notifyListeners();
+  }
+
+  void setManualSupportDistance(double? value) {
+    manualSupportDistance = value;
     notifyListeners();
   }
 
@@ -146,11 +148,7 @@ class ArchitectRoofTool extends ChangeNotifier {
   ArchitectRoofPlane? finishPolygonDraft({required ArchitectStorey storey}) {
     if (draftPoints.length < 3) return null;
     final pts = List<Offset>.from(draftPoints);
-    final created = _buildPlane(
-      storey: storey,
-      points: pts,
-      eavesEdgeIndex: 0,
-    );
+    final created = _buildPlane(storey: storey, points: pts, eavesEdgeIndex: 0);
     clearDraft();
     return created;
   }
@@ -169,7 +167,12 @@ class ArchitectRoofTool extends ChangeNotifier {
       assembly: activeAssembly,
     );
     clearDraft();
-    return planes.isNotEmpty ? planes : null;
+    return planes.isNotEmpty
+        ? [
+            for (final plane in planes)
+              plane.copyWith(manualSupportDistance: manualSupportDistance),
+          ]
+        : null;
   }
 
   void undoLastDraftPoint() {
@@ -216,6 +219,7 @@ class ArchitectRoofTool extends ChangeNotifier {
     slopeDegrees: slopeDegrees,
     baseElevationOffset: storey.height,
     eavesOverhang: eavesOverhang,
+    manualSupportDistance: manualSupportDistance,
     eavesCut: eavesCut,
     assembly: activeAssembly.copyWith(),
   );
@@ -246,13 +250,20 @@ class ArchitectRoofTool extends ChangeNotifier {
     required ArchitectProject project,
     required AutoRoofType type,
     required ArchitectRoofTool tool,
-  }) => ArchitectRoofGeometry.generateAutoRoof(
-    project: project,
-    type: type,
-    slopeDegrees: tool.slopeDegrees,
-    eavesOverhang: tool.eavesOverhang,
-    preset: tool.activeAssembly.preset,
-  );
+  }) =>
+      ArchitectRoofGeometry.generateAutoRoof(
+            project: project,
+            type: type,
+            slopeDegrees: tool.slopeDegrees,
+            eavesOverhang: tool.eavesOverhang,
+            preset: tool.activeAssembly.preset,
+          )
+          .map(
+            (roof) => roof.copyWith(
+              manualSupportDistance: tool.manualSupportDistance,
+            ),
+          )
+          .toList();
 
   static double _pointToSegmentDistance(Offset p, Offset a, Offset b) {
     final ab = b - a;

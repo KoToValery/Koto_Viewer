@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'dart:math' as math;
 import '../services/architect_slab_geometry.dart';
+import '../services/architect_roof_geometry.dart';
 import 'architect_vertical_clip.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_project.dart';
@@ -40,15 +41,16 @@ class ArchitectWallSolids {
       final cached = _cache[project]?[storey];
       if (cached != null) return cached;
     }
-    final roofFloors = [storey];
-    if (project != null && storey.roofs.isEmpty) {
-      final index = project.storeys.indexWhere((s) => s.id == storey.id);
-      if (index >= 0 &&
-          index + 1 < project.storeys.length &&
-          project.storeys[index + 1].walls.isEmpty) {
-        roofFloors.add(project.storeys[index + 1]);
-      }
-    }
+    final roofFloors = [
+      storey,
+      if (project != null)
+        for (final floor in project.storeys)
+          if (floor.id != storey.id &&
+              floor.roofs.isNotEmpty &&
+              ArchitectRoofGeometry.supportingWallStorey(project, floor)?.id ==
+                  storey.id)
+            floor,
+    ];
     final roofEnvelopes = [
       for (final floor in roofFloors)
         for (final roof in floor.roofs) (floor, roof),
@@ -190,62 +192,70 @@ class ArchitectWallSolids {
         final color = wall.layers.isEmpty && !plinth.enabled
             ? const Color(0xFFECEFF1)
             : region.layer.material.color;
-        final tris = [
-          for (final part in parts)
-            ...ArchitectPathSolid.between(
-              part.path,
-              part.bottom,
-              part.top,
-              color,
-            ),
-        ];
+        // Each clipped part is a closed solid. Keep it separate so vertical
+        // sections do not trace through shared internal faces and lose masonry.
+        for (final part in parts) {
+          final tris = ArchitectPathSolid.between(
+            part.path,
+            part.bottom,
+            part.top,
+            color,
+          );
 
-        final exteriorLayer = wall.resolvedLayers.first;
-        // With no explicit render skin, the finish is a surface treatment;
-        // it must not turn the insulation or masonry volume into stone.
-        if (wall.isExterior &&
-            plinth.enabled &&
-            mid >= plinth.baseElevation &&
-            mid < plinth.baseElevation + plinth.height &&
-            region.layer.id == exteriorLayer.id &&
-            exteriorLayer.role != ArchitectLayerRole.finish) {
-          final plane =
-              wall.centerStart + wall.exteriorNormal * (wall.thickness / 2);
-          for (var j = 0; j < tris.length; j++) {
-            final t = tris[j];
-            bool onFace(Vector3 p) {
-              if (wall.isCurved) {
-                return ((Offset(p.x, p.y) - wall.arc!.center).distance -
-                            (wall.arc!.radius -
-                                wall.arcBulge.sign *
-                                    (wall.centerLineOffset +
-                                        wall.exteriorSign *
-                                            wall.thickness /
-                                            2)))
+          final exteriorLayer = wall.resolvedLayers.first;
+          // With no explicit render skin, the finish is a surface treatment;
+          // it must not turn the insulation or masonry volume into stone.
+          if (wall.isExterior &&
+              plinth.enabled &&
+              mid >= plinth.baseElevation &&
+              mid < plinth.baseElevation + plinth.height &&
+              region.layer.id == exteriorLayer.id &&
+              exteriorLayer.role != ArchitectLayerRole.finish) {
+            final plane =
+                wall.centerStart + wall.exteriorNormal * (wall.thickness / 2);
+            for (var j = 0; j < tris.length; j++) {
+              final t = tris[j];
+              bool onFace(Vector3 p) {
+                if (wall.isCurved) {
+                  return ((Offset(p.x, p.y) - wall.arc!.center).distance -
+                              (wall.arc!.radius -
+                                  wall.arcBulge.sign *
+                                      (wall.centerLineOffset +
+                                          wall.exteriorSign *
+                                              wall.thickness /
+                                              2)))
+                          .abs() <
+                      .0001;
+                }
+                return ((Offset(p.x, p.y) - plane).dx * wall.exteriorNormal.dx +
+                            (Offset(p.x, p.y) - plane).dy *
+                                wall.exteriorNormal.dy)
                         .abs() <
-                    .0001;
+                    .00001;
               }
-              return ((Offset(p.x, p.y) - plane).dx * wall.exteriorNormal.dx +
-                          (Offset(p.x, p.y) - plane).dy *
-                              wall.exteriorNormal.dy)
-                      .abs() <
-                  .00001;
-            }
 
-            if ([t.v0, t.v1, t.v2].every(onFace)) {
-              tris[j] = Triangle3D(
-                v0: t.v0,
-                v1: t.v1,
-                v2: t.v2,
-                color: plinth.finish.color,
-              );
+              if ([t.v0, t.v1, t.v2].every(onFace)) {
+                tris[j] = Triangle3D(
+                  v0: t.v0,
+                  v1: t.v1,
+                  v2: t.v2,
+                  color: plinth.finish.color,
+                );
+              }
             }
           }
+          if (tris.isEmpty) continue;
+          result.add(
+            ArchitectWallSolid(
+              wall,
+              region.layer,
+              part.path,
+              bottom,
+              top,
+              tris,
+            ),
+          );
         }
-        if (tris.isEmpty) continue;
-        result.add(
-          ArchitectWallSolid(wall, region.layer, path, bottom, top, tris),
-        );
       }
     }
     if (cacheable) {

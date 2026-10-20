@@ -18,6 +18,7 @@ class ArchitectRoofLayersResult {
   final ArchitectRoofEavesCut eavesCut;
   final double? baseElevationOffset;
   final bool attachToWalls;
+  final double? manualSupportDistance;
 
   const ArchitectRoofLayersResult({
     required this.assembly,
@@ -26,6 +27,7 @@ class ArchitectRoofLayersResult {
     required this.eavesCut,
     this.baseElevationOffset,
     this.attachToWalls = true,
+    this.manualSupportDistance,
   });
 }
 
@@ -36,6 +38,8 @@ class ArchitectRoofLayersDialog extends StatefulWidget {
   final ArchitectRoofEavesCut initialEavesCut;
   final double? initialBaseElevationOffset;
   final bool initialAttachToWalls;
+  final double? initialManualSupportDistance;
+  final double? maxSupportDistance;
   final ValueChanged<ArchitectRoofLayersResult> onApply;
 
   const ArchitectRoofLayersDialog({
@@ -46,6 +50,8 @@ class ArchitectRoofLayersDialog extends StatefulWidget {
     required this.initialEavesCut,
     this.initialBaseElevationOffset,
     this.initialAttachToWalls = true,
+    this.initialManualSupportDistance,
+    this.maxSupportDistance,
     required this.onApply,
   });
 
@@ -61,6 +67,9 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
   late ArchitectRoofEavesCut _eavesCut;
   late double? _baseElevationOffset;
   late bool _attachToWalls;
+  late bool _manualSupport;
+  late final TextEditingController _supportDistance;
+  final _supportField = GlobalKey<FormFieldState<String>>();
 
   @override
   void initState() {
@@ -71,6 +80,17 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
     _eavesCut = widget.initialEavesCut;
     _baseElevationOffset = widget.initialBaseElevationOffset;
     _attachToWalls = widget.initialAttachToWalls;
+    _manualSupport = widget.initialManualSupportDistance != null;
+    _supportDistance = TextEditingController(
+      text: ((widget.initialManualSupportDistance ?? _eavesOverhang) * 100)
+          .toStringAsFixed(1),
+    );
+  }
+
+  @override
+  void dispose() {
+    _supportDistance.dispose();
+    super.dispose();
   }
 
   void _selectPreset(ArchitectRoofPreset preset) {
@@ -147,7 +167,24 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
     });
   }
 
+  String? _validateSupportDistance(String? text) {
+    final cm = double.tryParse((text ?? '').trim().replaceAll(',', '.'));
+    if (cm == null ||
+        !cm.isFinite ||
+        cm < 0 ||
+        (widget.maxSupportDistance != null &&
+            cm / 100 > widget.maxSupportDistance!)) {
+      return context.l10n.architectRoofSupportDistanceInvalid;
+    }
+    return null;
+  }
+
   void _save() {
+    if (_manualSupport &&
+        _validateSupportDistance(_supportDistance.text) != null) {
+      _supportField.currentState?.validate();
+      return;
+    }
     widget.onApply(
       ArchitectRoofLayersResult(
         assembly: _assembly,
@@ -156,6 +193,10 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
         eavesCut: _eavesCut,
         baseElevationOffset: _baseElevationOffset,
         attachToWalls: _attachToWalls,
+        manualSupportDistance: _manualSupport
+            ? double.parse(_supportDistance.text.trim().replaceAll(',', '.')) /
+                  100
+            : null,
       ),
     );
     Navigator.of(context).pop();
@@ -339,6 +380,43 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
             ],
           ),
           const SizedBox(height: 8),
+          Tooltip(
+            message: l.architectRoofManualSupportHelp,
+            child: CheckboxListTile(
+              key: const ValueKey('roof-manual-support'),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: Text(
+                l.architectRoofManualSupport,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
+              value: _manualSupport,
+              activeColor: const Color(0xFF00E5FF),
+              checkColor: Colors.black,
+              onChanged: (value) =>
+                  setState(() => _manualSupport = value ?? false),
+            ),
+          ),
+          if (_manualSupport) ...[
+            TextFormField(
+              key: _supportField,
+              controller: _supportDistance,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                labelText: l.architectRoofSupportDistance,
+                suffixText: 'cm',
+                labelStyle: const TextStyle(color: Colors.white70),
+                isDense: true,
+              ),
+              validator: _validateSupportDistance,
+            ),
+            const SizedBox(height: 12),
+          ],
           Row(
             children: [
               Expanded(

@@ -145,10 +145,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
 
   void _snapRoofToWalls(String roofId) {
     _updateRoof(roofId, (storey, roof) {
-      final sorted = [...project.storeys]
-        ..sort((a, b) => a.elevation.compareTo(b.elevation));
-      final idx = sorted.indexWhere((s) => s.id == storey.id);
-      final lower = idx > 0 ? sorted[idx - 1] : null;
+      final lower = ArchitectRoofGeometry.supportingWallStorey(project, storey);
       final resolvedOffset =
           ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
             roof: roof,
@@ -192,14 +189,13 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
         initialEavesCut: hit.roof.eavesCut,
         initialBaseElevationOffset: hit.roof.baseElevationOffset,
         initialAttachToWalls: hit.roof.attachToWalls,
+        initialManualSupportDistance: hit.roof.manualSupportDistance,
+        maxSupportDistance: hit.roof.maxSlopeRun,
         onApply: (res) {
           _updateRoof(roofId, (st, r) {
             var nextOffset = res.baseElevationOffset;
             if (res.attachToWalls && !r.attachToWalls) {
-              final sorted = [...project.storeys]
-                ..sort((a, b) => a.elevation.compareTo(b.elevation));
-              final idx = sorted.indexWhere((s) => s.id == st.id);
-              final lower = idx > 0 ? sorted[idx - 1] : null;
+              final lower = ArchitectRoofGeometry.supportingWallStorey(project, st);
               nextOffset =
                   ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
                     roof: r.copyWith(
@@ -219,6 +215,8 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
               eavesCut: res.eavesCut,
               baseElevationOffset: nextOffset,
               attachToWalls: res.attachToWalls,
+              manualSupportDistance: res.manualSupportDistance,
+              clearManualSupportDistance: res.manualSupportDistance == null,
             );
           });
         },

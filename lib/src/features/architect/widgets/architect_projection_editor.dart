@@ -220,6 +220,8 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
           initialEavesCut: roof.eavesCut,
           initialBaseElevationOffset: roof.baseElevationOffset,
           initialAttachToWalls: roof.attachToWalls,
+          initialManualSupportDistance: roof.manualSupportDistance,
+          maxSupportDistance: roof.maxSlopeRun,
           onApply: (result) => apply(
             () => UpdateArchitectRoofPlane(
               storeyId: ref.storey.id,
@@ -230,6 +232,8 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                 eavesCut: result.eavesCut,
                 baseElevationOffset: result.baseElevationOffset,
                 attachToWalls: result.attachToWalls,
+                manualSupportDistance: result.manualSupportDistance,
+                clearManualSupportDistance: result.manualSupportDistance == null,
               ),
             ).apply(project),
           ),

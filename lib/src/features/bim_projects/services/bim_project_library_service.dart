@@ -402,6 +402,13 @@ class BimProjectLibraryService {
         );
       }).toList();
 
+      // Roof plans belong to the architectural model and have no underlay
+      // entry in the shared storey manifest.
+      final manifestIds = {for (final s in manifest.storeys) s.storeyId};
+      syncedStoreys.addAll(
+        arch.storeys.where((s) => s.isRoof && !manifestIds.contains(s.id)),
+      );
+
       final activeExists = syncedStoreys.any((s) => s.id == arch.activeStoreyId);
       final activeId = activeExists
           ? arch.activeStoreyId
@@ -410,7 +417,7 @@ class BimProjectLibraryService {
       return arch.copyWith(
         storeys: syncedStoreys,
         activeStoreyId: activeId,
-      );
+      ).syncRoofElevation();
     } catch (e) {
       debugPrint('Error loading architectural project for $projectId: $e');
       return null;

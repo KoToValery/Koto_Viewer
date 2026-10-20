@@ -82,6 +82,27 @@ class ArchitectRoofSectionSlice {
 // === SECTION: AUTO-ROOF GENERATOR ===
 
 class ArchitectRoofGeometry {
+  /// Resolve by physical elevation, independent of plan/menu ordering. Empty
+  /// intermediate levels must not hide the walls carrying a dedicated roof plan.
+  static ArchitectStorey? supportingWallStorey(
+    ArchitectProject project,
+    ArchitectStorey roofStorey,
+  ) {
+    if (roofStorey.walls.any((w) => !w.isParapet)) return roofStorey;
+    final candidates =
+        project.storeys
+            .where(
+              (s) =>
+                  s.id != roofStorey.id &&
+                  !s.isRoof &&
+                  s.elevation <= roofStorey.elevation + 1e-4 &&
+                  s.walls.any((w) => !w.isParapet),
+            )
+            .toList()
+          ..sort((a, b) => b.elevation.compareTo(a.elevation));
+    return candidates.firstOrNull;
+  }
+
   /// Generates a complete roof (Gable, Hip, Shed, or Flat) over the exterior walls
   /// or slabs of the active storey (or the supporting storey immediately below if active storey has no walls).
   static List<ArchitectRoofPlane> generateAutoRoof({
@@ -625,15 +646,21 @@ class ArchitectRoofGeometry {
   }
 
   /// Returns the inner wall bearing line segment `(p1, p2)` shifted inward from
-  /// the eaves edge by `roof.eavesOverhang`, clipped to the roof polygon.
+  /// the eaves edge by the manual support distance or nominal overhang,
+  /// clipped to the roof polygon.
   static (Offset, Offset)? wallBearingLine(ArchitectRoofPlane roof) {
-    if (roof.eavesOverhang <= 0.01 || roof.points.length < 3) return null;
+    final distance = roof.manualSupportDistance ?? roof.eavesOverhang;
+    if (!distance.isFinite || distance < 0 || distance > roof.maxSlopeRun ||
+        roof.points.length < 3) {
+      return null;
+    }
+    if (roof.manualSupportDistance == null && distance <= 0.01) return null;
     final (ea, eb) = roof.eavesEdge;
     final inward = roof.inwardNormalOfEdge(roof.safeEavesEdgeIndex);
     final shift = inward *
         (roof.reverseSlope
-            ? (roof.maxSlopeRun - roof.eavesOverhang)
-            : roof.eavesOverhang);
+            ? (roof.maxSlopeRun - distance)
+            : distance);
     final lineA = ea + shift;
     final lineB = eb + shift;
     final edgeDir = eb - ea;
@@ -728,14 +755,21 @@ class ArchitectRoofGeometry {
     final lineDir = lineVec / lineLen;
 
     // 0. Intersect supporting walls with sectionLine to find transverse wall intervals [wMin, wMax]
-    final supportingWalls = storey.walls.isNotEmpty
-        ? storey.walls
+    final supportingWalls = storey.walls.any((w) => !w.isParapet)
+        ? storey.walls.where((w) => !w.isParapet).toList()
         : (lowerStorey?.walls ?? const []);
-    final wallIntervals = <({double fromS, double toS})>[];
+    final wallIntervals = <({double fromS, double toS, double plateScale})>[];
     for (final wall in supportingWalls) {
       if (wall.isParapet) continue;
-      final corners = wall.polygonCorners;
+      // Concrete and timber bear on the masonry/concrete core, never on the
+      // centre of the complete envelope (which may include thick insulation).
+      final corners = wall.coreCorners;
       if (corners.length < 3) continue;
+      final transverse =
+          (wall.normalVector.dx * lineDir.dx +
+                  wall.normalVector.dy * lineDir.dy)
+              .abs();
+      if (!wall.isCurved && transverse < 0.15) continue;
       final wHits = <double>[];
       for (var i = 0; i < corners.length; i++) {
         final a = corners[i];
@@ -761,8 +795,13 @@ class ArchitectRoofGeometry {
         final wMax = wHits.last;
         final wSpan = wMax - wMin;
         // Transverse / oblique wall cross-section (exclude longitudinal gable wall cuts)
-        if (wSpan >= 0.06 && wSpan <= 0.85) {
-          wallIntervals.add((fromS: wMin, toS: wMax));
+        if (wSpan >= 0.01 &&
+            (wall.isCurved || wSpan <= wall.coreThickness / transverse + 0.01)) {
+          wallIntervals.add((
+            fromS: wMin,
+            toS: wMax,
+            plateScale: wall.isCurved ? 1.0 : 1.0 / transverse,
+          ));
         }
       }
     }
@@ -1004,14 +1043,17 @@ class ArchitectRoofGeometry {
       // at intersected supporting walls (or at the nominal eaves bearing line if no walls are present).
       if ((timber.hasWallPlate || timber.hasRingBeam) &&
           slopeDirDotSection > 0.25) {
-        final sliceWallSpans = <({double fromS, double toS})>[];
-        for (final wSpan in wallIntervals) {
-          final wCenter = (wSpan.fromS + wSpan.toS) * 0.5;
-          if (wCenter > s0 + 0.04 && wCenter < s1 - 0.04) {
-            sliceWallSpans.add(wSpan);
+        final sliceWallSpans = <({double fromS, double toS, double plateScale})>[];
+        if (roof.manualSupportDistance == null) {
+          for (final wSpan in wallIntervals) {
+            final wCenter = (wSpan.fromS + wSpan.toS) * 0.5;
+            if (wCenter >= s0 - 1e-4 && wCenter <= s1 + 1e-4) {
+              sliceWallSpans.add(wSpan);
+            }
           }
         }
-        if (sliceWallSpans.isEmpty) {
+        if (roof.manualSupportDistance != null ||
+            (sliceWallSpans.isEmpty && supportingWalls.isEmpty)) {
           final bearingLine = wallBearingLine(roof);
           double? sWallPlate;
           if (bearingLine != null) {
@@ -1027,18 +1069,29 @@ class ArchitectRoofGeometry {
                   (hit - sectionLine.start).dy * lineDir.dy;
             }
           }
-          if (sWallPlate == null && roof.eavesOverhang > 0.05) {
+          if (roof.manualSupportDistance == null &&
+              sWallPlate == null && roof.eavesOverhang > 0.05) {
             final overhangS =
                 roof.eavesOverhang / math.max(0.3, slopeDirDotSection);
             sWallPlate = zTop0 <= zTop1 ? (s0 + overhangS) : (s1 - overhangS);
           }
           if (sWallPlate != null &&
-              sWallPlate > s0 + 0.05 &&
-              sWallPlate < s1 - 0.05) {
-            final nominalHalfW = math.max(0.125, timber.wallPlateWidth * 0.5);
+              sWallPlate >= s0 - 1e-4 &&
+              sWallPlate <= s1 + 1e-4) {
+            final plateScale = 1.0 / slopeDirDotSection;
+            var nominalWidth = math.max(0.25, timber.wallPlateWidth) * plateScale;
+            if (roof.manualSupportDistance != null && wallIntervals.isNotEmpty) {
+              final station = sWallPlate;
+              final nearest = [...wallIntervals]..sort((a, b) =>
+                (((a.fromS + a.toS) * .5) - station).abs().compareTo(
+                  (((b.fromS + b.toS) * .5) - station).abs()));
+              nominalWidth = nearest.first.toS - nearest.first.fromS;
+            }
+            final nominalHalfW = nominalWidth * .5;
             sliceWallSpans.add((
               fromS: sWallPlate - nominalHalfW,
               toS: sWallPlate + nominalHalfW,
+              plateScale: plateScale,
             ));
           }
         }
@@ -1048,17 +1101,23 @@ class ArchitectRoofGeometry {
 
         for (final wSpan in sliceWallSpans) {
           final sWallCenter = (wSpan.fromS + wSpan.toS) * 0.5;
-          final wallW = (wSpan.toS - wSpan.fromS).clamp(0.12, 0.85);
+          final wallW = wSpan.toS - wSpan.fromS;
           // Rafter underside elevation at the supporting wall centerline
           final zRafterBotWall =
               zTop0 + dzDs * (sWallCenter - s0) - dRafterBotV;
           var zCurrentBot = zRafterBotWall;
 
           if (timber.hasWallPlate) {
-            final halfWp = math.min(timber.wallPlateWidth, wallW) * 0.5;
+            final halfWp =
+                math.min(timber.wallPlateWidth * wSpan.plateScale, wallW) * 0.5;
             final sa = sWallCenter - halfWp;
             final sb = sWallCenter + halfWp;
-            final zWpTop = zCurrentBot;
+            // A horizontal seat cuts a shallow birdsmouth in the rafter;
+            // choosing its higher underside avoids a gap above half the plate.
+            final zWpTop = math.max(
+              zTop0 + dzDs * (sa - s0) - dRafterBotV,
+              zTop0 + dzDs * (sb - s0) - dRafterBotV,
+            );
             final zWpBot = zWpTop - timber.wallPlateHeight;
             final wpPoly = <Offset>[
               Offset(sa, zWpTop),

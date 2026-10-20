@@ -6046,6 +6046,20 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectRoofOverhang => 'Стреха';
 
   @override
+  String get architectRoofManualSupport => 'Ръчно положение на опората';
+
+  @override
+  String get architectRoofSupportDistance => 'От стрехата';
+
+  @override
+  String get architectRoofManualSupportHelp =>
+      'Хоризонтално разстояние от ръба на стрехата до оста на пояса и дървената греда. Махнете отметката, за да следват носещата стена автоматично.';
+
+  @override
+  String get architectRoofSupportDistanceInvalid =>
+      'Въведете разстояние в рамките на ската.';
+
+  @override
   String get architectRoofBaseElev => 'Кота стреха';
 
   @override

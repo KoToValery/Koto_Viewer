@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/bim_projects/models/bim_work_project.dart';
 import 'package:kotoview/src/features/bim_projects/services/bim_export_service.dart';
 import 'package:kotoview/src/features/bim_projects/services/bim_project_library_service.dart';
@@ -197,6 +198,86 @@ void main() {
         await tempDir.delete(recursive: true);
       }
     });
+
+    test(
+      'architectural roof plan survives manifest sync and repeated reopen',
+      () async {
+        final manifest = await libraryService.createProject(
+          name: 'Roof persistence',
+          storeys: const [
+            BimStoreyUnderlay(
+              storeyId: 'ground',
+              name: 'Ground',
+              elevation: 0,
+              height: 3,
+            ),
+          ],
+        );
+        final initial = (await libraryService.loadArchitectProject(
+          manifest.id,
+        ))!;
+        final withRoofPlan = initial.ensureRoofStorey();
+        final roofPlan = withRoofPlan.roofStorey!;
+        final roof = ArchitectRoofPlane(
+          id: 'saved_roof',
+          storeyId: roofPlan.id,
+          points: const [
+            Offset(-1, -1),
+            Offset(6, -1),
+            Offset(6, 4),
+            Offset(-1, 4),
+          ],
+          slopeDegrees: 31,
+          eavesOverhang: 1.1,
+          baseElevationOffset: 0.35,
+          placementResolved: true,
+          roofGroupId: 'saved_group',
+        manualSupportDistance: .75,
+          assembly: ArchitectRoofAssembly.fromPreset(
+            ArchitectRoofPreset.warmPitched,
+          ),
+        );
+        var architectural = withRoofPlan.copyWith(
+          activeStoreyId: roofPlan.id,
+          storeys: [
+            ...initial.storeys,
+            roofPlan.copyWith(roofs: [roof]),
+          ],
+        );
+        for (var reopen = 0; reopen < 3; reopen++) {
+          expect(
+            await libraryService.saveArchitectProject(
+              manifest.id,
+              architectural,
+            ),
+            isTrue,
+          );
+          architectural = (await libraryService.loadArchitectProject(
+            manifest.id,
+          ))!;
+          expect(architectural.activeStoreyId, roofPlan.id);
+          expect(
+            architectural.roofStorey!.roofs.single.toJson(),
+            roof.toJson(),
+          );
+          expect(architectural.storeys.length, 2);
+        }
+        final latestManifest = (await libraryService.loadProject(manifest.id))!;
+        expect(
+          await libraryService.saveProjectManifest(
+            latestManifest.copyWith(
+              storeys: [latestManifest.storeys.single.copyWith(height: 3.4)],
+            ),
+          ),
+          isTrue,
+        );
+        final changed = (await libraryService.loadArchitectProject(
+          manifest.id,
+        ))!;
+        expect(changed.roofStorey!.elevation, closeTo(3.4, 1e-6));
+        expect(changed.roofStorey!.roofs.single.toJson(), roof.toJson());
+      },
+    );
 
     test(
       'Creates project, saves manifest, loads structural model and exports ZIP',

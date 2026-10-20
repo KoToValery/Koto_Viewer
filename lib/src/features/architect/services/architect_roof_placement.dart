@@ -11,8 +11,6 @@ class ArchitectRoofPlacement {
       for (final s in previous?.storeys ?? <ArchitectStorey>[])
         for (final r in s.roofs) r.id: r,
     };
-    final sorted = [...next.storeys]
-      ..sort((a, b) => a.elevation.compareTo(b.elevation));
     var changed = false;
     final floors = [
       for (final floor in next.storeys)
@@ -29,12 +27,14 @@ class ArchitectRoofPlacement {
                         (roof.placementResolved || old.containsKey(roof.id)))) {
                   return roof;
                 }
-                final index = sorted.indexWhere((s) => s.id == floor.id);
                 final height =
                     ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
                       roof: roof,
                       storey: floor,
-                      lowerStorey: index > 0 ? sorted[index - 1] : null,
+                      lowerStorey: ArchitectRoofGeometry.supportingWallStorey(
+                        next,
+                        floor,
+                      ),
                     );
                 changed = true;
                 return roof.copyWith(

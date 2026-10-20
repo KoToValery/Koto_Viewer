@@ -695,6 +695,8 @@ class ArchitectRoofPlane {
   /// The initial support height has been materialized in model coordinates.
   bool placementResolved;
   double eavesOverhang;
+  /// Horizontal eaves-to-support centreline distance; null follows the walls.
+  double? manualSupportDistance;
   ArchitectRoofEavesCut eavesCut;
   ArchitectRoofAssembly assembly;
   String? roofGroupId;
@@ -711,6 +713,7 @@ class ArchitectRoofPlane {
     this.attachToWalls = true,
     this.placementResolved = false,
     this.eavesOverhang = 0.50,
+    this.manualSupportDistance,
     this.eavesCut = ArchitectRoofEavesCut.plumb,
     ArchitectRoofAssembly? assembly,
     this.roofGroupId,
@@ -915,6 +918,8 @@ class ArchitectRoofPlane {
     bool? attachToWalls,
     bool? placementResolved,
     double? eavesOverhang,
+    double? manualSupportDistance,
+    bool clearManualSupportDistance = false,
     ArchitectRoofEavesCut? eavesCut,
     ArchitectRoofAssembly? assembly,
     String? roofGroupId,
@@ -930,6 +935,9 @@ class ArchitectRoofPlane {
     attachToWalls: attachToWalls ?? this.attachToWalls,
     placementResolved: placementResolved ?? this.placementResolved,
     eavesOverhang: eavesOverhang ?? this.eavesOverhang,
+    manualSupportDistance: clearManualSupportDistance
+        ? null
+        : (manualSupportDistance ?? this.manualSupportDistance),
     eavesCut: eavesCut ?? this.eavesCut,
     assembly: assembly ?? this.assembly.copyWith(),
     roofGroupId: roofGroupId ?? this.roofGroupId,
@@ -949,6 +957,8 @@ class ArchitectRoofPlane {
     'attachToWalls': attachToWalls,
     'placementResolved': placementResolved,
     'eavesOverhang': eavesOverhang,
+    if (manualSupportDistance != null)
+      'manualSupportDistance': manualSupportDistance,
     'eavesCut': eavesCut.name,
     'assembly': assembly.toJson(),
     'roofGroupId': roofGroupId,
@@ -972,6 +982,7 @@ class ArchitectRoofPlane {
       attachToWalls: json['attachToWalls'] as bool? ?? true,
       placementResolved: json['placementResolved'] as bool? ?? false,
       eavesOverhang: (json['eavesOverhang'] as num?)?.toDouble() ?? 0.50,
+      manualSupportDistance: (json['manualSupportDistance'] as num?)?.toDouble(),
       eavesCut: ArchitectRoofEavesCut.values.byName(
         json['eavesCut'] as String? ?? ArchitectRoofEavesCut.plumb.name,
       ),

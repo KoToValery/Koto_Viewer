@@ -294,14 +294,17 @@ class Architect3dBuilder {
     // 1. Wall plate (Mauerlat / Мауерлат) along wall bearing line & Ridge Purlin (Билова столица)
     final wpW = timber.wallPlateWidth.clamp(0.10, 0.24);
     final wpH = timber.wallPlateHeight.clamp(0.10, 0.24);
-    final dWall = minD + math.min(roof.eavesOverhang, spanD * 0.45);
-    if (dWall + wpW < maxD) {
+    final dWall = minD + (roof.manualSupportDistance ??
+        math.min(roof.eavesOverhang, spanD * 0.45));
+    if (timber.hasWallPlate && (roof.manualSupportDistance != null
+        ? dWall - wpW * .5 < maxD && dWall + wpW * .5 > minD
+        : dWall + wpW < maxD)) {
       final wpClipped = _clipPolygonToRect(
         polySD,
         minS,
         maxS,
-        dWall,
-        dWall + wpW,
+        roof.manualSupportDistance != null ? dWall - wpW * .5 : dWall,
+        roof.manualSupportDistance != null ? dWall + wpW * .5 : dWall + wpW,
       );
       _addExtrudedClippedPrism(
         tris,

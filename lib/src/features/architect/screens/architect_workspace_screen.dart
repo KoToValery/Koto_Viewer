@@ -7037,10 +7037,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       case 'move_vertical':
         setState(() => _selectedSectionRoofId = roofId);
       case 'snap_walls':
-        final sorted = [..._modelCommands.project.storeys]
-          ..sort((a, b) => a.elevation.compareTo(b.elevation));
-        final idx = sorted.indexWhere((s) => s.id == hit.storey.id);
-        final lower = idx > 0 ? sorted[idx - 1] : null;
+        final lower = ArchitectRoofGeometry.supportingWallStorey(
+          _modelCommands.project, hit.storey,
+        );
         final resolvedOffset =
             ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
               roof: hit.roof,
@@ -8218,12 +8217,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         initialEavesCut: initialEavesCut,
         initialBaseElevationOffset: target?.baseElevationOffset,
         initialAttachToWalls: target?.attachToWalls ?? true,
+        initialManualSupportDistance: target != null
+            ? target.manualSupportDistance : _roofTool.manualSupportDistance,
+        maxSupportDistance: target?.maxSlopeRun,
         onApply: (result) {
           setState(() {
             _roofTool.setAssembly(result.assembly);
             _roofTool.setSlopeDegrees(result.slopeDegrees);
             _roofTool.setEavesOverhang(result.eavesOverhang);
             _roofTool.setEavesCut(result.eavesCut);
+            _roofTool.setManualSupportDistance(result.manualSupportDistance);
             if (target != null) {
               final hit = ArchitectBuildingSection.findRoofById(
                 _modelCommands.project,
@@ -8233,10 +8236,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               final currentRoof = hit?.roof ?? target;
               var nextOffset = result.baseElevationOffset;
               if (result.attachToWalls && !currentRoof.attachToWalls) {
-                final sorted = [..._modelCommands.project.storeys]
-                  ..sort((a, b) => a.elevation.compareTo(b.elevation));
-                final idx = sorted.indexWhere((s) => s.id == storey.id);
-                final lower = idx > 0 ? sorted[idx - 1] : null;
+                final lower = ArchitectRoofGeometry.supportingWallStorey(
+                  _modelCommands.project, storey,
+                );
                 nextOffset =
                     ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
                       roof: currentRoof.copyWith(
@@ -8259,6 +8261,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     eavesCut: result.eavesCut,
                     baseElevationOffset: nextOffset,
                     attachToWalls: result.attachToWalls,
+                    manualSupportDistance: result.manualSupportDistance,
+                    clearManualSupportDistance: result.manualSupportDistance == null,
                   ),
                 ),
               );

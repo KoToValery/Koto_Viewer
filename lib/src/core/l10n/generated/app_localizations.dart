@@ -10637,6 +10637,30 @@ abstract class AppLocalizations {
   /// **'Eaves'**
   String get architectRoofOverhang;
 
+  /// No description provided for @architectRoofManualSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual support position'**
+  String get architectRoofManualSupport;
+
+  /// No description provided for @architectRoofSupportDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'From eaves'**
+  String get architectRoofSupportDistance;
+
+  /// No description provided for @architectRoofManualSupportHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal distance from the eaves edge to the centre of the ring beam and wall plate. Uncheck to follow the supporting wall automatically.'**
+  String get architectRoofManualSupportHelp;
+
+  /// No description provided for @architectRoofSupportDistanceInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a distance within the roof plane.'**
+  String get architectRoofSupportDistanceInvalid;
+
   /// No description provided for @architectRoofBaseElev.
   ///
   /// In en, this message translates to:

@@ -150,9 +150,11 @@ class ArchitectBuildingSection {
 
     // 1. Pre-build roof section slices per storey
     final storeyRoofSlices = <String, List<ArchitectRoofSectionSlice>>{};
-    for (var i = 0; i < project.storeys.length; i++) {
-      final floor = project.storeys[i];
-      final lowerFloor = i > 0 ? project.storeys[i - 1] : null;
+    for (final floor in project.storeys) {
+      final lowerFloor = ArchitectRoofGeometry.supportingWallStorey(
+        project,
+        floor,
+      );
       final slices = ArchitectRoofGeometry.buildSectionSlices(
         storey: floor,
         sectionLine: cut,
@@ -231,16 +233,15 @@ class ArchitectBuildingSection {
     }
 
     // 3. Build Walls, Columns, Beams, Stairs — trimming walls against roofs and slabs
-    for (var fIdx = 0; fIdx < project.storeys.length; fIdx++) {
-      final floor = project.storeys[fIdx];
-      // Check if this floor has pitched roofs (or if a dedicated roof-only storey sits directly above it)
-      var activeRoofSlices = storeyRoofSlices[floor.id] ?? const [];
-      if (activeRoofSlices.isEmpty && fIdx + 1 < project.storeys.length) {
-        final upper = project.storeys[fIdx + 1];
-        if (upper.walls.isEmpty && upper.roofs.isNotEmpty) {
-          activeRoofSlices = storeyRoofSlices[upper.id] ?? const [];
-        }
-      }
+    for (final floor in project.storeys) {
+      final activeRoofSlices = <ArchitectRoofSectionSlice>[
+        ...?storeyRoofSlices[floor.id],
+        for (final upper in project.storeys)
+          if (upper.id != floor.id &&
+              ArchitectRoofGeometry.supportingWallStorey(project, upper)?.id ==
+                  floor.id)
+            ...?storeyRoofSlices[upper.id],
+      ]..sort((a, b) => a.fromS.compareTo(b.fromS));
 
       // Compute max roof underside height on this floor so supporting and gable walls rise to meet the roof underside
       var maxRoofHeightAboveFloor = floor.height;
