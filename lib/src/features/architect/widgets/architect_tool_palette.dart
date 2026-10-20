@@ -7,6 +7,7 @@ import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_wall_type.dart';
 import '../models/architect_zone.dart';
+import '../models/architect_zone_presets.dart';
 import '../models/architect_fenestration_style.dart';
 import '../services/fenestration_library_service.dart';
 import '../rendering/architect_2d_painter.dart';
@@ -64,6 +65,7 @@ class ArchitectToolPalette extends StatefulWidget {
   final ValueChanged<ArchitectFenestrationStyle>? onDoorStyleSelected;
 
   // Zone options
+  final ArchitectZonePresets zonePresets;
   final ArchitectZoneCategory activeZoneCategory;
   final ValueChanged<ArchitectZoneCategory> onZoneCategoryChanged;
 
@@ -128,6 +130,7 @@ class ArchitectToolPalette extends StatefulWidget {
 
   const ArchitectToolPalette({
     super.key,
+    this.zonePresets = const ArchitectZonePresets(),
     required this.activeTool,
     this.drawingOnly = false,
     required this.onToolChanged,
@@ -1138,53 +1141,20 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   Widget _buildZoneSubBar(BuildContext context) {
     final l10n = context.l10n;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0x33FFA726),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFFFFA726)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.polyline_rounded,
-                  size: 14,
-                  color: Color(0xFFFFA726),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  l10n.architectZoneDrawPrompt,
-                  style: const TextStyle(
-                    color: Color(0xFFFFA726),
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          for (final cat in ArchitectZoneCategory.values)
-            Padding(
-              padding: const EdgeInsets.only(right: 5),
-              child: ChoiceChip(
-                avatar: Icon(cat.icon, size: 14, color: cat.color),
-                label: Text(cat.localizedName(l10n)),
-                selected: activeZoneCategory == cat,
-                onSelected: (sel) {
-                  if (sel) onZoneCategoryChanged(cat);
-                },
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-        ],
+    return SizedBox(
+      width: 240,
+      child: DropdownButton<ArchitectZoneCategory>(
+        dropdownColor: const Color(0xFF1E2230),
+        style: const TextStyle(color: Colors.white, fontSize: 13),
+        value: activeZoneCategory,
+        isExpanded: true,
+        items: [for (final category in ArchitectZoneCategory.values)
+          DropdownMenuItem(value: category,
+            child: Text(widget.zonePresets.categoryName(category, l10n),
+              maxLines: 1, overflow: TextOverflow.ellipsis))],
+        onChanged: (category) {
+          if (category != null) onZoneCategoryChanged(category);
+        },
       ),
     );
   }

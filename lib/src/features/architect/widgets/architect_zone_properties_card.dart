@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_zone.dart';
+import '../models/architect_zone_presets.dart';
+import 'architect_zone_preset_field.dart';
 import '../services/architect_zone_tool.dart';
 
 // =============================================================================
@@ -21,6 +23,7 @@ import '../services/architect_zone_tool.dart';
 /// dynamic boundary toggle, and finishes inspector.
 class ArchitectZonePropertiesCard extends StatefulWidget {
   final ArchitectZone zone;
+  final ArchitectZonePresets presets;
   final ArchitectZoneTool? tool;
   final ValueChanged<ArchitectZone> onZoneUpdated;
   final VoidCallback onDeleteZone;
@@ -31,6 +34,7 @@ class ArchitectZonePropertiesCard extends StatefulWidget {
     super.key,
     required this.zone,
     this.tool,
+    this.presets = const ArchitectZonePresets(),
     required this.onZoneUpdated,
     required this.onDeleteZone,
     required this.onClose,
@@ -79,12 +83,16 @@ class _ArchitectZonePropertiesCardState
                 onTap: () => _showEditZoneDetailsDialog(context),
                 borderRadius: BorderRadius.circular(6),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: zone.color.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: zone.color.withValues(alpha: 0.5)),
+                    border: Border.all(
+                      color: zone.color.withValues(alpha: 0.5),
+                    ),
                   ),
                   child: Text(
                     '№ ${zone.number}',
@@ -104,6 +112,25 @@ class _ArchitectZonePropertiesCardState
                   child: DropdownButton<ArchitectZoneCategory>(
                     value: zone.category,
                     isDense: true,
+                    isExpanded: true,
+                    selectedItemBuilder: (_) => [
+                      for (final category in ArchitectZoneCategory.values)
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(
+                            category == zone.category && zone.name.isNotEmpty
+                                ? zone.name
+                                : widget.presets.categoryName(category, l10n),
+                            style: TextStyle(
+                              color: zone.color,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
                     dropdownColor: const Color(0xFF1E2230),
                     borderRadius: BorderRadius.circular(10),
                     icon: const Icon(
@@ -121,7 +148,7 @@ class _ArchitectZonePropertiesCardState
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
-                                cat.localizedName(l10n),
+                                widget.presets.categoryName(cat, l10n),
                                 style: TextStyle(
                                   color: cat == zone.category
                                       ? cat.color
@@ -137,18 +164,13 @@ class _ArchitectZonePropertiesCardState
                       );
                     }).toList(),
                     onChanged: (newCat) {
-                      if (newCat != null && newCat != zone.category) {
-                        final currentCat = zone.category;
-                        final isDefaultName =
-                            zone.name == currentCat.defaultBgName ||
-                                zone.name == currentCat.defaultEnName ||
-                                zone.name == currentCat.localizedName(l10n);
-                        widget.onZoneUpdated(zone.copyWith(
-                          category: newCat,
-                          name: isDefaultName
-                              ? newCat.localizedName(l10n)
-                              : zone.name,
-                        ));
+                      if (newCat != null) {
+                        widget.onZoneUpdated(
+                          zone.copyWith(
+                            category: newCat,
+                            name: widget.presets.categoryName(newCat, l10n),
+                          ),
+                        );
                       }
                     },
                   ),
@@ -169,7 +191,10 @@ class _ArchitectZonePropertiesCardState
                 visualDensity: VisualDensity.compact,
               ),
               const SizedBox(width: 4),
-
+            ],
+          ),
+          Row(
+            children: [
               // Net Area Badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
@@ -279,57 +304,29 @@ class _ArchitectZonePropertiesCardState
 
           const SizedBox(height: 6),
 
-          // 3. Dynamic Boundary Mode (Auto follows walls vs Manual fixed)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: zone.isAutoBoundary
-                  ? const Color(0x1A00E5FF)
-                  : const Color(0x1AFFB74D),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: zone.isAutoBoundary
-                    ? const Color(0x4400E5FF)
-                    : const Color(0x44FFB74D),
+          Tooltip(
+            message: l10n.architectZoneManualHelp,
+            child: Material(
+              type: MaterialType.transparency,
+              child: CheckboxListTile(
+                key: const ValueKey('zone-manual-mode'),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: Text(
+                  l10n.architectZoneModeManual,
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                side: const BorderSide(color: Colors.white54),
+                value: !zone.isAutoBoundary,
+                onChanged: (manual) {
+                  if (manual != null) {
+                    widget.onZoneUpdated(
+                      zone.copyWith(isAutoBoundary: !manual),
+                    );
+                  }
+                },
               ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  zone.isAutoBoundary
-                      ? Icons.auto_awesome_rounded
-                      : Icons.edit_note_rounded,
-                  color: zone.isAutoBoundary
-                      ? const Color(0xFF00E5FF)
-                      : const Color(0xFFFFB74D),
-                  size: 15,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    zone.isAutoBoundary
-                        ? l10n.architectZoneBoundaryAuto
-                        : l10n.architectZoneBoundaryManual,
-                    style: TextStyle(
-                      color: zone.isAutoBoundary
-                          ? const Color(0xFF00E5FF)
-                          : const Color(0xFFFFB74D),
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                Transform.scale(
-                  scale: 0.75,
-                  child: Switch(
-                    value: zone.isAutoBoundary,
-                    activeThumbColor: const Color(0xFF00E5FF),
-                    onChanged: (val) {
-                      widget.onZoneUpdated(zone.copyWith(isAutoBoundary: val));
-                    },
-                  ),
-                ),
-              ],
             ),
           ),
         ],
@@ -357,16 +354,18 @@ class _ArchitectZonePropertiesCardState
           ? zone.ceilingFinish
           : zone.resolvedCeilingFinish(l10n),
     );
-    final heightController =
-        TextEditingController(text: zone.clearHeight.toStringAsFixed(2));
+    final heightController = TextEditingController(
+      text: zone.clearHeight.toStringAsFixed(2),
+    );
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: const Color(0xFF1E2230),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
               Icon(zone.category.icon, color: zone.color, size: 22),
@@ -395,7 +394,9 @@ class _ArchitectZonePropertiesCardState
                         child: TextField(
                           controller: numberController,
                           style: const TextStyle(
-                              color: Colors.white, fontSize: 14),
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
                           decoration: InputDecoration(
                             labelText: l10n.architectZoneNumberPrompt,
                             labelStyle: const TextStyle(color: Colors.white70),
@@ -413,23 +414,13 @@ class _ArchitectZonePropertiesCardState
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: TextField(
+                        child: ArchitectZonePresetField(
                           controller: nameController,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 14),
-                          decoration: InputDecoration(
-                            labelText: l10n.architectZoneName,
-                            labelStyle: const TextStyle(color: Colors.white70),
-                            filled: true,
-                            fillColor: const Color(0x22FFFFFF),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                          ),
+                          label: l10n.architectZoneName,
+                          presets: [
+                            for (final category in ArchitectZoneCategory.values)
+                              widget.presets.categoryName(category, l10n),
+                          ],
                         ),
                       ),
                     ],
@@ -438,130 +429,28 @@ class _ArchitectZonePropertiesCardState
                   const SizedBox(height: 12),
 
                   // Floor Finish
-                  TextField(
+                  ArchitectZonePresetField(
                     controller: floorController,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    decoration: InputDecoration(
-                      labelText: l10n.architectZoneFloorFinish,
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      filled: true,
-                      fillColor: const Color(0x22FFFFFF),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final preset
-                            in ArchitectZone.standardFloorFinishes(l10n))
-                          Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: ActionChip(
-                              label: Text(preset,
-                                  style: const TextStyle(fontSize: 10)),
-                              onPressed: () {
-                                setDialogState(
-                                    () => floorController.text = preset);
-                              },
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
-                      ],
-                    ),
+                    label: l10n.architectZoneFloorFinish,
+                    presets: widget.presets.finishes('floor', l10n),
                   ),
 
                   const SizedBox(height: 10),
 
                   // Wall Finish
-                  TextField(
+                  ArchitectZonePresetField(
                     controller: wallController,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    decoration: InputDecoration(
-                      labelText: l10n.architectZoneWallFinish,
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      filled: true,
-                      fillColor: const Color(0x22FFFFFF),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final preset
-                            in ArchitectZone.standardWallFinishes(l10n))
-                          Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: ActionChip(
-                              label: Text(preset,
-                                  style: const TextStyle(fontSize: 10)),
-                              onPressed: () {
-                                setDialogState(
-                                    () => wallController.text = preset);
-                              },
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
-                      ],
-                    ),
+                    label: l10n.architectZoneWallFinish,
+                    presets: widget.presets.finishes('wall', l10n),
                   ),
 
                   const SizedBox(height: 10),
 
                   // Ceiling Finish
-                  TextField(
+                  ArchitectZonePresetField(
                     controller: ceilingController,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    decoration: InputDecoration(
-                      labelText: l10n.architectZoneCeilingFinish,
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      filled: true,
-                      fillColor: const Color(0x22FFFFFF),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final preset
-                            in ArchitectZone.standardCeilingFinishes(l10n))
-                          Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: ActionChip(
-                              label: Text(preset,
-                                  style: const TextStyle(fontSize: 10)),
-                              onPressed: () {
-                                setDialogState(
-                                    () => ceilingController.text = preset);
-                              },
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
-                      ],
-                    ),
+                    label: l10n.architectZoneCeilingFinish,
+                    presets: widget.presets.finishes('ceiling', l10n),
                   ),
 
                   const SizedBox(height: 10),
@@ -569,8 +458,9 @@ class _ArchitectZonePropertiesCardState
                   // Clear Height
                   TextField(
                     controller: heightController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: InputDecoration(
                       labelText: l10n.architectZoneClearHeight,
@@ -601,13 +491,29 @@ class _ArchitectZonePropertiesCardState
                 foregroundColor: Colors.black,
               ),
               onPressed: () {
-                final newH = double.tryParse(heightController.text) ?? 2.60;
+                final newH =
+                    double.tryParse(
+                      heightController.text.replaceAll(',', '.'),
+                    ) ??
+                    2.60;
                 final updated = zone.copyWith(
                   number: numberController.text.trim(),
                   name: nameController.text.trim(),
-                  floorFinish: floorController.text.trim(),
-                  wallFinish: wallController.text.trim(),
-                  ceilingFinish: ceilingController.text.trim(),
+                  floorFinish:
+                      floorController.text.trim() ==
+                          zone.resolvedFloorFinish(l10n)
+                      ? zone.floorFinish
+                      : floorController.text.trim(),
+                  wallFinish:
+                      wallController.text.trim() ==
+                          zone.resolvedWallFinish(l10n)
+                      ? zone.wallFinish
+                      : wallController.text.trim(),
+                  ceilingFinish:
+                      ceilingController.text.trim() ==
+                          zone.resolvedCeilingFinish(l10n)
+                      ? zone.ceilingFinish
+                      : ceilingController.text.trim(),
                   clearHeight: newH,
                 );
                 widget.onZoneUpdated(updated);

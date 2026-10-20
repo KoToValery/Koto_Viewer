@@ -40,6 +40,23 @@ class ZoneMergeCandidate {
 /// Uses 2D spatial discretization (occupancy grid flood-fill), boundary tracing,
 /// Douglas-Peucker simplification, and CAD-exact wall face projection.
 class ArchitectRoomDetector {
+  /// Restores the full room boundary, including legacy zones without a seed.
+  /// Never changes the mode if the room leaks to the exterior.
+  static ArchitectZone? automaticZone(
+    ArchitectZone zone,
+    List<ArchitectWall> walls,
+  ) {
+    final seed = zone.interiorPoint;
+    if (seed == null) return null;
+    final polygon = detectRoomPolygon(seedPoint: seed, walls: walls);
+    if (polygon == null) return null;
+    return zone.copyWith(
+      polygon: polygon,
+      seedPoint: seed,
+      isAutoBoundary: true,
+    );
+  }
+
   /// Detects the enclosed room polygon around [seedPoint] bounded by [walls].
   /// Returns null if the space is unbounded (open to exterior) or too small.
   static List<Offset>? detectRoomPolygon({
@@ -484,7 +501,8 @@ class ArchitectRoomDetector {
       final lineA = snappedLines[(i - 1 + n) % n];
       final lineB = snappedLines[i];
       final corner = _lineIntersection(lineA.$1, lineA.$2, lineB.$1, lineB.$2);
-      if (corner != null && (corner - polygon[i]).distance < snapDistance * 1.5) {
+      if (corner != null &&
+          (corner - polygon[i]).distance < snapDistance * 1.5) {
         result.add(corner);
       } else {
         result.add(polygon[i]);
@@ -498,7 +516,8 @@ class ArchitectRoomDetector {
     final d = lineB - lineA;
     final len = d.distance;
     if (len < 1e-6) return (pt - lineA).distance;
-    return ((d.dx * (lineA.dy - pt.dy) - d.dy * (lineA.dx - pt.dx)).abs()) / len;
+    return ((d.dx * (lineA.dy - pt.dy) - d.dy * (lineA.dx - pt.dx)).abs()) /
+        len;
   }
 
   static Offset _projectPointOnLine(Offset pt, Offset a, Offset b) {
@@ -536,7 +555,8 @@ class ArchitectRoomDetector {
     for (int i = 0, j = poly.length - 1; i < poly.length; j = i++) {
       final pi = poly[i];
       final pj = poly[j];
-      final intersect = ((pi.dy > pt.dy) != (pj.dy > pt.dy)) &&
+      final intersect =
+          ((pi.dy > pt.dy) != (pj.dy > pt.dy)) &&
           (pt.dx < (pj.dx - pi.dx) * (pt.dy - pi.dy) / (pj.dy - pi.dy) + pi.dx);
       if (intersect) inside = !inside;
     }

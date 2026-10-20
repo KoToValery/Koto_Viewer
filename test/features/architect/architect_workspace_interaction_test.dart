@@ -406,6 +406,7 @@ void main() {
           storeyId: 's',
           zone: ArchitectZone(
             id: 'room',
+            isAutoBoundary: false,
             name: 'Room',
             category: ArchitectZoneCategory.living,
             polygon: polygon,

@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_zone.dart';
+import '../models/architect_zone_presets.dart';
+import 'architect_zone_preset_field.dart';
 
 // =============================================================================
 // FILE INDEX / TABLE OF CONTENTS (Grep markers: === SECTION: <NAME> ===)
@@ -20,6 +22,7 @@ import '../models/architect_zone.dart';
 /// Displays room areas, perimeters, floor/wall/ceiling finishes, clear heights,
 /// and total net area summaries with drawing canvas placement and clipboard export.
 class ArchitectZoneScheduleDialog extends StatefulWidget {
+  final ArchitectZonePresets presets;
   final ArchitectStorey storey;
   final ValueChanged<ArchitectZone> onZoneUpdated;
   final ValueChanged<Offset?> onTableOriginChanged;
@@ -27,6 +30,7 @@ class ArchitectZoneScheduleDialog extends StatefulWidget {
   const ArchitectZoneScheduleDialog({
     super.key,
     required this.storey,
+    this.presets = const ArchitectZonePresets(),
     required this.onZoneUpdated,
     required this.onTableOriginChanged,
   });
@@ -34,6 +38,7 @@ class ArchitectZoneScheduleDialog extends StatefulWidget {
   static Future<void> show({
     required BuildContext context,
     required ArchitectStorey storey,
+    ArchitectZonePresets presets = const ArchitectZonePresets(),
     required ValueChanged<ArchitectZone> onZoneUpdated,
     required ValueChanged<Offset?> onTableOriginChanged,
   }) {
@@ -42,6 +47,7 @@ class ArchitectZoneScheduleDialog extends StatefulWidget {
       barrierDismissible: true,
       builder: (ctx) => ArchitectZoneScheduleDialog(
         storey: storey,
+        presets: presets,
         onZoneUpdated: onZoneUpdated,
         onTableOriginChanged: onTableOriginChanged,
       ),
@@ -60,16 +66,18 @@ class _ArchitectZoneScheduleDialogState
     final buffer = StringBuffer();
 
     // Headers
-    buffer.writeln([
-      l10n.architectZoneScheduleColNo,
-      l10n.architectZoneScheduleColName,
-      l10n.architectZoneScheduleColArea,
-      l10n.architectZoneScheduleColPerimeter,
-      l10n.architectZoneScheduleColFloor,
-      l10n.architectZoneScheduleColWalls,
-      l10n.architectZoneScheduleColCeiling,
-      l10n.architectZoneScheduleColHeight,
-    ].join('\t'));
+    buffer.writeln(
+      [
+        l10n.architectZoneScheduleColNo,
+        l10n.architectZoneScheduleColName,
+        l10n.architectZoneScheduleColArea,
+        l10n.architectZoneScheduleColPerimeter,
+        l10n.architectZoneScheduleColFloor,
+        l10n.architectZoneScheduleColWalls,
+        l10n.architectZoneScheduleColCeiling,
+        l10n.architectZoneScheduleColHeight,
+      ].join('\t'),
+    );
 
     double totalArea = 0.0;
     final sortedZones = List<ArchitectZone>.from(widget.storey.zones)
@@ -78,20 +86,24 @@ class _ArchitectZoneScheduleDialogState
     for (int i = 0; i < sortedZones.length; i++) {
       final z = sortedZones[i];
       totalArea += z.area;
-      buffer.writeln([
-        z.number.isNotEmpty ? z.number : '${i + 1}',
-        z.name,
-        z.area.toStringAsFixed(2),
-        z.perimeter.toStringAsFixed(2),
-        z.resolvedFloorFinish(l10n),
-        z.resolvedWallFinish(l10n),
-        z.resolvedCeilingFinish(l10n),
-        z.clearHeight.toStringAsFixed(2),
-      ].join('\t'));
+      buffer.writeln(
+        [
+          z.number.isNotEmpty ? z.number : '${i + 1}',
+          z.name,
+          z.area.toStringAsFixed(2),
+          z.perimeter.toStringAsFixed(2),
+          z.resolvedFloorFinish(l10n),
+          z.resolvedWallFinish(l10n),
+          z.resolvedCeilingFinish(l10n),
+          z.clearHeight.toStringAsFixed(2),
+        ].join('\t'),
+      );
     }
 
     buffer.writeln();
-    buffer.writeln('${l10n.architectZoneScheduleTotalArea}:\t${totalArea.toStringAsFixed(2)} m²');
+    buffer.writeln(
+      '${l10n.architectZoneScheduleTotalArea}:\t${totalArea.toStringAsFixed(2)} m²',
+    );
 
     Clipboard.setData(ClipboardData(text: buffer.toString()));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -153,8 +165,9 @@ class _ArchitectZoneScheduleDialogState
           ? zone.ceilingFinish
           : zone.resolvedCeilingFinish(l10n),
     );
-    final heightController =
-        TextEditingController(text: zone.clearHeight.toStringAsFixed(2));
+    final heightController = TextEditingController(
+      text: zone.clearHeight.toStringAsFixed(2),
+    );
 
     showDialog(
       context: context,
@@ -187,7 +200,10 @@ class _ArchitectZoneScheduleDialogState
                       width: 80,
                       child: TextField(
                         controller: numberController,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
                         decoration: InputDecoration(
                           labelText: l10n.architectZoneScheduleColNo,
                           labelStyle: const TextStyle(color: Colors.white70),
@@ -205,85 +221,41 @@ class _ArchitectZoneScheduleDialogState
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: TextField(
+                      child: ArchitectZonePresetField(
                         controller: nameController,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
-                        decoration: InputDecoration(
-                          labelText: l10n.architectZoneName,
-                          labelStyle: const TextStyle(color: Colors.white70),
-                          filled: true,
-                          fillColor: const Color(0x33FFFFFF),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 8,
-                          ),
-                        ),
+                        label: l10n.architectZoneName,
+                        presets: [
+                          for (final c in ArchitectZoneCategory.values)
+                            widget.presets.categoryName(c, l10n),
+                        ],
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                ArchitectZonePresetField(
                   controller: floorController,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: l10n.architectZoneFloorFinish,
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: const Color(0x33FFFFFF),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                  ),
+                  label: l10n.architectZoneFloorFinish,
+                  presets: widget.presets.finishes('floor', l10n),
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                ArchitectZonePresetField(
                   controller: wallController,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: l10n.architectZoneWallFinish,
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: const Color(0x33FFFFFF),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                  ),
+                  label: l10n.architectZoneWallFinish,
+                  presets: widget.presets.finishes('wall', l10n),
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                ArchitectZonePresetField(
                   controller: ceilingController,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: l10n.architectZoneCeilingFinish,
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: const Color(0x33FFFFFF),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                  ),
+                  label: l10n.architectZoneCeilingFinish,
+                  presets: widget.presets.finishes('ceiling', l10n),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: heightController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: InputDecoration(
                     labelText: l10n.architectZoneClearHeight,
@@ -318,9 +290,20 @@ class _ArchitectZoneScheduleDialogState
               final updated = zone.copyWith(
                 number: numberController.text.trim(),
                 name: nameController.text.trim(),
-                floorFinish: floorController.text.trim(),
-                wallFinish: wallController.text.trim(),
-                ceilingFinish: ceilingController.text.trim(),
+                floorFinish:
+                    floorController.text.trim() ==
+                        zone.resolvedFloorFinish(l10n)
+                    ? zone.floorFinish
+                    : floorController.text.trim(),
+                wallFinish:
+                    wallController.text.trim() == zone.resolvedWallFinish(l10n)
+                    ? zone.wallFinish
+                    : wallController.text.trim(),
+                ceilingFinish:
+                    ceilingController.text.trim() ==
+                        zone.resolvedCeilingFinish(l10n)
+                    ? zone.ceilingFinish
+                    : ceilingController.text.trim(),
                 clearHeight: newH,
               );
               widget.onZoneUpdated(updated);
@@ -396,7 +379,10 @@ class _ArchitectZoneScheduleDialogState
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white70,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -504,9 +490,7 @@ class _ArchitectZoneScheduleDialogState
                                     ),
                                   ),
                                 ),
-                                const DataColumn(
-                                  label: Text(''),
-                                ),
+                                const DataColumn(label: Text('')),
                               ],
                               rows: [
                                 for (int i = 0; i < sortedZones.length; i++)

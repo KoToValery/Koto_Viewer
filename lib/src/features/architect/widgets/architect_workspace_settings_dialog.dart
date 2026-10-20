@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
+import '../models/architect_zone.dart';
+import '../models/architect_zone_presets.dart';
 import 'architect_wall_drafting_panel.dart';
 
 class ArchitectWorkspaceSettings {
+  final ArchitectZonePresets zonePresets;
   final ArchitectUnit units;
   final int distanceDecimals;
   final ArchitectDimensionScale dimensionScale;
@@ -12,6 +15,7 @@ class ArchitectWorkspaceSettings {
   final double handleOffsetLength;
   const ArchitectWorkspaceSettings({
     required this.units,
+    this.zonePresets = const ArchitectZonePresets(),
     this.distanceDecimals = 2,
     this.dimensionScale = ArchitectDimensionScale.scale100,
     required this.ghostStoreys,
@@ -41,6 +45,21 @@ class ArchitectWorkspaceSettingsDialog extends StatefulWidget {
 
 class _ArchitectWorkspaceSettingsDialogState
     extends State<ArchitectWorkspaceSettingsDialog> {
+  late final Map<String, String> zoneOverrides = Map.of(widget.settings.zonePresets.overrides);
+
+  Widget presetField(String id, String label) => TextFormField(
+    key: ValueKey('zone-preset-$id'),
+    initialValue: zoneOverrides[id] ?? '',
+    decoration: InputDecoration(labelText: label, hintText: label),
+    onChanged: (value) {
+      if (value.trim().isEmpty) {
+        zoneOverrides.remove(id);
+      } else {
+        zoneOverrides[id] = value.trim();
+      }
+    },
+  );
+
   late int distanceDecimals = widget.settings.distanceDecimals;
   late ArchitectUnit units = widget.settings.units;
   late ArchitectDimensionScale dimensionScale = widget.settings.dimensionScale;
@@ -96,6 +115,27 @@ class _ArchitectWorkspaceSettingsDialogState
             mainAxisSize: MainAxisSize.min,
             children: [
               if(widget.onWalls!=null)ListTile(key:const ValueKey('architect-settings-walls'),contentPadding:EdgeInsets.zero,title:Text(l.wallTypesTitle),leading:const Icon(Icons.line_weight),trailing:const Icon(Icons.chevron_right),onTap:widget.onWalls),
+              ExpansionTile(
+                key: const ValueKey('architect-settings-zone-presets'),
+                tilePadding: EdgeInsets.zero,
+                title: Text(l.architectZonePresets),
+                children: [
+                  for (final category in ArchitectZoneCategory.values)
+                    presetField('category.${category.name}', category.localizedName(l)),
+                  for (final group in <String, String>{
+                    'floor': l.architectZoneFloorFinish,
+                    'wall': l.architectZoneWallFinish,
+                    'ceiling': l.architectZoneCeilingFinish,
+                  }.entries)
+                    ExpansionTile(
+                      title: Text(group.value),
+                      children: [
+                        for (final entry in const ArchitectZonePresets().finishes(group.key, l).asMap().entries)
+                          presetField('${group.key}.${entry.key}', entry.value),
+                      ],
+                    ),
+                ],
+              ),
               DropdownButtonFormField<ArchitectUnit>(
                 key: const ValueKey('architect-settings-units'),
                 initialValue: units,
@@ -243,6 +283,7 @@ class _ArchitectWorkspaceSettingsDialogState
             context,
             ArchitectWorkspaceSettings(
               units: units,
+              zonePresets: ArchitectZonePresets(Map.unmodifiable(zoneOverrides)),
               distanceDecimals: distanceDecimals,
               dimensionScale: dimensionScale,
               ghostStoreys: ghost,

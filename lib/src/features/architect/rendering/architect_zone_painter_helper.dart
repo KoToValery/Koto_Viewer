@@ -5,8 +5,8 @@ import '../models/architect_project.dart';
 import '../models/architect_zone.dart';
 import 'architect_canvas_palette.dart';
 
-/// Specialized rendering helper for architectural functional zones,
-/// dynamic vertex handles, midpoint grips, and magnetic guide lines.
+/// Architectural room stamps, zone fills, schedules, and drafting previews.
+/// Manual contour handles are rendered by the shared polygon painter.
 class ArchitectZonePainterHelper {
   /// Draws the room schedule table or ghost preview.
   static void drawZoneSchedule({
@@ -127,29 +127,19 @@ class ArchitectZonePainterHelper {
               : palette.foreground(zone.color).withValues(alpha: 0.85));
     final borderPaint = Paint()
       ..color = borderColor
-      ..strokeWidth = (isSelected ? 2.2 : 1.2) / zoomScale
+      ..strokeWidth = (isSelected ? 2.2 : 1.2) / math.max(zoomScale, 80.0)
       ..style = PaintingStyle.stroke;
     canvas.drawPath(path, borderPaint);
 
-    // 3. Central room stamp badge (Име и Квадратура)
+    // Keep the stamp and its area attached to the live contour preview.
+    final stampZone = zone.copyWith(polygon: poly);
     _drawRoomStamp(
       canvas: canvas,
-      zone: zone,
-      centroid: zone.centroid,
+      zone: stampZone,
+      centroid: stampZone.centroid,
       zoomScale: zoomScale,
       isSelected: isSelected,
     );
-
-    // 4. Dynamic BiM-style handles if selected
-    if (isSelected) {
-      _drawDynamicHandles(
-        canvas: canvas,
-        polygon: poly,
-        zoomScale: zoomScale,
-        draggingVertexIndex: draggingVertexIndex,
-        mergeCandidateIndex: mergeCandidateIndex,
-      );
-    }
   }
 
   /// Draws the compact architectural room badge with sequence number, name, and area.
@@ -162,7 +152,8 @@ class ArchitectZonePainterHelper {
   }) {
     canvas.save();
     canvas.translate(centroid.dx, centroid.dy);
-    canvas.scale(1.0 / zoomScale);
+    // Fixed model-space lettering: zooming out reduces the stamp with the plan.
+    canvas.scale(1.0 / 80.0);
 
     final numberText = '№ ${zone.number.isNotEmpty ? zone.number : '1'}';
     final nameText = zone.name;
@@ -234,109 +225,6 @@ class ArchitectZonePainterHelper {
     canvas.restore();
   }
 
-  /// Draws dynamic vertex handles and edge midpoint grips.
-  static void _drawDynamicHandles({
-    required Canvas canvas,
-    required List<Offset> polygon,
-    required double zoomScale,
-    int? draggingVertexIndex,
-    int? mergeCandidateIndex,
-  }) {
-    final vertexRadius = 12.0 / zoomScale;
-    final midpointRadius = 7.5 / zoomScale;
-
-    // Edge midpoint grips
-    final midFill = Paint()
-      ..color = const Color(0xFFFFD600)
-      ..style = PaintingStyle.fill;
-    final midBorder = Paint()
-      ..color = Colors.black
-      ..strokeWidth = 1.5 / zoomScale
-      ..style = PaintingStyle.stroke;
-
-    for (int i = 0; i < polygon.length; i++) {
-      final p1 = polygon[i];
-      final p2 = polygon[(i + 1) % polygon.length];
-      final mid = (p1 + p2) / 2.0;
-
-      // Draw diamond for edge midpoint
-      final dPath = Path()
-        ..moveTo(mid.dx, mid.dy - midpointRadius)
-        ..lineTo(mid.dx + midpointRadius, mid.dy)
-        ..lineTo(mid.dx, mid.dy + midpointRadius)
-        ..lineTo(mid.dx - midpointRadius, mid.dy)
-        ..close();
-
-      canvas.drawPath(dPath, midFill);
-      canvas.drawPath(dPath, midBorder);
-
-      // Dimension of this edge
-      final edgeLen = (p2 - p1).distance;
-      if (edgeLen > 0.8) {
-        _drawEdgeDimension(canvas, p1, p2, edgeLen, zoomScale);
-      }
-    }
-
-    // Vertex pins (GPS_Mapping style prominent nodes)
-    final vFill = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..style = PaintingStyle.fill;
-    final vBorder = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 2.0 / zoomScale
-      ..style = PaintingStyle.stroke;
-
-    final mergeFill = Paint()
-      ..color =
-          const Color(0xFFFF3D00) // Red pulse for merge candidate
-      ..style = PaintingStyle.fill;
-
-    for (int i = 0; i < polygon.length; i++) {
-      final v = polygon[i];
-      final isMergeCandidate = (i == mergeCandidateIndex);
-      final isDragging = (i == draggingVertexIndex);
-
-      // Drop shadow
-      canvas.drawCircle(
-        v,
-        (isMergeCandidate || isDragging ? vertexRadius * 1.4 : vertexRadius) +
-            1.5 / zoomScale,
-        Paint()..color = Colors.black45,
-      );
-
-      if (isMergeCandidate) {
-        canvas.drawCircle(v, vertexRadius * 1.5, mergeFill);
-        canvas.drawCircle(v, vertexRadius * 1.5, vBorder);
-      } else {
-        canvas.drawCircle(
-          v,
-          isDragging ? vertexRadius * 1.3 : vertexRadius,
-          vFill,
-        );
-        canvas.drawCircle(
-          v,
-          isDragging ? vertexRadius * 1.3 : vertexRadius,
-          vBorder,
-        );
-      }
-
-      // Vertex index number (1-based, GPS_Mapping style)
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '${i + 1}',
-          style: TextStyle(
-            color: Colors.black87,
-            fontFamily: 'Roboto',
-            fontSize: 10.5 / zoomScale,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, v - Offset(tp.width / 2, tp.height / 2));
-    }
-  }
-
   static void _drawEdgeDimension(
     Canvas canvas,
     Offset p1,
@@ -402,7 +290,7 @@ class ArchitectZonePainterHelper {
     canvas.drawRect(rect, borderPaint);
 
     // Live dimensions badge in center
-    final catName = categoryName ?? category.defaultEnName;
+    final catName = categoryName ?? '';
     final label =
         '$catName\n${w.toStringAsFixed(2)} × ${h.toStringAsFixed(2)} m\n${area.toStringAsFixed(1)} m²';
 
@@ -712,7 +600,8 @@ class ArchitectZonePainterHelper {
           )..layout();
 
           final labelPos =
-              pt + Offset(-tpLabel.width / 2, beaconRadius + 4.0 / draftingScale);
+              pt +
+              Offset(-tpLabel.width / 2, beaconRadius + 4.0 / draftingScale);
           final labelRect = Rect.fromLTWH(
             labelPos.dx - 6.0 / draftingScale,
             labelPos.dy - 3.0 / draftingScale,
@@ -740,7 +629,10 @@ class ArchitectZonePainterHelper {
         }
 
         // When closing snap is active (3+ points hovering start):
-        if (isClosingSnap && points.length >= 3 && closeLabel != null && closeLabel.isNotEmpty) {
+        if (isClosingSnap &&
+            points.length >= 3 &&
+            closeLabel != null &&
+            closeLabel.isNotEmpty) {
           final badgeText = closeLabel;
           final tpClose = TextPainter(
             text: TextSpan(
@@ -786,7 +678,6 @@ class ArchitectZonePainterHelper {
           );
           tpClose.paint(canvas, badgePos);
         }
-
       } else {
         // --- SUBSEQUENT POINTS 2..N: HIGH CONTRAST BADGES ---
         canvas.drawCircle(pt, nodeRadius + 1.5 / draftingScale, nodeShadow);
@@ -949,9 +840,9 @@ class ArchitectZonePainterHelper {
   static const double zoneTableFooterHeight = 24.0;
 
   static const List<double> zoneTableColWidths = [
-    36.0,  // №
+    36.0, // №
     135.0, // Наименование
-    80.0,  // Квадратура (m²)
+    80.0, // Квадратура (m²)
     115.0, // Настилка под
     114.0, // Стени
     110.0, // Таван
@@ -1058,8 +949,10 @@ class ArchitectZonePainterHelper {
       borderPaint,
     );
 
-    final titlePrefix = l10n?.architectZoneScheduleTitle ?? 'ТАБЛИЦА НА ПОМЕЩЕНИЯТА';
-    final titleText = '${titlePrefix.toUpperCase()} — ${storey.name.toUpperCase()}';
+    final titlePrefix =
+        l10n?.architectZoneScheduleTitle ?? 'ТАБЛИЦА НА ПОМЕЩЕНИЯТА';
+    final titleText =
+        '${titlePrefix.toUpperCase()} — ${storey.name.toUpperCase()}';
     final titleTp = TextPainter(
       text: TextSpan(
         text: titleText,
@@ -1076,15 +969,22 @@ class ArchitectZonePainterHelper {
     )..layout(maxWidth: totalWidth - 16);
     titleTp.paint(
       canvas,
-      Offset((totalWidth - titleTp.width) / 2, (zoneTableTitleHeight - titleTp.height) / 2),
+      Offset(
+        (totalWidth - titleTp.width) / 2,
+        (zoneTableTitleHeight - titleTp.height) / 2,
+      ),
     );
 
     // 3. Column Headers
     final headerPaint = Paint()
       ..color = const Color(0xFF1E293B)
       ..style = PaintingStyle.fill;
-    final headerRect =
-        Rect.fromLTWH(0, zoneTableTitleHeight, totalWidth, zoneTableHeaderHeight);
+    final headerRect = Rect.fromLTWH(
+      0,
+      zoneTableTitleHeight,
+      totalWidth,
+      zoneTableHeaderHeight,
+    );
     canvas.drawRect(headerRect, headerPaint);
     canvas.drawLine(
       const Offset(0, zoneTableTitleHeight + zoneTableHeaderHeight),
@@ -1119,12 +1019,13 @@ class ArchitectZonePainterHelper {
         textDirection: TextDirection.ltr,
       )..layout(maxWidth: w - 8);
 
-      final tx = isCentered
-          ? curX + (w - colTp.width) / 2
-          : curX + 6.0;
+      final tx = isCentered ? curX + (w - colTp.width) / 2 : curX + 6.0;
       colTp.paint(
         canvas,
-        Offset(tx, zoneTableTitleHeight + (zoneTableHeaderHeight - colTp.height) / 2),
+        Offset(
+          tx,
+          zoneTableTitleHeight + (zoneTableHeaderHeight - colTp.height) / 2,
+        ),
       );
 
       curX += w;
@@ -1191,9 +1092,7 @@ class ArchitectZonePainterHelper {
           ellipsis: '…',
         )..layout(maxWidth: w - 8);
 
-        final pX = isCentered
-            ? cellX + (w - cellTp.width) / 2
-            : cellX + 6.0;
+        final pX = isCentered ? cellX + (w - cellTp.width) / 2 : cellX + 6.0;
         cellTp.paint(
           canvas,
           Offset(pX, curY + (zoneTableRowHeight - cellTp.height) / 2),
@@ -1205,7 +1104,12 @@ class ArchitectZonePainterHelper {
     }
 
     // 5. Total Footer Row
-    final footerRect = Rect.fromLTWH(0, curY, totalWidth, zoneTableFooterHeight);
+    final footerRect = Rect.fromLTWH(
+      0,
+      curY,
+      totalWidth,
+      zoneTableFooterHeight,
+    );
     final footerPaint = Paint()
       ..color = const Color(0xFF0F2642)
       ..style = PaintingStyle.fill;
@@ -1217,14 +1121,12 @@ class ArchitectZonePainterHelper {
       ),
       footerPaint,
     );
-    canvas.drawLine(
-      Offset(0, curY),
-      Offset(totalWidth, curY),
-      borderPaint,
-    );
+    canvas.drawLine(Offset(0, curY), Offset(totalWidth, curY), borderPaint);
 
-    final totalLabel = l10n?.architectZoneScheduleTotalArea.toUpperCase() ?? 'ОБЩО';
-    final countLabel = l10n?.architectZoneScheduleRoomCount.toUpperCase() ?? 'БРОЙ';
+    final totalLabel =
+        l10n?.architectZoneScheduleTotalArea.toUpperCase() ?? 'ОБЩО';
+    final countLabel =
+        l10n?.architectZoneScheduleRoomCount.toUpperCase() ?? 'БРОЙ';
     final footerTp = TextPainter(
       text: TextSpan(
         children: [
@@ -1306,7 +1208,8 @@ class ArchitectZonePainterHelper {
     );
 
     // Prompt inside
-    final hint = l10n?.architectZoneTableBarHint ?? 'Кликнете за поставяне на таблицата';
+    final hint =
+        l10n?.architectZoneTableBarHint ?? 'Кликнете за поставяне на таблицата';
     final hintTp = TextPainter(
       text: TextSpan(
         text: '📋 $hint',
@@ -1322,7 +1225,10 @@ class ArchitectZonePainterHelper {
     )..layout(maxWidth: totalWidth - 16);
     hintTp.paint(
       canvas,
-      Offset((totalWidth - hintTp.width) / 2, (totalHeight - hintTp.height) / 2),
+      Offset(
+        (totalWidth - hintTp.width) / 2,
+        (totalHeight - hintTp.height) / 2,
+      ),
     );
 
     canvas.restore();

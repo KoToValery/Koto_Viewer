@@ -845,6 +845,9 @@ class MoveArchitectElement extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     ArchitectModelCommand.point(delta);
     final s = ArchitectModelCommand.storey(project, storeyId);
+    if (s.zones.any((zone) => zone.id == elementId && zone.isAutoBoundary)) {
+      return project;
+    }
     final walls = s.walls.where((w) => w.id == elementId);
     if (walls.isNotEmpty) {
       if (!carryConnections) {
@@ -1630,6 +1633,9 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
       throw ArgumentError('Invalid contour');
     }
     final floor = ArchitectModelCommand.storey(project, storeyId);
+    if (floor.zones.any((z) => z.id == elementId && z.isAutoBoundary)) {
+      throw ArgumentError('Automatic zone boundaries are controlled by walls');
+    }
     final slab = floor.slabs.any((s) => s.id == elementId);
     final roof = floor.roofs.any((r) => r.id == elementId);
     final rect = floor.cadPrimitives.any(
@@ -1737,7 +1743,7 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
       if (r.id == id) return (points: r.points, closed: true, width: 0);
     }
     for (final z in storey.zones) {
-      if (z.id == id) return (points: z.polygon, closed: true, width: 0);
+      if (z.id == id && !z.isAutoBoundary) return (points: z.polygon, closed: true, width: 0);
     }
     for (final o in storey.openings) {
       if (o.id == id) return (points: o.boundary, closed: true, width: 0);

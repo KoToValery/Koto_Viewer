@@ -3696,10 +3696,10 @@ class AppLocalizationsBg extends AppLocalizations {
       'Фиксирани граници без динамично изменяне';
 
   @override
-  String get architectZoneModeAuto => 'Автоматично (1 клик)';
+  String get architectZoneModeAuto => 'Авто';
 
   @override
-  String get architectZoneModeManual => 'Ръчно (точка по точка)';
+  String get architectZoneModeManual => 'Ръчна';
 
   @override
   String get architectZoneAutoPrompt =>
@@ -6619,4 +6619,15 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get wallArcMode => 'Дъга';
+
+  @override
+  String get architectZonePresets => 'Имена и покрития';
+
+  @override
+  String get architectZoneManualHelp =>
+      'Ръчна: редактиране по точки и отсечки. Махнете отметката за повторно откриване на помещението по стените.';
+
+  @override
+  String get architectZoneBoundaryOpen =>
+      'Не е открито затворено помещение. Проверете стените за пролуки.';
 }

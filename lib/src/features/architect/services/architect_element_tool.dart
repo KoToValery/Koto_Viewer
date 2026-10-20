@@ -770,6 +770,7 @@ class ArchitectElementTool extends ChangeNotifier {
     final zoneIndex = storey.zones.indexWhere((z) => z.id == elementId);
     if (zoneIndex != -1) {
       final zone = storey.zones[zoneIndex];
+      if (zone.isAutoBoundary) return (storey, null);
       final newZone = const ArchitectZoneEditingAdapter().translate(
         zone.copyWith(id: newId),
         offset,
@@ -1124,6 +1125,7 @@ class ArchitectElementTool extends ChangeNotifier {
     final zoneIndex = storey.zones.indexWhere((z) => z.id == elementId);
     if (zoneIndex != -1) {
       final zone = storey.zones[zoneIndex];
+      if (zone.isAutoBoundary) return (storey, null);
       final newPoly = [
         for (final p in zone.polygon)
           BimTransform2D.mirror(p, origin, direction),

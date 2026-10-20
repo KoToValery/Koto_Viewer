@@ -169,7 +169,7 @@ class ArchitectZoneEditingAdapter extends BimElementAdapter<ArchitectZone> {
   const ArchitectZoneEditingAdapter();
   @override
   ArchitectZone translate(ArchitectZone source, Offset deltaMetres) =>
-      deltaMetres == Offset.zero
+      source.isAutoBoundary || deltaMetres == Offset.zero
       ? source
       : source.copyWith(
           polygon: translatedContour(source.polygon, deltaMetres),
@@ -185,12 +185,12 @@ class ArchitectZoneEditingAdapter extends BimElementAdapter<ArchitectZone> {
     kind: BimEditingGeometryKind.contour,
     anchor: source.polygon.isEmpty ? Offset.zero : source.polygon.first,
     outline: source.polygon,
-    capabilities: {
+    capabilities: source.isAutoBoundary ? {} : {
       BimEditingCapability.translate,
       BimEditingCapability.contour,
     },
     revision: revision,
-    readOnly: readOnly,
+    readOnly: readOnly || source.isAutoBoundary,
   );
 }
 

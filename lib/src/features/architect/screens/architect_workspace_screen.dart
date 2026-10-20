@@ -17,6 +17,8 @@ import '../../bim_editing/widgets/bim_edit_actions.dart';
 import '../../bim_editing/geometry/bim_contour_drafting_geometry.dart';
 import 'dart:math' as math;
 import 'dart:async';
+import 'dart:convert';
+import '../models/architect_zone_presets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
@@ -900,13 +902,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _showDrawingGrid = true;
   double _axisWallCoreThickness = .25;
   double _handleOffsetLength = 50.0;
+  ArchitectZonePresets _zonePresets = const ArchitectZonePresets();
   bool _viewPreferencesChanged = false;
 
   Future<void> _loadWorkspacePreferences() async {
     try {
       final preferences = await SharedPreferences.getInstance();
       if (!mounted || _viewPreferencesChanged) return;
+      final savedPresets = preferences.getString('architect_zone_presets');
+      final zonePresets = savedPresets == null
+          ? const ArchitectZonePresets()
+          : ArchitectZonePresets.fromJson(
+              jsonDecode(savedPresets) as Map<String, dynamic>,
+            );
       setState(() {
+        _zonePresets = zonePresets;
         _showGhostStoreys =
             preferences.getBool('architect_ghost_storeys') ?? false;
         _showUpperOverhangs =
@@ -939,6 +949,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Future<void> _saveWorkspacePreferences() async {
     try {
       final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(
+        'architect_zone_presets', jsonEncode(_zonePresets.overrides),
+      );
       await preferences.setBool('architect_ghost_storeys', _showGhostStoreys);
       await preferences.setBool(
         'architect_upper_overhangs',
@@ -984,6 +997,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         hasUnderlay: _underlaysByStorey.isNotEmpty,
         onWalls: _showWallTypes,
         settings: ArchitectWorkspaceSettings(
+          zonePresets: _zonePresets,
           units: _project.units,
           dimensionScale: _project.dimensionScale,
           distanceDecimals: _project.distanceDecimals,
@@ -1011,6 +1025,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _showUnderlay = result.underlay;
       _axisWallCoreThickness = result.axisCoreThickness;
       _handleOffsetLength = result.handleOffsetLength;
+      _zonePresets = result.zonePresets;
       _canvasPalette = result.darkCanvas
           ? const ArchitectCanvasPalette.dark()
           : const ArchitectCanvasPalette.light();
@@ -1084,16 +1099,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
-  // Zone Drafting & Dynamic Slab-style Editing State
+  // Zone placement and manual body movement
   ArchitectZoneCategory _activeZoneCategory = ArchitectZoneCategory.living;
   String? _selectedZoneId;
-  int? _draggingVertexIndex;
-  Offset? _draggingVertexPoint;
-  int? _mergeCandidateIndex;
   Offset? _zoneMoveStartPoint;
   List<Offset>? _zoneMoveOriginalPolygon;
   List<Offset>? _zoneMovePreviewPolygon;
-  Offset _vertexGrabOffset = Offset.zero;
   Offset _axisHandleGrabOffset = Offset.zero;
   List<(Offset, Offset)> _activeMagneticGuides = [];
 
@@ -1103,7 +1114,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _zoneTableDragOffset;
   Offset? _zoneTablePreviewOrigin;
 
-  // Unified tool controller for zone drafting, edge extrusion, and geometry
+  // Zone placement controller; contour editing uses the common polygon editor
   late final ArchitectZoneTool _zoneTool;
 
   // Unified tool controller for dynamic grid axes
@@ -1689,8 +1700,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _duplicateMove != null ||
       _polygonEditor.active ||
       _draggingElementId != null ||
-      _draggingVertexIndex != null ||
-      _zoneTool.isExtruding ||
       _zoneMoveStartPoint != null ||
       _axisTool.isDraggingHandle ||
       _axisTool.isMovingAxis ||
@@ -1858,29 +1867,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return (rawModel - closest).distance <= tol;
   }
 
-  int? _hitTestZoneVertex(Offset modelPt, ArchitectZone zone) {
-    final tolerance = 14.0 / _currentScale;
-    for (int i = 0; i < zone.polygon.length; i++) {
-      if ((modelPt - zone.polygon[i]).distance <= tolerance) {
-        return i;
-      }
-    }
-    return null;
-  }
-
-  int? _hitTestZoneMidpoint(Offset modelPt, ArchitectZone zone) {
-    final tolerance = 12.0 / _currentScale;
-    for (int i = 0; i < zone.polygon.length; i++) {
-      final p1 = zone.polygon[i];
-      final p2 = zone.polygon[(i + 1) % zone.polygon.length];
-      final mid = (p1 + p2) / 2.0;
-      if ((modelPt - mid).distance <= tolerance) {
-        return i;
-      }
-    }
-    return null;
-  }
-
   ArchitectZone? _findZoneAt(Offset modelPt) {
     final zones = _project.activeStorey.zones;
     for (int i = zones.length - 1; i >= 0; i--) {
@@ -1891,12 +1877,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return null;
   }
 
+  ArchitectZone _applyZoneFinishPresets(ArchitectZone zone) {
+    final l = context.l10n;
+    String overrideFor(String kind, String resolved) {
+      final defaults = const ArchitectZonePresets().finishes(kind, l);
+      final index = defaults.indexOf(resolved);
+      return index < 0 ? '' : _zonePresets.overrides['$kind.$index'] ?? '';
+    }
+    return zone.copyWith(
+      floorFinish: overrideFor('floor', zone.resolvedFloorFinish(l)),
+      wallFinish: overrideFor('wall', zone.resolvedWallFinish(l)),
+      ceilingFinish: overrideFor('ceiling', zone.resolvedCeilingFinish(l)),
+    );
+  }
+
   void _commitDraftedZone() {
     final l10n = context.l10n;
     final nextNumber = (_project.activeStorey.zones.length + 1).toString();
     final newZone = _zoneTool.commitDrafting(
       category: _activeZoneCategory,
-      defaultName: _activeZoneCategory.localizedName(l10n),
+      defaultName: _zonePresets.categoryName(_activeZoneCategory, l10n),
       number: nextNumber,
     );
 
@@ -1905,7 +1905,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final activeStorey = _project.activeStorey;
       setState(() {
         _commands.execute(
-          CreateArchitectZone(storeyId: activeStorey.id, zone: newZone),
+          CreateArchitectZone(
+            storeyId: activeStorey.id, zone: _applyZoneFinishPresets(newZone),
+          ),
         );
         _selectedZoneId = newZone.id;
         _activeMagneticGuides = [];
@@ -2062,13 +2064,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
     final polygon = _selectedPolygon;
-    final isRoofDirect = _polygonEditId == null && _selectedRoof != null;
+    final isDirectContour = _polygonEditId == null &&
+        (_selectedRoof != null || _selectedZone?.isAutoBoundary == false);
     final movableEdge =
         polygon != null &&
             (_polygonEditId != null &&
                     (_polygonEdgeMode == ArchitectPolygonEdgeMode.move ||
                         _polygonEdgeMode == ArchitectPolygonEdgeMode.extendCatheti) ||
-                isRoofDirect) &&
+                isDirectContour) &&
             !polygon.any((p) => (p - rawModel).distance < 10 / _currentScale)
         ? ArchitectPolygonDimensions.hitEdge(
             polygon,
@@ -2084,7 +2087,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 movableEdge,
                 rawModel,
                 _currentScale,
-                mode: isRoofDirect
+                mode: isDirectContour
                     ? ArchitectPolygonEdgeMode.extendCatheti
                     : _polygonEdgeMode,
                 offsetLengthPx: _handleOffsetLength,
@@ -2095,7 +2098,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 rawModel,
                 _currentScale,
                 mode: _polygonEditId == null
-                    ? (_selectedRoof != null
+                    ? (_selectedRoof != null || _selectedZone?.isAutoBoundary == false
                           ? ArchitectPolygonEdgeMode.extendCatheti
                           : ArchitectPolygonEdgeMode.pull)
                     : _polygonEdgeMode,
@@ -2335,40 +2338,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
 
-    // 2. Zone handle interactions in Zone or Select mode
+    // Manual zone body movement; vertices and edges use the common editor above
     if (_activeTool == ArchitectTool.zone) {
       final currentSelected = _selectedZone;
-      if (currentSelected != null) {
-        // 2b. Vertex handle check (drag existing vertex)
-        final vIdx = _hitTestZoneVertex(rawModel, currentSelected);
-        if (vIdx != null) {
-          setState(() {
-            _draggingVertexIndex = vIdx;
-            _draggingVertexPoint = currentSelected.polygon[vIdx];
-            _vertexGrabOffset = currentSelected.polygon[vIdx] - rawModel;
-            _mergeCandidateIndex = null;
-            _activeMagneticGuides = [];
-            _isHandleEngaged = true;
-          });
-          HapticFeedback.selectionClick();
-          ArchitectLogger.log('HANDLE', 'Zone vertex $vIdx drag engaged');
-          return;
-        }
-
-        // 2c. Midpoint handle check (extrude/pull edge)
-        final midIdx = _hitTestZoneMidpoint(rawModel, currentSelected);
-        if (midIdx != null) {
-          _zoneTool.startExtrude(
-            zone: currentSelected,
-            edgeIndex: midIdx,
-            pointerModel: rawModel,
-          );
-          _isHandleEngaged = true;
-          HapticFeedback.mediumImpact();
-          ArchitectLogger.log('HANDLE', 'Zone edge $midIdx extrusion engaged');
-          return;
-        }
-
+      if (currentSelected != null && !currentSelected.isAutoBoundary) {
         // 2d. Tap inside currently selected zone -> initiate body move
         if (currentSelected.containsPoint(rawModel)) {
           setState(() {
@@ -2879,7 +2852,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (roof.id == id) return roof.points;
     }
     for (final zone in _project.activeStorey.zones) {
-      if (zone.id == id) return zone.polygon;
+      if (zone.id == id) return zone.isAutoBoundary ? null : zone.polygon;
     }
     for (final opening in _project.activeStorey.openings) {
       if (opening.id == id) return opening.boundary;
@@ -3281,33 +3254,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // 2. Dragging edge midpoint (extruding segment)
-    if (_zoneTool.isExtruding) {
-      _zoneTool.updateExtrudePointer(rawModel);
-      return;
-    }
-
-    // 3. Dragging a zone vertex (dynamic slab editing)
-    if (_draggingVertexIndex != null && _selectedZone != null) {
-      final snap = ArchitectZoneSnap.snap(
-        magnetic: _magnetEnabled,
-        underlay: _currentUnderlayDoc,
-        frame: widget.underlayFrame,
-        visibility: _underlayLayerVisibility,
-        raw: rawModel + _vertexGrabOffset,
-        project: _project,
-        excludedZoneId: _selectedZoneId,
-        movingVertexIndex: _draggingVertexIndex,
-        tolerance: 14.0 / _currentScale,
-      );
-      _draggingVertexPoint = snap.point;
-      _mergeCandidateIndex = snap.mergeCandidateIndex;
-      _activeMagneticGuides = snap.magneticGuides;
-      _activeSnapLabel = snap.snapLabel;
-      _repaintPreview();
-      return;
-    }
-
     // 4. Moving whole zone on canvas
     if (_zoneMoveStartPoint != null &&
         _zoneMoveOriginalPolygon != null &&
@@ -3660,17 +3606,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _elementMoveOriginal = null;
     _elementMovePreview = null;
     _isHandleEngaged = false;
-    _draggingVertexIndex = null;
-    _draggingVertexPoint = null;
-    _mergeCandidateIndex = null;
     _zoneMoveStartPoint = null;
     _zoneMoveOriginalPolygon = null;
     _zoneMovePreviewPolygon = null;
     _activeMagneticGuides = [];
     _activeSnapLabel = null;
-    if (_zoneTool.isExtruding) {
-      _zoneTool.cancelExtrude();
-    }
     if (_axisTool.isDraggingHandle ||
         _axisTool.isMovingAxis ||
         _axisTool.isOffsettingWithDrag) {
@@ -3834,90 +3774,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         );
       }
-      return;
-    }
-
-    // 1. Edge extrusion commit
-    if (_zoneTool.isExtruding) {
-      final isSelfIntersecting = _zoneTool.isExtrudeSelfIntersecting;
-      final result = _zoneTool.commitExtrude();
-      if (result != null) {
-        final (updatedZone, cleanedCount) = result;
-        _updateZone(updatedZone);
-        HapticFeedback.mediumImpact();
-        if (cleanedCount > 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.architectZoneCleaned(cleanedCount)),
-              duration: const Duration(seconds: 1),
-            ),
-          );
-        }
-      } else if (isSelfIntersecting) {
-        HapticFeedback.heavyImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.architectZoneSelfIntersectError),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-      return;
-    }
-
-    // 2. Commit vertex drag with orphan cleaning & self-intersection protection
-    if (_draggingVertexIndex != null && _selectedZone != null) {
-      final zone = _selectedZone!;
-      final idx = _draggingVertexIndex!;
-      final mergeCandidate = _mergeCandidateIndex;
-
-      if (mergeCandidate != null && zone.polygon.length > 3) {
-        final updated = zone.removeVertex(idx);
-        if (updated != null) {
-          final cleaned = ArchitectZoneGeometry.cleanPolygon(
-            updated.polygon,
-            minDistance: 1e-6,
-            minCollinearDistance: 1e-7,
-          );
-          _updateZone(updated.copyWith(polygon: cleaned));
-          HapticFeedback.heavyImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.architectZoneMerged),
-              duration: const Duration(seconds: 1),
-            ),
-          );
-        }
-      } else if (_draggingVertexPoint != null) {
-        final candidatePoly = List<Offset>.from(zone.polygon)
-          ..[idx] = _draggingVertexPoint!;
-        if (ArchitectZoneGeometry.hasSelfIntersections(candidatePoly)) {
-          HapticFeedback.heavyImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.architectZoneSelfIntersectError),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        } else {
-          final cleaned = ArchitectZoneGeometry.cleanPolygon(
-            candidatePoly,
-            minDistance: 1e-6,
-            minCollinearDistance: 1e-7,
-          );
-          final updated = zone.copyWith(polygon: cleaned);
-          _updateZone(updated);
-          HapticFeedback.lightImpact();
-        }
-      }
-
-      setState(() {
-        _draggingVertexIndex = null;
-        _draggingVertexPoint = null;
-        _mergeCandidateIndex = null;
-        _activeMagneticGuides = [];
-        _activeSnapLabel = null;
-      });
       return;
     }
 
@@ -4541,14 +4397,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             polygon: roomPoly,
             seedPoint: rawModel,
             category: _activeZoneCategory,
-            name: _activeZoneCategory.localizedName(context.l10n),
+            name: _zonePresets.categoryName(_activeZoneCategory, context.l10n),
             number: nextNumber,
           );
           setState(() {
             _commands.execute(
               CreateArchitectZone(
                 storeyId: _project.activeStorey.id,
-                zone: newZone,
+                zone: _applyZoneFinishPresets(newZone),
               ),
             );
             _selectedZoneId = newZone.id;
@@ -5084,12 +4940,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _updateZone(ArchitectZone updated) {
     final activeStorey = _project.activeStorey;
+    final previous = activeStorey.zones.where((z) => z.id == updated.id).firstOrNull;
+    if (previous == null) return;
+    if (!previous.isAutoBoundary && updated.isAutoBoundary) {
+      final detected = ArchitectRoomDetector.automaticZone(updated, activeStorey.walls);
+      if (detected == null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(context.l10n.architectZoneBoundaryOpen),
+        ));
+        return;
+      }
+      updated = detected;
+    } else if (previous.isAutoBoundary && updated.isAutoBoundary) {
+      updated = updated.copyWith(polygon: previous.polygon, seedPoint: previous.seedPoint);
+    }
     final updatedZones = activeStorey.zones
         .map((z) => z.id == updated.id ? updated : z)
         .toList();
     setState(() {
-      _project = _project.updateActiveStorey(
-        activeStorey.copyWith(zones: updatedZones),
+      _commands.commit(
+        _project.updateActiveStorey(activeStorey.copyWith(zones: updatedZones)),
       );
     });
     _saveBiMProjectIfAttached();
@@ -5123,6 +4993,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _showRoomScheduleDialog() {
     ArchitectZoneScheduleDialog.show(
+      presets: _zonePresets,
       context: context,
       storey: _project.activeStorey,
       onZoneUpdated: _updateZone,
@@ -5249,30 +5120,39 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _syncAutoZones(ArchitectStorey storey) {
-    if (storey.zones.isEmpty || storey.walls.isEmpty) return;
+    if (storey.zones.isEmpty) return;
     final autoZones = storey.zones
-        .where((z) => z.isAutoBoundary && z.seedPoint != null)
+        .where((z) => z.isAutoBoundary)
         .toList();
     if (autoZones.isEmpty) return;
 
     bool changed = false;
+    bool openBoundary = false;
     final updatedZones = List<ArchitectZone>.from(storey.zones);
 
     for (int i = 0; i < updatedZones.length; i++) {
       final zone = updatedZones[i];
-      if (!zone.isAutoBoundary || zone.seedPoint == null) continue;
+      if (!zone.isAutoBoundary) continue;
 
-      final newPoly = ArchitectRoomDetector.detectRoomPolygon(
-        seedPoint: zone.seedPoint!,
-        walls: storey.walls,
-      );
+      final detected = ArchitectRoomDetector.automaticZone(zone, storey.walls);
+      if (detected == null) {
+        openBoundary = true;
+        continue;
+      }
+      final newPoly = detected.polygon;
 
-      if (newPoly != null && newPoly.length >= 3) {
+      if (newPoly.length >= 3) {
         if (_hasPolygonGeometryChanged(zone.polygon, newPoly)) {
-          updatedZones[i] = zone.copyWith(polygon: newPoly);
+          updatedZones[i] = detected;
           changed = true;
         }
       }
+    }
+
+    if (openBoundary) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(context.l10n.architectZoneBoundaryOpen),
+      ));
     }
 
     if (changed) {
@@ -6410,8 +6290,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final id = _activePolygonDistanceElementId;
     if (polygon == null || edge == null || id == null) return;
     final original = List<Offset>.of(polygon);
-    final isRoofDirect = _polygonEditId == null && _selectedRoof?.id == id;
-    final mode = isRoofDirect
+    final isDirectContour = _polygonEditId == null && _selectedRoof?.id == id;
+    final mode = isDirectContour
         ? ArchitectPolygonEdgeMode.extendCatheti
         : _polygonEdgeMode;
     final project = _project;
@@ -7099,8 +6979,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         : null,
   );
 
+  bool get _selectionHasAutoZones => _project.activeStorey.zones.any(
+    (zone) => zone.isAutoBoundary && _effectiveSelection.contains(zone.id),
+  );
+
   List<ArchitectRadialMenuItem> _buildRadialMenuItems(String elementId) {
     final items = <ArchitectRadialMenuItem>[];
+    if (_selectionHasAutoZones) {
+      return [
+        _radialItem(action: ArchitectRadialAction.properties, color: const Color(0xFFB388FF)),
+        _radialItem(action: ArchitectRadialAction.delete, color: const Color(0xFFFF5252)),
+      ];
+    }
     if (_effectiveSelection.length > 1) {
       final sel = _effectiveSelection;
       final storey = _project.activeStorey;
@@ -8935,6 +8825,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _beginDuplicateSelection() {
+    if (_selectionHasAutoZones) return;
     _cancelActiveDrags();
     final ids = _effectiveSelection;
     if (ids.isEmpty) return;
@@ -8958,6 +8849,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _startMirrorSession({required bool isDuplicate}) {
+    if (_selectionHasAutoZones) return;
     if (_effectiveSelection.isEmpty) return;
     _cancelActiveDrags();
     setState(() {
@@ -9482,6 +9374,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _moveSelection = false;
                   }),
                 ),
+                if (!_selectionHasAutoZones)
                 IconButton(
                   constraints: const BoxConstraints.tightFor(
                     width: 26,
@@ -9503,6 +9396,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _moveSelection = !_moveSelection;
                   }),
                 ),
+                if (!_selectionHasAutoZones)
                 IconButton(
                   constraints: const BoxConstraints.tightFor(
                     width: 26,
@@ -9518,6 +9412,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   ),
                   onPressed: () => _startMirrorSession(isDuplicate: false),
                 ),
+                if (!_selectionHasAutoZones)
                 IconButton(
                   constraints: const BoxConstraints.tightFor(
                     width: 26,
@@ -10299,6 +10194,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           bottomNavigationBar: _is3DView || !_commands.hasView
               ? null
               : ArchitectToolPalette(
+                  zonePresets: _zonePresets,
                   drawingOnly: !_commands.isPlan,
                   activeTool: _activeTool,
                   onToolChanged: (tool) => setState(() {
@@ -10448,6 +10344,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         left: 0,
                         right: 0,
                         child: ArchitectZoneDraftingBar(
+                          zonePresets: _zonePresets,
                           tool: _zoneTool,
                           category: _activeZoneCategory,
                           onCategoryChanged: (cat) =>
@@ -10806,6 +10703,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               if (!_multiSelect && _effectiveSelection.length == 1 &&
                   _selectedZone != null && !_is3DView)
                 ArchitectZonePropertiesCard(
+                  presets: _zonePresets,
                   zone: _selectedZone!,
                   tool: _zoneTool,
                   onZoneUpdated: _updateZone,
@@ -12067,9 +11965,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         selectedElementIds: _effectiveSelection,
         selectedZoneId: _selectedZoneId,
         activeZoneCategory: _activeZoneCategory,
-        draggingVertexIndex: _draggingVertexIndex,
-        draggingVertexPoint: _draggingVertexPoint,
-        mergeCandidateIndex: _mergeCandidateIndex,
         selectedAxisId: _axisTool.selectedAxisId,
         draggedAxisSnapshot: _axisTool.draggedAxisSnapshot,
         isDraggingAxisHandle: false,
@@ -12094,16 +11989,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         isZoneDraftingSelfIntersecting:
             _zoneTool.pointStatus == ZoneDraftingPointStatus.selfIntersects,
         zoneCloseLabel: context.l10n.architectZonePointSnapStart,
-        zoneCategoryName: _activeZoneCategory.localizedName(context.l10n),
-        zoneExtrudePreviewPolygon: _zoneTool.extrudePreviewPolygon,
+        zoneCategoryName: _zonePresets.categoryName(_activeZoneCategory, context.l10n),
 
-        zoneExtrudeV1: _zoneTool.extrudeV1,
-        zoneExtrudeV2: _zoneTool.extrudeV2,
-        zoneExtrudeNormal: _zoneTool.extrudeNormal,
-        zoneExtrudeDistance: _zoneTool.extrudeDistance,
-        isZoneExtrudeSelfIntersecting: _zoneTool.isExtrudeSelfIntersecting,
         zonePreviewRectangle: _zoneTool.previewRectangle,
-        zoneEditingPolygon: _zoneMovePreviewPolygon ?? _zoneTool.editingPolygon,
+        zoneEditingPolygon: _zoneMovePreviewPolygon,
         isZoneTableSelected: _isZoneTableSelected,
         zoneTableDragPreviewOrigin: _zoneTablePreviewOrigin,
 

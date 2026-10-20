@@ -716,7 +716,7 @@ class Architect2dPainter extends CustomPainter {
       if (roof.id == targetId) polygon = roof.points;
     }
     for (final zone in _project.activeStorey.zones) {
-      if (zone.id == targetId) polygon = zone.polygon;
+      if (zone.id == targetId && !zone.isAutoBoundary) polygon = zone.polygon;
     }
     for (final opening in _project.activeStorey.openings) {
       if (opening.id == targetId) polygon = opening.boundary;

@@ -1186,8 +1186,8 @@
   "architectZoneBoundaryAutoDesc": "Динамично изменяне при промяна на стените",
   "architectZoneBoundaryManual": "Ръчна корекция",
   "architectZoneBoundaryManualDesc": "Фиксирани граници без динамично изменяне",
-  "architectZoneModeAuto": "Автоматично (1 клик)",
-  "architectZoneModeManual": "Ръчно (точка по точка)",
+  "architectZoneModeAuto": "Авто",
+  "architectZoneModeManual": "Ръчна",
   "architectZoneAutoPrompt": "Кликнете в готово помещение за автоматично разпознаване",
   "architectZoneAutoFailed": "Помещението не е напълно затворено от стени",
   "architectZoneMergeDialogTitle": "Обединяване на помещения",
@@ -2167,5 +2167,8 @@
   "wallArcInvalidRadius": "Радиусът е твърде малък за тази стена.",
   "wallArcPickStart": "Посочи началото на дъгата",
   "wallPlinthEnabled": "Включен",
-  "wallArcMode": "Дъга"
+  "wallArcMode": "Дъга",
+  "architectZonePresets": "Имена и покрития",
+  "architectZoneManualHelp": "Ръчна: редактиране по точки и отсечки. Махнете отметката за повторно откриване на помещението по стените.",
+  "architectZoneBoundaryOpen": "Не е открито затворено помещение. Проверете стените за пролуки."
 }

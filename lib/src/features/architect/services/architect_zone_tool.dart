@@ -525,8 +525,7 @@ class ArchitectZoneTool extends ChangeNotifier {
       name: defaultName,
       category: category,
       polygon: cleaned,
-      isAutoBoundary: _placementMode == ArchitectZonePlacementMode.autoClick,
-      seedPoint: cleaned.isNotEmpty ? cleaned.first : null,
+      isAutoBoundary: false,
     );
 
     cancelDrafting();
@@ -570,6 +569,7 @@ class ArchitectZoneTool extends ChangeNotifier {
     required int edgeIndex,
     required Offset pointerModel,
   }) {
+    if (zone.isAutoBoundary) return false;
     cancelDrafting();
     final poly = zone.polygon;
     final n = poly.length;
@@ -675,8 +675,8 @@ class ArchitectZoneTool extends ChangeNotifier {
   void startEditingZone(ArchitectZone zone) {
     cancelDrafting();
     cancelExtrude();
-    _editingZone = zone;
-    _editingPolygon = List<Offset>.from(zone.polygon);
+    _editingZone = zone.isAutoBoundary ? null : zone;
+    _editingPolygon = zone.isAutoBoundary ? null : List<Offset>.from(zone.polygon);
     notifyListeners();
   }
 

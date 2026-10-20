@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_zone.dart';
+import '../models/architect_zone_presets.dart';
 import '../services/architect_zone_tool.dart';
 
 // =============================================================================
@@ -23,6 +24,7 @@ import '../services/architect_zone_tool.dart';
 /// - One-tap access to Room Schedule table and drawing placement
 class ArchitectZoneDraftingBar extends StatelessWidget {
   final ArchitectZoneTool tool;
+  final ArchitectZonePresets zonePresets;
   final ArchitectZoneCategory category;
   final ValueChanged<ArchitectZoneCategory>? onCategoryChanged;
   final VoidCallback onClose;
@@ -33,6 +35,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
 
   const ArchitectZoneDraftingBar({
     super.key,
+    this.zonePresets = const ArchitectZonePresets(),
     required this.tool,
     required this.category,
     this.onCategoryChanged,
@@ -120,7 +123,11 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
               ),
 
               const SizedBox(width: 6),
-
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
               // Category Selector Dropdown (Compact, space-efficient, zero hardcoded names)
               Expanded(
                 child: Container(
@@ -137,6 +144,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                     child: DropdownButton<ArchitectZoneCategory>(
                       value: category,
                       isDense: true,
+                      isExpanded: true,
                       dropdownColor: const Color(0xFF1E2230),
                       borderRadius: BorderRadius.circular(10),
                       icon: const Icon(
@@ -154,7 +162,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                               const SizedBox(width: 5),
                               Flexible(
                                 child: Text(
-                                  cat.localizedName(l10n),
+                                  zonePresets.categoryName(cat, l10n),
                                   style: TextStyle(
                                     color: cat == category
                                         ? cat.color
@@ -343,8 +351,10 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                   onTap: canClose ? onClose : null,
                   borderRadius: BorderRadius.circular(6),
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: canClose
                           ? const Color(0xFF00E676)

@@ -3681,10 +3681,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Fixed boundaries without dynamic updates';
 
   @override
-  String get architectZoneModeAuto => 'Auto (1-Click)';
+  String get architectZoneModeAuto => 'Auto';
 
   @override
-  String get architectZoneModeManual => 'Manual (Points)';
+  String get architectZoneModeManual => 'Manual';
 
   @override
   String get architectZoneAutoPrompt =>
@@ -6594,4 +6594,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wallArcMode => 'Arc';
+
+  @override
+  String get architectZonePresets => 'Zone presets';
+
+  @override
+  String get architectZoneManualHelp =>
+      'Manual: edit points and edges. Clear to detect the room from its walls again.';
+
+  @override
+  String get architectZoneBoundaryOpen =>
+      'No enclosed room found. Check the walls for gaps.';
 }

@@ -4,71 +4,46 @@ import '../../../core/l10n/generated/app_localizations.dart';
 /// Standard architectural functional room categories.
 enum ArchitectZoneCategory {
   living(
-    defaultBgName: 'Дневна',
-    defaultEnName: 'Living Room',
     color: Color(0xFFFFA726), // Warm Amber
     icon: Icons.weekend_rounded,
   ),
   bedroom(
-    defaultBgName: 'Спалня',
-    defaultEnName: 'Bedroom',
     color: Color(0xFF5C6BC0), // Indigo
     icon: Icons.bed_rounded,
   ),
   kitchen(
-    defaultBgName: 'Кухня',
-    defaultEnName: 'Kitchen',
     color: Color(0xFF26A69A), // Teal / Emerald
     icon: Icons.kitchen_rounded,
   ),
   corridor(
-    defaultBgName: 'Коридор',
-    defaultEnName: 'Corridor / Hall',
     color: Color(0xFF78909C), // Slate Grey
     icon: Icons.alt_route_rounded,
   ),
   bathroom(
-    defaultBgName: 'Баня / WC',
-    defaultEnName: 'Bathroom',
     color: Color(0xFF29B6F6), // Cyan / Sky Blue
     icon: Icons.bathtub_rounded,
   ),
   terrace(
-    defaultBgName: 'Тераса',
-    defaultEnName: 'Terrace / Balcony',
     color: Color(0xFF66BB6A), // Leaf Green
     icon: Icons.deck_rounded,
   ),
   storage(
-    defaultBgName: 'Склад / Мокро',
-    defaultEnName: 'Storage / Utility',
     color: Color(0xFF8D6E63), // Brown
     icon: Icons.inventory_2_rounded,
   ),
   office(
-    defaultBgName: 'Кабинет / Офис',
-    defaultEnName: 'Home Office',
     color: Color(0xFFAB47BC), // Purple
     icon: Icons.laptop_mac_rounded,
   ),
   custom(
-    defaultBgName: 'Помещение',
-    defaultEnName: 'Custom Space',
     color: Color(0xFF7E57C2), // Deep Purple
     icon: Icons.dashboard_rounded,
   );
 
-  final String defaultBgName;
-  final String defaultEnName;
   final Color color;
   final IconData icon;
 
-  const ArchitectZoneCategory({
-    required this.defaultBgName,
-    required this.defaultEnName,
-    required this.color,
-    required this.icon,
-  });
+  const ArchitectZoneCategory({required this.color, required this.icon});
 
   String localizedName(AppLocalizations l10n) {
     switch (this) {
@@ -94,13 +69,13 @@ enum ArchitectZoneCategory {
   }
 }
 
-
 /// A functional architectural zone (room / space / spatial partition)
 /// defined by a parametric 2D polygon with dynamic vertices, grips,
 /// room finishes (floor, wall, ceiling), and automated schedule metadata.
 class ArchitectZone {
   final String id;
-  final String number; // Room number for schedules/drawings (e.g. "1", "01", "101")
+  final String
+  number; // Room number for schedules/drawings (e.g. "1", "01", "101")
   final String name;
   final ArchitectZoneCategory category;
   final List<Offset> polygon; // Coordinates in model meters
@@ -109,7 +84,8 @@ class ArchitectZone {
   final String ceilingFinish; // Ceiling finish / финиш таван
   final double clearHeight; // Clear room height in meters (default 2.60 m)
   final bool isAutoBoundary; // Automatic dynamic room boundary vs manual fixed
-  final Offset? seedPoint; // Internal seed point for dynamic boundary detection & merge
+  final Offset?
+  seedPoint; // Internal seed point for dynamic boundary detection & merge
   final double? targetArea; // Optional target program area in m²
   final int? customColorValue;
 
@@ -129,9 +105,8 @@ class ArchitectZone {
     this.customColorValue,
   });
 
-  Color get color => customColorValue != null
-      ? Color(customColorValue!)
-      : category.color;
+  Color get color =>
+      customColorValue != null ? Color(customColorValue!) : category.color;
 
   /// Localized default or user-specified floor finish.
   String resolvedFloorFinish(AppLocalizations l10n) {
@@ -273,6 +248,26 @@ class ArchitectZone {
     return Offset(cx / (6.0 * signedArea), cy / (6.0 * signedArea));
   }
 
+  /// A point inside the contour, unlike the centroid of some concave rooms.
+  Offset? get interiorPoint {
+    if (seedPoint != null && containsPoint(seedPoint!)) return seedPoint;
+    if (containsPoint(centroid)) return centroid;
+    // At least one edge has free interior immediately on one side.
+    for (var i = 0; i < polygon.length; i++) {
+      final a = polygon[i], b = polygon[(i + 1) % polygon.length];
+      final delta = b - a;
+      if (delta.distance < 1e-8) continue;
+      final normal = Offset(-delta.dy, delta.dx) / delta.distance;
+      for (final inset in [.05, .01, .001]) {
+        for (final sign in [-1.0, 1.0]) {
+          final candidate = (a + b) / 2 + normal * (inset * sign);
+          if (containsPoint(candidate)) return candidate;
+        }
+      }
+    }
+    return null;
+  }
+
   /// Bounding rectangle in meters.
   Rect get bounds {
     if (polygon.isEmpty) return Rect.zero;
@@ -299,7 +294,8 @@ class ArchitectZone {
     for (int i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
       final pi = polygon[i];
       final pj = polygon[j];
-      final intersect = ((pi.dy > pt.dy) != (pj.dy > pt.dy)) &&
+      final intersect =
+          ((pi.dy > pt.dy) != (pj.dy > pt.dy)) &&
           (pt.dx < (pj.dx - pi.dx) * (pt.dy - pi.dy) / (pj.dy - pi.dy) + pi.dx);
       if (intersect) inside = !inside;
     }
@@ -405,20 +401,21 @@ class ArchitectZone {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'number': number,
-        'name': name,
-        'category': category.name,
-        'polygon': polygon.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
-        'floorFinish': floorFinish,
-        'wallFinish': wallFinish,
-        'ceilingFinish': ceilingFinish,
-        'clearHeight': clearHeight,
-        'isAutoBoundary': isAutoBoundary,
-        if (seedPoint != null) 'seedPoint': {'x': seedPoint!.dx, 'y': seedPoint!.dy},
-        'targetArea': targetArea,
-        'customColorValue': customColorValue,
-      };
+    'id': id,
+    'number': number,
+    'name': name,
+    'category': category.name,
+    'polygon': polygon.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
+    'floorFinish': floorFinish,
+    'wallFinish': wallFinish,
+    'ceilingFinish': ceilingFinish,
+    'clearHeight': clearHeight,
+    'isAutoBoundary': isAutoBoundary,
+    if (seedPoint != null)
+      'seedPoint': {'x': seedPoint!.dx, 'y': seedPoint!.dy},
+    'targetArea': targetArea,
+    'customColorValue': customColorValue,
+  };
 
   factory ArchitectZone.fromJson(Map<String, dynamic> json) {
     final catName = json['category'] as String? ?? 'custom';
@@ -427,11 +424,14 @@ class ArchitectZone {
       orElse: () => ArchitectZoneCategory.custom,
     );
 
-    final polyList = (json['polygon'] as List<dynamic>?)
-            ?.map((pt) => Offset(
-                  (pt['x'] as num).toDouble(),
-                  (pt['y'] as num).toDouble(),
-                ))
+    final polyList =
+        (json['polygon'] as List<dynamic>?)
+            ?.map(
+              (pt) => Offset(
+                (pt['x'] as num).toDouble(),
+                (pt['y'] as num).toDouble(),
+              ),
+            )
             .toList() ??
         const [];
 
@@ -444,7 +444,7 @@ class ArchitectZone {
     return ArchitectZone(
       id: json['id'] as String,
       number: json['number'] as String? ?? '1',
-      name: json['name'] as String? ?? category.defaultBgName,
+      name: json['name'] as String? ?? '',
       category: category,
       polygon: polyList,
       floorFinish: json['floorFinish'] as String? ?? '',

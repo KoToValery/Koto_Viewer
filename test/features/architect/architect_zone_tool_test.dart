@@ -199,6 +199,7 @@ void main() {
     test('interactive edge midpoint extrusion creates new vertices and preserves old ones', () {
       final zone = ArchitectZone(
         id: 'zone_1',
+        isAutoBoundary: false,
         name: 'Спалня',
         category: ArchitectZoneCategory.bedroom,
         polygon: const [
@@ -292,6 +293,7 @@ void main() {
     test('ArchitectZoneTool editing workflow starts, modifies polygon, and commits', () {
       final zone = ArchitectZone(
         id: 'zone_edit',
+        isAutoBoundary: false,
         name: 'Офис',
         category: ArchitectZoneCategory.office,
         polygon: const [

@@ -155,6 +155,8 @@ void main() {
       expect(workspace.overlay(tester).selectedElementIds, {'w1', 'w4', 'c1'});
       expect(menu.items.map((i) => i.action), [
         ArchitectRadialAction.move,
+        ArchitectRadialAction.mirrorMove,
+        ArchitectRadialAction.mirrorCopy,
         ArchitectRadialAction.properties,
         ArchitectRadialAction.delete,
       ]);
@@ -242,8 +244,8 @@ void main() {
       expect(workspace.overlay(tester).selectedElementIds, {'c', 'z', 'axis'});
       expect(find.byType(ArchitectGridAxisPropertiesCard), findsNothing);
       final menu = await holdMenu(tester, const Offset(0, 3));
+      // The group contains an automatic zone: only metadata and deletion apply.
       expect(menu.items.map((i) => i.action), [
-        ArchitectRadialAction.move,
         ArchitectRadialAction.properties,
         ArchitectRadialAction.delete,
       ]);

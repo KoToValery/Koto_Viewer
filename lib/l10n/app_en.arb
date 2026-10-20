@@ -2766,9 +2766,9 @@
   "@architectZoneBoundaryManual": { "description": "Manual boundary mode label" },
   "architectZoneBoundaryManualDesc": "Fixed boundaries without dynamic updates",
   "@architectZoneBoundaryManualDesc": { "description": "Description of manual boundary mode" },
-  "architectZoneModeAuto": "Auto (1-Click)",
+  "architectZoneModeAuto": "Auto",
   "@architectZoneModeAuto": { "description": "Auto 1-click zone placement mode" },
-  "architectZoneModeManual": "Manual (Points)",
+  "architectZoneModeManual": "Manual",
   "@architectZoneModeManual": { "description": "Manual point-by-point zone placement mode" },
   "architectZoneAutoPrompt": "Tap inside an enclosed room to auto-detect boundary",
   "@architectZoneAutoPrompt": { "description": "Prompt for auto-detecting room boundary" },
@@ -4299,5 +4299,8 @@
   "wallArcInvalidRadius": "Radius is too small for this wall.",
   "wallArcPickStart": "Pick the start of the arc",
   "wallPlinthEnabled": "Enabled",
-  "wallArcMode": "Arc"
+  "wallArcMode": "Arc",
+  "architectZonePresets": "Zone presets",
+  "architectZoneManualHelp": "Manual: edit points and edges. Clear to detect the room from its walls again.",
+  "architectZoneBoundaryOpen": "No enclosed room found. Check the walls for gaps."
 }

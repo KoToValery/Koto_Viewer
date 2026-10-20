@@ -6368,13 +6368,13 @@ abstract class AppLocalizations {
   /// Auto 1-click zone placement mode
   ///
   /// In en, this message translates to:
-  /// **'Auto (1-Click)'**
+  /// **'Auto'**
   String get architectZoneModeAuto;
 
   /// Manual point-by-point zone placement mode
   ///
   /// In en, this message translates to:
-  /// **'Manual (Points)'**
+  /// **'Manual'**
   String get architectZoneModeManual;
 
   /// Prompt for auto-detecting room boundary
@@ -11704,6 +11704,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Arc'**
   String get wallArcMode;
+
+  /// No description provided for @architectZonePresets.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone presets'**
+  String get architectZonePresets;
+
+  /// No description provided for @architectZoneManualHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual: edit points and edges. Clear to detect the room from its walls again.'**
+  String get architectZoneManualHelp;
+
+  /// No description provided for @architectZoneBoundaryOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'No enclosed room found. Check the walls for gaps.'**
+  String get architectZoneBoundaryOpen;
 }
 
 class _AppLocalizationsDelegate
