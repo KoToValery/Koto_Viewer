@@ -378,7 +378,7 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('architect-wall-actions')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('wall-split-stroke')));
+      await tester.tap(find.byKey(const ValueKey('wall-cut')));
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(3, -1));
       final g = await tester.startGesture(
@@ -514,7 +514,7 @@ void main() {
     }
     await tester.tap(find.byKey(const ValueKey('architect-wall-actions')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('wall-split-stroke')));
+    await tester.tap(find.byKey(const ValueKey('wall-cut')));
     await tester.pumpAndSettle();
     await workspace.wallTap(tester, const Offset(0, -1.8));
     final gesture = await tester.startGesture(

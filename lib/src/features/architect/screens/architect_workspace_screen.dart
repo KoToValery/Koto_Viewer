@@ -2974,6 +2974,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
       );
       final rawTarget = rawModel + _wallGrabOffset - _wallEndpointDisplacement;
+      final origVec = original.endPoint - original.startPoint;
+      final origDir = origVec.distance > 1e-4
+          ? origVec / origVec.distance
+          : const Offset(1, 0);
+      final origNormal = Offset(-origDir.dy, origDir.dx);
       final snap = ArchitectWallSnap.resolve(
         raw: rawTarget,
         magnetic: _magnetEnabled,
@@ -2983,6 +2988,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         underlay: _currentUnderlayDoc,
         frame: widget.underlayFrame,
         visibility: _underlayLayerVisibility,
+        referenceDirections: [origDir, origNormal],
       );
       final updated = original.copyWith(
         startPoint: _wallDragStart ? snap.point : null,
@@ -4073,7 +4079,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           );
           if (!identical(before, _project)) setState(() => _wallCutIds = {});
+          return;
         }
+        setState(() {
+          _wallCutStroke = true;
+          _wallCutStart = rawModel;
+        });
         return;
       }
       if (_wallCutStart == null) {
@@ -11179,8 +11190,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               'Midpoint' => DxfSnapType.midpoint,
                               'Center' => DxfSnapType.center,
                               'Perpendicular' => DxfSnapType.perpendicular,
-                              _ when label.endsWith('°') =>
-                                DxfSnapType.perpendicular,
+                              _ when label.endsWith('°') => DxfSnapType.point,
                               _ => DxfSnapType.nearest,
                             };
                       final lastAnchor = _draftStart ??

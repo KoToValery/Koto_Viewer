@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_wall.dart';
 import 'architect_wall_network.dart';
@@ -64,20 +65,25 @@ class ArchitectWallAlignment {
     List<ArchitectWall> walls,
     double scale,
   ) {
-    final radius = 8 / scale;
+    final radius = math.min(22.0 / scale, 0.4);
     var best = radius;
     Offset? snapped;
     (Offset, Offset)? guide;
     for (final wall in walls) {
-      if(wall.isCurved)continue;
+      if (wall.isCurved) continue;
       for (final corner in [...wall.polygonCorners, ...wall.coreCorners]) {
         for (final direction in [wall.unitVector, wall.normalVector]) {
-          final projected = corner + direction * dot(raw - corner, direction);
+          final along = dot(raw - corner, direction);
+          final projected = corner + direction * along;
           final distance = (projected - raw).distance;
           if (distance < best) {
             best = distance;
             snapped = projected;
-            guide = (corner - direction * .3, projected + direction * .3);
+            final overshoot = math.max(0.4, 20.0 / scale);
+            final (p1, p2) = along >= 0
+                ? (corner - direction * overshoot, projected + direction * overshoot)
+                : (projected - direction * overshoot, corner + direction * overshoot);
+            guide = (p1, p2);
           }
         }
       }
@@ -95,7 +101,7 @@ class ArchitectWallAlignment {
   }) {
     final moving = walls.where((w) => ids.contains(w.id)).toList();
     if (moving.isEmpty) return (delta, []);
-    final radius = 8 / scale;
+    final radius = math.min(22.0 / scale, 0.4);
     final guides = <(Offset, Offset)>[];
     var result = delta;
     final basis = [
@@ -108,7 +114,7 @@ class ArchitectWallAlignment {
       (Offset, Offset)? guide;
       for (final a in moving) {
         for (final b in walls.where((w) => !ids.contains(w.id))) {
-          if(a.isCurved||b.isCurved)continue;
+          if (a.isCurved || b.isCurved) continue;
           final angle = dot(a.unitVector, b.unitVector).abs();
           if (angle > 1e-6 && (1 - angle).abs() > 1e-6) continue;
           for (final p in [...a.polygonCorners, ...a.coreCorners]) {
@@ -119,9 +125,10 @@ class ArchitectWallAlignment {
                 distance = c.abs();
                 correction = c;
                 final direction = Offset(-axis.dy, axis.dx);
+                final overshoot = math.max(0.4, 20.0 / scale);
                 guide = (
-                  q - direction * .3,
-                  shifted + axis * c + direction * .3,
+                  q - direction * overshoot,
+                  shifted + axis * c + direction * overshoot,
                 );
               }
             }

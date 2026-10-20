@@ -210,8 +210,8 @@ class BimPointerMarks {
           final perpPaint = Paint()
             ..color = color
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.0;
-          const double sp = 4.5;
+            ..strokeWidth = 0.95;
+          const double sp = 3.2;
           canvas.drawPath(
             Path()
               ..moveTo(pos.dx - sp, pos.dy - sp)

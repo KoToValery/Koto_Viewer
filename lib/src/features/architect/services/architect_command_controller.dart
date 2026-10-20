@@ -301,13 +301,10 @@ class CutArchitectWalls extends ArchitectModelCommand {
     final delta = end - start;
     final len = delta.distance;
     if (len < .001) throw ArgumentError('Cut too short');
-    final u = delta / len;
-    final extendedStart = start - u * 50.0;
-    final extendedEnd = end + u * 50.0;
     final cutter = ArchitectWall(
       id: 'cutter',
-      startPoint: extendedStart,
-      endPoint: extendedEnd,
+      startPoint: start,
+      endPoint: end,
     );
     var result = project;
     var cuts = 0;

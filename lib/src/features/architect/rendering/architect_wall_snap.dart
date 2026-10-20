@@ -22,6 +22,7 @@ class ArchitectWallSnap {
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
+    List<Offset> referenceDirections = const [],
   }) {
     final radius = math.min(capturePixels / scale, .35);
     var best = magnetic
@@ -197,13 +198,11 @@ class ArchitectWallSnap {
     final delta = raw - anchor;
     if (delta.distance < .001) return ArchitectSnapResult(point: anchor);
     final angle = math.atan2(delta.dy, delta.dx);
-    // Strong orthogonal capture; lighter 15-degree increments.
+    // Strong orthogonal capture (~24px); lighter 15-degree increments.
     for (final step in [math.pi / 2, math.pi / 12]) {
       final target = (angle / step).round() * step;
       final threshold = step == math.pi / 2 ? math.pi / 15 : math.pi / 90;
-      final directionRadius = step == math.pi / 2
-          ? math.min(28 / scale, .5)
-          : radius;
+      final directionRadius = math.min(24.0 / scale, 0.4);
       final u = Offset(math.cos(target), math.sin(target));
       final projected = anchor + u * (delta.dx * u.dx + delta.dy * u.dy);
       if ((angle - target).abs() <= threshold &&
@@ -215,7 +214,7 @@ class ArchitectWallSnap {
           projected: projected,
           degrees: degrees,
           axes: project.gridAxes,
-          tolerance: math.max(directionRadius, 24 / scale),
+          tolerance: directionRadius,
         );
         if (axisCrossing != null) return axisCrossing;
         final perpCrossing = _perpendicularWallCrossingOnRay(
@@ -224,7 +223,8 @@ class ArchitectWallSnap {
           projected: projected,
           degrees: degrees,
           walls: project.activeStorey.walls,
-          tolerance: math.max(directionRadius, 24 / scale),
+          tolerance: directionRadius,
+          scale: scale,
         );
         if (perpCrossing != null) return perpCrossing;
         final guideLength = math.max(delta.distance + 40.0 / scale, 60.0 / scale);
@@ -239,38 +239,49 @@ class ArchitectWallSnap {
       }
     }
     if (magnetic) {
-      // Relative directions also work when the neighboring wall is rotated.
-      for (final wall in project.activeStorey.walls) {
-        for (final u in [wall.unitVector, wall.normalVector]) {
+      // Relative directions and reference directions (e.g. wall being lengthened/edited).
+      final directionRadius = math.min(24.0 / scale, 0.4);
+      final directionsToTest = <Offset>[
+        for (final wall in project.activeStorey.walls) ...[
+          wall.unitVector,
+          wall.normalVector,
+        ],
+        ...referenceDirections,
+      ];
+      for (final uCandidate in directionsToTest) {
+        if (uCandidate.distanceSquared < 1e-8) continue;
+        final uNorm = uCandidate / uCandidate.distance;
+        for (final u in [uNorm, uNorm * -1]) {
           final along = delta.dx * u.dx + delta.dy * u.dy;
+          if (along <= 1e-4) continue;
           final projected = anchor + u * along;
-          if ((projected - raw).distance <= 8 / scale &&
-              (projected - raw).distance <=
-                  delta.distance * math.sin(math.pi / 90)) {
-            final direction = along < 0 ? u * -1 : u;
+          final dist = (projected - raw).distance;
+          if (dist <= directionRadius &&
+              dist <= delta.distance * math.sin(math.pi / 15)) {
             final degrees =
-                (math.atan2(direction.dy, direction.dx) * 180 / math.pi + 360) %
-                360;
+                (math.atan2(u.dy, u.dx) * 180 / math.pi + 360) % 360;
             final axisCrossing = _axisCrossingOnRay(
               anchor: anchor,
-              u: direction,
+              u: u,
               projected: projected,
               degrees: degrees,
               axes: project.gridAxes,
-              tolerance: math.max(radius, 24 / scale),
+              tolerance: directionRadius,
             );
             if (axisCrossing != null) return axisCrossing;
             final perpCrossing = _perpendicularWallCrossingOnRay(
               anchor: anchor,
-              u: direction,
+              u: u,
               projected: projected,
               degrees: degrees,
               walls: project.activeStorey.walls,
-              tolerance: math.max(radius, 24 / scale),
+              tolerance: directionRadius,
+              scale: scale,
             );
             if (perpCrossing != null) return perpCrossing;
-            final guideLength = math.max(along.abs() + 40.0 / scale, 60.0 / scale);
-            final guideEnd = anchor + direction * guideLength;
+            final guideLength =
+                math.max(along.abs() + 40.0 / scale, 60.0 / scale);
+            final guideEnd = anchor + u * guideLength;
             return ArchitectSnapResult(
               point: projected,
               isSnapped: true,
@@ -345,26 +356,53 @@ class ArchitectWallSnap {
     required double degrees,
     required List<ArchitectWall> walls,
     required double tolerance,
-    double maxDistance = 15.0,
+    double maxDistance = 25.0,
+    double scale = 1.0,
   }) {
     ArchitectSnapResult? best;
     double bestDist = tolerance;
 
     for (final wall in walls) {
+      if (wall.isCurved) continue;
       if ((wall.startPoint - anchor).distance < 1e-3 ||
           (wall.endPoint - anchor).distance < 1e-3) {
         continue;
       }
       final v = wall.unitVector;
       final dot = (u.dx * v.dx + u.dy * v.dy).abs();
-      // Must be perpendicular within ~3 degrees
-      if (dot > 0.05) continue;
+      final isPerpendicular = dot <= 0.05;
+      final isParallel = dot >= 0.95;
+      if (!isPerpendicular && !isParallel) continue;
 
       final lines = <(Offset, Offset)>[
-        (wall.startPoint, wall.endPoint),
-        if (wall.polygonCorners.length >= 4) ...[
-          (wall.polygonCorners[0], wall.polygonCorners[1]),
-          (wall.polygonCorners[3], wall.polygonCorners[2]),
+        if (isPerpendicular) ...[
+          (wall.startPoint, wall.endPoint),
+          if (wall.polygonCorners.length >= 4) ...[
+            (wall.polygonCorners[0], wall.polygonCorners[1]),
+            (wall.polygonCorners[3], wall.polygonCorners[2]),
+          ],
+          if (wall.coreCorners.length >= 4) ...[
+            (wall.coreCorners[0], wall.coreCorners[1]),
+            (wall.coreCorners[3], wall.coreCorners[2]),
+          ],
+        ],
+        if (isParallel) ...[
+          if (wall.polygonCorners.length >= 4) ...[
+            (wall.polygonCorners[1], wall.polygonCorners[2]),
+            (wall.polygonCorners[3], wall.polygonCorners[0]),
+          ],
+          if (wall.coreCorners.length >= 4) ...[
+            (wall.coreCorners[1], wall.coreCorners[2]),
+            (wall.coreCorners[3], wall.coreCorners[0]),
+          ],
+          (
+            wall.startPoint - wall.normalVector * 0.5,
+            wall.startPoint + wall.normalVector * 0.5,
+          ),
+          (
+            wall.endPoint - wall.normalVector * 0.5,
+            wall.endPoint + wall.normalVector * 0.5,
+          ),
         ],
       ];
 
@@ -381,7 +419,7 @@ class ArchitectWallSnap {
         final t = (inter - anchor).dx * u.dx + (inter - anchor).dy * u.dy;
         if (t <= 1e-3) continue;
 
-        // Closest point on the perpendicular wall segment to inter
+        // Closest point on the wall segment to inter
         final seg = w2 - w1;
         final segLen = seg.distance;
         if (segLen < 1e-4) continue;
@@ -396,14 +434,24 @@ class ArchitectWallSnap {
         final d = (inter - projected).distance;
         if (d <= bestDist) {
           bestDist = d;
+          final overshoot = math.max(0.4, 20.0 / scale);
+          final rayGuide = (anchor, inter + u * overshoot);
+          final (Offset, Offset) perpGuide;
+          if (gap > 1e-4) {
+            final guideDir = inter - closestOnWall;
+            final norm = guideDir / guideDir.distance;
+            perpGuide = (closestOnWall, inter + norm * overshoot);
+          } else {
+            perpGuide = (w1 - segU * overshoot, w2 + segU * overshoot);
+          }
           best = ArchitectSnapResult(
             point: inter,
             isSnapped: true,
             snapLabel: 'Perpendicular',
             angleDeg: degrees,
             magneticGuides: [
-              (anchor, inter),
-              (closestOnWall, inter),
+              rayGuide,
+              perpGuide,
             ],
           );
         }
