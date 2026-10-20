@@ -7389,11 +7389,98 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final edgeP2 = path.points[(hit.edge + 1) % path.points.length];
     final snapTol = 24.0 / _currentScale;
 
-    // Snapping to intersections with outer face lines and centerline of other walls
-    for (final other in _project.activeStorey.walls) {
+    var bestDist = snapTol;
+    final storeyWalls = _project.activeStorey.walls;
+
+    // 1. Snapping to outer corners where wall insulation / core lines connect
+    for (var i = 0; i < storeyWalls.length; i++) {
+      final a = storeyWalls[i];
+      if (a.length < 1e-4) continue;
+
+      // Include wall individual corner vertices (insulation & core)
+      for (final p in [...a.polygonCorners, ...a.coreCorners]) {
+        final targetPoint = path.closed
+            ? p
+            : BimLineGeometry.closest(p, edgeP1, edgeP2);
+        final dist = (targetPoint - hit.point).distance;
+        if (dist <= bestDist) {
+          bestDist = dist;
+          candidate = targetPoint;
+          snapLabel = 'Corner';
+          guides = [
+            if (!path.closed && (p - targetPoint).distance > 1e-4)
+              (p, targetPoint),
+          ];
+        }
+      }
+
+      for (final b in storeyWalls.skip(i + 1)) {
+        if (b.length < 1e-4) continue;
+        final cross = BimLineGeometry.cross(a.unitVector, b.unitVector);
+        if (cross.abs() < 1e-4) continue;
+
+        // Outer face intersections (insulation corner junctions)
+        final facesA = [
+          (a.polygonCorners[0], a.polygonCorners[1]),
+          (a.polygonCorners[3], a.polygonCorners[2]),
+        ];
+        final facesB = [
+          (b.polygonCorners[0], b.polygonCorners[1]),
+          (b.polygonCorners[3], b.polygonCorners[2]),
+        ];
+        for (final fa in facesA) {
+          for (final fb in facesB) {
+            final pt = BimLineGeometry.intersection(fa.$1, fa.$2, fb.$1, fb.$2);
+            if (pt != null) {
+              final targetPoint = path.closed
+                  ? pt
+                  : BimLineGeometry.closest(pt, edgeP1, edgeP2);
+              final dist = (targetPoint - hit.point).distance;
+              if (dist <= bestDist) {
+                bestDist = dist;
+                candidate = targetPoint;
+                snapLabel = 'Corner';
+                guides = [fa, fb];
+              }
+            }
+          }
+        }
+
+        // Core face intersections (core corner junctions)
+        final coreA = [
+          (a.coreCorners[0], a.coreCorners[1]),
+          (a.coreCorners[3], a.coreCorners[2]),
+        ];
+        final coreB = [
+          (b.coreCorners[0], b.coreCorners[1]),
+          (b.coreCorners[3], b.coreCorners[2]),
+        ];
+        for (final ca in coreA) {
+          for (final cb in coreB) {
+            final pt = BimLineGeometry.intersection(ca.$1, ca.$2, cb.$1, cb.$2);
+            if (pt != null) {
+              final targetPoint = path.closed
+                  ? pt
+                  : BimLineGeometry.closest(pt, edgeP1, edgeP2);
+              final dist = (targetPoint - hit.point).distance;
+              if (dist <= bestDist) {
+                bestDist = dist;
+                candidate = targetPoint;
+                snapLabel = 'Core';
+                guides = [ca, cb];
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Intersections of other walls with edgeP1..edgeP2
+    for (final other in storeyWalls) {
       if (other.id == _newPointTargetId) continue;
-      final lines = <(Offset, Offset)>[
-        (other.startPoint, other.endPoint),
+
+      // 2a. Insulation lines
+      final insLines = <(Offset, Offset)>[
         if (other.polygonCorners.length >= 4) ...[
           (other.polygonCorners[0], other.polygonCorners[1]),
           (other.polygonCorners[3], other.polygonCorners[2]),
@@ -7401,7 +7488,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           (other.polygonCorners[1], other.polygonCorners[2]),
         ],
       ];
-      for (final (w1, w2) in lines) {
+      for (final (w1, w2) in insLines) {
         final inter = BimLineGeometry.intersection(
           edgeP1,
           edgeP2,
@@ -7410,43 +7497,97 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           firstFinite: true,
           secondFinite: false,
         );
-        if (inter != null && (inter - hit.point).distance <= snapTol) {
-          candidate = inter;
-          snapLabel = 'Intersection';
-          guides = [(w1, w2)];
-          break;
+        if (inter != null) {
+          final dist = (inter - hit.point).distance;
+          if (dist <= bestDist) {
+            bestDist = dist;
+            candidate = inter;
+            snapLabel = 'Insulation';
+            guides = [(w1, w2)];
+          }
         }
       }
-      if (snapLabel != null) break;
+
+      // 2b. Core lines
+      if (other.coreCorners.length >= 4) {
+        final coreLines = <(Offset, Offset)>[
+          (other.coreCorners[0], other.coreCorners[1]),
+          (other.coreCorners[3], other.coreCorners[2]),
+          (other.coreCorners[0], other.coreCorners[3]),
+          (other.coreCorners[1], other.coreCorners[2]),
+        ];
+        for (final (c1, c2) in coreLines) {
+          final inter = BimLineGeometry.intersection(
+            edgeP1,
+            edgeP2,
+            c1,
+            c2,
+            firstFinite: true,
+            secondFinite: false,
+          );
+          if (inter != null) {
+            final dist = (inter - hit.point).distance;
+            if (dist <= bestDist) {
+              bestDist = dist;
+              candidate = inter;
+              snapLabel = 'Core';
+              guides = [(c1, c2)];
+            }
+          }
+        }
+      }
+
+      // 2c. Wall axis
+      final interAxis = BimLineGeometry.intersection(
+        edgeP1,
+        edgeP2,
+        other.startPoint,
+        other.endPoint,
+        firstFinite: true,
+        secondFinite: false,
+      );
+      if (interAxis != null) {
+        final dist = (interAxis - hit.point).distance;
+        // Insulation & core take precedence over axis when within 4px of each other
+        final margin = (snapLabel == 'Insulation' || snapLabel == 'Core') ? 4.0 / _currentScale : 0.0;
+        if (dist <= bestDist - margin) {
+          bestDist = dist;
+          candidate = interAxis;
+          snapLabel = 'Axis intersection';
+          guides = [(other.startPoint, other.endPoint)];
+        }
+      }
     }
 
-    // Snapping to intersection with grid axes
-    if (snapLabel == null) {
-      for (final axis in _project.gridAxes) {
-        final inter = BimLineGeometry.intersection(
-          edgeP1,
-          edgeP2,
-          axis.start,
-          axis.end,
-          firstFinite: true,
-          secondFinite: false,
-        );
-        if (inter != null && (inter - hit.point).distance <= snapTol) {
+    // 3. Snapping to intersection with grid axes
+    for (final axis in _project.gridAxes) {
+      final inter = BimLineGeometry.intersection(
+        edgeP1,
+        edgeP2,
+        axis.start,
+        axis.end,
+        firstFinite: true,
+        secondFinite: false,
+      );
+      if (inter != null) {
+        final dist = (inter - hit.point).distance;
+        if (dist <= bestDist) {
+          bestDist = dist;
           candidate = inter;
           snapLabel = 'Axis intersection';
           guides = [(axis.start, axis.end)];
-          break;
         }
       }
     }
 
-    // Midpoint of the edge
-    if (snapLabel == null) {
-      final mid = (edgeP1 + edgeP2) / 2;
-      if ((mid - hit.point).distance <= 16.0 / _currentScale) {
-        candidate = mid;
-        snapLabel = 'Midpoint';
-      }
+    // 4. Midpoint of the edge
+    final mid = (edgeP1 + edgeP2) / 2;
+    final midDist = (mid - hit.point).distance;
+    if (midDist <= math.min(bestDist, 16.0 / _currentScale)) {
+      bestDist = midDist;
+      candidate = mid;
+      snapLabel = 'Midpoint';
+      guides = [];
     }
 
     (Offset, Offset)? leaderLine;
@@ -11589,6 +11730,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (label == 'Merge' || label == 'Обединяване (Merge)') {
       return l10n.snapMerge;
     }
+    if (label == 'Insulation') return l10n.wallLayerInsulation;
+    if (label == 'Core') return l10n.wallLayerCore;
+    if (label == 'Corner') return l10n.snapCorner;
     if (label.endsWith(' (Corner)') || label.endsWith(' (Ъгъл)')) {
       final name = label.replaceAll(' (Corner)', '').replaceAll(' (Ъгъл)', '');
       return '$name (${l10n.snapCorner})';

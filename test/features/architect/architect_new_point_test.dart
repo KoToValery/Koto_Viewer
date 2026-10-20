@@ -405,4 +405,51 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'New point snaps to intersecting wall core and insulation lines',
+    (tester) async {
+      final storey = ArchitectStorey(
+        id: 's',
+        name: 's',
+        walls: [
+          editing.wall('w1', Offset.zero, const Offset(10, 0)),
+          editing.wall('w2', const Offset(5, -3), const Offset(5, 3), exterior: true),
+        ],
+      );
+      final model = editing.seeded(storey);
+      addTearDown(model.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('bg'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: ArchitectWorkspaceScreen(commandController: model),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await editing.selectTool(tester, 'wall');
+      await editing.contextHold(tester, const Offset(2, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('architect-radial-newPoint')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('architect-new-point-banner')), findsOneWidget);
+
+      final w2 = storey.walls[1];
+      final coreX = w2.coreCorners.first.dx;
+      workspace.camera(tester).fit(const Rect.fromLTWH(-1, -4, 12, 8));
+      await tester.pumpAndSettle();
+
+      await tester.tapAt(workspace.screen(tester, Offset(coreX + 0.02, 0.01)));
+      await tester.pumpAndSettle();
+
+      final walls = model.project.activeStorey.walls;
+      expect(walls.length, greaterThanOrEqualTo(2));
+      final splitWall = walls.firstWhere(
+        (w) => (w.endPoint.dx - coreX).abs() < 1e-3 || (w.startPoint.dx - coreX).abs() < 1e-3,
+      );
+      expect(splitWall, isNotNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
