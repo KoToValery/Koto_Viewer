@@ -898,6 +898,8 @@ void main() {
       );
       expect(menu.items.map((i) => i.action), [
         ArchitectRadialAction.move,
+        ArchitectRadialAction.mirrorMove,
+        ArchitectRadialAction.mirrorCopy,
         ArchitectRadialAction.properties,
         ArchitectRadialAction.delete,
       ]);

@@ -459,7 +459,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   List<String> _selectionCandidates(Offset point) {
     if (_activeTool == ArchitectTool.select ||
-        _activeTool == ArchitectTool.zone) {
+        _activeTool == ArchitectTool.zone ||
+        _activeTool == ArchitectTool.dimension) {
       final first = _hitSelection(point);
       return <String>{
         ?first,
@@ -705,37 +706,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final snap = _snapDimensionPoint(raw);
     final anchors = <ArchitectDimensionAnchor>[];
 
-    final isCornerSnap = snap.snapLabel != null &&
-        (snap.snapLabel == 'Vertex' ||
-            snap.snapLabel == 'Endpoint' ||
-            snap.snapLabel == 'Intersection' ||
-            snap.snapLabel == 'Axis intersection' ||
-            snap.snapLabel == 'Center' ||
-            snap.snapLabel == 'Corner') &&
-        (snap.point - raw).distance <= 20 / _currentScale;
+    final candidateWalls = _project.activeStorey.walls
+        .where((w) => ids.contains(w.id))
+        .toList();
 
     if (openingId != null && openingHostWall != null) {
       _dimensionDirection ??= openingHostWall.unitVector;
       anchors.addAll(
         ArchitectDimensionChain.openingAnchors(openingHostWall, openingId),
       );
-    } else if (isCornerSnap) {
-      final cornerWall = _project.activeStorey.walls
-          .where((w) => w.containsPoint(snap.point, tolerance: 0.15))
-          .firstOrNull;
-      anchors.add(
-        ArchitectDimensionAnchor(
-          point: snap.point,
-          elementId: cornerWall?.id,
-          feature: 'vertex',
-        ),
-      );
-    } else if (_dimensionAllowPoint && snap.isSnapped) {
-      anchors.add(_dimensionPointAnchor(snap.point));
-    } else {
-      final candidateWalls = _project.activeStorey.walls
-          .where((w) => ids.contains(w.id))
-          .toList();
+    } else if (_dimensionAllowPoint) {
+      if (snap.isSnapped) {
+        anchors.add(_dimensionPointAnchor(snap.point));
+      } else {
+        final candidateWall = candidateWalls.firstOrNull;
+        if (candidateWall != null) {
+          anchors.add(ArchitectDimensionChain.wallFaceAt(candidateWall, raw));
+        } else {
+          anchors.add(ArchitectDimensionAnchor(point: raw));
+        }
+      }
+    } else if (candidateWalls.isNotEmpty) {
       final previousWall = _project.activeStorey.walls
           .where(
             (w) => _dimensionAnchors.any(
@@ -772,10 +763,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               (raw - wall.startPoint).distance < (raw - wall.endPoint).distance
                   ? wall.startPoint
                   : wall.endPoint;
-          if ((raw - nearestEnd).distance <= 24 / _currentScale) {
+          final targetPoint =
+              (snap.isSnapped && (snap.point - nearestEnd).distance <= 24 / _currentScale)
+                  ? snap.point
+                  : nearestEnd;
+          if ((raw - nearestEnd).distance <= 24 / _currentScale ||
+              (raw - targetPoint).distance <= 24 / _currentScale) {
             anchors.add(
               ArchitectDimensionAnchor(
-                point: nearestEnd,
+                point: targetPoint,
                 elementId: wall.id,
                 feature: 'vertex',
               ),
@@ -786,12 +782,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           }
         } else {
           _dimensionDirection ??= wall.normalVector;
-          if (_dimensionAllowPoint) {
-            anchors.add(ArchitectDimensionChain.wallFaceAt(wall, snap.point));
-          } else {
-            anchors.addAll(ArchitectDimensionChain.wallFaces(wall, raw));
-          }
+          anchors.addAll(ArchitectDimensionChain.wallFaces(wall, raw));
         }
+      }
+    } else {
+      final isCornerSnap = snap.snapLabel != null &&
+          (snap.snapLabel == 'Vertex' ||
+              snap.snapLabel == 'Endpoint' ||
+              snap.snapLabel == 'Intersection' ||
+              snap.snapLabel == 'Corner') &&
+          (snap.point - raw).distance <= 20 / _currentScale;
+
+      if (isCornerSnap) {
+        final cornerWall = _project.activeStorey.walls
+            .where((w) => w.containsPoint(snap.point, tolerance: 0.15))
+            .firstOrNull;
+        anchors.add(
+          ArchitectDimensionAnchor(
+            point: snap.point,
+            elementId: cornerWall?.id,
+            feature: 'vertex',
+          ),
+        );
       } else {
         for (final id in ids) {
           final anchor = ArchitectDimensionChain.pickElement(
@@ -1831,7 +1843,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final n = wall.normalVector * (wall.thickness / 2.0);
     final capA = centerPt - n;
     final capB = centerPt + n;
-    final tol = math.max(26.0 / _currentScale, wall.thickness / 2.0 + 0.15);
+    final tol = math.min(math.max(26.0 / _currentScale, wall.thickness / 2.0 + 0.05), 0.40);
     if ((rawModel - refPt).distance <= tol) return true;
     if ((rawModel - centerPt).distance <= tol) return true;
     if ((rawModel - capA).distance <= tol) return true;
