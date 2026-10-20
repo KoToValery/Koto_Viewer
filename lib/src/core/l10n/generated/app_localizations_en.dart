@@ -4809,6 +4809,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectRadialSplit => 'Split';
 
   @override
+  String get architectRadialCut => 'Cut';
+
+  @override
   String get architectRadialOffset => 'Offset';
 
   @override

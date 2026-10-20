@@ -8441,6 +8441,12 @@ abstract class AppLocalizations {
   /// **'Split'**
   String get architectRadialSplit;
 
+  /// Radial menu cut/trim action
+  ///
+  /// In en, this message translates to:
+  /// **'Cut'**
+  String get architectRadialCut;
+
   /// Radial menu offset action
   ///
   /// In en, this message translates to:

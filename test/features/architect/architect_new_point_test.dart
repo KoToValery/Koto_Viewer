@@ -372,19 +372,20 @@ void main() {
       await editing.contextHold(tester, const Offset(3, 0));
       expect(find.text('Нова точка'), findsOneWidget);
       expect(find.text('Срежи'), findsOneWidget);
+      expect(find.text('Раздели'), findsOneWidget);
       final buttons = find.byWidgetPredicate(
         (w) =>
             w is InkWell &&
             w.key is ValueKey<String> &&
             (w.key as ValueKey<String>).value.startsWith('architect-radial-'),
       );
-      expect(buttons, findsNWidgets(10));
+      expect(buttons, findsNWidgets(11));
       final rects = tester.getRect(buttons.at(0));
       expect(rects.left, greaterThanOrEqualTo(0));
-      for (var i = 0; i < 10; i++) {
+      for (var i = 0; i < 11; i++) {
         final a = tester.getRect(buttons.at(i));
         expect(a.right, lessThanOrEqualTo(360));
-        for (var j = i + 1; j < 10; j++) {
+        for (var j = i + 1; j < 11; j++) {
           expect(
             (a.center - tester.getRect(buttons.at(j)).center).distance,
             greaterThanOrEqualTo(50 - 1e-8),

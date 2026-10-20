@@ -4828,7 +4828,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectRadialProperties => 'Свойства';
 
   @override
-  String get architectRadialSplit => 'Срежи';
+  String get architectRadialSplit => 'Раздели';
+
+  @override
+  String get architectRadialCut => 'Срежи';
 
   @override
   String get architectRadialOffset => 'Офсет';

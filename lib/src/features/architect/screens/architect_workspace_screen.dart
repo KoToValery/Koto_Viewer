@@ -4073,8 +4073,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           );
           if (!identical(before, _project)) setState(() => _wallCutIds = {});
-          return;
         }
+        return;
       }
       if (_wallCutStart == null) {
         // Step 1: Click 1 confirms the surface (or sets first point in space)
@@ -5363,6 +5363,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   // === SECTION: WALL SPLIT, SURFACE DETECTION & CLEARANCES ===
+  void _startCutSession(Set<String> wallIds) {
+    _cancelActiveDrags();
+    setState(() {
+      _splitActive = false;
+      _splitWallIds.clear();
+      _wallCutIds = Set.from(wallIds);
+      _wallCutStroke = false;
+      _wallCutStart = null;
+      _wallCutConfirmedDir = null;
+      _wallExtendId = null;
+      _radialMenuScreenPosition = null;
+      _placingWithHold = false;
+      _touchPosition = null;
+      _moveSelection = false;
+      _wallParallelMove = false;
+    });
+    HapticFeedback.selectionClick();
+  }
+
+  void _cancelCutSession() {
+    setState(() {
+      _wallCutIds.clear();
+      _wallCutStart = null;
+      _wallCutConfirmedDir = null;
+      _wallCutStroke = false;
+    });
+    _repaintPreview();
+  }
+
   void _startSplitSession({Set<String>? wallIds}) {
     _cancelActiveDrags();
     setState(() {
@@ -5558,6 +5587,47 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       HapticFeedback.selectionClick();
       _repaintPreview();
     }
+  }
+
+  Widget _buildCutPromptBanner() {
+    return Material(
+      key: const ValueKey('architect-cut-banner'),
+      color: const Color(0xE61E1E26),
+      borderRadius: BorderRadius.circular(8),
+      elevation: 4,
+      shadowColor: Colors.black54,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFF9100), width: 1.0),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.content_cut,
+                color: Color(0xFFFF9100),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                context.l10n.architectWallCutHint,
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                key: const ValueKey('architect-cut-cancel'),
+                onTap: _cancelCutSession,
+                child: const Icon(Icons.close, color: Colors.white70, size: 18),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildSplitPromptBanner() {
@@ -7173,6 +7243,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
       items.add(
         _radialItem(
+          action: ArchitectRadialAction.cut,
+
+          color: const Color(0xFFFF7043),
+        ),
+      );
+      items.add(
+        _radialItem(
           action: ArchitectRadialAction.split,
 
           color: const Color(0xFFFF9100),
@@ -7876,6 +7953,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _startNewPointSession(id, initialPick: pick);
         break;
 
+      case ArchitectRadialAction.cut:
+        _startCutSession({id});
+        break;
+
       case ArchitectRadialAction.split:
         _startSplitSession(wallIds: {id});
         break;
@@ -8572,6 +8653,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   tooltip: l.architectWallCut,
                   icon: Icon(
                     Icons.content_cut,
+                    color: (_wallCutIds.isNotEmpty && !_wallCutStroke)
+                        ? Colors.amber
+                        : Colors.white,
+                  ),
+                  onPressed: () {
+                    if (_wallCutIds.isNotEmpty && !_wallCutStroke) {
+                      _cancelCutSession();
+                    } else {
+                      _startCutSession(wallIds);
+                    }
+                  },
+                ),
+                IconButton(
+                  key: const ValueKey('architect-wall-split'),
+                  tooltip: l.architectWallSplit,
+                  icon: Icon(
+                    Icons.call_split,
                     color: _splitActive ? Colors.amber : Colors.white,
                   ),
                   onPressed: () {
@@ -9483,7 +9581,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     padding: EdgeInsets.zero,
                     icon: const Icon(Icons.more_horiz, color: Colors.white70),
                     onSelected: (action) {
-                      if (action == 'cut' || action == 'splitStroke') {
+                      if (action == 'cut') {
+                        _startCutSession(Set.of(wallIds));
+                      } else if (action == 'splitStroke') {
                         _startSplitSession(wallIds: Set.of(wallIds));
                       } else if (action == 'mirror') {
                         _executeWallEdit(
@@ -11332,6 +11432,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           left: 8,
           right: 64,
           child: _buildMirrorPromptBanner(),
+        ),
+      if (_wallCutIds.isNotEmpty && !_wallCutStroke)
+        Positioned(
+          top: 8,
+          left: 8,
+          right: 64,
+          child: _buildCutPromptBanner(),
         ),
       if (_splitActive)
         Positioned(

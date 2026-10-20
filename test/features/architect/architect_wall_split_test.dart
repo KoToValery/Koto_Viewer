@@ -93,8 +93,8 @@ void main() {
         await hold(tester, const Offset(3, 0));
 
         // Start split session from wall selection action bar
-        expect(find.byKey(const ValueKey('architect-wall-cut')), findsOneWidget);
-        await tester.tap(find.byKey(const ValueKey('architect-wall-cut')));
+        expect(find.byKey(const ValueKey('architect-wall-split')), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('architect-wall-split')));
         await tester.pumpAndSettle();
 
         // Banner should be visible with Step 1 prompt
@@ -184,7 +184,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await hold(tester, const Offset(3, 0));
-        await tester.tap(find.byKey(const ValueKey('architect-wall-cut')));
+        await tester.tap(find.byKey(const ValueKey('architect-wall-split')));
         await tester.pumpAndSettle();
 
         // Step 1: Pick Point 1 at (3, 0)
@@ -226,7 +226,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await hold(tester, const Offset(3, 0));
-        await tester.tap(find.byKey(const ValueKey('architect-wall-cut')));
+        await tester.tap(find.byKey(const ValueKey('architect-wall-split')));
         await tester.pumpAndSettle();
 
         await tester.tapAt(screen(tester, const Offset(3, 0)));
@@ -261,7 +261,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await hold(tester, const Offset(3, 0));
-        await tester.tap(find.byKey(const ValueKey('architect-wall-cut')));
+        await tester.tap(find.byKey(const ValueKey('architect-wall-split')));
         await tester.pumpAndSettle();
 
         await tester.tapAt(screen(tester, const Offset(3, 0)));
@@ -296,7 +296,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await hold(tester, const Offset(3, 0));
-        await tester.tap(find.byKey(const ValueKey('architect-wall-cut')));
+        await tester.tap(find.byKey(const ValueKey('architect-wall-split')));
         await tester.pumpAndSettle();
 
         await tester.tapAt(screen(tester, const Offset(3, 0)));
@@ -340,7 +340,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await hold(tester, const Offset(3, 0));
-        await tester.tap(find.byKey(const ValueKey('architect-wall-cut')));
+        await tester.tap(find.byKey(const ValueKey('architect-wall-split')));
         await tester.pumpAndSettle();
 
         // Step 1: Pick Point 1 at (2, 0)

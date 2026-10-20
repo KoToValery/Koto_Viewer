@@ -3518,6 +3518,8 @@
   "@architectRadialProperties": { "description": "Radial menu properties action" },
   "architectRadialSplit": "Split",
   "@architectRadialSplit": { "description": "Radial menu split action" },
+  "architectRadialCut": "Cut",
+  "@architectRadialCut": { "description": "Radial menu cut/trim action" },
   "architectRadialOffset": "Offset",
   "@architectRadialOffset": { "description": "Radial menu offset action" },
   "architectMirrorMove": "Mirror",
