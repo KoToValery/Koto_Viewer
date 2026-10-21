@@ -154,7 +154,7 @@ class ArchitectElementsPainterHelper {
           text: TextSpan(
             children: [
               ArchitectAnnotationSpan(role: ArchitectAnnotationRole.ordinary, text: '${slab.label}\n'),
-              ArchitectAnnotationSpan(role: ArchitectAnnotationRole.area, text: ArchitectTextScope.current?.area(slab.area) ?? '${slab.area.toStringAsFixed(1)} m²'),
+              ArchitectAnnotationSpan(role: ArchitectAnnotationRole.area, text: ArchitectTextScope.current?.area(slab.area) ?? '${BimDistanceUnit.trimZeros(slab.area.toStringAsFixed(2))} m²'),
             ],
             style: TextStyle(
               color: palette.foreground(const Color(0xFF37474F)),
@@ -472,12 +472,12 @@ class ArchitectElementsPainterHelper {
           final text =
               isSingleSegment && dim.customText?.trim().isNotEmpty == true
               ? dim.customText!
-              : unit
+              : BimDistanceUnit.trimZeros(unit
                     .toUnit((p2 - p1).distance)
                     .toStringAsFixed(
                       decimals ?? (unit == ArchitectUnit.centimeters ||
                               unit == ArchitectUnit.millimeters ? 0 : 2),
-                    );
+                    ));
 
           final tp = ArchitectTextPainter(elementId: dim.id, role: ArchitectAnnotationRole.dimension, modelScale: textScale,
             text: TextSpan(

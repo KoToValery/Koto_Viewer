@@ -17,6 +17,12 @@ enum BimDistanceUnit {
   double toUnit(double meters) => meters / scaleToMeters;
   double fromUnit(double valueInUnit) => valueInUnit * scaleToMeters;
 
+  static String trimZeros(String s) {
+    if (!s.contains('.')) return s;
+    final trimmed = s.replaceAll(RegExp(r'\.?0+$'), '');
+    return trimmed.isEmpty || trimmed == '-0' ? '0' : trimmed;
+  }
+
   String format(double meters, {int? decimals}) {
     final val = toUnit(meters);
     if (isImperial && decimals == null) {
@@ -36,11 +42,22 @@ enum BimDistanceUnit {
           ? '$sign$feet′ $whole$fraction″'
           : '$sign$whole$fraction in';
     } else if (this == BimDistanceUnit.millimeters) {
-      return '${val.toStringAsFixed(decimals ?? 0)} $symbol';
+      final s = val.toStringAsFixed(decimals ?? 0);
+      return '${decimals == null ? trimZeros(s) : s} $symbol';
     } else if (this == BimDistanceUnit.centimeters) {
-      return '${val.toStringAsFixed(decimals ?? 0)} $symbol';
+      final s = val.toStringAsFixed(decimals ?? 0);
+      return '${decimals == null ? trimZeros(s) : s} $symbol';
     } else {
-      return '${val.toStringAsFixed(decimals ?? 2)} $symbol';
+      final s = val.toStringAsFixed(decimals ?? 2);
+      return '${decimals == null ? trimZeros(s) : s} $symbol';
     }
+  }
+
+  String formatArea(double squareMeters, {int decimals = 2}) {
+    if (isImperial) {
+      final sqFt = squareMeters / (0.3048 * 0.3048);
+      return '${trimZeros(sqFt.toStringAsFixed(decimals))} sq ft';
+    }
+    return '${trimZeros(squareMeters.toStringAsFixed(decimals))} m²';
   }
 }

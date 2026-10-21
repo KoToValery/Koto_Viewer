@@ -1,4 +1,5 @@
 import '../models/architect_document.dart';
+import '../../bim_editing/properties/bim_distance_unit.dart';
 import 'architect_vector_scene.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -35,9 +36,12 @@ class ArchitectOpeningPlanPainter {
       ..strokeWidth = 0.8 / zoomScale
       ..style = PaintingStyle.stroke;
 
-    final wCm = ArchitectTextScope.current?.number(width) ?? (width * 100).round().toString();
-    final hCm = ArchitectTextScope.current?.number(height) ?? (height * 100).round().toString();
-    final sillCm = ArchitectTextScope.current?.number(sillHeight) ?? (sillHeight * 100).round().toString();
+    final wCm = ArchitectTextScope.current?.number(width) ??
+        BimDistanceUnit.trimZeros((width * 100).toStringAsFixed(1));
+    final hCm = ArchitectTextScope.current?.number(height) ??
+        BimDistanceUnit.trimZeros((height * 100).toStringAsFixed(1));
+    final sillCm = ArchitectTextScope.current?.number(sillHeight) ??
+        BimDistanceUnit.trimZeros((sillHeight * 100).toStringAsFixed(1));
 
     // Paint dimension numbers on both sides of the transverse line, parallel to the line
     // Static architectural size in model space: does not balloon up upon zoom-out

@@ -727,10 +727,41 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     HapticFeedback.selectionClick();
   }
 
+  bool _isElementAllowedForTool(String id, ArchitectTool tool) {
+    if (tool == ArchitectTool.select) return true;
+    final storey = _project.activeStorey;
+    return switch (tool) {
+      ArchitectTool.wall => storey.walls.any((w) => w.id == id),
+      ArchitectTool.door =>
+        storey.walls.any((w) => w.doors.any((d) => d.id == id)),
+      ArchitectTool.window =>
+        storey.walls.any((w) => w.windows.any((win) => win.id == id)),
+      ArchitectTool.column => storey.columns.any((c) => c.id == id),
+      ArchitectTool.beam => storey.beams.any((b) => b.id == id),
+      ArchitectTool.slab => storey.slabs.any((s) => s.id == id),
+      ArchitectTool.roof =>
+        storey.roofs.any((r) => r.id == id) ||
+        _project.storeys.any((st) => st.roofs.any((r) => r.id == id)),
+      ArchitectTool.opening => storey.openings.any((o) => o.id == id),
+      ArchitectTool.stair => storey.stairs.any((s) => s.id == id),
+      ArchitectTool.component => storey.components.any((c) => c.id == id),
+      ArchitectTool.dimension => storey.dimensions.any((d) => d.id == id),
+      ArchitectTool.level => storey.elevationMarkers.any((e) => e.id == id),
+      ArchitectTool.text => storey.annotations.any((a) => a.id == id),
+      ArchitectTool.cadLine => storey.cadPrimitives
+          .any((p) => p.id == id && p.type == CadPrimitiveType.line),
+      ArchitectTool.cadRect => storey.cadPrimitives
+          .any((p) => p.id == id && p.type == CadPrimitiveType.rect),
+      ArchitectTool.cadCircle => storey.cadPrimitives
+          .any((p) => p.id == id && p.type == CadPrimitiveType.circle),
+      ArchitectTool.axis => _project.gridAxes.any((a) => a.id == id),
+      ArchitectTool.zone => storey.zones.any((z) => z.id == id),
+      _ => false,
+    };
+  }
+
   List<String> _selectionCandidates(Offset point) {
-    if (_activeTool == ArchitectTool.select ||
-        _activeTool == ArchitectTool.zone ||
-        _activeTool == ArchitectTool.dimension) {
+    if (_activeTool == ArchitectTool.select) {
       final first = _hitSelection(point);
       return <String>{
         ?first,
@@ -750,8 +781,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }.toList();
     }
 
-    final id = _hitSelection(point);
-    return id != null ? [id] : const [];
+    if (_activeTool == ArchitectTool.axis) {
+      final hitAxis = _axisTool.hitTestAxis(
+        point,
+        _project.gridAxes,
+        tolerance: 14 / _currentScale,
+      );
+      return hitAxis != null ? [hitAxis.id] : const [];
+    }
+
+    if (_activeTool == ArchitectTool.zone) {
+      final hitZone = _findZoneAt(point);
+      return hitZone != null ? [hitZone.id] : const [];
+    }
+
+    final toolElements = _elementTool.hitTestElementsForTool(
+      _project.activeStorey,
+      point,
+      _currentScale,
+      _activeTool,
+      gridAxes: _project.gridAxes,
+    );
+    final first = _hitSelection(point);
+    return <String>{
+      ?first,
+      ...toolElements,
+    }.where((id) => _isElementAllowedForTool(id, _activeTool)).toList();
   }
 
   String? _nextSelection(Offset point, {bool advance = true}) {
@@ -817,7 +872,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   ArchitectDimensionAnchor _dimensionPointAnchor(Offset point) {
-    final candidates = _selectionCandidates(point);
+    final candidates = <String>{
+      ?_hitSelection(point),
+      ..._elementTool.hitTestElements(
+        _project.activeStorey,
+        point,
+        _currentScale,
+        gridAxes: _project.gridAxes,
+      ),
+    };
     for (final id in candidates) {
       final wall = _project.activeStorey.walls
           .where((w) => w.id == id)
@@ -956,7 +1019,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _commitDimensionDraft();
       return;
     }
-    final ids = _selectionCandidates(raw);
+    final hitIds = _elementTool.hitTestElements(
+      _project.activeStorey,
+      raw,
+      _currentScale,
+      gridAxes: _project.gridAxes,
+    ).toSet();
 
     // 1. Check if an opening (window or door) was picked
     ArchitectWall? openingHostWall;
@@ -966,7 +1034,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ...w.doors.map((d) => d.id),
         ...w.windows.map((win) => win.id),
       ]) {
-        if (ids.contains(o)) {
+        if (hitIds.contains(o)) {
           openingHostWall = w;
           openingId = o;
           break;
@@ -979,7 +1047,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final anchors = <ArchitectDimensionAnchor>[];
 
     final candidateWalls = _project.activeStorey.walls
-        .where((w) => ids.contains(w.id))
+        .where((w) => hitIds.contains(w.id))
         .toList();
 
     if (_dimensionAllowPoint) {
@@ -1085,7 +1153,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         );
       } else {
-        for (final id in ids) {
+        for (final id in hitIds) {
           final anchor = ArchitectDimensionChain.pickElement(
             _project,
             id,
@@ -1768,12 +1836,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   DateTime? _lastTapTime;
   Offset? _lastTapPos;
   Set<String> get _effectiveSelection {
-    if (_selectionIds.isNotEmpty) return Set.of(_selectionIds);
-    return {
-      ?_selectedElementId,
-      ?_selectedZoneId,
-      if (_axisTool.selectedAxisId != null) _axisTool.selectedAxisId!,
-    };
+    if (_activeTool == ArchitectTool.select) {
+      if (_selectionIds.isNotEmpty) return Set.of(_selectionIds);
+      return {
+        ?_selectedElementId,
+        ?_selectedZoneId,
+        if (_axisTool.selectedAxisId != null) _axisTool.selectedAxisId!,
+      };
+    }
+    final allowed = <String>{};
+    for (final id in _selectionIds) {
+      if (_isElementAllowedForTool(id, _activeTool)) allowed.add(id);
+    }
+    if (allowed.isNotEmpty) return allowed;
+    if (_selectedElementId != null &&
+        _isElementAllowedForTool(_selectedElementId!, _activeTool)) {
+      return {_selectedElementId!};
+    }
+    if (_selectedZoneId != null &&
+        _isElementAllowedForTool(_selectedZoneId!, _activeTool)) {
+      return {_selectedZoneId!};
+    }
+    if (_activeTool == ArchitectTool.axis &&
+        _axisTool.selectedAxisId != null &&
+        _isElementAllowedForTool(_axisTool.selectedAxisId!, _activeTool)) {
+      return {_axisTool.selectedAxisId!};
+    }
+    return const {};
   }
 
   bool _mirrorActive = false;
@@ -1861,6 +1950,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   ArchitectWall? get _selectedWall {
+    if (_activeTool != ArchitectTool.select &&
+        _activeTool != ArchitectTool.wall) {
+      return null;
+    }
     final singleId =
         _selectedElementId ??
         (_selectedWallIds.length == 1 ? _selectedWallIds.first : null);
@@ -2041,6 +2134,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _handleMoved = false;
 
   ArchitectZone? get _selectedZone {
+    if (_activeTool != ArchitectTool.select &&
+        _activeTool != ArchitectTool.zone) {
+      return null;
+    }
     if (_selectedZoneId == null) return null;
     final zones = _project.activeStorey.zones;
     for (final z in zones) {
@@ -2281,7 +2378,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${l10n.architectZoneCreated(newZone.name, newZone.area.toStringAsFixed(1))}'
+            '${l10n.architectZoneCreated(newZone.name, BimDistanceUnit.trimZeros(newZone.area.toStringAsFixed(2)))}'
             '${repairedCrossings ? '\n${l10n.architectZoneBoundaryRepaired}' : ''}',
           ),
           duration: const Duration(seconds: 1),
@@ -3236,6 +3333,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   ArchitectRoofPlane? get _selectedRoof {
+    if (_activeTool != ArchitectTool.select &&
+        _activeTool != ArchitectTool.roof) {
+      return null;
+    }
     final id = _selectedElementId;
     if (id == null || _effectiveSelection.length > 1) return null;
     for (final roof in _project.activeStorey.roofs) {
@@ -4295,6 +4396,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final candidates = _selectionCandidates(rawModel);
     if (_commands.view == ArchitectWorkspaceView.section &&
+        (_activeTool == ArchitectTool.select ||
+            _activeTool == ArchitectTool.roof) &&
         candidates.isEmpty &&
         _draftStart == null &&
         !_axisTool.isDrafting &&
@@ -4330,11 +4433,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _lastTapTime = now;
     _lastTapPos = rawModel;
 
-    if (isDoubleTap && _activeTool == ArchitectTool.wall && !_multiSelect) {
+    if (isDoubleTap && !_multiSelect) {
       final hitId = _hitSelection(rawModel);
-      if (hitId != null) {
+      if (hitId != null && _isElementAllowedForTool(hitId, _activeTool)) {
         final storey = _project.activeStorey;
-        if (storey.walls.any((w) => w.id == hitId)) {
+        if ((_activeTool == ArchitectTool.wall ||
+                _activeTool == ArchitectTool.select) &&
+            storey.walls.any((w) => w.id == hitId)) {
           final chain = _elementTool.findConnectedWallChain(storey, hitId);
           if (chain.isNotEmpty) {
             setState(() {
@@ -4348,7 +4453,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             HapticFeedback.mediumImpact();
             return;
           }
-        } else if (storey.columns.any((c) => c.id == hitId)) {
+        } else if ((_activeTool == ArchitectTool.column ||
+                _activeTool == ArchitectTool.select) &&
+            storey.columns.any((c) => c.id == hitId)) {
           setState(() {
             _selectionIds
               ..clear()
@@ -4359,7 +4466,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           });
           HapticFeedback.mediumImpact();
           return;
-        } else if (storey.beams.any((b) => b.id == hitId)) {
+        } else if ((_activeTool == ArchitectTool.beam ||
+                _activeTool == ArchitectTool.select) &&
+            storey.beams.any((b) => b.id == hitId)) {
           setState(() {
             _selectionIds
               ..clear()
@@ -4370,7 +4479,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           });
           HapticFeedback.mediumImpact();
           return;
-        } else if (storey.slabs.any((s) => s.id == hitId)) {
+        } else if ((_activeTool == ArchitectTool.slab ||
+                _activeTool == ArchitectTool.select) &&
+            storey.slabs.any((s) => s.id == hitId)) {
           setState(() {
             _selectionIds
               ..clear()
@@ -4381,7 +4492,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           });
           HapticFeedback.mediumImpact();
           return;
-        } else if (storey.roofs.any((r) => r.id == hitId)) {
+        } else if ((_activeTool == ArchitectTool.roof ||
+                _activeTool == ArchitectTool.select) &&
+            storey.roofs.any((r) => r.id == hitId)) {
           setState(() {
             _selectionIds
               ..clear()
@@ -4859,7 +4972,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               content: Text(
                 context.l10n.architectZoneCreated(
                   newZone.name,
-                  newZone.area.toStringAsFixed(1),
+                  BimDistanceUnit.trimZeros(newZone.area.toStringAsFixed(2)),
                 ),
               ),
               duration: const Duration(seconds: 1),
@@ -7258,7 +7371,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_selectAt(raw, invalidateGesture: false)) {
       return true;
     }
-    if (_commands.view == ArchitectWorkspaceView.section) {
+    if (_commands.view == ArchitectWorkspaceView.section &&
+        (_activeTool == ArchitectTool.select ||
+            _activeTool == ArchitectTool.roof)) {
       _cacheProjection();
       final hitRoof = _sectionGeometry?.pickRoof(
         _modelToSection(raw),
@@ -7312,7 +7427,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
       return true;
     }
-    if (_commands.view == ArchitectWorkspaceView.section) {
+    if (_commands.view == ArchitectWorkspaceView.section &&
+        (_activeTool == ArchitectTool.select ||
+            _activeTool == ArchitectTool.roof)) {
       _cacheProjection();
       final hitRoof =
           _sectionGeometry?.pickRoof(
@@ -8457,6 +8574,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }) {
     final id = _nextSelection(point, advance: invalidateGesture);
     if (id == null) return false;
+    if (_activeTool != ArchitectTool.select &&
+        !_isElementAllowedForTool(id, _activeTool)) {
+      return false;
+    }
     _cancelActiveDrags();
     _polygonEditId = null;
     _polygonSelectedEdge = null;

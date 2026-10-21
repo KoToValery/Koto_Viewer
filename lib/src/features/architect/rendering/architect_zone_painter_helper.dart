@@ -162,7 +162,7 @@ class ArchitectZonePainterHelper {
     final nameText = zone.name;
     final areaText =
         ArchitectTextScope.current?.area(zone.area) ??
-        '${zone.area.toStringAsFixed(2)} m²';
+        '${BimDistanceUnit.trimZeros(zone.area.toStringAsFixed(2))} m²';
 
     final numberSpan = ArchitectAnnotationSpan(
       role: ArchitectAnnotationRole.ordinary,
@@ -249,7 +249,7 @@ class ArchitectZonePainterHelper {
 
     final tp = ArchitectTextPainter(
       text: TextSpan(
-        text: '${length.toStringAsFixed(2)} m',
+        text: '${BimDistanceUnit.trimZeros(length.toStringAsFixed(2))} m',
         style: TextStyle(
           color: const Color(0xFFEEEEEE),
           fontFamily: 'Roboto',
@@ -302,7 +302,7 @@ class ArchitectZonePainterHelper {
     // Live dimensions badge in center
     final catName = categoryName ?? '';
     final label =
-        '$catName\n${w.toStringAsFixed(2)} × ${h.toStringAsFixed(2)} m\n${area.toStringAsFixed(1)} m²';
+        '$catName\n${BimDistanceUnit.trimZeros(w.toStringAsFixed(2))} × ${BimDistanceUnit.trimZeros(h.toStringAsFixed(2))} m\n${BimDistanceUnit.trimZeros(area.toStringAsFixed(2))} m²';
 
     final tp = ArchitectTextPainter(
       text: TextSpan(
@@ -739,8 +739,8 @@ class ArchitectZonePainterHelper {
     final n = Offset(-u.dy, u.dx) * (0.35); // offset normal
 
     final text = orthoLabel != null
-        ? '${length.toStringAsFixed(2)} m  ($orthoLabel)'
-        : '${length.toStringAsFixed(2)} m';
+        ? '${BimDistanceUnit.trimZeros(length.toStringAsFixed(2))} m  ($orthoLabel)'
+        : '${BimDistanceUnit.trimZeros(length.toStringAsFixed(2))} m';
 
     final tp = ArchitectTextPainter(
       text: TextSpan(
@@ -804,7 +804,7 @@ class ArchitectZonePainterHelper {
     // Dimension badge
     final midExtruded = (vNew1 + vNew2) / 2.0;
     final distText =
-        '${distance >= 0 ? "+" : ""}${distance.toStringAsFixed(2)} m';
+        '${distance >= 0 ? "+" : "-"}${BimDistanceUnit.trimZeros(distance.abs().toStringAsFixed(2))} m';
     final tp = ArchitectTextPainter(
       text: TextSpan(
         text: distText,
@@ -1117,7 +1117,7 @@ class ArchitectZonePainterHelper {
         z.number.isNotEmpty ? z.number : '${rowIdx + 1}',
         z.name,
         (ArchitectTextScope.current?.area(z.area) ??
-            '${z.area.toStringAsFixed(2)} m²'),
+            '${BimDistanceUnit.trimZeros(z.area.toStringAsFixed(2))} m²'),
         l10n != null ? z.resolvedFloorFinish(l10n) : z.floorFinish,
         l10n != null ? z.resolvedWallFinish(l10n) : z.wallFinish,
         l10n != null ? z.resolvedCeilingFinish(l10n) : z.ceilingFinish,
@@ -1192,7 +1192,8 @@ class ArchitectZonePainterHelper {
             ),
           ),
           TextSpan(
-            text: '${totalNetArea.toStringAsFixed(2)} m²',
+            text: ArchitectTextScope.current?.area(totalNetArea) ??
+                '${BimDistanceUnit.trimZeros(totalNetArea.toStringAsFixed(2))} m²',
             style: const TextStyle(
               color: ArchitectPaperStyle.ink,
               fontFamily: 'Roboto',

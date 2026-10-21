@@ -419,13 +419,21 @@ class ArchitectElementTool extends ChangeNotifier {
 
   /// Filter before hit testing so overlapping objects of other tools cannot
   /// capture a selection (including a door's host wall).
-  String? hitTestForTool(
+  Iterable<String> hitTestElementsForTool(
     ArchitectStorey storey,
     Offset point,
     double scale,
     ArchitectTool tool, {
     List<StructuralGridAxis> gridAxes = const [],
   }) {
+    if (tool == ArchitectTool.select) {
+      return hitTestElements(
+        storey,
+        point,
+        scale,
+        gridAxes: gridAxes,
+      );
+    }
     final scoped = storey.copyWith(
       walls: [
         if ([
@@ -442,6 +450,7 @@ class ArchitectElementTool extends ChangeNotifier {
       columns: tool == ArchitectTool.column ? storey.columns : [],
       beams: tool == ArchitectTool.beam ? storey.beams : [],
       slabs: tool == ArchitectTool.slab ? storey.slabs : [],
+      roofs: tool == ArchitectTool.roof ? storey.roofs : [],
       openings: tool == ArchitectTool.opening ? storey.openings : [],
       stairs: tool == ArchitectTool.stair ? storey.stairs : [],
       dimensions: tool == ArchitectTool.dimension ? storey.dimensions : [],
@@ -449,6 +458,8 @@ class ArchitectElementTool extends ChangeNotifier {
       elevationMarkers: tool == ArchitectTool.level
           ? storey.elevationMarkers
           : [],
+      components: tool == ArchitectTool.component ? storey.components : [],
+      zones: tool == ArchitectTool.zone ? storey.zones : [],
       cadPrimitives: storey.cadPrimitives
           .where(
             (p) => switch (tool) {
@@ -460,18 +471,29 @@ class ArchitectElementTool extends ChangeNotifier {
           )
           .toList(),
     );
-    final id = hitTestElement(
+    return hitTestElements(
       scoped,
       point,
       scale,
-      gridAxes: gridAxes,
+      gridAxes: tool == ArchitectTool.axis ? gridAxes : const [],
       dimensionStorey: storey,
-    );
-    if (tool != ArchitectTool.wall && scoped.walls.any((w) => w.id == id)) {
-      return null;
-    }
-    return id;
+    ).where((id) => tool == ArchitectTool.wall || !scoped.walls.any((w) => w.id == id));
   }
+
+  String? hitTestForTool(
+    ArchitectStorey storey,
+    Offset point,
+    double scale,
+    ArchitectTool tool, {
+    List<StructuralGridAxis> gridAxes = const [],
+  }) =>
+      hitTestElementsForTool(
+        storey,
+        point,
+        scale,
+        tool,
+        gridAxes: gridAxes,
+      ).firstOrNull;
 
   String? hitTestElement(
     ArchitectStorey storey,
@@ -512,6 +534,7 @@ class ArchitectElementTool extends ChangeNotifier {
           wallEnd: wall.openingAxis(win.offsetRatio).$2,
           wallThickness: wall.thickness,
           tolerance: tolerance,
+          exteriorSign: wall.exteriorSign.toDouble(),
         )) {
           yield win.id;
         }

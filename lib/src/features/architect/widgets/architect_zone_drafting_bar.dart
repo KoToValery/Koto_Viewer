@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../bim_editing/properties/bim_distance_unit.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_zone.dart';
 import '../models/architect_zone_presets.dart';
@@ -317,7 +318,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                 if (tool.activeSegmentLength != null) ...[
                   _buildMetricChip(
                     icon: Icons.straighten_rounded,
-                    label: '${tool.activeSegmentLength!.toStringAsFixed(2)} m',
+                    label: '${BimDistanceUnit.trimZeros(tool.activeSegmentLength!.toStringAsFixed(2))} m',
                     subLabel: tool.orthoLabel,
                     color: const Color(0xFFFFD600),
                   ),
@@ -326,7 +327,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                 if (tool.draftPointCount >= 2) ...[
                   _buildMetricChip(
                     icon: Icons.crop_free_rounded,
-                    label: '${tool.liveArea.toStringAsFixed(1)} m²',
+                    label: '${BimDistanceUnit.trimZeros(tool.liveArea.toStringAsFixed(2))} m²',
                     color: const Color(0xFF69F0AE),
                   ),
                 ],

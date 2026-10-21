@@ -32,13 +32,14 @@ class ArchitectTextScope {
       ArchitectDrawingScale(
         denominator,
       ).paperToModel(document.textMm(view, id, role, denominator));
-  String length(double metres) => units.format(metres, decimals: decimals);
+  String length(double metres) =>
+      BimDistanceUnit.trimZeros(units.format(metres, decimals: decimals));
   double fontSize(String id, ArchitectAnnotationRole role) =>
       height(id, role) / ArchitectDrawingScale.fontCapRatio;
   String number(double metres) =>
-      units.toUnit(metres).toStringAsFixed(decimals);
+      BimDistanceUnit.trimZeros(units.toUnit(metres).toStringAsFixed(decimals));
   String area(double squareMetres) =>
-      '${(squareMetres / (units.scaleToMeters * units.scaleToMeters)).toStringAsFixed(2)} ${units.symbol}²';
+      units.formatArea(squareMetres, decimals: decimals);
 }
 
 InlineSpan? _styleSpan(

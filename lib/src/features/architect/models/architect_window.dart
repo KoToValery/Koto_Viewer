@@ -170,7 +170,7 @@ class ArchitectWindow {
       ArchitectOpeningPlanPainter.paint(
         canvas: canvas,
         centerPos: centerPos,
-        normal: n,
+        normal: n * exteriorSign,
         wallThickness: wallThickness,
         width: width,
         height: height,
@@ -290,7 +290,7 @@ class ArchitectWindow {
     ArchitectOpeningPlanPainter.paint(
       canvas: canvas,
       centerPos: centerPos,
-      normal: n,
+      normal: n * exteriorSign,
       wallThickness: wallThickness,
       width: width,
       height: height,
@@ -311,6 +311,7 @@ class ArchitectWindow {
     required Offset wallEnd,
     required double wallThickness,
     double tolerance = 0.15,
+    double exteriorSign = 1.0,
   }) {
     final wallDelta = wallEnd - wallStart;
     final wallLen = wallDelta.distance;
@@ -324,7 +325,7 @@ class ArchitectWindow {
     final dOpening = _distToSegment(point, pLeftBase, pRightBase);
     if (dOpening <= (wallThickness / 2.0) + tolerance) return true;
 
-    final n = Offset(-u.dy, u.dx);
+    final n = Offset(-u.dy, u.dx) * exteriorSign;
     return ArchitectOpeningPlanPainter.containsPoint(
       point,
       center: centerPos,

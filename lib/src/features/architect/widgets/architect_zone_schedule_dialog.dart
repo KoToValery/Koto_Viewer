@@ -90,19 +90,19 @@ class _ArchitectZoneScheduleDialogState
         [
           z.number.isNotEmpty ? z.number : '${i + 1}',
           z.name,
-          z.area.toStringAsFixed(2),
-          z.perimeter.toStringAsFixed(2),
+          BimDistanceUnit.trimZeros(z.area.toStringAsFixed(2)),
+          BimDistanceUnit.trimZeros(z.perimeter.toStringAsFixed(2)),
           z.resolvedFloorFinish(l10n),
           z.resolvedWallFinish(l10n),
           z.resolvedCeilingFinish(l10n),
-          z.clearHeight.toStringAsFixed(2),
+          BimDistanceUnit.trimZeros(z.clearHeight.toStringAsFixed(2)),
         ].join('\t'),
       );
     }
 
     buffer.writeln();
     buffer.writeln(
-      '${l10n.architectZoneScheduleTotalArea}:\t${totalArea.toStringAsFixed(2)} m²',
+      '${l10n.architectZoneScheduleTotalArea}:\t${BimDistanceUnit.trimZeros(totalArea.toStringAsFixed(2))} m²',
     );
 
     Clipboard.setData(ClipboardData(text: buffer.toString()));
@@ -166,7 +166,7 @@ class _ArchitectZoneScheduleDialogState
           : zone.resolvedCeilingFinish(l10n),
     );
     final heightController = TextEditingController(
-      text: zone.clearHeight.toStringAsFixed(2),
+      text: BimDistanceUnit.trimZeros(zone.clearHeight.toStringAsFixed(2)),
     );
 
     showDialog(
@@ -180,7 +180,7 @@ class _ArchitectZoneScheduleDialogState
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                '${zone.name} (${zone.area.toStringAsFixed(1)} m²)',
+                '${zone.name} (${BimDistanceUnit.trimZeros(zone.area.toStringAsFixed(2))} m²)',
                 style: const TextStyle(color: Colors.white, fontSize: 16),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -369,7 +369,7 @@ class _ArchitectZoneScheduleDialogState
                           ),
                         ),
                         Text(
-                          '${l10n.architectZoneScheduleRoomCount}: ${zones.length}  •  ${l10n.architectZoneScheduleTotalArea}: ${totalArea.toStringAsFixed(2)} m²',
+                          '${l10n.architectZoneScheduleRoomCount}: ${zones.length}  •  ${l10n.architectZoneScheduleTotalArea}: ${BimDistanceUnit.trimZeros(totalArea.toStringAsFixed(2))} m²',
                           style: const TextStyle(
                             color: Color(0xFF94A3B8),
                             fontSize: 12,
@@ -599,7 +599,7 @@ class _ArchitectZoneScheduleDialogState
         ),
         DataCell(
           Text(
-            '${z.area.toStringAsFixed(2)} m²',
+            '${BimDistanceUnit.trimZeros(z.area.toStringAsFixed(2))} m²',
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
@@ -608,7 +608,7 @@ class _ArchitectZoneScheduleDialogState
         ),
         DataCell(
           Text(
-            '${z.perimeter.toStringAsFixed(2)} m',
+            '${BimDistanceUnit.trimZeros(z.perimeter.toStringAsFixed(2))} m',
             style: const TextStyle(color: Colors.white70),
           ),
         ),
@@ -632,7 +632,7 @@ class _ArchitectZoneScheduleDialogState
         ),
         DataCell(
           Text(
-            '${z.clearHeight.toStringAsFixed(2)} m',
+            '${BimDistanceUnit.trimZeros(z.clearHeight.toStringAsFixed(2))} m',
             style: const TextStyle(color: Colors.white70),
           ),
         ),

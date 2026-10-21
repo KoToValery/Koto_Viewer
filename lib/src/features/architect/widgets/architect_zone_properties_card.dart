@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../bim_editing/properties/bim_distance_unit.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_zone.dart';
 import '../models/architect_zone_presets.dart';
@@ -203,7 +204,7 @@ class _ArchitectZonePropertiesCardState
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  '${zone.area.toStringAsFixed(2)} m²',
+                  '${BimDistanceUnit.trimZeros(zone.area.toStringAsFixed(2))} m²',
                   style: TextStyle(
                     color: zone.color,
                     fontWeight: FontWeight.bold,
@@ -355,7 +356,7 @@ class _ArchitectZonePropertiesCardState
           : zone.resolvedCeilingFinish(l10n),
     );
     final heightController = TextEditingController(
-      text: zone.clearHeight.toStringAsFixed(2),
+      text: BimDistanceUnit.trimZeros(zone.clearHeight.toStringAsFixed(2)),
     );
 
     showDialog(
@@ -372,7 +373,7 @@ class _ArchitectZonePropertiesCardState
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '${zone.name} (${zone.area.toStringAsFixed(2)} m²)',
+                  '${zone.name} (${BimDistanceUnit.trimZeros(zone.area.toStringAsFixed(2))} m²)',
                   style: const TextStyle(color: Colors.white, fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
