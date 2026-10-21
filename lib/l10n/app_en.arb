@@ -3177,6 +3177,7 @@
   "@architectMagnetHelp": {"description": "Wall positioning control guidance"},
   "architectWallParallel": "Parallel",
   "architectWallDraftHint": "Hold → point · 2 fingers → zoom",
+  "architectColumnPlacementHint": "Hold → place · Tap → select · X → cancel",
   "architectEditHoldHint": "Hold → edit · longer → menu",
   "architectNavigationHint": "Pan / zoom",
   "architectWallEditRejected": "Opening or wall too short.",

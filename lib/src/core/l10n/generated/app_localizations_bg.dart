@@ -4289,6 +4289,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallDraftHint => 'Задръж → точка · 2 пръста → мащаб';
 
   @override
+  String get architectColumnPlacementHint =>
+      'Задръж → постави · Тап → избор · X → отказ';
+
+  @override
   String get architectEditHoldHint => 'Задръж → редакция · по-дълго → меню';
 
   @override

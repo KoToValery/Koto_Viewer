@@ -1,8 +1,24 @@
 import 'dart:ui';
+import 'dart:math' as math;
 
 /// Screen-space placement: keep values readable even when their walls are far
 /// outside the viewport, and reserve space for contextual controls.
 class ArchitectClearanceBadgeLayout {
+  static const openingReferenceScale = 100.0;
+  static const openingBaseSize = Size(88, 36);
+
+  /// Opening values follow model space, including when the view zooms out.
+  static Size openingSize(double zoomScale, Rect available) {
+    final scale = math.min(
+      zoomScale / openingReferenceScale,
+      math.min(
+        available.width / openingBaseSize.width,
+        available.height / openingBaseSize.height,
+      ),
+    );
+    return openingBaseSize * scale;
+  }
+
   static Rect place({
     required Offset preferred,
     required Rect available,

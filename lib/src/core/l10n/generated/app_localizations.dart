@@ -7457,6 +7457,12 @@ abstract class AppLocalizations {
   /// **'Hold → point · 2 fingers → zoom'**
   String get architectWallDraftHint;
 
+  /// No description provided for @architectColumnPlacementHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold → place · Tap → select · X → cancel'**
+  String get architectColumnPlacementHint;
+
   /// No description provided for @architectEditHoldHint.
   ///
   /// In en, this message translates to:

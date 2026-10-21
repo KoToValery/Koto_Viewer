@@ -430,8 +430,16 @@ class ArchitectOpeningClearance {
       final r=station/len;
       return wall.centerPointAt(r)+wall.normalAt(r)*wall.exteriorSign*(wall.thickness/2+extra);
     }
-    final leftRefPt=at(leftStation,0),leftJambPt=at(leftJamb,0),leftStart=at(leftStation,.22),leftEnd=at(leftJamb,.22);
-    final rightRefPt=at(rightStation,0),rightJambPt=at(rightJamb,0),rightStart=at(rightJamb,.22),rightEnd=at(rightStation,.22);
+    Offset reference(double station, ArchitectOpeningBoundaryKind kind) {
+      if (kind != ArchitectOpeningBoundaryKind.intersectingWall) {
+        return at(station, 0);
+      }
+      final r = station / len;
+      return wall.centerPointAt(r) -
+          wall.normalAt(r) * wall.exteriorSign * wall.coreAsymmetry / 2;
+    }
+    final leftRefPt=reference(leftStation,leftKind),leftJambPt=at(leftJamb,0),leftStart=at(leftStation,.22),leftEnd=at(leftJamb,.22);
+    final rightRefPt=reference(rightStation,rightKind),rightJambPt=at(rightJamb,0),rightStart=at(rightJamb,.22),rightEnd=at(rightStation,.22);
 
     return [
       ArchitectOpeningClearance(
@@ -579,7 +587,7 @@ class ArchitectOpeningPlacement {
           if(sin<.15)continue;
           final station=ratio*len,half=other.coreThickness/2/sin;
           final from=(station-half).clamp(0.0,len),to=(station+half).clamp(0.0,len);
-          if(from>.01&&to<len-.01)obstacles.add((start:from,end:to,kind:ArchitectOpeningBoundaryKind.intersectingWall,id:other.id));
+          if(to>from+1e-5)obstacles.add((start:from,end:to,kind:ArchitectOpeningBoundaryKind.intersectingWall,id:other.id));
         }
         continue;
       }
@@ -605,60 +613,23 @@ class ArchitectOpeningPlacement {
       final halfWallCore = wall.coreThickness / 2.0;
       final halfOtherCore = other.coreThickness / 2.0;
 
-      if (alongWall < -halfWallCore - 0.02 ||
-          alongWall > len + halfWallCore + 0.02 ||
-          alongOther < -halfOtherCore - 0.02 ||
-          alongOther > other.length + halfOtherCore + 0.02) {
-        continue;
-      }
+      // A butt/T junction may stop at the host's core face. Its allowed
+      // reach is set by the host core, never by either wall's insulation.
+      final reach = halfWallCore / sinTheta + .02;
+      if (alongOther < -reach || alongOther > other.length + reach) continue;
 
       final halfProjected = halfOtherCore / sinTheta;
-      final rawStart = alongWall - halfProjected;
-      final rawEnd = alongWall + halfProjected;
-
-      // Only treat a corner cross-wall as an internal obstacle if it is a mid-wall
-      // junction OR if we want the corner face when the cross-wall crosses the interior.
-      // Wait: if rawStart <= 0.005 (corner at startPoint) or rawEnd >= len - 0.005 (corner at endPoint),
-      // check if the user connects at start/end vs mid-wall:
-      // If a cross-wall intersects in the middle of the wall (rawStart > 0.01 && rawEnd < len - 0.01),
-      // it splits the wall at its core faces [rawStart, rawEnd].
-      // If it is at the corner (rawStart <= 0.01 or rawEnd >= len - 0.01),
-      // we record the intersecting wall at 0.0 or len so boundaryKind is intersectingWall
-      // while keeping the full wall length [0, len] available from the wall start/end!
-      if (rawStart > 0.01 && rawEnd < len - 0.01) {
-        final s = rawStart.clamp(0.0, len);
-        final e = rawEnd.clamp(0.0, len);
-        if (e > s + 1e-5) {
-          obstacles.add((
-            start: s,
-            end: e,
-            kind: ArchitectOpeningBoundaryKind.intersectingWall,
-            id: other.id,
-          ));
-        }
-      }
-    }
-
-    String? startCrossWallId;
-    String? endCrossWallId;
-    for (final other in walls) {
-      if (other.id == wall.id || other.isDetached) continue;
-      final sinTheta =
-          (u.dx * other.unitVector.dy - u.dy * other.unitVector.dx).abs();
-      if (sinTheta < 0.15) continue;
-      if ((other.startPoint - wall.startPoint).distance <=
-              other.thickness / 2 + 0.05 ||
-          (other.endPoint - wall.startPoint).distance <=
-              other.thickness / 2 + 0.05 ||
-          other.containsPoint(wall.startPoint, tolerance: 0.05)) {
-        startCrossWallId ??= other.id;
-      }
-      if ((other.startPoint - wall.endPoint).distance <=
-              other.thickness / 2 + 0.05 ||
-          (other.endPoint - wall.endPoint).distance <=
-              other.thickness / 2 + 0.05 ||
-          other.containsPoint(wall.endPoint, tolerance: 0.05)) {
-        endCrossWallId ??= other.id;
+      final s = (alongWall - halfProjected).clamp(0.0, len);
+      final e = (alongWall + halfProjected).clamp(0.0, len);
+      // Include end/corner junctions: the free span begins at the actual
+      // masonry face rather than at the reference axis through the corner.
+      if (e > s + 1e-5) {
+        obstacles.add((
+          start: s,
+          end: e,
+          kind: ArchitectOpeningBoundaryKind.intersectingWall,
+          id: other.id,
+        ));
       }
     }
 
@@ -700,10 +671,8 @@ class ArchitectOpeningPlacement {
 
     final spans = <ArchitectOpeningFreeSpan>[];
     var cursor = 0.0;
-    var cursorKind = startCrossWallId != null
-        ? ArchitectOpeningBoundaryKind.intersectingWall
-        : ArchitectOpeningBoundaryKind.wallStart;
-    var cursorId = startCrossWallId ?? wall.id;
+    var cursorKind = ArchitectOpeningBoundaryKind.wallStart;
+    var cursorId = wall.id;
 
     for (final obs in merged) {
       if (obs.start > cursor + 1e-5) {
@@ -730,10 +699,8 @@ class ArchitectOpeningPlacement {
           rightStation: len,
           leftKind: cursorKind,
           leftRefId: cursorId,
-          rightKind: endCrossWallId != null
-              ? ArchitectOpeningBoundaryKind.intersectingWall
-              : ArchitectOpeningBoundaryKind.wallEnd,
-          rightRefId: endCrossWallId ?? wall.id,
+          rightKind: ArchitectOpeningBoundaryKind.wallEnd,
+          rightRefId: wall.id,
         ),
       );
     }

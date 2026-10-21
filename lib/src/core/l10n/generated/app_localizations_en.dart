@@ -4272,6 +4272,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallDraftHint => 'Hold → point · 2 fingers → zoom';
 
   @override
+  String get architectColumnPlacementHint =>
+      'Hold → place · Tap → select · X → cancel';
+
+  @override
   String get architectEditHoldHint => 'Hold → edit · longer → menu';
 
   @override

@@ -52,7 +52,7 @@ void main() {
       ArchitectTool.cadLine: 'line',
       ArchitectTool.cadRect: 'rect',
       ArchitectTool.window: null,
-      ArchitectTool.select: null,
+      ArchitectTool.select: 'c',
       ArchitectTool.beam: null,
     }.entries) {
       expect(
@@ -305,6 +305,8 @@ void main() {
     );
     addTearDown(model.dispose);
     await workspace.open(tester, model);
+    workspace.camera(tester).fit(const Rect.fromLTRB(-5, -5, 5, 5));
+    await tester.pumpAndSettle();
     await editing.selectTool(tester, 'column');
     await editing.hold(tester, Offset.zero);
     expect(workspace.overlay(tester).selectedElementId, 'c');

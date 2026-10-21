@@ -1630,9 +1630,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _elementTool.cancelSlabDrafting();
     _roofTool.clearDraft();
     if (_activeTool == ArchitectTool.door ||
-        _activeTool == ArchitectTool.window) {
+        _activeTool == ArchitectTool.window ||
+        _activeTool == ArchitectTool.column) {
       _activeTool = ArchitectTool.select;
       _cursorModel = null;
+      _columnPreviewPoint = null;
     }
     setState(() {
       _draftStart = null;
@@ -2017,6 +2019,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _cursorModel;
   Offset? _columnPreviewPoint;
   double _columnPreviewRotation = 0.0;
+  bool get _columnPreviewIsOccupied =>
+      _columnPreviewPoint != null &&
+      _project.activeStorey.columns.any(
+        (column) => column.containsPoint(_columnPreviewPoint!, tolerance: 0),
+      );
   String? _activeSnapLabel;
 
   // Door State (from element_vrata.dxf)
@@ -4693,6 +4700,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
+    // A tap selects at the finger/cursor. Only an intentional hold places a
+    // column, and an existing column always takes priority over placement.
+    if (_activeTool == ArchitectTool.column &&
+        (!_placingWithHold || _hitSelection(rawModel) != null)) {
+      if (!_selectAt(rawModel)) _clearSelection();
+      return;
+    }
+
     if (_draftStart == null &&
         !_axisTool.isDrafting &&
         !_zoneTool.isDrafting &&
@@ -5191,6 +5206,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_activeTool == ArchitectTool.column) {
       final snap = _snapColumn(rawModel);
       final pt = snap.point;
+      // Snapping can move the placement marker onto an existing column.
+      if (_project.activeStorey.columns.any(
+        (column) => column.containsPoint(pt, tolerance: 0),
+      )) {
+        _selectAt(pt);
+        return;
+      }
       final rot = snap.angleDeg ?? _columnPreviewRotation;
       final (_, newCol) = _elementTool.placeColumn(
         storey: _project.activeStorey,
@@ -6563,6 +6585,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               : (segment.$1 + segment.$2) / 2;
           final rect = ArchitectClearanceBadgeLayout.place(
             preferred: preferred,
+            size: ArchitectClearanceBadgeLayout.openingSize(
+              _currentScale, available,
+            ),
             available: available,
             excluded: excluded,
             intersectsWall: (rect) {
@@ -6636,31 +6661,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 },
               ),
             for (final gap in openingClearances)
-              Builder(
-                builder: (context) {
-                  final rect = placements[gap.key]!;
-                  return Positioned.fromRect(
-                    rect: rect,
-                    child: IgnorePointer(
-                      ignoring: _radialMenuScreenPosition != null,
-                      child: Tooltip(
-                        message: context.l10n.architectOpeningClearance,
+              Positioned.fromRect(
+                rect: placements[gap.key]!,
+                child: IgnorePointer(
+                  ignoring: _radialMenuScreenPosition != null,
+                  child: Tooltip(
+                    message: context.l10n.architectOpeningClearance,
+                    child: FittedBox(
+                      key: ValueKey('opening-clearance-${gap.key}'),
+                      child: SizedBox(
+                        width: ArchitectClearanceBadgeLayout.openingBaseSize.width,
+                        height: ArchitectClearanceBadgeLayout.openingBaseSize.height,
                         child: Material(
-                          color: gap.isModularSnap
-                              ? const Color(0xEE004D40)
-                              : const Color(0xEE1E242C),
-                          elevation: 3,
-                          shadowColor: Colors.black54,
+                          color: Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                            side: BorderSide(
-                              color: gap.isModularSnap
-                                  ? const Color(0xFF64FFDA)
-                                  : Colors.white24,
-                            ),
+                            borderRadius: BorderRadius.circular(3),
+                            side: const BorderSide(color: Color(0xFF78818A), width: .7),
                           ),
                           child: InkWell(
-                            key: ValueKey('opening-clearance-${gap.key}'),
                             onTap: () {
                               setState(() => _radialMenuScreenPosition = null);
                               _editOpeningClearance(gap);
@@ -6669,10 +6687,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               child: Text(
                                 _project.formatLength(gap.distance),
                                 style: TextStyle(
-                                  color: gap.isModularSnap
-                                      ? const Color(0xFF64FFDA)
-                                      : Colors.cyanAccent,
-                                  fontSize: 12,
+                                  color: const Color(0xFF20252A),
+                                  fontSize: 11,
                                   fontWeight: gap.isModularSnap
                                       ? FontWeight.w600
                                       : FontWeight.normal,
@@ -6683,8 +6699,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         ),
                       ),
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
           ],
         );
@@ -11713,6 +11729,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // === SECTION: 2D CANVAS VIEWPORT (LAYERED MODEL SPACE) ===
 
   Offset? get _draftCancelAnchor {
+    if (_activeTool == ArchitectTool.column && _effectiveSelection.isEmpty) {
+      final center = _columnPreviewPoint ?? _cursorModel;
+      if (center == null) return null;
+      final halfWidth = _elementTool.columnWidth / 2;
+      if (_elementTool.columnShape == ColumnShape.circular) {
+        return center + Offset(halfWidth, -halfWidth);
+      }
+      final angle = _columnPreviewRotation * math.pi / 180;
+      final cosine = math.cos(angle).abs();
+      final sine = math.sin(angle).abs();
+      final halfDepth = _elementTool.columnDepth / 2;
+      return center + Offset(
+        halfWidth * cosine + halfDepth * sine,
+        -(halfWidth * sine + halfDepth * cosine),
+      );
+    }
     if (_activeTool == ArchitectTool.door ||
         _activeTool == ArchitectTool.window) {
       return _openingPlacementPreview?.centerPoint ?? _cursorModel;
@@ -11815,12 +11847,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     height: 22,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Theme.of(context).colorScheme.secondaryContainer,
+                      color: _activeTool == ArchitectTool.column
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.secondaryContainer,
                     ),
                     child: Icon(
                       Icons.close,
                       size: 13,
-                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      color: _activeTool == ArchitectTool.column
+                          ? Colors.red
+                          : Theme.of(context).colorScheme.onSecondaryContainer,
                     ),
                   ),
                 ),
@@ -12147,6 +12183,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                   : context.l10n.architectEditHoldHint)
                             : _activeTool == ArchitectTool.select
                             ? context.l10n.architectSelectionCycleHelp
+                            : _activeTool == ArchitectTool.column
+                            ? context.l10n.architectColumnPlacementHint
                             : _canPlaceWithMarker &&
                                   !_placingWithHold &&
                                   !_wallDirectionLocked
@@ -12815,7 +12853,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     columnPreview:
         _activeTool == ArchitectTool.column &&
             _effectiveSelection.isEmpty &&
-            _columnPreviewPoint != null
+            _columnPreviewPoint != null &&
+            !_columnPreviewIsOccupied
         ? ArchitectColumn(
             id: 'preview',
             position: _columnPreviewPoint!,

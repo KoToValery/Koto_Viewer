@@ -1400,6 +1400,7 @@
   "@architectMagnetHelp": {"description": "Wall positioning control guidance"},
   "architectWallParallel": "Успоредно",
   "architectWallDraftHint": "Задръж → точка · 2 пръста → мащаб",
+  "architectColumnPlacementHint": "Задръж → постави · Тап → избор · X → отказ",
   "architectEditHoldHint": "Задръж → редакция · по-дълго → меню",
   "architectNavigationHint": "Местене / мащаб",
   "architectWallEditRejected": "Отвор или твърде къса стена.",
