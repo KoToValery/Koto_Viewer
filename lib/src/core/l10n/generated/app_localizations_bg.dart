@@ -3551,7 +3551,7 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
-  String get architectZoneClose => 'Затвори зона';
+  String get architectZoneClose => 'Готово';
 
   @override
   String get architectZoneUndoPoint => 'Отмени точка';
@@ -6630,4 +6630,12 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectZoneBoundaryOpen =>
       'Не е открито затворено помещение. Проверете стените за пролуки.';
+
+  @override
+  String get architectZoneCrossingRepairHint =>
+      'Пресичанията ще се коригират при затваряне.';
+
+  @override
+  String get architectZoneBoundaryRepaired =>
+      'Пресичанията на границите са коригирани.';
 }

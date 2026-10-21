@@ -798,18 +798,11 @@ class Architect2dPainter extends CustomPainter {
 
   void _drawZoneDrafting(Canvas canvas) {
     if (activeTool == ArchitectTool.zone && zoneDraftingPoints.isNotEmpty) {
-      ArchitectZonePainterHelper.drawPointByPointDrafting(
+      ArchitectElementsPainterHelper.drawSlabDrafting(
         canvas: canvas,
         points: zoneDraftingPoints,
         candidatePoint: zoneDraftingCandidate,
-        category: activeZoneCategory ?? ArchitectZoneCategory.living,
         zoomScale: zoomScale,
-        orthoGuide: zoneOrthoGuide,
-        orthoLabel: zoneOrthoLabel,
-        isClosingSnap: isZoneClosingSnap,
-        isSelfIntersecting: isZoneDraftingSelfIntersecting,
-        closeLabel: zoneCloseLabel,
-        previewRectangle: zonePreviewRectangle,
       );
     }
   }

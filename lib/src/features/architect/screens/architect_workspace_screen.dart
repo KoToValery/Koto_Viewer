@@ -52,7 +52,6 @@ import '../rendering/architect_snap_helper.dart';
 import '../rendering/architect_wall_snap.dart';
 import '../rendering/architect_column_snap.dart';
 import '../rendering/architect_wall_geometry.dart';
-import '../rendering/architect_zone_snap.dart';
 import '../rendering/architect_underlay_painter.dart';
 import '../rendering/architect_scene_geometry.dart';
 import '../services/architect_command_controller.dart';
@@ -1894,6 +1893,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _commitDraftedZone() {
     final l10n = context.l10n;
     final nextNumber = (_project.activeStorey.zones.length + 1).toString();
+    final repairedCrossings = _zoneTool.hasDraftCrossings;
     final newZone = _zoneTool.commitDrafting(
       category: _activeZoneCategory,
       defaultName: _zonePresets.categoryName(_activeZoneCategory, l10n),
@@ -1919,10 +1919,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            l10n.architectZoneCreated(
-              newZone.name,
-              newZone.area.toStringAsFixed(1),
-            ),
+            '${l10n.architectZoneCreated(newZone.name, newZone.area.toStringAsFixed(1))}'
+            '${repairedCrossings ? '\n${l10n.architectZoneBoundaryRepaired}' : ''}',
           ),
           duration: const Duration(seconds: 1),
         ),
@@ -3240,15 +3238,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 1. Point-by-point zone drafting preview
     if (_activeTool == ArchitectTool.zone && _zoneTool.isDrafting) {
-      _zoneTool.updateDraftingPointer(
-        rawModelPoint: rawModel,
-        project: _project,
-        currentScale: _currentScale,
-        magnetic: _magnetEnabled,
-        underlay: _currentUnderlayDoc,
-        frame: widget.underlayFrame,
-        visibility: _underlayLayerVisibility,
-      );
+      _updateZoneDraftingPointer(rawModel);
       _cursorModel = _zoneTool.candidatePoint;
       _repaintPreview();
       return;
@@ -3460,8 +3450,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return pt;
   }
 
-  Offset _resolveSlabPoint(Offset raw) {
-    final points = _elementTool.slabDraftPoints;
+  Offset _resolveSlabPoint(Offset raw) =>
+      _resolveContourPoint(_elementTool.slabDraftPoints, raw);
+
+  void _updateZoneDraftingPointer(Offset raw) {
+    final point = _resolveContourPoint(_zoneTool.draftPoints, raw);
+    _zoneTool.updateDraftingPointer(
+      rawModelPoint: raw,
+      project: _project,
+      currentScale: _currentScale,
+      resolvedSnap: ArchitectSnapResult(
+        point: point,
+        snapLabel: _activeSnapLabel,
+        magneticGuides: _activeMagneticGuides,
+      ),
+    );
+  }
+
+  Offset _resolveContourPoint(List<Offset> points, Offset raw) {
     if (points.length >= 3) {
       if ((raw - points.first).distance <= math.min(16 / _currentScale, .20)) {
         _activeSnapLabel = context.l10n.architectZonePointSnapStart;
@@ -4320,20 +4326,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       // Point-by-point drafting mode:
       if (_zoneTool.isDrafting) {
         // Immediately compute fresh snap for this tap location (touch devices have no hover)
-        _zoneTool.updateDraftingPointer(
-          rawModelPoint: rawModel,
-          project: _project,
-          currentScale: _currentScale,
-          magnetic: _magnetEnabled,
-          underlay: _currentUnderlayDoc,
-          frame: widget.underlayFrame,
-          visibility: _underlayLayerVisibility,
-        );
+        _updateZoneDraftingPointer(rawModel);
 
         final distToStart = _zoneTool.draftPoints.isNotEmpty
             ? (rawModel - _zoneTool.draftPoints.first).distance
             : double.infinity;
-        final closeThreshold = math.min(16.0 / _currentScale, 0.25);
+        final closeThreshold = math.min(16.0 / _currentScale, 0.20);
 
         if (_zoneTool.isClosingSnap ||
             _zoneTool.pointStatus == ZoneDraftingPointStatus.closeTarget ||
@@ -4435,17 +4433,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }
         return;
       } else {
-        // Point-by-point manual drafting (like slab element)
-        final snap = ArchitectZoneSnap.snap(
-          magnetic: _magnetEnabled,
-          underlay: _currentUnderlayDoc,
-          frame: widget.underlayFrame,
-          visibility: _underlayLayerVisibility,
-          raw: rawModel,
-          project: _project,
-          tolerance: 16.0 / _currentScale,
-        );
-        final startPt = snap.isSnapped ? snap.point : rawModel;
+        // Same initial object snap as the slab contour tool.
+        final startPt = _resolveContourPoint(const [], rawModel);
         _zoneTool.startDrafting(startPt);
         setState(() {
           _selectedZoneId = null;

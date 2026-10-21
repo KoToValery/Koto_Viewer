@@ -184,7 +184,7 @@ void main() {
       expect(tool.isDrafting, isFalse); // fully cancelled
     });
 
-    test('rejects self-intersecting segments during drafting', () {
+    test('marks crossing drafts for correction on closure', () {
       final tool = ArchitectZoneTool();
       tool.start(const Offset(0, 0));
       tool.addPoint(const Offset(10, 0));
@@ -192,6 +192,7 @@ void main() {
       tool.addPoint(const Offset(5, -5)); // Crosses segment from (0,0) to (10,0)
 
       expect(tool.pointStatus, ZoneDraftingPointStatus.selfIntersects);
+      expect(tool.pointCount, 4);
     });
   });
 

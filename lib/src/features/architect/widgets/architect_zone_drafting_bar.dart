@@ -58,8 +58,9 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
     final l10n = context.l10n;
     final isAuto = tool.placementMode == ArchitectZonePlacementMode.autoClick;
     final isSelfIntersecting =
+        tool.hasDraftCrossings ||
         tool.pointStatus == ZoneDraftingPointStatus.selfIntersects;
-    final canClose = tool.canCloseDraft && !isSelfIntersecting;
+    final canClose = tool.canCloseDraft;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -255,7 +256,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                   const SizedBox(width: 5),
                   Expanded(
                     child: Text(
-                      l10n.architectZoneSelfIntersectError,
+                      l10n.architectZoneCrossingRepairHint,
                       style: const TextStyle(
                         color: Color(0xFFFF5252),
                         fontSize: 10.5,
@@ -267,8 +268,8 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                   ),
                 ],
               ),
-            )
-          else if (isAuto)
+            ),
+          if (isAuto)
             // Auto Mode Prompt Banner
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -302,14 +303,16 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
             )
           else
             // Manual Mode: Points counter, segment length, live area, Undo, Finish
-            Row(
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 _buildMetricChip(
                   icon: Icons.scatter_plot_rounded,
                   label: '${tool.draftPointCount}',
                   color: const Color(0xFF00E5FF),
                 ),
-                const SizedBox(width: 4),
 
                 if (tool.activeSegmentLength != null) ...[
                   _buildMetricChip(
@@ -318,7 +321,6 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                     subLabel: tool.orthoLabel,
                     color: const Color(0xFFFFD600),
                   ),
-                  const SizedBox(width: 4),
                 ],
 
                 if (tool.draftPointCount >= 2) ...[
@@ -327,10 +329,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                     label: '${tool.liveArea.toStringAsFixed(1)} m²',
                     color: const Color(0xFF69F0AE),
                   ),
-                  const SizedBox(width: 4),
                 ],
-
-                const Spacer(),
 
                 // Undo point button
                 IconButton(
@@ -344,10 +343,10 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                   visualDensity: VisualDensity.compact,
                   onPressed: tool.draftPointCount > 0 ? onUndo : null,
                 ),
-                const SizedBox(width: 6),
 
-                // Finish / Close zone button
+                // Finish remains available when crossing repair is needed.
                 InkWell(
+                  key: const ValueKey('zone-draft-close'),
                   onTap: canClose ? onClose : null,
                   borderRadius: BorderRadius.circular(6),
                   child: Container(
@@ -369,7 +368,6 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                           size: 14,
                           color: canClose ? Colors.black : Colors.white38,
                         ),
-                        const SizedBox(width: 4),
                         Text(
                           l10n.architectZoneClose,
                           style: TextStyle(

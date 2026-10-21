@@ -1118,7 +1118,7 @@
       "count": { "type": "int" }
     }
   },
-  "architectZoneClose": "Затвори зона",
+  "architectZoneClose": "Готово",
   "architectZoneUndoPoint": "Отмени точка",
   "architectZoneCancelDraft": "Отказ",
   "architectZonePointSnapStart": "Затваряне на зона (1-ва точка)",
@@ -2170,5 +2170,7 @@
   "wallArcMode": "Дъга",
   "architectZonePresets": "Имена и покрития",
   "architectZoneManualHelp": "Ръчна: редактиране по точки и отсечки. Махнете отметката за повторно откриване на помещението по стените.",
-  "architectZoneBoundaryOpen": "Не е открито затворено помещение. Проверете стените за пролуки."
+  "architectZoneBoundaryOpen": "Не е открито затворено помещение. Проверете стените за пролуки.",
+  "architectZoneCrossingRepairHint": "Пресичанията ще се коригират при затваряне.",
+  "architectZoneBoundaryRepaired": "Пресичанията на границите са коригирани."
 }

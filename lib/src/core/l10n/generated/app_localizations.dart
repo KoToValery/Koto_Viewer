@@ -6104,7 +6104,7 @@ abstract class AppLocalizations {
   /// Button to close and finalize zone polygon
   ///
   /// In en, this message translates to:
-  /// **'Close Zone'**
+  /// **'Finish'**
   String get architectZoneClose;
 
   /// Button to undo last placed vertex in zone drafting
@@ -11722,6 +11722,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No enclosed room found. Check the walls for gaps.'**
   String get architectZoneBoundaryOpen;
+
+  /// No description provided for @architectZoneCrossingRepairHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossings will be corrected when the zone is closed.'**
+  String get architectZoneCrossingRepairHint;
+
+  /// No description provided for @architectZoneBoundaryRepaired.
+  ///
+  /// In en, this message translates to:
+  /// **'Boundary crossings corrected.'**
+  String get architectZoneBoundaryRepaired;
 }
 
 class _AppLocalizationsDelegate

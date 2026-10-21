@@ -3536,7 +3536,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get architectZoneClose => 'Close Zone';
+  String get architectZoneClose => 'Finish';
 
   @override
   String get architectZoneUndoPoint => 'Undo Point';
@@ -6605,4 +6605,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectZoneBoundaryOpen =>
       'No enclosed room found. Check the walls for gaps.';
+
+  @override
+  String get architectZoneCrossingRepairHint =>
+      'Crossings will be corrected when the zone is closed.';
+
+  @override
+  String get architectZoneBoundaryRepaired => 'Boundary crossings corrected.';
 }

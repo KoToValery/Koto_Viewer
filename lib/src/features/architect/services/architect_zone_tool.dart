@@ -1,3 +1,5 @@
+import '../../bim_editing/geometry/bim_contour_repair.dart';
+import '../rendering/architect_snap_helper.dart';
 import '../../bim_editing/geometry/bim_contour_drafting_geometry.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -142,6 +144,8 @@ class ArchitectZoneTool extends ChangeNotifier {
   }
 
   bool get canClose => canCloseDraft;
+  bool get hasDraftCrossings =>
+      ArchitectZoneGeometry.hasSelfIntersections(_draftPoints);
   Offset? get candidatePoint => _snappedPoint ?? _candidatePoint;
   Offset? get rawCandidatePoint => _candidatePoint;
   (Offset, Offset)? get orthoGuide => _orthoGuide;
@@ -205,7 +209,10 @@ class ArchitectZoneTool extends ChangeNotifier {
     }
     if (_draftPoints.length < 2) return 0.0;
     final testPoly = [..._draftPoints, candidatePoint!];
-    return ArchitectZoneGeometry.calculateArea(testPoly);
+    final repaired = ArchitectZoneGeometry.hasSelfIntersections(testPoly)
+        ? BimContourRepair.uncrossDraftPolygon(testPoly)
+        : null;
+    return ArchitectZoneGeometry.calculateArea(repaired ?? testPoly);
   }
 
   // ---------------------------------------------------------------------------
@@ -283,8 +290,35 @@ class ArchitectZoneTool extends ChangeNotifier {
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
+    ArchitectSnapResult? resolvedSnap,
   }) {
     if (!isDrafting) return;
+    if (resolvedSnap != null) {
+      _candidatePoint = rawModelPoint;
+      _snappedPoint = resolvedSnap.point;
+      _magneticGuides = resolvedSnap.magneticGuides;
+      _orthoGuide = null;
+      _orthoLabel = null;
+      _isClosingSnap =
+          _draftPoints.length >= 3 &&
+          (resolvedSnap.point - _draftPoints.first).distance <= 1e-9;
+      if (_isClosingSnap) {
+        _pointStatus = ZoneDraftingPointStatus.closeTarget;
+      } else if (hasDraftCrossings ||
+          ArchitectZoneGeometry.segmentIntersectsChain(
+            _draftPoints.last,
+            resolvedSnap.point,
+            _draftPoints,
+          )) {
+        _pointStatus = ZoneDraftingPointStatus.selfIntersects;
+      } else {
+        _pointStatus = (resolvedSnap.point - _draftPoints.last).distance < .001
+            ? ZoneDraftingPointStatus.tooClose
+            : ZoneDraftingPointStatus.valid;
+      }
+      notifyListeners();
+      return;
+    }
 
     _candidatePoint = rawModelPoint;
     final lastPoint = _draftPoints.last;
@@ -307,10 +341,10 @@ class ArchitectZoneTool extends ChangeNotifier {
       if (magnetic) {
         final closure =
             BimContourDraftingGeometry.calculatePolygonClosureOrthoSnap(
-          points: _draftPoints,
-          raw: rawModelPoint,
-          tolerance: math.max(16.0 / currentScale, 0.30),
-        );
+              points: _draftPoints,
+              raw: rawModelPoint,
+              tolerance: math.max(16.0 / currentScale, 0.30),
+            );
         if (closure.isSnapped) {
           _snappedPoint = closure.point;
           _candidatePoint = closure.point;
@@ -389,6 +423,7 @@ class ArchitectZoneTool extends ChangeNotifier {
   }
 
   bool addDraftingPoint(Offset point) {
+    if (!point.dx.isFinite || !point.dy.isFinite) return false;
     if (!isDrafting) {
       startDrafting(point);
       return true;
@@ -423,23 +458,15 @@ class ArchitectZoneTool extends ChangeNotifier {
       return false;
     }
 
-    if (ArchitectZoneGeometry.segmentIntersectsChain(
-      _draftPoints.last,
-      point,
-      _draftPoints,
-    )) {
-      _pointStatus = ZoneDraftingPointStatus.selfIntersects;
-      notifyListeners();
-      return false;
-    }
-
     _draftPoints.add(point);
     _candidatePoint = point;
     _snappedPoint = point;
     _orthoGuide = null;
     _orthoLabel = null;
     _isClosingSnap = false;
-    _pointStatus = ZoneDraftingPointStatus.valid;
+    _pointStatus = hasDraftCrossings
+        ? ZoneDraftingPointStatus.selfIntersects
+        : ZoneDraftingPointStatus.valid;
     notifyListeners();
     return true;
   }
@@ -493,26 +520,8 @@ class ArchitectZoneTool extends ChangeNotifier {
 
     if (_draftPoints.length < 3) return null;
 
-    if (ArchitectZoneGeometry.segmentIntersectsChain(
-      _draftPoints.last,
-      _draftPoints.first,
-      _draftPoints,
-      isClosing: true,
-    )) {
-      _pointStatus = ZoneDraftingPointStatus.selfIntersects;
-      notifyListeners();
-      return null;
-    }
-
-    final cleaned = ArchitectZoneGeometry.cleanPolygon(
-      _draftPoints,
-      minDistance: 1e-6,
-      minCollinearDistance: 1e-7,
-    );
-
-    if (cleaned.length < 3) return null;
-
-    if (ArchitectZoneGeometry.hasSelfIntersections(cleaned)) {
+    final cleaned = BimContourRepair.uncrossDraftPolygon(_draftPoints);
+    if (cleaned == null) {
       _pointStatus = ZoneDraftingPointStatus.selfIntersects;
       notifyListeners();
       return null;
@@ -676,7 +685,9 @@ class ArchitectZoneTool extends ChangeNotifier {
     cancelDrafting();
     cancelExtrude();
     _editingZone = zone.isAutoBoundary ? null : zone;
-    _editingPolygon = zone.isAutoBoundary ? null : List<Offset>.from(zone.polygon);
+    _editingPolygon = zone.isAutoBoundary
+        ? null
+        : List<Offset>.from(zone.polygon);
     notifyListeners();
   }
 

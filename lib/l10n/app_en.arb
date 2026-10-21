@@ -2660,7 +2660,7 @@
       "count": { "type": "int" }
     }
   },
-  "architectZoneClose": "Close Zone",
+  "architectZoneClose": "Finish",
   "@architectZoneClose": { "description": "Button to close and finalize zone polygon" },
   "architectZoneUndoPoint": "Undo Point",
   "@architectZoneUndoPoint": { "description": "Button to undo last placed vertex in zone drafting" },
@@ -4302,5 +4302,7 @@
   "wallArcMode": "Arc",
   "architectZonePresets": "Zone presets",
   "architectZoneManualHelp": "Manual: edit points and edges. Clear to detect the room from its walls again.",
-  "architectZoneBoundaryOpen": "No enclosed room found. Check the walls for gaps."
+  "architectZoneBoundaryOpen": "No enclosed room found. Check the walls for gaps.",
+  "architectZoneCrossingRepairHint": "Crossings will be corrected when the zone is closed.",
+  "architectZoneBoundaryRepaired": "Boundary crossings corrected."
 }

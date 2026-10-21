@@ -5,6 +5,45 @@ import 'bim_polygon_geometry.dart';
 /// Compatibility repair policy for imported/legacy contours. Domain adapters
 /// choose it explicitly; normal edits use BimPolygonGeometry's strict policy.
 class BimContourRepair {
+  /// Uncross a manually drafted ring by reversing the chain between crossing
+  /// edges (2-opt). Keep every distinct corner and leave valid concavities alone.
+  /// Touching/overlapping edges are ambiguous: return null instead of discarding
+  /// a lobe or inventing a convex hull. The caller retains the editable draft.
+  static List<Offset>? uncrossDraftPolygon(List<Offset> polygon) {
+    if (polygon.length < 3 ||
+        polygon.length > 2048 ||
+        polygon.any((p) => !p.dx.isFinite || !p.dy.isFinite)) {
+      return null;
+    }
+    final points = BimPolygonGeometry.clean(polygon);
+    if (points.length < 3) return null;
+    if (BimPolygonGeometry.valid(points)) return points;
+    var remainingChecks = 250000;
+    while (true) {
+      var changed = false;
+      for (var i = 0; i < points.length && !changed; i++) {
+        for (var j = i + 2; j < points.length; j++) {
+          if (i == 0 && j == points.length - 1) continue;
+          if (--remainingChecks < 0) return null;
+          if (!doSegmentsIntersect(
+            points[i],
+            points[(i + 1) % points.length],
+            points[j],
+            points[(j + 1) % points.length],
+            epsilon: 0,
+          )) {
+            continue;
+          }
+          final reversed = points.sublist(i + 1, j + 1).reversed.toList();
+          points.setRange(i + 1, j + 1, reversed);
+          changed = true;
+          break;
+        }
+      }
+      if (!changed) return BimPolygonGeometry.valid(points) ? points : null;
+    }
+  }
+
   /// Legacy drafting cleanup; preserves valid origin vertices and accepts the
   /// caller's collinear threshold. Imported stray-origin repair is separate.
   static List<Offset> cleanDraftPolygon(
