@@ -2248,5 +2248,6 @@
   "architectSheetTemplateName": "Име на шаблона",
   "architectAreaWithUnit": "Площ ({unit}²)",
   "@architectAreaWithUnit": {"placeholders":{"unit":{"type":"String"}}},
-  "architectSheetTemplateOverflow": "Текстът излиза от полето в антетката. Увеличи полето преди експорт."
+  "architectSheetTemplateOverflow": "Текстът излиза от полето в антетката. Увеличи полето преди експорт.",
+  "snapMidpointAlignment": "По средна точка"
 }

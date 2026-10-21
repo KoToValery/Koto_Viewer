@@ -10,6 +10,7 @@ import '../../dxf_viewer/models/dxf_models.dart';
 import '../models/architect_column.dart';
 import '../models/architect_project.dart';
 import 'architect_snap_helper.dart';
+import 'architect_midpoint_tracking.dart';
 
 // === SECTION: ARCHITECT COLUMN SNAP ENGINE ===
 
@@ -31,6 +32,7 @@ class ArchitectColumnSnap {
     double tolerance = 0.25,
     bool magnetic = true,
     Set<String> excludedIds = const {},
+    List<ArchitectMidpointReference> midpointReferences = const [],
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
@@ -72,37 +74,43 @@ class ArchitectColumnSnap {
 
         final halfOpen = openWidth / 2.0;
         final leftJamb = wall.isCurved
-            ? wall.centerPointAt(((ratio * wallLen - halfOpen) / wallLen).clamp(0.0, 1.0))
+            ? wall.centerPointAt(
+                ((ratio * wallLen - halfOpen) / wallLen).clamp(0.0, 1.0),
+              )
             : center - tangent * halfOpen;
         final rightJamb = wall.isCurved
-            ? wall.centerPointAt(((ratio * wallLen + halfOpen) / wallLen).clamp(0.0, 1.0))
+            ? wall.centerPointAt(
+                ((ratio * wallLen + halfOpen) / wallLen).clamp(0.0, 1.0),
+              )
             : center + tangent * halfOpen;
 
         final wallAngleDeg =
             (math.atan2(tangent.dy, tangent.dx) * 180.0 / math.pi) % 360.0;
 
         // Try parallel and (for rectangular with different width/depth) perpendicular orientation
-        final orientations = <({double rot, double halfAlong, double halfAcross})>[
-          (
-            rot: wallAngleDeg,
-            halfAlong: columnWidth / 2.0,
-            halfAcross: columnDepth / 2.0,
-          ),
-          if (columnShape == ColumnShape.rectangular &&
-              (columnWidth - columnDepth).abs() > 1e-4)
-            (
-              rot: (wallAngleDeg + 90.0) % 360.0,
-              halfAlong: columnDepth / 2.0,
-              halfAcross: columnWidth / 2.0,
-            ),
-        ];
+        final orientations =
+            <({double rot, double halfAlong, double halfAcross})>[
+              (
+                rot: wallAngleDeg,
+                halfAlong: columnWidth / 2.0,
+                halfAcross: columnDepth / 2.0,
+              ),
+              if (columnShape == ColumnShape.rectangular &&
+                  (columnWidth - columnDepth).abs() > 1e-4)
+                (
+                  rot: (wallAngleDeg + 90.0) % 360.0,
+                  halfAlong: columnDepth / 2.0,
+                  halfAcross: columnWidth / 2.0,
+                ),
+            ];
 
         for (final orient in orientations) {
           final acrossOffsets = <double>[
             0.0, // Centered on wall core / centerline
             if (wall.thickness > orient.halfAcross * 2.0 + 0.01) ...[
               wall.thickness / 2.0 - orient.halfAcross, // Flush exterior face
-              -(wall.thickness / 2.0 - orient.halfAcross), // Flush interior face
+              -(wall.thickness / 2.0 -
+                  orient.halfAcross), // Flush interior face
             ],
           ];
 
@@ -135,7 +143,8 @@ class ArchitectColumnSnap {
             final dRight = (pRight - raw).distance;
             if (dRight <= bestDist) {
               bestDist = dRight;
-              final jambGuideStart = rightJamb - normal * (wall.thickness * 1.5);
+              final jambGuideStart =
+                  rightJamb - normal * (wall.thickness * 1.5);
               final jambGuideEnd = rightJamb + normal * (wall.thickness * 1.5);
               final wallGuideStart = center - tangent * (openWidth + 1.2);
               final wallGuideEnd = center + tangent * (openWidth + 1.2);
@@ -167,6 +176,7 @@ class ArchitectColumnSnap {
       magnetic: magnetic,
       alignment: true,
       excludedIds: excludedIds,
+      midpointReferences: midpointReferences,
       underlay: underlay,
       frame: frame,
       visibility: visibility,

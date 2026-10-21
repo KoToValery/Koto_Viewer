@@ -299,8 +299,10 @@ class ArchitectGridAxisPainterHelper {
           backgroundColor: const Color(0xCC000000),
         ),
       );
-      final tp = ArchitectTextPainter(text: textSpan, textDirection: TextDirection.ltr)
-        ..layout();
+      final tp = ArchitectTextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      )..layout();
       tp.paint(
         canvas,
         mid - Offset(tp.width / 2, tp.height / 2 + 12.0 / zoomScale),
@@ -322,7 +324,14 @@ class ArchitectGridAxisPainterHelper {
   }) {
     canvas.save();
     canvas.translate(center.dx, center.dy);
-    final localScale = ArchitectTextScope.current?.publication == true ? ArchitectTextScope.current!.height(elementId ?? label, ArchitectAnnotationRole.symbol) / 11 : 1 / zoomScale;
+    final publication = ArchitectTextScope.current?.publication == true;
+    final localScale = publication
+        ? ArchitectTextScope.current!.height(
+                elementId ?? label,
+                ArchitectAnnotationRole.symbol,
+              ) /
+              11
+        : 1 / zoomScale;
     canvas.scale(localScale);
     center = Offset.zero;
     zoomScale = 1;
@@ -360,8 +369,15 @@ class ArchitectGridAxisPainterHelper {
       ),
     );
 
-    final tp = ArchitectTextPainter(elementId: elementId, role: ArchitectAnnotationRole.symbol, modelScale: localScale,text: textSpan, textDirection: TextDirection.ltr)
-      ..layout();
+    // Working axis labels share the bubble's screen size. Only publication
+    // applies the paper text profile; otherwise it cancels the zoom scaling.
+    final tp = ArchitectTextPainter(
+      elementId: publication ? elementId : null,
+      role: ArchitectAnnotationRole.symbol,
+      modelScale: localScale,
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
 
     tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
     canvas.restore();

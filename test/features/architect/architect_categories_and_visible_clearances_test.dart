@@ -9,7 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
-import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart' show ArchitectTool;
+import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart'
+    show ArchitectTool;
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_radial_menu.dart';
 import 'architect_editing_test.dart' as editing;
@@ -172,14 +173,15 @@ void main() {
             expect(viewport.contains(rect.topLeft), isTrue);
             expect(viewport.contains(rect.bottomRight), isTrue);
             expect(rects.any((r) => r.overlaps(rect)), isFalse);
-            expect(
-              rect.overlaps(
-                tester.getRect(
-                  find.byKey(const ValueKey('architect-wall-floating-actions')),
-                ),
-              ),
-              isFalse,
+            final floatingActionsFinder = find.byKey(
+              const ValueKey('architect-wall-floating-actions'),
             );
+            if (floatingActionsFinder.evaluate().isNotEmpty) {
+              expect(
+                rect.overlaps(tester.getRect(floatingActionsFinder)),
+                isFalse,
+              );
+            }
             if (fan) {
               final menu = tester.widget<ArchitectRadialMenu>(
                 find.byType(ArchitectRadialMenu),

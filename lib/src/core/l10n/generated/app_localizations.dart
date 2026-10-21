@@ -12184,6 +12184,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Title block text exceeds its cell. Enlarge the cell before export.'**
   String get architectSheetTemplateOverflow;
+
+  /// No description provided for @snapMidpointAlignment.
+  ///
+  /// In en, this message translates to:
+  /// **'Align to midpoint'**
+  String get snapMidpointAlignment;
 }
 
 class _AppLocalizationsDelegate

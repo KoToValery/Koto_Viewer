@@ -6843,4 +6843,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectSheetTemplateOverflow =>
       'Title block text exceeds its cell. Enlarge the cell before export.';
+
+  @override
+  String get snapMidpointAlignment => 'Align to midpoint';
 }

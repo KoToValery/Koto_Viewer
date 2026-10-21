@@ -19,6 +19,9 @@ class ArchitectSnapGeometry {
   final _edgeIndex = BimBoundsIndex<ArchitectSnapEdge>();
   final _circleIndex = BimBoundsIndex<ArchitectSnapCircle>();
   final List<ArchitectSnapEdge> edges = [];
+
+  /// Logical straight edges, excluding wall end caps and curve tessellation.
+  final Set<ArchitectSnapEdge> midpointEdges = {};
   final List<ArchitectSnapCircle> circles = [];
   final List<ArchitectSnapPoint> alignmentPoints = [];
 
@@ -33,14 +36,10 @@ class ArchitectSnapGeometry {
       if (label != 'Midpoint') alignmentPoints.add(value);
     }
 
-    void edge(
-      Offset a,
-      Offset b,
-      String owner, {
-      bool includeMidpoint = true,
-    }) {
+    void edge(Offset a, Offset b, String owner, {bool includeMidpoint = true}) {
       if ((b - a).distanceSquared < 1e-16) return;
       edges.add((a: a, b: b, owner: owner));
+      if (includeMidpoint) midpointEdges.add((a: a, b: b, owner: owner));
       point(a, 'Endpoint', owner);
       point(b, 'Endpoint', owner);
       if (includeMidpoint && (b - a).distance > 0.45) {
@@ -86,26 +85,40 @@ class ArchitectSnapGeometry {
     final referenceWalls = floor.walls.isNotEmpty
         ? floor.walls
         : (floor.isRoof
-            ? (project.highestWallStorey?.walls ?? const [])
-            : (activeIdx > 0 ? project.storeys[activeIdx - 1].walls : floor.walls));
+              ? (project.highestWallStorey?.walls ?? const [])
+              : (activeIdx > 0
+                    ? project.storeys[activeIdx - 1].walls
+                    : floor.walls));
 
     for (final wall in referenceWalls) {
-      if(wall.isCurved) {
-        for(final ratio in [0.0,.5,1.0]) {
-          point(wall.referencePointAt(ratio),ratio==.5?'Midpoint':'Endpoint',wall.id);
+      if (wall.isCurved) {
+        for (final ratio in [0.0, .5, 1.0]) {
+          point(
+            wall.referencePointAt(ratio),
+            ratio == .5 ? 'Midpoint' : 'Endpoint',
+            wall.id,
+          );
         }
-        point(wall.arc!.center,'Center',wall.id);
-        final paths=[(wall.facePolygon(0,0),'@wall-axis:${wall.id}'),(wall.polygonCorners,wall.id),(wall.coreCorners,wall.id)];
+        point(wall.arc!.center, 'Center', wall.id);
+        final paths = [
+          (wall.facePolygon(0, 0), '@wall-axis:${wall.id}'),
+          (wall.polygonCorners, wall.id),
+          (wall.coreCorners, wall.id),
+        ];
         for (final (points, owner) in paths) {
           for (var i = 0; i < points.length; i++) {
-            edges.add((a: points[i], b: points[(i + 1) % points.length], owner: owner));
+            edges.add((
+              a: points[i],
+              b: points[(i + 1) % points.length],
+              owner: owner,
+            ));
           }
         }
       } else {
-      edge(wall.startPoint, wall.endPoint, '@wall-axis:${wall.id}');
-      edge(wall.coreCenterStart, wall.coreCenterEnd, '@wall-axis:${wall.id}');
-      wallBox(wall.polygonCorners, wall.id);
-      wallBox(wall.coreCorners, wall.id);
+        edge(wall.startPoint, wall.endPoint, '@wall-axis:${wall.id}');
+        edge(wall.coreCenterStart, wall.coreCenterEnd, '@wall-axis:${wall.id}');
+        wallBox(wall.polygonCorners, wall.id);
+        wallBox(wall.coreCorners, wall.id);
       }
       for (final opening in [
         for (final d in wall.doors) (d.id, d.offsetRatio, d.width, true),
@@ -143,9 +156,9 @@ class ArchitectSnapGeometry {
       if (a.length < 1e-4) continue;
       for (final b in referenceWalls.skip(i + 1)) {
         if (b.length < 1e-4) continue;
-        if(a.isCurved||b.isCurved) {
-          for(final p in a.intersections(b)) {
-            point(p,'Intersection','@wall-face-joints');
+        if (a.isCurved || b.isCurved) {
+          for (final p in a.intersections(b)) {
+            point(p, 'Intersection', '@wall-face-joints');
           }
           continue;
         }
@@ -177,8 +190,10 @@ class ArchitectSnapGeometry {
               final alongA = dA.dx * a.unitVector.dx + dA.dy * a.unitVector.dy;
               final dB = pt - b.centerStart;
               final alongB = dB.dx * b.unitVector.dx + dB.dy * b.unitVector.dy;
-              if (alongA >= -a.thickness && alongA <= a.length + a.thickness &&
-                  alongB >= -b.thickness && alongB <= b.length + b.thickness) {
+              if (alongA >= -a.thickness &&
+                  alongA <= a.length + a.thickness &&
+                  alongB >= -b.thickness &&
+                  alongB <= b.length + b.thickness) {
                 point(pt, 'Intersection', '@wall-face-joints');
               }
             }
@@ -211,7 +226,9 @@ class ArchitectSnapGeometry {
       polygon(beam.polygonCorners, beam.id);
     }
     for (final stair in floor.stairs) {
-      if (stair.design == null) edge(stair.startPoint, stair.endPoint, stair.id);
+      if (stair.design == null) {
+        edge(stair.startPoint, stair.endPoint, stair.id);
+      }
       for (final footprint in stair.plan.footprints) {
         polygon(footprint, stair.id);
       }

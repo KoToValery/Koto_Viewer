@@ -4380,5 +4380,6 @@
   "architectSheetTemplateName": "Template name",
   "architectAreaWithUnit": "Area ({unit}²)",
   "@architectAreaWithUnit": {"placeholders":{"unit":{"type":"String"}}},
-  "architectSheetTemplateOverflow": "Title block text exceeds its cell. Enlarge the cell before export."
+  "architectSheetTemplateOverflow": "Title block text exceeds its cell. Enlarge the cell before export.",
+  "snapMidpointAlignment": "Align to midpoint"
 }

@@ -108,6 +108,7 @@ class Architect2dPainter extends CustomPainter {
   final Offset? draggingVertexPoint;
   final int? mergeCandidateIndex;
   final List<(Offset, Offset)> magneticGuides;
+  final List<Offset> midpointHints;
   final double _zoomScale;
   double get zoomScale => viewport?.scale ?? _zoomScale;
 
@@ -222,6 +223,7 @@ class Architect2dPainter extends CustomPainter {
     this.draggingVertexPoint,
     this.mergeCandidateIndex,
     this.magneticGuides = const [],
+    this.midpointHints = const [],
     double zoomScale = 1.0,
     this.cursorPosition,
     this.columnPreview,
@@ -488,6 +490,22 @@ class Architect2dPainter extends CustomPainter {
         guides: magneticGuides,
         zoomScale: zoomScale,
       );
+      for (final midpoint in midpointHints) {
+        final r = 5 / zoomScale;
+        final mark = Path()
+          ..moveTo(midpoint.dx, midpoint.dy - r)
+          ..lineTo(midpoint.dx + r, midpoint.dy + r)
+          ..lineTo(midpoint.dx - r, midpoint.dy + r)
+          ..close();
+        canvas.drawPath(mark, Paint()..color = palette.background);
+        canvas.drawPath(
+          mark,
+          Paint()
+            ..color = palette.foreground(const Color(0xFF00796B))
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5 / zoomScale,
+        );
+      }
     }
     canvas.restore();
   }

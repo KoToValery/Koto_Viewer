@@ -6869,4 +6869,7 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectSheetTemplateOverflow =>
       'Текстът излиза от полето в антетката. Увеличи полето преди експорт.';
+
+  @override
+  String get snapMidpointAlignment => 'По средна точка';
 }

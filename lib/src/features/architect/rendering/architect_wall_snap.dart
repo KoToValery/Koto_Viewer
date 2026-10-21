@@ -8,6 +8,7 @@ import '../../dxf_viewer/rendering/dxf_segment_snap.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 import 'architect_snap_helper.dart';
+import 'architect_midpoint_tracking.dart';
 import 'architect_wall_network.dart';
 import 'architect_wall_geometry.dart';
 
@@ -23,6 +24,7 @@ class ArchitectWallSnap {
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
     List<Offset> referenceDirections = const [],
+    List<ArchitectMidpointReference> midpointReferences = const [],
   }) {
     final radius = math.min(capturePixels / scale, .35);
     var best = magnetic
@@ -30,6 +32,7 @@ class ArchitectWallSnap {
             rawPoint: raw,
             project: project,
             tolerance: radius,
+            midpointReferences: midpointReferences,
           )
         : ArchitectSnapResult(point: raw);
     if (anchor != null && (best.point - anchor).distance < .001) {
@@ -42,6 +45,7 @@ class ArchitectWallSnap {
             'Axis intersection' ||
             'Intersection' ||
             'Center' ||
+            'Midpoint alignment' ||
             'Midpoint' => 1,
             _ => 3,
           }
@@ -66,10 +70,28 @@ class ArchitectWallSnap {
       ArchitectWallAttachment? attachment;
       var bestDistance = double.infinity;
       for (final wall in project.activeStorey.walls) {
-        if(wall.isCurved) {
-          final r=wall.arc!.parameter(result.point).clamp(0.0,1.0),n=wall.normalAt(r)*wall.exteriorSign;
-          for(final face in [(WallReferenceLine.center,wall.centerPointAt(r)-n*wall.coreAsymmetry/2),(WallReferenceLine.outer,wall.centerPointAt(r)+n*wall.thickness/2),(WallReferenceLine.inner,wall.centerPointAt(r)-n*wall.thickness/2)]) {
-            if((result.point-face.$2).distance<.0001&&(face.$2-raw).distance<bestDistance){bestDistance=(face.$2-raw).distance;attachment=ArchitectWallAttachment(wall,face.$1);}
+        if (wall.isCurved) {
+          final r = wall.arc!.parameter(result.point).clamp(0.0, 1.0),
+              n = wall.normalAt(r) * wall.exteriorSign;
+          for (final face in [
+            (
+              WallReferenceLine.center,
+              wall.centerPointAt(r) - n * wall.coreAsymmetry / 2,
+            ),
+            (
+              WallReferenceLine.outer,
+              wall.centerPointAt(r) + n * wall.thickness / 2,
+            ),
+            (
+              WallReferenceLine.inner,
+              wall.centerPointAt(r) - n * wall.thickness / 2,
+            ),
+          ]) {
+            if ((result.point - face.$2).distance < .0001 &&
+                (face.$2 - raw).distance < bestDistance) {
+              bestDistance = (face.$2 - raw).distance;
+              attachment = ArchitectWallAttachment(wall, face.$1);
+            }
           }
           continue;
         }
@@ -227,7 +249,10 @@ class ArchitectWallSnap {
           scale: scale,
         );
         if (perpCrossing != null) return perpCrossing;
-        final guideLength = math.max(delta.distance + 40.0 / scale, 60.0 / scale);
+        final guideLength = math.max(
+          delta.distance + 40.0 / scale,
+          60.0 / scale,
+        );
         final guideEnd = anchor + u * guideLength;
         return ArchitectSnapResult(
           point: projected,
@@ -279,8 +304,10 @@ class ArchitectWallSnap {
               scale: scale,
             );
             if (perpCrossing != null) return perpCrossing;
-            final guideLength =
-                math.max(along.abs() + 40.0 / scale, 60.0 / scale);
+            final guideLength = math.max(
+              along.abs() + 40.0 / scale,
+              60.0 / scale,
+            );
             final guideEnd = anchor + u * guideLength;
             return ArchitectSnapResult(
               point: projected,
@@ -424,8 +451,10 @@ class ArchitectWallSnap {
         final segLen = seg.distance;
         if (segLen < 1e-4) continue;
         final segU = seg / segLen;
-        final s = ((inter - w1).dx * segU.dx + (inter - w1).dy * segU.dy)
-            .clamp(0.0, segLen);
+        final s = ((inter - w1).dx * segU.dx + (inter - w1).dy * segU.dy).clamp(
+          0.0,
+          segLen,
+        );
         final closestOnWall = w1 + segU * s;
 
         final gap = (closestOnWall - inter).distance;
@@ -449,10 +478,7 @@ class ArchitectWallSnap {
             isSnapped: true,
             snapLabel: 'Perpendicular',
             angleDeg: degrees,
-            magneticGuides: [
-              rayGuide,
-              perpGuide,
-            ],
+            magneticGuides: [rayGuide, perpGuide],
           );
         }
       }
@@ -460,4 +486,3 @@ class ArchitectWallSnap {
     return best;
   }
 }
-

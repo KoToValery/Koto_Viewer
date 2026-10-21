@@ -9,6 +9,7 @@ import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/rendering/dxf_segment_snap.dart';
 import '../../dxf_viewer/rendering/dxf_snap_helper.dart';
 import 'architect_snap_geometry.dart';
+import 'architect_midpoint_tracking.dart';
 
 class ArchitectSnapResult {
   final Offset point;
@@ -44,6 +45,7 @@ class ArchitectSnapHelper {
     bool excludeWallAxes = false,
     bool preferIntersections = false,
     Set<String> excludedIds = const {},
+    List<ArchitectMidpointReference> midpointReferences = const [],
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
@@ -57,6 +59,7 @@ class ArchitectSnapHelper {
     excludeWallAxes: excludeWallAxes,
     preferIntersections: preferIntersections,
     excludedIds: excludedIds,
+    midpointReferences: midpointReferences,
     underlay: underlay,
     frame: frame,
     visibility: visibility,
@@ -71,6 +74,7 @@ class ArchitectSnapHelper {
     bool excludeWallAxes = false,
     bool preferIntersections = false,
     Set<String> excludedIds = const {},
+    List<ArchitectMidpointReference> midpointReferences = const [],
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
@@ -83,6 +87,7 @@ class ArchitectSnapHelper {
     excludeWallAxes: excludeWallAxes,
     preferIntersections: preferIntersections,
     excludedIds: excludedIds,
+    midpointReferences: midpointReferences,
     underlay: underlay,
     frame: frame,
     visibility: visibility,
@@ -99,6 +104,7 @@ class ArchitectSnapHelper {
     'Midpoint' => BimSnapKind.midpoint,
     'Perpendicular' => BimSnapKind.perpendicular,
     'Alignment' => BimSnapKind.alignment,
+    'Midpoint alignment' => BimSnapKind.alignment,
     _ => BimSnapKind.edge,
   };
   static int _rank(String label) => _kind(label).priority;
@@ -111,6 +117,7 @@ class ArchitectSnapHelper {
     required Offset delta,
     double tolerance = .20,
     bool magnetic = true,
+    List<ArchitectMidpointReference> midpointReferences = const [],
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
@@ -131,6 +138,7 @@ class ArchitectSnapHelper {
         tolerance: tolerance,
         alignment: true,
         excludedIds: elementIds,
+        midpointReferences: midpointReferences,
         underlay: underlay,
         frame: frame,
         visibility: visibility,
@@ -163,6 +171,7 @@ class ArchitectSnapHelper {
     bool excludeWallAxes = false,
     bool preferIntersections = false,
     required Set<String> excludedIds,
+    required List<ArchitectMidpointReference> midpointReferences,
     DxfDocument? underlay,
     required BimCoordinateFrame frame,
     required Map<String, bool> visibility,
@@ -211,6 +220,18 @@ class ArchitectSnapHelper {
       if (preferIntersections && candidate.kind == BimSnapKind.intersection) {
         intersections.consider(candidate);
       }
+    }
+
+    final references = midpointReferences
+        .where(
+          (r) =>
+              !excluded(r.owner) &&
+              !excluded(r.edge.owner) &&
+              geometry.midpointEdges.contains(r.edge),
+        )
+        .toList();
+    for (final reference in references) {
+      consider(reference.point, 'Midpoint');
     }
 
     for (final candidate in geometry.query(raw, radius)) {
@@ -314,6 +335,20 @@ class ArchitectSnapHelper {
         isSnapped: true,
         snapLabel: best.source,
         magneticGuides: anchor == null ? [] : [(anchor, best.point)],
+      );
+    }
+    final tracked = ArchitectMidpointTracking.align(
+      raw: raw,
+      radius: radius,
+      references: references,
+      anchor: anchor,
+    );
+    if (tracked != null) {
+      return ArchitectSnapResult(
+        point: tracked.point,
+        isSnapped: true,
+        snapLabel: 'Midpoint alignment',
+        magneticGuides: tracked.guides,
       );
     }
     if (anchor != null) {

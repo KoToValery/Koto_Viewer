@@ -1,5 +1,4 @@
 import 'package:kotoview/src/features/architect/rendering/architect_vector_scene.dart';
-import 'package:kotoview/src/features/architect/models/architect_document.dart';
 import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_elements_painter_helper.dart';
@@ -8,6 +7,9 @@ import 'package:kotoview/src/features/bim_projects/controllers/bim_viewport_cont
 import 'package:kotoview/src/features/bim_projects/models/bim_coordinate_frame.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/architect/models/architect_column.dart';
+import 'package:kotoview/src/features/architect/models/architect_grid_axis.dart';
+import 'package:kotoview/src/features/architect/models/architect_project.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_grid_axis_painter_helper.dart';
 
 class CountingCanvas implements Canvas {
   int lines = 0;
@@ -27,6 +29,77 @@ DxfDocument document(List<DxfEntity> entities, Rect bounds) => DxfDocument(
 );
 
 void main() {
+  test('Axis labels retain screen size with their bubbles while zooming', () {
+    final project = ArchitectProject(
+      id: 'axes',
+      name: 'Axes',
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+      activeStoreyId: 's',
+      storeys: const [ArchitectStorey(id: 's', name: 'Storey')],
+      gridAxes: const [
+        StructuralGridAxis(
+          id: 'axis',
+          name: 'A',
+          start: Offset.zero,
+          end: Offset(6, 0),
+        ),
+      ],
+    );
+    final screenWidths = <double>[];
+    for (final zoom in [20.0, 80.0, 320.0]) {
+      final canvas = ArchitectVectorCanvas()..scale(zoom);
+      ArchitectTextScope(const ArchitectDocument(), 'plan:s', 50, zoom).run(() {
+        ArchitectGridAxisPainterHelper.drawAxes(
+          canvas: canvas,
+          project: project,
+          zoomScale: zoom,
+        );
+      });
+      final labels = canvas.operations
+          .whereType<ArchitectVectorText>()
+          .toList();
+      expect(labels, hasLength(2));
+      expect(labels.every((t) => t.sources.contains('axis')), isTrue);
+      expect(labels.first.size, closeTo(10.5, 1e-8));
+      screenWidths.add(labels.first.bounds.width);
+      expect(
+        canvas.operations.whereType<ArchitectVectorPath>().any(
+          (p) =>
+              (p.bounds.width - 24).abs() < 1e-8 &&
+              (p.bounds.height - 24).abs() < 1e-8,
+        ),
+        isTrue,
+      );
+    }
+    expect(screenWidths[1], closeTo(screenWidths[0], 1e-8));
+    expect(screenWidths[2], closeTo(screenWidths[0], 1e-8));
+    // Print previews and export keep real paper sizes, independently of zoom.
+    for (final denominator in [50, 100]) {
+      for (final zoom in [20.0, 320.0]) {
+        final canvas = ArchitectVectorCanvas()..scale(zoom);
+        ArchitectTextScope(
+          const ArchitectDocument(),
+          'plan:s',
+          denominator,
+          zoom,
+          publication: true,
+        ).run(() {
+          ArchitectGridAxisPainterHelper.drawAxes(
+            canvas: canvas,
+            project: project,
+            zoomScale: zoom,
+          );
+        });
+        final text = canvas.operations.whereType<ArchitectVectorText>().first;
+        expect(
+          ArchitectDrawingScale(denominator).modelToPaper(text.size / zoom) *
+              ArchitectDrawingScale.fontCapRatio,
+          closeTo(denominator == 50 ? 1.5 : 2.2, 1e-8),
+        );
+      }
+    }
+  });
   test('Column text follows model geometry rather than camera pixels', () {
     final widths = <double>[];
     for (final zoom in [40.0, 160.0]) {
