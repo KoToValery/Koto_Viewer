@@ -1,3 +1,4 @@
+import '../rendering/architect_vector_scene.dart';
 import '../rendering/architect_opening_plan_painter.dart';
 import '../rendering/architect_canvas_palette.dart';
 // === SECTION: ARCHITECTURAL PARAMETRIC FENESTRATION MODEL ===
@@ -887,7 +888,7 @@ class ArchitectFenestrationStyle {
           ? '$wCm/$hCm'
           : '$wCm/$hCm\nh=$sillCm';
 
-      final tp = TextPainter(
+      final tp = ArchitectTextPainter(
         text: TextSpan(
           text: text,
           style: TextStyle(
@@ -1298,7 +1299,7 @@ class ArchitectFenestrationStyle {
       final centerP = toCanvas(inX + inW / 2, inY + inH / 2);
       final dimStr =
           '${(rect.width * 100).round()} × ${(rect.height * 100).round()} cm';
-      final dimTp = TextPainter(
+      final dimTp = ArchitectTextPainter(
         text: TextSpan(
           text: dimStr,
           style: const TextStyle(
@@ -1353,7 +1354,7 @@ class ArchitectFenestrationStyle {
         canvas.drawLine(Offset(sX1, subY - 3), Offset(sX1, subY + 3), dimPaint);
         canvas.drawLine(Offset(sX2, subY - 3), Offset(sX2, subY + 3), dimPaint);
         final sText = '${((slice.right - slice.left) * 100).round()}';
-        final sTp = TextPainter(
+        final sTp = ArchitectTextPainter(
           text: TextSpan(
             text: sText,
             style: const TextStyle(
@@ -1377,7 +1378,7 @@ class ArchitectFenestrationStyle {
     canvas.drawLine(Offset(bX2, bY - 4), Offset(bX2, bY + 4), dimPaint);
 
     final wText = '${(defaultWidth * 100).round()} cm';
-    final wPainter = TextPainter(
+    final wPainter = ArchitectTextPainter(
       text: TextSpan(
         text: wText,
         style: const TextStyle(
@@ -1402,7 +1403,7 @@ class ArchitectFenestrationStyle {
     canvas.drawLine(Offset(lX - 4, lY2), Offset(lX + 4, lY2), dimPaint);
 
     final hText = '${(defaultHeight * 100).round()} cm';
-    final hPainter = TextPainter(
+    final hPainter = ArchitectTextPainter(
       text: TextSpan(
         text: hText,
         style: const TextStyle(

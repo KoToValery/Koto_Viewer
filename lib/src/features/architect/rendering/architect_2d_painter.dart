@@ -1,3 +1,4 @@
+import 'architect_vector_scene.dart';
 import '../models/architect_wall_type.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import 'architect_canvas_palette.dart';
@@ -67,6 +68,7 @@ class Architect2dPainter extends CustomPainter {
   final BimViewportController? viewport;
   final ArchitectPaintLayer layer;
   final bool paintGrid;
+  final String? drawingViewKey;
   final ArchitectCanvasPalette palette;
   final AppLocalizations? l10n;
   final ArchitectTool activeTool;
@@ -178,6 +180,7 @@ class Architect2dPainter extends CustomPainter {
     this.l10n,
     this.layer = ArchitectPaintLayer.all,
     this.paintGrid = true,
+    this.drawingViewKey,
     this.palette = const ArchitectCanvasPalette.light(),
     this.activeOvershoot,
     this.upperOverhangs,
@@ -268,6 +271,13 @@ class Architect2dPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (ArchitectTextScope.current == null) {
+      final key = drawingViewKey ?? 'plan:${_project.activeStoreyId}';
+      final denominator = _project.document.viewScales[key] ?? _project.dimensionScale.denominator;
+      ArchitectTextScope(_project.document, key, denominator, zoomScale, units: _project.units, decimals: _project.distanceDecimals).run(() => _paint(canvas, size));
+    } else { _paint(canvas, size); }
+  }
+  void _paint(Canvas canvas, Size size) {
     canvas.save();
     if (viewport != null) {
       canvas.translate(viewport!.translation.dx, viewport!.translation.dy);
@@ -914,6 +924,7 @@ class Architect2dPainter extends CustomPainter {
   void _drawWalls(Canvas canvas) {
     final activeStorey = project.activeStorey;
 
+    architectDrawingSources(canvas, activeStorey.walls.map((w) => w.id), 'wall');
     final wallBorderPaint = Paint()
       ..color = palette.foreground(const Color(0xFF212121))
       ..strokeWidth = ArchitectLineWeights.cutHeavy / zoomScale
@@ -1035,7 +1046,7 @@ class Architect2dPainter extends CustomPainter {
     }
     for(final material in layers.materials.where((r)=>r.wall.layers.isNotEmpty||r.wall.plinth.enabled)) {
       final region=material.path;
-      canvas.drawPath(region,Paint()..color=material.layer.material.color.withValues(alpha:.18));
+      canvas.drawPath(region,Paint()..color=material.layer.material.color.withValues(alpha:.06));
       if(material.layer.role==ArchitectLayerRole.core) {
         ArchitectWallHatch.paint(canvas,material.wall,region,zoomScale,hatchColor,material:WallCoreMaterial.values.where((m)=>m.name==material.layer.material.name).firstOrNull);
       }
@@ -1088,7 +1099,7 @@ class Architect2dPainter extends CustomPainter {
           Paint()..color = const Color(0xFFFFB74D),
         );
         if (dotRadius * zoomScale >= 4.5) {
-          final marker = TextPainter(
+          final marker = ArchitectTextPainter(
             text: TextSpan(
               text: gap.atStart! ? '1' : '2',
               style: TextStyle(
@@ -1177,7 +1188,7 @@ class Architect2dPainter extends CustomPainter {
         canvas.drawLine(point - tick, point + tick, dimPaint);
       }
       if (showOpeningClearanceBadges && gap.distance >= 0.01) {
-        final tp = TextPainter(
+        final tp = ArchitectTextPainter(
           text: TextSpan(
             text: _project.formatLength(gap.distance),
             style: TextStyle(
@@ -1543,7 +1554,7 @@ class Architect2dPainter extends CustomPainter {
         ),
       );
 
-      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)
+      final tp = ArchitectTextPainter(text: textSpan, textDirection: TextDirection.ltr)
         ..layout();
 
       final badge = ArchitectDimensionLayout.wallBadge(

@@ -1,3 +1,5 @@
+import 'architect_document.dart';
+export 'architect_document.dart';
 import 'architect_slab_assembly.dart';
 import 'architect_roof.dart';
 export 'architect_roof.dart';
@@ -21,8 +23,11 @@ typedef ArchitectUnit = BimDistanceUnit;
 
 /// Paper-space dimension text sizes; model geometry is always in metres.
 enum ArchitectDimensionScale {
+  scale20(20, 1.5),
   scale50(50, 1.5),
-  scale100(100, 2.2);
+  scale100(100, 2.2),
+  scale200(200, 2.2),
+  scale500(500, 2.2);
 
   final int denominator;
   final double textHeightMm;
@@ -276,6 +281,7 @@ class ArchitectProject {
   final ArchitectUnit units;
   final int distanceDecimals;
   final ArchitectDimensionScale dimensionScale;
+  final ArchitectDocument document;
   final List<ArchitectStorey> storeys;
   final String activeStoreyId;
   final List<StructuralGridAxis> gridAxes;
@@ -295,6 +301,7 @@ class ArchitectProject {
     this.units = ArchitectUnit.meters,
     this.distanceDecimals = 2,
     this.dimensionScale = ArchitectDimensionScale.scale100,
+    this.document = const ArchitectDocument(),
     required this.storeys,
     required this.activeStoreyId,
     this.gridAxes = const [],
@@ -408,6 +415,7 @@ class ArchitectProject {
     ArchitectUnit? units,
     int? distanceDecimals,
     ArchitectDimensionScale? dimensionScale,
+    ArchitectDocument? document,
     List<ArchitectStorey>? storeys,
     String? activeStoreyId,
     List<StructuralGridAxis>? gridAxes,
@@ -427,6 +435,7 @@ class ArchitectProject {
     units: units ?? this.units,
     distanceDecimals: distanceDecimals ?? this.distanceDecimals,
     dimensionScale: dimensionScale ?? this.dimensionScale,
+    document: document ?? this.document,
     storeys: storeys ?? this.storeys,
     activeStoreyId: activeStoreyId ?? this.activeStoreyId,
     gridAxes: gridAxes ?? this.gridAxes,
@@ -448,6 +457,7 @@ class ArchitectProject {
     'units': units.name,
     'distanceDecimals': distanceDecimals,
     'dimensionScale': dimensionScale.denominator,
+    'document': document.toJson(),
     'storeys': storeys.map((s) => s.toJson()).toList(),
     'activeStoreyId': activeStoreyId,
     'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
@@ -469,6 +479,7 @@ class ArchitectProject {
         DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
     updatedAt:
         DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
+    document: ArchitectDocument.fromProjectJson(json),
     units: ArchitectUnit.values.firstWhere(
       (u) => u.name == json['units'],
       orElse: () => ArchitectUnit.meters,

@@ -1,3 +1,4 @@
+import 'architect_vector_scene.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. Committed Roof Planes 2D Painter (Hatch, Eaves Overhang Dashed Line, Ridge/Hip Edges, Slope Arrow & Badge)
 // 2. Interactive Roof Drafting Preview (Rubber-band Polygon, Edge Dimensions, Snap Guides)
@@ -65,6 +66,7 @@ class ArchitectRoofPainterHelper {
     if (storey.roofs.isEmpty) return;
 
     for (final roof in storey.roofs) {
+      architectDrawingSources(canvas, {roof.id}, 'roof');
       if (roof.points.length < 3) continue;
       final isSelected = !isGhost && !isLowerLevel && selectedIds.contains(roof.id);
       final path = Path()..addPolygon(roof.points, true);
@@ -83,7 +85,7 @@ class ArchitectRoofPainterHelper {
       // Lower level roofs use softer alpha
       final fillAlpha = isGhost
           ? 0.05
-          : (isLowerLevel ? 0.07 : (isSelected ? 0.22 : 0.12));
+          : (isLowerLevel ? 0.04 : (isSelected ? 0.12 : 0.06));
       canvas.drawPath(
         path,
         Paint()
@@ -211,6 +213,8 @@ class ArchitectRoofPainterHelper {
     bool isSelected = false,
     bool isLowerLevel = false,
   }) {
+    final scope = ArchitectTextScope.current;
+    if (scope != null) scale = 11 / scope.height(roof.id, ArchitectAnnotationRole.symbol);
     final center = roof.centroid;
     final dir = roof.slopeDirection;
     final arrowHalfLen = 18.0 / scale;
@@ -260,16 +264,17 @@ class ArchitectRoofPainterHelper {
     final pctText = roof.slopePercent.round();
     final ridgeZ = storey.elevation + roof.ridgeTopElevation;
     final sign = ridgeZ >= 0 ? '+' : '';
+    final ridgeLabel = scope?.length(ridgeZ) ?? ridgeZ.toStringAsFixed(2);
     final label = isLowerLevel
-        ? '${storey.elevationLabel}  $degText°'
-        : '$degText° ($pctText%)  $sign${ridgeZ.toStringAsFixed(2)}';
+        ? '${scope?.length(storey.elevation) ?? storey.elevationLabel}  $degText°'
+        : '$degText° ($pctText%)  $sign$ridgeLabel';
 
     final fontSize = 11.0 / scale;
-    final tp = TextPainter(
+    final tp = ArchitectTextPainter(elementId: roof.id, role: ArchitectAnnotationRole.symbol, modelScale: 1,
       text: TextSpan(
         text: label,
         style: TextStyle(
-          color: isLowerLevel ? const Color(0xFF80DEEA) : Colors.white,
+          color: ArchitectPaperStyle.ink,
           fontSize: fontSize,
           fontWeight: FontWeight.w600,
         ),
@@ -292,9 +297,7 @@ class ArchitectRoofPainterHelper {
     canvas.drawRRect(
       bgRect,
       Paint()
-        ..color = isLowerLevel
-            ? const Color(0xDD1A262E)
-            : const Color(0xCC1E2229),
+        ..color = ArchitectPaperStyle.paper,
     );
     if (isLowerLevel) {
       canvas.drawRRect(
@@ -382,7 +385,7 @@ class ArchitectRoofPainterHelper {
           final mid = (a + b) / 2.0;
           final text = units.format(len, decimals: decimals);
           final fontSize = (10.5 / scale).clamp(0.08, 0.28);
-          final tp = TextPainter(
+          final tp = ArchitectTextPainter(
             text: TextSpan(
               text: text,
               style: TextStyle(

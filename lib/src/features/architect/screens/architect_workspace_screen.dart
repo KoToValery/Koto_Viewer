@@ -1,3 +1,7 @@
+import '../widgets/architect_sheets_screen.dart';
+import '../widgets/architect_annotation_settings.dart';
+import '../services/architect_drawing_publisher.dart';
+import '../rendering/architect_vector_scene.dart';
 import '../widgets/architect_wall_types_manager.dart';
 import '../widgets/architect_wall_composition_editor.dart';
 import '../widgets/architect_wall_radius_dialog.dart';
@@ -164,6 +168,225 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   set _project(ArchitectProject value) => _commands.commit(value);
   final Map<ArchitectWorkspaceView, String> _lastViewIds = {};
   final Map<String, ({double scale, Offset translation})> _viewCameras = {};
+  bool _printPreview = false;
+  final _scaledProjects = Expando<Map<int, ArchitectProject>>();
+  ArchitectProject _withDrawingScale(ArchitectProject source) {
+    final n = _publicationScale;
+    if (source.dimensionScale.denominator == n) return source;
+    return (_scaledProjects[source] ??= {}).putIfAbsent(
+      n,
+      () => source.copyWith(
+        dimensionScale: ArchitectDimensionScale.values.firstWhere(
+          (s) => s.denominator == n,
+        ),
+      ),
+    );
+  }
+
+  ArchitectPublicationSources get _publicationSources =>
+      ArchitectPublicationSources(
+        underlays: _showUnderlay ? _underlaysByStorey : const {},
+        frame: widget.underlayFrame,
+        visibility: _underlayLayerVisibility,
+      );
+  int get _publicationScale =>
+      _modelCommands.project.document.viewScales[_workspaceViewKey] ??
+      _project.dimensionScale.denominator;
+  ArchitectSavedDrawing get _publicationView => ArchitectSavedDrawing(
+    id: _workspaceViewKey,
+    sourceId: _commands.isPlan
+        ? _modelCommands.project.activeStoreyId
+        : _commands.viewId!,
+    kind: ArchitectDrawingKind.values.byName(_commands.view.name),
+    scale: _publicationScale,
+  );
+  Future<void> _openSheets() async {
+    final drawing = await Navigator.push<ArchitectSavedDrawing>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ArchitectSheetsScreen(
+          controller: _modelCommands,
+          sources: _publicationSources,
+        ),
+      ),
+    );
+    if (drawing != null && mounted) {
+      _selectWorkspaceView(
+        ArchitectWorkspaceView.values.byName(drawing.kind.name),
+        drawing.sourceId,
+      );
+    }
+  }
+
+  Widget _publicationToolbar({bool compact = false}) {
+    final l = context.l10n;
+    final available = _commands.hasView && !_is3DView;
+    void action(String key) {
+      if (key == 'sheets') _openSheets();
+      if (key == 'model') setState(() => _printPreview = false);
+      if (key == 'preview' && available) {
+        _cancelDrafting();
+        _clearSelection();
+        setState(() => _printPreview = !_printPreview);
+      }
+      if (key == 'annotations' && available) {
+        showArchitectAnnotationSettings(
+          context,
+          _modelCommands,
+          _publicationView,
+          _publicationScale,
+        );
+      }
+    }
+
+    final scale = DropdownButton<int>(
+      isExpanded: compact,
+      value: _publicationScale,
+      dropdownColor: const Color(0xFF1E1E26),
+      style: const TextStyle(color: Colors.white, fontSize: 12),
+      iconEnabledColor: Colors.white70,
+      underline: const SizedBox.shrink(),
+      items: [
+        for (final n in ArchitectDrawingScale.presets)
+          DropdownMenuItem(value: n, child: Text('1:$n')),
+      ],
+      onChanged: available
+          ? (n) {
+              if (n == null) return;
+              final p = _modelCommands.project;
+              _modelCommands.replaceView(
+                p.copyWith(
+                  document: p.document.copyWith(
+                    viewScales: {
+                      ...p.document.viewScales,
+                      _workspaceViewKey: n,
+                    },
+                  ),
+                ),
+              );
+              setState(() {});
+            }
+          : null,
+    );
+    if (compact) {
+      return Row(
+        children: [
+          Expanded(child: scale),
+          PopupMenuButton<String>(
+            tooltip: l.architectSheets,
+            icon: const Icon(Icons.layers_outlined, color: Colors.white),
+            onSelected: action,
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'model', child: Text(l.architectModel)),
+              PopupMenuItem(value: 'sheets', child: Text(l.architectSheets)),
+              PopupMenuItem(
+                value: 'preview',
+                enabled: available,
+                child: Text(l.architectPrintPreview),
+              ),
+              PopupMenuItem(
+                value: 'annotations',
+                enabled: available,
+                child: Text(l.architectAnnotationSettings),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.white),
+            onPressed: () => action('model'),
+            child: Text(l.architectModel),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.white),
+            onPressed: () => action('sheets'),
+            child: Text(l.architectSheets),
+          ),
+          scale,
+          IconButton(
+            color: Colors.white,
+            tooltip: l.architectPrintPreview,
+            onPressed: available ? () => action('preview') : null,
+            icon: Icon(_printPreview ? Icons.visibility : Icons.print_outlined),
+          ),
+          IconButton(
+            color: Colors.white,
+            tooltip: l.architectAnnotationSettings,
+            onPressed: available ? () => action('annotations') : null,
+            icon: const Icon(Icons.text_fields),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _workspaceNavigationBar() {
+    final compact = MediaQuery.sizeOf(context).width < 800;
+    return Material(
+      color: const Color(0xFF1E1E26),
+      child: SizedBox(
+        height: 48,
+        child: Row(
+          children: [
+            Expanded(
+              child: ArchitectWorkspaceViewBar(
+                project: _modelCommands.project,
+                view: _commands.view,
+                viewId: _commands.viewId,
+                lastViewIds: _lastViewIds,
+                onSelected: _selectWorkspaceView,
+                onManage: _manageWorkspaceViews,
+              ),
+            ),
+            SizedBox(
+              width: compact ? 120 : 340,
+              child: _publicationToolbar(compact: compact),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPublicationCanvas() {
+    final scene = ArchitectDrawingPublisher.build(
+      _modelCommands.project,
+      _publicationView,
+      _publicationScale,
+      context.l10n,
+      sources: _publicationSources,
+    );
+    return ColoredBox(
+      color: Colors.white,
+      child: ArchitectViewport(
+        controller: _viewport,
+        singlePointerPan: true,
+        isDraggingHandle: () => false,
+        onToolDown: (_) {},
+        onToolMove: (_) {},
+        onToolHover: (_) {},
+        onToolUp: (_) {},
+        onToolCancel: () {},
+        onFirstLayout: (_) {},
+        child: AnimatedBuilder(
+          animation: _viewport,
+          builder: (_, _) => CustomPaint(
+            painter: _PublicationPreviewPainter(
+              scene,
+              _viewport.scale,
+              _viewport.translation,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
   ArchitectProject? _projectionSource;
   String? _projectionKey;
   ArchitectBuildingElevation? _facadeGeometry;
@@ -237,7 +460,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset _modelToSection(Offset rawModel) => Offset(rawModel.dx, -rawModel.dy);
 
   ArchitectProject get _projectionModelProject {
-    final base = _modelCommands.project;
+    final base = _withDrawingScale(_modelCommands.project);
     if (_selectedSectionRoofId == null ||
         _sectionRoofDragPreviewOffset == null) {
       return base;
@@ -316,20 +539,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   CustomPainter? get _workspaceProjectionPainter {
     _cacheProjection();
+    final scope = ArchitectTextScope(_project.document, _workspaceViewKey, _publicationScale, _viewport.scale, units: _project.units, decimals: _project.distanceDecimals);
     final centre = _viewport.visibleRect.center;
     final upCentre = Offset(centre.dx, -centre.dy);
     if (_facadeGeometry != null) {
-      return ArchitectFacadePainter(
+      return ArchitectStyledPainter(ArchitectFacadePainter(
         _facadeGeometry!, upCentre, _viewport.scale,
         fill: _canvasPalette.background,
         stroke: _canvasPalette.foreground(Colors.black),
-        fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily,
-      );
+        fontFamily: 'ArchitectNoto',
+      ), scope);
     }
     final drawing = _workspaceSectionDrawing;
     return drawing == null
         ? null
-        : ArchitectBuildingSectionPainter(drawing, upCentre, _viewport.scale);
+        : ArchitectStyledPainter(ArchitectBuildingSectionPainter(drawing, upCentre, _viewport.scale), scope);
   }
   Widget _nativeProjectionEditor() => AnimatedBuilder(
     animation: Listenable.merge([_viewport, _modelCommands]),
@@ -2311,6 +2535,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _project.activeStorey.zoneScheduleOrigin != null &&
         _project.activeStorey.zones.isNotEmpty) {
       final tableBounds = ArchitectZonePainterHelper.getZoneTableBounds(
+        project: _modelCommands.project,
+        l10n: context.l10n,
+        viewKey: _workspaceViewKey,
         storey: _project.activeStorey,
         origin: _project.activeStorey.zoneScheduleOrigin!,
         zoomScale: _currentScale,
@@ -10308,14 +10535,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 ),
           body: Column(
             children: [
-              ArchitectWorkspaceViewBar(
-                project: _modelCommands.project,
-                view: _commands.view,
-                viewId: _commands.viewId,
-                lastViewIds: _lastViewIds,
-                onSelected: _selectWorkspaceView,
-                onManage: _manageWorkspaceViews,
-              ),
+              _workspaceNavigationBar(),
 
               // Main Viewport (2D Canvas or 3D Solid Model)
               Expanded(
@@ -10323,7 +10543,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   children: [
                     _is3DView ? _build3DViewport() : !_commands.hasView
                         ? Center(child: Text(l10n.architectViewDrawingEmpty))
-                        : _build2DCanvas(),
+                        : (_printPreview ? _buildPublicationCanvas() : _build2DCanvas()),
                     if (_activeTool == ArchitectTool.zone &&
                         !_is3DView &&
                         _radialMenuScreenPosition == null &&
@@ -11850,7 +12070,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         palette: _canvasPalette,
         paintGrid: _showDrawingGrid,
         showUpperOverhangs: _showUpperOverhangs,
-        project: _drawingProject,
+        project: _withDrawingScale(_drawingProject),
+        drawingViewKey: _workspaceViewKey,
         viewport: _viewport,
         layer: layer,
         activeTool: _effectiveSelection.isEmpty
@@ -12005,4 +12226,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     project: _modelCommands.project,
     controller: _camera3D,
   );
+}
+
+class _PublicationPreviewPainter extends CustomPainter {
+  final ArchitectVectorScene scene;
+  final double zoom;
+  final Offset translation;
+  _PublicationPreviewPainter(this.scene, this.zoom, this.translation);
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.clipRect(Offset.zero & size);
+    canvas.translate(translation.dx, translation.dy);
+    canvas.scale(zoom * scene.denominator / 1000);
+    scene.paint(canvas);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PublicationPreviewPainter old) =>
+      old.scene != scene || old.zoom != zoom || old.translation != translation;
 }

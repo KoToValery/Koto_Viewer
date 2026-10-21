@@ -1,3 +1,5 @@
+import 'package:kotoview/src/features/architect/rendering/architect_vector_scene.dart';
+import 'package:kotoview/src/features/architect/models/architect_document.dart';
 import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_elements_painter_helper.dart';
@@ -25,44 +27,33 @@ DxfDocument document(List<DxfEntity> entities, Rect bounds) => DxfDocument(
 );
 
 void main() {
-  test(
-    'Column text remains a readable pixel-sized label at different camera scales',
-    () async {
-      for (final scale in [40.0, 160.0]) {
-        final recorder = PictureRecorder();
-        final canvas = Canvas(recorder)
-          ..translate(250, 250)
-          ..scale(scale);
-        const column = ArchitectColumn(
-          id: 'col',
-          position: Offset.zero,
-          width: .4,
-          depth: .4,
-        );
-        column.paint2D(canvas: canvas, zoomScale: scale);
-        final picture = recorder.endRecording();
-        final image = await picture.toImage(500, 500);
-        final data = (await image.toByteData(format: ImageByteFormat.rawRgba))!;
-        var left = 500, right = 0;
-        for (var y = 235; y < 265; y++) {
-          for (var x = 0; x < 500; x++) {
-            final offset = (y * 500 + x) * 4;
-            if (data.getUint8(offset) == 255 &&
-                data.getUint8(offset + 1) == 255 &&
-                data.getUint8(offset + 2) == 255 &&
-                data.getUint8(offset + 3) > 128) {
-              if (x < left) left = x;
-              if (x > right) right = x;
-            }
-          }
-        }
-        expect(right, greaterThan(left));
-        expect(right - left, lessThan(80));
-        image.dispose();
-        picture.dispose();
-      }
-    },
-  );
+  test('Column text follows model geometry rather than camera pixels', () {
+    final widths = <double>[];
+    for (final zoom in [40.0, 160.0]) {
+      final canvas = ArchitectVectorCanvas()..scale(zoom);
+      const column = ArchitectColumn(
+        id: 'col',
+        position: Offset.zero,
+        width: .4,
+        depth: .4,
+      );
+      ArchitectTextScope(
+        const ArchitectDocument(),
+        'plan:s',
+        50,
+        zoom,
+      ).run(() => column.paint2D(canvas: canvas, zoomScale: zoom));
+      final label = canvas.operations
+          .whereType<ArchitectVectorText>()
+          .firstWhere((e) => e.role == 'dimension');
+      widths.add(label.bounds.width);
+      expect(
+        label.size / zoom * 20 * ArchitectDrawingScale.fontCapRatio,
+        closeTo(1.5, 1e-8),
+      );
+    }
+    expect(widths[1] / widths[0], closeTo(4, 1e-5));
+  });
 
   test(
     '10,000-entity underlay renders only geometry intersecting the camera',

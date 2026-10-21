@@ -3799,16 +3799,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectZoneTableActionPlace => 'Place Table';
 
   @override
-  String get architectZoneFloorLaminate => 'Laminate Flooring';
+  String get architectZoneFloorLaminate => 'Laminate';
 
   @override
-  String get architectZoneFloorGranite => 'Granite Tiles';
+  String get architectZoneFloorGranite => 'Porcelain tile';
 
   @override
-  String get architectZoneFloorTerracotta => 'Terracotta Tiles';
+  String get architectZoneFloorTerracotta => 'Terracotta';
 
   @override
-  String get architectZoneFloorParquet => 'Natural Parquet';
+  String get architectZoneFloorParquet => 'Parquet';
 
   @override
   String get architectZoneFloorCarpet => 'Carpet';
@@ -3817,13 +3817,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectZoneFloorConcrete => 'Polished Concrete';
 
   @override
-  String get architectZoneWallLatex => 'Plaster & Latex';
+  String get architectZoneWallLatex => 'Latex paint';
 
   @override
-  String get architectZoneWallFaience => 'Faience Tiles';
+  String get architectZoneWallFaience => 'Faience';
 
   @override
-  String get architectZoneWallPlaster => 'Decorative Plaster';
+  String get architectZoneWallPlaster => 'Dec. plaster';
 
   @override
   String get architectZoneWallWallpaper => 'Wallpaper';
@@ -3832,7 +3832,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectZoneWallExposedBrick => 'Exposed Brick';
 
   @override
-  String get architectZoneCeilingLatex => 'Plaster & Latex';
+  String get architectZoneCeilingLatex => 'Latex paint';
 
   @override
   String get architectZoneCeilingGypsum => 'Gypsum Board';
@@ -6612,4 +6612,235 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectZoneBoundaryRepaired => 'Boundary crossings corrected.';
+
+  @override
+  String get architectSheets => 'Sheets';
+
+  @override
+  String get architectModel => 'Model';
+
+  @override
+  String get architectSheetName => 'Sheet';
+
+  @override
+  String get architectSheetPlan => 'Plan';
+
+  @override
+  String get architectSheetAdd => 'Add sheet';
+
+  @override
+  String get architectSheetProperties => 'Sheet properties';
+
+  @override
+  String get architectSheetPlace => 'Place view';
+
+  @override
+  String get architectSheetEdit => 'Properties';
+
+  @override
+  String get architectSheetDuplicate => 'Duplicate';
+
+  @override
+  String get architectSheetDelete => 'Delete';
+
+  @override
+  String get architectSheetLock => 'Lock';
+
+  @override
+  String get architectSheetUnlock => 'Unlock';
+
+  @override
+  String get architectSheetTemplate => 'Title block';
+
+  @override
+  String get architectSheetExport => 'Export PDF';
+
+  @override
+  String get architectSheetPrint => 'Print';
+
+  @override
+  String get architectSheetMissingSource =>
+      'Missing source. Relink or remove this drawing before export.';
+
+  @override
+  String get architectSheetMixedScales => 'Various';
+
+  @override
+  String get architectSheetFormat => 'Format';
+
+  @override
+  String get architectSheetCustom => 'Custom';
+
+  @override
+  String get architectSheetWidth => 'Width (mm)';
+
+  @override
+  String get architectSheetHeight => 'Height (mm)';
+
+  @override
+  String get architectSheetMargin => 'Margin (mm)';
+
+  @override
+  String get architectSheetNumber => 'Number';
+
+  @override
+  String get architectSheetAuthor => 'Author';
+
+  @override
+  String get architectSheetDate => 'Date';
+
+  @override
+  String get architectSheetNameField => 'Name';
+
+  @override
+  String get architectSheetSave => 'Save';
+
+  @override
+  String get architectSheetCancel => 'Cancel';
+
+  @override
+  String get architectSheetScale => 'Scale';
+
+  @override
+  String get architectSheetX => 'X (mm)';
+
+  @override
+  String get architectSheetY => 'Y (mm)';
+
+  @override
+  String get architectSheetAnchorX => 'Source X';
+
+  @override
+  String get architectSheetAnchorY => 'Source Y';
+
+  @override
+  String get architectSheetRotation => 'Rotation (°)';
+
+  @override
+  String get architectSheetTitle => 'Show title';
+
+  @override
+  String get architectSheetSource => 'Source';
+
+  @override
+  String get architectSheetAlign => 'Align';
+
+  @override
+  String get architectSheetLeft => 'Left';
+
+  @override
+  String get architectSheetRight => 'Right';
+
+  @override
+  String get architectSheetTop => 'Top';
+
+  @override
+  String get architectSheetBottom => 'Bottom';
+
+  @override
+  String get architectSheetSelect => 'Select sheets in export order';
+
+  @override
+  String get architectSheetInvalid =>
+      'Enter valid positive sizes and keep the margin inside the sheet.';
+
+  @override
+  String get architectSheetExportFailed => 'PDF export failed.';
+
+  @override
+  String get architectSheetNoViews => 'No views available.';
+
+  @override
+  String get architectSheetAddCell => 'Add cell';
+
+  @override
+  String get architectSheetField => 'Field';
+
+  @override
+  String get architectSheetBorder => 'Border';
+
+  @override
+  String get architectSheetText => 'Text';
+
+  @override
+  String get architectSheetProject => 'Project';
+
+  @override
+  String get architectSheetDrawing => 'Drawing';
+
+  @override
+  String get architectPrintPreview => 'Print preview';
+
+  @override
+  String get architectAnnotationSettings => 'Annotations';
+
+  @override
+  String get architectAnnotationSize => 'Size on paper (mm)';
+
+  @override
+  String get architectAnnotationReset => 'Use profile';
+
+  @override
+  String get architectAnnotationProfile => 'Profile';
+
+  @override
+  String get architectAnnotationElement => 'Individual annotation';
+
+  @override
+  String get architectAnnotationOrdinary => 'Labels';
+
+  @override
+  String get architectAnnotationDimension => 'Dimensions';
+
+  @override
+  String get architectAnnotationArea => 'Areas';
+
+  @override
+  String get architectAnnotationRoomName => 'Room names';
+
+  @override
+  String get architectAnnotationTitle => 'Titles';
+
+  @override
+  String get architectAnnotationTable => 'Tables';
+
+  @override
+  String get architectAnnotationSymbol => 'Symbols';
+
+  @override
+  String get architectSheetVisibility => 'Visibility';
+
+  @override
+  String get architectSheetAxes => 'Axes';
+
+  @override
+  String get architectSheetZones => 'Zones';
+
+  @override
+  String get architectSheetDimensions => 'Dimensions';
+
+  @override
+  String get architectSheetAnnotations => 'Text';
+
+  @override
+  String get architectSheetMarkers => 'Markers';
+
+  @override
+  String get architectSheetEmpty =>
+      'Create a sheet, then place a plan, section or elevation.';
+
+  @override
+  String get architectSheetSaveView => 'Save view';
+
+  @override
+  String get architectSheetTemplateName => 'Template name';
+
+  @override
+  String architectAreaWithUnit(String unit) {
+    return 'Area ($unit²)';
+  }
+
+  @override
+  String get architectSheetTemplateOverflow =>
+      'Title block text exceeds its cell. Enlarge the cell before export.';
 }

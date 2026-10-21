@@ -1,3 +1,4 @@
+import 'architect_vector_scene.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/architect_project.dart';
@@ -148,7 +149,7 @@ class ArchitectPolygonPainter {
     final u = delta / delta.distance;
     final text =
         unit.format(delta.distance, decimals: decimals);
-    final tp = TextPainter(
+    final tp = ArchitectTextPainter(
       text: TextSpan(
         text: text,
         style: const TextStyle(

@@ -1,3 +1,4 @@
+import '../rendering/architect_vector_scene.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -504,6 +505,7 @@ class ArchitectFacadePainter extends CustomPainter {
     canvas.clipRect(Offset.zero & size);
     // All fills precede all strokes, so shared depth boundaries remain crisp.
     for (final face in geometry.faces) {
+      architectDrawingSources(canvas, geometry.elementPaths.entries.where((e) => e.value.getBounds().overlaps(face.getBounds())).map((e) => e.key), 'elevationFace');
       canvas.drawPath(face.transform(matrix.storage), Paint()..color = fill);
     }
     for (final face in geometry.faces) {
@@ -552,7 +554,7 @@ class ArchitectFacadePainter extends CustomPainter {
       final percent = (slope.percent - slope.percent.round()).abs() < .05
           ? slope.percent.round().toString()
           : slope.percent.toStringAsFixed(1);
-      final text = TextPainter(
+      final text = ArchitectTextPainter(
         text: TextSpan(
           text: '$percent%',
           style: TextStyle(color: stroke, fontSize: 12, fontFamily: fontFamily),

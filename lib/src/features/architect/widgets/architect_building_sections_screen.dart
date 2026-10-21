@@ -1,3 +1,4 @@
+import '../rendering/architect_vector_scene.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -1139,7 +1140,7 @@ class ArchitectSectionDrawing {
     }
     var width = 0.0;
     for (final line in rows) {
-      final painter = TextPainter(
+      final painter = ArchitectTextPainter(
         text: TextSpan(
           text: line,
           style: TextStyle(fontSize: textHeight, fontFamily: fontFamily),
@@ -1199,6 +1200,7 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
     for (final region in drawing.data.drawingRegions) {
+      architectDrawingSources(canvas, drawing.data.regions.where((r) => r.material == region.material && r.path.getBounds().overlaps(region.path.getBounds())).map((r) => r.sourceId), 'sectionRegion');
       final path = region.path.transform(matrix.storage);
       final isSelectedRoof =
           drawing.selectedRoofId != null &&
@@ -1251,7 +1253,7 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
       Color c, {
       bool centred = false,
     }) {
-      final tp = TextPainter(
+      final tp = ArchitectTextPainter(
         text: TextSpan(
           text: value,
           style: TextStyle(
@@ -1310,7 +1312,7 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
           ..strokeWidth = .5,
       );
       text(
-        floor.elevationLabel,
+        ArchitectTextScope.current?.length(floor.elevation) ?? floor.elevationLabel,
         a + const Offset(2, -2),
         math.max(9, drawing.textHeight * scale),
         color,
@@ -1363,7 +1365,7 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
         final y = d.text.dy - i * d.rowHeight;
         final at = p(Offset(d.text.dx, y));
         final right = detail.textOffset.dx >= 0;
-        final tp = TextPainter(
+        final tp = ArchitectTextPainter(
           text: TextSpan(
             text: d.rows[i],
             style: TextStyle(

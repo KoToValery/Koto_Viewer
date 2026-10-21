@@ -3816,7 +3816,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneTableActionPlace => 'Постави таблица';
 
   @override
-  String get architectZoneFloorLaminate => 'Ламиниран паркет';
+  String get architectZoneFloorLaminate => 'Ламинат';
 
   @override
   String get architectZoneFloorGranite => 'Гранитогрес';
@@ -3825,7 +3825,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneFloorTerracotta => 'Теракота';
 
   @override
-  String get architectZoneFloorParquet => 'Естествен паркет';
+  String get architectZoneFloorParquet => 'Паркет';
 
   @override
   String get architectZoneFloorCarpet => 'Мокет';
@@ -3834,13 +3834,13 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneFloorConcrete => 'Шлайфан бетон';
 
   @override
-  String get architectZoneWallLatex => 'Шпакловка и латекс';
+  String get architectZoneWallLatex => 'Латекс';
 
   @override
   String get architectZoneWallFaience => 'Фаянс';
 
   @override
-  String get architectZoneWallPlaster => 'Декоративна мазилка';
+  String get architectZoneWallPlaster => 'Декор. мазилка';
 
   @override
   String get architectZoneWallWallpaper => 'Тапети';
@@ -3849,7 +3849,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneWallExposedBrick => 'Видима тухла';
 
   @override
-  String get architectZoneCeilingLatex => 'Шпакловка и латекс';
+  String get architectZoneCeilingLatex => 'Латекс';
 
   @override
   String get architectZoneCeilingGypsum => 'Гипсокартон';
@@ -6638,4 +6638,235 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectZoneBoundaryRepaired =>
       'Пресичанията на границите са коригирани.';
+
+  @override
+  String get architectSheets => 'Листове';
+
+  @override
+  String get architectModel => 'Модел';
+
+  @override
+  String get architectSheetName => 'Лист';
+
+  @override
+  String get architectSheetPlan => 'План';
+
+  @override
+  String get architectSheetAdd => 'Добави лист';
+
+  @override
+  String get architectSheetProperties => 'Свойства на листа';
+
+  @override
+  String get architectSheetPlace => 'Постави изглед';
+
+  @override
+  String get architectSheetEdit => 'Свойства';
+
+  @override
+  String get architectSheetDuplicate => 'Дублирай';
+
+  @override
+  String get architectSheetDelete => 'Изтрий';
+
+  @override
+  String get architectSheetLock => 'Заключи';
+
+  @override
+  String get architectSheetUnlock => 'Отключи';
+
+  @override
+  String get architectSheetTemplate => 'Антетка';
+
+  @override
+  String get architectSheetExport => 'Експорт PDF';
+
+  @override
+  String get architectSheetPrint => 'Печат';
+
+  @override
+  String get architectSheetMissingSource =>
+      'Липсва източник. Свържи или премахни чертежа преди експорт.';
+
+  @override
+  String get architectSheetMixedScales => 'Различни';
+
+  @override
+  String get architectSheetFormat => 'Формат';
+
+  @override
+  String get architectSheetCustom => 'Собствен';
+
+  @override
+  String get architectSheetWidth => 'Ширина (mm)';
+
+  @override
+  String get architectSheetHeight => 'Височина (mm)';
+
+  @override
+  String get architectSheetMargin => 'Поле (mm)';
+
+  @override
+  String get architectSheetNumber => 'Номер';
+
+  @override
+  String get architectSheetAuthor => 'Автор';
+
+  @override
+  String get architectSheetDate => 'Дата';
+
+  @override
+  String get architectSheetNameField => 'Име';
+
+  @override
+  String get architectSheetSave => 'Запази';
+
+  @override
+  String get architectSheetCancel => 'Отказ';
+
+  @override
+  String get architectSheetScale => 'Мащаб';
+
+  @override
+  String get architectSheetX => 'X (mm)';
+
+  @override
+  String get architectSheetY => 'Y (mm)';
+
+  @override
+  String get architectSheetAnchorX => 'Източник X';
+
+  @override
+  String get architectSheetAnchorY => 'Източник Y';
+
+  @override
+  String get architectSheetRotation => 'Завъртане (°)';
+
+  @override
+  String get architectSheetTitle => 'Показвай заглавие';
+
+  @override
+  String get architectSheetSource => 'Източник';
+
+  @override
+  String get architectSheetAlign => 'Подравни';
+
+  @override
+  String get architectSheetLeft => 'Вляво';
+
+  @override
+  String get architectSheetRight => 'Вдясно';
+
+  @override
+  String get architectSheetTop => 'Горе';
+
+  @override
+  String get architectSheetBottom => 'Долу';
+
+  @override
+  String get architectSheetSelect => 'Избери листове по реда за експорт';
+
+  @override
+  String get architectSheetInvalid =>
+      'Въведи валидни положителни размери и поле в листа.';
+
+  @override
+  String get architectSheetExportFailed => 'Неуспешен PDF експорт.';
+
+  @override
+  String get architectSheetNoViews => 'Няма налични изгледи.';
+
+  @override
+  String get architectSheetAddCell => 'Добави поле';
+
+  @override
+  String get architectSheetField => 'Поле';
+
+  @override
+  String get architectSheetBorder => 'Рамка';
+
+  @override
+  String get architectSheetText => 'Текст';
+
+  @override
+  String get architectSheetProject => 'Проект';
+
+  @override
+  String get architectSheetDrawing => 'Чертеж';
+
+  @override
+  String get architectPrintPreview => 'Преглед за печат';
+
+  @override
+  String get architectAnnotationSettings => 'Означения';
+
+  @override
+  String get architectAnnotationSize => 'Размер на хартия (mm)';
+
+  @override
+  String get architectAnnotationReset => 'По профил';
+
+  @override
+  String get architectAnnotationProfile => 'Профил';
+
+  @override
+  String get architectAnnotationElement => 'Отделно означение';
+
+  @override
+  String get architectAnnotationOrdinary => 'Надписи';
+
+  @override
+  String get architectAnnotationDimension => 'Размери';
+
+  @override
+  String get architectAnnotationArea => 'Квадратури';
+
+  @override
+  String get architectAnnotationRoomName => 'Имена на помещения';
+
+  @override
+  String get architectAnnotationTitle => 'Заглавия';
+
+  @override
+  String get architectAnnotationTable => 'Таблици';
+
+  @override
+  String get architectAnnotationSymbol => 'Символи';
+
+  @override
+  String get architectSheetVisibility => 'Видимост';
+
+  @override
+  String get architectSheetAxes => 'Оси';
+
+  @override
+  String get architectSheetZones => 'Зони';
+
+  @override
+  String get architectSheetDimensions => 'Размери';
+
+  @override
+  String get architectSheetAnnotations => 'Текст';
+
+  @override
+  String get architectSheetMarkers => 'Маркери';
+
+  @override
+  String get architectSheetEmpty =>
+      'Създай лист и постави план, разрез или фасада.';
+
+  @override
+  String get architectSheetSaveView => 'Запази изглед';
+
+  @override
+  String get architectSheetTemplateName => 'Име на шаблона';
+
+  @override
+  String architectAreaWithUnit(String unit) {
+    return 'Площ ($unit²)';
+  }
+
+  @override
+  String get architectSheetTemplateOverflow =>
+      'Текстът излиза от полето в антетката. Увеличи полето преди експорт.';
 }

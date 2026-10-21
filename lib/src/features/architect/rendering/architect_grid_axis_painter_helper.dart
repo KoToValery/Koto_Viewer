@@ -1,3 +1,4 @@
+import 'architect_vector_scene.dart';
 import 'architect_canvas_palette.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. IMPORTS & DEFINITIONS
@@ -49,6 +50,7 @@ class ArchitectGridAxisPainterHelper {
       ..style = PaintingStyle.stroke;
 
     for (final axis in project.gridAxes) {
+      architectDrawingSources(canvas, {axis.id}, 'axis');
       final isSelected = (axis.id == selectedAxisId);
 
       // If this axis is currently being stretched via handle drag, use dragged snapshot
@@ -78,6 +80,7 @@ class ArchitectGridAxisPainterHelper {
           canvas: canvas,
           center: renderAxis.start,
           label: renderAxis.name,
+          elementId: renderAxis.id,
           zoomScale: zoomScale,
           isSelected: isSelected,
         );
@@ -88,6 +91,7 @@ class ArchitectGridAxisPainterHelper {
           canvas: canvas,
           center: renderAxis.end,
           label: renderAxis.name,
+          elementId: renderAxis.id,
           zoomScale: zoomScale,
           isSelected: isSelected,
         );
@@ -160,7 +164,7 @@ class ArchitectGridAxisPainterHelper {
       for (final p in [origin, end]) {
         canvas.drawLine(p - tick, p + tick, paint);
       }
-      final tp = TextPainter(
+      final tp = ArchitectTextPainter(
         text: TextSpan(
           text: project.formatLength(neighbor.distance.abs()),
           style: TextStyle(
@@ -295,7 +299,7 @@ class ArchitectGridAxisPainterHelper {
           backgroundColor: const Color(0xCC000000),
         ),
       );
-      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)
+      final tp = ArchitectTextPainter(text: textSpan, textDirection: TextDirection.ltr)
         ..layout();
       tp.paint(
         canvas,
@@ -314,10 +318,12 @@ class ArchitectGridAxisPainterHelper {
     required double zoomScale,
     required bool isSelected,
     bool isGhost = false,
+    String? elementId,
   }) {
     canvas.save();
     canvas.translate(center.dx, center.dy);
-    canvas.scale(1.0 / zoomScale);
+    final localScale = ArchitectTextScope.current?.publication == true ? ArchitectTextScope.current!.height(elementId ?? label, ArchitectAnnotationRole.symbol) / 11 : 1 / zoomScale;
+    canvas.scale(localScale);
     center = Offset.zero;
     zoomScale = 1;
     final double bubbleRadius = 12.0 / zoomScale;
@@ -354,7 +360,7 @@ class ArchitectGridAxisPainterHelper {
       ),
     );
 
-    final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)
+    final tp = ArchitectTextPainter(elementId: elementId, role: ArchitectAnnotationRole.symbol, modelScale: localScale,text: textSpan, textDirection: TextDirection.ltr)
       ..layout();
 
     tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));

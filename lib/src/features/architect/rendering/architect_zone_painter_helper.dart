@@ -1,3 +1,4 @@
+import 'architect_vector_scene.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/generated/app_localizations.dart';
@@ -37,6 +38,7 @@ class ArchitectZonePainterHelper {
         origin: tableGhostOrigin,
         zoomScale: zoomScale,
         zoneCount: storey.zones.length,
+        storey: storey,
         l10n: l10n,
       );
     }
@@ -60,6 +62,7 @@ class ArchitectZonePainterHelper {
     if (activeStorey.zones.isEmpty) return;
 
     for (final zone in activeStorey.zones) {
+      architectDrawingSources(canvas, {zone.id}, 'zone');
       final isSelected = zone.id == selectedZoneId;
       _drawSingleZone(
         palette: palette,
@@ -115,7 +118,7 @@ class ArchitectZonePainterHelper {
 
     // 1. Pastel architectural fill
     final fillPaint = Paint()
-      ..color = zone.color.withValues(alpha: isSelected ? 0.28 : 0.16)
+      ..color = zone.color.withValues(alpha: isSelected ? 0.12 : 0.04)
       ..style = PaintingStyle.fill;
     canvas.drawPath(path, fillPaint);
 
@@ -153,42 +156,49 @@ class ArchitectZonePainterHelper {
     canvas.save();
     canvas.translate(centroid.dx, centroid.dy);
     // Fixed model-space lettering: zooming out reduces the stamp with the plan.
-    canvas.scale(1.0 / 80.0);
+    canvas.scale(ArchitectPaperStyle.annotationScale);
 
     final numberText = '№ ${zone.number.isNotEmpty ? zone.number : '1'}';
     final nameText = zone.name;
-    final areaText = '${zone.area.toStringAsFixed(2)} m²';
+    final areaText =
+        ArchitectTextScope.current?.area(zone.area) ??
+        '${zone.area.toStringAsFixed(2)} m²';
 
-    final numberSpan = TextSpan(
+    final numberSpan = ArchitectAnnotationSpan(
+      role: ArchitectAnnotationRole.ordinary,
       text: '$numberText\n',
       style: TextStyle(
-        color: zone.color,
+        color: ArchitectPaperStyle.ink,
         fontFamily: 'Roboto',
         fontSize: 10.0,
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w600,
         letterSpacing: 0.3,
       ),
     );
-    final nameSpan = TextSpan(
+    final nameSpan = ArchitectAnnotationSpan(
+      role: ArchitectAnnotationRole.roomName,
       text: '$nameText\n',
       style: const TextStyle(
-        color: Colors.white,
+        color: ArchitectPaperStyle.ink,
         fontFamily: 'Roboto',
         fontSize: 11.5,
         fontWeight: FontWeight.bold,
       ),
     );
-    final areaSpan = TextSpan(
+    final areaSpan = ArchitectAnnotationSpan(
+      role: ArchitectAnnotationRole.area,
       text: areaText,
       style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.92),
+        color: ArchitectPaperStyle.ink,
         fontFamily: 'Roboto',
         fontSize: 10.5,
         fontWeight: FontWeight.w600,
       ),
     );
 
-    final tp = TextPainter(
+    final tp = ArchitectTextPainter(
+      elementId: zone.id,
+      modelScale: ArchitectPaperStyle.annotationScale,
       text: TextSpan(children: [numberSpan, nameSpan, areaSpan]),
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
@@ -203,12 +213,12 @@ class ArchitectZonePainterHelper {
     );
 
     final bgPaint = Paint()
-      ..color = const Color(0xEE161822)
+      ..color = ArchitectPaperStyle.paper
       ..style = PaintingStyle.fill;
     final borderPaint = Paint()
-      ..color = (isSelected ? const Color(0xFF00E5FF) : zone.color).withValues(
-        alpha: isSelected ? 0.95 : 0.65,
-      )
+      ..color =
+          (isSelected ? const Color(0xFF00E5FF) : ArchitectPaperStyle.rule)
+              .withValues(alpha: isSelected ? 0.95 : 0.65)
       ..strokeWidth = isSelected ? 1.5 : 1.0
       ..style = PaintingStyle.stroke;
 
@@ -237,7 +247,7 @@ class ArchitectZonePainterHelper {
     final u = delta / delta.distance;
     final n = Offset(-u.dy, u.dx) * (0.22); // slight offset from edge
 
-    final tp = TextPainter(
+    final tp = ArchitectTextPainter(
       text: TextSpan(
         text: '${length.toStringAsFixed(2)} m',
         style: TextStyle(
@@ -294,7 +304,7 @@ class ArchitectZonePainterHelper {
     final label =
         '$catName\n${w.toStringAsFixed(2)} × ${h.toStringAsFixed(2)} m\n${area.toStringAsFixed(1)} m²';
 
-    final tp = TextPainter(
+    final tp = ArchitectTextPainter(
       text: TextSpan(
         text: label,
         style: TextStyle(
@@ -570,7 +580,7 @@ class ArchitectZonePainterHelper {
         );
 
         // Bold black numeral '1'
-        final tp1 = TextPainter(
+        final tp1 = ArchitectTextPainter(
           text: TextSpan(
             text: '1',
             style: TextStyle(
@@ -586,7 +596,7 @@ class ArchitectZonePainterHelper {
 
         // When points.length == 1: show immediate helper badge under Point 1
         if (points.length == 1) {
-          final tpLabel = TextPainter(
+          final tpLabel = ArchitectTextPainter(
             text: TextSpan(
               text: '1',
               style: TextStyle(
@@ -634,7 +644,7 @@ class ArchitectZonePainterHelper {
             closeLabel != null &&
             closeLabel.isNotEmpty) {
           final badgeText = closeLabel;
-          final tpClose = TextPainter(
+          final tpClose = ArchitectTextPainter(
             text: TextSpan(
               text: badgeText,
               style: TextStyle(
@@ -698,7 +708,7 @@ class ArchitectZonePainterHelper {
             ..style = PaintingStyle.stroke,
         );
 
-        final tpN = TextPainter(
+        final tpN = ArchitectTextPainter(
           text: TextSpan(
             text: '${i + 1}',
             style: TextStyle(
@@ -732,7 +742,7 @@ class ArchitectZonePainterHelper {
         ? '${length.toStringAsFixed(2)} m  ($orthoLabel)'
         : '${length.toStringAsFixed(2)} m';
 
-    final tp = TextPainter(
+    final tp = ArchitectTextPainter(
       text: TextSpan(
         text: text,
         style: TextStyle(
@@ -795,7 +805,7 @@ class ArchitectZonePainterHelper {
     final midExtruded = (vNew1 + vNew2) / 2.0;
     final distText =
         '${distance >= 0 ? "+" : ""}${distance.toStringAsFixed(2)} m';
-    final tp = TextPainter(
+    final tp = ArchitectTextPainter(
       text: TextSpan(
         text: distText,
         style: TextStyle(
@@ -834,6 +844,10 @@ class ArchitectZonePainterHelper {
   // ===========================================================================
 
   static const double zoneTableTotalWidth = 590.0;
+
+  /// Fixed conversion from table drafting units to model metres, matching the
+  /// room stamps. Camera zoom must not change the table's drawing footprint.
+  static const double zoneTableDrawingScale = 80.0;
   static const double zoneTableTitleHeight = 28.0;
   static const double zoneTableHeaderHeight = 24.0;
   static const double zoneTableRowHeight = 22.0;
@@ -861,10 +875,27 @@ class ArchitectZonePainterHelper {
     required ArchitectStorey storey,
     required Offset origin,
     required double zoomScale,
+    ArchitectProject? project,
+    AppLocalizations? l10n,
+    String? viewKey,
   }) {
+    if (project != null && l10n != null) {
+      final key = viewKey ?? 'plan:${storey.id}';
+      final n =
+          project.document.viewScales[key] ??
+          project.dimensionScale.denominator;
+      return ArchitectTextScope(
+        project.document,
+        key,
+        n,
+        zoomScale,
+        units: project.units,
+        decimals: project.distanceDecimals,
+      ).run(() => _paperTable(storey, l10n).$1.shift(origin));
+    }
     final totalHeight = getZoneTableTotalHeight(storey.zones.length);
-    final widthModel = zoneTableTotalWidth / zoomScale;
-    final heightModel = totalHeight / zoomScale;
+    final widthModel = zoneTableTotalWidth / zoneTableDrawingScale;
+    final heightModel = totalHeight / zoneTableDrawingScale;
     return Rect.fromLTWH(origin.dx, origin.dy, widthModel, heightModel);
   }
 
@@ -879,6 +910,31 @@ class ArchitectZonePainterHelper {
     bool isSelected = false,
     AppLocalizations? l10n,
   }) {
+    if (ArchitectTextScope.current != null && l10n != null) {
+      architectDrawingSources(
+        canvas,
+        storey.zones.map((z) => z.id),
+        'zoneSchedule',
+      );
+      final (bounds, operations) = _paperTable(storey, l10n);
+      canvas.save();
+      canvas.translate(origin.dx, origin.dy);
+      canvas.drawRect(bounds, Paint()..color = ArchitectPaperStyle.paper);
+      for (final operation in operations) {
+        operation(canvas);
+      }
+      canvas.drawRect(
+        bounds,
+        Paint()
+          ..color = isSelected ? Colors.cyan : ArchitectPaperStyle.ink
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = ArchitectDrawingScale(
+            ArchitectTextScope.current!.denominator,
+          ).paperToModel(.18),
+      );
+      canvas.restore();
+      return;
+    }
     final zones = storey.zones;
     if (zones.isEmpty) return;
 
@@ -890,13 +946,13 @@ class ArchitectZonePainterHelper {
 
     canvas.save();
     canvas.translate(origin.dx, origin.dy);
-    canvas.scale(1.0 / zoomScale);
+    canvas.scale(1.0 / zoneTableDrawingScale);
 
     final tableRect = Rect.fromLTWH(0, 0, totalWidth, totalHeight);
 
     // 1. Table Background & Outer Border
     final bgPaint = Paint()
-      ..color = const Color(0xF7131622)
+      ..color = ArchitectPaperStyle.paper
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
       RRect.fromRectAndRadius(tableRect, const Radius.circular(6)),
@@ -904,9 +960,7 @@ class ArchitectZonePainterHelper {
     );
 
     final borderPaint = Paint()
-      ..color = isSelected
-          ? const Color(0xFF00E5FF)
-          : const Color(0xFF38BDF8).withValues(alpha: 0.8)
+      ..color = isSelected ? const Color(0xFF00E5FF) : ArchitectPaperStyle.ink
       ..strokeWidth = isSelected ? 2.0 : 1.5
       ..style = PaintingStyle.stroke;
     canvas.drawRRect(
@@ -926,13 +980,13 @@ class ArchitectZonePainterHelper {
     }
 
     final gridLinePaint = Paint()
-      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.3)
+      ..color = ArchitectPaperStyle.rule
       ..strokeWidth = 0.8
       ..style = PaintingStyle.stroke;
 
     // 2. Title Header
     final titlePaint = Paint()
-      ..color = const Color(0xFF0F2642)
+      ..color = ArchitectPaperStyle.wash
       ..style = PaintingStyle.fill;
     final titleRect = Rect.fromLTWH(0, 0, totalWidth, zoneTableTitleHeight);
     canvas.drawRRect(
@@ -953,11 +1007,11 @@ class ArchitectZonePainterHelper {
         l10n?.architectZoneScheduleTitle ?? 'ТАБЛИЦА НА ПОМЕЩЕНИЯТА';
     final titleText =
         '${titlePrefix.toUpperCase()} — ${storey.name.toUpperCase()}';
-    final titleTp = TextPainter(
+    final titleTp = ArchitectTextPainter(
       text: TextSpan(
         text: titleText,
         style: const TextStyle(
-          color: Colors.white,
+          color: ArchitectPaperStyle.ink,
           fontFamily: 'Roboto',
           fontSize: 11.0,
           fontWeight: FontWeight.bold,
@@ -977,7 +1031,7 @@ class ArchitectZonePainterHelper {
 
     // 3. Column Headers
     final headerPaint = Paint()
-      ..color = const Color(0xFF1E293B)
+      ..color = ArchitectPaperStyle.wash
       ..style = PaintingStyle.fill;
     final headerRect = Rect.fromLTWH(
       0,
@@ -1005,11 +1059,11 @@ class ArchitectZonePainterHelper {
     for (int i = 0; i < headers.length; i++) {
       final w = zoneTableColWidths[i];
       final isCentered = i == 0;
-      final colTp = TextPainter(
+      final colTp = ArchitectTextPainter(
         text: TextSpan(
           text: headers[i],
           style: const TextStyle(
-            color: Color(0xFF7DD3FC),
+            color: ArchitectPaperStyle.ink,
             fontFamily: 'Roboto',
             fontSize: 10.0,
             fontWeight: FontWeight.bold,
@@ -1049,10 +1103,7 @@ class ArchitectZonePainterHelper {
       // Alternating row background
       if (rowIdx % 2 == 1) {
         final rowRect = Rect.fromLTWH(0, curY, totalWidth, zoneTableRowHeight);
-        canvas.drawRect(
-          rowRect,
-          Paint()..color = Colors.white.withValues(alpha: 0.03),
-        );
+        canvas.drawRect(rowRect, Paint()..color = ArchitectPaperStyle.wash);
       }
 
       // Horizontal separator line
@@ -1065,10 +1116,11 @@ class ArchitectZonePainterHelper {
       final rowValues = [
         z.number.isNotEmpty ? z.number : '${rowIdx + 1}',
         z.name,
-        '${z.area.toStringAsFixed(2)} m²',
-        z.floorFinish.isNotEmpty ? z.floorFinish : '—',
-        z.wallFinish.isNotEmpty ? z.wallFinish : '—',
-        z.ceilingFinish.isNotEmpty ? z.ceilingFinish : '—',
+        (ArchitectTextScope.current?.area(z.area) ??
+            '${z.area.toStringAsFixed(2)} m²'),
+        l10n != null ? z.resolvedFloorFinish(l10n) : z.floorFinish,
+        l10n != null ? z.resolvedWallFinish(l10n) : z.wallFinish,
+        l10n != null ? z.resolvedCeilingFinish(l10n) : z.ceilingFinish,
       ];
 
       double cellX = 0;
@@ -1076,11 +1128,11 @@ class ArchitectZonePainterHelper {
         final w = zoneTableColWidths[c];
         final isCentered = c == 0;
         final isNumeric = c == 0 || c == 2;
-        final cellTp = TextPainter(
+        final cellTp = ArchitectTextPainter(
           text: TextSpan(
             text: rowValues[c],
             style: TextStyle(
-              color: c == 0 ? z.color : Colors.white.withValues(alpha: 0.9),
+              color: ArchitectPaperStyle.ink,
               fontFamily: 'Roboto',
               fontSize: 9.5,
               fontWeight: isNumeric ? FontWeight.bold : FontWeight.normal,
@@ -1111,7 +1163,7 @@ class ArchitectZonePainterHelper {
       zoneTableFooterHeight,
     );
     final footerPaint = Paint()
-      ..color = const Color(0xFF0F2642)
+      ..color = ArchitectPaperStyle.wash
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
       RRect.fromRectAndCorners(
@@ -1127,13 +1179,13 @@ class ArchitectZonePainterHelper {
         l10n?.architectZoneScheduleTotalArea.toUpperCase() ?? 'ОБЩО';
     final countLabel =
         l10n?.architectZoneScheduleRoomCount.toUpperCase() ?? 'БРОЙ';
-    final footerTp = TextPainter(
+    final footerTp = ArchitectTextPainter(
       text: TextSpan(
         children: [
           TextSpan(
             text: '$totalLabel: ',
             style: const TextStyle(
-              color: Color(0xFF7DD3FC),
+              color: ArchitectPaperStyle.ink,
               fontFamily: 'Roboto',
               fontSize: 10.0,
               fontWeight: FontWeight.bold,
@@ -1142,16 +1194,16 @@ class ArchitectZonePainterHelper {
           TextSpan(
             text: '${totalNetArea.toStringAsFixed(2)} m²',
             style: const TextStyle(
-              color: Colors.white,
+              color: ArchitectPaperStyle.ink,
               fontFamily: 'Roboto',
               fontSize: 11.0,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
             ),
           ),
           TextSpan(
             text: '   •   $countLabel: ${sortedZones.length}',
             style: const TextStyle(
-              color: Color(0xFF94A3B8),
+              color: ArchitectPaperStyle.ink,
               fontFamily: 'Roboto',
               fontSize: 9.5,
               fontWeight: FontWeight.w500,
@@ -1170,21 +1222,170 @@ class ArchitectZonePainterHelper {
     canvas.restore();
   }
 
+  /// Measure the complete schedule once, sharing exactly the same wrapping and
+  /// row sizes between publication and model-space picking.
+  static (Rect, List<void Function(Canvas)>) _paperTable(
+    ArchitectStorey storey,
+    AppLocalizations l,
+  ) {
+    final scope = ArchitectTextScope.current!;
+    final scale = ArchitectDrawingScale(scope.denominator);
+    double u(double mm) => scale.paperToModel(mm);
+    // Paper dimensions: keep padding small without reducing the text profile.
+    const widths = [7.0, 25.0, 16.0, 22.0, 22.0, 22.0];
+    final width = u(widths.reduce((a, b) => a + b));
+    final operations = <void Function(Canvas)>[];
+    final rows = [...storey.zones]
+      ..sort((a, b) => a.number.compareTo(b.number));
+    final headers = [
+      l.architectZoneScheduleColNo,
+      l.architectZoneScheduleColName,
+      l.architectAreaWithUnit(scope.units.symbol),
+      l.architectZoneScheduleColFloor,
+      l.architectZoneScheduleColWalls,
+      l.architectZoneScheduleColCeiling,
+    ];
+    double y = 0;
+    void row(
+      List<String> values, {
+      String id = '',
+      bool heading = false,
+      bool fullWidth = false,
+    }) {
+      final painters = <ArchitectTextPainter>[];
+      var height = u(3);
+      for (var i = 0; i < values.length; i++) {
+        final tp = ArchitectTextPainter(
+          elementId: id,
+          role: ArchitectAnnotationRole.table,
+          modelScale: 1,
+          text: TextSpan(
+            text: values[i],
+            style: TextStyle(
+              color: ArchitectPaperStyle.ink,
+              fontSize: u(2.2),
+              fontWeight: heading ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: (fullWidth ? width : u(widths[i])) - u(1.2));
+        painters.add(tp);
+        height = math.max(height, tp.height + u(.8));
+      }
+      final top = y, h = height;
+      if (heading) {
+        operations.add(
+          (c) => c.drawRect(
+            Rect.fromLTWH(0, top, width, h),
+            Paint()..color = ArchitectPaperStyle.wash,
+          ),
+        );
+      }
+      var x = 0.0;
+      for (var i = 0; i < painters.length; i++) {
+        final tp = painters[i], left = x;
+        operations.add(
+          (c) => tp.paint(c, Offset(left + u(.6), top + (h - tp.height) / 2)),
+        );
+        x += fullWidth ? width : u(widths[i]);
+        if (!fullWidth && i < painters.length - 1) {
+          final edge = x;
+          operations.add(
+            (c) => c.drawLine(
+              Offset(edge, top),
+              Offset(edge, top + h),
+              Paint()
+                ..color = ArchitectPaperStyle.rule
+                ..strokeWidth = u(.1),
+            ),
+          );
+        }
+      }
+      y += height;
+      final bottom = y;
+      operations.add(
+        (c) => c.drawLine(
+          Offset(0, bottom),
+          Offset(width, bottom),
+          Paint()
+            ..color = ArchitectPaperStyle.rule
+            ..strokeWidth = u(.1),
+        ),
+      );
+    }
+
+    row(
+      ['${l.architectZoneScheduleTitle} — ${storey.name}'],
+      heading: true,
+      fullWidth: true,
+    );
+    row(headers, heading: true);
+    for (final z in rows) {
+      row([
+        z.number,
+        z.name,
+        scope.area(z.area),
+        z.resolvedFloorFinish(l),
+        z.resolvedWallFinish(l),
+        z.resolvedCeilingFinish(l),
+      ], id: z.id);
+    }
+    row(
+      [
+        '${l.architectZoneScheduleTotalArea}: ${scope.area(rows.fold<double>(0, (v, z) => v + z.area))}   ${l.architectZoneScheduleRoomCount}: ${rows.length}',
+      ],
+      heading: true,
+      fullWidth: true,
+    );
+    return (Rect.fromLTWH(0, 0, width, y), operations);
+  }
+
   /// Draws a lightweight ghost placement preview following cursor when placing the table.
   static void drawZoneTableGhostPreview({
     required Canvas canvas,
     required Offset origin,
     required double zoomScale,
     required int zoneCount,
+    ArchitectStorey? storey,
     AppLocalizations? l10n,
   }) {
+    if (ArchitectTextScope.current != null && storey != null && l10n != null) {
+      final bounds = _paperTable(storey, l10n).$1.shift(origin);
+      final scope = ArchitectTextScope.current!;
+      final u = ArchitectDrawingScale(scope.denominator).paperToModel;
+      canvas.drawRect(
+        bounds,
+        Paint()..color = Colors.cyan.withValues(alpha: .08),
+      );
+      canvas.drawRect(
+        bounds,
+        Paint()
+          ..color = Colors.cyan
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = u(.18),
+      );
+      final text = ArchitectTextPainter(
+        elementId: '',
+        modelScale: 1,
+        text: TextSpan(
+          text: l10n.architectZoneTableBarHint,
+          style: const TextStyle(color: Colors.cyan),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: bounds.width - u(2));
+      text.paint(
+        canvas,
+        bounds.center - Offset(text.width / 2, text.height / 2),
+      );
+      return;
+    }
     final totalWidth = zoneTableTotalWidth;
     final rowCount = zoneCount > 0 ? zoneCount : 2;
     final totalHeight = getZoneTableTotalHeight(rowCount);
 
     canvas.save();
     canvas.translate(origin.dx, origin.dy);
-    canvas.scale(1.0 / zoomScale);
+    canvas.scale(1.0 / zoneTableDrawingScale);
 
     final tableRect = Rect.fromLTWH(0, 0, totalWidth, totalHeight);
 
@@ -1210,7 +1411,7 @@ class ArchitectZonePainterHelper {
     // Prompt inside
     final hint =
         l10n?.architectZoneTableBarHint ?? 'Кликнете за поставяне на таблицата';
-    final hintTp = TextPainter(
+    final hintTp = ArchitectTextPainter(
       text: TextSpan(
         text: '📋 $hint',
         style: const TextStyle(

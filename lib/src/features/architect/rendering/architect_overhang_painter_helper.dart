@@ -1,3 +1,4 @@
+import 'architect_vector_scene.dart';
 // === SECTION: ARCHITECTURAL UPPER OVERHANG PAINTER HELPER ===
 import 'package:flutter/material.dart';
 import '../../../core/l10n/generated/app_localizations.dart';
@@ -37,6 +38,7 @@ class ArchitectOverhangPainterHelper {
         : const Color(0xFF2E7D32); // Forest / Slate Green
 
     for (final overhang in overhangs) {
+      architectDrawingSources(canvas, {overhang.id}, 'overhang');
       final isBalcony = overhang.kind == ArchitectOverhangKind.balcony;
       final baseColor = isBalcony ? balconyColor : erkerColor;
 
@@ -73,11 +75,11 @@ class ArchitectOverhangPainterHelper {
       if (zoomScale > 14.0 && l10n != null) {
         final labelText = overhang.displayLabel(l10n);
         final depthStr = overhang.overhangDepth > 0.12
-            ? ' (${overhang.overhangDepth.toStringAsFixed(2)}m)'
+            ? ' (${ArchitectTextScope.current?.length(overhang.overhangDepth) ?? '${overhang.overhangDepth.toStringAsFixed(2)}m'})'
             : '';
         final text = '$labelText$depthStr';
 
-        final tp = TextPainter(
+        final tp = ArchitectTextPainter(elementId: overhang.id, modelScale: ArchitectPaperStyle.annotationScale,
           text: TextSpan(
             text: text,
             style: TextStyle(
@@ -94,7 +96,7 @@ class ArchitectOverhangPainterHelper {
         final center = overhang.centroid;
         canvas.save();
         canvas.translate(center.dx, center.dy);
-        canvas.scale(1.0 / zoomScale);
+        canvas.scale(ArchitectPaperStyle.annotationScale);
         tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
         canvas.restore();
       }

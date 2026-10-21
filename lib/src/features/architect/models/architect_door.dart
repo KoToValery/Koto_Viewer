@@ -1,3 +1,4 @@
+import '../rendering/architect_vector_scene.dart';
 import '../rendering/architect_path_solid.dart';
 import '../rendering/architect_opening_plan_painter.dart';
 import '../rendering/architect_canvas_palette.dart';
@@ -238,6 +239,7 @@ class ArchitectDoor {
     double? coreCenterShift,
     double exteriorSign = 1.0,
   }) {
+    architectDrawingSources(canvas, {id}, 'opening');
     final wallVec = wallEnd - wallStart;
     final wallLen = wallVec.distance;
     if (wallLen < 1e-4) return;

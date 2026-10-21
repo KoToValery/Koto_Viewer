@@ -394,7 +394,7 @@ void main() {
       );
     });
 
-    test('getZoneTableBounds computes correct model rectangle and hit test', () {
+    test('zone table bounds and hit testing stay fixed across camera zooms', () {
       final zone1 = ArchitectZone(
         id: 'z1',
         number: '1',
@@ -424,6 +424,7 @@ void main() {
       );
 
       const zoom = 50.0;
+      const drawingScale = ArchitectZonePainterHelper.zoneTableDrawingScale;
       final bounds = ArchitectZonePainterHelper.getZoneTableBounds(
         storey: storey,
         origin: storey.zoneScheduleOrigin!,
@@ -434,15 +435,33 @@ void main() {
       expect(bounds.top, 15.0);
       expect(
         bounds.width,
-        closeTo(ArchitectZonePainterHelper.zoneTableTotalWidth / zoom, 1e-4),
+        closeTo(
+          ArchitectZonePainterHelper.zoneTableTotalWidth / drawingScale,
+          1e-4,
+        ),
       );
       final expectedHeight =
-          ArchitectZonePainterHelper.getZoneTableTotalHeight(2) / zoom;
+          ArchitectZonePainterHelper.getZoneTableTotalHeight(2) / drawingScale;
       expect(bounds.height, closeTo(expectedHeight, 1e-4));
 
       // Hit testing inside bounds
       expect(bounds.contains(const Offset(10.1, 15.1)), isTrue);
-      expect(bounds.contains(const Offset(10.0 + (ArchitectZonePainterHelper.zoneTableTotalWidth / zoom) / 2, 15.1)), isTrue);
+      expect(bounds.contains(bounds.center), isTrue);
+
+      // Zooming changes the screen footprint, never the model-space hit area.
+      for (final cameraZoom in [5.0, 20.0, 80.0, 200.0]) {
+        final zoomedBounds = ArchitectZonePainterHelper.getZoneTableBounds(
+          storey: storey,
+          origin: storey.zoneScheduleOrigin!,
+          zoomScale: cameraZoom,
+        );
+        expect(zoomedBounds, bounds);
+        expect(zoomedBounds.contains(bounds.center), isTrue);
+        expect(
+          zoomedBounds.contains(Offset(bounds.right + .01, bounds.center.dy)),
+          isFalse,
+        );
+      }
 
       // Hit testing outside bounds
       expect(bounds.contains(const Offset(9.9, 15.0)), isFalse);

@@ -1,3 +1,5 @@
+import 'architect_document.dart';
+import '../rendering/architect_vector_scene.dart';
 import '../rendering/architect_canvas_palette.dart';
 // === SECTION: ARCHITECTURAL COLUMN MODEL & RENDERING ===
 import 'dart:math' as math;
@@ -139,6 +141,7 @@ class ArchitectColumn {
     double cutPlaneHeight = 1.20,
     double defaultStoreyHeight = 2.80,
   }) {
+    architectDrawingSources(canvas, {id}, 'column');
     final isCut = isCutAt(cutPlaneHeight, defaultStoreyHeight);
     final strokeWidth = isSelected
         ? 2.5
@@ -154,11 +157,11 @@ class ArchitectColumn {
       ..style = PaintingStyle.stroke;
 
     final fillPaint = Paint()
-      ..color = const Color(0xFF757575)
+      ..color = ArchitectPaperStyle.cutFill
       ..style = PaintingStyle.fill;
 
     final crossPaint = Paint()
-      ..color = Colors.white70
+      ..color = ArchitectPaperStyle.rule
       ..strokeWidth = 0.8 / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -192,17 +195,17 @@ class ArchitectColumn {
 
     // Dimension / Name label if zoomed in
     if (zoomScale > 15.0) {
-      final wCm = (width * 100).round();
-      final dCm = (depth * 100).round();
+      final wCm = ArchitectTextScope.current?.number(width) ?? (width * 100).round().toString();
+      final dCm = ArchitectTextScope.current?.number(depth) ?? (depth * 100).round().toString();
       final text = shape == ColumnShape.circular ? 'd=$wCm' : '$wCm/$dCm';
 
       canvas.save();
-      canvas.scale(1.0 / zoomScale);
-      final tp = TextPainter(
+      canvas.scale(ArchitectPaperStyle.annotationScale);
+      final tp = ArchitectTextPainter(elementId: id, role: ArchitectAnnotationRole.dimension, modelScale: ArchitectPaperStyle.annotationScale,
         text: TextSpan(
           text: text,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF00E5FF) : Colors.white,
+            color: isSelected ? const Color(0xFF00E5FF) : ArchitectPaperStyle.ink,
             fontFamily: 'Roboto',
             fontSize: 11.0,
             fontWeight: FontWeight.bold,
@@ -212,7 +215,16 @@ class ArchitectColumn {
         textDirection: TextDirection.ltr,
       )..layout();
 
-      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+      var textOffset = Offset(-tp.width / 2, -tp.height / 2);
+      if (ArchitectTextScope.current != null) {
+        final factor = ArchitectPaperStyle.annotationScale;
+        final availableDepth = shape == ColumnShape.circular ? width : depth;
+        if (tp.width * factor > width * .85 || tp.height * factor > availableDepth * .7) {
+          textOffset = Offset(-tp.width / 2, availableDepth / 2 / factor + 3);
+        }
+        canvas.drawRect((textOffset & tp.size).inflate(1), Paint()..color = ArchitectPaperStyle.paper);
+      }
+      tp.paint(canvas, textOffset);
       canvas.restore();
     }
 
@@ -240,7 +252,7 @@ class ArchitectColumn {
         position.dy - halfExtentY - 0.02,
       );
 
-      final tpLabel = TextPainter(
+      final tpLabel = ArchitectTextPainter(elementId: id, modelScale: ArchitectPaperStyle.annotationScale,
         text: TextSpan(
           text: label,
           style: TextStyle(
@@ -255,8 +267,8 @@ class ArchitectColumn {
         textDirection: TextDirection.ltr,
       )..layout();
 
-      // Bounded model height: stays crisp at close zoom, never balloons above ~0.12m upon zoom-out
-      final scaleFactor = (1.0 / zoomScale).clamp(0.0, 0.12 / tpLabel.height);
+      // Fixed model height for the designation and its frame at every zoom.
+      final scaleFactor = ArchitectPaperStyle.annotationScale;
 
       const padX = 2.5;
       const padY = 1.0;

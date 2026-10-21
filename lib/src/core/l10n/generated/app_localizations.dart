@@ -6584,25 +6584,25 @@ abstract class AppLocalizations {
   /// Laminate floor finish preset
   ///
   /// In en, this message translates to:
-  /// **'Laminate Flooring'**
+  /// **'Laminate'**
   String get architectZoneFloorLaminate;
 
   /// Granite tiles floor finish preset
   ///
   /// In en, this message translates to:
-  /// **'Granite Tiles'**
+  /// **'Porcelain tile'**
   String get architectZoneFloorGranite;
 
   /// Terracotta tiles floor finish preset
   ///
   /// In en, this message translates to:
-  /// **'Terracotta Tiles'**
+  /// **'Terracotta'**
   String get architectZoneFloorTerracotta;
 
   /// Parquet floor finish preset
   ///
   /// In en, this message translates to:
-  /// **'Natural Parquet'**
+  /// **'Parquet'**
   String get architectZoneFloorParquet;
 
   /// Carpet floor finish preset
@@ -6620,19 +6620,19 @@ abstract class AppLocalizations {
   /// Latex wall finish preset
   ///
   /// In en, this message translates to:
-  /// **'Plaster & Latex'**
+  /// **'Latex paint'**
   String get architectZoneWallLatex;
 
   /// Faience wall finish preset
   ///
   /// In en, this message translates to:
-  /// **'Faience Tiles'**
+  /// **'Faience'**
   String get architectZoneWallFaience;
 
   /// Decorative plaster wall finish preset
   ///
   /// In en, this message translates to:
-  /// **'Decorative Plaster'**
+  /// **'Dec. plaster'**
   String get architectZoneWallPlaster;
 
   /// Wallpaper wall finish preset
@@ -6650,7 +6650,7 @@ abstract class AppLocalizations {
   /// Latex ceiling finish preset
   ///
   /// In en, this message translates to:
-  /// **'Plaster & Latex'**
+  /// **'Latex paint'**
   String get architectZoneCeilingLatex;
 
   /// Gypsum board ceiling finish preset
@@ -11734,6 +11734,456 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Boundary crossings corrected.'**
   String get architectZoneBoundaryRepaired;
+
+  /// No description provided for @architectSheets.
+  ///
+  /// In en, this message translates to:
+  /// **'Sheets'**
+  String get architectSheets;
+
+  /// No description provided for @architectModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get architectModel;
+
+  /// No description provided for @architectSheetName.
+  ///
+  /// In en, this message translates to:
+  /// **'Sheet'**
+  String get architectSheetName;
+
+  /// No description provided for @architectSheetPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan'**
+  String get architectSheetPlan;
+
+  /// No description provided for @architectSheetAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add sheet'**
+  String get architectSheetAdd;
+
+  /// No description provided for @architectSheetProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'Sheet properties'**
+  String get architectSheetProperties;
+
+  /// No description provided for @architectSheetPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Place view'**
+  String get architectSheetPlace;
+
+  /// No description provided for @architectSheetEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Properties'**
+  String get architectSheetEdit;
+
+  /// No description provided for @architectSheetDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate'**
+  String get architectSheetDuplicate;
+
+  /// No description provided for @architectSheetDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get architectSheetDelete;
+
+  /// No description provided for @architectSheetLock.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock'**
+  String get architectSheetLock;
+
+  /// No description provided for @architectSheetUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get architectSheetUnlock;
+
+  /// No description provided for @architectSheetTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Title block'**
+  String get architectSheetTemplate;
+
+  /// No description provided for @architectSheetExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export PDF'**
+  String get architectSheetExport;
+
+  /// No description provided for @architectSheetPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Print'**
+  String get architectSheetPrint;
+
+  /// No description provided for @architectSheetMissingSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing source. Relink or remove this drawing before export.'**
+  String get architectSheetMissingSource;
+
+  /// No description provided for @architectSheetMixedScales.
+  ///
+  /// In en, this message translates to:
+  /// **'Various'**
+  String get architectSheetMixedScales;
+
+  /// No description provided for @architectSheetFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Format'**
+  String get architectSheetFormat;
+
+  /// No description provided for @architectSheetCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get architectSheetCustom;
+
+  /// No description provided for @architectSheetWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width (mm)'**
+  String get architectSheetWidth;
+
+  /// No description provided for @architectSheetHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Height (mm)'**
+  String get architectSheetHeight;
+
+  /// No description provided for @architectSheetMargin.
+  ///
+  /// In en, this message translates to:
+  /// **'Margin (mm)'**
+  String get architectSheetMargin;
+
+  /// No description provided for @architectSheetNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Number'**
+  String get architectSheetNumber;
+
+  /// No description provided for @architectSheetAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'Author'**
+  String get architectSheetAuthor;
+
+  /// No description provided for @architectSheetDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get architectSheetDate;
+
+  /// No description provided for @architectSheetNameField.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get architectSheetNameField;
+
+  /// No description provided for @architectSheetSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get architectSheetSave;
+
+  /// No description provided for @architectSheetCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get architectSheetCancel;
+
+  /// No description provided for @architectSheetScale.
+  ///
+  /// In en, this message translates to:
+  /// **'Scale'**
+  String get architectSheetScale;
+
+  /// No description provided for @architectSheetX.
+  ///
+  /// In en, this message translates to:
+  /// **'X (mm)'**
+  String get architectSheetX;
+
+  /// No description provided for @architectSheetY.
+  ///
+  /// In en, this message translates to:
+  /// **'Y (mm)'**
+  String get architectSheetY;
+
+  /// No description provided for @architectSheetAnchorX.
+  ///
+  /// In en, this message translates to:
+  /// **'Source X'**
+  String get architectSheetAnchorX;
+
+  /// No description provided for @architectSheetAnchorY.
+  ///
+  /// In en, this message translates to:
+  /// **'Source Y'**
+  String get architectSheetAnchorY;
+
+  /// No description provided for @architectSheetRotation.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotation (°)'**
+  String get architectSheetRotation;
+
+  /// No description provided for @architectSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show title'**
+  String get architectSheetTitle;
+
+  /// No description provided for @architectSheetSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get architectSheetSource;
+
+  /// No description provided for @architectSheetAlign.
+  ///
+  /// In en, this message translates to:
+  /// **'Align'**
+  String get architectSheetAlign;
+
+  /// No description provided for @architectSheetLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get architectSheetLeft;
+
+  /// No description provided for @architectSheetRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get architectSheetRight;
+
+  /// No description provided for @architectSheetTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Top'**
+  String get architectSheetTop;
+
+  /// No description provided for @architectSheetBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom'**
+  String get architectSheetBottom;
+
+  /// No description provided for @architectSheetSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select sheets in export order'**
+  String get architectSheetSelect;
+
+  /// No description provided for @architectSheetInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter valid positive sizes and keep the margin inside the sheet.'**
+  String get architectSheetInvalid;
+
+  /// No description provided for @architectSheetExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF export failed.'**
+  String get architectSheetExportFailed;
+
+  /// No description provided for @architectSheetNoViews.
+  ///
+  /// In en, this message translates to:
+  /// **'No views available.'**
+  String get architectSheetNoViews;
+
+  /// No description provided for @architectSheetAddCell.
+  ///
+  /// In en, this message translates to:
+  /// **'Add cell'**
+  String get architectSheetAddCell;
+
+  /// No description provided for @architectSheetField.
+  ///
+  /// In en, this message translates to:
+  /// **'Field'**
+  String get architectSheetField;
+
+  /// No description provided for @architectSheetBorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Border'**
+  String get architectSheetBorder;
+
+  /// No description provided for @architectSheetText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get architectSheetText;
+
+  /// No description provided for @architectSheetProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Project'**
+  String get architectSheetProject;
+
+  /// No description provided for @architectSheetDrawing.
+  ///
+  /// In en, this message translates to:
+  /// **'Drawing'**
+  String get architectSheetDrawing;
+
+  /// No description provided for @architectPrintPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Print preview'**
+  String get architectPrintPreview;
+
+  /// No description provided for @architectAnnotationSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Annotations'**
+  String get architectAnnotationSettings;
+
+  /// No description provided for @architectAnnotationSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Size on paper (mm)'**
+  String get architectAnnotationSize;
+
+  /// No description provided for @architectAnnotationReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Use profile'**
+  String get architectAnnotationReset;
+
+  /// No description provided for @architectAnnotationProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get architectAnnotationProfile;
+
+  /// No description provided for @architectAnnotationElement.
+  ///
+  /// In en, this message translates to:
+  /// **'Individual annotation'**
+  String get architectAnnotationElement;
+
+  /// No description provided for @architectAnnotationOrdinary.
+  ///
+  /// In en, this message translates to:
+  /// **'Labels'**
+  String get architectAnnotationOrdinary;
+
+  /// No description provided for @architectAnnotationDimension.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimensions'**
+  String get architectAnnotationDimension;
+
+  /// No description provided for @architectAnnotationArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Areas'**
+  String get architectAnnotationArea;
+
+  /// No description provided for @architectAnnotationRoomName.
+  ///
+  /// In en, this message translates to:
+  /// **'Room names'**
+  String get architectAnnotationRoomName;
+
+  /// No description provided for @architectAnnotationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Titles'**
+  String get architectAnnotationTitle;
+
+  /// No description provided for @architectAnnotationTable.
+  ///
+  /// In en, this message translates to:
+  /// **'Tables'**
+  String get architectAnnotationTable;
+
+  /// No description provided for @architectAnnotationSymbol.
+  ///
+  /// In en, this message translates to:
+  /// **'Symbols'**
+  String get architectAnnotationSymbol;
+
+  /// No description provided for @architectSheetVisibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Visibility'**
+  String get architectSheetVisibility;
+
+  /// No description provided for @architectSheetAxes.
+  ///
+  /// In en, this message translates to:
+  /// **'Axes'**
+  String get architectSheetAxes;
+
+  /// No description provided for @architectSheetZones.
+  ///
+  /// In en, this message translates to:
+  /// **'Zones'**
+  String get architectSheetZones;
+
+  /// No description provided for @architectSheetDimensions.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimensions'**
+  String get architectSheetDimensions;
+
+  /// No description provided for @architectSheetAnnotations.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get architectSheetAnnotations;
+
+  /// No description provided for @architectSheetMarkers.
+  ///
+  /// In en, this message translates to:
+  /// **'Markers'**
+  String get architectSheetMarkers;
+
+  /// No description provided for @architectSheetEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a sheet, then place a plan, section or elevation.'**
+  String get architectSheetEmpty;
+
+  /// No description provided for @architectSheetSaveView.
+  ///
+  /// In en, this message translates to:
+  /// **'Save view'**
+  String get architectSheetSaveView;
+
+  /// No description provided for @architectSheetTemplateName.
+  ///
+  /// In en, this message translates to:
+  /// **'Template name'**
+  String get architectSheetTemplateName;
+
+  /// No description provided for @architectAreaWithUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Area ({unit}²)'**
+  String architectAreaWithUnit(String unit);
+
+  /// No description provided for @architectSheetTemplateOverflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Title block text exceeds its cell. Enlarge the cell before export.'**
+  String get architectSheetTemplateOverflow;
 }
 
 class _AppLocalizationsDelegate

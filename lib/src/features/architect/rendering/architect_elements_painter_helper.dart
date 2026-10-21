@@ -1,3 +1,4 @@
+import 'architect_vector_scene.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import 'architect_stair_plan_painter.dart';
 import 'architect_canvas_palette.dart';
@@ -123,6 +124,7 @@ class ArchitectElementsPainterHelper {
       ..style = PaintingStyle.stroke;
 
     for (final slab in storey.slabs) {
+      architectDrawingSources(canvas, {slab.id}, 'slabs');
       if (slab.polygon.length < 3) continue;
       final isSelected = slab.id == selectedElementId;
       final border = isSelected
@@ -145,10 +147,13 @@ class ArchitectElementsPainterHelper {
         final c = slab.centroid;
         canvas.save();
         canvas.translate(c.dx, c.dy);
-        canvas.scale(1.0 / zoomScale);
-        final tp = TextPainter(
+        canvas.scale(ArchitectPaperStyle.annotationScale);
+        final tp = ArchitectTextPainter(elementId: slab.id, role: ArchitectAnnotationRole.ordinary, modelScale: ArchitectPaperStyle.annotationScale,
           text: TextSpan(
-            text: '${slab.label}\n${slab.area.toStringAsFixed(1)} m²',
+            children: [
+              ArchitectAnnotationSpan(role: ArchitectAnnotationRole.ordinary, text: '${slab.label}\n'),
+              ArchitectAnnotationSpan(role: ArchitectAnnotationRole.area, text: ArchitectTextScope.current?.area(slab.area) ?? '${slab.area.toStringAsFixed(1)} m²'),
+            ],
             style: TextStyle(
               color: palette.foreground(const Color(0xFF37474F)),
               fontFamily: 'Roboto',
@@ -177,6 +182,7 @@ class ArchitectElementsPainterHelper {
     String? selectedElementId,
   }) {
     for (final beam in storey.beams) {
+      architectDrawingSources(canvas, {beam.id}, 'beams');
       final isSelected = beam.id == selectedElementId;
       final isCut = beam.isCutAt(storey.cutPlaneHeight);
       final isOverhead = beam.isOverheadAt(storey.cutPlaneHeight);
@@ -218,8 +224,8 @@ class ArchitectElementsPainterHelper {
         final mid = (beam.startPoint + beam.endPoint) / 2.0;
         canvas.save();
         canvas.translate(mid.dx, mid.dy);
-        canvas.scale(1.0 / zoomScale);
-        final tp = TextPainter(
+        canvas.scale(ArchitectPaperStyle.annotationScale);
+        final tp = ArchitectTextPainter(elementId: beam.id, role: ArchitectAnnotationRole.ordinary, modelScale: ArchitectPaperStyle.annotationScale,
           text: TextSpan(
             text: beam.label,
             style: TextStyle(
@@ -286,6 +292,7 @@ class ArchitectElementsPainterHelper {
       ..style = PaintingStyle.stroke;
 
     for (final op in storey.openings) {
+      architectDrawingSources(canvas, {op.id}, 'openings');
       if (op.boundary.length < 3) continue;
       final isSelected = op.id == selectedElementId;
       final pBorder = isSelected
@@ -319,8 +326,8 @@ class ArchitectElementsPainterHelper {
         final c = op.centroid;
         canvas.save();
         canvas.translate(c.dx, c.dy);
-        canvas.scale(1.0 / zoomScale);
-        final tp = TextPainter(
+        canvas.scale(ArchitectPaperStyle.annotationScale);
+        final tp = ArchitectTextPainter(elementId: op.id, role: ArchitectAnnotationRole.ordinary, modelScale: ArchitectPaperStyle.annotationScale,
           text: TextSpan(
             text: op.label,
             style: TextStyle(
@@ -387,6 +394,7 @@ class ArchitectElementsPainterHelper {
     ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
   }) {
     for (final dim in storey.dimensions) {
+      architectDrawingSources(canvas, {dim.id}, 'dimensions');
       final isSelected = dim.id == selectedElementId;
       if (dim.length < 1e-4) continue;
       final u = dim.unitVector;
@@ -469,7 +477,7 @@ class ArchitectElementsPainterHelper {
                               unit == ArchitectUnit.millimeters ? 0 : 2),
                     );
 
-          final tp = TextPainter(
+          final tp = ArchitectTextPainter(elementId: dim.id, role: ArchitectAnnotationRole.dimension, modelScale: textScale,
             text: TextSpan(
               text: text,
               style: TextStyle(
@@ -528,6 +536,7 @@ class ArchitectElementsPainterHelper {
     String? selectedElementId,
   }) {
     for (final marker in storey.elevationMarkers) {
+      architectDrawingSources(canvas, {marker.id}, 'elevationMarkers');
       final isSelected = marker.id == selectedElementId;
       final p = marker.position;
       final color = isSelected
@@ -550,11 +559,11 @@ class ArchitectElementsPainterHelper {
       canvas.drawPath(path, markerPaint);
       canvas.drawLine(p, Offset(p.dx + s * 3.0, p.dy), markerPaint);
 
-      final label = marker.formattedElevation;
+      final label = ArchitectTextScope.current?.length(marker.elevation) ?? marker.formattedElevation;
       canvas.save();
       canvas.translate(p.dx + s * .4, p.dy - .02);
       canvas.scale(1.0 / zoomScale);
-      final tp = TextPainter(
+      final tp = ArchitectTextPainter(elementId: marker.id, role: ArchitectAnnotationRole.ordinary, modelScale: 1 / zoomScale,
         text: TextSpan(
           text: marker.label != null ? '$label (${marker.label})' : label,
           style: TextStyle(
@@ -579,11 +588,12 @@ class ArchitectElementsPainterHelper {
     String? selectedElementId,
   }) {
     for (final ann in storey.annotations) {
+      architectDrawingSources(canvas, {ann.id}, 'annotations');
       final isSelected = ann.id == selectedElementId;
       canvas.save();
       canvas.translate(ann.position.dx, ann.position.dy);
       canvas.scale(1.0 / zoomScale);
-      final tp = TextPainter(
+      final tp = ArchitectTextPainter(elementId: ann.id, role: ArchitectAnnotationRole.ordinary, modelScale: 1 / zoomScale,
         text: TextSpan(
           text: ann.text,
           style: TextStyle(
@@ -614,6 +624,7 @@ class ArchitectElementsPainterHelper {
     String? selectedElementId,
   }) {
     for (final prim in storey.cadPrimitives) {
+      architectDrawingSources(canvas, {prim.id}, 'cadPrimitives');
       final isSelected = prim.id == selectedElementId;
       final paint = Paint()
         ..color = isSelected
@@ -726,7 +737,7 @@ class ArchitectElementsPainterHelper {
       canvas.save();
       canvas.translate(mid.dx, mid.dy);
       canvas.scale(1.0 / zoomScale);
-      final tp = TextPainter(
+      final tp = ArchitectTextPainter(
         text: TextSpan(
           text: unit.format(dist, decimals: decimals),
           style: const TextStyle(

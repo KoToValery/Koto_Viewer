@@ -1,4 +1,25 @@
 import 'package:flutter/material.dart';
+import 'architect_vector_scene.dart';
+import '../models/architect_document.dart';
+
+/// Paper-first drafting colours. Annotations stay legible in monochrome and
+/// never use reversed white lettering on a solid dark background.
+class ArchitectPaperStyle {
+  ArchitectPaperStyle._();
+
+  static const paper = Colors.white;
+  static const ink = Color(0xFF202020);
+  static const rule = Color(0xFF707070);
+  static const wash = Color(0xFFF5F5F5);
+  static const cutFill = Color(0xFFEDEDED);
+
+  /// Converts annotation lettering to model metres, independently of camera
+  /// zoom, using the same drafting scale as room stamps and schedules.
+  static double get annotationScale {
+    final scope = ArchitectTextScope.current;
+    return scope == null ? 1 / 80 : scope.height('', ArchitectAnnotationRole.ordinary) / 11;
+  }
+}
 
 /// Display colours only; switching the canvas never changes element data.
 class ArchitectCanvasPalette {

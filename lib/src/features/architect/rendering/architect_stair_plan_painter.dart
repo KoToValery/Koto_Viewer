@@ -1,3 +1,4 @@
+import 'architect_vector_scene.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -34,6 +35,7 @@ class ArchitectStairPlanPainter {
     bool labels = true,
     ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
   }) {
+    architectDrawingSources(canvas, {stair.id}, 'stair');
     final plan = stair.plan, d = stair.design;
     final geometry = ArchitectStairGeometry.of(stair);
     final cut = geometry.cut(cutHeight ?? double.infinity);
@@ -177,7 +179,7 @@ class ArchitectStairPlanPainter {
         labels &&
         l10n != null &&
         dimensionScale.textHeight * scale >= 5) {
-      final text = TextPainter(
+      final text = ArchitectTextPainter(elementId: stair.id, modelScale: 1 / scale,
         textDirection: TextDirection.ltr,
         textAlign: TextAlign.center,
         text: TextSpan(

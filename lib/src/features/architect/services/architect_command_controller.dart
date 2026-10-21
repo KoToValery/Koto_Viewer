@@ -1923,7 +1923,8 @@ class ArchitectCommandController
     if (viewed == snapshot.activeStoreyId &&
         current.units == snapshot.units &&
         current.distanceDecimals == snapshot.distanceDecimals &&
-        current.dimensionScale == snapshot.dimensionScale) {
+        current.dimensionScale == snapshot.dimensionScale &&
+        bimValuesEqual(current.document.viewScales, snapshot.document.viewScales)) {
       return snapshot;
     }
     return snapshot.copyWith(
@@ -1931,6 +1932,7 @@ class ArchitectCommandController
       units: current.units,
       distanceDecimals: current.distanceDecimals,
       dimensionScale: current.dimensionScale,
+      document: snapshot.document.copyWith(viewScales: current.document.viewScales),
     );
   }
 }
