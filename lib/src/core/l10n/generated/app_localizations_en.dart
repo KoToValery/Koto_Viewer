@@ -6846,4 +6846,78 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get snapMidpointAlignment => 'Align to midpoint';
+
+  @override
+  String get architectComponentLibraryTitle => 'Library & Objects';
+
+  @override
+  String get architectComponentStudioTitle => 'Component Studio';
+
+  @override
+  String get architectComponentStudioBtn => 'Studio (Code)';
+
+  @override
+  String get architectCategorySanitary => 'Sanitary';
+
+  @override
+  String get architectCategoryFurniture => 'Furniture';
+
+  @override
+  String get architectCategoryKitchen => 'Kitchen';
+
+  @override
+  String get architectCategoryStorage => 'Wardrobes & Storage';
+
+  @override
+  String get architectCategoryOffice => 'Office & Equipment';
+
+  @override
+  String get architectCategoryEquipment => 'Equipment';
+
+  @override
+  String get architectCategoryLighting => 'Lighting';
+
+  @override
+  String get architectCategoryOutdoor => 'Outdoor';
+
+  @override
+  String get architectComponentRotateBtn => 'Rotate 90° (R)';
+
+  @override
+  String get architectComponentSavedMsg => 'Component saved to custom library!';
+
+  @override
+  String get architectComponentCompileBtn => 'Compile & Test';
+
+  @override
+  String get architectComponentSaveBtn => 'Save to Library';
+
+  @override
+  String get architectComponentTemplateHint => 'Select template...';
+
+  @override
+  String get architectComponentExportDartTooltip =>
+      'Export Dart class to clipboard';
+
+  @override
+  String get architectComponentExportDartMsg =>
+      'Dart code copied to clipboard!';
+
+  @override
+  String get architect2dPlanSymbol => '2D Plan Symbol';
+
+  @override
+  String get architect3dSolidMesh => '3D Solid Mesh';
+
+  @override
+  String get architectPlacementModeWall => 'Wall Attached';
+
+  @override
+  String get architectPlacementModeFree => 'Free Standing';
+
+  @override
+  String get architectLayerFurniture => 'Furniture Layer';
+
+  @override
+  String get architectComponentNoItems => 'No items found';
 }

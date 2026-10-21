@@ -12190,6 +12190,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Align to midpoint'**
   String get snapMidpointAlignment;
+
+  /// No description provided for @architectComponentLibraryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Library & Objects'**
+  String get architectComponentLibraryTitle;
+
+  /// No description provided for @architectComponentStudioTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Component Studio'**
+  String get architectComponentStudioTitle;
+
+  /// No description provided for @architectComponentStudioBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Studio (Code)'**
+  String get architectComponentStudioBtn;
+
+  /// No description provided for @architectCategorySanitary.
+  ///
+  /// In en, this message translates to:
+  /// **'Sanitary'**
+  String get architectCategorySanitary;
+
+  /// No description provided for @architectCategoryFurniture.
+  ///
+  /// In en, this message translates to:
+  /// **'Furniture'**
+  String get architectCategoryFurniture;
+
+  /// No description provided for @architectCategoryKitchen.
+  ///
+  /// In en, this message translates to:
+  /// **'Kitchen'**
+  String get architectCategoryKitchen;
+
+  /// No description provided for @architectCategoryStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Wardrobes & Storage'**
+  String get architectCategoryStorage;
+
+  /// No description provided for @architectCategoryOffice.
+  ///
+  /// In en, this message translates to:
+  /// **'Office & Equipment'**
+  String get architectCategoryOffice;
+
+  /// No description provided for @architectCategoryEquipment.
+  ///
+  /// In en, this message translates to:
+  /// **'Equipment'**
+  String get architectCategoryEquipment;
+
+  /// No description provided for @architectCategoryLighting.
+  ///
+  /// In en, this message translates to:
+  /// **'Lighting'**
+  String get architectCategoryLighting;
+
+  /// No description provided for @architectCategoryOutdoor.
+  ///
+  /// In en, this message translates to:
+  /// **'Outdoor'**
+  String get architectCategoryOutdoor;
+
+  /// No description provided for @architectComponentRotateBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate 90° (R)'**
+  String get architectComponentRotateBtn;
+
+  /// No description provided for @architectComponentSavedMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Component saved to custom library!'**
+  String get architectComponentSavedMsg;
+
+  /// No description provided for @architectComponentCompileBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Compile & Test'**
+  String get architectComponentCompileBtn;
+
+  /// No description provided for @architectComponentSaveBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Library'**
+  String get architectComponentSaveBtn;
+
+  /// No description provided for @architectComponentTemplateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select template...'**
+  String get architectComponentTemplateHint;
+
+  /// No description provided for @architectComponentExportDartTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Dart class to clipboard'**
+  String get architectComponentExportDartTooltip;
+
+  /// No description provided for @architectComponentExportDartMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Dart code copied to clipboard!'**
+  String get architectComponentExportDartMsg;
+
+  /// No description provided for @architect2dPlanSymbol.
+  ///
+  /// In en, this message translates to:
+  /// **'2D Plan Symbol'**
+  String get architect2dPlanSymbol;
+
+  /// No description provided for @architect3dSolidMesh.
+  ///
+  /// In en, this message translates to:
+  /// **'3D Solid Mesh'**
+  String get architect3dSolidMesh;
+
+  /// No description provided for @architectPlacementModeWall.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall Attached'**
+  String get architectPlacementModeWall;
+
+  /// No description provided for @architectPlacementModeFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free Standing'**
+  String get architectPlacementModeFree;
+
+  /// No description provided for @architectLayerFurniture.
+  ///
+  /// In en, this message translates to:
+  /// **'Furniture Layer'**
+  String get architectLayerFurniture;
+
+  /// No description provided for @architectComponentNoItems.
+  ///
+  /// In en, this message translates to:
+  /// **'No items found'**
+  String get architectComponentNoItems;
 }
 
 class _AppLocalizationsDelegate

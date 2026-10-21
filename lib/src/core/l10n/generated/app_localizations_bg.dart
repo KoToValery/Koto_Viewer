@@ -6872,4 +6872,79 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get snapMidpointAlignment => 'По средна точка';
+
+  @override
+  String get architectComponentLibraryTitle => 'Библиотека и обекти';
+
+  @override
+  String get architectComponentStudioTitle => 'Компонентно студио';
+
+  @override
+  String get architectComponentStudioBtn => 'Студио (Код)';
+
+  @override
+  String get architectCategorySanitary => 'Санитария';
+
+  @override
+  String get architectCategoryFurniture => 'Мебели';
+
+  @override
+  String get architectCategoryKitchen => 'Кухня';
+
+  @override
+  String get architectCategoryStorage => 'Гардероби и шкафове';
+
+  @override
+  String get architectCategoryOffice => 'Офис и оборудване';
+
+  @override
+  String get architectCategoryEquipment => 'Оборудване';
+
+  @override
+  String get architectCategoryLighting => 'Осветление';
+
+  @override
+  String get architectCategoryOutdoor => 'Екстериор';
+
+  @override
+  String get architectComponentRotateBtn => 'Завърти на 90° (R)';
+
+  @override
+  String get architectComponentSavedMsg =>
+      'Обектът е запазен в потребителската библиотека!';
+
+  @override
+  String get architectComponentCompileBtn => 'Компилирай и тествай';
+
+  @override
+  String get architectComponentSaveBtn => 'Запази в библиотека';
+
+  @override
+  String get architectComponentTemplateHint => 'Избери шаблон...';
+
+  @override
+  String get architectComponentExportDartTooltip =>
+      'Копирай Dart клас в клипборда';
+
+  @override
+  String get architectComponentExportDartMsg =>
+      'Dart кодът е копиран в клипборда!';
+
+  @override
+  String get architect2dPlanSymbol => '2D Символ за план';
+
+  @override
+  String get architect3dSolidMesh => '3D Солиден меш';
+
+  @override
+  String get architectPlacementModeWall => 'До стена';
+
+  @override
+  String get architectPlacementModeFree => 'Свободно стоящ';
+
+  @override
+  String get architectLayerFurniture => 'Слой Обзавеждане';
+
+  @override
+  String get architectComponentNoItems => 'Няма намерени елементи';
 }

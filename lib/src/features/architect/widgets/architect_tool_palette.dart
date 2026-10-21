@@ -12,6 +12,7 @@ import '../models/architect_fenestration_style.dart';
 import '../services/fenestration_library_service.dart';
 import '../rendering/architect_2d_painter.dart';
 
+import "../services/component_library_service.dart";
 enum ArchitectToolCategory {
   plan,
   build,
@@ -36,6 +37,7 @@ enum ArchitectToolCategory {
     ArchitectTool.door ||
     ArchitectTool.window ||
     ArchitectTool.opening ||
+    ArchitectTool.component ||
     ArchitectTool.stair => build,
     ArchitectTool.column ||
     ArchitectTool.beam ||
@@ -83,6 +85,10 @@ class ArchitectToolPalette extends StatefulWidget {
   final ValueChanged<ArchitectWallType>? onWallTypeSelected;
 
   // Door options
+  final double componentRotation;
+  final VoidCallback? onRotateComponent;
+  final VoidCallback? onOpenComponentLibrary;
+  final VoidCallback? onOpenComponentStudio;
   final double doorWidth;
   final ValueChanged<double> onDoorWidthChanged;
   final double doorHeight;
@@ -152,6 +158,10 @@ class ArchitectToolPalette extends StatefulWidget {
     this.activeDoorStyle,
     this.onWindowStyleSelected,
     this.onDoorStyleSelected,
+    this.componentRotation = 0.0,
+    this.onRotateComponent,
+    this.onOpenComponentLibrary,
+    this.onOpenComponentStudio,
     required this.doorWidth,
     required this.onDoorWidthChanged,
     required this.doorHeight,
@@ -315,6 +325,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 _buildBeamSubBar(context)
               else if (activeTool == ArchitectTool.stair)
                 _buildStairSubBar(context)
+              else if (activeTool == ArchitectTool.component)
+                _buildComponentSubBar(context)
               else if (activeTool == ArchitectTool.opening)
                 _buildOpeningSubBar(context),
 
@@ -449,6 +461,13 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                               tool: ArchitectTool.stair,
                               icon: Icons.stairs_rounded,
                               label: l10n.architectToolStair,
+                            ),
+                          if (category ==
+                              ArchitectToolCategory.of(ArchitectTool.component))
+                            _buildToolButton(
+                              tool: ArchitectTool.component,
+                              icon: Icons.chair_outlined,
+                              label: l10n.architectComponentLibraryTitle,
                             ),
                           if (category ==
                               ArchitectToolCategory.of(ArchitectTool.zone)) ...[
@@ -1065,6 +1084,67 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     );
   }
 
+  Widget _buildComponentSubBar(BuildContext context) {
+    final l = context.l10n;
+    final activeDef = ComponentLibraryService.instance.activeDefinition;
+    final activeParams = ComponentLibraryService.instance.activeParameters;
+    final w = (activeParams["width"] as num?)?.toDouble() ?? 0.80;
+    final d = (activeParams["depth"] as num?)?.toDouble() ?? 0.60;
+    final h = (activeParams["height"] as num?)?.toDouble() ?? 0.80;
+    final deg = (widget.componentRotation * 180 / 3.141592653589793).round() % 360;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          OutlinedButton.icon(
+            key: const ValueKey("component-tool-library-btn"),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF00E5FF),
+              side: const BorderSide(color: Color(0xFF00E5FF)),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            ),
+            icon: const Icon(Icons.widgets_outlined, size: 16),
+            label: Text(
+              activeDef.defaultName,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            onPressed: widget.onOpenComponentLibrary,
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF262633),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              "${(w * 100).round()}x${(d * 100).round()}x${(h * 100).round()} cm",
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton.icon(
+            key: const ValueKey("component-tool-rotate-btn"),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white70,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            ),
+            icon: const Icon(Icons.rotate_right, size: 18),
+            label: Text("$deg°"),
+            onPressed: widget.onRotateComponent,
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            key: const ValueKey("component-tool-studio-btn"),
+            tooltip: l.architectComponentStudioTitle,
+            icon: const Icon(Icons.code, color: Colors.white70, size: 18),
+            onPressed: widget.onOpenComponentStudio,
+          ),
+        ],
+      ),
+    );
+  }
   Widget _buildStairSubBar(BuildContext context) {
     final l = context.l10n;
     return SingleChildScrollView(

@@ -49,6 +49,7 @@ enum ArchitectTool {
   roof,
   opening,
   stair,
+  component,
   dimension,
   level,
   text,
@@ -174,6 +175,8 @@ class Architect2dPainter extends CustomPainter {
   final ArchitectWallOvershoot? activeOvershoot;
   final List<ArchitectOverhang>? upperOverhangs;
   final bool showUpperOverhangs;
+  final bool showFurniture;
+  final ArchitectComponentInstance? componentPreview;
 
   Architect2dPainter({
     required ArchitectProject project,
@@ -186,6 +189,8 @@ class Architect2dPainter extends CustomPainter {
     this.activeOvershoot,
     this.upperOverhangs,
     this.showUpperOverhangs = true,
+    this.showFurniture = true,
+    this.componentPreview,
     required this.activeTool,
     this.activeWallLayers=const [],
     this.activeWallArcEnd,
@@ -392,6 +397,25 @@ class Architect2dPainter extends CustomPainter {
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
       );
+      ArchitectElementsPainterHelper.drawComponents(
+        palette: palette,
+        canvas: canvas,
+        storey: _elementLayerStorey,
+        zoomScale: zoomScale,
+        selectedElementId: selectedElementId,
+        selectedElementIds: selectedElementIds,
+        layerVisible: showFurniture,
+      );
+      if (componentPreview != null) {
+        ArchitectElementsPainterHelper.drawComponents(
+          palette: palette,
+          canvas: canvas,
+          storey: ArchitectStorey(id: "preview", name: "preview", components: [componentPreview!]),
+          zoomScale: zoomScale,
+          selectedElementId: componentPreview!.id,
+          layerVisible: true,
+        );
+      }
     }
     if (layer != ArchitectPaintLayer.model) {
       if (layer == ArchitectPaintLayer.interaction) {
@@ -1655,6 +1679,8 @@ class Architect2dPainter extends CustomPainter {
       splitCutLine != oldDelegate.splitCutLine ||
       activeOvershoot != oldDelegate.activeOvershoot ||
       showUpperOverhangs != oldDelegate.showUpperOverhangs ||
+      showFurniture != oldDelegate.showFurniture ||
+      componentPreview != oldDelegate.componentPreview ||
       upperOverhangs != oldDelegate.upperOverhangs ||
       isZoneTableSelected != oldDelegate.isZoneTableSelected ||
       zoneTableDragPreviewOrigin != oldDelegate.zoneTableDragPreviewOrigin ||

@@ -33,6 +33,10 @@ import '../widgets/architect_3d_viewport.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../bim_projects/models/bim_work_project.dart';
 import '../../bim_projects/models/bim_coordinate_frame.dart';
+import "../models/architect_component_definition.dart";
+import "../services/component_library_service.dart";
+import "../widgets/architect_component_library_dialog.dart";
+import "../widgets/component_studio_dialog.dart";
 import '../../bim_editing/interaction/bim_edit_session.dart';
 import '../../bim_editing/interaction/bim_drag_session.dart';
 import '../../bim_projects/controllers/bim_viewport_controller.dart';
@@ -1434,6 +1438,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Map<String, DxfDocument> _underlaysByStorey = {};
   final Map<String, bool> _underlayLayerVisibility = {};
   bool _showUnderlay = true;
+  double _componentRotation = 0.0;
+  bool _showFurnitureLayer = true;
+  void toggleFurnitureLayer() => setState(() => _showFurnitureLayer = !_showFurnitureLayer);
 
   DxfDocument? get _currentUnderlayDoc {
     if (!_showUnderlay || !_commands.isPlan) return null;
@@ -2963,6 +2970,34 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _activeSnapLabel = snap.snapLabel;
     _activeMagneticGuides = snap.magneticGuides;
     return snap;
+  }
+
+  (Offset, double) _snapComponent(Offset rawModel, ArchitectComponentDefinition def) {
+    if (def.placementMode == ComponentPlacementMode.wallAttached) {
+      const snapDistance = 0.50;
+      for (final wall in _project.activeStorey.walls) {
+        final p1 = wall.startPoint;
+        final p2 = wall.endPoint;
+        final lineVec = p2 - p1;
+        final lineLen = lineVec.distance;
+        if (lineLen < 1e-4) continue;
+        final u = lineVec / lineLen;
+        final toPt = rawModel - p1;
+        final projDist = toPt.dx * u.dx + toPt.dy * u.dy;
+        if (projDist < 0.0 || projDist > lineLen) continue;
+        final n = Offset(-u.dy, u.dx);
+        final distToBaseline = (toPt.dx * n.dx + toPt.dy * n.dy).abs();
+        if (distToBaseline <= snapDistance + wall.thickness / 2.0) {
+          final baseProj = p1 + u * projDist;
+          final side = (toPt.dx * n.dx + toPt.dy * n.dy) >= 0 ? 1.0 : -1.0;
+          final wallFaceNormal = n * side;
+          final snapPos = baseProj + wallFaceNormal * (wall.thickness / 2.0);
+          final rot = math.atan2(wallFaceNormal.dy, wallFaceNormal.dx) - (math.pi / 2.0);
+          return (snapPos, rot);
+        }
+      }
+    }
+    return (rawModel, _componentRotation);
   }
 
   ArchitectSnapResult _snapColumn(Offset raw) {
@@ -4949,6 +4984,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (_activeTool == ArchitectTool.select) {
+      if (_showFurnitureLayer) {
+        for (final comp in _project.activeStorey.components.reversed) {
+          if (comp.containsPoint(rawModel)) {
+            setState(() {
+              _selectedElementId = comp.id;
+              _selectionIds.clear();
+              _selectedZoneId = null;
+            });
+            return;
+          }
+        }
+      }
       _selectAt(rawModel, toggle: true);
       return;
     }
@@ -5001,6 +5048,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     // 7. In Column tool
+    // 6B. In Component tool
+    if (_activeTool == ArchitectTool.component) {
+      final activeDef = ComponentLibraryService.instance.activeDefinition;
+      final activeParams = ComponentLibraryService.instance.activeParameters;
+      final (pos, rot) = _snapComponent(rawModel, activeDef);
+      final newComp = ArchitectComponentInstance(
+        id: "comp_${DateTime.now().millisecondsSinceEpoch}",
+        definitionId: activeDef.id,
+        position: pos,
+        rotation: rot,
+        parameters: Map.of(activeParams),
+      );
+      final updatedComponents = [..._project.activeStorey.components, newComp];
+      final updatedStorey = _project.activeStorey.copyWith(components: updatedComponents);
+      setState(() {
+        _project = _project.copyWith(
+          storeys: [
+            for (final s in _project.storeys)
+              if (s.id == updatedStorey.id) updatedStorey else s,
+          ],
+        );
+      });
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      return;
+    }
+
     if (_activeTool == ArchitectTool.column) {
       final snap = _snapColumn(rawModel);
       final pt = snap.point;
@@ -8334,6 +8408,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               .updateActiveStorey(
                 storey.copyWith(
                   zones: storey.zones.where((z) => z.id != id).toList(),
+                  components: storey.components.where((c) => c.id != id).toList(),
                 ),
               )
               .copyWithGridAxes(
@@ -10932,6 +11007,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       _elementTool.setStairParams(steps: st),
                   openingType: _elementTool.openingType,
                   onOpeningTypeChanged: (ot) => _elementTool.setOpeningType(ot),
+                  componentRotation: _componentRotation,
+                  onRotateComponent: () {
+                    setState(() {
+                      _componentRotation = (_componentRotation + 3.141592653589793 / 2.0) % (2.0 * 3.141592653589793);
+                    });
+                  },
+                  onOpenComponentLibrary: () {
+                    ArchitectComponentLibraryDialog.show(
+                      context,
+                      onSelectComponent: (def) {
+                        setState(() {});
+                      },
+                      onSelectFenestration: (style) {
+                        setState(() {
+                          if (style.kind == FenestrationKind.door) {
+                            _activeTool = ArchitectTool.door;
+                          } else {
+                            _activeTool = ArchitectTool.window;
+                          }
+                        });
+                      },
+                    );
+                  },
+                  onOpenComponentStudio: () {
+                    ComponentStudioDialog.show(context);
+                  },
                 ),
           body: Column(
             children: [
@@ -12566,6 +12667,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     palette: _canvasPalette,
     paintGrid: _showDrawingGrid,
     showUpperOverhangs: _showUpperOverhangs,
+    showFurniture: _showFurnitureLayer,
+    componentPreview: _activeTool == ArchitectTool.component && _cursorModel != null
+        ? () {
+            final activeDef = ComponentLibraryService.instance.activeDefinition;
+            final activeParams = ComponentLibraryService.instance.activeParameters;
+            final (pos, rot) = _snapComponent(_cursorModel!, activeDef);
+            return ArchitectComponentInstance(
+              id: "preview",
+              definitionId: activeDef.id,
+              position: pos,
+              rotation: rot,
+              parameters: activeParams,
+            );
+          }()
+        : null,
     project: _withDrawingScale(_drawingProject),
     drawingViewKey: _workspaceViewKey,
     viewport: _viewport,

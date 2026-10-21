@@ -11,6 +11,8 @@ import '../../dxf_viewer/rendering/dxf_quadtree.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import '../models/architect_grid_axis.dart';
+import '../services/component_geometry_cache.dart';
+import '../services/component_library_service.dart';
 import 'architect_2d_painter.dart';
 import 'architect_dimension_layout.dart';
 
@@ -641,6 +643,66 @@ class ArchitectElementsPainterHelper {
         final r = (prim.endPoint - prim.startPoint).distance;
         canvas.drawCircle(prim.startPoint, r, paint);
       }
+    }
+  }
+
+  // ===========================================================================
+  // 9B. ARCHITECTURAL 3D/2D COMPONENTS (FURNITURE, SANITARY, KITCHEN)
+  // ===========================================================================
+
+  static void drawComponents({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
+    required Canvas canvas,
+    required ArchitectStorey storey,
+    required double zoomScale,
+    String? selectedElementId,
+    Set<String> selectedElementIds = const {},
+    bool layerVisible = true,
+  }) {
+    if (!layerVisible || storey.components.isEmpty) return;
+
+    for (final comp in storey.components) {
+      if (!comp.isVisible) continue;
+      final def = ComponentLibraryService.instance.findDefinition(comp.definitionId);
+      if (def == null) continue;
+      final geo = ComponentGeometryCache.instance.getOrCompute(def, comp.parameters);
+      final isSelected = comp.id == selectedElementId || selectedElementIds.contains(comp.id);
+
+      canvas.save();
+      canvas.translate(comp.position.dx, comp.position.dy);
+      canvas.rotate(comp.rotation);
+
+      // 1. Whiteout mask underneath (print-first clean style, masks floor hatch)
+      final maskPaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill;
+      canvas.drawPath(geo.block2d.boundsMask, maskPaint);
+
+      // 2. Outer outline
+      final outlinePaint = Paint()
+        ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF263238))
+        ..strokeWidth = (isSelected ? 2.5 : 1.2) / zoomScale
+        ..style = PaintingStyle.stroke;
+      canvas.drawPath(geo.block2d.outline, outlinePaint);
+
+      // 3. Inner detail linework
+      final detailPaint = Paint()
+        ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF546E7A))
+        ..strokeWidth = (isSelected ? 1.8 : 0.8) / zoomScale
+        ..style = PaintingStyle.stroke;
+      for (final p in geo.block2d.detailPaths) {
+        canvas.drawPath(p, detailPaint);
+      }
+
+      // If selected, display insertion origin indicator
+      if (isSelected) {
+        final originDot = Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(Offset.zero, 4.0 / zoomScale, originDot);
+      }
+
+      canvas.restore();
     }
   }
 

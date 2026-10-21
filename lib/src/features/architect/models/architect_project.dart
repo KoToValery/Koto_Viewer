@@ -18,6 +18,8 @@ import 'architect_door.dart';
 import 'architect_wall_type.dart';
 import 'architect_zone.dart';
 import 'architect_fenestration_style.dart';
+import 'architect_component.dart';
+export 'architect_component.dart';
 
 typedef ArchitectUnit = BimDistanceUnit;
 
@@ -60,6 +62,7 @@ class ArchitectStorey {
   final List<ArchitectElevationMarker> elevationMarkers;
   final List<ArchitectAnnotation> annotations;
   final List<ArchitectCadPrimitive> cadPrimitives;
+  final List<ArchitectComponentInstance> components;
   final Offset? zoneScheduleOrigin;
   final bool isRoof;
 
@@ -83,6 +86,7 @@ class ArchitectStorey {
     this.elevationMarkers = const [],
     this.annotations = const [],
     this.cadPrimitives = const [],
+    this.components = const [],
     this.zoneScheduleOrigin,
   });
 
@@ -112,6 +116,7 @@ class ArchitectStorey {
     List<ArchitectElevationMarker>? elevationMarkers,
     List<ArchitectAnnotation>? annotations,
     List<ArchitectCadPrimitive>? cadPrimitives,
+    List<ArchitectComponentInstance>? components,
     Offset? zoneScheduleOrigin,
     bool clearZoneScheduleOrigin = false,
   }) => ArchitectStorey(
@@ -139,6 +144,7 @@ class ArchitectStorey {
     elevationMarkers: elevationMarkers ?? this.elevationMarkers,
     annotations: annotations ?? this.annotations,
     cadPrimitives: cadPrimitives ?? this.cadPrimitives,
+    components: components ?? this.components,
     zoneScheduleOrigin: clearZoneScheduleOrigin
         ? null
         : (zoneScheduleOrigin ?? this.zoneScheduleOrigin),
@@ -166,6 +172,7 @@ class ArchitectStorey {
     'elevationMarkers': elevationMarkers.map((m) => m.toJson()).toList(),
     'annotations': annotations.map((a) => a.toJson()).toList(),
     'cadPrimitives': cadPrimitives.map((p) => p.toJson()).toList(),
+    'components': components.map((c) => c.toJson()).toList(),
     if (zoneScheduleOrigin != null)
       'zoneScheduleOrigin': {
         'x': zoneScheduleOrigin!.dx,
@@ -252,6 +259,10 @@ class ArchitectStorey {
             ?.map(
               (a) => ArchitectAnnotation.fromJson(a as Map<String, dynamic>),
             )
+            .toList() ??
+        const [],
+    components: (json['components'] as List<dynamic>?)
+            ?.map((c) => ArchitectComponentInstance.fromJson(c as Map<String, dynamic>))
             .toList() ??
         const [],
     cadPrimitives:

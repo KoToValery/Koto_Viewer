@@ -7,6 +7,8 @@ import '../models/architect_project.dart';
 import 'architect_wall_network.dart';
 import 'architect_wall_solids.dart';
 import 'architect_stair_mesh.dart';
+import '../services/component_geometry_cache.dart';
+import '../services/component_library_service.dart';
 
 /// Real-time 3D solid mesh builder for architectural projects.
 class Architect3dBuilder {
@@ -202,6 +204,49 @@ class Architect3dBuilder {
         final first = allTris.length;
         allTris.addAll(_buildRoofMesh(storey, roof, detailed: previewGeometry));
         mark(roof.id, first);
+      }
+
+      // Add 3D architectural components (furniture, sanitary, kitchen, equipment)
+      for (final comp in storey.components) {
+        if (!comp.isVisible) continue;
+        final def = ComponentLibraryService.instance.findDefinition(comp.definitionId);
+        if (def == null) continue;
+        final geo = ComponentGeometryCache.instance.getOrCompute(def, comp.parameters);
+        final first = allTris.length;
+        final cosR = math.cos(comp.rotation);
+        final sinR = math.sin(comp.rotation);
+        final zBase = storey.elevation + comp.elevationOffset;
+
+        Vector3 transform(Vector3 p) {
+          final rx = p.x * cosR - p.y * sinR;
+          final ry = p.x * sinR + p.y * cosR;
+          return Vector3(comp.position.dx + rx, comp.position.dy + ry, zBase + p.z);
+        }
+
+        Vector3 transformNormal(Vector3 n) {
+          final rx = n.x * cosR - n.y * sinR;
+          final ry = n.x * sinR + n.y * cosR;
+          return Vector3(rx, ry, n.z);
+        }
+
+        for (final t in geo.mesh3d.triangles) {
+          allTris.add(
+            Triangle3D(
+              v0: transform(t.v0),
+              v1: transform(t.v1),
+              v2: transform(t.v2),
+              normal: transformNormal(t.normal),
+              color: t.color,
+              isDoubleSided: t.isDoubleSided,
+              material: t.material,
+              textureCoordinates: t.textureCoordinates,
+              vertexNormals: t.vertexNormals?.map(transformNormal).toList(),
+              vertexColors: t.vertexColors,
+              linearVertexColors: t.linearVertexColors,
+            ),
+          );
+        }
+        mark(comp.id, first);
       }
     }
 
