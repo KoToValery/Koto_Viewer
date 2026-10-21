@@ -45,7 +45,19 @@ class ArchitectDrawingScale {
   double modelToPaper(double metres) => metres * 1000 / denominator;
   double paperToModel(double mm) => mm * denominator / 1000;
   String get ratio => '1:$denominator';
-  double get defaultTextMm => denominator <= 50 ? 1.5 : 2.2;
+  double get defaultTextMm => denominator <= 50
+      ? 1.5
+      : denominator >= 500
+      ? 2.5
+      : 2.2;
+
+  /// Paper spacing, with enough room for larger user-defined lettering.
+  /// 6 mm at 1:50 = 30 cm; 4 mm at 1:100 = 40 cm in the model.
+  double dimensionRowSpacing(double textMm) {
+    final base = denominator <= 50 || denominator >= 500 ? 6.0 : 4.0;
+    final factor = textMm / defaultTextMm;
+    return paperToModel(base * (factor > 1 ? factor : 1));
+  }
 }
 
 class ArchitectSavedDrawing {
@@ -359,7 +371,9 @@ class ArchitectDocument {
     ArchitectAnnotationRole role,
     int scale,
   ) {
-    final base = ArchitectDrawingScale(scale).defaultTextMm;
+    final base = role == ArchitectAnnotationRole.symbol && scale >= 500
+        ? 2.2
+        : ArchitectDrawingScale(scale).defaultTextMm;
     return overrideMm['$view/$element/${role.name}/$scale'] ??
         profileMm['$scale/${role.name}'] ??
         base *

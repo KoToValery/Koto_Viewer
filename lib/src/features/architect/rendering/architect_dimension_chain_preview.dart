@@ -5,6 +5,7 @@ import '../models/architect_project.dart';
 import '../models/architect_grid_axis.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_elements_painter_helper.dart';
+import 'architect_vector_scene.dart';
 
 class ArchitectDimensionChainPreview extends CustomPainter {
   final ArchitectDimension? dimension;
@@ -15,6 +16,8 @@ class ArchitectDimensionChainPreview extends CustomPainter {
   final ArchitectCanvasPalette palette;
   final ArchitectStorey? storey;
   final List<StructuralGridAxis> gridAxes;
+  final ArchitectDocument document;
+  final String? viewKey;
   ArchitectDimensionChainPreview({
     required this.dimension,
     required this.viewport,
@@ -24,6 +27,8 @@ class ArchitectDimensionChainPreview extends CustomPainter {
     required this.palette,
     this.storey,
     this.gridAxes = const [],
+    this.document = const ArchitectDocument(),
+    this.viewKey,
   }) : super(repaint: viewport);
   @override
   void paint(Canvas canvas, Size size) {
@@ -31,18 +36,29 @@ class ArchitectDimensionChainPreview extends CustomPainter {
     canvas.save();
     canvas.translate(viewport.translation.dx, viewport.translation.dy);
     canvas.scale(viewport.scale);
-    ArchitectElementsPainterHelper.drawDimensions(
-      gridAxes: gridAxes,
-      canvas: canvas,
-      storey: (storey ?? const ArchitectStorey(id: 'preview', name: ''))
-          .copyWith(dimensions: [dimension!]),
-      zoomScale: viewport.scale,
-      selectedElementId: dimension!.id,
-      unit: units,
-      decimals: decimals,
-      dimensionScale: dimensionScale,
-      palette: palette,
-      wallObstacles: Path(),
+    final key = viewKey ?? 'plan:${storey?.id ?? 'preview'}';
+    final denominator = document.viewScales[key] ?? dimensionScale.denominator;
+    ArchitectTextScope(
+      document,
+      key,
+      denominator,
+      viewport.scale,
+      units: units,
+      decimals: decimals ?? 2,
+    ).run(
+      () => ArchitectElementsPainterHelper.drawDimensions(
+        gridAxes: gridAxes,
+        canvas: canvas,
+        storey: (storey ?? const ArchitectStorey(id: 'preview', name: ''))
+            .copyWith(dimensions: [dimension!]),
+        zoomScale: viewport.scale,
+        selectedElementId: dimension!.id,
+        unit: units,
+        decimals: decimals,
+        dimensionScale: dimensionScale,
+        palette: palette,
+        wallObstacles: Path(),
+      ),
     );
     canvas.restore();
   }
@@ -52,6 +68,8 @@ class ArchitectDimensionChainPreview extends CustomPainter {
       old.dimension != dimension ||
       old.storey != storey ||
       old.gridAxes != gridAxes ||
+      old.document != document ||
+      old.viewKey != viewKey ||
       old.units != units ||
       old.decimals != decimals ||
       old.dimensionScale != dimensionScale ||

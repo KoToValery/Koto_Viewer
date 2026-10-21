@@ -154,7 +154,7 @@ void main() {
       expectValues(spans(tiers[1]), [4, 6]);
       expectValues(spans(tiers[2]), [10]);
       expectValues(spans(tiers[3]), [3.8, 5.8]);
-      expectValues(tiers.map((t) => t.line.$1.dy), [2, 2.45, 2.9, 3.35]);
+      expectValues(tiers.map((t) => t.line.$1.dy), [2, 2.4, 2.8, 3.2]);
       expect(dimension().anchors.any((a) => a.feature == 'opening'), isFalse);
     },
   );
@@ -170,7 +170,7 @@ void main() {
         gridAxes: axes,
       );
       expectValues(tiers.first.points.map((p) => p.dx), [0, 4, 6, 10]);
-      expectValues(tiers.map((t) => t.line.$1.dy), [-6, -6.45, -6.9, -7.35]);
+      expectValues(tiers.map((t) => t.line.$1.dy), [-6, -6.4, -6.8, -7.2]);
     },
   );
 

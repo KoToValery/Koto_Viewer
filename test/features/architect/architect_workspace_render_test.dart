@@ -29,7 +29,7 @@ DxfDocument document(List<DxfEntity> entities, Rect bounds) => DxfDocument(
 );
 
 void main() {
-  test('Axis labels retain screen size with their bubbles while zooming', () {
+  test('Axis bubbles and labels retain print proportions at every zoom', () {
     final project = ArchitectProject(
       id: 'axes',
       name: 'Axes',
@@ -46,58 +46,65 @@ void main() {
         ),
       ],
     );
-    final screenWidths = <double>[];
-    for (final zoom in [20.0, 80.0, 320.0]) {
-      final canvas = ArchitectVectorCanvas()..scale(zoom);
-      ArchitectTextScope(const ArchitectDocument(), 'plan:s', 50, zoom).run(() {
-        ArchitectGridAxisPainterHelper.drawAxes(
-          canvas: canvas,
-          project: project,
-          zoomScale: zoom,
-        );
-      });
-      final labels = canvas.operations
-          .whereType<ArchitectVectorText>()
-          .toList();
-      expect(labels, hasLength(2));
-      expect(labels.every((t) => t.sources.contains('axis')), isTrue);
-      expect(labels.first.size, closeTo(10.5, 1e-8));
-      screenWidths.add(labels.first.bounds.width);
-      expect(
-        canvas.operations.whereType<ArchitectVectorPath>().any(
-          (p) =>
-              (p.bounds.width - 24).abs() < 1e-8 &&
-              (p.bounds.height - 24).abs() < 1e-8,
-        ),
-        isTrue,
-      );
-    }
-    expect(screenWidths[1], closeTo(screenWidths[0], 1e-8));
-    expect(screenWidths[2], closeTo(screenWidths[0], 1e-8));
-    // Print previews and export keep real paper sizes, independently of zoom.
-    for (final denominator in [50, 100]) {
-      for (final zoom in [20.0, 320.0]) {
-        final canvas = ArchitectVectorCanvas()..scale(zoom);
-        ArchitectTextScope(
-          const ArchitectDocument(),
-          'plan:s',
-          denominator,
-          zoom,
-          publication: true,
-        ).run(() {
-          ArchitectGridAxisPainterHelper.drawAxes(
-            canvas: canvas,
-            project: project,
-            zoomScale: zoom,
+    for (final denominator in [50, 100, 500]) {
+      final widths = <double>[];
+      for (final publication in [false, true]) {
+        for (final zoom in [20.0, 80.0, 320.0]) {
+          final canvas = ArchitectVectorCanvas()..scale(zoom);
+          const document = ArchitectDocument();
+          final capMm = document.textMm(
+            'plan:s',
+            'axis',
+            ArchitectAnnotationRole.symbol,
+            denominator,
           );
-        });
-        final text = canvas.operations.whereType<ArchitectVectorText>().first;
-        expect(
-          ArchitectDrawingScale(denominator).modelToPaper(text.size / zoom) *
-              ArchitectDrawingScale.fontCapRatio,
-          closeTo(denominator == 50 ? 1.5 : 2.2, 1e-8),
-        );
+          ArchitectTextScope(
+            document,
+            'plan:s',
+            denominator,
+            zoom,
+            publication: publication,
+          ).run(() {
+            ArchitectGridAxisPainterHelper.drawAxes(
+              canvas: canvas,
+              project: project,
+              zoomScale: zoom,
+            );
+          });
+          final labels = canvas.operations
+              .whereType<ArchitectVectorText>()
+              .toList();
+          expect(labels, hasLength(2));
+          expect(labels.every((t) => t.sources.contains('axis')), isTrue);
+          expect(
+            ArchitectDrawingScale(
+                  denominator,
+                ).modelToPaper(labels.first.size / zoom) *
+                ArchitectDrawingScale.fontCapRatio,
+            closeTo(capMm, 1e-8),
+          );
+          widths.add(labels.first.bounds.width / zoom);
+          final bubbleWidth =
+              ArchitectDrawingScale(denominator).paperToModel(capMm) /
+              11 *
+              24 *
+              zoom;
+          expect(
+            canvas.operations.whereType<ArchitectVectorPath>().any(
+              (p) =>
+                  p.fill &&
+                  (p.bounds.width - bubbleWidth).abs() < 1e-4 &&
+                  (p.bounds.height - bubbleWidth).abs() < 1e-4,
+            ),
+            isTrue,
+          );
+        }
       }
+      expect(
+        widths.every((w) => (w - widths.first).abs() < 1e-4),
+        isTrue,
+        reason: '$denominator: $widths',
+      );
     }
   });
   test('Column text follows model geometry rather than camera pixels', () {

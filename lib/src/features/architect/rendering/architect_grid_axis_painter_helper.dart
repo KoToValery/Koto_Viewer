@@ -40,7 +40,9 @@ class ArchitectGridAxisPainterHelper {
       ..color = palette
           .foreground(const Color(0xFFC62828))
           .withValues(alpha: 0.80)
-      ..strokeWidth = 1.2 / zoomScale
+      ..strokeWidth = ArchitectTextScope.current == null
+          ? 1.2 / zoomScale
+          : ArchitectDrawingScale(ArchitectTextScope.current!.denominator).paperToModel(.15)
       ..style = PaintingStyle.stroke;
 
     // Selected axis paint
@@ -324,9 +326,9 @@ class ArchitectGridAxisPainterHelper {
   }) {
     canvas.save();
     canvas.translate(center.dx, center.dy);
-    final publication = ArchitectTextScope.current?.publication == true;
-    final localScale = publication
-        ? ArchitectTextScope.current!.height(
+    final scope = ArchitectTextScope.current;
+    final localScale = scope != null
+        ? scope.height(
                 elementId ?? label,
                 ArchitectAnnotationRole.symbol,
               ) /
@@ -369,10 +371,9 @@ class ArchitectGridAxisPainterHelper {
       ),
     );
 
-    // Working axis labels share the bubble's screen size. Only publication
-    // applies the paper text profile; otherwise it cancels the zoom scaling.
+    // The bubble and label share paper proportions on screen and in print.
     final tp = ArchitectTextPainter(
-      elementId: publication ? elementId : null,
+      elementId: scope == null ? null : elementId ?? label,
       role: ArchitectAnnotationRole.symbol,
       modelScale: localScale,
       text: textSpan,

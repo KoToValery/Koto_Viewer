@@ -25,15 +25,16 @@ typedef ArchitectUnit = BimDistanceUnit;
 
 /// Paper-space dimension text sizes; model geometry is always in metres.
 enum ArchitectDimensionScale {
-  scale20(20, 1.5),
-  scale50(50, 1.5),
-  scale100(100, 2.2),
-  scale200(200, 2.2),
-  scale500(500, 2.2);
+  scale20(20),
+  scale50(50),
+  scale100(100),
+  scale200(200),
+  scale500(500);
 
   final int denominator;
-  final double textHeightMm;
-  const ArchitectDimensionScale(this.denominator, this.textHeightMm);
+  const ArchitectDimensionScale(this.denominator);
+
+  double get textHeightMm => ArchitectDrawingScale(denominator).defaultTextMm;
 
   double paperToModel(double millimeters) => millimeters * denominator / 1000;
   double get textHeight => paperToModel(textHeightMm);

@@ -210,7 +210,9 @@ class ArchitectZonePainterHelper {
               : palette.foreground(zone.color).withValues(alpha: 0.85));
     final borderPaint = Paint()
       ..color = borderColor
-      ..strokeWidth = (isSelected ? 2.2 : 1.2) / math.max(zoomScale, 80.0)
+      ..strokeWidth = isSelected || ArchitectTextScope.current == null
+          ? (isSelected ? 2.2 : 1.2) / math.max(zoomScale, 80.0)
+          : ArchitectDrawingScale(ArchitectTextScope.current!.denominator).paperToModel(.15)
       ..style = PaintingStyle.stroke;
     canvas.drawPath(path, borderPaint);
 

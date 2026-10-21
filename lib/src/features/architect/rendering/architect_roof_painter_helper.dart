@@ -179,7 +179,7 @@ class ArchitectRoofPainterHelper {
       }
 
       // 5. Slope arrow and elevation/angle badge at centroid
-      if (!isGhost && scale > 8.0) {
+      if (!isGhost && (ArchitectTextScope.current != null || scale > 8.0)) {
         _drawSlopeIndicator(
           canvas: canvas,
           storey: storey,

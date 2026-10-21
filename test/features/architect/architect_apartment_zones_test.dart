@@ -7,10 +7,12 @@ import 'package:kotoview/src/features/architect/models/architect_zone.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/models/architect_material_layer.dart';
 import 'package:kotoview/src/features/architect/services/architect_apartment_zones.dart';
+import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_vector_scene.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_zone_painter_helper.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_zone_properties_card.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_zone_schedule_dialog.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_apartment_rooms_sheet.dart';
 import 'architect_editing_test.dart' as editing;
 import 'architect_workspace_interaction_test.dart' as workspace;
 import 'architect_tool_test_helper.dart' as tool_ui;
@@ -164,6 +166,26 @@ void main() {
       expect(groups.firstWhere((g) => g.id == 'b').netArea, 4);
       expect(groups.firstWhere((g) => g.id == 'c').netArea, 8);
       expect(groups.expand((g) => g.rooms).map((r) => r.id).toSet().length, 2);
+    },
+  );
+
+  test(
+    'A new room joins an existing apartment and updates its published table',
+    () {
+      final apartment = rectangle('a', 0, apartment: true);
+      final model = editing.seeded(scene().copyWith(zones: [apartment]));
+      addTearDown(model.dispose);
+      model.execute(
+        CreateArchitectZone(storeyId: 's', zone: rectangle('new', 1)),
+      );
+      expect(model.project.activeStorey.zones.last.apartmentId, 'a');
+      final tables = ArchitectZonePainterHelper.scheduleTables(
+        storey: model.project.activeStorey,
+        zoomScale: 80,
+      );
+      expect(tables.single.group.id, 'a');
+      expect(tables.single.group.rooms.single.id, 'new');
+      expect(tables.single.group.netArea, 4);
     },
   );
 
@@ -397,6 +419,42 @@ void main() {
   );
 
   for (final locale in ['bg', 'en']) {
+    testWidgets('Automatic room membership review fits a phone in $locale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final storey = scene();
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: Locale(locale),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showArchitectApartmentRooms(
+                  context,
+                  storey.zones.first,
+                  storey.zones,
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('apartment-room-r1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('apartment-room-r2')), findsNothing);
+      expect(find.byKey(const ValueKey('apartment-room-free')), findsNothing);
+      expect(find.byType(CheckboxListTile), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('Apartment properties and schedule fit a phone in $locale', (
       tester,
     ) async {

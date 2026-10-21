@@ -22,11 +22,20 @@ class ArchitectOpeningPlanPainter {
     required double height,
     required double sillHeight,
     required String specId,
+    String? elementId,
     required double zoomScale,
     required ArchitectCanvasPalette palette,
     bool isSelected = false,
     bool outsideWall = false,
   }) {
+    final scope = ArchitectTextScope.current;
+    final annotationId = elementId ?? specId;
+    final dimensionFontScale = scope == null
+        ? null
+        : scope.fontSize(annotationId, ArchitectAnnotationRole.dimension) / 10;
+    final symbolFontScale = scope == null
+        ? null
+        : scope.fontSize(annotationId, ArchitectAnnotationRole.symbol) / 14;
     final halfThick = wallThickness / 2;
     final n = normal;
     final dimLinePaint = Paint()
@@ -36,11 +45,14 @@ class ArchitectOpeningPlanPainter {
       ..strokeWidth = 0.8 / zoomScale
       ..style = PaintingStyle.stroke;
 
-    final wCm = ArchitectTextScope.current?.number(width) ??
+    final wCm =
+        ArchitectTextScope.current?.number(width) ??
         BimDistanceUnit.trimZeros((width * 100).toStringAsFixed(1));
-    final hCm = ArchitectTextScope.current?.number(height) ??
+    final hCm =
+        ArchitectTextScope.current?.number(height) ??
         BimDistanceUnit.trimZeros((height * 100).toStringAsFixed(1));
-    final sillCm = ArchitectTextScope.current?.number(sillHeight) ??
+    final sillCm =
+        ArchitectTextScope.current?.number(sillHeight) ??
         BimDistanceUnit.trimZeros((sillHeight * 100).toStringAsFixed(1));
 
     // Paint dimension numbers on both sides of the transverse line, parallel to the line
@@ -56,16 +68,22 @@ class ArchitectOpeningPlanPainter {
     );
 
     final tpWidth = ArchitectTextPainter(
+      elementId: annotationId,
+      role: ArchitectAnnotationRole.dimension,
+      modelScale: dimensionFontScale,
       text: TextSpan(text: wCm, style: textStyle),
       textDirection: TextDirection.ltr,
     )..layout();
 
     final tpHeight = ArchitectTextPainter(
+      elementId: annotationId,
+      role: ArchitectAnnotationRole.dimension,
+      modelScale: dimensionFontScale,
       text: TextSpan(text: hCm, style: textStyle),
       textDirection: TextDirection.ltr,
     )..layout();
 
-    final dimTextScale = ArchitectTextScope.current == null ? .10 / tpWidth.height : ArchitectTextScope.current!.fontSize(specId, ArchitectAnnotationRole.dimension) / (tpWidth.text as TextSpan).style!.fontSize!;
+    final dimTextScale = dimensionFontScale ?? .10 / tpWidth.height;
     final numberWidth = math.max(tpWidth.width, tpHeight.width) * dimTextScale;
     final labelOffset = outsideWall ? halfThick + 0.08 + numberWidth / 2 : 0.0;
     final extDist = outsideWall
@@ -94,6 +112,9 @@ class ArchitectOpeningPlanPainter {
     // Sill height text if > 0 (e.g. h=15)
     if (sillHeight > 0 && !outsideWall) {
       final tpSill = ArchitectTextPainter(
+        elementId: annotationId,
+        role: ArchitectAnnotationRole.dimension,
+        modelScale: dimensionFontScale,
         text: TextSpan(text: 'h=$sillCm', style: textStyle),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -109,10 +130,13 @@ class ArchitectOpeningPlanPainter {
 
     if (outsideWall && sillHeight > 0) {
       final sill = ArchitectTextPainter(
+        elementId: annotationId,
+        role: ArchitectAnnotationRole.dimension,
+        modelScale: dimensionFontScale,
         text: TextSpan(text: 'h=$sillCm', style: textStyle),
         textDirection: TextDirection.ltr,
       )..layout();
-      final sillScale = ArchitectTextScope.current == null ? .10 / sill.height : ArchitectTextScope.current!.fontSize(specId, ArchitectAnnotationRole.dimension) / (sill.text as TextSpan).style!.fontSize!;
+      final sillScale = dimensionFontScale ?? .10 / sill.height;
       final pos = centerPos - n * (halfThick + 0.08 + .05);
       var angle = math.atan2(-n.dx, n.dy);
       if (angle > math.pi / 2) angle -= math.pi;
@@ -129,7 +153,9 @@ class ArchitectOpeningPlanPainter {
     // Positioned at the end of the extended dimension line touching circumference.
     // Static in model coordinates: never balloons up upon zoom-out.
     // Circle interior is transparent (outline only, no solid hatch).
-    final badgeR = ArchitectTextScope.current == null ? badgeRadius : ArchitectDrawingScale(ArchitectTextScope.current!.denominator).paperToModel(ArchitectTextScope.current!.document.textMm(ArchitectTextScope.current!.view, specId, ArchitectAnnotationRole.symbol, ArchitectTextScope.current!.denominator) * 1.2);
+    final badgeR = scope == null
+        ? badgeRadius
+        : scope.height(annotationId, ArchitectAnnotationRole.symbol) * 1.2;
     final badgeCenter = centerPos + n * (extDist + badgeR);
 
     // Circle border (outline only, transparent interior)
@@ -146,6 +172,9 @@ class ArchitectOpeningPlanPainter {
 
     // Text ID inside circle (static ~0.14m height)
     final idPainter = ArchitectTextPainter(
+      elementId: annotationId,
+      role: ArchitectAnnotationRole.symbol,
+      modelScale: symbolFontScale,
       text: TextSpan(
         text: specId,
         style: TextStyle(
@@ -160,7 +189,7 @@ class ArchitectOpeningPlanPainter {
       textDirection: TextDirection.ltr,
     )..layout();
 
-    final idScale = ArchitectTextScope.current == null ? .14 / idPainter.height : ArchitectTextScope.current!.fontSize(specId, ArchitectAnnotationRole.symbol) / (idPainter.text as TextSpan).style!.fontSize!;
+    final idScale = symbolFontScale ?? .14 / idPainter.height;
     canvas.save();
     canvas.translate(badgeCenter.dx, badgeCenter.dy);
     canvas.scale(idScale);

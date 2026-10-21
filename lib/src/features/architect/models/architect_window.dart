@@ -168,6 +168,7 @@ class ArchitectWindow {
         showDimensions: false,
       );
       ArchitectOpeningPlanPainter.paint(
+        elementId: id,
         canvas: canvas,
         centerPos: centerPos,
         normal: n * exteriorSign,
@@ -288,6 +289,7 @@ class ArchitectWindow {
     }
 
     ArchitectOpeningPlanPainter.paint(
+      elementId: id,
       canvas: canvas,
       centerPos: centerPos,
       normal: n * exteriorSign,

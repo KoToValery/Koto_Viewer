@@ -44,7 +44,7 @@ void main() {
             tiers[1].line.$1 - tiers[0].line.$1,
             dimension.normal,
           ).abs(),
-          closeTo(.45, 1e-9),
+          closeTo(.4, 1e-9),
         );
       }
     }

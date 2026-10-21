@@ -425,6 +425,8 @@ class ArchitectElementTool extends ChangeNotifier {
     double scale,
     ArchitectTool tool, {
     List<StructuralGridAxis> gridAxes = const [],
+    ArchitectProject? annotationProject,
+    String? drawingViewKey,
   }) {
     if (tool == ArchitectTool.select) {
       return hitTestElements(
@@ -432,6 +434,8 @@ class ArchitectElementTool extends ChangeNotifier {
         point,
         scale,
         gridAxes: gridAxes,
+        annotationProject: annotationProject,
+        drawingViewKey: drawingViewKey,
       );
     }
     final scoped = storey.copyWith(
@@ -475,8 +479,10 @@ class ArchitectElementTool extends ChangeNotifier {
       scoped,
       point,
       scale,
-      gridAxes: tool == ArchitectTool.axis ? gridAxes : const [],
+      gridAxes: gridAxes,
       dimensionStorey: storey,
+      annotationProject: annotationProject,
+      drawingViewKey: drawingViewKey,
     ).where((id) => tool == ArchitectTool.wall || !scoped.walls.any((w) => w.id == id));
   }
 
@@ -486,6 +492,8 @@ class ArchitectElementTool extends ChangeNotifier {
     double scale,
     ArchitectTool tool, {
     List<StructuralGridAxis> gridAxes = const [],
+    ArchitectProject? annotationProject,
+    String? drawingViewKey,
   }) =>
       hitTestElementsForTool(
         storey,
@@ -493,6 +501,8 @@ class ArchitectElementTool extends ChangeNotifier {
         scale,
         tool,
         gridAxes: gridAxes,
+        annotationProject: annotationProject,
+        drawingViewKey: drawingViewKey,
       ).firstOrNull;
 
   String? hitTestElement(
@@ -501,12 +511,16 @@ class ArchitectElementTool extends ChangeNotifier {
     double scale, {
     List<StructuralGridAxis> gridAxes = const [],
     ArchitectStorey? dimensionStorey,
+    ArchitectProject? annotationProject,
+    String? drawingViewKey,
   }) => hitTestElements(
     storey,
     point,
     scale,
     gridAxes: gridAxes,
     dimensionStorey: dimensionStorey,
+    annotationProject: annotationProject,
+    drawingViewKey: drawingViewKey,
   ).firstOrNull;
 
   Iterable<String> hitTestElements(
@@ -515,6 +529,8 @@ class ArchitectElementTool extends ChangeNotifier {
     double scale, {
     List<StructuralGridAxis> gridAxes = const [],
     ArchitectStorey? dimensionStorey,
+    ArchitectProject? annotationProject,
+    String? drawingViewKey,
   }) sync* {
     final tolerance = 14.0 / scale;
 
@@ -591,6 +607,9 @@ class ArchitectElementTool extends ChangeNotifier {
         scale: scale,
         storey: dimensionStorey ?? storey,
         gridAxes: gridAxes,
+        dimensionScale: annotationProject?.dimensionScale,
+        document: annotationProject?.document,
+        viewKey: drawingViewKey ?? 'plan:${storey.id}',
       );
       bool hit = false;
       for (final tier in tiers) {

@@ -657,7 +657,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return null;
     }
     return ArchitectDimensionChain.build(
-      id: 'dimension-preview',
+      id: _dimensionEditing?.id ?? 'dimension-preview',
       anchors: _dimensionAnchors,
       direction: _dimensionDirection!,
       offset: _dimensionOffset,
@@ -772,6 +772,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           point,
           _currentScale,
           gridAxes: _project.gridAxes,
+          annotationProject: _project,
+          drawingViewKey: _workspaceViewKey,
         ),
         for (final zone in _project.activeStorey.zones)
           if ((Path()..addPolygon(zone.polygon, true)).contains(point)) zone.id,
@@ -803,6 +805,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _currentScale,
       _activeTool,
       gridAxes: _project.gridAxes,
+      annotationProject: _project,
+      drawingViewKey: _workspaceViewKey,
     );
     final first = _hitSelection(point);
     return <String>{
@@ -881,6 +885,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         point,
         _currentScale,
         gridAxes: _project.gridAxes,
+        annotationProject: _project,
+        drawingViewKey: _workspaceViewKey,
       ),
     };
     for (final id in candidates) {
@@ -1026,6 +1032,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       raw,
       _currentScale,
       gridAxes: _project.gridAxes,
+      annotationProject: _project,
+      drawingViewKey: _workspaceViewKey,
     ).toSet();
 
     // 1. Check if an opening (window or door) was picked
@@ -7375,6 +7383,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             point,
             _currentScale,
             gridAxes: _project.gridAxes,
+            annotationProject: _project,
+            drawingViewKey: _workspaceViewKey,
           ) ??
           _axisTool
               .hitTestAxis(
@@ -7397,6 +7407,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _currentScale,
       _activeTool,
       gridAxes: _project.gridAxes,
+      annotationProject: _project,
+      drawingViewKey: _workspaceViewKey,
     );
   }
 
@@ -12135,6 +12147,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       palette: _canvasPalette,
                       storey: _project.activeStorey,
                       gridAxes: _project.gridAxes,
+                      document: _project.document,
+                      viewKey: _workspaceViewKey,
                     ),
                   ),
                 ),

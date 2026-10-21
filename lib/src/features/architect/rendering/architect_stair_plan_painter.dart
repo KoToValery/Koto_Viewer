@@ -90,7 +90,13 @@ class ArchitectStairPlanPainter {
         path.lineTo(p.dx, p.dy);
       }
       canvas.drawPath(path, thin);
-      final radius = (stair.width * .055 * scale).clamp(4.5, 8.0) / scale;
+      final scope = ArchitectTextScope.current;
+      final radius = scope == null
+          ? (stair.width * .055 * scale).clamp(4.5, 8.0) / scale
+          : (stair.width * .055).clamp(
+              ArchitectDrawingScale(scope.denominator).paperToModel(.5625),
+              ArchitectDrawingScale(scope.denominator).paperToModel(1),
+            );
       canvas.drawCircle(points.first, radius, Paint()..color = background);
       canvas.drawCircle(points.first, radius, stroke);
       final end = points.last, delta = end - points[points.length - 2];
@@ -178,8 +184,10 @@ class ArchitectStairPlanPainter {
         d.showLabel &&
         labels &&
         l10n != null &&
-        dimensionScale.textHeight * scale >= 5) {
-      final text = ArchitectTextPainter(elementId: stair.id, modelScale: 1 / scale,
+        (ArchitectTextScope.current != null || dimensionScale.textHeight * scale >= 5)) {
+      final scope = ArchitectTextScope.current;
+      final labelScale = scope == null ? 1 / scale : 1.0;
+      final text = ArchitectTextPainter(elementId: stair.id, modelScale: labelScale,
         textDirection: TextDirection.ltr,
         textAlign: TextAlign.center,
         text: TextSpan(
@@ -194,12 +202,13 @@ class ArchitectStairPlanPainter {
       )..layout();
       canvas.save();
       canvas.translate(plan.bounds.bottomCenter.dx, plan.bounds.bottom + .16);
-      canvas.scale(1 / scale);
+      canvas.scale(labelScale);
+      final unit = scope == null ? 1.0 : ArchitectDrawingScale(scope.denominator).paperToModel(.125) / labelScale;
       final rect = Rect.fromLTWH(
-        -text.width / 2 - 3,
-        -2,
-        text.width + 6,
-        text.height + 4,
+        -text.width / 2 - 3 * unit,
+        -2 * unit,
+        text.width + 6 * unit,
+        text.height + 4 * unit,
       );
       canvas.drawRect(rect, Paint()..color = background.withValues(alpha: .94));
       text.paint(canvas, Offset(-text.width / 2, 0));

@@ -362,6 +362,7 @@ class ArchitectDoor {
     }
 
     ArchitectOpeningPlanPainter.paint(
+      elementId: id,
       canvas: canvas,
       centerPos: centerPos,
       normal: n,

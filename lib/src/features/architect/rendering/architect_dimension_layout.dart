@@ -6,6 +6,7 @@ import '../models/architect_grid_axis.dart';
 import '../services/architect_dimension_chain.dart';
 
 import '../models/architect_project.dart';
+import 'architect_vector_scene.dart';
 
 class DimensionTier {
   final int tierIndex; // 1 = openings, 2 = wall sections, 3 = overall, 4 = axes
@@ -21,8 +22,30 @@ class DimensionTier {
 }
 
 class ArchitectDimensionLayout {
-  /// Row spacing in model metres; camera zoom must not alter drawing geometry.
-  static const double rowSpacing = .45;
+  /// Resolve the same annotation profile for painting, drafting and picking.
+  /// Camera zoom only magnifies this model-space layout.
+  static double rowSpacingFor(
+    ArchitectDimension dimension, {
+    ArchitectDimensionScale? dimensionScale,
+    ArchitectDocument? document,
+    String? viewKey,
+  }) {
+    final scope = ArchitectTextScope.current;
+    final doc = document ?? scope?.document ?? const ArchitectDocument();
+    final view = viewKey ?? scope?.view ?? '';
+    final denominator = document == null && scope != null
+        ? scope.denominator
+        : doc.viewScales[view] ?? dimensionScale?.denominator ?? 100;
+    final height = doc.textMm(
+      view,
+      dimension.id,
+      ArchitectAnnotationRole.dimension,
+      denominator,
+    );
+    final lines = dimension.customText?.split('\n').length ?? 1;
+    return ArchitectDrawingScale(denominator).dimensionRowSpacing(height) *
+        lines;
+  }
 
   /// Resolve finish picks against the real wall faces, without changing the
   /// saved snap point or moving the positioned dimension line.
@@ -117,6 +140,9 @@ class ArchitectDimensionLayout {
     ArchitectDimension dimension,
     double scale, {
     bool hasOpenings = false,
+    ArchitectDimensionScale? dimensionScale,
+    ArchitectDocument? document,
+    String? viewKey,
   }) {
     if (dimension.style != ArchitectDimensionStyle.exterior ||
         !dimension.showOverall ||
@@ -124,6 +150,12 @@ class ArchitectDimensionLayout {
       return null;
     }
     final outward = dimension.normal * (dimension.offsetDistance < 0 ? -1 : 1);
+    final rowSpacing = rowSpacingFor(
+      dimension,
+      dimensionScale: dimensionScale,
+      document: document,
+      viewKey: viewKey,
+    );
     final shift = outward * (hasOpenings ? rowSpacing * 2 : rowSpacing);
     return (dimension.lineStart + shift, dimension.lineEnd + shift);
   }
@@ -133,6 +165,9 @@ class ArchitectDimensionLayout {
     required double scale,
     ArchitectStorey? storey,
     List<StructuralGridAxis> gridAxes = const [],
+    ArchitectDimensionScale? dimensionScale,
+    ArchitectDocument? document,
+    String? viewKey,
   }) {
     if (dimension.length < 1e-4) return const [];
     final u = dimension.unitVector;
@@ -140,6 +175,12 @@ class ArchitectDimensionLayout {
     double along(Offset p) =>
         ArchitectDimensionChain.dot(p - dimension.startPoint, u);
     final tiers = <DimensionTier>[];
+    final rowSpacing = rowSpacingFor(
+      dimension,
+      dimensionScale: dimensionScale,
+      document: document,
+      viewKey: viewKey,
+    );
 
     void row(int tier, Iterable<double> positions) {
       final values = positions.toList()..sort();
