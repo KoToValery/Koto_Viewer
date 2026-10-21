@@ -2274,5 +2274,15 @@
   "architectPlacementModeWall": "До стена",
   "architectPlacementModeFree": "Свободно стоящ",
   "architectLayerFurniture": "Слой Обзавеждане",
-  "architectComponentNoItems": "Няма намерени елементи"
+  "architectComponentNoItems": "Няма намерени елементи",
+  "architectApartment": "Апартамент",
+  "architectRoom": "Помещение",
+  "architectApartmentRooms": "Помещения",
+  "architectUnassignedRooms": "Без апартамент",
+  "architectApartmentAutoAssignment": "Автоматично",
+  "architectApartmentNoRooms": "Няма помещения в контура.",
+  "architectApartmentBoundaryHelp": "Начертайте ръчно по осите на вътрешните стени и външните лица на външните стени.",
+  "architectApartmentGross": "Площ по контур",
+  "architectApartmentNet": "Чиста площ",
+  "architectApartmentRoomsHelp": "Помещенията се включват автоматично според най-голямата обща площ с апартамента. Всяко помещение се отчита изцяло само веднъж. При равни площи се запазва текущият апартамент. Помещенията извън всички апартаменти остават без апартамент."
 }

@@ -6951,4 +6951,36 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectComponentNoItems => 'Няма намерени елементи';
+
+  @override
+  String get architectApartment => 'Апартамент';
+
+  @override
+  String get architectRoom => 'Помещение';
+
+  @override
+  String get architectApartmentRooms => 'Помещения';
+
+  @override
+  String get architectUnassignedRooms => 'Без апартамент';
+
+  @override
+  String get architectApartmentAutoAssignment => 'Автоматично';
+
+  @override
+  String get architectApartmentNoRooms => 'Няма помещения в контура.';
+
+  @override
+  String get architectApartmentBoundaryHelp =>
+      'Начертайте ръчно по осите на вътрешните стени и външните лица на външните стени.';
+
+  @override
+  String get architectApartmentGross => 'Площ по контур';
+
+  @override
+  String get architectApartmentNet => 'Чиста площ';
+
+  @override
+  String get architectApartmentRoomsHelp =>
+      'Помещенията се включват автоматично според най-голямата обща площ с апартамента. Всяко помещение се отчита изцяло само веднъж. При равни площи се запазва текущият апартамент. Помещенията извън всички апартаменти остават без апартамент.';
 }

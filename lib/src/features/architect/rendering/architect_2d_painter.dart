@@ -156,6 +156,7 @@ class Architect2dPainter extends CustomPainter {
   final List<Offset>? zoneEditingPolygon;
 
   // Zone Schedule Table
+  final String? selectedZoneTableId;
   final bool isZoneTableSelected;
   final Offset? zoneTableDragPreviewOrigin;
 
@@ -261,6 +262,7 @@ class Architect2dPainter extends CustomPainter {
     this.zonePreviewRectangle = const [],
     this.zoneEditingPolygon,
     this.isZoneTableSelected = false,
+    this.selectedZoneTableId,
     this.zoneTableDragPreviewOrigin,
     this.underlayDoc,
     this.underlayLayerVisibility = const {},
@@ -828,6 +830,7 @@ class Architect2dPainter extends CustomPainter {
       storey: _project.activeStorey,
       zoomScale: zoomScale,
       isTableSelected: isZoneTableSelected,
+      selectedTableId: selectedZoneTableId,
       tableDragPreviewOrigin: zoneTableDragPreviewOrigin,
       tableGhostOrigin:
           activeTool == ArchitectTool.zoneTable ? cursorPosition : null,

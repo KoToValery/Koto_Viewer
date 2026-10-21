@@ -6924,4 +6924,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectComponentNoItems => 'No items found';
+
+  @override
+  String get architectApartment => 'Apartment';
+
+  @override
+  String get architectRoom => 'Room';
+
+  @override
+  String get architectApartmentRooms => 'Rooms';
+
+  @override
+  String get architectUnassignedRooms => 'Unassigned rooms';
+
+  @override
+  String get architectApartmentAutoAssignment => 'Auto';
+
+  @override
+  String get architectApartmentNoRooms => 'No rooms within the outline.';
+
+  @override
+  String get architectApartmentBoundaryHelp =>
+      'Draw manually along internal wall axes and the exterior faces of exterior walls.';
+
+  @override
+  String get architectApartmentGross => 'Contour area';
+
+  @override
+  String get architectApartmentNet => 'Room area';
+
+  @override
+  String get architectApartmentRoomsHelp =>
+      'Rooms are assigned automatically by the largest overlapping area with an apartment. Each room is counted in full only once. Equal areas retain the current apartment. Rooms outside all apartments stay unassigned.';
 }

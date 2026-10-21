@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/l10n/generated/app_localizations.dart';
+import '../../bim_editing/geometry/bim_polygon_overlap.dart';
+
+enum ArchitectZoneKind { room, apartment }
 
 /// Standard architectural functional room categories.
 enum ArchitectZoneCategory {
@@ -73,6 +76,10 @@ enum ArchitectZoneCategory {
 /// defined by a parametric 2D polygon with dynamic vertices, grips,
 /// room finishes (floor, wall, ceiling), and automated schedule metadata.
 class ArchitectZone {
+  final ArchitectZoneKind kind;
+  final String? apartmentId;
+  final Offset? scheduleOrigin;
+  bool get isApartment => kind == ArchitectZoneKind.apartment;
   final String id;
   final String
   number; // Room number for schedules/drawings (e.g. "1", "01", "101")
@@ -83,7 +90,9 @@ class ArchitectZone {
   final String wallFinish; // Wall finish / финиш стени
   final String ceilingFinish; // Ceiling finish / финиш таван
   final double clearHeight; // Clear room height in meters (default 2.60 m)
-  final bool isAutoBoundary; // Automatic dynamic room boundary vs manual fixed
+  final bool _isAutoBoundary;
+  bool get isAutoBoundary => !isApartment && _isAutoBoundary;
+  // Apartment contours always remain manual.
   final Offset?
   seedPoint; // Internal seed point for dynamic boundary detection & merge
   final double? targetArea; // Optional target program area in m²
@@ -99,11 +108,67 @@ class ArchitectZone {
     this.wallFinish = '',
     this.ceilingFinish = '',
     this.clearHeight = 2.60,
-    this.isAutoBoundary = true,
+    bool isAutoBoundary = true,
+    this.kind = ArchitectZoneKind.room,
+    String? apartmentId,
+    this.scheduleOrigin,
     this.seedPoint,
     this.targetArea,
     this.customColorValue,
-  });
+  }) : _isAutoBoundary = isAutoBoundary,
+       apartmentId = kind == ArchitectZoneKind.room ? apartmentId : null;
+
+  // Storeys and their lists are immutable snapshots. Cache the derived ownership
+  // so repainting or opening properties does not repeat polygon intersections.
+  static final _memberships = Expando<List<ArchitectZone>>();
+  static final _overlaps = Expando<BimPolygonOverlap>();
+
+  static BimPolygonOverlap _overlap(ArchitectZone zone) =>
+      _overlaps[zone.polygon] ??= BimPolygonOverlap(zone.polygon);
+
+  /// Assign the entire room once, to the apartment with the largest overlap.
+  /// Keep the current owner on ties, otherwise use the stable apartment ID.
+  /// This is derived from contours rather than an independently editable link.
+  static List<ArchitectZone> normalizeMemberships(List<ArchitectZone> zones) {
+    final cached = _memberships[zones];
+    if (cached != null) return cached;
+    final apartments = zones.where((z) => z.isApartment).toList()
+      ..sort((a, b) => a.id.compareTo(b.id));
+    final result = <ArchitectZone>[];
+    const tolerance = 1e-8; // square metres; ignore numerical contact slivers.
+    for (final zone in zones) {
+      if (zone.isApartment) {
+        result.add(zone);
+        continue;
+      }
+      String? owner;
+      var largest = 0.0;
+      final overlaps = <(String, double)>[];
+      for (final apartment in apartments) {
+        final area = _overlap(zone).intersectionArea(_overlap(apartment));
+        overlaps.add((apartment.id, area));
+        if (area > largest) largest = area;
+      }
+      if (largest > tolerance) {
+        final tied = overlaps.where((a) => largest - a.$2 <= tolerance);
+        owner = tied.any((a) => a.$1 == zone.apartmentId)
+            ? zone.apartmentId
+            : tied.first.$1;
+      }
+      result.add(
+        owner == zone.apartmentId
+            ? zone
+            : zone.copyWith(
+                apartmentId: owner,
+                clearApartmentId: owner == null,
+              ),
+      );
+    }
+    final resolved = List<ArchitectZone>.unmodifiable(result);
+    _memberships[zones] = resolved;
+    _memberships[resolved] = resolved;
+    return resolved;
+  }
 
   Color get color =>
       customColorValue != null ? Color(customColorValue!) : category.color;
@@ -369,6 +434,11 @@ class ArchitectZone {
 
   ArchitectZone copyWith({
     String? id,
+    ArchitectZoneKind? kind,
+    String? apartmentId,
+    bool clearApartmentId = false,
+    Offset? scheduleOrigin,
+    bool clearScheduleOrigin = false,
     String? number,
     String? name,
     ArchitectZoneCategory? category,
@@ -385,6 +455,11 @@ class ArchitectZone {
   }) {
     return ArchitectZone(
       id: id ?? this.id,
+      kind: kind ?? this.kind,
+      apartmentId: clearApartmentId ? null : apartmentId ?? this.apartmentId,
+      scheduleOrigin: clearScheduleOrigin
+          ? null
+          : scheduleOrigin ?? this.scheduleOrigin,
       number: number ?? this.number,
       name: name ?? this.name,
       category: category ?? this.category,
@@ -402,6 +477,10 @@ class ArchitectZone {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    'kind': kind.name,
+    if (apartmentId != null) 'apartmentId': apartmentId,
+    if (scheduleOrigin != null)
+      'scheduleOrigin': {'x': scheduleOrigin!.dx, 'y': scheduleOrigin!.dy},
     'number': number,
     'name': name,
     'category': category.name,
@@ -443,6 +522,16 @@ class ArchitectZone {
 
     return ArchitectZone(
       id: json['id'] as String,
+      kind: json['kind'] == 'apartment'
+          ? ArchitectZoneKind.apartment
+          : ArchitectZoneKind.room,
+      apartmentId: json['apartmentId'] as String?,
+      scheduleOrigin: json['scheduleOrigin'] is Map
+          ? Offset(
+              (json['scheduleOrigin']['x'] as num).toDouble(),
+              (json['scheduleOrigin']['y'] as num).toDouble(),
+            )
+          : null,
       number: json['number'] as String? ?? '1',
       name: json['name'] as String? ?? '',
       category: category,

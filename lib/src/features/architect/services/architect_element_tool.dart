@@ -795,7 +795,7 @@ class ArchitectElementTool extends ChangeNotifier {
       final zone = storey.zones[zoneIndex];
       if (zone.isAutoBoundary) return (storey, null);
       final newZone = const ArchitectZoneEditingAdapter().translate(
-        zone.copyWith(id: newId),
+        zone.copyWith(id: newId, clearScheduleOrigin: true),
         offset,
       );
       return (storey.copyWith(zones: [...storey.zones, newZone]), newId);
@@ -1153,7 +1153,7 @@ class ArchitectElementTool extends ChangeNotifier {
         for (final p in zone.polygon)
           BimTransform2D.mirror(p, origin, direction),
       ].reversed.toList();
-      final newZone = zone.copyWith(id: targetId, polygon: newPoly);
+      final newZone = zone.copyWith(id: targetId, polygon: newPoly, clearScheduleOrigin: isDuplicate);
       if (isDuplicate) {
         return (storey.copyWith(zones: [...storey.zones, newZone]), targetId);
       } else {

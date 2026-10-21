@@ -1,3 +1,4 @@
+import 'architect_zone_apartment_controls.dart';
 import 'package:flutter/material.dart';
 import '../../bim_editing/properties/bim_distance_unit.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -23,6 +24,10 @@ import '../services/architect_zone_tool.dart';
 /// Optimized for mobile: sleek, minimal vertical footprint, dropdown room category selector,
 /// dynamic boundary toggle, and finishes inspector.
 class ArchitectZonePropertiesCard extends StatefulWidget {
+  final BimDistanceUnit units;
+  final List<ArchitectZone> zones;
+  final VoidCallback? onManageApartmentRooms;
+  final ValueChanged<String>? onOpenApartment;
   final ArchitectZone zone;
   final ArchitectZonePresets presets;
   final ArchitectZoneTool? tool;
@@ -34,6 +39,10 @@ class ArchitectZonePropertiesCard extends StatefulWidget {
   const ArchitectZonePropertiesCard({
     super.key,
     required this.zone,
+    this.zones = const [],
+    this.units = BimDistanceUnit.meters,
+    this.onManageApartmentRooms,
+    this.onOpenApartment,
     this.tool,
     this.presets = const ArchitectZonePresets(),
     required this.onZoneUpdated,
@@ -76,6 +85,13 @@ class _ArchitectZonePropertiesCardState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          ArchitectZoneApartmentControls(
+            zone: zone,
+            zones: widget.zones,
+            onChanged: widget.onZoneUpdated,
+            onRooms: widget.onManageApartmentRooms,
+            onOpenApartment: widget.onOpenApartment,
+          ),
           // 1. Header Row: Room №, Category Dropdown, Name edit, Area chip, Delete, Close
           Row(
             children: [
@@ -109,73 +125,85 @@ class _ArchitectZonePropertiesCardState
 
               // Category Selector Dropdown (Space-efficient, zero hardcoded names)
               Expanded(
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<ArchitectZoneCategory>(
-                    value: zone.category,
-                    isDense: true,
-                    isExpanded: true,
-                    selectedItemBuilder: (_) => [
-                      for (final category in ArchitectZoneCategory.values)
-                        Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: Text(
-                            category == zone.category && zone.name.isNotEmpty
-                                ? zone.name
-                                : widget.presets.categoryName(category, l10n),
-                            style: TextStyle(
-                              color: zone.color,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                    dropdownColor: const Color(0xFF1E2230),
-                    borderRadius: BorderRadius.circular(10),
-                    icon: const Icon(
-                      Icons.arrow_drop_down_rounded,
-                      color: Colors.white70,
-                      size: 20,
-                    ),
-                    items: ArchitectZoneCategory.values.map((cat) {
-                      return DropdownMenuItem<ArchitectZoneCategory>(
-                        value: cat,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(cat.icon, size: 16, color: cat.color),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                widget.presets.categoryName(cat, l10n),
-                                style: TextStyle(
-                                  color: cat == zone.category
-                                      ? cat.color
-                                      : Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
+                child: zone.isApartment
+                    ? Text(
+                        zone.name,
+                        style: const TextStyle(color: Colors.white),
+                      )
+                    : DropdownButtonHideUnderline(
+                        child: DropdownButton<ArchitectZoneCategory>(
+                          value: zone.category,
+                          isDense: true,
+                          isExpanded: true,
+                          selectedItemBuilder: (_) => [
+                            for (final category in ArchitectZoneCategory.values)
+                              Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Text(
+                                  category == zone.category &&
+                                          zone.name.isNotEmpty
+                                      ? zone.name
+                                      : widget.presets.categoryName(
+                                          category,
+                                          l10n,
+                                        ),
+                                  style: TextStyle(
+                                    color: zone.color,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
                           ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (newCat) {
-                      if (newCat != null) {
-                        widget.onZoneUpdated(
-                          zone.copyWith(
-                            category: newCat,
-                            name: widget.presets.categoryName(newCat, l10n),
+                          dropdownColor: const Color(0xFF1E2230),
+                          borderRadius: BorderRadius.circular(10),
+                          icon: const Icon(
+                            Icons.arrow_drop_down_rounded,
+                            color: Colors.white70,
+                            size: 20,
                           ),
-                        );
-                      }
-                    },
-                  ),
-                ),
+                          items: ArchitectZoneCategory.values.map((cat) {
+                            return DropdownMenuItem<ArchitectZoneCategory>(
+                              value: cat,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(cat.icon, size: 16, color: cat.color),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      widget.presets.categoryName(cat, l10n),
+                                      style: TextStyle(
+                                        color: cat == zone.category
+                                            ? cat.color
+                                            : Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (newCat) {
+                            if (newCat != null) {
+                              widget.onZoneUpdated(
+                                zone.copyWith(
+                                  category: newCat,
+                                  name: widget.presets.categoryName(
+                                    newCat,
+                                    l10n,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ),
               ),
 
               // Edit details pencil (if custom name is set)
@@ -204,7 +232,7 @@ class _ArchitectZonePropertiesCardState
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  '${BimDistanceUnit.trimZeros(zone.area.toStringAsFixed(2))} m²',
+                  widget.units.formatArea(zone.area),
                   style: TextStyle(
                     color: zone.color,
                     fontWeight: FontWeight.bold,
@@ -260,76 +288,80 @@ class _ArchitectZonePropertiesCardState
 
           const SizedBox(height: 6),
 
-          // 2. Finishes Summary Bar (Floor, Walls, Ceiling) - Tap to edit in dialog
-          InkWell(
-            onTap: () => _showEditZoneDetailsDialog(context),
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0x1AFFFFFF),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.tune_rounded,
-                    color: Color(0xFF38BDF8),
-                    size: 14,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '${l10n.architectZoneScheduleColFloor}: ${zone.resolvedFloorFinish(l10n)}  •  '
-                      '${l10n.architectZoneScheduleColWalls}: ${zone.resolvedWallFinish(l10n)}  •  '
-                      '${l10n.architectZoneScheduleColCeiling}: ${zone.resolvedCeilingFinish(l10n)}',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 10.5,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+          // Room finishes belong to the rooms, rather than their apartment container.
+          if (!zone.isApartment)
+            InkWell(
+              onTap: () => _showEditZoneDetailsDialog(context),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0x1AFFFFFF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.tune_rounded,
+                      color: Color(0xFF38BDF8),
+                      size: 14,
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.white38,
-                    size: 16,
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${l10n.architectZoneScheduleColFloor}: ${zone.resolvedFloorFinish(l10n)}  •  '
+                        '${l10n.architectZoneScheduleColWalls}: ${zone.resolvedWallFinish(l10n)}  •  '
+                        '${l10n.architectZoneScheduleColCeiling}: ${zone.resolvedCeilingFinish(l10n)}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10.5,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white38,
+                      size: 16,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
           const SizedBox(height: 6),
 
-          Tooltip(
-            message: l10n.architectZoneManualHelp,
-            child: Material(
-              type: MaterialType.transparency,
-              child: CheckboxListTile(
-                key: const ValueKey('zone-manual-mode'),
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                controlAffinity: ListTileControlAffinity.leading,
-                title: Text(
-                  l10n.architectZoneModeManual,
-                  style: const TextStyle(color: Colors.white70),
+          if (!zone.isApartment)
+            Tooltip(
+              message: l10n.architectZoneManualHelp,
+              child: Material(
+                type: MaterialType.transparency,
+                child: CheckboxListTile(
+                  key: const ValueKey('zone-manual-mode'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text(
+                    l10n.architectZoneModeManual,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                  side: const BorderSide(color: Colors.white54),
+                  value: !zone.isAutoBoundary,
+                  onChanged: zone.isApartment
+                      ? null
+                      : (manual) {
+                          if (manual != null) {
+                            widget.onZoneUpdated(
+                              zone.copyWith(isAutoBoundary: !manual),
+                            );
+                          }
+                        },
                 ),
-                side: const BorderSide(color: Colors.white54),
-                value: !zone.isAutoBoundary,
-                onChanged: (manual) {
-                  if (manual != null) {
-                    widget.onZoneUpdated(
-                      zone.copyWith(isAutoBoundary: !manual),
-                    );
-                  }
-                },
               ),
             ),
-          ),
         ],
       ),
     );

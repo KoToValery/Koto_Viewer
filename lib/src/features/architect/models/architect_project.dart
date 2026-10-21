@@ -51,7 +51,8 @@ class ArchitectStorey {
   cutPlaneHeight; // floor plan cut plane height above storey elevation (default 1.20 m)
   final double floorFinishThickness; // default 0.05 m
   final List<ArchitectWall> walls;
-  final List<ArchitectZone> zones;
+  final List<ArchitectZone> _zones;
+  List<ArchitectZone> get zones => ArchitectZone.normalizeMemberships(_zones);
   final List<ArchitectColumn> columns;
   final List<ArchitectBeam> beams;
   final List<ArchitectSlab> slabs;
@@ -75,7 +76,7 @@ class ArchitectStorey {
     this.floorFinishThickness = 0.05,
     this.isRoof = false,
     this.walls = const [],
-    this.zones = const [],
+    List<ArchitectZone> zones = const [],
     this.columns = const [],
     this.beams = const [],
     this.slabs = const [],
@@ -88,7 +89,7 @@ class ArchitectStorey {
     this.cadPrimitives = const [],
     this.components = const [],
     this.zoneScheduleOrigin,
-  });
+  }) : _zones = zones;
 
   String get elevationLabel {
     if (elevation.abs() < 1e-4) return '±0.00';
@@ -226,9 +227,7 @@ class ArchitectStorey {
         const [],
     roofs:
         (json['roofs'] as List<dynamic>?)
-            ?.map(
-              (r) => ArchitectRoofPlane.fromJson(r as Map<String, dynamic>),
-            )
+            ?.map((r) => ArchitectRoofPlane.fromJson(r as Map<String, dynamic>))
             .toList() ??
         const [],
     openings:
@@ -261,8 +260,13 @@ class ArchitectStorey {
             )
             .toList() ??
         const [],
-    components: (json['components'] as List<dynamic>?)
-            ?.map((c) => ArchitectComponentInstance.fromJson(c as Map<String, dynamic>))
+    components:
+        (json['components'] as List<dynamic>?)
+            ?.map(
+              (c) => ArchitectComponentInstance.fromJson(
+                c as Map<String, dynamic>,
+              ),
+            )
             .toList() ??
         const [],
     cadPrimitives:
@@ -338,13 +342,13 @@ class ArchitectProject {
       storeys.expand((s) => s.walls).expand((w) => w.doors);
 
   /// The dedicated roof lines plan storey, if present.
-  ArchitectStorey? get roofStorey =>
-      storeys.where((s) => s.isRoof).firstOrNull;
+  ArchitectStorey? get roofStorey => storeys.where((s) => s.isRoof).firstOrNull;
 
   /// The highest non-roof storey with walls (or highest non-roof storey).
   ArchitectStorey? get highestWallStorey {
-    final withWalls =
-        storeys.where((s) => !s.isRoof && s.walls.isNotEmpty).toList();
+    final withWalls = storeys
+        .where((s) => !s.isRoof && s.walls.isNotEmpty)
+        .toList();
     if (withWalls.isNotEmpty) {
       withWalls.sort((a, b) => a.elevation.compareTo(b.elevation));
       return withWalls.last;
@@ -395,8 +399,7 @@ class ArchitectProject {
     if ((roof.elevation - target).abs() < 1e-4) return this;
     return copyWith(
       storeys: [
-        for (final s in storeys)
-          s.isRoof ? s.copyWith(elevation: target) : s,
+        for (final s in storeys) s.isRoof ? s.copyWith(elevation: target) : s,
       ],
     );
   }
@@ -495,8 +498,13 @@ class ArchitectProject {
       (u) => u.name == json['units'],
       orElse: () => ArchitectUnit.meters,
     ),
-    distanceDecimals: ((json['distanceDecimals'] as num?)?.toInt() ??
-        (json['units'] == 'centimeters' || json['units'] == 'millimeters' ? 0 : 2)).clamp(0, 2),
+    distanceDecimals:
+        ((json['distanceDecimals'] as num?)?.toInt() ??
+                (json['units'] == 'centimeters' ||
+                        json['units'] == 'millimeters'
+                    ? 0
+                    : 2))
+            .clamp(0, 2),
     dimensionScale: ArchitectDimensionScale.values.firstWhere(
       (scale) => scale.denominator == json['dimensionScale'],
       orElse: () => ArchitectDimensionScale.scale100,

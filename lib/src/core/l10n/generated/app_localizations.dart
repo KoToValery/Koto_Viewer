@@ -12340,6 +12340,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No items found'**
   String get architectComponentNoItems;
+
+  /// No description provided for @architectApartment.
+  ///
+  /// In en, this message translates to:
+  /// **'Apartment'**
+  String get architectApartment;
+
+  /// No description provided for @architectRoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Room'**
+  String get architectRoom;
+
+  /// No description provided for @architectApartmentRooms.
+  ///
+  /// In en, this message translates to:
+  /// **'Rooms'**
+  String get architectApartmentRooms;
+
+  /// No description provided for @architectUnassignedRooms.
+  ///
+  /// In en, this message translates to:
+  /// **'Unassigned rooms'**
+  String get architectUnassignedRooms;
+
+  /// No description provided for @architectApartmentAutoAssignment.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get architectApartmentAutoAssignment;
+
+  /// No description provided for @architectApartmentNoRooms.
+  ///
+  /// In en, this message translates to:
+  /// **'No rooms within the outline.'**
+  String get architectApartmentNoRooms;
+
+  /// No description provided for @architectApartmentBoundaryHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw manually along internal wall axes and the exterior faces of exterior walls.'**
+  String get architectApartmentBoundaryHelp;
+
+  /// No description provided for @architectApartmentGross.
+  ///
+  /// In en, this message translates to:
+  /// **'Contour area'**
+  String get architectApartmentGross;
+
+  /// No description provided for @architectApartmentNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Room area'**
+  String get architectApartmentNet;
+
+  /// No description provided for @architectApartmentRoomsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Rooms are assigned automatically by the largest overlapping area with an apartment. Each room is counted in full only once. Equal areas retain the current apartment. Rooms outside all apartments stay unassigned.'**
+  String get architectApartmentRoomsHelp;
 }
 
 class _AppLocalizationsDelegate

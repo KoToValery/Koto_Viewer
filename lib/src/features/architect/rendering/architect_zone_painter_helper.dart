@@ -1,3 +1,4 @@
+import '../services/architect_apartment_zones.dart';
 import 'architect_vector_scene.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -9,6 +10,65 @@ import 'architect_canvas_palette.dart';
 /// Architectural room stamps, zone fills, schedules, and drafting previews.
 /// Manual contour handles are rendered by the shared polygon painter.
 class ArchitectZonePainterHelper {
+  static List<
+    ({
+      ArchitectZoneScheduleGroup group,
+      ArchitectStorey storey,
+      Offset origin,
+      Rect bounds,
+    })
+  >
+  scheduleTables({
+    required ArchitectStorey storey,
+    required double zoomScale,
+    ArchitectProject? project,
+    AppLocalizations? l10n,
+    String? viewKey,
+    Offset? baseOrigin,
+  }) {
+    final base = baseOrigin ?? storey.zoneScheduleOrigin;
+    if (base == null) return [];
+    var next = base;
+    final result =
+        <
+          ({
+            ArchitectZoneScheduleGroup group,
+            ArchitectStorey storey,
+            Offset origin,
+            Rect bounds,
+          })
+        >[];
+    for (final group in ArchitectApartmentZones.groups(storey)) {
+      final tableStorey = l10n == null
+          ? storey.copyWith(
+              zones: group.rooms,
+              name: group.apartment?.name ?? storey.name,
+            )
+          : group.tableStorey(storey, l10n);
+      final origin =
+          group.apartment?.scheduleOrigin ??
+          (group.apartment == null ? base : next);
+      final bounds = getZoneTableBounds(
+        storey: tableStorey,
+        origin: origin,
+        zoomScale: zoomScale,
+        project: project,
+        l10n: l10n,
+        viewKey: viewKey,
+        apartment: group.apartment,
+      );
+      result.add((
+        group: group,
+        storey: tableStorey,
+        origin: origin,
+        bounds: bounds,
+      ));
+      // Reserve a separate slot even if a table was moved away from its default.
+      next = Offset(base.dx, next.dy + bounds.height + .4);
+    }
+    return result;
+  }
+
   /// Draws the room schedule table or ghost preview.
   static void drawZoneSchedule({
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
@@ -16,31 +76,51 @@ class ArchitectZonePainterHelper {
     required ArchitectStorey storey,
     required double zoomScale,
     bool isTableSelected = false,
+    String? selectedTableId,
     Offset? tableDragPreviewOrigin,
     Offset? tableGhostOrigin,
     AppLocalizations? l10n,
   }) {
-    final effectiveTableOrigin =
-        tableDragPreviewOrigin ?? storey.zoneScheduleOrigin;
-    if (effectiveTableOrigin != null && storey.zones.isNotEmpty) {
-      drawZoneScheduleTable(
-        canvas: canvas,
-        storey: storey,
-        origin: effectiveTableOrigin,
-        zoomScale: zoomScale,
-        palette: palette,
-        isSelected: isTableSelected,
-        l10n: l10n,
-      );
+    final tables = scheduleTables(
+      storey: storey,
+      zoomScale: zoomScale,
+      l10n: l10n,
+    );
+    if (tables.isNotEmpty) {
+      for (final table in tables) {
+        final selected =
+            isTableSelected &&
+            (selectedTableId ?? tables.first.group.id) == table.group.id;
+        drawZoneScheduleTable(
+          canvas: canvas,
+          storey: table.storey,
+          origin: selected
+              ? tableDragPreviewOrigin ?? table.origin
+              : table.origin,
+          zoomScale: zoomScale,
+          palette: palette,
+          isSelected: selected,
+          l10n: l10n,
+          apartment: table.group.apartment,
+        );
+      }
     } else if (tableGhostOrigin != null) {
-      drawZoneTableGhostPreview(
-        canvas: canvas,
-        origin: tableGhostOrigin,
-        zoomScale: zoomScale,
-        zoneCount: storey.zones.length,
+      for (final table in scheduleTables(
         storey: storey,
+        zoomScale: zoomScale,
         l10n: l10n,
-      );
+        baseOrigin: tableGhostOrigin,
+      )) {
+        drawZoneScheduleTable(
+          canvas: canvas,
+          storey: table.storey,
+          origin: table.origin,
+          zoomScale: zoomScale,
+          palette: palette,
+          l10n: l10n,
+          apartment: table.group.apartment,
+        );
+      }
     }
   }
 
@@ -120,7 +200,7 @@ class ArchitectZonePainterHelper {
     final fillPaint = Paint()
       ..color = zone.color.withValues(alpha: isSelected ? 0.12 : 0.04)
       ..style = PaintingStyle.fill;
-    canvas.drawPath(path, fillPaint);
+    if (isSelected) canvas.drawPath(path, fillPaint);
 
     // 2. Zone border
     final borderColor = isExtrudeSelfIntersecting
@@ -139,7 +219,20 @@ class ArchitectZonePainterHelper {
     _drawRoomStamp(
       canvas: canvas,
       zone: stampZone,
-      centroid: stampZone.centroid,
+      // The apartment stamp stays outside its rooms, so their labels do not
+      // become an overlapping block of text in the published plan.
+      centroid: stampZone.isApartment
+          ? Offset(
+              stampZone.bounds.center.dx,
+              stampZone.bounds.top -
+                  (ArchitectTextScope.current?.height(
+                            stampZone.id,
+                            ArchitectAnnotationRole.roomName,
+                          ) ??
+                          .22) *
+                      3,
+            )
+          : stampZone.centroid,
       zoomScale: zoomScale,
       isSelected: isSelected,
     );
@@ -212,9 +305,6 @@ class ArchitectZonePainterHelper {
       height: tp.height + badgePaddingV * 2,
     );
 
-    final bgPaint = Paint()
-      ..color = ArchitectPaperStyle.paper
-      ..style = PaintingStyle.fill;
     final borderPaint = Paint()
       ..color =
           (isSelected ? const Color(0xFF00E5FF) : ArchitectPaperStyle.rule)
@@ -222,14 +312,12 @@ class ArchitectZonePainterHelper {
       ..strokeWidth = isSelected ? 1.5 : 1.0
       ..style = PaintingStyle.stroke;
 
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(badgeRect, const Radius.circular(6.0)),
-      bgPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(badgeRect, const Radius.circular(6.0)),
-      borderPaint,
-    );
+    if (isSelected) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(badgeRect, const Radius.circular(6.0)),
+        borderPaint,
+      );
+    }
 
     tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
     canvas.restore();
@@ -878,6 +966,7 @@ class ArchitectZonePainterHelper {
     ArchitectProject? project,
     AppLocalizations? l10n,
     String? viewKey,
+    ArchitectZone? apartment,
   }) {
     if (project != null && l10n != null) {
       final key = viewKey ?? 'plan:${storey.id}';
@@ -891,9 +980,16 @@ class ArchitectZonePainterHelper {
         zoomScale,
         units: project.units,
         decimals: project.distanceDecimals,
-      ).run(() => _paperTable(storey, l10n).$1.shift(origin));
+      ).run(
+        () => _paperTable(storey, l10n, apartment: apartment).$1.shift(origin),
+      );
     }
-    final totalHeight = getZoneTableTotalHeight(storey.zones.length);
+    if (ArchitectTextScope.current != null && l10n != null) {
+      return _paperTable(storey, l10n, apartment: apartment).$1.shift(origin);
+    }
+    final totalHeight =
+        getZoneTableTotalHeight(storey.zones.length) +
+        (apartment == null ? 0 : zoneTableFooterHeight);
     final widthModel = zoneTableTotalWidth / zoneTableDrawingScale;
     final heightModel = totalHeight / zoneTableDrawingScale;
     return Rect.fromLTWH(origin.dx, origin.dy, widthModel, heightModel);
@@ -909,14 +1005,18 @@ class ArchitectZonePainterHelper {
     required ArchitectCanvasPalette palette,
     bool isSelected = false,
     AppLocalizations? l10n,
+    ArchitectZone? apartment,
   }) {
     if (ArchitectTextScope.current != null && l10n != null) {
-      architectDrawingSources(
-        canvas,
-        storey.zones.map((z) => z.id),
-        'zoneSchedule',
+      architectDrawingSources(canvas, {
+        if (apartment != null) apartment.id,
+        ...storey.zones.map((z) => z.id),
+      }, 'zoneSchedule');
+      final (bounds, operations) = _paperTable(
+        storey,
+        l10n,
+        apartment: apartment,
       );
-      final (bounds, operations) = _paperTable(storey, l10n);
       canvas.save();
       canvas.translate(origin.dx, origin.dy);
       canvas.drawRect(bounds, Paint()..color = ArchitectPaperStyle.paper);
@@ -936,13 +1036,15 @@ class ArchitectZonePainterHelper {
       return;
     }
     final zones = storey.zones;
-    if (zones.isEmpty) return;
+    if (zones.isEmpty && apartment == null) return;
 
     final sortedZones = List<ArchitectZone>.from(zones)
       ..sort((a, b) => a.number.compareTo(b.number));
 
     final totalWidth = zoneTableTotalWidth;
-    final totalHeight = getZoneTableTotalHeight(sortedZones.length);
+    final totalHeight =
+        getZoneTableTotalHeight(sortedZones.length) +
+        (apartment == null ? 0 : zoneTableFooterHeight);
 
     canvas.save();
     canvas.translate(origin.dx, origin.dy);
@@ -1156,6 +1258,18 @@ class ArchitectZonePainterHelper {
     }
 
     // 5. Total Footer Row
+    if (apartment != null && l10n != null) {
+      final gross = ArchitectTextPainter(
+        text: TextSpan(
+          text:
+              '${l10n.architectApartmentGross}: ${ArchitectTextScope.current?.area(apartment.area) ?? BimDistanceUnit.meters.formatArea(apartment.area)}',
+          style: const TextStyle(color: ArchitectPaperStyle.ink, fontSize: 10),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: totalWidth - 16);
+      gross.paint(canvas, Offset(12, curY + 4));
+      curY += zoneTableFooterHeight;
+    }
     final footerRect = Rect.fromLTWH(
       0,
       curY,
@@ -1192,7 +1306,8 @@ class ArchitectZonePainterHelper {
             ),
           ),
           TextSpan(
-            text: ArchitectTextScope.current?.area(totalNetArea) ??
+            text:
+                ArchitectTextScope.current?.area(totalNetArea) ??
                 '${BimDistanceUnit.trimZeros(totalNetArea.toStringAsFixed(2))} m²',
             style: const TextStyle(
               color: ArchitectPaperStyle.ink,
@@ -1227,8 +1342,9 @@ class ArchitectZonePainterHelper {
   /// row sizes between publication and model-space picking.
   static (Rect, List<void Function(Canvas)>) _paperTable(
     ArchitectStorey storey,
-    AppLocalizations l,
-  ) {
+    AppLocalizations l, {
+    ArchitectZone? apartment,
+  }) {
     final scope = ArchitectTextScope.current!;
     final scale = ArchitectDrawingScale(scope.denominator);
     double u(double mm) => scale.paperToModel(mm);
@@ -1241,7 +1357,7 @@ class ArchitectZonePainterHelper {
     final headers = [
       l.architectZoneScheduleColNo,
       l.architectZoneScheduleColName,
-      l.architectAreaWithUnit(scope.units.symbol),
+      l.architectAreaWithUnit(scope.units.isImperial ? 'ft' : 'm'),
       l.architectZoneScheduleColFloor,
       l.architectZoneScheduleColWalls,
       l.architectZoneScheduleColCeiling,
@@ -1331,9 +1447,16 @@ class ArchitectZonePainterHelper {
         z.resolvedCeilingFinish(l),
       ], id: z.id);
     }
+    if (apartment != null) {
+      row(
+        ['${l.architectApartmentGross}: ${scope.area(apartment.area)}'],
+        heading: true,
+        fullWidth: true,
+      );
+    }
     row(
       [
-        '${l.architectZoneScheduleTotalArea}: ${scope.area(rows.fold<double>(0, (v, z) => v + z.area))}   ${l.architectZoneScheduleRoomCount}: ${rows.length}',
+        '${apartment == null ? l.architectZoneScheduleTotalArea : l.architectApartmentNet}: ${scope.area(rows.fold<double>(0, (v, z) => v + z.area))}   ${l.architectZoneScheduleRoomCount}: ${rows.length}',
       ],
       heading: true,
       fullWidth: true,

@@ -4406,5 +4406,15 @@
   "architectPlacementModeWall": "Wall Attached",
   "architectPlacementModeFree": "Free Standing",
   "architectLayerFurniture": "Furniture Layer",
-  "architectComponentNoItems": "No items found"
+  "architectComponentNoItems": "No items found",
+  "architectApartment": "Apartment",
+  "architectRoom": "Room",
+  "architectApartmentRooms": "Rooms",
+  "architectUnassignedRooms": "Unassigned rooms",
+  "architectApartmentAutoAssignment": "Auto",
+  "architectApartmentNoRooms": "No rooms within the outline.",
+  "architectApartmentBoundaryHelp": "Draw manually along internal wall axes and the exterior faces of exterior walls.",
+  "architectApartmentGross": "Contour area",
+  "architectApartmentNet": "Room area",
+  "architectApartmentRoomsHelp": "Rooms are assigned automatically by the largest overlapping area with an apartment. Each room is counted in full only once. Equal areas retain the current apartment. Rooms outside all apartments stay unassigned."
 }
