@@ -6,6 +6,7 @@
 // 4. ABSTRACT COMPONENT DEFINITION (ArchitectComponentDefinition)
 
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../cad_3d/models/mesh_3d.dart';
@@ -56,10 +57,7 @@ class CachedComponentGeometry {
   /// Clean 2D architectural block for plan rendering.
   final ArchitectComponentBlock2D block2d;
 
-  const CachedComponentGeometry({
-    required this.mesh3d,
-    required this.block2d,
-  });
+  const CachedComponentGeometry({required this.mesh3d, required this.block2d});
 }
 
 // ===========================================================================
@@ -79,6 +77,7 @@ class ParametricSolidBuilder {
 
   final List<Triangle3D> _triangles = [];
   final List<Path> _detailPaths = [];
+  Path? _footprint;
   Path? _customOutline;
   Path? _customMask;
 
@@ -89,6 +88,20 @@ class ParametricSolidBuilder {
   });
 
   List<Triangle3D> get triangles => List.unmodifiable(_triangles);
+
+  void _includeFootprint(Path path) {
+    _footprint = _footprint == null
+        ? path
+        : Path.combine(PathOperation.union, _footprint!, path);
+  }
+
+  void _validateSize(Iterable<double> values) {
+    if (values.any((v) => !v.isFinite || v <= 0)) {
+      throw const FormatException(
+        'Solid dimensions must be positive and finite',
+      );
+    }
+  }
 
   /// Adds an axis-aligned box solid in Z-up coordinates.
   ///
@@ -102,12 +115,14 @@ class ParametricSolidBuilder {
     Color color = const Color(0xFFEEEEEE),
     MeshMaterial? material,
   }) {
+    _validateSize([boxWidth, boxDepth, boxHeight]);
     final x0 = origin?.dx ?? (-boxWidth / 2.0);
     final y0 = origin?.dy ?? 0.0;
     final x1 = x0 + boxWidth;
     final y1 = y0 + boxDepth;
     final z0 = zBottom;
     final z1 = z0 + boxHeight;
+    _includeFootprint(Path()..addRect(Rect.fromLTRB(x0, y0, x1, y1)));
 
     final p000 = Vector3(x0, y0, z0);
     final p100 = Vector3(x1, y0, z0);
@@ -120,8 +135,12 @@ class ParametricSolidBuilder {
     final p011 = Vector3(x0, y1, z1);
 
     void quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d) {
-      _triangles.add(Triangle3D(v0: a, v1: b, v2: c, color: color, material: material));
-      _triangles.add(Triangle3D(v0: a, v1: c, v2: d, color: color, material: material));
+      _triangles.add(
+        Triangle3D(v0: a, v1: b, v2: c, color: color, material: material),
+      );
+      _triangles.add(
+        Triangle3D(v0: a, v1: c, v2: d, color: color, material: material),
+      );
     }
 
     // Bottom (normal -Z)
@@ -144,11 +163,19 @@ class ParametricSolidBuilder {
     required double radius,
     required double cylinderHeight,
     double zBottom = 0.0,
-    int segments = 16,
+    int segments = 48,
     Color color = const Color(0xFFFFFFFF),
     MeshMaterial? material,
   }) {
-    if (segments < 3 || radius <= 1e-4) return;
+    _validateSize([radius, cylinderHeight]);
+    if (segments < 3 || segments > 256) {
+      throw const FormatException(
+        'Cylinder segments must be between 3 and 256',
+      );
+    }
+    _includeFootprint(
+      Path()..addOval(Rect.fromCircle(center: center, radius: radius)),
+    );
     final z0 = zBottom;
     final z1 = z0 + cylinderHeight;
 
@@ -169,15 +196,175 @@ class ParametricSolidBuilder {
     for (var i = 0; i < segments; i++) {
       final next = (i + 1) % segments;
       // Side quads
-      _triangles.add(Triangle3D(v0: circle0[i], v1: circle1[i], v2: circle1[next], color: color, material: material));
-      _triangles.add(Triangle3D(v0: circle0[i], v1: circle1[next], v2: circle0[next], color: color, material: material));
+      _triangles.add(
+        Triangle3D(
+          v0: circle0[i],
+          v1: circle0[next],
+          v2: circle1[next],
+          color: color,
+          material: material,
+        ),
+      );
+      _triangles.add(
+        Triangle3D(
+          v0: circle0[i],
+          v1: circle1[next],
+          v2: circle1[i],
+          color: color,
+          material: material,
+        ),
+      );
 
       // Top cap
-      _triangles.add(Triangle3D(v0: topCenter, v1: circle1[i], v2: circle1[next], color: color, material: material));
+      _triangles.add(
+        Triangle3D(
+          v0: topCenter,
+          v1: circle1[i],
+          v2: circle1[next],
+          color: color,
+          material: material,
+        ),
+      );
 
       // Bottom cap
-      _triangles.add(Triangle3D(v0: botCenter, v1: circle0[next], v2: circle0[i], color: color, material: material));
+      _triangles.add(
+        Triangle3D(
+          v0: botCenter,
+          v1: circle0[next],
+          v2: circle0[i],
+          color: color,
+          material: material,
+        ),
+      );
     }
+  }
+
+  /// Elliptical vessel with an actual cavity, tapered inner walls and closed base.
+  /// Each ring connects to the next; no intersecting substitute solids are used.
+  void addBasin({
+    required Offset center,
+    required double basinWidth,
+    required double basinDepth,
+    required double basinHeight,
+    double wall = 0.025,
+    double base = 0.04,
+    double zBottom = 0,
+    int segments = 64,
+    bool rectangular = false,
+    bool roundedBody = false,
+    Color color = const Color(0xFFFAFAFA),
+  }) {
+    _validateSize([basinWidth, basinDepth, basinHeight, wall, base]);
+    if (wall * 2 >= math.min(basinWidth, basinDepth) ||
+        base >= basinHeight ||
+        segments < 8 ||
+        segments > 256) {
+      throw const FormatException('Invalid basin wall, base or segment count');
+    }
+    final rx = basinWidth / 2;
+    final ry = basinDepth / 2;
+    final footprint = Rect.fromCenter(
+      center: center,
+      width: basinWidth,
+      height: basinDepth,
+    );
+    _includeFootprint(
+      rectangular ? (Path()..addRect(footprint)) : (Path()..addOval(footprint)),
+    );
+    List<Vector3> ring(double x, double y, double z) => [
+      for (var i = 0; i < segments; i++)
+        Vector3(
+          center.dx + x * math.cos(i * 2 * math.pi / segments),
+          center.dy + y * math.sin(i * 2 * math.pi / segments),
+          z,
+        ),
+    ];
+    List<Vector3> outerRing(double z) {
+      if (!rectangular) return ring(rx, ry, z);
+      final corners = [
+        Offset(rx, 0),
+        Offset(rx, ry),
+        Offset(0, ry),
+        Offset(-rx, ry),
+        Offset(-rx, 0),
+        Offset(-rx, -ry),
+        Offset(0, -ry),
+        Offset(rx, -ry),
+        Offset(rx, 0),
+      ];
+      return [
+        for (var i = 0; i < segments; i++)
+          () {
+            final t = i * 8 / segments;
+            final point = Offset.lerp(
+              corners[t.floor()],
+              corners[t.floor() + 1],
+              t - t.floor(),
+            )!;
+            return Vector3(center.dx + point.dx, center.dy + point.dy, z);
+          }(),
+      ];
+    }
+
+    final outerBottom = rectangular
+        ? outerRing(zBottom)
+        : ring(
+            rx * (roundedBody ? .45 : .82),
+            ry * (roundedBody ? .45 : .82),
+            zBottom,
+          );
+    final outerTop = outerRing(zBottom + basinHeight);
+    final innerTop = ring(rx - wall, ry - wall, zBottom + basinHeight);
+    final innerBottom = ring(
+      (rx - wall) * .65,
+      (ry - wall) * .65,
+      zBottom + base,
+    );
+    void triangle(Vector3 a, Vector3 b, Vector3 c) {
+      _triangles.add(Triangle3D(v0: a, v1: b, v2: c, color: color));
+    }
+
+    void join(List<Vector3> a, List<Vector3> b) {
+      for (var i = 0; i < segments; i++) {
+        final j = (i + 1) % segments;
+        triangle(a[i], a[j], b[j]);
+        triangle(a[i], b[j], b[i]);
+      }
+    }
+
+    if (roundedBody && !rectangular) {
+      final lower = ring(rx * .75, ry * .75, zBottom + basinHeight * .25);
+      final upper = ring(rx * .96, ry * .96, zBottom + basinHeight * .70);
+      join(outerBottom, lower);
+      join(lower, upper);
+      join(upper, outerTop);
+    } else {
+      join(outerBottom, outerTop);
+    }
+    join(outerTop, innerTop);
+    join(innerTop, innerBottom);
+    for (var i = 0; i < segments; i++) {
+      final j = (i + 1) % segments;
+      triangle(
+        Vector3(center.dx, center.dy, zBottom),
+        outerBottom[j],
+        outerBottom[i],
+      );
+      triangle(
+        Vector3(center.dx, center.dy, zBottom + base),
+        innerBottom[i],
+        innerBottom[j],
+      );
+    }
+    add2DDetailPath(
+      Path()..addOval(
+        Rect.fromCenter(
+          center: center,
+          width: basinWidth - wall * 2,
+          height: basinDepth - wall * 2,
+        ),
+      ),
+    );
   }
 
   /// Adds 2D plan detail line.
@@ -201,25 +388,25 @@ class ParametricSolidBuilder {
 
   /// Compiles both the 3D mesh and 2D block.
   CachedComponentGeometry build(String name) {
-    final rect = Rect.fromLTRB(-width / 2.0, 0.0, width / 2.0, depth);
-    final defaultPath = Path()..addRect(rect);
+    final defaultPath =
+        _footprint ??
+        (Path()..addRect(Rect.fromLTRB(-width / 2.0, 0.0, width / 2.0, depth)));
+    final outline = _customOutline ?? defaultPath;
+    var rect = outline.getBounds();
+    for (final detail in _detailPaths) {
+      rect = rect.expandToInclude(detail.getBounds());
+    }
 
     final block = ArchitectComponentBlock2D(
       boundsMask: _customMask ?? defaultPath,
-      outline: _customOutline ?? defaultPath,
+      outline: outline,
       detailPaths: List.unmodifiable(_detailPaths),
       bounds: rect,
     );
 
-    final mesh = Mesh3D(
-      name: name,
-      triangles: List.unmodifiable(_triangles),
-    );
+    final mesh = Mesh3D(name: name, triangles: List.unmodifiable(_triangles));
 
-    return CachedComponentGeometry(
-      mesh3d: mesh,
-      block2d: block,
-    );
+    return CachedComponentGeometry(mesh3d: mesh, block2d: block);
   }
 }
 
@@ -251,4 +438,87 @@ abstract class ArchitectComponentDefinition {
 
   /// Synchronously generates 3D mesh and 2D CAD block from parameters.
   CachedComponentGeometry generateGeometry(Map<String, dynamic> params);
+
+  /// Placement resizing scales the authored object, including every detail.
+  /// The native parameter values are retained for repeated edits and JSON export.
+  /// This keeps a locked XYZ ratio from changing mattress/leg/wall proportions.
+  CachedComponentGeometry resolveGeometry(Map<String, dynamic> params) {
+    const axes = ['width', 'depth', 'height'];
+    final native = {...defaultParameters, ...params};
+    if (!axes.every((key) => params['_base_$key'] is num)) {
+      return generateGeometry(native);
+    }
+    final scales = <double>[];
+    for (final key in axes) {
+      final original = (params['_base_$key'] as num).toDouble();
+      final target = (native[key] as num).toDouble();
+      if (!original.isFinite ||
+          original <= 0 ||
+          !target.isFinite ||
+          target <= 0) {
+        throw const FormatException('Invalid component scale');
+      }
+      native[key] = original;
+      native.remove('_base_$key');
+      scales.add(target / original);
+    }
+    final geometry = generateGeometry(native);
+    final sx = scales[0], sy = scales[1], sz = scales[2];
+    Vector3 point(Vector3 p) => Vector3(p.x * sx, p.y * sy, p.z * sz);
+    Vector3 normal(Vector3 n) =>
+        Vector3(n.x / sx, n.y / sy, n.z / sz).normalized();
+    final matrix = Float64List.fromList([
+      sx,
+      0,
+      0,
+      0,
+      0,
+      sy,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+    ]);
+    final block = geometry.block2d;
+    return CachedComponentGeometry(
+      mesh3d: Mesh3D(
+        name: geometry.mesh3d.name,
+        triangles: [
+          for (final t in geometry.mesh3d.triangles)
+            Triangle3D(
+              v0: point(t.v0),
+              v1: point(t.v1),
+              v2: point(t.v2),
+              normal: normal(t.normal),
+              color: t.color,
+              material: t.material,
+              isDoubleSided: t.isDoubleSided,
+              textureCoordinates: t.textureCoordinates,
+              vertexNormals: t.vertexNormals?.map(normal).toList(),
+              vertexColors: t.vertexColors,
+              linearVertexColors: t.linearVertexColors,
+            ),
+        ],
+      ),
+      block2d: ArchitectComponentBlock2D(
+        boundsMask: block.boundsMask.transform(matrix),
+        outline: block.outline.transform(matrix),
+        detailPaths: [
+          for (final path in block.detailPaths) path.transform(matrix),
+        ],
+        bounds: Rect.fromLTRB(
+          block.bounds.left * sx,
+          block.bounds.top * sy,
+          block.bounds.right * sx,
+          block.bounds.bottom * sy,
+        ),
+      ),
+    );
+  }
 }

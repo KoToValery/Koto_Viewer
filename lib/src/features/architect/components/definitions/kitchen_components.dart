@@ -30,9 +30,30 @@ class KitchenBaseCabinet extends ArchitectComponentDefinition {
 
   @override
   List<ParametricFieldSchema> get schema => const [
-    ParametricFieldSchema(key: 'width', label: 'Width', defaultValue: 0.60, min: 0.30, max: 1.20, step: 0.05),
-    ParametricFieldSchema(key: 'depth', label: 'Depth', defaultValue: 0.60, min: 0.50, max: 0.70, step: 0.02),
-    ParametricFieldSchema(key: 'height', label: 'Height', defaultValue: 0.86, min: 0.80, max: 0.92, step: 0.01),
+    ParametricFieldSchema(
+      key: 'width',
+      label: 'Width',
+      defaultValue: 0.60,
+      min: 0.30,
+      max: 1.20,
+      step: 0.05,
+    ),
+    ParametricFieldSchema(
+      key: 'depth',
+      label: 'Depth',
+      defaultValue: 0.60,
+      min: 0.50,
+      max: 0.70,
+      step: 0.02,
+    ),
+    ParametricFieldSchema(
+      key: 'height',
+      label: 'Height',
+      defaultValue: 0.86,
+      min: 0.80,
+      max: 0.92,
+      step: 0.01,
+    ),
   ];
 
   @override
@@ -79,7 +100,10 @@ class KitchenBaseCabinet extends ArchitectComponentDefinition {
     // 2D CAD Plan Details
     // Door handle or line
     final handleY = d - 0.02;
-    builder.add2DDetailLine(Offset(-wHalf * 0.5, handleY), Offset(wHalf * 0.5, handleY));
+    builder.add2DDetailLine(
+      Offset(-wHalf * 0.5, handleY),
+      Offset(wHalf * 0.5, handleY),
+    );
 
     return builder.build(defaultName);
   }
@@ -90,8 +114,11 @@ class KitchenBaseCabinet extends ArchitectComponentDefinition {
 // ===========================================================================
 
 class KitchenSinkCabinet extends ArchitectComponentDefinition {
+  final bool legacyDimensions;
+  KitchenSinkCabinet({this.legacyDimensions = false});
   @override
-  String get id => 'kitchen_sink_cabinet';
+  String get id =>
+      legacyDimensions ? 'kitchen_sink_cabinet' : 'kitchen_sink_unit';
 
   @override
   String get defaultName => 'Kitchen Sink Unit';
@@ -103,70 +130,74 @@ class KitchenSinkCabinet extends ArchitectComponentDefinition {
   ComponentPlacementMode get placementMode => ComponentPlacementMode.wallAttached;
 
   @override
-  List<ParametricFieldSchema> get schema => const [
-    ParametricFieldSchema(key: 'width', label: 'Width', defaultValue: 0.80, min: 0.60, max: 1.20, step: 0.05),
-    ParametricFieldSchema(key: 'depth', label: 'Depth', defaultValue: 0.60, min: 0.55, max: 0.70, step: 0.02),
-    ParametricFieldSchema(key: 'height', label: 'Height', defaultValue: 0.86, min: 0.80, max: 0.92, step: 0.01),
+  List<ParametricFieldSchema> get schema => [
+    ParametricFieldSchema(
+      key: 'width',
+      label: 'Width',
+      defaultValue: 0.80,
+      min: 0.60,
+      max: 1.20,
+      step: 0.05,
+    ),
+    ParametricFieldSchema(
+      key: 'depth',
+      label: 'Depth',
+      defaultValue: 0.60,
+      min: 0.55,
+      max: 0.70,
+      step: 0.02,
+    ),
+    ParametricFieldSchema(
+      key: 'height',
+      label: 'Height',
+      defaultValue: legacyDimensions ? .86 : 1.08,
+      min: .80,
+      max: 1.20,
+      step: 0.01,
+    ),
   ];
 
   @override
   CachedComponentGeometry generateGeometry(Map<String, dynamic> params) {
-    final w = (params['width'] as num?)?.toDouble() ?? 0.80;
-    final d = (params['depth'] as num?)?.toDouble() ?? 0.60;
-    final h = (params['height'] as num?)?.toDouble() ?? 0.86;
-
+    final w = (params['width'] as num?)?.toDouble() ?? .80;
+    final d = (params['depth'] as num?)?.toDouble() ?? .60;
+    final requestedH =
+        (params['height'] as num?)?.toDouble() ??
+        (legacyDimensions ? .86 : 1.08);
+    final h = legacyDimensions ? requestedH + .22 : requestedH;
+    final tapH = h * (.22 / 1.08);
+    final basinH = h * (.16 / 1.08);
+    final baseH = h - tapH - basinH;
     final builder = ParametricSolidBuilder(width: w, depth: d, height: h);
-    final wHalf = w / 2.0;
-
-    // Base & Countertop
     builder.addBox(
-      origin: Offset(-wHalf, 0.0),
       boxWidth: w,
       boxDepth: d,
-      boxHeight: h,
+      boxHeight: baseH,
       color: const Color(0xFFECEFF1),
     );
-
-    // Faucet in 3D
-    builder.addCylinder(
-      center: Offset(0.0, d * 0.18),
-      radius: 0.02,
-      cylinderHeight: 0.22,
-      zBottom: h,
+    builder.addBasin(
+      center: Offset(0, d / 2),
+      basinWidth: w,
+      basinDepth: d,
+      basinHeight: basinH,
+      zBottom: baseH,
+      wall: math.min(w, d) * .20,
+      base: basinH * .15,
+      rectangular: true,
       color: const Color(0xFFCFD8DC),
     );
-
-    // 2D CAD Plan Details
-    // Stainless basin
-    final basinW = math.min(w * 0.55, 0.45);
-    final basinD = d * 0.65;
-    final basinX = -wHalf + 0.06;
-    final basinY = d * 0.20;
-    final basinPath = Path()
-      ..addRRect(RRect.fromRectAndRadius(
-        Rect.fromLTWH(basinX, basinY, basinW, basinD),
-        const Radius.circular(0.04),
-      ));
-    builder.add2DDetailPath(basinPath);
-
-    // Drain
-    final drainPath = Path()
-      ..addOval(Rect.fromCenter(
-        center: Offset(basinX + basinW * 0.5, basinY + basinD * 0.5),
-        width: 0.07,
-        height: 0.07,
-      ));
-    builder.add2DDetailPath(drainPath);
-
-    // Drainer ribbed lines (right side)
-    final ribStartX = basinX + basinW + 0.06;
-    final ribEndX = wHalf - 0.06;
-    if (ribEndX > ribStartX) {
-      for (var y = basinY + 0.05; y <= basinY + basinD - 0.05; y += 0.06) {
-        builder.add2DDetailLine(Offset(ribStartX, y), Offset(ribEndX, y));
-      }
-    }
-
+    builder.addCylinder(
+      center: Offset(0, d * .06),
+      radius: w * .025,
+      cylinderHeight: tapH,
+      zBottom: h - tapH,
+      color: const Color(0xFFB0BEC5),
+    );
+    builder.add2DDetailPath(
+      Path()..addOval(
+        Rect.fromCircle(center: Offset(0, d / 2), radius: math.min(w, d) * .05),
+      ),
+    );
     return builder.build(defaultName);
   }
 }
@@ -190,9 +221,30 @@ class KitchenRefrigerator extends ArchitectComponentDefinition {
 
   @override
   List<ParametricFieldSchema> get schema => const [
-    ParametricFieldSchema(key: 'width', label: 'Width', defaultValue: 0.60, min: 0.55, max: 0.95, step: 0.05),
-    ParametricFieldSchema(key: 'depth', label: 'Depth', defaultValue: 0.65, min: 0.55, max: 0.80, step: 0.02),
-    ParametricFieldSchema(key: 'height', label: 'Height', defaultValue: 1.85, min: 1.50, max: 2.10, step: 0.05),
+    ParametricFieldSchema(
+      key: 'width',
+      label: 'Width',
+      defaultValue: 0.60,
+      min: 0.55,
+      max: 0.95,
+      step: 0.05,
+    ),
+    ParametricFieldSchema(
+      key: 'depth',
+      label: 'Depth',
+      defaultValue: 0.65,
+      min: 0.55,
+      max: 0.80,
+      step: 0.02,
+    ),
+    ParametricFieldSchema(
+      key: 'height',
+      label: 'Height',
+      defaultValue: 1.85,
+      min: 1.50,
+      max: 2.10,
+      step: 0.05,
+    ),
   ];
 
   @override
@@ -243,9 +295,30 @@ class KitchenCooktopOven extends ArchitectComponentDefinition {
 
   @override
   List<ParametricFieldSchema> get schema => const [
-    ParametricFieldSchema(key: 'width', label: 'Width', defaultValue: 0.60, min: 0.60, max: 0.90, step: 0.05),
-    ParametricFieldSchema(key: 'depth', label: 'Depth', defaultValue: 0.60, min: 0.55, max: 0.65, step: 0.02),
-    ParametricFieldSchema(key: 'height', label: 'Height', defaultValue: 0.86, min: 0.80, max: 0.92, step: 0.01),
+    ParametricFieldSchema(
+      key: 'width',
+      label: 'Width',
+      defaultValue: 0.60,
+      min: 0.60,
+      max: 0.90,
+      step: 0.05,
+    ),
+    ParametricFieldSchema(
+      key: 'depth',
+      label: 'Depth',
+      defaultValue: 0.60,
+      min: 0.55,
+      max: 0.65,
+      step: 0.02,
+    ),
+    ParametricFieldSchema(
+      key: 'height',
+      label: 'Height',
+      defaultValue: 0.86,
+      min: 0.80,
+      max: 0.92,
+      step: 0.01,
+    ),
   ];
 
   @override
@@ -281,13 +354,15 @@ class KitchenCooktopOven extends ArchitectComponentDefinition {
         center: b.$1,
         radius: b.$2,
         cylinderHeight: 0.005,
-        zBottom: h,
+        zBottom: h - 0.005,
         segments: 16,
         color: const Color(0xFF424242),
       );
 
       // 2D CAD Plan Burner Circles
-      builder.add2DDetailPath(Path()..addOval(Rect.fromCircle(center: b.$1, radius: b.$2)));
+      builder.add2DDetailPath(
+        Path()..addOval(Rect.fromCircle(center: b.$1, radius: b.$2)),
+      );
     }
 
     return builder.build(defaultName);

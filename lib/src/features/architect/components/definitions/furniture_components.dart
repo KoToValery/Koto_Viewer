@@ -32,9 +32,30 @@ class FurnitureBedDouble extends ArchitectComponentDefinition {
 
   @override
   List<ParametricFieldSchema> get schema => const [
-    ParametricFieldSchema(key: 'width', label: 'Width', defaultValue: 1.80, min: 1.40, max: 2.20, step: 0.10),
-    ParametricFieldSchema(key: 'depth', label: 'Length', defaultValue: 2.00, min: 1.90, max: 2.20, step: 0.05),
-    ParametricFieldSchema(key: 'height', label: 'Headboard Height', defaultValue: 0.95, min: 0.75, max: 1.25, step: 0.05),
+    ParametricFieldSchema(
+      key: 'width',
+      label: 'Width',
+      defaultValue: 1.80,
+      min: 1.40,
+      max: 2.20,
+      step: 0.10,
+    ),
+    ParametricFieldSchema(
+      key: 'depth',
+      label: 'Length',
+      defaultValue: 2.00,
+      min: 1.90,
+      max: 2.20,
+      step: 0.05,
+    ),
+    ParametricFieldSchema(
+      key: 'height',
+      label: 'Headboard Height',
+      defaultValue: 0.95,
+      min: 0.75,
+      max: 1.25,
+      step: 0.05,
+    ),
   ];
 
   @override
@@ -55,6 +76,13 @@ class FurnitureBedDouble extends ArchitectComponentDefinition {
       boxDepth: headboardD,
       boxHeight: h,
       color: const Color(0xFF5D4037), // Dark wood
+    );
+
+    builder.addBox(
+      boxWidth: w,
+      boxDepth: d,
+      boxHeight: h * .20,
+      color: const Color(0xFF8D6E63),
     );
 
     // 2. Mattress
@@ -110,7 +138,10 @@ class FurnitureBedDouble extends ArchitectComponentDefinition {
 
     // Blanket fold line
     final foldY = headboardD + mattressD * 0.55;
-    builder.add2DDetailLine(Offset(-mattressW / 2.0, foldY), Offset(mattressW / 2.0, foldY));
+    builder.add2DDetailLine(
+      Offset(-mattressW / 2.0, foldY),
+      Offset(mattressW / 2.0, foldY),
+    );
 
     return builder.build(defaultName);
   }
@@ -135,9 +166,30 @@ class FurnitureBedSingle extends ArchitectComponentDefinition {
 
   @override
   List<ParametricFieldSchema> get schema => const [
-    ParametricFieldSchema(key: 'width', label: 'Width', defaultValue: 0.90, min: 0.80, max: 1.20, step: 0.05),
-    ParametricFieldSchema(key: 'depth', label: 'Length', defaultValue: 2.00, min: 1.90, max: 2.15, step: 0.05),
-    ParametricFieldSchema(key: 'height', label: 'Headboard Height', defaultValue: 0.85, min: 0.70, max: 1.10, step: 0.05),
+    ParametricFieldSchema(
+      key: 'width',
+      label: 'Width',
+      defaultValue: 0.90,
+      min: 0.80,
+      max: 1.20,
+      step: 0.05,
+    ),
+    ParametricFieldSchema(
+      key: 'depth',
+      label: 'Length',
+      defaultValue: 2.00,
+      min: 1.90,
+      max: 2.15,
+      step: 0.05,
+    ),
+    ParametricFieldSchema(
+      key: 'height',
+      label: 'Headboard Height',
+      defaultValue: 0.85,
+      min: 0.70,
+      max: 1.10,
+      step: 0.05,
+    ),
   ];
 
   @override
@@ -158,6 +210,13 @@ class FurnitureBedSingle extends ArchitectComponentDefinition {
       boxDepth: headboardD,
       boxHeight: h,
       color: const Color(0xFF6D4C41),
+    );
+
+    builder.addBox(
+      boxWidth: w,
+      boxDepth: d,
+      boxHeight: h * .20,
+      color: const Color(0xFF8D6E63),
     );
 
     // Mattress
@@ -194,12 +253,18 @@ class FurnitureBedSingle extends ArchitectComponentDefinition {
       pillowW / 2.0,
       headboardD + 0.06 + pillowD,
     );
-    builder.add2DDetailPath(Path()..addRRect(RRect.fromRectAndRadius(pRect, const Radius.circular(0.04))));
+    builder.add2DDetailPath(
+      Path()
+        ..addRRect(RRect.fromRectAndRadius(pRect, const Radius.circular(0.04))),
+    );
     builder.add2DDetailLine(pRect.topLeft, pRect.bottomRight);
     builder.add2DDetailLine(pRect.topRight, pRect.bottomLeft);
 
     final foldY = headboardD + mattressD * 0.55;
-    builder.add2DDetailLine(Offset(-mattressW / 2.0, foldY), Offset(mattressW / 2.0, foldY));
+    builder.add2DDetailLine(
+      Offset(-mattressW / 2.0, foldY),
+      Offset(mattressW / 2.0, foldY),
+    );
 
     return builder.build(defaultName);
   }
@@ -224,9 +289,30 @@ class FurnitureWardrobe extends ArchitectComponentDefinition {
 
   @override
   List<ParametricFieldSchema> get schema => const [
-    ParametricFieldSchema(key: 'width', label: 'Width', defaultValue: 1.80, min: 0.80, max: 3.50, step: 0.10),
-    ParametricFieldSchema(key: 'depth', label: 'Depth', defaultValue: 0.60, min: 0.50, max: 0.70, step: 0.02),
-    ParametricFieldSchema(key: 'height', label: 'Height', defaultValue: 2.20, min: 1.90, max: 2.70, step: 0.05),
+    ParametricFieldSchema(
+      key: 'width',
+      label: 'Width',
+      defaultValue: 1.80,
+      min: 0.80,
+      max: 3.50,
+      step: 0.10,
+    ),
+    ParametricFieldSchema(
+      key: 'depth',
+      label: 'Depth',
+      defaultValue: 0.60,
+      min: 0.50,
+      max: 0.70,
+      step: 0.02,
+    ),
+    ParametricFieldSchema(
+      key: 'height',
+      label: 'Height',
+      defaultValue: 2.20,
+      min: 1.90,
+      max: 2.70,
+      step: 0.05,
+    ),
   ];
 
   @override
@@ -267,30 +353,62 @@ class FurnitureWardrobe extends ArchitectComponentDefinition {
 // ===========================================================================
 
 class FurnitureDiningTableSet extends ArchitectComponentDefinition {
+  final bool legacyDimensions;
+  FurnitureDiningTableSet({this.legacyDimensions = false});
   @override
-  String get id => 'furniture_dining_table';
+  String get id =>
+      legacyDimensions ? 'furniture_dining_table' : 'furniture_dining_set';
 
   @override
   String get defaultName => 'Dining Table & Chairs';
 
   @override
-  ArchitectComponentCategory get category => ArchitectComponentCategory.furniture;
+  ArchitectComponentCategory get category =>
+      ArchitectComponentCategory.furniture;
 
   @override
-  ComponentPlacementMode get placementMode => ComponentPlacementMode.freeStanding;
+  ComponentPlacementMode get placementMode =>
+      ComponentPlacementMode.freeStanding;
 
   @override
-  List<ParametricFieldSchema> get schema => const [
-    ParametricFieldSchema(key: 'width', label: 'Width', defaultValue: 0.90, min: 0.75, max: 1.20, step: 0.05),
-    ParametricFieldSchema(key: 'depth', label: 'Length', defaultValue: 1.60, min: 1.10, max: 2.60, step: 0.10),
-    ParametricFieldSchema(key: 'height', label: 'Table Height', defaultValue: 0.76, min: 0.70, max: 0.82, step: 0.02),
+  List<ParametricFieldSchema> get schema => [
+    ParametricFieldSchema(
+      key: 'width',
+      label: 'Width',
+      defaultValue: legacyDimensions ? .90 : 1.53,
+      min: .75,
+      max: 3.0,
+      step: 0.05,
+    ),
+    ParametricFieldSchema(
+      key: 'depth',
+      label: 'Length',
+      defaultValue: 1.60,
+      min: 1.10,
+      max: 2.60,
+      step: 0.10,
+    ),
+    ParametricFieldSchema(
+      key: 'height',
+      label: 'Table Height',
+      defaultValue: legacyDimensions ? .76 : .82,
+      min: .70,
+      max: 1.0,
+      step: 0.02,
+    ),
   ];
 
   @override
   CachedComponentGeometry generateGeometry(Map<String, dynamic> params) {
-    final w = (params['width'] as num?)?.toDouble() ?? 0.90;
+    final overallW =
+        (params['width'] as num?)?.toDouble() ??
+        (legacyDimensions ? .90 : 1.53);
+    final w = legacyDimensions ? overallW : overallW * (.90 / 1.53);
     final d = (params['depth'] as num?)?.toDouble() ?? 1.60;
-    final h = (params['height'] as num?)?.toDouble() ?? 0.76;
+    final overallH =
+        (params['height'] as num?)?.toDouble() ??
+        (legacyDimensions ? .76 : .82);
+    final h = legacyDimensions ? overallH : overallH * (.76 / .82);
 
     final builder = ParametricSolidBuilder(width: w, depth: d, height: h);
     final wHalf = w / 2.0;
@@ -326,37 +444,68 @@ class FurnitureDiningTableSet extends ArchitectComponentDefinition {
     }
 
     // 3. Chairs placed along the two long sides (X = -wHalf and X = wHalf)
-    final chairW = 0.42;
-    final chairD = 0.42;
-    final chairH = 0.45;
+    final chairW = d * (.42 / 1.60);
+    final chairD = w * (.42 / .90);
     final chairCountPerSide = math.max(1, (d / 0.70).floor());
     final spacing = d / (chairCountPerSide + 1);
+    builder.add2DDetailPath(
+      Path()..addRect(Rect.fromLTRB(-wHalf, 0, wHalf, d)),
+    );
+
+    void chair(Offset origin, bool left) {
+      final seatZ = h * (.45 / .76);
+      final seatThickness = h * (.035 / .76);
+      builder.addBox(
+        origin: origin,
+        boxWidth: chairD,
+        boxDepth: chairW,
+        boxHeight: seatThickness,
+        zBottom: seatZ,
+        color: const Color(0xFFB0BEC5),
+      );
+      for (final x in [.025, chairD - .055]) {
+        for (final y in [.025, chairW - .055]) {
+          builder.addBox(
+            origin: origin + Offset(x, y),
+            boxWidth: .03,
+            boxDepth: .03,
+            boxHeight: seatZ,
+            color: const Color(0xFF78909C),
+          );
+        }
+      }
+      builder.addBox(
+        origin: origin + Offset(left ? 0 : chairD - .035, 0),
+        boxWidth: .035,
+        boxDepth: chairW,
+        boxHeight:
+            (legacyDimensions ? h * (.82 / .76) : overallH) -
+            seatZ -
+            seatThickness,
+        zBottom: seatZ + seatThickness,
+        color: const Color(0xFF90A4AE),
+      );
+    }
 
     for (var i = 1; i <= chairCountPerSide; i++) {
       final cy = i * spacing;
       // Left chair (tucked slightly under table)
       final leftOrigin = Offset(-wHalf - chairD * 0.75, cy - chairW / 2.0);
-      builder.addBox(
-        origin: leftOrigin,
-        boxWidth: chairD,
-        boxDepth: chairW,
-        boxHeight: chairH,
-        color: const Color(0xFFB0BEC5),
-      );
+      chair(leftOrigin, true);
 
       // Right chair
       final rightOrigin = Offset(wHalf - chairD * 0.25, cy - chairW / 2.0);
-      builder.addBox(
-        origin: rightOrigin,
-        boxWidth: chairD,
-        boxDepth: chairW,
-        boxHeight: chairH,
-        color: const Color(0xFFB0BEC5),
-      );
+      chair(rightOrigin, false);
 
       // 2D detail lines for chairs
-      builder.add2DDetailPath(Path()..addRect(Rect.fromLTWH(leftOrigin.dx, leftOrigin.dy, chairD, chairW)));
-      builder.add2DDetailPath(Path()..addRect(Rect.fromLTWH(rightOrigin.dx, rightOrigin.dy, chairD, chairW)));
+      builder.add2DDetailLine(
+        leftOrigin + const Offset(.035, 0),
+        leftOrigin + Offset(.035, chairW),
+      );
+      builder.add2DDetailLine(
+        rightOrigin + Offset(chairD - .035, 0),
+        rightOrigin + Offset(chairD - .035, chairW),
+      );
     }
 
     return builder.build(defaultName);
@@ -382,9 +531,30 @@ class FurnitureSofa extends ArchitectComponentDefinition {
 
   @override
   List<ParametricFieldSchema> get schema => const [
-    ParametricFieldSchema(key: 'width', label: 'Width', defaultValue: 2.10, min: 1.50, max: 2.80, step: 0.10),
-    ParametricFieldSchema(key: 'depth', label: 'Depth', defaultValue: 0.90, min: 0.80, max: 1.05, step: 0.02),
-    ParametricFieldSchema(key: 'height', label: 'Backrest Height', defaultValue: 0.82, min: 0.70, max: 0.95, step: 0.02),
+    ParametricFieldSchema(
+      key: 'width',
+      label: 'Width',
+      defaultValue: 2.10,
+      min: 1.50,
+      max: 2.80,
+      step: 0.10,
+    ),
+    ParametricFieldSchema(
+      key: 'depth',
+      label: 'Depth',
+      defaultValue: 0.90,
+      min: 0.80,
+      max: 1.05,
+      step: 0.02,
+    ),
+    ParametricFieldSchema(
+      key: 'height',
+      label: 'Backrest Height',
+      defaultValue: 0.82,
+      min: 0.70,
+      max: 0.95,
+      step: 0.02,
+    ),
   ];
 
   @override
@@ -438,11 +608,20 @@ class FurnitureSofa extends ArchitectComponentDefinition {
 
     // 2D CAD Plan Block Details
     // Backrest line
-    builder.add2DDetailLine(Offset(-wHalf, backrestD), Offset(wHalf, backrestD));
+    builder.add2DDetailLine(
+      Offset(-wHalf, backrestD),
+      Offset(wHalf, backrestD),
+    );
 
     // Armrest lines
-    builder.add2DDetailLine(Offset(-wHalf + armrestW, backrestD), Offset(-wHalf + armrestW, d));
-    builder.add2DDetailLine(Offset(wHalf - armrestW, backrestD), Offset(wHalf - armrestW, d));
+    builder.add2DDetailLine(
+      Offset(-wHalf + armrestW, backrestD),
+      Offset(-wHalf + armrestW, d),
+    );
+    builder.add2DDetailLine(
+      Offset(wHalf - armrestW, backrestD),
+      Offset(wHalf - armrestW, d),
+    );
 
     // Seat cushion division (2 or 3 cushions)
     final cushionCount = w > 2.0 ? 3 : 2;
@@ -475,9 +654,30 @@ class FurnitureOfficeDesk extends ArchitectComponentDefinition {
 
   @override
   List<ParametricFieldSchema> get schema => const [
-    ParametricFieldSchema(key: 'width', label: 'Width', defaultValue: 1.40, min: 1.00, max: 2.00, step: 0.10),
-    ParametricFieldSchema(key: 'depth', label: 'Depth', defaultValue: 0.70, min: 0.60, max: 0.90, step: 0.05),
-    ParametricFieldSchema(key: 'height', label: 'Height', defaultValue: 0.75, min: 0.70, max: 0.80, step: 0.01),
+    ParametricFieldSchema(
+      key: 'width',
+      label: 'Width',
+      defaultValue: 1.40,
+      min: 1.00,
+      max: 2.00,
+      step: 0.10,
+    ),
+    ParametricFieldSchema(
+      key: 'depth',
+      label: 'Depth',
+      defaultValue: 0.70,
+      min: 0.60,
+      max: 0.90,
+      step: 0.05,
+    ),
+    ParametricFieldSchema(
+      key: 'height',
+      label: 'Height',
+      defaultValue: 0.75,
+      min: 0.70,
+      max: 0.80,
+      step: 0.01,
+    ),
   ];
 
   @override
@@ -520,7 +720,10 @@ class FurnitureOfficeDesk extends ArchitectComponentDefinition {
 
     // 2D CAD Plan Details
     // Pedestal drawer line
-    builder.add2DDetailLine(Offset(-wHalf + pedW, 0.0), Offset(-wHalf + pedW, d * 0.90));
+    builder.add2DDetailLine(
+      Offset(-wHalf + pedW, 0.0),
+      Offset(-wHalf + pedW, d * 0.90),
+    );
 
     return builder.build(defaultName);
   }

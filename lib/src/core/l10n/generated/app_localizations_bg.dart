@@ -1060,6 +1060,15 @@ class AppLocalizationsBg extends AppLocalizations {
   String get snapMidpoint => 'Среда';
 
   @override
+  String get snapOpeningEdge => 'Ръб на отвор';
+
+  @override
+  String get snapOpeningCenter => 'Център на отвор';
+
+  @override
+  String get snapModuleStep => 'Модулна стъпка';
+
+  @override
   String get snapCenter => 'Център';
 
   @override
@@ -3608,6 +3617,12 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneName => 'Име на помещение';
 
   @override
+  String get architectZoneCategory => 'Категория';
+
+  @override
+  String get architectZoneTargetArea => 'Целева площ';
+
+  @override
   String get architectZoneAreaLabel => 'Площ';
 
   @override
@@ -5529,7 +5544,7 @@ class AppLocalizationsBg extends AppLocalizations {
       'Изчистване на изскачащия край до ъгъла';
 
   @override
-  String get architectRadialJoin => 'Съединяване';
+  String get architectRadialJoin => 'Свържи';
 
   @override
   String get architectWallJoinTooltip => 'Съединяване на стени (Join)';
@@ -6878,13 +6893,13 @@ class AppLocalizationsBg extends AppLocalizations {
   String get snapMidpointAlignment => 'По средна точка';
 
   @override
-  String get architectComponentLibraryTitle => 'Библиотека и обекти';
+  String get architectComponentLibraryTitle => 'Библиотека';
 
   @override
   String get architectComponentStudioTitle => 'Компонентно студио';
 
   @override
-  String get architectComponentStudioBtn => 'Студио (Код)';
+  String get architectComponentStudioBtn => 'Код';
 
   @override
   String get architectCategorySanitary => 'Санитария';
@@ -6896,10 +6911,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectCategoryKitchen => 'Кухня';
 
   @override
-  String get architectCategoryStorage => 'Гардероби и шкафове';
+  String get architectCategoryStorage => 'Съхранение';
 
   @override
-  String get architectCategoryOffice => 'Офис и оборудване';
+  String get architectCategoryOffice => 'Офис';
 
   @override
   String get architectCategoryEquipment => 'Оборудване';
@@ -6918,10 +6933,10 @@ class AppLocalizationsBg extends AppLocalizations {
       'Обектът е запазен в потребителската библиотека!';
 
   @override
-  String get architectComponentCompileBtn => 'Компилирай и тествай';
+  String get architectComponentCompileBtn => 'Преглед';
 
   @override
-  String get architectComponentSaveBtn => 'Запази в библиотека';
+  String get architectComponentSaveBtn => 'Запази';
 
   @override
   String get architectComponentTemplateHint => 'Избери шаблон...';
@@ -6951,6 +6966,125 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectComponentNoItems => 'Няма намерени елементи';
+
+  @override
+  String get architectFurnishing => 'Обзавеждане';
+
+  @override
+  String get architectLibrary => 'Библиотека';
+
+  @override
+  String get architectLibraryAll => 'Всички';
+
+  @override
+  String get architectLibrarySourceAll => 'Всички източници';
+
+  @override
+  String get architectLibraryBuiltIn => 'Служебни';
+
+  @override
+  String get architectLibraryCustom => 'Мои обекти';
+
+  @override
+  String get architectLibraryImport => 'Импорт JSON';
+
+  @override
+  String get architectLibraryImportHelp =>
+      'Импортирайте параметричен обект (.json) с размери в метри. Прегледайте и запазете в студиото.';
+
+  @override
+  String get architectLibraryImportError =>
+      'Обектът не може да бъде импортиран.';
+
+  @override
+  String get architectComponentInvalid =>
+      'Проверете кода, размерите и поддържаните форми на обекта.';
+
+  @override
+  String get architectComponentCustomName => 'Потребителски обект';
+
+  @override
+  String get architectComponentCode => 'Код';
+
+  @override
+  String get architectComponentPreview => 'Преглед';
+
+  @override
+  String get architectComponentLockRatio => 'Заключи X:Y:Z';
+
+  @override
+  String get architectComponentLockRatioHelp =>
+      'Промяната на един размер мащабира и трите с един и същ коефициент.';
+
+  @override
+  String get architectComponentDimensionError =>
+      'Въведете размер от 0,1 до 10000 cm.';
+
+  @override
+  String get architectComponentDefaults => 'Начален размер';
+
+  @override
+  String get architectTemplateDesk => 'Бюро';
+
+  @override
+  String get architectTemplateBasin => 'Умивалник';
+
+  @override
+  String get architectComponentToiletWall => 'Конзолна тоалетна';
+
+  @override
+  String get architectComponentToiletFloor => 'Стояща тоалетна';
+
+  @override
+  String get architectComponentVanity => 'Шкаф с умивалник';
+
+  @override
+  String get architectComponentBathtub => 'Вана';
+
+  @override
+  String get architectComponentShower => 'Душ кабина';
+
+  @override
+  String get architectComponentBedDouble => 'Двойно легло';
+
+  @override
+  String get architectComponentBedSingle => 'Единично легло';
+
+  @override
+  String get architectComponentWardrobe => 'Гардероб';
+
+  @override
+  String get architectComponentDining => 'Маса със столове';
+
+  @override
+  String get architectComponentSofa => 'Диван';
+
+  @override
+  String get architectComponentDesk => 'Бюро';
+
+  @override
+  String get architectComponentKitchenBase => 'Долен шкаф';
+
+  @override
+  String get architectComponentKitchenSink => 'Шкаф с мивка';
+
+  @override
+  String get architectComponentFridge => 'Хладилник';
+
+  @override
+  String get architectComponentCooktop => 'Котлони с фурна';
+
+  @override
+  String get architectComponentExportJsonTooltip => 'Копирай JSON';
+
+  @override
+  String get architectComponentExportJsonMsg => 'JSON е копиран';
+
+  @override
+  String get architectComponentView2d => '2D изглед';
+
+  @override
+  String get architectComponentView3d => '3D изглед';
 
   @override
   String get architectApartment => 'Апартамент';

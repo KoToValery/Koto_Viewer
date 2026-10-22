@@ -19,6 +19,7 @@ enum BimEditAction {
   straighten,
   mirrorMove,
   mirrorCopy,
+  schedule,
 }
 
 class BimEditActions {
@@ -40,6 +41,7 @@ class BimEditActions {
         BimEditAction.straighten => l.architectWallStraighten,
         BimEditAction.mirrorMove => l.architectMirrorMove,
         BimEditAction.mirrorCopy => l.architectMirrorCopy,
+        BimEditAction.schedule => l.architectZoneScheduleTitle,
       };
   static IconData icon(BimEditAction action) => switch (action) {
     BimEditAction.move => Icons.open_with_rounded,
@@ -58,6 +60,7 @@ class BimEditActions {
     BimEditAction.straighten => Icons.square_foot,
     BimEditAction.mirrorMove => Icons.flip,
     BimEditAction.mirrorCopy => Icons.copy_all,
+    BimEditAction.schedule => Icons.table_chart_rounded,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};

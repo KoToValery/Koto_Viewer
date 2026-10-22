@@ -12,6 +12,7 @@ import 'package:kotoview/src/features/architect/screens/architect_workspace_scre
 import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart'
     show ArchitectTool;
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_component_library_dialog.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_radial_menu.dart';
 import 'architect_editing_test.dart' as editing;
 import 'architect_manual_selection_test.dart' as selection;
@@ -49,6 +50,27 @@ void main() {
             find.byKey(ValueKey('architect-category-${category.name}')),
           );
           await tester.pumpAndSettle();
+          if (category == ArchitectToolCategory.furnishing) {
+            expect(
+              find.byType(ArchitectComponentLibraryDialog),
+              findsOneWidget,
+            );
+            final dialogContext = tester.element(
+              find.byType(ArchitectComponentLibraryDialog),
+            );
+            await tester.tap(
+              find.byTooltip(AppLocalizations.of(dialogContext)!.close),
+            );
+            await tester.pumpAndSettle();
+            expect(
+              tester.getSize(find.byType(ArchitectToolPalette)).height,
+              lessThan(90),
+            );
+            expect(
+              find.byKey(const ValueKey('component-tool-size-btn')),
+              findsOneWidget,
+            );
+          }
           for (final entry in tool_ui.toolsByIcon.entries) {
             expect(
               find.byIcon(entry.key),

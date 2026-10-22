@@ -59,12 +59,14 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets(
-    'Rapid manual taps toggle only their targets, including selected wall handles',
+    'Explicit multi-selection taps toggle only their targets, including selected wall handles',
     (tester) async {
       final model = editing.seeded(scene());
       addTearDown(model.dispose);
       await workspace.open(tester, model);
       await selectTool(tester);
+      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
+      await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(2, 0));
       expect(workspace.overlay(tester).selectedElementIds, {'w1'});
       await workspace.wallTap(tester, const Offset(2, 0));
@@ -108,6 +110,8 @@ void main() {
       addTearDown(model.dispose);
       await workspace.open(tester, model);
       await selectTool(tester);
+      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
+      await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(2, 2));
       for (final expected in [
         {'other', 'overlap'},
@@ -130,6 +134,8 @@ void main() {
       addTearDown(model.dispose);
       await workspace.open(tester, model);
       await selectTool(tester);
+      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
+      await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(1, 0));
       await workspace.wallTap(tester, const Offset(7, 1));
       var menu = await holdMenu(tester, const Offset(1, 0));
@@ -182,6 +188,8 @@ void main() {
       addTearDown(model.dispose);
       await workspace.open(tester, model);
       await selectTool(tester);
+      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
+      await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(1, 2));
       await workspace.wallTap(tester, const Offset(2, 2));
       final menu = await holdMenu(tester, const Offset(1, 2));
@@ -236,6 +244,8 @@ void main() {
       addTearDown(model.dispose);
       await workspace.open(tester, model);
       await selectTool(tester);
+      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
+      await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(4, 1));
       await workspace.wallTap(tester, const Offset(1, 1));
       expect(workspace.overlay(tester).selectedElementIds, {'c', 'z'});
@@ -294,6 +304,8 @@ void main() {
         );
         await tester.pumpAndSettle();
         await selectTool(tester);
+        await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
+        await tester.pumpAndSettle();
         for (final point in [
           const Offset(1, 0),
           const Offset(1, 2),
