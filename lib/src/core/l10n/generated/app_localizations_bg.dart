@@ -3608,6 +3608,12 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneName => 'Име на помещение';
 
   @override
+  String get architectZoneCategory => 'Категория';
+
+  @override
+  String get architectZoneTargetArea => 'Целева площ';
+
+  @override
   String get architectZoneAreaLabel => 'Площ';
 
   @override

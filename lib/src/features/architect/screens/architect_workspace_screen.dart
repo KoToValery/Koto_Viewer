@@ -1,5 +1,4 @@
 import '../services/architect_apartment_zones.dart';
-import '../widgets/architect_apartment_rooms_sheet.dart';
 import '../widgets/architect_sheets_screen.dart';
 import '../widgets/architect_annotation_settings.dart';
 import '../services/architect_drawing_publisher.dart';
@@ -101,7 +100,6 @@ import '../services/architect_building_elevation.dart';
 import '../services/architect_building_section.dart';
 import '../widgets/architect_tool_palette.dart';
 import '../widgets/architect_zone_drafting_bar.dart';
-import '../widgets/architect_zone_properties_card.dart';
 import '../widgets/architect_zone_schedule_dialog.dart';
 import '../widgets/architect_zone_table_bar.dart';
 import '../rendering/architect_zone_painter_helper.dart';
@@ -3392,7 +3390,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (roof.id == id) return roof.points;
     }
     for (final zone in _project.activeStorey.zones) {
-      if (zone.id == id) return zone.isAutoBoundary ? null : zone.polygon;
+      if (zone.id == id) return (_polygonEditId == id || !zone.isAutoBoundary) ? zone.polygon : null;
     }
     for (final opening in _project.activeStorey.openings) {
       if (opening.id == id) return opening.boundary;
@@ -5640,34 +5638,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
-  Future<void> _manageApartmentRooms() async {
-    final apartment = _selectedZone;
-    if (apartment == null || !apartment.isApartment) return;
-    await showArchitectApartmentRooms(context, apartment, _project.activeStorey.zones);
-  }
 
-  void _deleteSelectedZone() {
-    if (_selectedZoneId == null) return;
-    final activeStorey = _project.activeStorey;
-    final updatedZones = activeStorey.zones
-        .where((z) => z.id != _selectedZoneId)
-        .toList();
-    _zoneTool.cancelEditingZone();
-    setState(() {
-      _project = _project.updateActiveStorey(
-        activeStorey.copyWith(zones: updatedZones),
-      );
-      _selectedZoneId = null;
-    });
-    _saveBiMProjectIfAttached();
-    HapticFeedback.mediumImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(context.l10n.architectZoneDeleted),
-        duration: const Duration(seconds: 1),
-      ),
-    );
-  }
 
   ArchitectStorey _placedZoneSchedules(Offset origin) {
     final current = _project.activeStorey;
@@ -7681,18 +7652,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   List<ArchitectRadialMenuItem> _buildRadialMenuItems(String elementId) {
     final items = <ArchitectRadialMenuItem>[];
-    if (_selectionHasAutoZones) {
-      return [
-        _radialItem(
-          action: ArchitectRadialAction.properties,
-          color: const Color(0xFFB388FF),
-        ),
-        _radialItem(
-          action: ArchitectRadialAction.delete,
-          color: const Color(0xFFFF5252),
-        ),
-      ];
-    }
+
     if (_effectiveSelection.length > 1) {
       final sel = _effectiveSelection;
       final storey = _project.activeStorey;
@@ -7928,7 +7888,38 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           color: const Color(0xFFB388FF),
         ),
       );
-    } else if (isSlab || isRoof || isCadPrim || isZone) {
+    } else if (isZone) {
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.properties,
+          color: const Color(0xFFB388FF),
+        ),
+      );
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.edit,
+          color: const Color(0xFF00E5FF),
+        ),
+      );
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.schedule,
+          color: const Color(0xFF38BDF8),
+        ),
+      );
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.move,
+          color: const Color(0xFFFFB300),
+        ),
+      );
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.duplicate,
+          color: const Color(0xFF64FFDA),
+        ),
+      );
+    } else if (isSlab || isRoof || isCadPrim) {
       items.add(
         _radialItem(
           action: ArchitectRadialAction.edit,
@@ -8474,7 +8465,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     switch (action) {
+      case ArchitectRadialAction.schedule:
+        _showRoomScheduleDialog();
+        break;
+
       case ArchitectRadialAction.edit:
+        final zoneToEdit = _project.activeStorey.zones.where((z) => z.id == id).firstOrNull;
+        if (zoneToEdit != null && zoneToEdit.isAutoBoundary) {
+          _commands.commit(
+            _project.updateActiveStorey(
+              _project.activeStorey.copyWith(
+                zones: [
+                  for (final z in _project.activeStorey.zones)
+                    if (z.id == id) z.copyWith(isAutoBoundary: false) else z,
+                ],
+              ),
+            ),
+          );
+        }
         final polygon = _selectedPolygon;
         if (polygon != null) {
           _cancelActiveDrags();
@@ -8500,6 +8508,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         break;
 
       case ArchitectRadialAction.move:
+        final zoneToMove = _project.activeStorey.zones.where((z) => z.id == id).firstOrNull;
+        if (zoneToMove != null && zoneToMove.isAutoBoundary) {
+          _commands.commit(
+            _project.updateActiveStorey(
+              _project.activeStorey.copyWith(
+                zones: [
+                  for (final z in _project.activeStorey.zones)
+                    if (z.id == id) z.copyWith(isAutoBoundary: false) else z,
+                ],
+              ),
+            ),
+          );
+        }
         setState(() {
           _polygonEditId = null;
           _polygonSelectedEdge = null;
@@ -9143,6 +9164,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       builder: (_) => ArchitectElementPropertiesDialog(
         project: _project,
         elementIds: ids,
+        onScheduleTable: ids.any((id) => _project.activeStorey.zones.any((z) => z.id == id))
+            ? () {
+                Navigator.pop(context);
+                _showRoomScheduleDialog();
+              }
+            : null,
         onWallPlinth:
             _selectedWallIds.length == ids.length &&
                 _project.activeStorey.walls
@@ -11119,6 +11146,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   drawingOnly: !_commands.isPlan,
                   activeTool: _activeTool,
                   onToolChanged: (tool) => setState(() {
+                    final nextTool =
+                        (_activeTool == tool && tool != ArchitectTool.select)
+                            ? ArchitectTool.select
+                            : tool;
                     _resetDimensionDraft();
                     _selectionCyclePoint = null;
                     _selectionIds.clear();
@@ -11133,7 +11164,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _wallParallelMove = false;
                     _wallEndpointClearanceId = null;
                     _moveSelection = false;
-                    _activeTool = tool;
+                    _activeTool = nextTool;
                     _midpointTracking.clear();
                     _pendingShape = null;
                     _shapePanelAnchor = null;
@@ -11695,27 +11726,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 ),
               ),
 
-              // Floating Zone Property Inspector Card if a zone is selected
-              if (!_multiSelect &&
-                  _effectiveSelection.length == 1 &&
-                  _selectedZone != null &&
-                  !_is3DView)
-                ArchitectZonePropertiesCard(
-                  units: _project.units,
-                  zones: _project.activeStorey.zones,
-                  onManageApartmentRooms: _manageApartmentRooms,
-                  onOpenApartment: (id) => setState(() { _selectedZoneId = id; _selectedElementId = null; _zoneTool.cancelEditingZone(); }),
-                  presets: _zonePresets,
-                  zone: _selectedZone!,
-                  tool: _zoneTool,
-                  onZoneUpdated: _updateZone,
-                  onDeleteZone: _deleteSelectedZone,
-                  onClose: () {
-                    _zoneTool.cancelEditingZone();
-                    setState(() => _selectedZoneId = null);
-                  },
-                  onOpenScheduleTable: _showRoomScheduleDialog,
-                ),
+
 
               // Floating Axis Property Inspector Card if an axis is selected
               if (!_multiSelect &&

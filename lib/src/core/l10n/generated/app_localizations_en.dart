@@ -3593,6 +3593,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectZoneName => 'Room Name';
 
   @override
+  String get architectZoneCategory => 'Category';
+
+  @override
+  String get architectZoneTargetArea => 'Target Area';
+
+  @override
   String get architectZoneAreaLabel => 'Area';
 
   @override

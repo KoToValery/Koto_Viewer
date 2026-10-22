@@ -631,10 +631,15 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
             : const Color(0xFF262630),
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
+          key: ValueKey('architect-tool-${tool.name}'),
           onTap: () {
-            onToolChanged(tool);
-            if (tool == ArchitectTool.component) {
-              widget.onOpenComponentLibrary?.call();
+            if (isSelected) {
+              onToolChanged(ArchitectTool.select);
+            } else {
+              onToolChanged(tool);
+              if (tool == ArchitectTool.component) {
+                widget.onOpenComponentLibrary?.call();
+              }
             }
           },
           borderRadius: BorderRadius.circular(10),

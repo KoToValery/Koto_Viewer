@@ -1155,6 +1155,8 @@
   "architectZoneMerged": "Точките са обединени",
   "architectZoneProperties": "Свойства на зоната",
   "architectZoneName": "Име на помещение",
+  "architectZoneCategory": "Категория",
+  "architectZoneTargetArea": "Целева площ",
   "architectZoneAreaLabel": "Площ",
   "architectZonePerimeterLabel": "Периметър",
   "architectDeleteZone": "Изтрий зона",

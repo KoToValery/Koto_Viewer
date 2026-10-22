@@ -8,12 +8,14 @@ import '../models/architect_fenestration_style.dart';
 import '../services/fenestration_library_service.dart';
 import '../models/architect_door.dart';
 import '../services/architect_selection.dart';
+import '../models/architect_zone.dart';
 import 'architect_wall_drafting_panel.dart';
 
 class ArchitectElementPropertiesDialog extends StatefulWidget {
   final ArchitectProject project;
   final Set<String> elementIds;
   final VoidCallback? onSlabLayers;
+  final VoidCallback? onScheduleTable;
   final void Function(Map<String,double>,Map<String,String>)? onWallLayers,onWallPlinth;
   final bool Function(Map<String, double>, Map<String, String>)? onStraighten;
   final bool Function(Map<String, double>, Map<String, String>) onApply;
@@ -22,7 +24,10 @@ class ArchitectElementPropertiesDialog extends StatefulWidget {
     required this.project,
     required this.elementIds,
     required this.onApply,
-    this.onSlabLayers, this.onWallLayers,this.onWallPlinth,
+    this.onSlabLayers,
+    this.onScheduleTable,
+    this.onWallLayers,
+    this.onWallPlinth,
     this.onStraighten,
   });
   @override
@@ -80,6 +85,38 @@ class _ArchitectElementPropertiesDialogState
         texts['styleId'] = styleIds.first!;
       }
     }
+    final isZone = records.isNotEmpty &&
+        records.every((e) => e.containsKey('category') && e.containsKey('floorFinish'));
+    if (isZone) {
+      final categories = records.map((e) => e['category'] as String?).toSet();
+      if (categories.length == 1 && categories.first != null) {
+        texts['category'] = categories.first!;
+      }
+      final numbers = records.map((e) => e['number'] as String?).toSet();
+      if (numbers.length == 1 && numbers.first != null) {
+        texts['number'] = numbers.first!;
+      }
+      final names = records.map((e) => e['name'] as String?).toSet();
+      if (names.length == 1 && names.first != null) {
+        texts['name'] = names.first!;
+      }
+      final floorFinishes = records.map((e) => e['floorFinish'] as String?).toSet();
+      if (floorFinishes.length == 1 && floorFinishes.first != null) {
+        texts['floorFinish'] = floorFinishes.first!;
+      }
+      final wallFinishes = records.map((e) => e['wallFinish'] as String?).toSet();
+      if (wallFinishes.length == 1 && wallFinishes.first != null) {
+        texts['wallFinish'] = wallFinishes.first!;
+      }
+      final ceilingFinishes = records.map((e) => e['ceilingFinish'] as String?).toSet();
+      if (ceilingFinishes.length == 1 && ceilingFinishes.first != null) {
+        texts['ceilingFinish'] = ceilingFinishes.first!;
+      }
+      final autoBoundaries = records.map((e) => e['isAutoBoundary'] as bool?).toSet();
+      if (autoBoundaries.length == 1 && autoBoundaries.first != null) {
+        texts['isAutoBoundary'] = '${autoBoundaries.first!}';
+      }
+    }
   }
 
   String label(String key) {
@@ -102,6 +139,8 @@ class _ArchitectElementPropertiesDialogState
       'elevation' => l.architectToolLevel,
       'offsetDistance' => l.architectPropertyOffset,
       'baseOffset' => l.architectPropertyBaseOffset,
+      'clearHeight' => l.architectZoneClearHeight,
+      'targetArea' => l.architectZoneTargetArea,
       _ => l.architectPropertySize,
     };
   }
@@ -179,6 +218,209 @@ class _ArchitectElementPropertiesDialogState
           records.every((e) => e['followStoreyHeight'] == true));
   bool get normalWalls =>
       records.every((e) => !ArchitectWall.fromJson(e).isParapet);
+  Widget _zoneMetricsBanner(ArchitectZone zone, AppLocalizations l) => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: zone.color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: zone.color.withValues(alpha: 0.3)),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Icon(Icons.square_foot, size: 16, color: zone.color),
+              const SizedBox(width: 4),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    '${l.architectZoneAreaLabel}: ${widget.project.units.formatArea(zone.area)}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            '${l.architectZonePerimeterLabel}: ${widget.project.formatLength(zone.perimeter)}',
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _zoneCategoryField(AppLocalizations l) {
+    final currentCatName = texts['category'] ??
+        (records.map((e) => e['category']).toSet().length == 1
+            ? records.first['category'] as String? ?? 'custom'
+            : 'custom');
+    final currentCat = ArchitectZoneCategory.values.firstWhere(
+      (c) => c.name == currentCatName,
+      orElse: () => ArchitectZoneCategory.custom,
+    );
+    return DropdownButtonFormField<String>(
+      key: ValueKey('architect-property-category-$currentCatName'),
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: l.architectZoneCategory,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      ),
+      initialValue: currentCat.name,
+      items: [
+        for (final cat in ArchitectZoneCategory.values)
+          DropdownMenuItem(
+            value: cat.name,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(cat.icon, size: 18, color: cat.color),
+                const SizedBox(width: 8),
+                Text(cat.localizedName(l)),
+              ],
+            ),
+          ),
+      ],
+      onChanged: (val) {
+        if (val != null) {
+          setState(() {
+            texts['category'] = val;
+            final newCat = ArchitectZoneCategory.values.firstWhere(
+              (c) => c.name == val,
+              orElse: () => ArchitectZoneCategory.custom,
+            );
+            final currentName = texts['name'] ?? (records.first['name'] as String? ?? '');
+            if (currentName.isEmpty ||
+                ArchitectZoneCategory.values.any((c) => c.localizedName(l) == currentName)) {
+              texts['name'] = newCat.localizedName(l);
+            }
+          });
+        }
+      },
+    );
+  }
+
+  Widget _zoneNumberAndNameFields(AppLocalizations l) {
+    final currentNumber = texts['number'] ??
+        (records.map((e) => e['number']).toSet().length == 1
+            ? records.first['number'] as String? ?? '1'
+            : '1');
+    final currentName = texts['name'] ??
+        (records.map((e) => e['name']).toSet().length == 1
+            ? records.first['name'] as String? ?? ''
+            : '');
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 75,
+          child: TextFormField(
+            key: ValueKey('architect-property-number-$currentNumber'),
+            initialValue: currentNumber,
+            decoration: InputDecoration(
+              labelText: l.architectZoneNumberPrompt,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            ),
+            onChanged: (v) => texts['number'] = v,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: TextFormField(
+            key: ValueKey('architect-property-name-$currentName'),
+            initialValue: currentName,
+            decoration: InputDecoration(
+              labelText: l.architectZoneName,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            ),
+            onChanged: (v) => texts['name'] = v,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _zoneFinishField(String key, String label, List<String> presets) {
+    final current = texts[key] ??
+        (records.map((e) => e[key]).toSet().length == 1
+            ? records.first[key] as String? ?? ''
+            : '');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextFormField(
+              key: ValueKey('architect-property-$key-$current'),
+              initialValue: current,
+              decoration: InputDecoration(
+                labelText: label,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              ),
+              onChanged: (v) => texts[key] = v,
+            ),
+          ),
+          PopupMenuButton<String>(
+            tooltip: label,
+            icon: const Icon(Icons.arrow_drop_down, size: 22),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onSelected: (val) {
+              setState(() => texts[key] = val);
+            },
+            itemBuilder: (_) => [
+              for (final preset in presets.toSet())
+                PopupMenuItem(value: preset, child: Text(preset)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _zoneBoundaryModeSwitch(AppLocalizations l) {
+    final isAuto = texts['isAutoBoundary'] == 'false'
+        ? false
+        : (texts['isAutoBoundary'] == 'true'
+            ? true
+            : (records.first['isAutoBoundary'] as bool? ?? true));
+    return CheckboxListTile(
+      key: const ValueKey('architect-property-isAutoBoundary'),
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: Text(l.architectZoneBoundaryAuto),
+      subtitle: Text(
+        l.architectZoneBoundaryAutoDesc,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11),
+      ),
+      value: isAuto,
+      onChanged: (val) {
+        if (val != null) {
+          setState(() => texts['isAutoBoundary'] = '$val');
+        }
+      },
+    );
+  }
+
   Widget numberField(String key, bool walls) => ListTile(
     key: ValueKey('architect-property-$key'),
     dense: true,
@@ -239,14 +481,25 @@ class _ArchitectElementPropertiesDialogState
         records.every(
           (e) => e.containsKey('offsetRatio') && e.containsKey('panesCount'),
         );
+    final isZone = records.isNotEmpty &&
+        records.every((e) => e.containsKey('category') && e.containsKey('floorFinish'));
     return AlertDialog(
       title: Text(l.architectProperties),
       content: SizedBox(
-        width: 270,
+        width: isZone ? 310 : 270,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (widget.onScheduleTable != null) ...[
+                OutlinedButton.icon(
+                  key: const ValueKey('architect-property-schedule-table'),
+                  onPressed: widget.onScheduleTable,
+                  icon: const Icon(Icons.table_chart_rounded, size: 18),
+                  label: Text(l.architectZoneScheduleTitle),
+                ),
+                const SizedBox(height: 8),
+              ],
               if (widget.onSlabLayers != null)
                 OutlinedButton.icon(
                   key: const ValueKey('architect-property-slab-layers'),
@@ -254,6 +507,56 @@ class _ArchitectElementPropertiesDialogState
                   icon: const Icon(Icons.layers_outlined),
                   label: Text(l.slabLayers),
                 ),
+              if (isZone) ...[
+                if (widget.elementIds.length == 1) ...[
+                  Builder(
+                    builder: (_) {
+                      final zone = widget.project.activeStorey.zones
+                          .where((z) => widget.elementIds.contains(z.id))
+                          .firstOrNull;
+                      return zone != null
+                          ? _zoneMetricsBanner(zone, l)
+                          : const SizedBox.shrink();
+                    },
+                  ),
+                ],
+                _zoneNumberAndNameFields(l),
+                const SizedBox(height: 8),
+                _zoneCategoryField(l),
+                const SizedBox(height: 4),
+                numberField('clearHeight', false),
+                if (fields.containsKey('targetArea'))
+                  numberField('targetArea', false),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    l.architectZoneFinishes,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _zoneFinishField(
+                  'floorFinish',
+                  l.architectZoneFloorFinish,
+                  ArchitectZone.standardFloorFinishes(l),
+                ),
+                _zoneFinishField(
+                  'wallFinish',
+                  l.architectZoneWallFinish,
+                  ArchitectZone.standardWallFinishes(l),
+                ),
+                _zoneFinishField(
+                  'ceilingFinish',
+                  l.architectZoneCeilingFinish,
+                  ArchitectZone.standardCeilingFinishes(l),
+                ),
+                const SizedBox(height: 4),
+                _zoneBoundaryModeSwitch(l),
+              ],
               if (isDoor || isWindow) ...[
                 DropdownButtonFormField<String>(
                   key: const ValueKey('architect-property-styleId'),
@@ -482,7 +785,7 @@ class _ArchitectElementPropertiesDialogState
                 ),
                 const SizedBox(height: 8),
               ],
-              if (!walls)
+              if (!walls && !isZone)
                 for (final key in fields.keys) numberField(key, false),
               if (walls) ...[
                 if(widget.onWallPlinth!=null)OutlinedButton.icon(key:const ValueKey('architect-property-wall-plinth'),icon:const Icon(Icons.border_bottom),label:Text(l.wallPlinth),onPressed:(){Navigator.pop(context);widget.onWallPlinth!(values,texts);}),
@@ -570,13 +873,14 @@ class _ArchitectElementPropertiesDialogState
                   },
                 ),
               ],
-              for (final key in [
-                'name',
-                'label',
-                'text',
-                'specId',
-                'customText',
-              ])
+              if (!isZone)
+                for (final key in [
+                  'name',
+                  'label',
+                  'text',
+                  'specId',
+                  'customText',
+                ])
                 if (records.every((e) => e.containsKey(key)))
                   TextFormField(
                     key: ValueKey('$key-${texts[key] ?? records.first[key]}'),

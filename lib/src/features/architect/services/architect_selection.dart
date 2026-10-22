@@ -6,6 +6,7 @@ import '../models/architect_elements.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_door.dart';
 import '../models/architect_wall_type.dart';
+import '../models/architect_zone.dart';
 import '../rendering/architect_scene_geometry.dart';
 import 'architect_command_controller.dart';
 import 'architect_stair_rules.dart';
@@ -26,6 +27,8 @@ class ArchitectSelection {
     'offsetDistance',
     'strokeWidth',
     'baseOffset',
+    'clearHeight',
+    'targetArea',
   };
   static Iterable<Map<String, dynamic>> records(
     Map<String, dynamic> json,
@@ -63,6 +66,13 @@ class ArchitectSelection {
     if (project.activeStorey.columns.any((c) => c.id == id)) {
       fields['height'] =
           (e['height'] as num?)?.toDouble() ?? project.activeStorey.height;
+    }
+    if (project.activeStorey.zones.any((z) => z.id == id)) {
+      fields['clearHeight'] =
+          (e['clearHeight'] as num?)?.toDouble() ?? 2.60;
+      if (e['targetArea'] is num) {
+        fields['targetArea'] = (e['targetArea'] as num).toDouble();
+      }
     }
     if (e.containsKey('referenceLine') ||
         project.activeStorey.columns.any((c) => c.id == id) ||
@@ -346,14 +356,29 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
               'cutDisplayMode',
               'isHingeLeft',
               'openInward',
+              'number',
+              'category',
+              'floorFinish',
+              'wallFinish',
+              'ceilingFinish',
+              'isAutoBoundary',
             }.contains(value.key)) {
           throw ArgumentError('Unsupported property');
+        }
+        if (value.key == 'category' &&
+            !ArchitectZoneCategory.values.any((c) => c.name == value.value)) {
+          throw ArgumentError('Invalid zone category');
         }
         if (value.key == 'cutDisplayMode' &&
             !ArchitectCutDisplayMode.values.any((m) => m.name == value.value)) {
           throw ArgumentError('Invalid cut display mode');
         }
-        if (value.key == 'isHingeLeft' || value.key == 'openInward') {
+        if (value.key == 'isAutoBoundary') {
+          if (!{'true', 'false'}.contains(value.value)) {
+            throw ArgumentError('Invalid boolean value');
+          }
+          e[value.key] = value.value == 'true';
+        } else if (value.key == 'isHingeLeft' || value.key == 'openInward') {
           if (!{'true', 'false'}.contains(value.value)) {
             throw ArgumentError('Invalid boolean value');
           }

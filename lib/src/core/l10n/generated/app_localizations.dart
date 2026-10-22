@@ -6197,6 +6197,18 @@ abstract class AppLocalizations {
   /// **'Room Name'**
   String get architectZoneName;
 
+  /// Room category preset selector
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get architectZoneCategory;
+
+  /// Target area label
+  ///
+  /// In en, this message translates to:
+  /// **'Target Area'**
+  String get architectZoneTargetArea;
+
   /// Room area label
   ///
   /// In en, this message translates to:
