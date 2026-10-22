@@ -1,3 +1,4 @@
+import 'architect_line_style.dart';
 // === SECTION: ARCHITECTURAL ELEMENT MODELS ===
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -798,6 +799,7 @@ class ArchitectCadPrimitive {
   final int colorValue; // ARGB
   final List<Offset>? polygon;
   final double strokeWidth;
+  final ArchitectLineStyle lineStyle;
 
   const ArchitectCadPrimitive({
     required this.id,
@@ -806,6 +808,7 @@ class ArchitectCadPrimitive {
     required this.endPoint,
     this.colorValue = 0xFF424242,
     this.strokeWidth = 1.0,
+    this.lineStyle = ArchitectLineStyle.solid,
     this.polygon,
   });
 
@@ -822,6 +825,7 @@ class ArchitectCadPrimitive {
     Offset? endPoint,
     int? colorValue,
     double? strokeWidth,
+    ArchitectLineStyle? lineStyle,
     List<Offset>? polygon,
   }) => ArchitectCadPrimitive(
     id: id ?? this.id,
@@ -830,6 +834,7 @@ class ArchitectCadPrimitive {
     endPoint: endPoint ?? this.endPoint,
     colorValue: colorValue ?? this.colorValue,
     strokeWidth: strokeWidth ?? this.strokeWidth,
+    lineStyle: lineStyle ?? this.lineStyle,
     polygon: polygon ?? this.polygon,
   );
 
@@ -840,6 +845,7 @@ class ArchitectCadPrimitive {
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'colorValue': colorValue,
     'strokeWidth': strokeWidth,
+    if (type != CadPrimitiveType.circle) 'lineStyle': lineStyle.toJson(),
     if (polygon != null)
       'polygon': [
         for (final p in polygon!) {'x': p.dx, 'y': p.dy},
@@ -863,6 +869,11 @@ class ArchitectCadPrimitive {
         ),
         colorValue: (json['colorValue'] as num?)?.toInt() ?? 0xFF424242,
         strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 1.0,
+        lineStyle: json['lineStyle'] is Map
+            ? ArchitectLineStyle.fromJson(
+                Map<String, dynamic>.from(json['lineStyle'] as Map),
+              )
+            : ArchitectLineStyle.solid,
         polygon: (json['polygon'] as List?)
             ?.map(
               (p) => Offset(

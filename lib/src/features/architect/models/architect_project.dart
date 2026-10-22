@@ -1,3 +1,4 @@
+import 'architect_line_style.dart';
 import 'architect_document.dart';
 export 'architect_document.dart';
 import 'architect_slab_assembly.dart';
@@ -302,6 +303,7 @@ class ArchitectProject {
   final String activeStoreyId;
   final List<StructuralGridAxis> gridAxes;
   final List<ArchitectWallType> wallTypes;
+  final List<ArchitectLineStyle> lineStyles;
   final List<ArchitectFenestrationStyle> openingStyles;
   final List<ArchitectSlabAssembly> slabAssemblies;
   final List<ArchitectSection> sections;
@@ -322,6 +324,7 @@ class ArchitectProject {
     required this.activeStoreyId,
     this.gridAxes = const [],
     this.wallTypes = const [],
+    this.lineStyles = const [],
     this.openingStyles = const [],
     this.slabAssemblies = const [],
     this.sections = const [],
@@ -435,6 +438,7 @@ class ArchitectProject {
     String? activeStoreyId,
     List<StructuralGridAxis>? gridAxes,
     List<ArchitectWallType>? wallTypes,
+    List<ArchitectLineStyle>? lineStyles,
     List<ArchitectFenestrationStyle>? openingStyles,
     List<ArchitectSlabAssembly>? slabAssemblies,
     List<ArchitectSection>? sections,
@@ -455,6 +459,7 @@ class ArchitectProject {
     activeStoreyId: activeStoreyId ?? this.activeStoreyId,
     gridAxes: gridAxes ?? this.gridAxes,
     wallTypes: wallTypes ?? this.wallTypes,
+    lineStyles: lineStyles ?? this.lineStyles,
     openingStyles: openingStyles ?? this.openingStyles,
     slabAssemblies: slabAssemblies ?? this.slabAssemblies,
     sections: sections ?? this.sections,
@@ -477,6 +482,7 @@ class ArchitectProject {
     'activeStoreyId': activeStoreyId,
     'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
     'wallTypes': wallTypes.map((w) => w.toJson()).toList(),
+    'lineStyles': lineStyles.map((s) => s.toJson()).toList(),
     'openingStyles': openingStyles.map((o) => o.toJson()).toList(),
     'slabAssemblies': slabAssemblies.map((a) => a.toJson()).toList(),
     'sections': sections.map((a) => a.toJson()).toList(),
@@ -552,6 +558,13 @@ class ArchitectProject {
             ?.map((w) => ArchitectWallType.fromJson(w as Map<String, dynamic>))
             .toList() ??
         ArchitectWallType.standardCatalog(),
+    lineStyles: (json['lineStyles'] as List? ?? [])
+        .map(
+          (s) =>
+              ArchitectLineStyle.fromJson(Map<String, dynamic>.from(s as Map)),
+        )
+        .where((s) => !s.isPreset)
+        .toList(),
     openingStyles:
         (json['openingStyles'] as List<dynamic>?)
             ?.map(

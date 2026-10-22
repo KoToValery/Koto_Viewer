@@ -7134,4 +7134,137 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectLineEditRejected => 'Линията трябва да е поне 1 mm.';
+
+  @override
+  String get architectLineStyle => 'Вид линия';
+
+  @override
+  String get architectLineSolid => 'Непрекъсната';
+
+  @override
+  String get architectLineDashed => 'Прекъсната';
+
+  @override
+  String get architectLineShortDashed => 'Къси тирета';
+
+  @override
+  String get architectLineLongDashed => 'Дълги тирета';
+
+  @override
+  String get architectLineDotted => 'Точкова';
+
+  @override
+  String get architectLineSparseDotted => 'Редки точки';
+
+  @override
+  String get architectLineDashDot => 'Тире–точка';
+
+  @override
+  String get architectLineDashDoubleDot => 'Тире–две точки';
+
+  @override
+  String get architectLineLongDashDot => 'Дълго тире–точка';
+
+  @override
+  String get architectLineLongShortDash => 'Дълго–късо тире';
+
+  @override
+  String get architectLineDoubleDashDot => 'Две тирета–точка';
+
+  @override
+  String get architectLinePatternEditor => 'Собствена шарка';
+
+  @override
+  String get architectLineDash => 'Тире';
+
+  @override
+  String get architectLineGap => 'Пауза';
+
+  @override
+  String get architectLinePatternHint =>
+      'Тирета, паузи и символи. Размерите са върху листа.';
+
+  @override
+  String get architectLinePatternRange => 'Въведете 0.1–100 mm.';
+
+  @override
+  String get architectLinePatternAdd => 'Добави двойка';
+
+  @override
+  String get architectLinePatternRemove => 'Премахни двойка';
+
+  @override
+  String get architectLinePowerLine => 'Далекопровод';
+
+  @override
+  String get architectLineSymbol => 'Символ';
+
+  @override
+  String get architectLineSymbolNone => 'Без';
+
+  @override
+  String get architectLineSymbolLightning => 'Светкавица';
+
+  @override
+  String get architectLineSymbolCircle => 'Кръг';
+
+  @override
+  String get architectLineSymbolSquare => 'Квадрат';
+
+  @override
+  String get architectLineSymbolTriangle => 'Триъгълник';
+
+  @override
+  String get architectLineSymbolDiamond => 'Ромб';
+
+  @override
+  String get architectLineSymbolCross => 'Кръст';
+
+  @override
+  String get architectLineSymbolArrow => 'Стрелка';
+
+  @override
+  String get architectLineSymbolChevron => 'Шеврон';
+
+  @override
+  String get architectLineSymbolCustom => 'Собствена форма';
+
+  @override
+  String get architectLineSymbolSettings => 'Поставяне';
+
+  @override
+  String get architectLineSymbolDraw => 'Редактирай формата';
+
+  @override
+  String get architectLineSymbolSize => 'Размер';
+
+  @override
+  String get architectLineSymbolSpacing => 'Повторение';
+
+  @override
+  String get architectLineSymbolFollow => 'По посоката на линията';
+
+  @override
+  String get architectLineSymbolClearLine => 'Пауза около знака';
+
+  @override
+  String get architectLineSymbolDrawHint =>
+      'Поставете възли или рисувайте свободно. Може да добавяте отделни щрихи.';
+
+  @override
+  String get architectLineSymbolPoints => 'С възли';
+
+  @override
+  String get architectLineSymbolFreehand => 'Свободно';
+
+  @override
+  String get architectLineSymbolNewStroke => 'Нов щрих';
+
+  @override
+  String get architectLineSymbolCloseStroke => 'Затвори щриха';
+
+  @override
+  String architectLineSymbolRange(String minimum, String maximum, String unit) {
+    return 'Въведете от $minimum до $maximum $unit.';
+  }
 }

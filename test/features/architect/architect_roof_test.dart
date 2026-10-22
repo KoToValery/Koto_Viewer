@@ -417,6 +417,29 @@ void main() {
       expect(mauerlatMembers.length, 2);
       expect(purlinMembers.length, 1);
 
+      // Verify that all batten cross sections are true orthogonal rectangles (90 deg corners, not squashed parallelograms)
+      for (final batten in battenMembers) {
+        expect(batten.polygon.length, equals(4));
+        final pts = batten.polygon;
+        final v01 = pts[1] - pts[0];
+        final v12 = pts[2] - pts[1];
+        final v23 = pts[3] - pts[2];
+        final v30 = pts[0] - pts[3];
+
+        // Corners are exactly 90 degrees (dot product == 0)
+        expect(v01.dx * v12.dx + v01.dy * v12.dy, closeTo(0.0, 1e-4));
+        expect(v12.dx * v23.dx + v12.dy * v23.dy, closeTo(0.0, 1e-4));
+        expect(v23.dx * v30.dx + v23.dy * v30.dy, closeTo(0.0, 1e-4));
+
+        // Dimension along slope is battenWidth (0.05m)
+        expect(v01.distance, closeTo(0.05, 1e-4));
+        expect(v23.distance, closeTo(0.05, 1e-4));
+
+        // Dimension perpendicular to slope is battenHeight (0.04m)
+        expect(v12.distance, closeTo(0.04, 1e-4));
+        expect(v30.distance, closeTo(0.04, 1e-4));
+      }
+
       // Verify the two roof slices meet cleanly at the ridge (t = 5.0 along cut line from y=-2 to y=8)
       final firstRoofMaxT = [
         for (final m in slices[0].members.where(
@@ -1073,6 +1096,42 @@ void main() {
 
       final restored = ArchitectRoofPlane.fromJson(json);
       expect(restored.isSlopeLocked, isFalse);
+    });
+
+    test('finishDraft completes roof without clicking first point (green checkmark trigger)', () {
+      final tool = ArchitectRoofTool();
+      final storey = ArchitectStorey(id: 's1', name: 'Storey 1', elevation: 0.0, height: 2.80);
+
+      // 1. Polygon mode
+      tool.setDrawMode(RoofDrawMode.polygon);
+      tool.addDraftPoint(const Offset(0, 0), storey: storey);
+      tool.addDraftPoint(const Offset(6, 0), storey: storey);
+      expect(tool.finishDraft(storey: storey), isNull); // only 2 points
+
+      tool.addDraftPoint(const Offset(6, 4), storey: storey);
+      tool.addDraftPoint(const Offset(0, 4), storey: storey);
+      expect(tool.draftPoints.length, 4);
+
+      // Finish without clicking (0,0)
+      final created = tool.finishDraft(storey: storey);
+      expect(created, isNotNull);
+      expect(created!.length, 1);
+      expect(created.first.points.length, 4);
+      expect(tool.isDrafting, isFalse);
+
+      // 2. Multi-pitch mode
+      tool.setDrawMode(RoofDrawMode.multiPitch);
+      tool.addDraftPoint(const Offset(0, 0), storey: storey);
+      tool.addDraftPoint(const Offset(10, 0), storey: storey);
+      tool.addDraftPoint(const Offset(10, 6), storey: storey);
+      tool.addDraftPoint(const Offset(0, 6), storey: storey);
+      expect(tool.draftPoints.length, 4);
+
+      // Finish directly via checkmark
+      final multiPlanes = tool.finishDraft(storey: storey);
+      expect(multiPlanes, isNotNull);
+      expect(multiPlanes!.length, greaterThanOrEqualTo(2));
+      expect(tool.isDrafting, isFalse);
     });
   });
 }

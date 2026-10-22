@@ -1,3 +1,6 @@
+import '../models/architect_line_style.dart';
+import '../widgets/architect_line_style_picker.dart';
+import '../services/architect_line_styles.dart';
 import '../services/architect_line_editing.dart';
 import '../services/architect_apartment_zones.dart';
 import '../widgets/architect_sheets_screen.dart';
@@ -914,6 +917,38 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     setState(_resetDimensionDraft);
     _saveBiMProjectIfAttached();
     HapticFeedback.lightImpact();
+  }
+
+  void _commitCreatedRoofPlanes(List<ArchitectRoofPlane> createdList) {
+    if (createdList.isEmpty) return;
+    setState(() {
+      for (final plane in createdList) {
+        _commands.execute(
+          CreateArchitectRoofPlane(
+            storeyId: _project.activeStoreyId,
+            roof: plane,
+          ),
+        );
+      }
+      _selectionIds
+        ..clear()
+        ..addAll(createdList.map((p) => p.id));
+      _selectedElementId = createdList.first.id;
+      _polygonSelectedEdge = createdList.first.safeEavesEdgeIndex;
+      _activeMagneticGuides = [];
+      _activeSnapLabel = null;
+    });
+    _saveBiMProjectIfAttached();
+    HapticFeedback.mediumImpact();
+  }
+
+  void _commitRoofDraft() {
+    final createdList = _roofTool.finishDraft(
+      storey: _project.activeStorey,
+    );
+    if (createdList != null && createdList.isNotEmpty) {
+      _commitCreatedRoofPlanes(createdList);
+    }
   }
 
   ArchitectDimensionAnchor _dimensionPointAnchor(Offset point) {
@@ -2020,6 +2055,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset _wallEndpointDisplacement = Offset.zero;
   (Offset, Offset)? _wallEndpointLeaderLine;
   bool _wallParallelMove = false;
+  ArchitectLineStyle _activeCadLineStyle = ArchitectLineStyle.solid;
+  Widget _lineStyleControl() => Theme(
+    data: ThemeData.dark(),
+    child: ArchitectLineStylePicker(
+      key: const ValueKey('architect-draft-line-style'),
+      value: _activeCadLineStyle,
+      compact: true,
+      customStyles: _project.lineStyles,
+      onChanged: (style) {
+        if (!style.isPreset && !_project.lineStyles.any((s) => s == style)) {
+          _commands.execute(SaveArchitectLineStyle(style));
+          _saveBiMProjectIfAttached();
+        }
+        setState(() => _activeCadLineStyle = style);
+      },
+    ),
+  );
   bool get _linearDraftTool =>
       _activeTool == ArchitectTool.wall || _activeTool == ArchitectTool.cadLine;
 
@@ -5450,26 +5502,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         closeRadius: math.min(18.0 / _currentScale, 0.35),
       );
       if (createdList != null && createdList.isNotEmpty) {
-        setState(() {
-          for (final plane in createdList) {
-            _commands.execute(
-              CreateArchitectRoofPlane(
-                storeyId: _project.activeStoreyId,
-                roof: plane,
-              ),
-            );
-          }
-          _selectionIds
-            ..clear()
-            ..addAll(createdList.map((p) => p.id));
-          _selectedElementId = createdList.first.id;
-          _polygonSelectedEdge = createdList.first.safeEavesEdgeIndex;
-          _activeMagneticGuides = [];
-          _activeSnapLabel = null;
-        });
-        _saveBiMProjectIfAttached();
-        HapticFeedback.mediumImpact();
+        _commitCreatedRoofPlanes(createdList);
       } else {
+        _repaintPreview();
         HapticFeedback.lightImpact();
       }
       return;
@@ -5942,6 +5977,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             startPoint: _draftStart!,
             endPoint: end,
             colorValue: 0xFF9E9E9E,
+            lineStyle: _activeCadLineStyle,
           ),
         ),
       );
@@ -11876,31 +11912,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             });
                             HapticFeedback.selectionClick();
                           },
-                          onFinishPolygon: () {
-                            final createdList = _roofTool.finishDraft(
-                              storey: _project.activeStorey,
-                            );
-                            if (createdList != null && createdList.isNotEmpty) {
-                              setState(() {
-                                for (final plane in createdList) {
-                                  _commands.execute(
-                                    CreateArchitectRoofPlane(
-                                      storeyId: _project.activeStoreyId,
-                                      roof: plane,
-                                    ),
-                                  );
-                                }
-                                _selectionIds
-                                  ..clear()
-                                  ..addAll(createdList.map((p) => p.id));
-                                _selectedElementId = createdList.first.id;
-                                _polygonSelectedEdge =
-                                    createdList.first.safeEavesEdgeIndex;
-                              });
-                              _saveBiMProjectIfAttached();
-                              HapticFeedback.mediumImpact();
-                            }
-                          },
+                          onFinishPolygon: _commitRoofDraft,
                           onUndoDraftPoint: () =>
                               setState(() => _roofTool.undoLastDraftPoint()),
                           onCancelDraft: _cancelDrafting,
@@ -12153,6 +12165,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _activeTool == ArchitectTool.window) {
       return _openingPlacementPreview?.centerPoint ?? _cursorModel;
     }
+    if (_activeTool == ArchitectTool.roof && _roofTool.isDrafting) {
+      return _roofTool.draftPoints.lastOrNull ??
+          _roofTool.draftPoints.firstOrNull ??
+          _draftStart;
+    }
     return _dimensionAnchors.firstOrNull?.point ??
         _draftStart ??
         _axisTool.draftStart ??
@@ -12172,6 +12189,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         draft.dimensionPoints.length >= 2;
   }
 
+  bool get _canConfirmRoofDraft =>
+      _activeTool == ArchitectTool.roof &&
+      _roofTool.isDrafting &&
+      (_roofTool.drawMode == RoofDrawMode.polygon ||
+          _roofTool.drawMode == RoofDrawMode.multiPitch) &&
+      _roofTool.draftPoints.length >= 3;
+
+  bool get _canConfirmDraft => _canConfirmDimension || _canConfirmRoofDraft;
+
+  void _onConfirmDraft() {
+    if (_canConfirmRoofDraft) {
+      _commitRoofDraft();
+    } else if (_canConfirmDimension) {
+      _commitDimensionDraft();
+    }
+  }
+
   Rect? get _draftCancelRect {
     final anchor = _draftCancelAnchor;
     if (anchor == null ||
@@ -12180,7 +12214,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return null;
     }
     final point = _viewport.toScreen(anchor);
-    final width = _canConfirmDimension && _viewport.size.width >= 92
+    final width = _canConfirmDraft && _viewport.size.width >= 92
         ? 84.0
         : 40.0;
     return Rect.fromLTWH(
@@ -12193,7 +12227,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Rect? get _draftConfirmRect {
     final cancel = _draftCancelRect;
-    return cancel != null && _canConfirmDimension && _viewport.size.width >= 92
+    return cancel != null && _canConfirmDraft && _viewport.size.width >= 92
         ? cancel.shift(const Offset(44, 0))
         : null;
   }
@@ -12220,7 +12254,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _renderedDimensionEditHandles.any((h) => h.rect.contains(position));
 
   Widget _buildDraftCancel() => AnimatedBuilder(
-    animation: Listenable.merge([_viewport, _previewRevision]),
+    animation: Listenable.merge([_viewport, _previewRevision, _roofTool]),
     builder: (context, _) {
       final rect = _draftCancelRect;
       _renderedDraftCancelRect = rect;
@@ -12272,7 +12306,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             Positioned.fromRect(
               rect: confirm,
               child: IconButton(
-                key: const ValueKey('architect-dimension-confirm'),
+                key: ValueKey(
+                  _canConfirmRoofDraft
+                      ? 'architect-roof-confirm'
+                      : 'architect-dimension-confirm',
+                ),
                 constraints: const BoxConstraints.tightFor(
                   width: 40,
                   height: 40,
@@ -12281,8 +12319,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 style: const ButtonStyle(
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                tooltip: context.l10n.architectDimensionConfirm,
-                onPressed: _commitDimensionDraft,
+                tooltip: _canConfirmRoofDraft
+                    ? context.l10n.architectDimensionFinish
+                    : context.l10n.architectDimensionConfirm,
+                onPressed: _onConfirmDraft,
                 icon: const SizedBox(
                   width: 40,
                   height: 40,
@@ -12713,6 +12753,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           right: 64,
           child: _buildNewPointPromptBanner(),
         ),
+      if (_activeTool == ArchitectTool.cadRect && _effectiveSelection.isEmpty)
+        Positioned(
+          top: 8,
+          left: 8,
+          child: Material(
+            color: const Color(0xEE1E242C),
+            borderRadius: BorderRadius.circular(8),
+            child: Theme(data: ThemeData.dark(), child: _lineStyleControl()),
+          ),
+        ),
       if (_linearDraftTool && _effectiveSelection.isEmpty)
         Positioned(
           top: 8,
@@ -12735,6 +12785,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (_activeTool == ArchitectTool.cadLine)
+                        _lineStyleControl(),
                       if (_activeTool == ArchitectTool.wall)
                         Expanded(
                           child: DropdownButton<WallReferenceLine>(
@@ -13058,6 +13110,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final result = _elementTool.placeCadPrimitive(
       storey: _project.activeStorey,
       type: type,
+      lineStyle: type == CadPrimitiveType.rect
+          ? _activeCadLineStyle
+          : ArchitectLineStyle.solid,
       start: _draftStart!,
       end: _draftEnd!,
     );
@@ -13271,6 +13326,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     activeTool: _effectiveSelection.isEmpty
         ? _activeTool
         : ArchitectTool.select,
+    activeCadLineStyle: _activeCadLineStyle,
     cursorPosition: _cursorModel,
     columnPreview:
         _activeTool == ArchitectTool.column &&

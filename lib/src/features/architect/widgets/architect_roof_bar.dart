@@ -73,6 +73,31 @@ class ArchitectRoofBar extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (roof == null) ...[
+                    // Quick finish button at front when actively drafting with >= 3 points
+                    if (tool.isDrafting &&
+                        (tool.drawMode == RoofDrawMode.polygon ||
+                            tool.drawMode == RoofDrawMode.multiPitch) &&
+                        tool.draftPoints.length >= 3) ...[
+                      ActionChip(
+                        key: const ValueKey('roof-poly-finish-front'),
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor: const Color(0xFF2E7D32),
+                        avatar: const Icon(
+                          Icons.check,
+                          size: 15,
+                          color: Colors.white,
+                        ),
+                        label: Text(
+                          l.architectDimensionFinish,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onPressed: onFinishPolygon,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                     // Draw mode toggle: Rect vs Poly
                     ChoiceChip(
                       key: const ValueKey('roof-mode-rect'),
@@ -447,7 +472,8 @@ class ArchitectRoofBar extends StatelessWidget {
                   // Polygon drafting controls when active
                   if (roof == null && tool.isDrafting) ...[
                     const SizedBox(width: 6),
-                    if (tool.drawMode == RoofDrawMode.polygon &&
+                    if ((tool.drawMode == RoofDrawMode.polygon ||
+                            tool.drawMode == RoofDrawMode.multiPitch) &&
                         tool.draftPoints.length >= 3)
                       ActionChip(
                         key: const ValueKey('roof-poly-finish'),

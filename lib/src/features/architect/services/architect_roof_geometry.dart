@@ -903,8 +903,6 @@ class ArchitectRoofGeometry {
 
       // Apparent slope along the section line:
       final dzDs = (zTop1 - zTop0) / (s1 - s0);
-      final apparentAngle = math.atan(dzDs);
-      final cosApparent = math.cos(apparentAngle).clamp(0.15, 1.0);
       final slopeDirDotSection =
           (roof.slopeDirection.dx * lineDir.dx +
                   roof.slopeDirection.dy * lineDir.dy)
@@ -960,36 +958,50 @@ class ArchitectRoofGeometry {
         cumulativePerp += layer.thickness;
       }
 
-      // 3. Discrete Battens (Летви) along the slope
+      // 3. Discrete Battens (Летви) along the slope (true orthogonal rectangular profiles)
       if (timber.hasBattens && slopeDirDotSection > 0.35) {
-        final bTopV = (battenTopPerp ?? 0.04) / cosSlope;
-        final bHeightV = timber.battenHeight / cosSlope;
-        final stepS =
+        final hypot = math.sqrt(1.0 + dzDs * dzDs);
+        final uSlope = Offset(1.0 / hypot, dzDs / hypot);
+        final vNormIn = Offset(dzDs / hypot, -1.0 / hypot);
+
+        final isEavesAtS0 = zTop0 <= zTop1;
+        final uUpslope = isEavesAtS0 ? uSlope : -uSlope;
+        final pEaves = isEavesAtS0 ? Offset(s0, zTop0) : Offset(s1, zTop1);
+        final slopeLen = (s1 - s0) * hypot;
+
+        final stepDist =
             (timber.battenSpacing / math.max(0.25, slopeDirDotSection)).clamp(
               0.18,
               0.80,
             );
-        final halfW = (timber.battenWidth * 0.5) * cosApparent;
+        final dTopPerp = battenTopPerp ?? 0.04;
+        final halfW = timber.battenWidth * 0.5;
+        final bHeight = timber.battenHeight;
 
-        final startFromS0 = zTop0 <= zTop1;
-        final count = ((s1 - s0 - 0.08) / stepS).floor();
+        final startDist = halfW + 0.03;
+        final availableLen = slopeLen - startDist - halfW - 0.03;
+        final count = availableLen > 0 ? (availableLen / stepDist).floor() : 0;
+
         for (var k = 0; k <= count; k++) {
-          final sCenter = startFromS0
-              ? (s0 + 0.06 + k * stepS)
-              : (s1 - 0.06 - k * stepS);
-          if (sCenter - halfW < s0 + 0.01 || sCenter + halfW > s1 - 0.01) {
+          final distAlongSlope = startDist + k * stepDist;
+          final pCenterTop = pEaves + uUpslope * distAlongSlope;
+          final cTop = pCenterTop + vNormIn * dTopPerp;
+
+          // True orthogonal rectangle oriented with the roof slope:
+          // p1 -> p2 is along the slope (width = timber.battenWidth)
+          // p2 -> p3 is perpendicular to the slope (height = timber.battenHeight)
+          final p1 = cTop - uUpslope * halfW;
+          final p2 = cTop + uUpslope * halfW;
+          final p3 = p2 + vNormIn * bHeight;
+          final p4 = p1 + vNormIn * bHeight;
+
+          final minS = math.min(math.min(p1.dx, p2.dx), math.min(p3.dx, p4.dx));
+          final maxS = math.max(math.max(p1.dx, p2.dx), math.max(p3.dx, p4.dx));
+          if (minS < s0 - 0.02 || maxS > s1 + 0.02) {
             continue;
           }
-          final sa = sCenter - halfW;
-          final sb = sCenter + halfW;
-          final zaTop = zTop0 + dzDs * (sa - s0) - bTopV;
-          final zbTop = zTop0 + dzDs * (sb - s0) - bTopV;
-          final battenPoly = <Offset>[
-            Offset(sa, zaTop),
-            Offset(sb, zbTop),
-            Offset(sb, zbTop - bHeightV),
-            Offset(sa, zaTop - bHeightV),
-          ];
+
+          final battenPoly = <Offset>[p1, p2, p3, p4];
           discreteMembers.add(
             ArchitectRoofSectionMember(
               roofId: roof.id,
@@ -1006,25 +1018,36 @@ class ArchitectRoofGeometry {
 
       // 4. Discrete Rafters & Counter-Battens when cutting across the slope (parallel to eaves)
       if (timber.hasRafters && slopeDirDotSection <= 0.35) {
-        final rTopV =
-            (rafterTopPerp ?? roof.assembly.thicknessAboveRafters) / cosSlope;
-        final rHeightV = timber.rafterHeight / cosSlope;
-        final stepS = timber.rafterSpacing.clamp(0.35, 1.20);
+        final hypot = math.sqrt(1.0 + dzDs * dzDs);
+        final uSlope = Offset(1.0 / hypot, dzDs / hypot);
+        final vNormIn = Offset(dzDs / hypot, -1.0 / hypot);
+
+        final rTopPerpDist =
+            rafterTopPerp ?? roof.assembly.thicknessAboveRafters;
+        final rHeight = timber.rafterHeight;
         final halfW = timber.rafterWidth * 0.5;
-        final count = ((s1 - s0 - 0.10) / stepS).floor();
+        final stepDist = timber.rafterSpacing.clamp(0.35, 1.20);
+        final spanLen = (s1 - s0) * hypot;
+        final availableLen = spanLen - 0.16;
+        final count = availableLen > 0 ? (availableLen / stepDist).floor() : 0;
+
         for (var k = 0; k <= count; k++) {
-          final sCenter = s0 + 0.08 + k * stepS;
-          if (sCenter + halfW > s1 - 0.01) break;
-          final sa = sCenter - halfW;
-          final sb = sCenter + halfW;
-          final zaTop = zTop0 + dzDs * (sa - s0) - rTopV;
-          final zbTop = zTop0 + dzDs * (sb - s0) - rTopV;
-          final rafterPoly = <Offset>[
-            Offset(sa, zaTop),
-            Offset(sb, zbTop),
-            Offset(sb, zbTop - rHeightV),
-            Offset(sa, zaTop - rHeightV),
-          ];
+          final distAlongSlope = 0.08 + halfW + k * stepDist;
+          if (distAlongSlope + halfW > spanLen - 0.02) break;
+
+          final pCenterTop = Offset(s0, zTop0) + uSlope * distAlongSlope;
+          final cTop = pCenterTop + vNormIn * rTopPerpDist;
+
+          final p1 = cTop - uSlope * halfW;
+          final p2 = cTop + uSlope * halfW;
+          final p3 = p2 + vNormIn * rHeight;
+          final p4 = p1 + vNormIn * rHeight;
+
+          final minS = math.min(math.min(p1.dx, p2.dx), math.min(p3.dx, p4.dx));
+          final maxS = math.max(math.max(p1.dx, p2.dx), math.max(p3.dx, p4.dx));
+          if (minS < s0 - 0.02 || maxS > s1 + 0.02) continue;
+
+          final rafterPoly = <Offset>[p1, p2, p3, p4];
           discreteMembers.add(
             ArchitectRoofSectionMember(
               roofId: roof.id,

@@ -1,3 +1,4 @@
+import '../models/architect_line_style.dart';
 import 'architect_clearance_badge_layout.dart';
 import 'architect_vector_scene.dart';
 import '../models/architect_wall_type.dart';
@@ -74,6 +75,7 @@ class Architect2dPainter extends CustomPainter {
   final ArchitectCanvasPalette palette;
   final AppLocalizations? l10n;
   final ArchitectTool activeTool;
+  final ArchitectLineStyle activeCadLineStyle;
   final List<ArchitectMaterialLayer> activeWallLayers;
   final Offset? activeWallArcEnd;
   final Offset? activeDraftStart;
@@ -194,7 +196,8 @@ class Architect2dPainter extends CustomPainter {
     this.showFurniture = true,
     this.componentPreview,
     required this.activeTool,
-    this.activeWallLayers=const [],
+    this.activeCadLineStyle = ArchitectLineStyle.solid,
+    this.activeWallLayers = const [],
     this.activeWallArcEnd,
     this.activeDraftStart,
     this.activeDraftEnd,
@@ -394,6 +397,7 @@ class Architect2dPainter extends CustomPainter {
         },
       );
       ArchitectElementsPainterHelper.drawCadPrimitives(
+        dimensionScale: _project.dimensionScale,
         palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
@@ -450,6 +454,8 @@ class Architect2dPainter extends CustomPainter {
         zoomScale: zoomScale,
         unit: _project.units,
         decimals: _project.distanceDecimals,
+        lineStyle: activeCadLineStyle,
+        dimensionScale: _project.dimensionScale,
       );
     }
     if (layer != ArchitectPaintLayer.interaction) {
@@ -610,6 +616,7 @@ class Architect2dPainter extends CustomPainter {
         .firstOrNull;
     if (selectedLine != null) {
       ArchitectElementsPainterHelper.drawCadPrimitives(
+        dimensionScale: _project.dimensionScale,
         palette: palette,
         canvas: canvas,
         storey: selected,
@@ -629,6 +636,7 @@ class Architect2dPainter extends CustomPainter {
     }
     if (selected.cadPrimitives.any((p) => p.type == CadPrimitiveType.rect)) {
       ArchitectElementsPainterHelper.drawCadPrimitives(
+        dimensionScale: _project.dimensionScale,
         palette: palette,
         canvas: canvas,
         storey: selected,

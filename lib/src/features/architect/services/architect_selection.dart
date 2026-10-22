@@ -1,3 +1,5 @@
+import 'dart:convert';
+import '../models/architect_line_style.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../models/architect_column.dart';
@@ -343,7 +345,27 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         }
       }
       for (final value in textValues.entries) {
-        if ((!e.containsKey(value.key) && value.key != 'styleId' && value.key != 'cutDisplayMode') ||
+        if (value.key == 'lineStyle') {
+          if (!project.activeStorey.cadPrimitives.any(
+            (p) => p.id == e['id'] && p.type != CadPrimitiveType.circle,
+          )) {
+            throw ArgumentError('Line styles apply to lines and rectangles');
+          }
+          final style = ArchitectLineStyle.fromJson(
+            Map<String, dynamic>.from(jsonDecode(value.value) as Map),
+          );
+          style.validate();
+          e['lineStyle'] = style.toJson();
+          if (!style.isPreset) {
+            final catalog = (json['lineStyles'] as List);
+            catalog.removeWhere((s) => (s as Map)['id'] == style.id);
+            catalog.add(style.toJson());
+          }
+          continue;
+        }
+        if ((!e.containsKey(value.key) &&
+                value.key != 'styleId' &&
+                value.key != 'cutDisplayMode') ||
             !{
               'text',
               'label',

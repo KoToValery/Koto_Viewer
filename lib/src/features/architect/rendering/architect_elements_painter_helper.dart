@@ -1,3 +1,5 @@
+import '../models/architect_line_style.dart';
+import 'architect_line_pattern.dart';
 import 'architect_vector_scene.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import 'architect_stair_plan_painter.dart';
@@ -634,8 +636,12 @@ class ArchitectElementsPainterHelper {
     required Canvas canvas,
     required ArchitectStorey storey,
     required double zoomScale,
+    ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
     String? selectedElementId,
   }) {
+    final unitsPerMm = ArchitectDrawingScale(
+      ArchitectTextScope.current?.denominator ?? dimensionScale.denominator,
+    ).paperToModel(1);
     for (final prim in storey.cadPrimitives) {
       architectDrawingSources(canvas, {prim.id}, 'cadPrimitives');
       final isSelected = prim.id == selectedElementId;
@@ -647,9 +653,25 @@ class ArchitectElementsPainterHelper {
         ..style = PaintingStyle.stroke;
 
       if (prim.type == CadPrimitiveType.line) {
-        canvas.drawLine(prim.startPoint, prim.endPoint, paint);
+        canvas.drawPath(
+          ArchitectLinePattern.path(
+            Path()
+              ..moveTo(prim.startPoint.dx, prim.startPoint.dy)
+              ..lineTo(prim.endPoint.dx, prim.endPoint.dy),
+            prim.lineStyle,
+            unitsPerMm,
+          ),
+          paint,
+        );
       } else if (prim.type == CadPrimitiveType.rect) {
-        canvas.drawPath(Path()..addPolygon(prim.polygonCorners, true), paint);
+        canvas.drawPath(
+          ArchitectLinePattern.path(
+            Path()..addPolygon(prim.polygonCorners, true),
+            prim.lineStyle,
+            unitsPerMm,
+          ),
+          paint,
+        );
       } else if (prim.type == CadPrimitiveType.circle) {
         final r = (prim.endPoint - prim.startPoint).distance;
         canvas.drawCircle(prim.startPoint, r, paint);
@@ -729,6 +751,8 @@ class ArchitectElementsPainterHelper {
     required double zoomScale,
     ArchitectUnit unit = ArchitectUnit.meters,
     int? decimals,
+    ArchitectLineStyle lineStyle = ArchitectLineStyle.solid,
+    ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
     ArchitectStair? stairPreview,
     ArchitectStorey? stairStorey,
     ArchitectProject? stairProject,
@@ -755,8 +779,19 @@ class ArchitectElementsPainterHelper {
     } else if (activeTool == ArchitectTool.opening ||
         activeTool == ArchitectTool.cadRect) {
       final rect = Rect.fromPoints(p1, p2);
-      canvas.drawRect(rect, fillPreview);
-      canvas.drawRect(rect, previewPaint);
+      if (activeTool == ArchitectTool.opening) {
+        canvas.drawRect(rect, fillPreview);
+        canvas.drawRect(rect, previewPaint);
+      } else {
+        canvas.drawPath(
+          ArchitectLinePattern.path(
+            Path()..addRect(rect),
+            lineStyle,
+            ArchitectDrawingScale(dimensionScale.denominator).paperToModel(1),
+          ),
+          previewPaint,
+        );
+      }
       ArchitectPolygonPainter.draw(
         canvas: canvas,
         polygon: [
@@ -786,7 +821,16 @@ class ArchitectElementsPainterHelper {
     } else if (activeTool == ArchitectTool.dimension) {
       canvas.drawLine(p1, p2, previewPaint);
     } else if (activeTool == ArchitectTool.cadLine) {
-      canvas.drawLine(p1, p2, previewPaint);
+      canvas.drawPath(
+        ArchitectLinePattern.path(
+          Path()
+            ..moveTo(p1.dx, p1.dy)
+            ..lineTo(p2.dx, p2.dy),
+          lineStyle,
+          ArchitectDrawingScale(dimensionScale.denominator).paperToModel(1),
+        ),
+        previewPaint,
+      );
       final delta = p2 - p1;
       if (delta.distance >= .001) {
         final u = delta / delta.distance;

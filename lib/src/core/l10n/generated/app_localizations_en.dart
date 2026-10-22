@@ -7105,4 +7105,137 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectLineEditRejected => 'Line must be at least 1 mm long.';
+
+  @override
+  String get architectLineStyle => 'Line style';
+
+  @override
+  String get architectLineSolid => 'Continuous';
+
+  @override
+  String get architectLineDashed => 'Dashed';
+
+  @override
+  String get architectLineShortDashed => 'Short dashes';
+
+  @override
+  String get architectLineLongDashed => 'Long dashes';
+
+  @override
+  String get architectLineDotted => 'Dotted';
+
+  @override
+  String get architectLineSparseDotted => 'Sparse dots';
+
+  @override
+  String get architectLineDashDot => 'Dash–dot';
+
+  @override
+  String get architectLineDashDoubleDot => 'Dash–double dot';
+
+  @override
+  String get architectLineLongDashDot => 'Long dash–dot';
+
+  @override
+  String get architectLineLongShortDash => 'Long–short dash';
+
+  @override
+  String get architectLineDoubleDashDot => 'Double dash–dot';
+
+  @override
+  String get architectLinePatternEditor => 'Custom pattern';
+
+  @override
+  String get architectLineDash => 'Dash';
+
+  @override
+  String get architectLineGap => 'Gap';
+
+  @override
+  String get architectLinePatternHint =>
+      'Dashes, gaps and symbols. Sizes are measured on paper.';
+
+  @override
+  String get architectLinePatternRange => 'Enter 0.1–100 mm.';
+
+  @override
+  String get architectLinePatternAdd => 'Add pair';
+
+  @override
+  String get architectLinePatternRemove => 'Remove pair';
+
+  @override
+  String get architectLinePowerLine => 'Power line';
+
+  @override
+  String get architectLineSymbol => 'Symbol';
+
+  @override
+  String get architectLineSymbolNone => 'None';
+
+  @override
+  String get architectLineSymbolLightning => 'Lightning';
+
+  @override
+  String get architectLineSymbolCircle => 'Circle';
+
+  @override
+  String get architectLineSymbolSquare => 'Square';
+
+  @override
+  String get architectLineSymbolTriangle => 'Triangle';
+
+  @override
+  String get architectLineSymbolDiamond => 'Diamond';
+
+  @override
+  String get architectLineSymbolCross => 'Cross';
+
+  @override
+  String get architectLineSymbolArrow => 'Arrow';
+
+  @override
+  String get architectLineSymbolChevron => 'Chevron';
+
+  @override
+  String get architectLineSymbolCustom => 'Custom shape';
+
+  @override
+  String get architectLineSymbolSettings => 'Placement';
+
+  @override
+  String get architectLineSymbolDraw => 'Edit shape';
+
+  @override
+  String get architectLineSymbolSize => 'Size';
+
+  @override
+  String get architectLineSymbolSpacing => 'Repeat';
+
+  @override
+  String get architectLineSymbolFollow => 'Follow line direction';
+
+  @override
+  String get architectLineSymbolClearLine => 'Gap around symbol';
+
+  @override
+  String get architectLineSymbolDrawHint =>
+      'Place points or draw freehand. You can add separate strokes.';
+
+  @override
+  String get architectLineSymbolPoints => 'Point by point';
+
+  @override
+  String get architectLineSymbolFreehand => 'Freehand';
+
+  @override
+  String get architectLineSymbolNewStroke => 'New stroke';
+
+  @override
+  String get architectLineSymbolCloseStroke => 'Close stroke';
+
+  @override
+  String architectLineSymbolRange(String minimum, String maximum, String unit) {
+    return 'Enter $minimum–$maximum $unit.';
+  }
 }

@@ -1538,6 +1538,7 @@ class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
+    primitive.lineStyle.validate();
     ArchitectModelCommand.point(primitive.startPoint);
     ArchitectModelCommand.point(primitive.endPoint);
     ArchitectModelCommand.newId(project, primitive.id);
@@ -1548,7 +1549,12 @@ class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
     }
     final floor = ArchitectModelCommand.storey(project, storeyId);
     return ArchitectModelCommand.replace(
-      project,
+      primitive.lineStyle.isPreset ||
+              project.lineStyles.any((s) => s.id == primitive.lineStyle.id)
+          ? project
+          : project.copyWith(
+              lineStyles: [...project.lineStyles, primitive.lineStyle],
+            ),
       floor.copyWith(cadPrimitives: [...floor.cadPrimitives, primitive]),
     );
   }

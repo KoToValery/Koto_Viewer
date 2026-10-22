@@ -12688,6 +12688,264 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Line must be at least 1 mm long.'**
   String get architectLineEditRejected;
+
+  /// No description provided for @architectLineStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Line style'**
+  String get architectLineStyle;
+
+  /// No description provided for @architectLineSolid.
+  ///
+  /// In en, this message translates to:
+  /// **'Continuous'**
+  String get architectLineSolid;
+
+  /// No description provided for @architectLineDashed.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashed'**
+  String get architectLineDashed;
+
+  /// No description provided for @architectLineShortDashed.
+  ///
+  /// In en, this message translates to:
+  /// **'Short dashes'**
+  String get architectLineShortDashed;
+
+  /// No description provided for @architectLineLongDashed.
+  ///
+  /// In en, this message translates to:
+  /// **'Long dashes'**
+  String get architectLineLongDashed;
+
+  /// No description provided for @architectLineDotted.
+  ///
+  /// In en, this message translates to:
+  /// **'Dotted'**
+  String get architectLineDotted;
+
+  /// No description provided for @architectLineSparseDotted.
+  ///
+  /// In en, this message translates to:
+  /// **'Sparse dots'**
+  String get architectLineSparseDotted;
+
+  /// No description provided for @architectLineDashDot.
+  ///
+  /// In en, this message translates to:
+  /// **'Dash–dot'**
+  String get architectLineDashDot;
+
+  /// No description provided for @architectLineDashDoubleDot.
+  ///
+  /// In en, this message translates to:
+  /// **'Dash–double dot'**
+  String get architectLineDashDoubleDot;
+
+  /// No description provided for @architectLineLongDashDot.
+  ///
+  /// In en, this message translates to:
+  /// **'Long dash–dot'**
+  String get architectLineLongDashDot;
+
+  /// No description provided for @architectLineLongShortDash.
+  ///
+  /// In en, this message translates to:
+  /// **'Long–short dash'**
+  String get architectLineLongShortDash;
+
+  /// No description provided for @architectLineDoubleDashDot.
+  ///
+  /// In en, this message translates to:
+  /// **'Double dash–dot'**
+  String get architectLineDoubleDashDot;
+
+  /// No description provided for @architectLinePatternEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom pattern'**
+  String get architectLinePatternEditor;
+
+  /// No description provided for @architectLineDash.
+  ///
+  /// In en, this message translates to:
+  /// **'Dash'**
+  String get architectLineDash;
+
+  /// No description provided for @architectLineGap.
+  ///
+  /// In en, this message translates to:
+  /// **'Gap'**
+  String get architectLineGap;
+
+  /// No description provided for @architectLinePatternHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashes, gaps and symbols. Sizes are measured on paper.'**
+  String get architectLinePatternHint;
+
+  /// No description provided for @architectLinePatternRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter 0.1–100 mm.'**
+  String get architectLinePatternRange;
+
+  /// No description provided for @architectLinePatternAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add pair'**
+  String get architectLinePatternAdd;
+
+  /// No description provided for @architectLinePatternRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove pair'**
+  String get architectLinePatternRemove;
+
+  /// No description provided for @architectLinePowerLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Power line'**
+  String get architectLinePowerLine;
+
+  /// No description provided for @architectLineSymbol.
+  ///
+  /// In en, this message translates to:
+  /// **'Symbol'**
+  String get architectLineSymbol;
+
+  /// No description provided for @architectLineSymbolNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get architectLineSymbolNone;
+
+  /// No description provided for @architectLineSymbolLightning.
+  ///
+  /// In en, this message translates to:
+  /// **'Lightning'**
+  String get architectLineSymbolLightning;
+
+  /// No description provided for @architectLineSymbolCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'Circle'**
+  String get architectLineSymbolCircle;
+
+  /// No description provided for @architectLineSymbolSquare.
+  ///
+  /// In en, this message translates to:
+  /// **'Square'**
+  String get architectLineSymbolSquare;
+
+  /// No description provided for @architectLineSymbolTriangle.
+  ///
+  /// In en, this message translates to:
+  /// **'Triangle'**
+  String get architectLineSymbolTriangle;
+
+  /// No description provided for @architectLineSymbolDiamond.
+  ///
+  /// In en, this message translates to:
+  /// **'Diamond'**
+  String get architectLineSymbolDiamond;
+
+  /// No description provided for @architectLineSymbolCross.
+  ///
+  /// In en, this message translates to:
+  /// **'Cross'**
+  String get architectLineSymbolCross;
+
+  /// No description provided for @architectLineSymbolArrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrow'**
+  String get architectLineSymbolArrow;
+
+  /// No description provided for @architectLineSymbolChevron.
+  ///
+  /// In en, this message translates to:
+  /// **'Chevron'**
+  String get architectLineSymbolChevron;
+
+  /// No description provided for @architectLineSymbolCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom shape'**
+  String get architectLineSymbolCustom;
+
+  /// No description provided for @architectLineSymbolSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Placement'**
+  String get architectLineSymbolSettings;
+
+  /// No description provided for @architectLineSymbolDraw.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit shape'**
+  String get architectLineSymbolDraw;
+
+  /// No description provided for @architectLineSymbolSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get architectLineSymbolSize;
+
+  /// No description provided for @architectLineSymbolSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat'**
+  String get architectLineSymbolSpacing;
+
+  /// No description provided for @architectLineSymbolFollow.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow line direction'**
+  String get architectLineSymbolFollow;
+
+  /// No description provided for @architectLineSymbolClearLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Gap around symbol'**
+  String get architectLineSymbolClearLine;
+
+  /// No description provided for @architectLineSymbolDrawHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Place points or draw freehand. You can add separate strokes.'**
+  String get architectLineSymbolDrawHint;
+
+  /// No description provided for @architectLineSymbolPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Point by point'**
+  String get architectLineSymbolPoints;
+
+  /// No description provided for @architectLineSymbolFreehand.
+  ///
+  /// In en, this message translates to:
+  /// **'Freehand'**
+  String get architectLineSymbolFreehand;
+
+  /// No description provided for @architectLineSymbolNewStroke.
+  ///
+  /// In en, this message translates to:
+  /// **'New stroke'**
+  String get architectLineSymbolNewStroke;
+
+  /// No description provided for @architectLineSymbolCloseStroke.
+  ///
+  /// In en, this message translates to:
+  /// **'Close stroke'**
+  String get architectLineSymbolCloseStroke;
+
+  /// No description provided for @architectLineSymbolRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter {minimum}–{maximum} {unit}.'**
+  String architectLineSymbolRange(String minimum, String maximum, String unit);
 }
 
 class _AppLocalizationsDelegate

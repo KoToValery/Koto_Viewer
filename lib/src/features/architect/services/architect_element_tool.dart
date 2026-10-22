@@ -1,3 +1,4 @@
+import '../models/architect_line_style.dart';
 // === SECTION: ARCHITECTURAL ELEMENT TOOL ===
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
@@ -393,6 +394,7 @@ class ArchitectElementTool extends ChangeNotifier {
     required Offset end,
     int colorValue = 0xFF9E9E9E,
     double strokeWidth = 1.0,
+    ArchitectLineStyle lineStyle = ArchitectLineStyle.solid,
   }) {
     if ((end - start).distance < .001) {
       return null;
@@ -405,6 +407,7 @@ class ArchitectElementTool extends ChangeNotifier {
       endPoint: end,
       colorValue: colorValue,
       strokeWidth: strokeWidth,
+      lineStyle: lineStyle,
     );
 
     return (

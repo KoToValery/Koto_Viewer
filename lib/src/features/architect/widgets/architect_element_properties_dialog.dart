@@ -1,3 +1,7 @@
+import 'dart:convert';
+import '../models/architect_elements.dart';
+import '../models/architect_line_style.dart';
+import 'architect_line_style_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -39,6 +43,12 @@ class _ArchitectElementPropertiesDialogState
     extends State<ArchitectElementPropertiesDialog> {
   final values = <String, double>{};
   final texts = <String, String>{};
+  ArchitectLineStyle? _lineStyle;
+  bool get _supportsLineStyle => widget.elementIds.every(
+    (id) => widget.project.activeStorey.cadPrimitives.any(
+      (p) => p.id == id && p.type != CadPrimitiveType.circle,
+    ),
+  );
   late final Map<String, double?> fields;
   late final List<Map<String, dynamic>> records;
   String reference(Map<String, dynamic> record) =>
@@ -55,6 +65,13 @@ class _ArchitectElementPropertiesDialogState
       for (final id in widget.elementIds)
         ArchitectSelection.record(widget.project, id),
     ];
+    if (_supportsLineStyle) {
+      final styles = widget.project.activeStorey.cadPrimitives
+          .where((p) => widget.elementIds.contains(p.id))
+          .map((p) => p.lineStyle)
+          .toSet();
+      if (styles.length == 1) _lineStyle = styles.single;
+    }
     if (records.every((e) => e.containsKey('referenceLine')) &&
         records.map(reference).toSet().length == 1 &&
         records.any(
@@ -785,6 +802,16 @@ class _ArchitectElementPropertiesDialogState
                 ),
                 const SizedBox(height: 8),
               ],
+              if (_supportsLineStyle)
+                ArchitectLineStylePicker(
+                  key: const ValueKey('architect-property-line-style'),
+                  value: _lineStyle,
+                  customStyles: widget.project.lineStyles,
+                  onChanged: (style) => setState(() {
+                    _lineStyle = style;
+                    texts['lineStyle'] = jsonEncode(style.toJson());
+                  }),
+                ),
               if (!walls && !isZone)
                 for (final key in fields.keys) numberField(key, false),
               if (walls) ...[
@@ -881,20 +908,21 @@ class _ArchitectElementPropertiesDialogState
                   'specId',
                   'customText',
                 ])
-                if (records.every((e) => e.containsKey(key)))
-                  TextFormField(
-                    key: ValueKey('$key-${texts[key] ?? records.first[key]}'),
-                    initialValue: texts[key] ??
-                        (records.map((e) => e[key]).toSet().length == 1
-                            ? records.first[key] as String? ?? ''
-                            : ''),
-                    decoration: InputDecoration(
-                      labelText: key == 'text' || key == 'customText'
-                          ? l.architectToolText
-                          : l.architectPropertyName,
+                  if (records.every((e) => e.containsKey(key)))
+                    TextFormField(
+                      key: ValueKey('$key-${texts[key] ?? records.first[key]}'),
+                      initialValue:
+                          texts[key] ??
+                          (records.map((e) => e[key]).toSet().length == 1
+                              ? records.first[key] as String? ?? ''
+                              : ''),
+                      decoration: InputDecoration(
+                        labelText: key == 'text' || key == 'customText'
+                            ? l.architectToolText
+                            : l.architectPropertyName,
+                      ),
+                      onChanged: (v) => texts[key] = v,
                     ),
-                    onChanged: (v) => texts[key] = v,
-                  ),
             ],
           ),
         ),
