@@ -4289,6 +4289,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallDraftHint => 'Задръж → точка · 2 пръста → мащаб';
 
   @override
+  String get architectColumnPlacementHint =>
+      'Задръж → постави · Тап → избор · X → отказ';
+
+  @override
   String get architectEditHoldHint => 'Задръж → редакция · по-дълго → меню';
 
   @override
@@ -5010,7 +5014,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectDimensionExteriorHelp =>
-      'Редове от сградата навън: отвори и стенни участъци до ядрото, общ размер на ядрото с отделни крайни размери за изолацията и разстояния между осите. Изборът по изолацията се отнася към ядрото. Фасадните отвори и перпендикулярните оси се включват автоматично.';
+      'Редове: отвори, стенни участъци, общ размер на ядрото с отделна крайна изолация, оси. Разстоянието между редовете следва мащаба и големината на текста. Фасадните отвори и перпендикулярните оси се включват автоматично; изборът по изолацията се отнася към ядрото.';
 
   @override
   String get architectDimensionInterior => 'Вътрешен';
@@ -7066,4 +7070,36 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectComponentView3d => '3D изглед';
+
+  @override
+  String get architectApartment => 'Апартамент';
+
+  @override
+  String get architectRoom => 'Помещение';
+
+  @override
+  String get architectApartmentRooms => 'Помещения';
+
+  @override
+  String get architectUnassignedRooms => 'Без апартамент';
+
+  @override
+  String get architectApartmentAutoAssignment => 'Автоматично';
+
+  @override
+  String get architectApartmentNoRooms => 'Няма помещения в контура.';
+
+  @override
+  String get architectApartmentBoundaryHelp =>
+      'Начертайте ръчно по осите на вътрешните стени и външните лица на външните стени.';
+
+  @override
+  String get architectApartmentGross => 'Площ по контур';
+
+  @override
+  String get architectApartmentNet => 'Чиста площ';
+
+  @override
+  String get architectApartmentRoomsHelp =>
+      'Помещенията се включват автоматично според най-голямата обща площ с апартамента. Всяко помещение се отчита изцяло само веднъж. При равни площи се запазва текущият апартамент. Помещенията извън всички апартаменти остават без апартамент.';
 }

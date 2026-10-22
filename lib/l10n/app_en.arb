@@ -3177,6 +3177,7 @@
   "@architectMagnetHelp": {"description": "Wall positioning control guidance"},
   "architectWallParallel": "Parallel",
   "architectWallDraftHint": "Hold → point · 2 fingers → zoom",
+  "architectColumnPlacementHint": "Hold → place · Tap → select · X → cancel",
   "architectEditHoldHint": "Hold → edit · longer → menu",
   "architectNavigationHint": "Pan / zoom",
   "architectWallEditRejected": "Opening or wall too short.",
@@ -3602,7 +3603,7 @@
   "architectDimensionScale": "Dimension scale",
   "architectDimensionSingle": "Single",
   "architectDimensionExterior": "Exterior",
-  "architectDimensionExteriorHelp": "Rows from the building outward: openings and wall sections measured to the core, overall core size with separate end insulation dimensions, then axis spacing. Picks on insulation reference the core. Facade openings and perpendicular axes are included automatically.",
+  "architectDimensionExteriorHelp": "Rows: openings, wall sections, overall core size with separate end insulation, axes. Row spacing follows drawing scale and text size. Facade openings and perpendicular axes are included automatically; picks on insulation reference the core.",
   "architectDimensionInterior": "Interior",
   "architectDimensionInteriorHint": "Select end walls and partitions, then position the line.",
   "architectDimensionInteriorHelp": "One row measures between the inner faces of parallel end walls, including both faces of intermediate partitions.",
@@ -4443,5 +4444,15 @@
   "architectComponentExportJsonTooltip": "Copy JSON",
   "architectComponentExportJsonMsg": "JSON copied to clipboard",
   "architectComponentView2d": "2D view",
-  "architectComponentView3d": "3D view"
+  "architectComponentView3d": "3D view",
+  "architectApartment": "Apartment",
+  "architectRoom": "Room",
+  "architectApartmentRooms": "Rooms",
+  "architectUnassignedRooms": "Unassigned rooms",
+  "architectApartmentAutoAssignment": "Auto",
+  "architectApartmentNoRooms": "No rooms within the outline.",
+  "architectApartmentBoundaryHelp": "Draw manually along internal wall axes and the exterior faces of exterior walls.",
+  "architectApartmentGross": "Contour area",
+  "architectApartmentNet": "Room area",
+  "architectApartmentRoomsHelp": "Rooms are assigned automatically by the largest overlapping area with an apartment. Each room is counted in full only once. Equal areas retain the current apartment. Rooms outside all apartments stay unassigned."
 }

@@ -24,6 +24,8 @@ import '../services/architect_zone_tool.dart';
 /// - Predefined room presets in a compact dropdown menu (zero hardcoded names)
 /// - One-tap access to Room Schedule table and drawing placement
 class ArchitectZoneDraftingBar extends StatelessWidget {
+  final ArchitectZoneKind kind;
+  final ValueChanged<ArchitectZoneKind>? onKindChanged;
   final ArchitectZoneTool tool;
   final ArchitectZonePresets zonePresets;
   final ArchitectZoneCategory category;
@@ -38,6 +40,8 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
     super.key,
     this.zonePresets = const ArchitectZonePresets(),
     required this.tool,
+    this.kind = ArchitectZoneKind.room,
+    this.onKindChanged,
     required this.category,
     this.onCategoryChanged,
     required this.onClose,
@@ -91,40 +95,74 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
           Row(
             children: [
               // Mode Toggle (Auto 1-Click vs Manual)
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0x33000000),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildModeButton(
-                      icon: Icons.auto_awesome_rounded,
-                      label: l10n.architectZoneModeAuto,
-                      isSelected: isAuto,
-                      selectedColor: const Color(0xFF00E5FF),
-                      onTap: () {
-                        tool.placementMode =
-                            ArchitectZonePlacementMode.autoClick;
-                      },
-                    ),
-                    _buildModeButton(
-                      icon: Icons.touch_app_outlined,
-                      label: l10n.architectZoneModeManual,
-                      isSelected: !isAuto,
-                      selectedColor: const Color(0xFFFFB74D),
-                      onTap: () {
-                        tool.placementMode =
-                            ArchitectZonePlacementMode.manualPoints;
-                      },
-                    ),
-                  ],
+              Flexible(
+                flex: 2,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0x33000000),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (kind != ArchitectZoneKind.apartment)
+                        _buildModeButton(
+                          icon: Icons.auto_awesome_rounded,
+                          label: l10n.architectZoneModeAuto,
+                          isSelected: isAuto,
+                          selectedColor: const Color(0xFF00E5FF),
+                          onTap: () {
+                            tool.placementMode =
+                                ArchitectZonePlacementMode.autoClick;
+                          },
+                        ),
+                      _buildModeButton(
+                        icon: Icons.touch_app_outlined,
+                        label: l10n.architectZoneModeManual,
+                        isSelected: !isAuto,
+                        selectedColor: const Color(0xFFFFB74D),
+                        onTap: () {
+                          tool.placementMode =
+                              ArchitectZonePlacementMode.manualPoints;
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
-
               const SizedBox(width: 6),
+              Expanded(
+                child: Tooltip(
+                  message: l10n.architectApartmentBoundaryHelp,
+                  child: DropdownButton<ArchitectZoneKind>(
+                    key: const ValueKey('zone-draft-kind'),
+                    value: kind,
+                    isExpanded: true,
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    dropdownColor: const Color(0xFF1E2230),
+                    items: [
+                      DropdownMenuItem(
+                        value: ArchitectZoneKind.room,
+                        child: Text(
+                          l10n.architectRoom,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: ArchitectZoneKind.apartment,
+                        child: Text(
+                          l10n.architectApartment,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                    onChanged: (kind) {
+                      if (kind != null) onKindChanged?.call(kind);
+                    },
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -318,7 +356,8 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                 if (tool.activeSegmentLength != null) ...[
                   _buildMetricChip(
                     icon: Icons.straighten_rounded,
-                    label: '${BimDistanceUnit.trimZeros(tool.activeSegmentLength!.toStringAsFixed(2))} m',
+                    label:
+                        '${BimDistanceUnit.trimZeros(tool.activeSegmentLength!.toStringAsFixed(2))} m',
                     subLabel: tool.orthoLabel,
                     color: const Color(0xFFFFD600),
                   ),
@@ -327,7 +366,8 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                 if (tool.draftPointCount >= 2) ...[
                   _buildMetricChip(
                     icon: Icons.crop_free_rounded,
-                    label: '${BimDistanceUnit.trimZeros(tool.liveArea.toStringAsFixed(2))} m²',
+                    label:
+                        '${BimDistanceUnit.trimZeros(tool.liveArea.toStringAsFixed(2))} m²',
                     color: const Color(0xFF69F0AE),
                   ),
                 ],

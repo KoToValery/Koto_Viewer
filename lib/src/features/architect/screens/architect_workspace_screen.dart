@@ -1,3 +1,5 @@
+import '../services/architect_apartment_zones.dart';
+import '../widgets/architect_apartment_rooms_sheet.dart';
 import '../widgets/architect_sheets_screen.dart';
 import '../widgets/architect_annotation_settings.dart';
 import '../services/architect_drawing_publisher.dart';
@@ -656,7 +658,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return null;
     }
     return ArchitectDimensionChain.build(
-      id: 'dimension-preview',
+      id: _dimensionEditing?.id ?? 'dimension-preview',
       anchors: _dimensionAnchors,
       direction: _dimensionDirection!,
       offset: _dimensionOffset,
@@ -771,6 +773,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           point,
           _currentScale,
           gridAxes: _project.gridAxes,
+          annotationProject: _project,
+          drawingViewKey: _workspaceViewKey,
         ),
         for (final zone in _project.activeStorey.zones)
           if ((Path()..addPolygon(zone.polygon, true)).contains(point)) zone.id,
@@ -802,6 +806,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _currentScale,
       _activeTool,
       gridAxes: _project.gridAxes,
+      annotationProject: _project,
+      drawingViewKey: _workspaceViewKey,
     );
     final first = _hitSelection(point);
     return <String>{
@@ -880,6 +886,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         point,
         _currentScale,
         gridAxes: _project.gridAxes,
+        annotationProject: _project,
+        drawingViewKey: _workspaceViewKey,
       ),
     };
     for (final id in candidates) {
@@ -1025,6 +1033,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       raw,
       _currentScale,
       gridAxes: _project.gridAxes,
+      annotationProject: _project,
+      drawingViewKey: _workspaceViewKey,
     ).toSet();
 
     // 1. Check if an opening (window or door) was picked
@@ -1446,6 +1456,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   // Zone placement and manual body movement
+  ArchitectZoneKind _activeZoneKind = ArchitectZoneKind.room;
   ArchitectZoneCategory _activeZoneCategory = ArchitectZoneCategory.living;
   String? _selectedZoneId;
   Offset? _zoneMoveStartPoint;
@@ -1486,6 +1497,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   // Zone Schedule Table Placement & Drag State
+  String? _selectedZoneTableId;
   bool _isZoneTableSelected = false;
   bool _isDraggingZoneTable = false;
   Offset? _zoneTableDragOffset;
@@ -1635,9 +1647,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _elementTool.cancelSlabDrafting();
     _roofTool.clearDraft();
     if (_activeTool == ArchitectTool.door ||
-        _activeTool == ArchitectTool.window) {
+        _activeTool == ArchitectTool.window ||
+        _activeTool == ArchitectTool.column) {
       _activeTool = ArchitectTool.select;
       _cursorModel = null;
+      _columnPreviewPoint = null;
     }
     setState(() {
       _draftStart = null;
@@ -2031,6 +2045,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _cursorModel;
   Offset? _columnPreviewPoint;
   double _columnPreviewRotation = 0.0;
+  bool get _columnPreviewIsOccupied =>
+      _columnPreviewPoint != null &&
+      _project.activeStorey.columns.any(
+        (column) => column.containsPoint(_columnPreviewPoint!, tolerance: 0),
+      );
   String? _activeSnapLabel;
 
   // Door State (from element_vrata.dxf)
@@ -2342,7 +2361,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   ArchitectZone? _findZoneAt(Offset modelPt) {
-    final zones = _project.activeStorey.zones;
+    final zones = [
+      ..._project.activeStorey.zones.where((z) => z.isApartment),
+      ..._project.activeStorey.zones.where((z) => !z.isApartment),
+    ];
     for (int i = zones.length - 1; i >= 0; i--) {
       if (zones[i].containsPoint(modelPt)) {
         return zones[i];
@@ -2372,7 +2394,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final repairedCrossings = _zoneTool.hasDraftCrossings;
     final newZone = _zoneTool.commitDrafting(
       category: _activeZoneCategory,
-      defaultName: _zonePresets.categoryName(_activeZoneCategory, l10n),
+      defaultName: _activeZoneKind == ArchitectZoneKind.apartment ? l10n.architectApartment : _zonePresets.categoryName(_activeZoneCategory, l10n),
       number: nextNumber,
     );
 
@@ -2382,7 +2404,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _commands.execute(
           CreateArchitectZone(
             storeyId: activeStorey.id,
-            zone: _applyZoneFinishPresets(newZone),
+            zone: _applyZoneFinishPresets(newZone).copyWith(kind: _activeZoneKind),
           ),
         );
         _selectedZoneId = newZone.id;
@@ -2794,20 +2816,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _activeTool == ArchitectTool.select) &&
         _project.activeStorey.zoneScheduleOrigin != null &&
         _project.activeStorey.zones.isNotEmpty) {
-      final tableBounds = ArchitectZonePainterHelper.getZoneTableBounds(
-        project: _modelCommands.project,
-        l10n: context.l10n,
-        viewKey: _workspaceViewKey,
-        storey: _project.activeStorey,
-        origin: _project.activeStorey.zoneScheduleOrigin!,
-        zoomScale: _currentScale,
+      final tables = ArchitectZonePainterHelper.scheduleTables(
+        project: _modelCommands.project, storey: _project.activeStorey,
+        l10n: context.l10n, viewKey: _workspaceViewKey, zoomScale: _currentScale,
       );
-      if (tableBounds.contains(rawModel)) {
+      for (final table in tables.reversed) {
+        if (!table.bounds.contains(rawModel)) continue;
+        _selectedZoneTableId = table.group.id;
         _isDraggingZoneTable = true;
         _isHandleEngaged = true;
-        _zoneTableDragOffset =
-            _project.activeStorey.zoneScheduleOrigin! - rawModel;
-        _zoneTablePreviewOrigin = _project.activeStorey.zoneScheduleOrigin!;
+        _zoneTableDragOffset = table.origin - rawModel;
+        _zoneTablePreviewOrigin = table.origin;
         setState(() {
           _isZoneTableSelected = true;
           _selectedZoneId = null;
@@ -2815,10 +2834,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _selectionIds.clear();
         });
         HapticFeedback.selectionClick();
-        ArchitectLogger.log(
-          'HANDLE',
-          'Zone schedule table drag engaged at ${_project.activeStorey.zoneScheduleOrigin}',
-        );
         return;
       }
     }
@@ -3442,7 +3457,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         rawModel,
         (point) {
           _updateMidpointReferences(point);
-          return ArchitectSnapHelper.snapFree(
+          return _snapApartmentEditPoint(point) ?? ArchitectSnapHelper.snapFree(
             midpointReferences: _midpointTracking.references,
             rawPoint: point,
             project: _elementMoveOriginal!,
@@ -4000,6 +4015,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return pt;
   }
 
+  ArchitectSnapResult? _snapApartmentEditPoint(Offset point) {
+    if (!_magnetEnabled || _selectedZone?.isApartment != true) return null;
+    final snapped = ArchitectApartmentZones.snapBoundary(point,
+      _project.activeStorey.walls, math.min(18 / _currentScale, .25));
+    return snapped == null ? null : ArchitectSnapResult(point: snapped,
+      isSnapped: true, snapLabel: context.l10n.architectApartment);
+  }
+
   Offset _resolveSlabPoint(Offset raw) =>
       _resolveContourPoint(_elementTool.slabDraftPoints, raw);
 
@@ -4018,6 +4041,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Offset _resolveContourPoint(List<Offset> points, Offset raw) {
+    if (_activeTool == ArchitectTool.zone && _activeZoneKind == ArchitectZoneKind.apartment && _magnetEnabled) {
+      final boundary = ArchitectApartmentZones.snapBoundary(raw, _project.activeStorey.walls, math.min(18 / _currentScale, .25));
+      if (boundary != null) {
+        _activeSnapLabel = context.l10n.architectApartment;
+        _activeMagneticGuides = [];
+        return boundary;
+      }
+    }
     final snap = _snapElement(raw, anchor: points.lastOrNull);
     final midpointSnap = snap.snapLabel == 'Midpoint' ||
         snap.snapLabel == 'Midpoint alignment';
@@ -4185,12 +4216,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _commitActiveHandleDrag(Offset screenPos) {
     if (_isDraggingZoneTable && _zoneTablePreviewOrigin != null) {
       final newOrigin = _zoneTablePreviewOrigin!;
+      final tableId = _selectedZoneTableId;
+      final current = _project.activeStorey;
+      final tables = ArchitectZonePainterHelper.scheduleTables(project: _project,
+        storey: current, l10n: context.l10n, viewKey: _workspaceViewKey, zoomScale: _currentScale);
+      final origins = {for (final t in tables) t.group.id: t.origin};
       _cancelActiveDrags();
       setState(() {
-        final updatedStorey = _project.activeStorey.copyWith(
-          zoneScheduleOrigin: newOrigin,
-        );
-        _project = _project.updateActiveStorey(updatedStorey);
+        _project = _project.updateActiveStorey(current.copyWith(
+          zoneScheduleOrigin: tableId == 'unassigned' ? newOrigin : current.zoneScheduleOrigin,
+          zones: [for (final z in current.zones) z.isApartment
+            ? z.copyWith(scheduleOrigin: z.id == tableId ? newOrigin : origins[z.id]) : z],
+        ));
       });
       _saveBiMProjectIfAttached();
       HapticFeedback.mediumImpact();
@@ -4710,6 +4747,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
+    // A tap selects at the finger/cursor. Only an intentional hold places a
+    // column, and an existing column always takes priority over placement.
+    if (_activeTool == ArchitectTool.column &&
+        (!_placingWithHold || _hitSelection(rawModel) != null)) {
+      if (!_selectAt(rawModel)) _clearSelection();
+      return;
+    }
+
     if (_draftStart == null &&
         !_axisTool.isDrafting &&
         !_zoneTool.isDrafting &&
@@ -5024,9 +5069,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 3. In Zone Table tool: Place or reposition schedule table
     if (_activeTool == ArchitectTool.zoneTable) {
-      final updatedStorey = _project.activeStorey.copyWith(
-        zoneScheduleOrigin: rawModel,
-      );
+      final updatedStorey = _placedZoneSchedules(rawModel);
       setState(() {
         _project = _project.updateActiveStorey(updatedStorey);
         _isZoneTableSelected = true;
@@ -5208,6 +5251,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_activeTool == ArchitectTool.column) {
       final snap = _snapColumn(rawModel);
       final pt = snap.point;
+      // Snapping can move the placement marker onto an existing column.
+      if (_project.activeStorey.columns.any(
+        (column) => column.containsPoint(pt, tolerance: 0),
+      )) {
+        _selectAt(pt);
+        return;
+      }
       final rot = snap.angleDeg ?? _columnPreviewRotation;
       final (_, newCol) = _elementTool.placeColumn(
         storey: _project.activeStorey,
@@ -5557,7 +5607,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         .where((z) => z.id == updated.id)
         .firstOrNull;
     if (previous == null) return;
-    if (!previous.isAutoBoundary && updated.isAutoBoundary) {
+    if (updated.isApartment) updated = updated.copyWith(isAutoBoundary: false, clearApartmentId: true);
+    if (!updated.isApartment && !previous.isAutoBoundary && updated.isAutoBoundary) {
       final detected = ArchitectRoomDetector.automaticZone(
         updated,
         activeStorey.walls,
@@ -5589,6 +5640,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  Future<void> _manageApartmentRooms() async {
+    final apartment = _selectedZone;
+    if (apartment == null || !apartment.isApartment) return;
+    await showArchitectApartmentRooms(context, apartment, _project.activeStorey.zones);
+  }
+
   void _deleteSelectedZone() {
     if (_selectedZoneId == null) return;
     final activeStorey = _project.activeStorey;
@@ -5612,20 +5669,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
+  ArchitectStorey _placedZoneSchedules(Offset origin) {
+    final current = _project.activeStorey;
+    final base = current.copyWith(zoneScheduleOrigin: origin, zones: [for (final z in current.zones)
+      z.isApartment ? z.copyWith(clearScheduleOrigin: true) : z]);
+    final tables = ArchitectZonePainterHelper.scheduleTables(project: _project,
+      storey: base, l10n: context.l10n, viewKey: _workspaceViewKey, zoomScale: _currentScale);
+    final origins = {for (final t in tables) t.group.id: t.origin};
+    return base.copyWith(zones: [for (final z in base.zones)
+      z.isApartment ? z.copyWith(scheduleOrigin: origins[z.id]) : z]);
+  }
+
   void _showRoomScheduleDialog() {
     ArchitectZoneScheduleDialog.show(
       presets: _zonePresets,
       context: context,
       storey: _project.activeStorey,
+      units: _project.units,
+      initialApartmentId: _selectedZone?.isApartment == true ? _selectedZoneId : _selectedZone?.apartmentId,
       onZoneUpdated: _updateZone,
       onTableOriginChanged: (origin) {
         setState(() {
-          _project = _project.updateActiveStorey(
-            _project.activeStorey.copyWith(
-              zoneScheduleOrigin: origin,
-              clearZoneScheduleOrigin: origin == null,
-            ),
-          );
+          _project = _project.updateActiveStorey(origin == null
+            ? _project.activeStorey.copyWith(clearZoneScheduleOrigin: true)
+            : _placedZoneSchedules(origin));
         });
         _saveBiMProjectIfAttached();
       },
@@ -6581,6 +6648,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               : (segment.$1 + segment.$2) / 2;
           final rect = ArchitectClearanceBadgeLayout.place(
             preferred: preferred,
+            size: ArchitectClearanceBadgeLayout.openingSize(
+              _currentScale, available,
+            ),
             available: available,
             excluded: excluded,
             intersectsWall: (rect) {
@@ -6654,31 +6724,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 },
               ),
             for (final gap in openingClearances)
-              Builder(
-                builder: (context) {
-                  final rect = placements[gap.key]!;
-                  return Positioned.fromRect(
-                    rect: rect,
-                    child: IgnorePointer(
-                      ignoring: _radialMenuScreenPosition != null,
-                      child: Tooltip(
-                        message: context.l10n.architectOpeningClearance,
+              Positioned.fromRect(
+                rect: placements[gap.key]!,
+                child: IgnorePointer(
+                  ignoring: _radialMenuScreenPosition != null,
+                  child: Tooltip(
+                    message: context.l10n.architectOpeningClearance,
+                    child: FittedBox(
+                      key: ValueKey('opening-clearance-${gap.key}'),
+                      child: SizedBox(
+                        width: ArchitectClearanceBadgeLayout.openingBaseSize.width,
+                        height: ArchitectClearanceBadgeLayout.openingBaseSize.height,
                         child: Material(
-                          color: gap.isModularSnap
-                              ? const Color(0xEE004D40)
-                              : const Color(0xEE1E242C),
-                          elevation: 3,
-                          shadowColor: Colors.black54,
+                          color: Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                            side: BorderSide(
-                              color: gap.isModularSnap
-                                  ? const Color(0xFF64FFDA)
-                                  : Colors.white24,
-                            ),
+                            borderRadius: BorderRadius.circular(3),
+                            side: const BorderSide(color: Color(0xFF78818A), width: .7),
                           ),
                           child: InkWell(
-                            key: ValueKey('opening-clearance-${gap.key}'),
                             onTap: () {
                               setState(() => _radialMenuScreenPosition = null);
                               _editOpeningClearance(gap);
@@ -6687,10 +6750,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               child: Text(
                                 _project.formatLength(gap.distance),
                                 style: TextStyle(
-                                  color: gap.isModularSnap
-                                      ? const Color(0xFF64FFDA)
-                                      : Colors.cyanAccent,
-                                  fontSize: 12,
+                                  color: const Color(0xFF20252A),
+                                  fontSize: 11,
                                   fontWeight: gap.isModularSnap
                                       ? FontWeight.w600
                                       : FontWeight.normal,
@@ -6701,8 +6762,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         ),
                       ),
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
           ],
         );
@@ -7340,6 +7401,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             point,
             _currentScale,
             gridAxes: _project.gridAxes,
+            annotationProject: _project,
+            drawingViewKey: _workspaceViewKey,
           ) ??
           _axisTool
               .hitTestAxis(
@@ -7362,6 +7425,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _currentScale,
       _activeTool,
       gridAxes: _project.gridAxes,
+      annotationProject: _project,
+      drawingViewKey: _workspaceViewKey,
     );
   }
 
@@ -11246,6 +11311,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         left: 0,
                         right: 0,
                         child: ArchitectZoneDraftingBar(
+                          kind: _activeZoneKind,
+                          onKindChanged: (kind) => setState(() {
+                            _zoneTool.cancelDrafting();
+                            _activeZoneKind = kind;
+                            if (kind == ArchitectZoneKind.apartment) _zoneTool.placementMode = ArchitectZonePlacementMode.manualPoints;
+                          }),
                           zonePresets: _zonePresets,
                           tool: _zoneTool,
                           category: _activeZoneCategory,
@@ -11630,6 +11701,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   _selectedZone != null &&
                   !_is3DView)
                 ArchitectZonePropertiesCard(
+                  units: _project.units,
+                  zones: _project.activeStorey.zones,
+                  onManageApartmentRooms: _manageApartmentRooms,
+                  onOpenApartment: (id) => setState(() { _selectedZoneId = id; _selectedElementId = null; _zoneTool.cancelEditingZone(); }),
                   presets: _zonePresets,
                   zone: _selectedZone!,
                   tool: _zoneTool,
@@ -11780,6 +11855,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // === SECTION: 2D CANVAS VIEWPORT (LAYERED MODEL SPACE) ===
 
   Offset? get _draftCancelAnchor {
+    if (_activeTool == ArchitectTool.column && _effectiveSelection.isEmpty) {
+      final center = _columnPreviewPoint ?? _cursorModel;
+      if (center == null) return null;
+      final halfWidth = _elementTool.columnWidth / 2;
+      if (_elementTool.columnShape == ColumnShape.circular) {
+        return center + Offset(halfWidth, -halfWidth);
+      }
+      final angle = _columnPreviewRotation * math.pi / 180;
+      final cosine = math.cos(angle).abs();
+      final sine = math.sin(angle).abs();
+      final halfDepth = _elementTool.columnDepth / 2;
+      return center + Offset(
+        halfWidth * cosine + halfDepth * sine,
+        -(halfWidth * sine + halfDepth * cosine),
+      );
+    }
     if (_activeTool == ArchitectTool.door ||
         _activeTool == ArchitectTool.window) {
       return _openingPlacementPreview?.centerPoint ?? _cursorModel;
@@ -11882,12 +11973,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     height: 22,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Theme.of(context).colorScheme.secondaryContainer,
+                      color: _activeTool == ArchitectTool.column
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.secondaryContainer,
                     ),
                     child: Icon(
                       Icons.close,
                       size: 13,
-                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      color: _activeTool == ArchitectTool.column
+                          ? Colors.red
+                          : Theme.of(context).colorScheme.onSecondaryContainer,
                     ),
                   ),
                 ),
@@ -12119,6 +12214,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       palette: _canvasPalette,
                       storey: _project.activeStorey,
                       gridAxes: _project.gridAxes,
+                      document: _project.document,
+                      viewKey: _workspaceViewKey,
                     ),
                   ),
                 ),
@@ -12214,6 +12311,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                   : context.l10n.architectEditHoldHint)
                             : _activeTool == ArchitectTool.select
                             ? context.l10n.architectSelectionCycleHelp
+                            : _activeTool == ArchitectTool.column
+                            ? context.l10n.architectColumnPlacementHint
                             : _canPlaceWithMarker &&
                                   !_placingWithHold &&
                                   !_wallDirectionLocked
@@ -12883,7 +12982,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     columnPreview:
         _activeTool == ArchitectTool.column &&
             _effectiveSelection.isEmpty &&
-            _columnPreviewPoint != null
+            _columnPreviewPoint != null &&
+            !_columnPreviewIsOccupied
         ? ArchitectColumn(
             id: 'preview',
             position: _columnPreviewPoint!,
@@ -13009,6 +13109,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     zonePreviewRectangle: _zoneTool.previewRectangle,
     zoneEditingPolygon: _zoneMovePreviewPolygon,
     isZoneTableSelected: _isZoneTableSelected,
+    selectedZoneTableId: _selectedZoneTableId,
     zoneTableDragPreviewOrigin: _zoneTablePreviewOrigin,
 
     underlayLayerVisibility: _underlayLayerVisibility,

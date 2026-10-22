@@ -7457,6 +7457,12 @@ abstract class AppLocalizations {
   /// **'Hold → point · 2 fingers → zoom'**
   String get architectWallDraftHint;
 
+  /// No description provided for @architectColumnPlacementHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold → place · Tap → select · X → cancel'**
+  String get architectColumnPlacementHint;
+
   /// No description provided for @architectEditHoldHint.
   ///
   /// In en, this message translates to:
@@ -8774,7 +8780,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectDimensionExteriorHelp.
   ///
   /// In en, this message translates to:
-  /// **'Rows from the building outward: openings and wall sections measured to the core, overall core size with separate end insulation dimensions, then axis spacing. Picks on insulation reference the core. Facade openings and perpendicular axes are included automatically.'**
+  /// **'Rows: openings, wall sections, overall core size with separate end insulation, axes. Row spacing follows drawing scale and text size. Facade openings and perpendicular axes are included automatically; picks on insulation reference the core.'**
   String get architectDimensionExteriorHelp;
 
   /// No description provided for @architectDimensionInterior.
@@ -12562,6 +12568,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'3D view'**
   String get architectComponentView3d;
+
+  /// No description provided for @architectApartment.
+  ///
+  /// In en, this message translates to:
+  /// **'Apartment'**
+  String get architectApartment;
+
+  /// No description provided for @architectRoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Room'**
+  String get architectRoom;
+
+  /// No description provided for @architectApartmentRooms.
+  ///
+  /// In en, this message translates to:
+  /// **'Rooms'**
+  String get architectApartmentRooms;
+
+  /// No description provided for @architectUnassignedRooms.
+  ///
+  /// In en, this message translates to:
+  /// **'Unassigned rooms'**
+  String get architectUnassignedRooms;
+
+  /// No description provided for @architectApartmentAutoAssignment.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get architectApartmentAutoAssignment;
+
+  /// No description provided for @architectApartmentNoRooms.
+  ///
+  /// In en, this message translates to:
+  /// **'No rooms within the outline.'**
+  String get architectApartmentNoRooms;
+
+  /// No description provided for @architectApartmentBoundaryHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw manually along internal wall axes and the exterior faces of exterior walls.'**
+  String get architectApartmentBoundaryHelp;
+
+  /// No description provided for @architectApartmentGross.
+  ///
+  /// In en, this message translates to:
+  /// **'Contour area'**
+  String get architectApartmentGross;
+
+  /// No description provided for @architectApartmentNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Room area'**
+  String get architectApartmentNet;
+
+  /// No description provided for @architectApartmentRoomsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Rooms are assigned automatically by the largest overlapping area with an apartment. Each room is counted in full only once. Equal areas retain the current apartment. Rooms outside all apartments stay unassigned.'**
+  String get architectApartmentRoomsHelp;
 }
 
 class _AppLocalizationsDelegate

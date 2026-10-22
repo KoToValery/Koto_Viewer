@@ -315,7 +315,7 @@ void main() {
         );
         expect(
           scene.operations.whereType<ArchitectVectorText>().any(
-            (e) => e.text.contains('${unit.symbol}²'),
+            (e) => e.text.contains(unit.isImperial ? 'ft²' : 'm²'),
           ),
           isTrue,
         );

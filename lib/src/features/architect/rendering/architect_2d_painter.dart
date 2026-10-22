@@ -1,3 +1,4 @@
+import 'architect_clearance_badge_layout.dart';
 import 'architect_vector_scene.dart';
 import '../models/architect_wall_type.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -155,6 +156,7 @@ class Architect2dPainter extends CustomPainter {
   final List<Offset>? zoneEditingPolygon;
 
   // Zone Schedule Table
+  final String? selectedZoneTableId;
   final bool isZoneTableSelected;
   final Offset? zoneTableDragPreviewOrigin;
 
@@ -260,6 +262,7 @@ class Architect2dPainter extends CustomPainter {
     this.zonePreviewRectangle = const [],
     this.zoneEditingPolygon,
     this.isZoneTableSelected = false,
+    this.selectedZoneTableId,
     this.zoneTableDragPreviewOrigin,
     this.underlayDoc,
     this.underlayLayerVisibility = const {},
@@ -827,6 +830,7 @@ class Architect2dPainter extends CustomPainter {
       storey: _project.activeStorey,
       zoomScale: zoomScale,
       isTableSelected: isZoneTableSelected,
+      selectedTableId: selectedZoneTableId,
       tableDragPreviewOrigin: zoneTableDragPreviewOrigin,
       tableGhostOrigin:
           activeTool == ArchitectTool.zoneTable ? cursorPosition : null,
@@ -1207,9 +1211,7 @@ class Architect2dPainter extends CustomPainter {
           .where((w) => w.id == gap.wallId)
           .firstOrNull;
       if (hostWall == null) continue;
-      final lineColor = gap.isModularSnap
-          ? palette.foreground(const Color(0xFF00A86B))
-          : palette.foreground(const Color(0xFF008C9E));
+      final lineColor = palette.foreground(const Color(0xFF424A52));
       final witnessPaint = Paint()
         ..color = lineColor.withValues(alpha: 0.55)
         ..strokeWidth = 0.85 / draftingScale;
@@ -1221,7 +1223,7 @@ class Architect2dPainter extends CustomPainter {
           (direction.distance < 1e-8
               ? hostWall.normalVector
               : Offset(-direction.dy, direction.dx) / direction.distance) *
-          (4 / draftingScale);
+          .04;
       final dimPaint = Paint()
         ..color = lineColor
         ..strokeWidth = (gap.isModularSnap ? 1.5 : 1.1) / draftingScale;
@@ -1234,7 +1236,7 @@ class Architect2dPainter extends CustomPainter {
           text: TextSpan(
             text: _project.formatLength(gap.distance),
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF20252A),
               fontFamily: 'Roboto',
               fontSize: 11.0,
               fontWeight: FontWeight.w700,
@@ -1244,28 +1246,24 @@ class Architect2dPainter extends CustomPainter {
         )..layout();
         canvas.save();
         canvas.translate(gap.midpoint.dx, gap.midpoint.dy);
-        canvas.scale(1.0 / zoomScale);
+        canvas.scale(1.0 / ArchitectClearanceBadgeLayout.openingReferenceScale);
         final rect = Rect.fromCenter(
           center: Offset.zero,
           width: tp.width + 12,
           height: tp.height + 6,
         );
-        final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(6));
+        final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(3));
         canvas.drawRRect(
           rrect,
           Paint()
-            ..color = gap.isModularSnap
-                ? const Color(0xEE00796B)
-                : const Color(0xDD1E293B),
+            ..color = Colors.white,
         );
         canvas.drawRRect(
           rrect,
           Paint()
-            ..color = gap.isModularSnap
-                ? const Color(0xFF64FFDA)
-                : const Color(0xFF38BDF8)
+            ..color = const Color(0xFF78818A)
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.0,
+            ..strokeWidth = .7,
         );
         tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
         canvas.restore();

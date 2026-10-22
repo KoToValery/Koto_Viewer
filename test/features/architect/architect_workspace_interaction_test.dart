@@ -154,7 +154,11 @@ void main() {
       await tool_ui.choose(tester, Icons.view_column_rounded);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.tapAt(screen(tester, const Offset(3, 3)));
+      final placement = await tester.startGesture(
+        screen(tester, const Offset(3, 3)) + const Offset(0, 64),
+      );
+      await tester.pump(const Duration(milliseconds: 281));
+      await placement.up();
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.columns.length, 1);
       await tool_ui.prepare(tester, Icons.view_column_rounded);
@@ -383,7 +387,9 @@ void main() {
       await mouse.moveTo(target);
       await tester.pump();
       final preview = overlay(tester).columnPreview!;
-      await tester.tapAt(target);
+      await mouse.down(target);
+      await tester.pump(const Duration(milliseconds: 281));
+      await mouse.up();
       await tester.pumpAndSettle();
       final column = model.project.activeStorey.columns.single;
       expect(column.position, preview.position);

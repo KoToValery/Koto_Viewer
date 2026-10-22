@@ -1400,6 +1400,7 @@
   "@architectMagnetHelp": {"description": "Wall positioning control guidance"},
   "architectWallParallel": "Успоредно",
   "architectWallDraftHint": "Задръж → точка · 2 пръста → мащаб",
+  "architectColumnPlacementHint": "Задръж → постави · Тап → избор · X → отказ",
   "architectEditHoldHint": "Задръж → редакция · по-дълго → меню",
   "architectNavigationHint": "Местене / мащаб",
   "architectWallEditRejected": "Отвор или твърде къса стена.",
@@ -1621,7 +1622,7 @@
   "architectDimensionScale": "Мащаб на размерите",
   "architectDimensionSingle": "Единичен",
   "architectDimensionExterior": "Външен",
-  "architectDimensionExteriorHelp": "Редове от сградата навън: отвори и стенни участъци до ядрото, общ размер на ядрото с отделни крайни размери за изолацията и разстояния между осите. Изборът по изолацията се отнася към ядрото. Фасадните отвори и перпендикулярните оси се включват автоматично.",
+  "architectDimensionExteriorHelp": "Редове: отвори, стенни участъци, общ размер на ядрото с отделна крайна изолация, оси. Разстоянието между редовете следва мащаба и големината на текста. Фасадните отвори и перпендикулярните оси се включват автоматично; изборът по изолацията се отнася към ядрото.",
   "architectDimensionInterior": "Вътрешен",
   "architectDimensionInteriorHint": "Избери крайни стени и прегради, после постави линията.",
   "architectDimensionInteriorHelp": "Една линия измерва между вътрешните лица на крайните успоредни стени, с двете лица на междинните прегради.",
@@ -2311,5 +2312,15 @@
   "architectComponentExportJsonTooltip": "Копирай JSON",
   "architectComponentExportJsonMsg": "JSON е копиран",
   "architectComponentView2d": "2D изглед",
-  "architectComponentView3d": "3D изглед"
+  "architectComponentView3d": "3D изглед",
+  "architectApartment": "Апартамент",
+  "architectRoom": "Помещение",
+  "architectApartmentRooms": "Помещения",
+  "architectUnassignedRooms": "Без апартамент",
+  "architectApartmentAutoAssignment": "Автоматично",
+  "architectApartmentNoRooms": "Няма помещения в контура.",
+  "architectApartmentBoundaryHelp": "Начертайте ръчно по осите на вътрешните стени и външните лица на външните стени.",
+  "architectApartmentGross": "Площ по контур",
+  "architectApartmentNet": "Чиста площ",
+  "architectApartmentRoomsHelp": "Помещенията се включват автоматично според най-голямата обща площ с апартамента. Всяко помещение се отчита изцяло само веднъж. При равни площи се запазва текущият апартамент. Помещенията извън всички апартаменти остават без апартамент."
 }

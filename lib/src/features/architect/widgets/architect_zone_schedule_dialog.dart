@@ -1,3 +1,4 @@
+import '../services/architect_apartment_zones.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -22,6 +23,8 @@ import 'architect_zone_preset_field.dart';
 /// Displays room areas, perimeters, floor/wall/ceiling finishes, clear heights,
 /// and total net area summaries with drawing canvas placement and clipboard export.
 class ArchitectZoneScheduleDialog extends StatefulWidget {
+  final ArchitectUnit units;
+  final String? initialApartmentId;
   final ArchitectZonePresets presets;
   final ArchitectStorey storey;
   final ValueChanged<ArchitectZone> onZoneUpdated;
@@ -30,6 +33,8 @@ class ArchitectZoneScheduleDialog extends StatefulWidget {
   const ArchitectZoneScheduleDialog({
     super.key,
     required this.storey,
+    this.units = ArchitectUnit.meters,
+    this.initialApartmentId,
     this.presets = const ArchitectZonePresets(),
     required this.onZoneUpdated,
     required this.onTableOriginChanged,
@@ -38,6 +43,8 @@ class ArchitectZoneScheduleDialog extends StatefulWidget {
   static Future<void> show({
     required BuildContext context,
     required ArchitectStorey storey,
+    ArchitectUnit units = ArchitectUnit.meters,
+    String? initialApartmentId,
     ArchitectZonePresets presets = const ArchitectZonePresets(),
     required ValueChanged<ArchitectZone> onZoneUpdated,
     required ValueChanged<Offset?> onTableOriginChanged,
@@ -47,6 +54,8 @@ class ArchitectZoneScheduleDialog extends StatefulWidget {
       barrierDismissible: true,
       builder: (ctx) => ArchitectZoneScheduleDialog(
         storey: storey,
+        units: units,
+        initialApartmentId: initialApartmentId,
         presets: presets,
         onZoneUpdated: onZoneUpdated,
         onTableOriginChanged: onTableOriginChanged,
@@ -61,89 +70,65 @@ class ArchitectZoneScheduleDialog extends StatefulWidget {
 
 class _ArchitectZoneScheduleDialogState
     extends State<ArchitectZoneScheduleDialog> {
-  void _copyScheduleToClipboard() {
-    final l10n = context.l10n;
-    final buffer = StringBuffer();
+  late List<ArchitectZone> _zones = List.of(widget.storey.zones);
+  late String? _groupId = widget.initialApartmentId;
+  late bool _placed = widget.storey.zoneScheduleOrigin != null;
+  List<ArchitectZoneScheduleGroup> get _groups =>
+      ArchitectApartmentZones.groups(widget.storey.copyWith(zones: _zones));
+  ArchitectZoneScheduleGroup get _group =>
+      _groups.where((g) => g.id == _groupId).firstOrNull ?? _groups.first;
 
-    // Headers
+  void _copyScheduleToClipboard() {
+    final l = context.l10n;
+    final group = _group;
+    final buffer = StringBuffer(group.title(l))..writeln();
     buffer.writeln(
       [
-        l10n.architectZoneScheduleColNo,
-        l10n.architectZoneScheduleColName,
-        l10n.architectZoneScheduleColArea,
-        l10n.architectZoneScheduleColPerimeter,
-        l10n.architectZoneScheduleColFloor,
-        l10n.architectZoneScheduleColWalls,
-        l10n.architectZoneScheduleColCeiling,
-        l10n.architectZoneScheduleColHeight,
+        l.architectZoneNumberPrompt,
+        l.architectZoneName,
+        l.architectAreaWithUnit(widget.units.isImperial ? 'ft' : 'm'),
+        l.architectZoneScheduleColPerimeter,
+        l.architectZoneFloorFinish,
+        l.architectZoneWallFinish,
+        l.architectZoneCeilingFinish,
+        l.architectZoneScheduleColHeight,
       ].join('\t'),
     );
-
-    double totalArea = 0.0;
-    final sortedZones = List<ArchitectZone>.from(widget.storey.zones)
-      ..sort((a, b) => a.number.compareTo(b.number));
-
-    for (int i = 0; i < sortedZones.length; i++) {
-      final z = sortedZones[i];
-      totalArea += z.area;
+    for (final room in group.rooms) {
       buffer.writeln(
         [
-          z.number.isNotEmpty ? z.number : '${i + 1}',
-          z.name,
-          BimDistanceUnit.trimZeros(z.area.toStringAsFixed(2)),
-          BimDistanceUnit.trimZeros(z.perimeter.toStringAsFixed(2)),
-          z.resolvedFloorFinish(l10n),
-          z.resolvedWallFinish(l10n),
-          z.resolvedCeilingFinish(l10n),
-          BimDistanceUnit.trimZeros(z.clearHeight.toStringAsFixed(2)),
+          room.number,
+          room.name,
+          widget.units.formatArea(room.area),
+          widget.units.format(room.perimeter),
+          room.resolvedFloorFinish(l),
+          room.resolvedWallFinish(l),
+          room.resolvedCeilingFinish(l),
+          widget.units.format(room.clearHeight),
         ].join('\t'),
       );
     }
-
-    buffer.writeln();
+    if (group.apartment != null) {
+      buffer.writeln(
+        '${l.architectApartmentGross}\t${widget.units.formatArea(group.apartment!.area)}',
+      );
+    }
     buffer.writeln(
-      '${l10n.architectZoneScheduleTotalArea}:\t${BimDistanceUnit.trimZeros(totalArea.toStringAsFixed(2))} m²',
+      '${l.architectApartmentNet}\t${widget.units.formatArea(group.netArea)}',
     );
-
     Clipboard.setData(ClipboardData(text: buffer.toString()));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(l10n.architectZoneScheduleCopied),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   void _togglePlacementOnDrawing() {
-    final l10n = context.l10n;
-    final currentOrigin = widget.storey.zoneScheduleOrigin;
-    if (currentOrigin != null) {
-      widget.onTableOriginChanged(null);
-      setState(() {});
-    } else {
-      // Default table placement near the top-left of the storey walls or (0, 0)
-      double minX = 0;
-      double minY = 0;
-      if (widget.storey.walls.isNotEmpty) {
-        minX = widget.storey.walls.first.startPoint.dx;
-        minY = widget.storey.walls.first.startPoint.dy;
-        for (final w in widget.storey.walls) {
-          if (w.startPoint.dx < minX) minX = w.startPoint.dx;
-          if (w.endPoint.dx < minX) minX = w.endPoint.dx;
-          if (w.startPoint.dy < minY) minY = w.startPoint.dy;
-          if (w.endPoint.dy < minY) minY = w.endPoint.dy;
-        }
-      }
-      final defaultOrigin = Offset(minX - 14.0, minY);
-      widget.onTableOriginChanged(defaultOrigin);
-      setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.architectZoneScheduleTablePlaced),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
+    widget.onTableOriginChanged(
+      _placed
+          ? null
+          : Offset(
+              widget.storey.zones.first.bounds.right + 1,
+              widget.storey.zones.first.bounds.top,
+            ),
+    );
+    setState(() => _placed = !_placed);
   }
 
   void _editZoneFinishes(ArchitectZone zone) {
@@ -307,6 +292,9 @@ class _ArchitectZoneScheduleDialogState
                 clearHeight: newH,
               );
               widget.onZoneUpdated(updated);
+              _zones = [
+                for (final z in _zones) z.id == updated.id ? updated : z,
+              ];
               Navigator.pop(ctx);
               setState(() {});
             },
@@ -319,237 +307,136 @@ class _ArchitectZoneScheduleDialogState
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final zones = widget.storey.zones;
-    final sortedZones = List<ArchitectZone>.from(zones)
-      ..sort((a, b) => a.number.compareTo(b.number));
-    final totalArea = zones.fold<double>(0.0, (sum, z) => sum + z.area);
-    final isPlacedOnDrawing = widget.storey.zoneScheduleOrigin != null;
-
+    final l = context.l10n;
+    final group = _group;
+    final rows = [...group.rooms]..sort((a, b) => a.number.compareTo(b.number));
     return Dialog(
-      backgroundColor: const Color(0xF7151824),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0x3338BDF8)),
-      ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 880, maxHeight: 600),
+        constraints: const BoxConstraints(maxWidth: 880, maxHeight: 640),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Header Bar: Title, Room count & Area badge, Close
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.table_chart_rounded,
-                      color: Color(0xFF38BDF8),
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.architectZoneScheduleTitle,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '${l10n.architectZoneScheduleRoomCount}: ${zones.length}  •  ${l10n.architectZoneScheduleTotalArea}: ${BimDistanceUnit.trimZeros(totalArea.toStringAsFixed(2))} m²',
-                          style: const TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: Colors.white70,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
+              Text(
+                l.architectZoneScheduleTitle,
+                style: Theme.of(context).textTheme.titleLarge,
               ),
-
-              const SizedBox(height: 12),
-              const Divider(color: Color(0x22FFFFFF), height: 1),
-              const SizedBox(height: 12),
-
-              // 2. Schedule Data Table
+              DropdownButton<String>(
+                key: const ValueKey('zone-schedule-group'),
+                isExpanded: true,
+                value: group.id,
+                items: [
+                  for (final g in _groups)
+                    DropdownMenuItem(
+                      value: g.id,
+                      child: Text(g.title(l), overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (id) => setState(() => _groupId = id),
+              ),
+              if (group.apartment != null)
+                Text(
+                  '${l.architectApartmentGross}: ${widget.units.formatArea(group.apartment!.area)}',
+                ),
+              Text(
+                '${l.architectApartmentNet}: ${widget.units.formatArea(group.netArea)} · ${l.architectZoneScheduleRoomCount}: ${rows.length}',
+              ),
+              const SizedBox(height: 8),
               Expanded(
-                child: zones.isEmpty
-                    ? Center(
-                        child: Text(
-                          l10n.architectZoneScheduleNoRooms,
-                          style: const TextStyle(color: Colors.white54),
+                child: Container(
+                  color: Colors.white,
+                  child: SingleChildScrollView(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        dataTextStyle: const TextStyle(color: Colors.black87),
+                        headingTextStyle: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.bold,
                         ),
-                      )
-                    : Scrollbar(
-                        thumbVisibility: true,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: SingleChildScrollView(
-                            child: DataTable(
-                              headingRowColor: WidgetStateProperty.all(
-                                const Color(0xFF1E293B),
+                        columns: [
+                          DataColumn(label: Text(l.architectZoneNumberPrompt)),
+                          DataColumn(label: Text(l.architectZoneName)),
+                          DataColumn(
+                            label: Text(
+                              l.architectAreaWithUnit(
+                                widget.units.isImperial ? 'ft' : 'm',
                               ),
-                              dataRowMinHeight: 38,
-                              dataRowMaxHeight: 46,
-                              columnSpacing: 18,
-                              horizontalMargin: 12,
-                              columns: [
-                                DataColumn(
-                                  label: Text(
-                                    l10n.architectZoneScheduleColNo,
-                                    style: const TextStyle(
-                                      color: Color(0xFF7DD3FC),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                            ),
+                            numeric: true,
+                          ),
+                          DataColumn(
+                            label: Text(l.architectZoneScheduleColPerimeter),
+                            numeric: true,
+                          ),
+                          DataColumn(label: Text(l.architectZoneFloorFinish)),
+                          DataColumn(label: Text(l.architectZoneWallFinish)),
+                          DataColumn(label: Text(l.architectZoneCeilingFinish)),
+                          DataColumn(
+                            label: Text(l.architectZoneScheduleColHeight),
+                            numeric: true,
+                          ),
+                        ],
+                        rows: [
+                          for (final room in rows)
+                            DataRow(
+                              cells: [
+                                DataCell(Text(room.number)),
+                                DataCell(
+                                  Text(room.name),
+                                  onTap: () => _editZoneFinishes(room),
                                 ),
-                                DataColumn(
-                                  label: Text(
-                                    l10n.architectZoneScheduleColName,
-                                    style: const TextStyle(
-                                      color: Color(0xFF7DD3FC),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                DataCell(
+                                  Text(widget.units.formatArea(room.area)),
                                 ),
-                                DataColumn(
-                                  numeric: true,
-                                  label: Text(
-                                    l10n.architectZoneScheduleColArea,
-                                    style: const TextStyle(
-                                      color: Color(0xFF7DD3FC),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                DataCell(
+                                  Text(widget.units.format(room.perimeter)),
                                 ),
-                                DataColumn(
-                                  numeric: true,
-                                  label: Text(
-                                    l10n.architectZoneScheduleColPerimeter,
-                                    style: const TextStyle(
-                                      color: Color(0xFF7DD3FC),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                DataCell(
+                                  Text(room.resolvedFloorFinish(l)),
+                                  onTap: () => _editZoneFinishes(room),
                                 ),
-                                DataColumn(
-                                  label: Text(
-                                    l10n.architectZoneScheduleColFloor,
-                                    style: const TextStyle(
-                                      color: Color(0xFF7DD3FC),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                DataCell(
+                                  Text(room.resolvedWallFinish(l)),
+                                  onTap: () => _editZoneFinishes(room),
                                 ),
-                                DataColumn(
-                                  label: Text(
-                                    l10n.architectZoneScheduleColWalls,
-                                    style: const TextStyle(
-                                      color: Color(0xFF7DD3FC),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                DataCell(
+                                  Text(room.resolvedCeilingFinish(l)),
+                                  onTap: () => _editZoneFinishes(room),
                                 ),
-                                DataColumn(
-                                  label: Text(
-                                    l10n.architectZoneScheduleColCeiling,
-                                    style: const TextStyle(
-                                      color: Color(0xFF7DD3FC),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                DataCell(
+                                  Text(widget.units.format(room.clearHeight)),
                                 ),
-                                DataColumn(
-                                  numeric: true,
-                                  label: Text(
-                                    l10n.architectZoneScheduleColHeight,
-                                    style: const TextStyle(
-                                      color: Color(0xFF7DD3FC),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const DataColumn(label: Text('')),
-                              ],
-                              rows: [
-                                for (int i = 0; i < sortedZones.length; i++)
-                                  _buildDataRow(sortedZones[i], i, l10n),
                               ],
                             ),
-                          ),
-                        ),
+                        ],
                       ),
+                    ),
+                  ),
+                ),
               ),
-
-              const SizedBox(height: 12),
-              const Divider(color: Color(0x22FFFFFF), height: 1),
-              const SizedBox(height: 12),
-
-              // 3. Action Buttons Row: Copy Table, Place on Drawing, Close
-              Row(
+              Wrap(
+                spacing: 8,
+                alignment: WrapAlignment.end,
                 children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF38BDF8),
-                      side: const BorderSide(color: Color(0x6638BDF8)),
-                    ),
-                    icon: const Icon(Icons.copy_rounded, size: 16),
-                    label: Text(l10n.architectZoneScheduleCopy),
-                    onPressed: zones.isEmpty ? null : _copyScheduleToClipboard,
+                  TextButton(
+                    onPressed: _copyScheduleToClipboard,
+                    child: Text(l.architectZoneScheduleCopy),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isPlacedOnDrawing
-                          ? const Color(0x33FF5252)
-                          : const Color(0x3300E676),
-                      foregroundColor: isPlacedOnDrawing
-                          ? const Color(0xFFFF5252)
-                          : const Color(0xFF00E676),
-                      side: BorderSide(
-                        color: isPlacedOnDrawing
-                            ? const Color(0x66FF5252)
-                            : const Color(0x6600E676),
-                      ),
+                  TextButton(
+                    onPressed: widget.storey.zones.isEmpty
+                        ? null
+                        : _togglePlacementOnDrawing,
+                    child: Text(
+                      _placed
+                          ? l.architectZoneScheduleRemoveFromDrawing
+                          : l.architectZoneSchedulePlaceOnDrawing,
                     ),
-                    icon: Icon(
-                      isPlacedOnDrawing
-                          ? Icons.layers_clear_rounded
-                          : Icons.post_add_rounded,
-                      size: 16,
-                    ),
-                    label: Text(
-                      isPlacedOnDrawing
-                          ? l10n.architectZoneScheduleRemoveFromDrawing
-                          : l10n.architectZoneSchedulePlaceOnDrawing,
-                    ),
-                    onPressed: zones.isEmpty ? null : _togglePlacementOnDrawing,
                   ),
-                  const Spacer(),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: Text(l10n.architectZoneCancel),
+                    child: Text(l.close),
                   ),
                 ],
               ),
@@ -557,94 +444,6 @@ class _ArchitectZoneScheduleDialogState
           ),
         ),
       ),
-    );
-  }
-
-  DataRow _buildDataRow(ArchitectZone z, int index, dynamic l10n) {
-    return DataRow(
-      cells: [
-        DataCell(
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: z.color.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: z.color.withValues(alpha: 0.5)),
-            ),
-            child: Text(
-              z.number.isNotEmpty ? z.number : '${index + 1}',
-              style: TextStyle(
-                color: z.color,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ),
-        DataCell(
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(z.category.icon, size: 16, color: z.color),
-              const SizedBox(width: 6),
-              Text(
-                z.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-        DataCell(
-          Text(
-            '${BimDistanceUnit.trimZeros(z.area.toStringAsFixed(2))} m²',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        DataCell(
-          Text(
-            '${BimDistanceUnit.trimZeros(z.perimeter.toStringAsFixed(2))} m',
-            style: const TextStyle(color: Colors.white70),
-          ),
-        ),
-        DataCell(
-          Text(
-            z.resolvedFloorFinish(l10n),
-            style: const TextStyle(color: Colors.white70),
-          ),
-        ),
-        DataCell(
-          Text(
-            z.resolvedWallFinish(l10n),
-            style: const TextStyle(color: Colors.white70),
-          ),
-        ),
-        DataCell(
-          Text(
-            z.resolvedCeilingFinish(l10n),
-            style: const TextStyle(color: Colors.white70),
-          ),
-        ),
-        DataCell(
-          Text(
-            '${BimDistanceUnit.trimZeros(z.clearHeight.toStringAsFixed(2))} m',
-            style: const TextStyle(color: Colors.white70),
-          ),
-        ),
-        DataCell(
-          IconButton(
-            icon: const Icon(Icons.edit_note_rounded, size: 18),
-            color: const Color(0xFF38BDF8),
-            tooltip: l10n.architectZoneProperties,
-            onPressed: () => _editZoneFinishes(z),
-          ),
-        ),
-      ],
     );
   }
 }

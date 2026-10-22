@@ -156,147 +156,80 @@ class ArchitectColumn {
       ..strokeWidth = strokeWidth / zoomScale
       ..style = PaintingStyle.stroke;
 
-    final fillPaint = Paint()
-      ..color = ArchitectPaperStyle.cutFill
-      ..style = PaintingStyle.fill;
-
-    final crossPaint = Paint()
-      ..color = ArchitectPaperStyle.rule
-      ..strokeWidth = 0.8 / zoomScale
-      ..style = PaintingStyle.stroke;
-
     canvas.save();
     canvas.translate(position.dx, position.dy);
     if (rotationDeg.abs() > 1e-4) {
       canvas.rotate(rotationDeg * math.pi / 180.0);
     }
 
+    final columnDepth = shape == ColumnShape.circular ? width : depth;
     if (shape == ColumnShape.circular) {
-      final r = width / 2.0;
-      canvas.drawCircle(Offset.zero, r, fillPaint);
-      canvas.drawCircle(Offset.zero, r, borderPaint);
-
-      // Center crosshair
-      final crossLen = r * 0.7;
-      canvas.drawLine(Offset(-crossLen, 0), Offset(crossLen, 0), crossPaint);
-      canvas.drawLine(Offset(0, -crossLen), Offset(0, crossLen), crossPaint);
+      canvas.drawCircle(Offset.zero, width / 2, borderPaint);
     } else {
-      final halfW = width / 2.0;
-      final halfD = depth / 2.0;
-      final rect = Rect.fromLTRB(-halfW, -halfD, halfW, halfD);
-
-      canvas.drawRect(rect, fillPaint);
+      final rect = Rect.fromCenter(
+        center: Offset.zero,
+        width: width,
+        height: depth,
+      );
       canvas.drawRect(rect, borderPaint);
-
-      // Center X diagonals or crosshair
-      canvas.drawLine(Offset(-halfW, -halfD), Offset(halfW, halfD), crossPaint);
-      canvas.drawLine(Offset(halfW, -halfD), Offset(-halfW, halfD), crossPaint);
     }
 
-    // Dimension / Name label if zoomed in
-    if (zoomScale > 15.0) {
-      final wCm = ArchitectTextScope.current?.number(width) ?? (width * 100).round().toString();
-      final dCm = ArchitectTextScope.current?.number(depth) ?? (depth * 100).round().toString();
-      final text = shape == ColumnShape.circular ? 'd=$wCm' : '$wCm/$dCm';
-
-      canvas.save();
-      canvas.scale(ArchitectPaperStyle.annotationScale);
-      final tp = ArchitectTextPainter(elementId: id, role: ArchitectAnnotationRole.dimension, modelScale: ArchitectPaperStyle.annotationScale,
-        text: TextSpan(
-          text: text,
-          style: TextStyle(
-            color: isSelected ? const Color(0xFF00E5FF) : ArchitectPaperStyle.ink,
-            fontFamily: 'Roboto',
-            fontSize: 11.0,
-            fontWeight: FontWeight.bold,
+    // Measure in model metres. Both texts zoom with the drawing, while the
+    // designation shrinks to fit even narrow columns and long custom names.
+    final scope = ArchitectTextScope.current;
+    final fontSize =
+        scope?.fontSize(id, ArchitectAnnotationRole.ordinary) ??
+        11 * ArchitectPaperStyle.annotationScale;
+    ArchitectTextPainter lettering(String text, ArchitectAnnotationRole role) =>
+        ArchitectTextPainter(
+          elementId: id,
+          role: role,
+          modelScale: scope == null ? 1 : scope.fontSize(id, role) / fontSize,
+          text: TextSpan(
+            text: text,
+            style: TextStyle(
+              color: palette.foreground(ArchitectPaperStyle.ink),
+              fontFamily: 'Roboto',
+              fontSize: fontSize,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        textAlign: TextAlign.center,
-        textDirection: TextDirection.ltr,
-      )..layout();
+          textDirection: TextDirection.ltr,
+        )..layout();
 
-      var textOffset = Offset(-tp.width / 2, -tp.height / 2);
-      if (ArchitectTextScope.current != null) {
-        final factor = ArchitectPaperStyle.annotationScale;
-        final availableDepth = shape == ColumnShape.circular ? width : depth;
-        if (tp.width * factor > width * .85 || tp.height * factor > availableDepth * .7) {
-          textOffset = Offset(-tp.width / 2, availableDepth / 2 / factor + 3);
-        }
-        canvas.drawRect((textOffset & tp.size).inflate(1), Paint()..color = ArchitectPaperStyle.paper);
-      }
-      tp.paint(canvas, textOffset);
+    final designation = lettering(label, ArchitectAnnotationRole.ordinary);
+    // An inscribed rectangle keeps every text corner inside circular columns.
+    final inset = shape == ColumnShape.circular ? .64 : .80;
+    final fit = math.min(
+      1.0,
+      math.min(
+        width * inset / math.max(designation.width, .0001),
+        columnDepth * inset / math.max(designation.height, .0001),
+      ),
+    );
+    if (label.isNotEmpty) {
+      canvas.save();
+      canvas.scale(fit);
+      designation.paint(
+        canvas,
+        Offset(-designation.width / 2, -designation.height / 2),
+      );
       canvas.restore();
     }
 
+    final w = scope?.number(width) ?? (width * 100).round().toString();
+    final d = scope?.number(depth) ?? (depth * 100).round().toString();
+    final dimension = lettering(
+      shape == ColumnShape.circular ? 'd=$w' : '$w/$d',
+      ArchitectAnnotationRole.dimension,
+    );
+    canvas.save();
+    canvas.translate(width / 2 + fontSize * fit * .4, 0);
+    canvas.scale(fit);
+    final dimensionOffset = Offset(0, -dimension.height / 2);
+    dimension.paint(canvas, dimensionOffset);
     canvas.restore();
-
-    // Column designation / number label next to the column (not scaled up when zoomed out)
-    if (label.isNotEmpty && zoomScale >= 8.0) {
-      final double halfExtentX;
-      final double halfExtentY;
-      if (shape == ColumnShape.circular) {
-        halfExtentX = width / 2.0;
-        halfExtentY = width / 2.0;
-      } else {
-        final rad = rotationDeg * math.pi / 180.0;
-        final cosA = math.cos(rad).abs();
-        final sinA = math.sin(rad).abs();
-        final halfW = width / 2.0;
-        final halfD = depth / 2.0;
-        halfExtentX = halfW * cosA + halfD * sinA;
-        halfExtentY = halfW * sinA + halfD * cosA;
-      }
-
-      final labelPos = Offset(
-        position.dx + halfExtentX + 0.04,
-        position.dy - halfExtentY - 0.02,
-      );
-
-      final tpLabel = ArchitectTextPainter(elementId: id, modelScale: ArchitectPaperStyle.annotationScale,
-        text: TextSpan(
-          text: label,
-          style: TextStyle(
-            color: isSelected
-                ? const Color(0xFF00E5FF)
-                : palette.foreground(const Color(0xFF1A237E)),
-            fontFamily: 'Roboto',
-            fontSize: 11.0,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      // Fixed model height for the designation and its frame at every zoom.
-      final scaleFactor = ArchitectPaperStyle.annotationScale;
-
-      const padX = 2.5;
-      const padY = 1.0;
-      final bgRect = Rect.fromLTWH(
-        -padX,
-        -padY,
-        tpLabel.width + padX * 2,
-        tpLabel.height + padY * 2,
-      );
-      final bgRRect = RRect.fromRectAndRadius(bgRect, const Radius.circular(2.5));
-      final bgPaint = Paint()
-        ..color = palette.background.withValues(alpha: 0.88)
-        ..style = PaintingStyle.fill;
-      final tagBorderPaint = Paint()
-        ..color = isSelected
-            ? const Color(0xFF00E5FF)
-            : palette.foreground(Colors.black38).withValues(alpha: 0.5)
-        ..strokeWidth = 0.6
-        ..style = PaintingStyle.stroke;
-
-      canvas.save();
-      canvas.translate(labelPos.dx, labelPos.dy);
-      canvas.scale(scaleFactor);
-      canvas.drawRRect(bgRRect, bgPaint);
-      canvas.drawRRect(bgRRect, tagBorderPaint);
-      tpLabel.paint(canvas, Offset.zero);
-      canvas.restore();
-    }
+    canvas.restore();
   }
 
   List<Triangle3D> build3D({

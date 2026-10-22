@@ -145,7 +145,7 @@ class ArchitectElementsPainterHelper {
       canvas.drawPath(path, slabFillPaint);
       canvas.drawPath(path, border);
 
-      if (zoomScale > 12.0) {
+      if (ArchitectTextScope.current != null || zoomScale > 12.0) {
         final c = slab.centroid;
         canvas.save();
         canvas.translate(c.dx, c.dy);
@@ -222,7 +222,7 @@ class ArchitectElementsPainterHelper {
       // Centerline
       canvas.drawLine(beam.startPoint, beam.endPoint, paint);
 
-      if (zoomScale > 15.0) {
+      if (ArchitectTextScope.current != null || zoomScale > 15.0) {
         final mid = (beam.startPoint + beam.endPoint) / 2.0;
         canvas.save();
         canvas.translate(mid.dx, mid.dy);
@@ -324,7 +324,7 @@ class ArchitectElementsPainterHelper {
         canvas.drawLine(op.boundary[1], op.boundary[3], crossPaint);
       }
 
-      if (zoomScale > 12.0) {
+      if (ArchitectTextScope.current != null || zoomScale > 12.0) {
         final c = op.centroid;
         canvas.save();
         canvas.translate(c.dx, c.dy);
@@ -403,12 +403,17 @@ class ArchitectElementsPainterHelper {
       final n = dim.normal;
       final points = dim.dimensionPoints;
       if (points.length < 2) continue;
+      final scope = ArchitectTextScope.current;
+      final paperScale = ArchitectDrawingScale(scope?.denominator ?? dimensionScale.denominator);
+      final annotationScale = ArchitectDimensionScale.values.firstWhere(
+        (s) => s.denominator == paperScale.denominator);
 
       final tiers = ArchitectDimensionLayout.layoutTiers(
         dimension: dim,
         scale: zoomScale,
         storey: dimensionStorey ?? storey,
         gridAxes: gridAxes,
+        dimensionScale: annotationScale,
       );
       if (tiers.isEmpty) continue;
 
@@ -416,18 +421,18 @@ class ArchitectElementsPainterHelper {
         ..color = isSelected
             ? const Color(0xFF00E5FF)
             : palette.foreground(const Color(0xFF37474F))
-        ..strokeWidth = (isSelected ? 2.0 : 1.0) / zoomScale
+        ..strokeWidth = isSelected ? 2 / zoomScale : paperScale.paperToModel(.125)
         ..style = PaintingStyle.stroke;
 
       final witnessPaint = Paint()
         ..color = palette.foreground(const Color(0xFF78909C))
-        ..strokeWidth = 0.8 / zoomScale
+        ..strokeWidth = paperScale.paperToModel(.1)
         ..style = PaintingStyle.stroke;
 
       for (final segment in ArchitectDimensionLayout.witnessSegments(
         dim,
         tiers,
-        dimensionScale: dimensionScale,
+        dimensionScale: annotationScale,
       )) {
         canvas.drawLine(segment.$1, segment.$2, witnessPaint);
       }
@@ -438,15 +443,13 @@ class ArchitectElementsPainterHelper {
         }
       }
 
-      final tickSize = dimensionScale.paperToModel(.8);
+      final tickSize = paperScale.paperToModel(.8);
       final tickVec = (u + n) * (tickSize / 1.414);
       final outward = n * (dim.offsetDistance < 0 ? -1 : 1);
 
       // Paper-space size converted to model metres, independent of camera zoom.
-      final modelTextHeight = dimensionScale.textHeight;
-      final textOffset =
-          outward * (modelTextHeight * 0.55 + dimensionScale.paperToModel(.4));
-      final textScale = modelTextHeight / 11.0;
+      final modelTextHeight = scope?.height(dim.id, ArchitectAnnotationRole.dimension) ?? annotationScale.textHeight;
+      final textScale = modelTextHeight / ArchitectDrawingScale.fontCapRatio / 11.0;
 
       for (final tier in tiers) {
         // Dimension line
@@ -495,7 +498,7 @@ class ArchitectElementsPainterHelper {
           )..layout();
 
           final textWidth = tp.width * textScale;
-          final clearance = dimensionScale.paperToModel(.6);
+          final clearance = paperScale.paperToModel(.6);
           final center = ArchitectDimensionLayout.segmentTextCenter(
             tier: tier,
             segmentIndex: segmentIndex,
@@ -514,12 +517,20 @@ class ArchitectElementsPainterHelper {
               dimPaint,
             );
           }
-          final mid = center + textOffset;
+          final lines = tp.computeLineMetrics();
+          final multiline = lines.length > 1;
+          final halfHeight = multiline ? tp.height * textScale / 2 : modelTextHeight / 2;
+          final mid = center + outward * (halfHeight + paperScale.paperToModel(.4));
           canvas.save();
           canvas.translate(mid.dx, mid.dy);
           canvas.rotate(ArchitectDimensionLayout.textAngle(u));
           canvas.scale(textScale);
-          tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+          // Position visible capitals, rather than the font's empty leading,
+          // at the same paper clearance in the workspace and publication.
+          final top = multiline || lines.isEmpty
+              ? -tp.height / 2
+              : -lines.first.baseline + modelTextHeight / textScale / 2;
+          tp.paint(canvas, Offset(-tp.width / 2, top));
           canvas.restore();
         }
       }

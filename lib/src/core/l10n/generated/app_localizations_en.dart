@@ -4272,6 +4272,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallDraftHint => 'Hold → point · 2 fingers → zoom';
 
   @override
+  String get architectColumnPlacementHint =>
+      'Hold → place · Tap → select · X → cancel';
+
+  @override
   String get architectEditHoldHint => 'Hold → edit · longer → menu';
 
   @override
@@ -4987,7 +4991,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectDimensionExteriorHelp =>
-      'Rows from the building outward: openings and wall sections measured to the core, overall core size with separate end insulation dimensions, then axis spacing. Picks on insulation reference the core. Facade openings and perpendicular axes are included automatically.';
+      'Rows: openings, wall sections, overall core size with separate end insulation, axes. Row spacing follows drawing scale and text size. Facade openings and perpendicular axes are included automatically; picks on insulation reference the core.';
 
   @override
   String get architectDimensionInterior => 'Interior';
@@ -7038,4 +7042,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectComponentView3d => '3D view';
+
+  @override
+  String get architectApartment => 'Apartment';
+
+  @override
+  String get architectRoom => 'Room';
+
+  @override
+  String get architectApartmentRooms => 'Rooms';
+
+  @override
+  String get architectUnassignedRooms => 'Unassigned rooms';
+
+  @override
+  String get architectApartmentAutoAssignment => 'Auto';
+
+  @override
+  String get architectApartmentNoRooms => 'No rooms within the outline.';
+
+  @override
+  String get architectApartmentBoundaryHelp =>
+      'Draw manually along internal wall axes and the exterior faces of exterior walls.';
+
+  @override
+  String get architectApartmentGross => 'Contour area';
+
+  @override
+  String get architectApartmentNet => 'Room area';
+
+  @override
+  String get architectApartmentRoomsHelp =>
+      'Rooms are assigned automatically by the largest overlapping area with an apartment. Each room is counted in full only once. Equal areas retain the current apartment. Rooms outside all apartments stay unassigned.';
 }
