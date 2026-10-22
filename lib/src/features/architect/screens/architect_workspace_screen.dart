@@ -761,11 +761,60 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     };
   }
 
+  ArchitectTool _toolForElement(String id) => ArchitectTool.values.firstWhere(
+    (tool) => tool != ArchitectTool.select && _isElementAllowedForTool(id, tool),
+    orElse: () => ArchitectTool.select,
+  );
+
+  void _toggleMultiSelection() {
+    final ids = _effectiveSelection;
+    final primary = _selectedElementId ?? _selectedZoneId ?? ids.lastOrNull;
+    final enable = !_multiSelect;
+    _cancelDrafting();
+    setState(() {
+      _radialMenuScreenPosition = null;
+      _polygonEditId = null;
+      _polygonSelectedEdge = null;
+      _moveSelection = false;
+      _selectionCyclePoint = null;
+      _lastTapTime = null;
+      _interactionEpoch++;
+      _multiSelect = enable;
+      _selectionIds.clear();
+      if (_multiSelect) {
+        _selectionIds.addAll(ids);
+        _activeTool = ArchitectTool.select;
+        _selectionContextActive = false;
+      } else {
+        if (primary != null) _selectionIds.add(primary);
+        _selectedElementId = primary;
+        _selectedZoneId = _project.activeStorey.zones.any((z) => z.id == primary)
+            ? primary
+            : null;
+        _activeTool = primary == null
+            ? ArchitectTool.select
+            : _toolForElement(primary);
+        _selectionContextActive = primary != null;
+        if (_activeTool == ArchitectTool.axis && primary != null) {
+          _axisTool.selectAxis(primary);
+        }
+        if (_selectedZoneId != null) {
+          _zoneTool.startEditingZone(
+            _project.activeStorey.zones.firstWhere((z) => z.id == primary),
+          );
+        }
+      }
+    });
+  }
+
   List<String> _selectionCandidates(Offset point) {
-    if (_activeTool == ArchitectTool.select) {
+    if (_acceptsAnySelection) {
       final first = _hitSelection(point);
       return <String>{
         ?first,
+        if (_showFurnitureLayer)
+          for (final component in _project.activeStorey.components.reversed)
+            if (component.isVisible && component.containsPoint(point)) component.id,
         ..._elementTool.hitTestElements(
           _project.activeStorey,
           point,
@@ -834,16 +883,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (advance || _selectionCycleIndex < 0) {
       _selectionCycleIndex =
           (_selectionCycleIndex + 1) % _selectionCycleIds.length;
-      if (_multiSelect) {
-        for (var step = 0; step < _selectionCycleIds.length; step++) {
-          final index =
-              (_selectionCycleIndex + step) % _selectionCycleIds.length;
-          if (!_effectiveSelection.contains(_selectionCycleIds[index])) {
-            _selectionCycleIndex = index;
-            break;
-          }
-        }
-      }
     }
     return _selectionCycleIds[_selectionCycleIndex];
   }
@@ -1598,6 +1637,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _cancelActiveDrags();
       _interactionEpoch++;
     }
+    if (_selectionContextActive &&
+        _effectiveSelection.isEmpty &&
+        _selectedSectionRoofId == null) {
+      _selectionContextActive = false;
+      _activeTool = ArchitectTool.select;
+    }
     if (_selectedZoneId != null && _zoneTool.isEditingZone) {
       final zone = _project.activeStorey.zones.firstWhere(
         (z) => z.id == _selectedZoneId,
@@ -1642,15 +1687,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _cancelActiveDrags();
     _zoneTool.cancelAll();
     _axisTool.cancelAll();
+    _axisTool.deselect();
     _elementTool.cancelSlabDrafting();
     _roofTool.clearDraft();
-    if (_activeTool == ArchitectTool.door ||
+    if (_selectionContextActive ||
+        _activeTool == ArchitectTool.door ||
         _activeTool == ArchitectTool.window ||
         _activeTool == ArchitectTool.column) {
       _activeTool = ArchitectTool.select;
       _cursorModel = null;
       _columnPreviewPoint = null;
     }
+    _selectionContextActive = false;
     setState(() {
       _draftStart = null;
       _wallArcEnd = null;
@@ -1662,8 +1710,51 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
   }
 
+  void _changeTool(ArchitectTool tool) => setState(() {
+    final nextTool =
+        (_activeTool == tool && tool != ArchitectTool.select)
+        ? ArchitectTool.select
+        : tool;
+    _resetDimensionDraft();
+    _selectionCyclePoint = null;
+    _lastTapTime = null;
+    _lastTapPos = null;
+    _selectionIds.clear();
+    _interactionEpoch++;
+    _cancelActiveDrags();
+    _zoneTool.cancelAll();
+    _axisTool.cancelAll();
+    _axisTool.deselect();
+    _elementTool.cancelSlabDrafting();
+    _roofTool.clearDraft();
+    _selectedZoneId = null;
+    _selectedElementId = null;
+    _wallParallelMove = false;
+    _wallEndpointClearanceId = null;
+    _multiSelect = false;
+    _moveSelection = false;
+    _activeTool = nextTool;
+    _midpointTracking.clear();
+    _pendingShape = null;
+    _shapePanelAnchor = null;
+    _columnPreviewPoint = null;
+    _columnPreviewRotation = 0.0;
+    _cursorModel = null;
+    _draftStart = null;
+    _wallArcEnd = null;
+    _draftEnd = null;
+    _wallDirectionLocked = false;
+    _activeMagneticGuides = [];
+    _activeSnapLabel = null;
+    _selectionContextActive = false;
+    _selectedSectionRoofId = null;
+    _isZoneTableSelected = false;
+  });
+
   void _clearSelection() {
     setState(() {
+      if (_selectionContextActive) _activeTool = ArchitectTool.select;
+      _selectionContextActive = false;
       _selectionCyclePoint = null;
       _cancelActiveDrags();
       _selectionIds.clear();
@@ -1858,11 +1949,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   final Set<String> _selectionIds = {};
   Set<String> _groupDragIds = {};
   bool _multiSelect = false;
+  // Auto-picked tools expose editing; drawing starts only after a tool command.
+  bool _selectionContextActive = false;
+  bool get _acceptsAnySelection =>
+      _activeTool == ArchitectTool.select ||
+      _selectionContextActive ||
+      _multiSelect;
   bool _moveSelection = false;
   DateTime? _lastTapTime;
   Offset? _lastTapPos;
   Set<String> get _effectiveSelection {
-    if (_activeTool == ArchitectTool.select) {
+    if (_acceptsAnySelection) {
       if (_selectionIds.isNotEmpty) return Set.of(_selectionIds);
       return {
         ?_selectedElementId,
@@ -2607,7 +2704,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       HapticFeedback.selectionClick();
       return;
     }
-    if (_activeTool == ArchitectTool.wall) {
+    if (_activeTool == ArchitectTool.wall && !_selectionContextActive) {
       _placingWithHold = !_touchInput;
       _touchPosition = null;
       if (!_touchInput) _updatePointerPreview(event.localPosition);
@@ -2695,6 +2792,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           final point = atStart ? wall.startPoint : wall.endPoint;
           setState(() {
             _selectedElementId = wall.id;
+            if (_activeTool == ArchitectTool.select && !_multiSelect) {
+              _activeTool = ArchitectTool.wall;
+              _selectionContextActive = true;
+            }
             _selectionIds
               ..clear()
               ..add(wall.id);
@@ -2919,7 +3020,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   bool get _canPlaceWithMarker =>
-      (_activeTool != ArchitectTool.select ||
+      ((_activeTool != ArchitectTool.select && !_selectionContextActive) ||
           _mirrorActive ||
           _splitActive ||
           _newPointTargetId != null) &&
@@ -4467,6 +4568,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _selectedElementId = null;
           _selectedZoneId = null;
           _selectedSectionRoofId = hitRoof;
+          if (!_multiSelect && _acceptsAnySelection) {
+            _activeTool = ArchitectTool.roof;
+            _selectionContextActive = true;
+          }
         });
         HapticFeedback.selectionClick();
         return;
@@ -4485,7 +4590,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _lastTapTime = now;
     _lastTapPos = rawModel;
 
-    if (isDoubleTap && !_multiSelect) {
+    if (isDoubleTap && !_multiSelect && !_selectionContextActive) {
       final hitId = _hitSelection(rawModel);
       if (hitId != null && _isElementAllowedForTool(hitId, _activeTool)) {
         final storey = _project.activeStorey;
@@ -4741,7 +4846,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     if (_activeTool == ArchitectTool.select && _multiSelect) {
-      _selectAt(rawModel, toggle: true);
+      if (!_selectAt(rawModel, toggle: true)) _clearSelection();
+      return;
+    }
+    if (_selectionContextActive) {
+      _handleSelectionTap(rawModel);
       return;
     }
 
@@ -5090,84 +5199,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       setState(() => _isZoneTableSelected = false);
     }
 
-    // Active selection tap handling: toggle in multi-select or select tool, replace in single-select, or cancel on empty space
     if (_effectiveSelection.isNotEmpty) {
-      final selectedRoof = _selectedRoof;
-      if (selectedRoof != null && !_multiSelect) {
-        // 1. Tap on the central slope direction arrow/badge rotates slope direction
-        if (ArchitectRoofPainterHelper.hitTestSlopeIndicator(
-          selectedRoof,
-          rawModel,
-          scale: _currentScale,
-        )) {
-          final nextRoof = selectedRoof.nextSlopeEdge();
-          setState(() {
-            _commands.execute(
-              UpdateArchitectRoofPlane(
-                storeyId: _project.activeStoreyId,
-                roof: nextRoof,
-              ),
-            );
-            _polygonSelectedEdge = nextRoof.safeEavesEdgeIndex;
-          });
-          _saveBiMProjectIfAttached();
-          HapticFeedback.selectionClick();
-          return;
-        }
-
-        // 2. Tap near a roof edge selects that edge for dynamic wall distance editing
-        //    (and a second tap on the already-selected edge sets it as the eaves edge).
-        final edgeIdx = ArchitectRoofTool.hitTestEdgeIndex(
-          selectedRoof,
-          rawModel,
-          tolerance: math.min(18.0 / _currentScale, 0.35),
-        );
-        if (edgeIdx != null) {
-          setState(() {
-            if (_polygonSelectedEdge == edgeIdx &&
-                (edgeIdx != selectedRoof.safeEavesEdgeIndex ||
-                    selectedRoof.reverseSlope)) {
-              _commands.execute(
-                UpdateArchitectRoofPlane(
-                  storeyId: _project.activeStoreyId,
-                  roof: selectedRoof.withEavesEdge(edgeIdx),
-                ),
-              );
-              _saveBiMProjectIfAttached();
-            }
-            _polygonSelectedEdge = edgeIdx;
-          });
-          HapticFeedback.selectionClick();
-          return;
-        }
-      }
-
-      final shouldToggle =
-          _multiSelect ||
-          _activeTool == ArchitectTool.select ||
-          HardwareKeyboard.instance.isShiftPressed ||
-          HardwareKeyboard.instance.isControlPressed;
-      final hit = _selectAt(rawModel, toggle: shouldToggle);
-      if (!hit) {
-        _clearSelection();
-      }
+      _handleSelectionTap(rawModel);
       return;
     }
-
     if (_activeTool == ArchitectTool.select) {
-      if (_showFurnitureLayer) {
-        for (final comp in _project.activeStorey.components.reversed) {
-          if (comp.containsPoint(rawModel)) {
-            setState(() {
-              _selectedElementId = comp.id;
-              _selectionIds.clear();
-              _selectedZoneId = null;
-            });
-            return;
-          }
-        }
-      }
-      _selectAt(rawModel, toggle: true);
+      _selectAt(rawModel, toggle: _multiSelect);
       return;
     }
 
@@ -6648,11 +6685,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   return Positioned.fromRect(
                     rect: rect,
                     child: IgnorePointer(
-                      ignoring:
-                          _radialMenuScreenPosition != null ||
-                          (gap.atStart == null &&
-                              _activeTool == ArchitectTool.select &&
-                              !_moveSelection),
+                      ignoring: _radialMenuScreenPosition != null || _multiSelect,
                       child: Tooltip(
                         message: gap.atStart == null
                             ? context.l10n.architectWallClearance
@@ -6698,7 +6731,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               Positioned.fromRect(
                 rect: placements[gap.key]!,
                 child: IgnorePointer(
-                  ignoring: _radialMenuScreenPosition != null,
+                  ignoring: _radialMenuScreenPosition != null || _multiSelect,
                   child: Tooltip(
                     message: context.l10n.architectOpeningClearance,
                     child: FittedBox(
@@ -7366,7 +7399,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   String? _hitSelection(Offset point) {
-    if (_activeTool == ArchitectTool.select) {
+    if (_acceptsAnySelection || _activeTool == ArchitectTool.component) {
+      if (_showFurnitureLayer) {
+        for (final component in _project.activeStorey.components.reversed) {
+          if (component.isVisible && component.containsPoint(point)) return component.id;
+        }
+      }
+      if (_activeTool == ArchitectTool.component && !_acceptsAnySelection) return null;
       return _elementTool.hitTestElement(
             _project.activeStorey,
             point,
@@ -7439,6 +7478,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _selectedElementId = null;
           _selectedZoneId = null;
           _selectedSectionRoofId = hitRoof;
+          if (!_multiSelect && _acceptsAnySelection) {
+            _activeTool = ArchitectTool.roof;
+            _selectionContextActive = true;
+          }
         });
         return true;
       }
@@ -7447,8 +7490,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   bool _onContextHold(Offset screenPoint) {
-    if (_activeTool == ArchitectTool.door ||
-        _activeTool == ArchitectTool.window) {
+    if (!_selectionContextActive &&
+        (_activeTool == ArchitectTool.door ||
+            _activeTool == ArchitectTool.window)) {
       return false;
     }
     if (_handleMoved ||
@@ -7497,6 +7541,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _selectedElementId = null;
           _selectedZoneId = null;
           _selectedSectionRoofId = hitRoof;
+          if (!_multiSelect && _acceptsAnySelection) {
+            _activeTool = ArchitectTool.roof;
+            _selectionContextActive = true;
+          }
         });
         unawaited(_showSectionRoofContextMenu(screenPoint, hitRoof));
         return true;
@@ -7654,6 +7702,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final items = <ArchitectRadialMenuItem>[];
 
     if (_effectiveSelection.length > 1) {
+      if (_selectionHasAutoZones) {
+        return [
+          _radialItem(
+            action: ArchitectRadialAction.properties,
+            color: const Color(0xFFB388FF),
+          ),
+          _radialItem(
+            action: ArchitectRadialAction.delete,
+            color: const Color(0xFFFF5252),
+          ),
+        ];
+      }
       final sel = _effectiveSelection;
       final storey = _project.activeStorey;
       final wallCount = storey.walls.where((w) => sel.contains(w.id)).length;
@@ -8441,6 +8501,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _beginDuplicateSelection();
           return;
         case ArchitectRadialAction.move:
+          _cancelActiveDrags();
           setState(() {
             _polygonEditId = null;
             _polygonSelectedEdge = null;
@@ -8508,6 +8569,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         break;
 
       case ArchitectRadialAction.move:
+        _cancelActiveDrags();
         final zoneToMove = _project.activeStorey.zones.where((z) => z.id == id).firstOrNull;
         if (zoneToMove != null && zoneToMove.isAutoBoundary) {
           _commands.commit(
@@ -8671,6 +8733,60 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  void _handleSelectionTap(Offset point) {
+    final selectedRoof = _selectedRoof;
+    if (selectedRoof != null && !_multiSelect) {
+      // 1. Tap on the central slope direction arrow/badge rotates slope direction
+      if (ArchitectRoofPainterHelper.hitTestSlopeIndicator(
+        selectedRoof,
+        point,
+        scale: _currentScale,
+      )) {
+        final nextRoof = selectedRoof.nextSlopeEdge();
+        setState(() {
+          _commands.execute(
+            UpdateArchitectRoofPlane(
+              storeyId: _project.activeStoreyId,
+              roof: nextRoof,
+            ),
+          );
+          _polygonSelectedEdge = nextRoof.safeEavesEdgeIndex;
+        });
+        _saveBiMProjectIfAttached();
+        HapticFeedback.selectionClick();
+        return;
+      }
+
+      // 2. Tap near a roof edge selects that edge for dynamic wall distance editing
+      //    (and a second tap on the already-selected edge sets it as the eaves edge).
+      final edgeIdx = ArchitectRoofTool.hitTestEdgeIndex(
+        selectedRoof,
+        point,
+        tolerance: math.min(18.0 / _currentScale, 0.35),
+      );
+      if (edgeIdx != null) {
+        setState(() {
+          if (_polygonSelectedEdge == edgeIdx &&
+              (edgeIdx != selectedRoof.safeEavesEdgeIndex ||
+                  selectedRoof.reverseSlope)) {
+            _commands.execute(
+              UpdateArchitectRoofPlane(
+                storeyId: _project.activeStoreyId,
+                roof: selectedRoof.withEavesEdge(edgeIdx),
+              ),
+            );
+            _saveBiMProjectIfAttached();
+          }
+          _polygonSelectedEdge = edgeIdx;
+        });
+        HapticFeedback.selectionClick();
+        return;
+      }
+    }
+
+    if (!_selectAt(point, toggle: _multiSelect)) _clearSelection();
+  }
+
   bool _selectAt(
     Offset point, {
     bool invalidateGesture = true,
@@ -8678,7 +8794,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }) {
     final id = _nextSelection(point, advance: invalidateGesture);
     if (id == null) return false;
-    if (_activeTool != ArchitectTool.select &&
+    if (!_acceptsAnySelection &&
         !_isElementAllowedForTool(id, _activeTool)) {
       return false;
     }
@@ -8687,11 +8803,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _polygonSelectedEdge = null;
     _zoneTool.cancelAll();
     _axisTool.cancelAll();
-    final shouldMulti =
-        _multiSelect ||
-        _activeTool == ArchitectTool.select ||
-        HardwareKeyboard.instance.isShiftPressed ||
-        HardwareKeyboard.instance.isControlPressed;
+    _axisTool.deselect();
+    final shouldMulti = _multiSelect;
+    final adoptTool = !_multiSelect &&
+        (_selectionContextActive || _activeTool == ArchitectTool.select);
     setState(() {
       if (invalidateGesture) _interactionEpoch++;
       _draftStart = null;
@@ -8723,6 +8838,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
       _selectedElementId = primary;
       _selectedZoneId = null;
+      if (adoptTool && primary != null) {
+        _activeTool = _toolForElement(primary);
+        _selectionContextActive = true;
+      }
       if (primary != null) {
         final zone = _project.activeStorey.zones
             .where((e) => e.id == primary)
@@ -10292,35 +10411,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   ),
                   onPressed: _selectSimilarElements,
                 ),
-                IconButton(
-                  constraints: const BoxConstraints.tightFor(
-                    width: 26,
-                    height: 40,
-                  ),
-                  padding: EdgeInsets.zero,
-                  key: const ValueKey('architect-multi-select'),
-                  tooltip: l.architectSelectionMulti,
-                  icon: Icon(
-                    Icons.library_add_check_outlined,
-                    size: 18,
-                    color: _multiSelect ? Colors.amber : Colors.white70,
-                  ),
-                  onPressed: () => setState(() {
-                    _radialMenuScreenPosition = null;
-                    _polygonEditId = null;
-                    _polygonSelectedEdge = null;
-                    if (!_multiSelect) {
-                      _selectionIds
-                        ..clear()
-                        ..addAll(ids);
-                      _multiSelect = true;
-                    } else {
-                      _multiSelect = false;
-                      _selectionIds.clear();
-                    }
-                    _moveSelection = false;
-                  }),
-                ),
                 if (!_selectionHasAutoZones)
                   IconButton(
                     constraints: const BoxConstraints.tightFor(
@@ -11145,39 +11235,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   zonePresets: _zonePresets,
                   drawingOnly: !_commands.isPlan,
                   activeTool: _activeTool,
-                  onToolChanged: (tool) => setState(() {
-                    final nextTool =
-                        (_activeTool == tool && tool != ArchitectTool.select)
-                            ? ArchitectTool.select
-                            : tool;
-                    _resetDimensionDraft();
-                    _selectionCyclePoint = null;
-                    _selectionIds.clear();
-                    _interactionEpoch++;
-                    _cancelActiveDrags();
-                    _zoneTool.cancelAll();
-                    _axisTool.cancelAll();
-                    _elementTool.cancelSlabDrafting();
-                    _roofTool.clearDraft();
-                    _selectedZoneId = null;
-                    _selectedElementId = null;
-                    _wallParallelMove = false;
-                    _wallEndpointClearanceId = null;
-                    _moveSelection = false;
-                    _activeTool = nextTool;
-                    _midpointTracking.clear();
-                    _pendingShape = null;
-                    _shapePanelAnchor = null;
-                    _columnPreviewPoint = null;
-                    _columnPreviewRotation = 0.0;
-                    _cursorModel = null;
-                    _draftStart = null;
-                    _wallArcEnd = null;
-                    _draftEnd = null;
-                    _wallDirectionLocked = false;
-                    _activeMagneticGuides = [];
-                    _activeSnapLabel = null;
-                  }),
+                  onToolChanged: _changeTool,
+                  multiSelect: _multiSelect,
+                  onToggleMultiSelect: _toggleMultiSelection,
                   activeZoneCategory: _activeZoneCategory,
                   onZoneCategoryChanged: (cat) =>
                       setState(() => _activeZoneCategory = cat),
@@ -12046,8 +12106,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ArchitectViewport(
         controller: _viewport,
         interactionKey: (
+          // Explicit mode commands increment the epoch. Auto-picking a tool
+          // while holding an object must keep the same pointer gesture alive.
           _interactionEpoch,
-          _activeTool,
           _project.id,
           _project.activeStoreyId,
         ),

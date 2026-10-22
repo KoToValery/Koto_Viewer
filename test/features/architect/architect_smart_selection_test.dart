@@ -314,12 +314,14 @@ void main() {
         tester.getTopLeft(find.byKey(const ValueKey('architect-viewport-input'))) +
         camera(tester).toScreen(point);
 
-    testWidgets('Select tool keeps multiple elements with a compact action bar', (tester) async {
+    testWidgets('Explicit multi-select keeps multiple elements with a compact action bar', (tester) async {
       final commands = seededController();
       await openWorkspace(tester, commands);
 
       // Switch to Select tool
       await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
       await tester.pumpAndSettle();
 
       // Tap w1 (at model 2, 0)

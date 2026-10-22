@@ -15,6 +15,7 @@ import '../services/fenestration_library_service.dart';
 import '../rendering/architect_2d_painter.dart';
 
 import "../services/component_library_service.dart";
+
 enum ArchitectToolCategory {
   plan,
   build,
@@ -62,6 +63,8 @@ class ArchitectToolPalette extends StatefulWidget {
   final ArchitectTool activeTool;
   final bool drawingOnly;
   final ValueChanged<ArchitectTool> onToolChanged;
+  final bool multiSelect;
+  final VoidCallback? onToggleMultiSelect;
 
   // Fenestration (Window & Door Editor) options
   final VoidCallback? onCreateFenestration;
@@ -144,6 +147,8 @@ class ArchitectToolPalette extends StatefulWidget {
     required this.activeTool,
     this.drawingOnly = false,
     required this.onToolChanged,
+    this.multiSelect = false,
+    this.onToggleMultiSelect,
     this.activeZoneCategory = ArchitectZoneCategory.living,
     required this.onZoneCategoryChanged,
     required this.wallThickness,
@@ -353,6 +358,19 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                           : Colors.white70,
                     ),
                   ),
+                  if (widget.onToggleMultiSelect != null)
+                    IconButton(
+                      key: const ValueKey('architect-multi-select'),
+                      tooltip: l10n.architectSelectionMulti,
+                      isSelected: widget.multiSelect,
+                      onPressed: widget.onToggleMultiSelect,
+                      icon: Icon(
+                        Icons.library_add_check_outlined,
+                        color: widget.multiSelect
+                            ? Colors.amber
+                            : Colors.white70,
+                      ),
+                    ),
                   PopupMenuButton<ArchitectToolCategory>(
                     key: const ValueKey('architect-tool-category'),
                     tooltip: l10n.architectToolCategories,
@@ -786,7 +804,9 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               avatar: const Icon(Icons.rounded_corner, size: 14),
               label: Text(l10n.wallArcMode),
               selected: curvedWall,
-              onSelected: (selected) { if (selected) onArcWallSelected(); },
+              onSelected: (selected) {
+                if (selected) onArcWallSelected();
+              },
               visualDensity: VisualDensity.compact,
             ),
           ],
@@ -1166,7 +1186,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     final w = (activeParams["width"] as num?)?.toDouble() ?? 0.80;
     final d = (activeParams["depth"] as num?)?.toDouble() ?? 0.60;
     final h = (activeParams["height"] as num?)?.toDouble() ?? 0.80;
-    final deg = (widget.componentRotation * 180 / 3.141592653589793).round() % 360;
+    final deg =
+        (widget.componentRotation * 180 / 3.141592653589793).round() % 360;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1232,6 +1253,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
       ),
     );
   }
+
   Widget _buildStairSubBar(BuildContext context) {
     final l = context.l10n;
     return SingleChildScrollView(

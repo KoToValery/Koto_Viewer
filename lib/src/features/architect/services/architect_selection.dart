@@ -90,6 +90,9 @@ class ArchitectSelection {
 
   static Rect? bounds(ArchitectProject project, String id) {
     final s = project.activeStorey;
+    for (final axis in project.gridAxes) {
+      if (axis.id == id) return Rect.fromPoints(axis.start, axis.end).inflate(.02);
+    }
     for (final component in s.components) {
       if (component.id == id) return component.worldBoundingRect;
     }
