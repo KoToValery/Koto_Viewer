@@ -4,6 +4,8 @@ import 'dart:ui';
 Offset sectionPoint(Map j) =>
     Offset((j['x'] as num).toDouble(), (j['y'] as num).toDouble());
 Map<String, double> sectionPointJson(Offset p) => {'x': p.dx, 'y': p.dy};
+double? viewDepthFromJson(Object? value) =>
+    value is num && value.isFinite && value > 0 ? value.toDouble() : null;
 
 class ArchitectSlabDetail {
   final String id, slabId;
@@ -50,12 +52,15 @@ class ArchitectSlabDetail {
 class ArchitectSection {
   final String id, name;
   final Offset start, end;
+  /// Far clipping distance in model metres; null keeps legacy unlimited views.
+  final double? viewDepth;
   final List<ArchitectSlabDetail> details;
   final ArchitectViewDrawing drawing;
   const ArchitectSection({
     required this.id,
     required this.start,
     required this.end,
+    this.viewDepth,
     this.name = '',
     this.details = const [],
     this.drawing = const ArchitectViewDrawing(),
@@ -88,6 +93,8 @@ class ArchitectSection {
     Offset? end,
     List<ArchitectSlabDetail>? details,
     ArchitectViewDrawing? drawing,
+    double? viewDepth,
+    bool clearViewDepth = false,
   }) => ArchitectSection(
     id: id,
     name: name ?? this.name,
@@ -95,12 +102,14 @@ class ArchitectSection {
     end: end ?? this.end,
     details: details ?? this.details,
     drawing: drawing ?? this.drawing,
+    viewDepth: clearViewDepth ? null : viewDepth ?? this.viewDepth,
   );
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
     'start': sectionPointJson(start),
     'end': sectionPointJson(end),
+    'viewDepth': viewDepth,
     'details': details.map((d) => d.toJson()).toList(),
     'drawing': drawing.toJson(),
   };
@@ -112,6 +121,7 @@ class ArchitectSection {
     ),
     start: sectionPoint(j['start'] as Map),
     end: sectionPoint(j['end'] as Map),
+    viewDepth: viewDepthFromJson(j['viewDepth']),
     details: (j['details'] as List? ?? [])
         .map(
           (d) =>

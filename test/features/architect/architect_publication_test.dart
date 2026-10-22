@@ -137,7 +137,13 @@ void main() {
       expect(
         label100.firstWhere((e) => e.role == 'area').size *
             ArchitectDrawingScale.fontCapRatio,
-        closeTo(2.2, 1e-8),
+        inExclusiveRange(0, 2.2 + 1e-8),
+      );
+      // Room fitting may reduce the block, while preserving its text hierarchy.
+      expect(
+        label100.firstWhere((e) => e.role == 'roomName').size /
+            label100.firstWhere((e) => e.role == 'area').size,
+        closeTo(1.2, 1e-8),
       );
       expect(
         label50.firstWhere((e) => e.role == 'roomName').size *

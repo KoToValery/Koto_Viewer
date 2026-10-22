@@ -212,7 +212,9 @@ class ArchitectZonePainterHelper {
       ..color = borderColor
       ..strokeWidth = isSelected || ArchitectTextScope.current == null
           ? (isSelected ? 2.2 : 1.2) / math.max(zoomScale, 80.0)
-          : ArchitectDrawingScale(ArchitectTextScope.current!.denominator).paperToModel(.15)
+          : ArchitectDrawingScale(
+              ArchitectTextScope.current!.denominator,
+            ).paperToModel(.15)
       ..style = PaintingStyle.stroke;
     canvas.drawPath(path, borderPaint);
 
@@ -248,81 +250,172 @@ class ArchitectZonePainterHelper {
     required double zoomScale,
     required bool isSelected,
   }) {
-    canvas.save();
-    canvas.translate(centroid.dx, centroid.dy);
-    // Fixed model-space lettering: zooming out reduces the stamp with the plan.
-    canvas.scale(ArchitectPaperStyle.annotationScale);
-
+    final annotationScale = ArchitectPaperStyle.annotationScale;
     final numberText = '№ ${zone.number.isNotEmpty ? zone.number : '1'}';
     final nameText = zone.name;
     final areaText =
         ArchitectTextScope.current?.area(zone.area) ??
         '${BimDistanceUnit.trimZeros(zone.area.toStringAsFixed(2))} m²';
 
-    final numberSpan = ArchitectAnnotationSpan(
-      role: ArchitectAnnotationRole.ordinary,
-      text: '$numberText\n',
-      style: TextStyle(
-        color: ArchitectPaperStyle.ink,
-        fontFamily: 'Roboto',
-        fontSize: 10.0,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.3,
-      ),
-    );
-    final nameSpan = ArchitectAnnotationSpan(
-      role: ArchitectAnnotationRole.roomName,
-      text: '$nameText\n',
-      style: const TextStyle(
-        color: ArchitectPaperStyle.ink,
-        fontFamily: 'Roboto',
-        fontSize: 11.5,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-    final areaSpan = ArchitectAnnotationSpan(
-      role: ArchitectAnnotationRole.area,
-      text: areaText,
-      style: TextStyle(
-        color: ArchitectPaperStyle.ink,
-        fontFamily: 'Roboto',
-        fontSize: 10.5,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-
-    final tp = ArchitectTextPainter(
+    ArchitectTextPainter label(
+      String text,
+      ArchitectAnnotationRole role,
+      double fontSize,
+      FontWeight weight,
+    ) => ArchitectTextPainter(
       elementId: zone.id,
-      modelScale: ArchitectPaperStyle.annotationScale,
-      text: TextSpan(children: [numberSpan, nameSpan, areaSpan]),
+      role: role,
+      modelScale: annotationScale,
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: ArchitectPaperStyle.ink,
+          fontFamily: 'Roboto',
+          fontSize: fontSize,
+          fontWeight: weight,
+          height: 1.05,
+        ),
+      ),
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
-    )..layout();
-
-    const badgePaddingH = 8.0;
-    const badgePaddingV = 5.0;
-    final badgeRect = Rect.fromCenter(
-      center: Offset.zero,
-      width: tp.width + badgePaddingH * 2,
-      height: tp.height + badgePaddingV * 2,
     );
 
-    final borderPaint = Paint()
-      ..color =
-          (isSelected ? const Color(0xFF00E5FF) : ArchitectPaperStyle.rule)
-              .withValues(alpha: isSelected ? 0.95 : 0.65)
-      ..strokeWidth = isSelected ? 1.5 : 1.0
-      ..style = PaintingStyle.stroke;
+    final number = label(
+      numberText,
+      ArchitectAnnotationRole.ordinary,
+      9,
+      FontWeight.w500,
+    )..layout();
+    final area = label(
+      areaText,
+      ArchitectAnnotationRole.area,
+      9,
+      FontWeight.w500,
+    )..layout();
+    final name = label(
+      nameText,
+      ArchitectAnnotationRole.roomName,
+      10,
+      FontWeight.w500,
+    )..layout();
 
+    // Name above one compact number/area row. Fit the complete name with the
+    // block; wrapping it first would add rows and force smaller lettering.
+    final metadataGap = math.max(number.height, area.height) * .55;
+    final metadataWidth = number.width + metadataGap + area.width;
+    final rowGap = math.max(number.height, area.height) * .16;
+    final metadataHeight = math.max(number.height, area.height);
+    final size = Size(
+      math.max(name.width, metadataWidth),
+      name.height + rowGap + metadataHeight,
+    );
+    const paddingH = 2.0, paddingV = 1.5;
+    final paddedSize = Size(
+      size.width + paddingH * 2,
+      size.height + paddingV * 2,
+    );
+    final placement = zone.isApartment
+        ? (centroid, 1.0)
+        : _fitRoomStamp(zone, centroid, paddedSize * annotationScale);
+
+    canvas.save();
+    canvas.translate(placement.$1.dx, placement.$1.dy);
+    // Fit in model space, never enlarge with camera zoom. Publication and the
+    // workspace use the same compact layout and retain selectable vector text.
+    canvas.scale(annotationScale * placement.$2);
+
+    final badgeRect = Rect.fromCenter(
+      center: Offset.zero,
+      width: paddedSize.width,
+      height: paddedSize.height,
+    );
     if (isSelected) {
       canvas.drawRRect(
-        RRect.fromRectAndRadius(badgeRect, const Radius.circular(6.0)),
-        borderPaint,
+        RRect.fromRectAndRadius(badgeRect, const Radius.circular(2)),
+        Paint()
+          ..color = const Color(0xFF00E5FF).withValues(alpha: .95)
+          ..strokeWidth = 1
+          ..style = PaintingStyle.stroke,
       );
     }
-
-    tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+    name.paint(canvas, Offset(-name.width / 2, -size.height / 2));
+    final rowY = -size.height / 2 + name.height + rowGap;
+    number.paint(
+      canvas,
+      Offset(-metadataWidth / 2, rowY + (metadataHeight - number.height) / 2),
+    );
+    area.paint(
+      canvas,
+      Offset(
+        metadataWidth / 2 - area.width,
+        rowY + (metadataHeight - area.height) / 2,
+      ),
+    );
     canvas.restore();
+  }
+
+  /// Reserve at most 6% of the room for its stamp, including selection padding.
+  /// Check the actual polygon so labels also fit narrow and concave rooms.
+  static (Offset, double) _fitRoomStamp(
+    ArchitectZone zone,
+    Offset preferred,
+    Size size,
+  ) {
+    if (size.isEmpty || zone.area <= 0) return (preferred, 1);
+    final bounds = zone.bounds;
+    final limit = math.min(
+      1.0,
+      math.min(
+        math.sqrt(zone.area * .06 / (size.width * size.height)),
+        math.min(
+          bounds.width * .55 / size.width,
+          bounds.height * .22 / size.height,
+        ),
+      ),
+    );
+    final room = Path()..addPolygon(zone.polygon, true);
+    bool fits(Offset point, double scale) {
+      final rect = Rect.fromCenter(
+        center: point,
+        width: size.width * scale,
+        height: size.height * scale,
+      );
+      return Path.combine(
+        PathOperation.difference,
+        Path()..addRect(rect),
+        room,
+      ).computeMetrics().isEmpty;
+    }
+
+    if (fits(preferred, limit)) return (preferred, limit);
+    var bestPoint = preferred, bestScale = 0.0;
+    for (final point in [
+      preferred,
+      if (zone.interiorPoint != null) zone.interiorPoint!,
+      for (final x in [.1, .25, .5, .75, .9])
+        for (final y in [.1, .25, .5, .75, .9])
+          Offset(
+            bounds.left + bounds.width * x,
+            bounds.top + bounds.height * y,
+          ),
+    ]) {
+      if (!zone.containsPoint(point)) continue;
+      if (fits(point, limit)) return (point, limit);
+      var low = 0.0, high = limit;
+      for (var i = 0; i < 12; i++) {
+        final mid = (low + high) / 2;
+        if (fits(point, mid)) {
+          low = mid;
+        } else {
+          high = mid;
+        }
+      }
+      if (low > bestScale) {
+        bestPoint = point;
+        bestScale = low;
+      }
+    }
+    return (bestPoint, bestScale);
   }
 
   static void _drawEdgeDimension(

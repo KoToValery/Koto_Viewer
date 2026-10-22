@@ -11,6 +11,7 @@ class ArchitectViewPlacement {
   final Offset? target;
   final ArchitectWall? wall;
   final bool aligned;
+  final double? viewDepth;
   const ArchitectViewPlacement(
     this.start,
     this.end,
@@ -18,9 +19,25 @@ class ArchitectViewPlacement {
     this.target,
     this.wall,
     this.aligned,
+    {this.viewDepth}
   );
   Offset get axis => (end - start) / (end - start).distance;
   Offset get centre => (start + end) / 2;
+
+  /// The third point sets both the viewing side and the far boundary. Its
+  /// distance along the marker is irrelevant: depth is always perpendicular.
+  static ({int side, double depth})? resolve(
+    Offset start,
+    Offset end,
+    Offset point,
+  ) {
+    final delta = end - start;
+    if (delta.distance < .01) return null;
+    final normal = Offset(-delta.dy, delta.dx) / delta.distance;
+    final distance = _dot(point - start, normal);
+    if (distance.abs() < .01) return null;
+    return (side: distance < 0 ? -1 : 1, depth: distance.abs());
+  }
 
   static List<Offset> anchors(ArchitectProject project) => [
     for (final a in project.gridAxes) ...[a.start, a.end],
@@ -146,6 +163,8 @@ class ArchitectViewPlacement {
       target,
       targetWall,
       raw != null && (raw - candidate).distance > 1e-6,
+      viewDepth: end == null || pointer == null
+          ? null : resolve(start, end, pointer)?.depth,
     );
   }
 

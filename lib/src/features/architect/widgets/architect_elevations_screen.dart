@@ -10,6 +10,8 @@ import '../services/architect_command_controller.dart';
 import 'architect_elevation_labels.dart';
 import 'architect_view_plan.dart';
 import 'architect_projection_editor.dart';
+import 'architect_view_depth_dialog.dart';
+import '../services/architect_view_placement.dart';
 
 enum _Placement { none, elevation, north }
 
@@ -151,19 +153,16 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
       if ((end - first!).distance >= .01) setState(() => second = end);
       return;
     }
-    final delta = second! - first!;
-    final normal = Offset(-delta.dy, delta.dx);
-    final side = point - (first! + second!) / 2;
-    if ((normal.dx * side.dx + normal.dy * side.dy).abs() / delta.distance <
-        .01) {
-      return;
-    }
+    final view = ArchitectViewPlacement.resolve(first!, second!, point);
+    if (view == null) return;
+    final previous = project.elevations.where((e) => e.id == editingId).firstOrNull;
     update(
-      ArchitectElevation(
+      previous?.copyWith(start: first!, end: second!, viewSide: view.side, viewDepth: view.depth) ?? ArchitectElevation(
         id: editingId ?? ArchitectElementId.next('facade'),
         start: first!,
         end: second!,
-        viewSide: normal.dx * side.dx + normal.dy * side.dy >= 0 ? 1 : -1,
+        viewSide: view.side,
+        viewDepth: view.depth,
       ),
     );
     cancel();
@@ -189,6 +188,15 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
           ),
         ),
       );
+    }
+  }
+
+  Future<void> changeDepth() async {
+    final value = selected;
+    if (value == null) return;
+    final result = await showArchitectViewDepth(context, project, value.viewDepth);
+    if (mounted && result != null) {
+      update(value.copyWith(viewDepth: result.depth, clearViewDepth: result.depth == null));
     }
   }
 
@@ -225,6 +233,7 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
           PopupMenuButton<String>(
             onSelected: (action) {
               if (action == 'edit') begin(_Placement.elevation, edit: true);
+              if (action == 'depth') changeDepth();
               if (action == 'flip' && value != null) {
                 update(value.copyWith(viewSide: -value.viewSide));
               }
@@ -246,6 +255,7 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
             },
             itemBuilder: (_) => [
               if (value != null) ...[
+                PopupMenuItem(value: 'depth', child: Text(l.architectViewDepth)),
                 PopupMenuItem(
                   value: 'edit',
                   child: Text(l.architectFacadeEdit),

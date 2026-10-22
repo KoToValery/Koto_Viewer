@@ -37,12 +37,14 @@ class ArchitectElevation {
   final String id;
   final Offset start, end;
   final int viewSide;
+  final double? viewDepth;
   final ArchitectViewDrawing drawing;
   const ArchitectElevation({
     required this.id,
     required this.start,
     required this.end,
     this.viewSide = 1,
+    this.viewDepth,
     this.drawing = const ArchitectViewDrawing(),
   });
   double get length => (end - start).distance;
@@ -63,18 +65,22 @@ class ArchitectElevation {
     Offset? end,
     int? viewSide,
     ArchitectViewDrawing? drawing,
+    double? viewDepth,
+    bool clearViewDepth = false,
   }) => ArchitectElevation(
     id: id,
     start: start ?? this.start,
     end: end ?? this.end,
     viewSide: viewSide ?? this.viewSide,
     drawing: drawing ?? this.drawing,
+    viewDepth: clearViewDepth ? null : viewDepth ?? this.viewDepth,
   );
   Map<String, dynamic> toJson() => {
     'id': id,
     'start': sectionPointJson(start),
     'end': sectionPointJson(end),
     'viewSide': viewSide,
+    'viewDepth': viewDepth,
     'drawing': drawing.toJson(),
   };
   factory ArchitectElevation.fromJson(Map<String, dynamic> json) =>
@@ -83,6 +89,7 @@ class ArchitectElevation {
         start: sectionPoint(json['start'] as Map),
         end: sectionPoint(json['end'] as Map),
         viewSide: json['viewSide'] == -1 ? -1 : 1,
+        viewDepth: viewDepthFromJson(json['viewDepth']),
         drawing: ArchitectViewDrawing.fromJson(
           Map<String, dynamic>.from(json['drawing'] as Map? ?? {}),
         ),

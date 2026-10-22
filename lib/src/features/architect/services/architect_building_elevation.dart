@@ -77,6 +77,9 @@ class ArchitectBuildingElevation {
       final u = -normal.x / normal.z, v = -normal.y / normal.z;
       final w = a.z - u * a.x - v * a.y;
       var polygon = _clip3([a, b, c], (p) => p.z);
+      if (view.viewDepth != null) {
+        polygon = _clip3(polygon, (p) => view.viewDepth! - p.z);
+      }
       polygon = _clip3(polygon, (p) => p.x + view.length / 2);
       polygon = _clip3(polygon, (p) => view.length / 2 - p.x);
       if (polygon.length < 3) continue;
@@ -164,6 +167,9 @@ class ArchitectBuildingElevation {
         if ((b.x - a.x).abs() < 1e-6) continue;
         final u = (b.z - a.z) / (b.x - a.x);
         var polygon = _clip3(operation.aperture, (p) => p.z);
+        if (view.viewDepth != null) {
+          polygon = _clip3(polygon, (p) => view.viewDepth! - p.z);
+        }
         polygon = _clip3(polygon, (p) => p.x + view.length / 2);
         polygon = _clip3(polygon, (p) => view.length / 2 - p.x);
         if (polygon.length < 3) continue;

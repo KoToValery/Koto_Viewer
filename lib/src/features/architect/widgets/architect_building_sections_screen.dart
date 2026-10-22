@@ -14,6 +14,8 @@ import 'architect_roof_layers_dialog.dart';
 import 'architect_slab_labels.dart';
 import 'architect_view_plan.dart';
 import 'architect_projection_editor.dart';
+import 'architect_view_depth_dialog.dart';
+import '../services/architect_view_placement.dart';
 
 /// Uses the workspace controller so changes, autosave and history remain live.
 class ArchitectBuildingSectionsScreen extends StatefulWidget {
@@ -333,19 +335,17 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
       setState(() => secondPoint = point);
       return;
     }
-    final axis = secondPoint! - firstPoint!;
-    final normal = Offset(-axis.dy, axis.dx);
-    final side = point - (firstPoint! + secondPoint!) / 2;
-    final dot = normal.dx * side.dx + normal.dy * side.dy;
-    if (dot.abs() / axis.distance < .01) return;
+    final view = ArchitectViewPlacement.resolve(firstPoint!, secondPoint!, point);
+    if (view == null) return;
     var next =
-        cut?.copyWith(start: firstPoint, end: secondPoint) ??
+        cut?.copyWith(start: firstPoint, end: secondPoint, viewDepth: view.depth) ??
         ArchitectSection(
           id: ArchitectElementId.next('section'),
           start: firstPoint!,
           end: secondPoint!,
+          viewDepth: view.depth,
         );
-    if (dot < 0) next = next.reversed();
+    if (view.side < 0) next = next.reversed();
     sectionId = next.id;
     update(next);
     setState(() {
@@ -524,6 +524,15 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
     onPoint: planTap,
   );
 
+  Future<void> changeDepth() async {
+    final value = cut;
+    if (value == null) return;
+    final result = await showArchitectViewDepth(context, project, value.viewDepth);
+    if (mounted && result != null) {
+      update(value.copyWith(viewDepth: result.depth, clearViewDepth: result.depth == null));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n, value = cut;
@@ -562,6 +571,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                 });
               }
               if (action == 'name') rename();
+              if (action == 'depth') changeDepth();
               if (action == 'flip' && value != null) {
                 setState(() {
                   firstPoint = secondPoint = null;
@@ -595,6 +605,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                   child: Text(l.architectFacadeReverse),
                 ),
                 PopupMenuItem(value: 'cut', child: Text(l.buildingSectionCut)),
+                PopupMenuItem(value: 'depth', child: Text(l.architectViewDepth)),
                 PopupMenuItem(
                   value: 'name',
                   child: Text(l.architectPropertyName),
@@ -1199,6 +1210,25 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
       ..setEntry(1, 3, size.height / 2 + centre.dy * scale);
     canvas.save();
     canvas.clipRect(Offset.zero & size);
+    final background = drawing.data.background;
+    if (background != null) {
+      final pen = Paint()
+        ..color = color.withValues(alpha: .7)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .55;
+      for (final face in background.faces) {
+        architectDrawingSources(canvas, background.elementPaths.entries
+            .where((e) => e.value.getBounds().overlaps(face.getBounds()))
+            .map((e) => e.key), 'sectionProjection');
+        canvas.drawPath(face.transform(matrix.storage), pen);
+      }
+      for (final op in background.operations) {
+        canvas.save();
+        canvas.clipPath(op.clip.transform(matrix.storage));
+        canvas.drawPath(op.lines.transform(matrix.storage), pen);
+        canvas.restore();
+      }
+    }
     for (final region in drawing.data.drawingRegions) {
       architectDrawingSources(canvas, drawing.data.regions.where((r) => r.material == region.material && r.path.getBounds().overlaps(region.path.getBounds())).map((r) => r.sourceId), 'sectionRegion');
       final path = region.path.transform(matrix.storage);
@@ -1318,7 +1348,8 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
         color,
       );
     }
-    if (drawing.data.regions.isEmpty) {
+    if (drawing.data.regions.isEmpty &&
+        (drawing.data.background?.faces.isEmpty ?? true)) {
       text(
         drawing.l.buildingSectionEmpty,
         Offset(size.width / 2, size.height / 2),

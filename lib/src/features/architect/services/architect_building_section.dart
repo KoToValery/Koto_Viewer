@@ -5,12 +5,14 @@ import '../models/architect_elements.dart';
 import '../models/architect_material_layer.dart';
 import '../models/architect_project.dart';
 import '../models/architect_section.dart';
+import '../models/architect_elevation.dart';
 import '../models/architect_slab_assembly.dart';
 import '../rendering/architect_stair_mesh.dart';
 import '../rendering/architect_wall_solids.dart';
 import 'architect_roof_geometry.dart';
 import 'architect_slab_geometry.dart';
 import 'architect_stair_section.dart';
+import 'architect_building_elevation.dart';
 
 class ArchitectSectionRegion {
   final String sourceId;
@@ -39,10 +41,14 @@ class ArchitectBuildingSection {
   final List<ArchitectSectionRegion> regions;
   final Rect bounds;
   final Map<String, Path> roofProfiles;
+  /// Visible surfaces behind the cut, already masked by cut solids. These are
+  /// projection lines only: they must never acquire section hatching.
+  final ArchitectBuildingElevation? background;
   const ArchitectBuildingSection(
     this.regions,
     this.bounds, {
     this.roofProfiles = const {},
+    this.background,
   });
 
   /// Ownership stays in [regions] for picking; equal materials share one
@@ -81,7 +87,7 @@ class ArchitectBuildingSection {
   }
 
   Map<String, Path> get elementPaths {
-    final result = <String, Path>{};
+    final result = <String, Path>{...?background?.elementPaths};
     for (final region in regions) {
       result[region.sourceId] = result.containsKey(region.sourceId)
           ? Path.combine(
@@ -516,7 +522,46 @@ class ArchitectBuildingSection {
       }
     }
 
+    // Project the same 3D solids as facades, with real hidden-surface removal.
+    // A slice alone cannot show a return flight, landing, or wall behind it.
+    final projected = ArchitectBuildingElevation.build(
+      project,
+      ArchitectElevation(
+        id: cut.id,
+        start: cut.start,
+        end: cut.end,
+        viewDepth: cut.viewDepth,
+      ),
+    );
+    var cutBody = Path();
+    for (final region in regions) {
+      cutBody = Path.combine(PathOperation.union, cutBody, region.path);
+    }
+    final shift = Offset(cut.length / 2, 0);
+    Path exposed(Path path) => Path.combine(
+      PathOperation.difference, path.shift(shift), cutBody,
+    );
+    final backgroundFaces = <Path>[];
     Rect? bounds;
+    for (final face in projected.faces) {
+      final visible = exposed(face);
+      if (visible.getBounds().isEmpty) continue;
+      backgroundFaces.add(visible);
+      bounds = bounds?.expandToInclude(visible.getBounds()) ?? visible.getBounds();
+    }
+    final background = ArchitectBuildingElevation(
+      backgroundFaces,
+      bounds ?? Rect.zero,
+      elementPaths: {
+        for (final entry in projected.elementPaths.entries)
+          if (!exposed(entry.value).getBounds().isEmpty) entry.key: exposed(entry.value),
+      },
+      operations: [
+        for (final op in projected.operations)
+          if (!exposed(op.clip).getBounds().isEmpty)
+            (lines: op.lines.shift(shift), clip: exposed(op.clip)),
+      ],
+    );
     for (final r in regions) {
       bounds =
           bounds?.expandToInclude(r.path.getBounds()) ?? r.path.getBounds();
@@ -526,6 +571,7 @@ class ArchitectBuildingSection {
       regions,
       Rect.fromLTRB(0, vertical.top, cut.length, vertical.bottom),
       roofProfiles: roofProfiles,
+      background: background,
     );
   }
 
