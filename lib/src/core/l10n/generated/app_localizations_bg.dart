@@ -6983,4 +6983,21 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectApartmentRoomsHelp =>
       'Помещенията се включват автоматично според най-голямата обща площ с апартамента. Всяко помещение се отчита изцяло само веднъж. При равни площи се запазва текущият апартамент. Помещенията извън всички апартаменти остават без апартамент.';
+
+  @override
+  String get architectLineParallelHelp =>
+      'Докоснете за успоредно местене на линията. Задръжте за въвеждане на отместване със знак.';
+
+  @override
+  String get architectLineJoinSuccess => 'Линиите са свързани';
+
+  @override
+  String get architectLineJoinIncompatible => 'Линиите не могат да се свържат';
+
+  @override
+  String get architectLineJoinSelectSecond =>
+      'Изберете втора линия за свързване';
+
+  @override
+  String get architectLineEditRejected => 'Линията трябва да е поне 1 mm.';
 }

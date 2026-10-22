@@ -4416,5 +4416,10 @@
   "architectApartmentBoundaryHelp": "Draw manually along internal wall axes and the exterior faces of exterior walls.",
   "architectApartmentGross": "Contour area",
   "architectApartmentNet": "Room area",
-  "architectApartmentRoomsHelp": "Rooms are assigned automatically by the largest overlapping area with an apartment. Each room is counted in full only once. Equal areas retain the current apartment. Rooms outside all apartments stay unassigned."
+  "architectApartmentRoomsHelp": "Rooms are assigned automatically by the largest overlapping area with an apartment. Each room is counted in full only once. Equal areas retain the current apartment. Rooms outside all apartments stay unassigned.",
+  "architectLineParallelHelp": "Tap to move across the line without changing its angle. Hold to enter a signed offset.",
+  "architectLineJoinSuccess": "Lines joined",
+  "architectLineJoinIncompatible": "Lines cannot be joined",
+  "architectLineJoinSelectSecond": "Select second line to join",
+  "architectLineEditRejected": "Line must be at least 1 mm long."
 }

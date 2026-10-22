@@ -6956,4 +6956,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectApartmentRoomsHelp =>
       'Rooms are assigned automatically by the largest overlapping area with an apartment. Each room is counted in full only once. Equal areas retain the current apartment. Rooms outside all apartments stay unassigned.';
+
+  @override
+  String get architectLineParallelHelp =>
+      'Tap to move across the line without changing its angle. Hold to enter a signed offset.';
+
+  @override
+  String get architectLineJoinSuccess => 'Lines joined';
+
+  @override
+  String get architectLineJoinIncompatible => 'Lines cannot be joined';
+
+  @override
+  String get architectLineJoinSelectSecond => 'Select second line to join';
+
+  @override
+  String get architectLineEditRejected => 'Line must be at least 1 mm long.';
 }

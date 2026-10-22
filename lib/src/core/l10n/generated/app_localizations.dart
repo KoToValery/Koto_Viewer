@@ -12400,6 +12400,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rooms are assigned automatically by the largest overlapping area with an apartment. Each room is counted in full only once. Equal areas retain the current apartment. Rooms outside all apartments stay unassigned.'**
   String get architectApartmentRoomsHelp;
+
+  /// No description provided for @architectLineParallelHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to move across the line without changing its angle. Hold to enter a signed offset.'**
+  String get architectLineParallelHelp;
+
+  /// No description provided for @architectLineJoinSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Lines joined'**
+  String get architectLineJoinSuccess;
+
+  /// No description provided for @architectLineJoinIncompatible.
+  ///
+  /// In en, this message translates to:
+  /// **'Lines cannot be joined'**
+  String get architectLineJoinIncompatible;
+
+  /// No description provided for @architectLineJoinSelectSecond.
+  ///
+  /// In en, this message translates to:
+  /// **'Select second line to join'**
+  String get architectLineJoinSelectSecond;
+
+  /// No description provided for @architectLineEditRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Line must be at least 1 mm long.'**
+  String get architectLineEditRejected;
 }
 
 class _AppLocalizationsDelegate

@@ -787,6 +787,19 @@ class ArchitectElementsPainterHelper {
       canvas.drawLine(p1, p2, previewPaint);
     } else if (activeTool == ArchitectTool.cadLine) {
       canvas.drawLine(p1, p2, previewPaint);
+      final delta = p2 - p1;
+      if (delta.distance >= .001) {
+        final u = delta / delta.distance;
+        ArchitectPolygonPainter.dimension(
+          canvas,
+          p1,
+          p2,
+          Offset(-u.dy, u.dx),
+          zoomScale,
+          unit,
+          decimals: decimals,
+        );
+      }
     } else if (activeTool == ArchitectTool.cadCircle) {
       final r = (p2 - p1).distance;
       canvas.drawCircle(p1, r, previewPaint);

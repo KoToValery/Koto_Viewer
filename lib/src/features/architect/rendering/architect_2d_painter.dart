@@ -605,6 +605,28 @@ class Architect2dPainter extends CustomPainter {
       );
       return;
     }
+    final selectedLine = selected.cadPrimitives
+        .where((p) => p.type == CadPrimitiveType.line)
+        .firstOrNull;
+    if (selectedLine != null) {
+      ArchitectElementsPainterHelper.drawCadPrimitives(
+        palette: palette,
+        canvas: canvas,
+        storey: selected,
+        zoomScale: zoomScale,
+        selectedElementId: selectedElementId,
+      );
+      _drawSelectedWallHandles(
+        canvas,
+        ArchitectWall(
+          id: selectedLine.id,
+          startPoint: selectedLine.startPoint,
+          endPoint: selectedLine.endPoint,
+          thickness: .001,
+        ),
+      );
+      return;
+    }
     if (selected.cadPrimitives.any((p) => p.type == CadPrimitiveType.rect)) {
       ArchitectElementsPainterHelper.drawCadPrimitives(
         palette: palette,
@@ -1487,6 +1509,7 @@ class Architect2dPainter extends CustomPainter {
     }
     if (cursorPosition != null &&
         (activeTool == ArchitectTool.wall ||
+            activeTool == ArchitectTool.cadLine ||
             activeTool == ArchitectTool.select ||
             activeTool == ArchitectTool.dimension)) {
       // Exact aim point sits at the tip, ahead of the offset pointer/ruler.
@@ -1505,7 +1528,9 @@ class Architect2dPainter extends CustomPainter {
           ..strokeWidth = 1.0 / draftingScale,
       );
     }
-    if (activeTool == ArchitectTool.wall && activeDraftStart != null) {
+    if ((activeTool == ArchitectTool.wall ||
+            activeTool == ArchitectTool.cadLine) &&
+        activeDraftStart != null) {
       canvas.drawCircle(
         activeDraftStart!,
         3 / draftingScale,

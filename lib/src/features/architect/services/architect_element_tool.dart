@@ -394,7 +394,7 @@ class ArchitectElementTool extends ChangeNotifier {
     int colorValue = 0xFF9E9E9E,
     double strokeWidth = 1.0,
   }) {
-    if ((end - start).distance < (type == CadPrimitiveType.line ? .05 : .001)) {
+    if ((end - start).distance < .001) {
       return null;
     }
     final now = ArchitectElementId.next('element');

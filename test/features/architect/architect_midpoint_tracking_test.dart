@@ -365,6 +365,8 @@ void main() {
       await mouse.down(workspace.screen(tester, const Offset(4.03, 4)));
       await mouse.up();
       await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('wall-end')));
+      await tester.pump();
       expect(
         (commands.project.activeStorey.cadPrimitives.last.endPoint -
                 const Offset(4, 4))

@@ -408,6 +408,10 @@ void main() {
         await tool_ui.prepare(tester, tool.$1);
         await tester.tap(find.byIcon(tool.$1));
         await tester.pumpAndSettle();
+        if (tool.$2 == 'line') {
+          await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
+          await tester.pump();
+        }
         await workspace.wallTap(tester, const Offset(1, -.4));
         await workspace.wallTap(tester, const Offset(8.03, .03));
         if (tool.$2 == 'dimension') {
@@ -457,6 +461,8 @@ void main() {
       await tool_ui.prepare(tester, Icons.timeline_rounded);
       await tool_ui.choose(tester, Icons.timeline_rounded);
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
+      await tester.pump();
       await workspace.wallTap(tester, const Offset(1, -.4));
       final gesture = await tester.startGesture(
         workspace.screen(tester, const Offset(3.03, .04)) + const Offset(0, 64),
@@ -498,6 +504,8 @@ void main() {
     await tool_ui.prepare(tester, Icons.timeline_rounded);
     await tool_ui.choose(tester, Icons.timeline_rounded);
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
+    await tester.pump();
     await tool_ui.setMagnetic(tester, false);
     await tester.pump();
     await workspace.wallTap(tester, const Offset(1, -.4));

@@ -130,7 +130,9 @@ class ArchitectWallSnap {
         isSnapped: result.isSnapped,
         snapLabel: result.snapLabel,
         angleDeg: result.angleDeg,
-        magneticGuides: result.magneticGuides,
+        magneticGuides: result.magneticGuides.isEmpty && anchor != null
+            ? [(anchor, result.point)]
+            : result.magneticGuides,
         wallAttachment: attachment,
       );
     }

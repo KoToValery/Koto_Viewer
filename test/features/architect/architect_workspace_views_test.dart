@@ -160,6 +160,8 @@ void main() {
     await tester.pumpAndSettle();
     await workspace.wallTap(tester, const Offset(1, -1));
     await workspace.wallTap(tester, const Offset(4, -1));
+    await tester.tap(find.byKey(const ValueKey('wall-end')));
+    await tester.pumpAndSettle();
     expect(
       source.project.elevations.single.drawing.cadPrimitives,
       hasLength(1),
@@ -253,6 +255,8 @@ void main() {
         await tester.pumpAndSettle();
         await workspace.wallTap(tester, const Offset(1, -1));
         await workspace.wallTap(tester, const Offset(4, -1));
+        await tester.tap(find.byKey(const ValueKey('wall-end')));
+        await tester.pumpAndSettle();
         expect(
           source.project.elevations.single.drawing.cadPrimitives,
           hasLength(1),
