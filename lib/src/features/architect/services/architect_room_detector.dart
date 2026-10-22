@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_zone.dart';
+import '../rendering/architect_path_solid.dart';
+import '../rendering/architect_wall_network.dart';
 
 // =============================================================================
 // FILE INDEX / TABLE OF CONTENTS (Grep markers: === SECTION: <NAME> ===)
@@ -66,14 +68,21 @@ class ArchitectRoomDetector {
   }) {
     if (walls.length < 3) return null;
 
-    // 1. Calculate bounding box of all walls
-    double minX = walls.first.polygonCorners.first.dx;
+    // Use the same physical junctions as the plan. Individual wall bodies can
+    // leave a raster-sized passage at an otherwise closed mitre or T junction.
+    final wallPolygons = [
+      for (final wall in walls) wall.polygonCorners,
+      for (final junction in ArchitectWallNetwork.junctions(walls)) junction.$1,
+    ];
+
+    // 1. Calculate bounding box of the complete joined network.
+    double minX = wallPolygons.first.first.dx;
     double maxX = minX;
-    double minY = walls.first.polygonCorners.first.dy;
+    double minY = wallPolygons.first.first.dy;
     double maxY = minY;
 
-    for (final wall in walls) {
-      for (final p in wall.polygonCorners) {
+    for (final polygon in wallPolygons) {
+      for (final p in polygon) {
         if (p.dx < minX) minX = p.dx;
         if (p.dx > maxX) maxX = p.dx;
         if (p.dy < minY) minY = p.dy;
@@ -107,8 +116,7 @@ class ArchitectRoomDetector {
     final grid = Uint8List(totalCells);
 
     // 2. Rasterize wall polygons into the occupancy grid
-    for (final wall in walls) {
-      final corners = wall.polygonCorners;
+    for (final corners in wallPolygons) {
       if (corners.length < 3) continue;
 
       double wMinX = corners.first.dx;
@@ -245,7 +253,10 @@ class ArchitectRoomDetector {
     if (simplified.length < 3) return null;
 
     // 7. Snap Simplified Segments to Actual Wall Inner Faces
-    final snapped = _snapContourToWalls(simplified, walls);
+    final snapped = _snapContourToWalls(
+      simplified,
+      ArchitectPathSolid.contours(ArchitectWallNetwork.body(walls)),
+    );
     if (snapped.length >= 3 && _polygonArea(snapped) >= 0.40) {
       return snapped;
     }
@@ -436,15 +447,15 @@ class ArchitectRoomDetector {
   /// Snaps polygon edges to the nearest parallel inner faces of surrounding walls.
   static List<Offset> _snapContourToWalls(
     List<Offset> polygon,
-    List<ArchitectWall> walls, {
+    List<List<Offset>> wallContours, {
     double snapDistance = 0.20,
   }) {
     if (polygon.length < 3) return polygon;
 
-    // Collect all wall boundary line segments
+    // Only exposed faces of the joined body bound rooms. Internal wall caps
+    // and junction seams must not pull the contour back into a closed joint.
     final wallSegments = <(Offset, Offset)>[];
-    for (final wall in walls) {
-      final c = wall.polygonCorners;
+    for (final c in wallContours) {
       for (int i = 0; i < c.length; i++) {
         wallSegments.add((c[i], c[(i + 1) % c.length]));
       }
