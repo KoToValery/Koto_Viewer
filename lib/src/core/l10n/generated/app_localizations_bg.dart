@@ -1060,6 +1060,15 @@ class AppLocalizationsBg extends AppLocalizations {
   String get snapMidpoint => 'Среда';
 
   @override
+  String get snapOpeningEdge => 'Ръб на отвор';
+
+  @override
+  String get snapOpeningCenter => 'Център на отвор';
+
+  @override
+  String get snapModuleStep => 'Модулна стъпка';
+
+  @override
   String get snapCenter => 'Център';
 
   @override

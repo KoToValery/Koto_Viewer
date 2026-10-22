@@ -1055,6 +1055,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get snapMidpoint => 'Midpoint';
 
   @override
+  String get snapOpeningEdge => 'Opening edge';
+
+  @override
+  String get snapOpeningCenter => 'Opening center';
+
+  @override
+  String get snapModuleStep => 'Module step';
+
+  @override
   String get snapCenter => 'Center';
 
   @override

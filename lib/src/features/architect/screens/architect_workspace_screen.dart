@@ -8347,6 +8347,44 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
 
+    // 3b. Door / window jambs and centres on the target wall
+    final targetWall = storeyWalls
+        .where((w) => w.id == _newPointTargetId)
+        .firstOrNull;
+    if (targetWall != null && targetWall.length > 1e-4) {
+      final wallDir = (targetWall.endPoint - targetWall.startPoint) /
+          targetWall.length;
+      final openings = <(double, double, bool)>[
+        for (final d in targetWall.doors)
+          (d.offsetRatio, d.width, true),
+        for (final w in targetWall.windows)
+          (w.offsetRatio, w.width, false),
+      ];
+      final openingTol = math.min(bestDist, 16.0 / _currentScale);
+      var openingBest = openingTol;
+      for (final (ratio, width, _) in openings) {
+        final centerDist = ratio * targetWall.length;
+        for (final (along, label) in [
+          (centerDist - width / 2, 'Opening edge'),
+          (centerDist + width / 2, 'Opening edge'),
+          (centerDist, 'Opening center'),
+        ]) {
+          if (along <= 1e-4 || along >= targetWall.length - 1e-4) continue;
+          final pt = targetWall.startPoint + wallDir * along;
+          final dist = (pt - hit.point).distance;
+          // Jambs take precedence over the centre when equally close.
+          final bias = label == 'Opening center' ? 2.0 / _currentScale : 0.0;
+          if (dist + bias <= openingBest) {
+            openingBest = dist + bias;
+            bestDist = dist;
+            candidate = pt;
+            snapLabel = label;
+            guides = [];
+          }
+        }
+      }
+    }
+
     // 4. Midpoint of the edge
     final mid = (edgeP1 + edgeP2) / 2;
     final midDist = (mid - hit.point).distance;
@@ -8355,6 +8393,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       candidate = mid;
       snapLabel = 'Midpoint';
       guides = [];
+    }
+
+    // 5. Modular step (multiples of the wall thickness) measured from the
+    // nearest end of the edge. Only used when no stronger snap was found.
+    if (snapLabel == null) {
+      final edgeLen = (edgeP2 - edgeP1).distance;
+      final module = path.width > 1e-4 ? path.width : 0.1;
+      final modulePx = module * _currentScale;
+      if (edgeLen > 1e-4 && modulePx >= 6.0) {
+        final dir = (edgeP2 - edgeP1) / edgeLen;
+        final t = ((hit.point - edgeP1).dx * dir.dx +
+            (hit.point - edgeP1).dy * dir.dy);
+        final fromStart = t <= edgeLen / 2;
+        final d = fromStart ? t : edgeLen - t;
+        final snapped = (d / module).round() * module;
+        final stepTol = math.min(6.0 / _currentScale, module / 3);
+        if (snapped > 1e-4 &&
+            snapped < edgeLen - 1e-4 &&
+            (d - snapped).abs() <= stepTol) {
+          candidate = fromStart
+              ? edgeP1 + dir * snapped
+              : edgeP2 - dir * snapped;
+          snapLabel = 'Step';
+          guides = [];
+        }
+      }
     }
 
     (Offset, Offset)? leaderLine;
@@ -12973,6 +13037,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       'Endpoint' || 'Axis endpoint' => l10n.snapEndpoint,
       'Vertex' => l10n.snapPoint,
       'Midpoint' => l10n.snapMidpoint,
+      'Opening edge' => l10n.snapOpeningEdge,
+      'Opening center' => l10n.snapOpeningCenter,
+      'Step' => l10n.snapModuleStep,
       'Midpoint alignment' => l10n.snapMidpointAlignment,
       'Center' => l10n.snapCenter,
       'Intersection' || 'Axis intersection' => l10n.snapIntersection,

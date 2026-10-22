@@ -1939,6 +1939,24 @@ abstract class AppLocalizations {
   /// **'Midpoint'**
   String get snapMidpoint;
 
+  /// Snap to door/window jamb
+  ///
+  /// In en, this message translates to:
+  /// **'Opening edge'**
+  String get snapOpeningEdge;
+
+  /// Snap to door/window centre
+  ///
+  /// In en, this message translates to:
+  /// **'Opening center'**
+  String get snapOpeningCenter;
+
+  /// Snap to multiples of the wall thickness
+  ///
+  /// In en, this message translates to:
+  /// **'Module step'**
+  String get snapModuleStep;
+
   /// Snap type center
   ///
   /// In en, this message translates to:
