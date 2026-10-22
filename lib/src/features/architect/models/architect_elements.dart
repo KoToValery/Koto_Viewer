@@ -1,4 +1,5 @@
 import 'architect_line_style.dart';
+import 'architect_hatch_pattern.dart';
 // === SECTION: ARCHITECTURAL ELEMENT MODELS ===
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -789,7 +790,7 @@ class ArchitectAnnotation {
 // 8. 2D CAD PRIMITIVES (LINE, RECT, CIRCLE)
 // ===========================================================================
 
-enum CadPrimitiveType { line, rect, circle }
+enum CadPrimitiveType { line, rect, circle, hatch }
 
 class ArchitectCadPrimitive {
   final String id;
@@ -800,6 +801,9 @@ class ArchitectCadPrimitive {
   final List<Offset>? polygon;
   final double strokeWidth;
   final ArchitectLineStyle lineStyle;
+  final ArchitectHatchPattern hatchPattern;
+  final double hatchScale, hatchAngle;
+  final bool hatchBorder;
 
   const ArchitectCadPrimitive({
     required this.id,
@@ -809,6 +813,10 @@ class ArchitectCadPrimitive {
     this.colorValue = 0xFF424242,
     this.strokeWidth = 1.0,
     this.lineStyle = ArchitectLineStyle.solid,
+    this.hatchPattern = ArchitectHatchPattern.diagonal,
+    this.hatchScale = 1,
+    this.hatchAngle = 0,
+    this.hatchBorder = true,
     this.polygon,
   });
 
@@ -818,6 +826,8 @@ class ArchitectCadPrimitive {
     return [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft];
   }
 
+  bool get isPolygon => type == CadPrimitiveType.rect || type == CadPrimitiveType.hatch;
+
   ArchitectCadPrimitive copyWith({
     String? id,
     CadPrimitiveType? type,
@@ -826,6 +836,10 @@ class ArchitectCadPrimitive {
     int? colorValue,
     double? strokeWidth,
     ArchitectLineStyle? lineStyle,
+    ArchitectHatchPattern? hatchPattern,
+    double? hatchScale,
+    double? hatchAngle,
+    bool? hatchBorder,
     List<Offset>? polygon,
   }) => ArchitectCadPrimitive(
     id: id ?? this.id,
@@ -835,6 +849,10 @@ class ArchitectCadPrimitive {
     colorValue: colorValue ?? this.colorValue,
     strokeWidth: strokeWidth ?? this.strokeWidth,
     lineStyle: lineStyle ?? this.lineStyle,
+    hatchPattern: hatchPattern ?? this.hatchPattern,
+    hatchScale: hatchScale ?? this.hatchScale,
+    hatchAngle: hatchAngle ?? this.hatchAngle,
+    hatchBorder: hatchBorder ?? this.hatchBorder,
     polygon: polygon ?? this.polygon,
   );
 
@@ -846,6 +864,10 @@ class ArchitectCadPrimitive {
     'colorValue': colorValue,
     'strokeWidth': strokeWidth,
     if (type != CadPrimitiveType.circle) 'lineStyle': lineStyle.toJson(),
+    if (type == CadPrimitiveType.hatch) ...{
+      'hatchPattern': hatchPattern.toJson(), 'hatchScale': hatchScale,
+      'hatchAngle': hatchAngle, 'hatchBorder': hatchBorder,
+    },
     if (polygon != null)
       'polygon': [
         for (final p in polygon!) {'x': p.dx, 'y': p.dy},
@@ -869,6 +891,11 @@ class ArchitectCadPrimitive {
         ),
         colorValue: (json['colorValue'] as num?)?.toInt() ?? 0xFF424242,
         strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 1.0,
+        hatchPattern: json['hatchPattern'] is Map ? ArchitectHatchPattern.fromJson(
+          Map<String, dynamic>.from(json['hatchPattern'] as Map)) : ArchitectHatchPattern.diagonal,
+        hatchScale: (json['hatchScale'] as num?)?.toDouble() ?? 1,
+        hatchAngle: (json['hatchAngle'] as num?)?.toDouble() ?? 0,
+        hatchBorder: json['hatchBorder'] as bool? ?? true,
         lineStyle: json['lineStyle'] is Map
             ? ArchitectLineStyle.fromJson(
                 Map<String, dynamic>.from(json['lineStyle'] as Map),

@@ -1,4 +1,5 @@
 import '../models/architect_line_style.dart';
+import 'architect_hatch_geometry.dart';
 import 'architect_line_pattern.dart';
 import 'architect_vector_scene.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -638,11 +639,13 @@ class ArchitectElementsPainterHelper {
     required double zoomScale,
     ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
     String? selectedElementId,
+    bool? hatchesOnly,
   }) {
     final unitsPerMm = ArchitectDrawingScale(
       ArchitectTextScope.current?.denominator ?? dimensionScale.denominator,
     ).paperToModel(1);
     for (final prim in storey.cadPrimitives) {
+      if (hatchesOnly != null && (prim.type == CadPrimitiveType.hatch) != hatchesOnly) continue;
       architectDrawingSources(canvas, {prim.id}, 'cadPrimitives');
       final isSelected = prim.id == selectedElementId;
       final paint = Paint()
@@ -652,7 +655,25 @@ class ArchitectElementsPainterHelper {
         ..strokeWidth = (isSelected ? 2.4 : prim.strokeWidth) / zoomScale
         ..style = PaintingStyle.stroke;
 
-      if (prim.type == CadPrimitiveType.line) {
+      if (prim.type == CadPrimitiveType.hatch) {
+        final boundary = Path()..addPolygon(prim.polygonCorners, true);
+        canvas.save();
+        canvas.clipPath(boundary);
+        canvas.drawPath(ArchitectHatchGeometry.path(boundary: boundary,
+          pattern: prim.hatchPattern, unitsPerMm: unitsPerMm,
+          scale: prim.hatchScale, angleDeg: prim.hatchAngle,
+          visibleBounds: canvas.getLocalClipBounds(),
+          origin: prim.polygonCorners.first),
+          Paint()..color = paint.color..style = PaintingStyle.stroke
+            ..strokeWidth = .13 * unitsPerMm);
+        canvas.restore();
+        if (prim.hatchBorder || isSelected) {
+          canvas.drawPath(prim.hatchBorder
+            ? ArchitectLinePattern.path(boundary, prim.lineStyle, unitsPerMm)
+            : boundary, Paint()..color = paint.color..style = PaintingStyle.stroke
+              ..strokeWidth = isSelected ? paint.strokeWidth : .18 * unitsPerMm);
+        }
+      } else if (prim.type == CadPrimitiveType.line) {
         canvas.drawPath(
           ArchitectLinePattern.path(
             Path()

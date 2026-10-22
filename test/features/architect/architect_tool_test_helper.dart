@@ -20,6 +20,7 @@ final toolsByIcon = {
   Icons.timeline_rounded: ArchitectTool.cadLine,
   Icons.crop_square_rounded: ArchitectTool.cadRect,
   Icons.radio_button_unchecked_rounded: ArchitectTool.cadCircle,
+  Icons.texture_rounded: ArchitectTool.hatch,
   Icons.grid_on_rounded: ArchitectTool.axis,
   Icons.square_foot_rounded: ArchitectTool.measure,
 };

@@ -254,6 +254,7 @@ class ArchitectSnapGeometry {
         case CadPrimitiveType.line:
           edge(primitive.startPoint, primitive.endPoint, primitive.id);
         case CadPrimitiveType.rect:
+        case CadPrimitiveType.hatch:
           polygon(primitive.polygonCorners, primitive.id);
           point(
             Rect.fromPoints(primitive.startPoint, primitive.endPoint).center,

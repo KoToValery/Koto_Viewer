@@ -1,5 +1,6 @@
 import 'dart:convert';
 import '../models/architect_line_style.dart';
+import '../models/architect_hatch_pattern.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../models/architect_column.dart';
@@ -28,6 +29,8 @@ class ArchitectSelection {
     'elevation',
     'offsetDistance',
     'strokeWidth',
+    'hatchScale',
+    'hatchAngle',
     'baseOffset',
     'clearHeight',
     'targetArea',
@@ -65,6 +68,10 @@ class ArchitectSelection {
       for (final key in numericKeys)
         if (e[key] is num) key: (e[key] as num).toDouble(),
     };
+    // Hatch pen widths are paper-space drawing rules, not model dimensions.
+    if (project.activeStorey.cadPrimitives.any((p) => p.id == id && p.type == CadPrimitiveType.hatch)) {
+      fields.remove('strokeWidth');
+    }
     if (project.activeStorey.columns.any((c) => c.id == id)) {
       fields['height'] =
           (e['height'] as num?)?.toDouble() ?? project.activeStorey.height;
@@ -229,7 +236,7 @@ class ArchitectSelection {
       }
     }
     for (final p in s.cadPrimitives) {
-      if (p.id == id && p.type == CadPrimitiveType.rect) {
+      if (p.id == id && p.isPolygon) {
         return path..addPolygon(p.polygonCorners, true);
       }
     }
@@ -261,7 +268,8 @@ class ArchitectSelection {
         .where((win) => ids.contains(win.id))
         .length;
     final axisCount = project.gridAxes.where((a) => ids.contains(a.id)).length;
-    final cadCount = s.cadPrimitives.where((c) => ids.contains(c.id)).length;
+    final cadCount = s.cadPrimitives.where((c) => ids.contains(c.id) && c.type != CadPrimitiveType.hatch).length;
+    final hatchCount = s.cadPrimitives.where((c) => ids.contains(c.id) && c.type == CadPrimitiveType.hatch).length;
 
     final parts = <String>[];
     if (wallCount > 0) parts.add(l.architectSelectionWallsCount(wallCount));
@@ -274,6 +282,7 @@ class ArchitectSelection {
     if (zoneCount > 0) parts.add(l.architectSelectionZonesCount(zoneCount));
     if (axisCount > 0) parts.add(l.architectSelectionAxesCount(axisCount));
     if (cadCount > 0) parts.add(l.architectSelectionCadCount(cadCount));
+    if (hatchCount > 0) parts.add(l.architectSelectionHatchesCount(hatchCount));
 
 
     if (parts.length == 1) {
@@ -303,7 +312,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
     for (final entry in values.entries) {
       final value = entry.value;
       if (!value.isFinite) throw ArgumentError('Invalid property');
-      if (!{'rotationDeg', 'elevation', 'offsetDistance', 'baseOffset'}.contains(entry.key) &&
+      if (!{'rotationDeg', 'hatchAngle', 'elevation', 'offsetDistance', 'baseOffset'}.contains(entry.key) &&
           value <
               (entry.key == 'sillHeight' ||
                       entry.key == 'insulationThicknessOverride'
@@ -314,6 +323,10 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
       if (entry.key == 'stepCount' &&
           (value != value.roundToDouble() || value < 1 || value > 1000)) {
         throw ArgumentError('Invalid steps');
+      }
+      if ((entry.key == 'hatchScale' && (value < .1 || value > 20)) ||
+          (entry.key == 'hatchAngle' && value.abs() > 180)) {
+        throw ArgumentError('Invalid hatch transform');
       }
     }
     final json = project.toJson();
@@ -345,6 +358,25 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         }
       }
       for (final value in textValues.entries) {
+        if (value.key == 'hatchPattern' || value.key == 'hatchBorder') {
+          if (!project.activeStorey.cadPrimitives.any((p) =>
+              p.id == e['id'] && p.type == CadPrimitiveType.hatch)) {
+            throw ArgumentError('Hatch properties require hatch elements');
+          }
+          if (value.key == 'hatchBorder') {
+            if (value.value != 'true' && value.value != 'false') throw ArgumentError('Invalid border');
+            e['hatchBorder'] = value.value == 'true';
+          } else {
+            final pattern = ArchitectHatchPattern.fromJson(Map<String, dynamic>.from(jsonDecode(value.value) as Map));
+            e['hatchPattern'] = pattern.toJson();
+            if (!pattern.isPreset) {
+              final catalog = json['hatchPatterns'] as List;
+              catalog.removeWhere((p) => (p as Map)['id'] == pattern.id);
+              catalog.add(pattern.toJson());
+            }
+          }
+          continue;
+        }
         if (value.key == 'lineStyle') {
           if (!project.activeStorey.cadPrimitives.any(
             (p) => p.id == e['id'] && p.type != CadPrimitiveType.circle,

@@ -12929,6 +12929,186 @@ abstract class AppLocalizations {
   /// **'Freehand'**
   String get architectLineSymbolFreehand;
 
+  /// No description provided for @architectToolHatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Hatch'**
+  String get architectToolHatch;
+
+  /// No description provided for @architectSelectionHatchesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 hatch} other{{count} hatches}}'**
+  String architectSelectionHatchesCount(int count);
+
+  /// No description provided for @architectHatchPattern.
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern'**
+  String get architectHatchPattern;
+
+  /// No description provided for @architectHatchCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom hatch'**
+  String get architectHatchCustom;
+
+  /// No description provided for @architectHatchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Layers of lines or symbols. Spacing and sizes are in mm on paper.'**
+  String get architectHatchHint;
+
+  /// No description provided for @architectHatchDiagonal.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagonal'**
+  String get architectHatchDiagonal;
+
+  /// No description provided for @architectHatchReverseDiagonal.
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse diagonal'**
+  String get architectHatchReverseDiagonal;
+
+  /// No description provided for @architectHatchHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal'**
+  String get architectHatchHorizontal;
+
+  /// No description provided for @architectHatchVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical'**
+  String get architectHatchVertical;
+
+  /// No description provided for @architectHatchCross.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid'**
+  String get architectHatchCross;
+
+  /// No description provided for @architectHatchDiagonalCross.
+  ///
+  /// In en, this message translates to:
+  /// **'Crosshatch'**
+  String get architectHatchDiagonalCross;
+
+  /// No description provided for @architectHatchBrick.
+  ///
+  /// In en, this message translates to:
+  /// **'Brick'**
+  String get architectHatchBrick;
+
+  /// No description provided for @architectHatchConcrete.
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete'**
+  String get architectHatchConcrete;
+
+  /// No description provided for @architectHatchDots.
+  ///
+  /// In en, this message translates to:
+  /// **'Dots'**
+  String get architectHatchDots;
+
+  /// No description provided for @architectHatchEarth.
+  ///
+  /// In en, this message translates to:
+  /// **'Earth'**
+  String get architectHatchEarth;
+
+  /// No description provided for @architectHatchScale.
+  ///
+  /// In en, this message translates to:
+  /// **'Scale'**
+  String get architectHatchScale;
+
+  /// No description provided for @architectHatchBorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Boundary'**
+  String get architectHatchBorder;
+
+  /// No description provided for @architectHatchLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Layer {number}'**
+  String architectHatchLayer(int number);
+
+  /// No description provided for @architectHatchAddLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Add layer'**
+  String get architectHatchAddLayer;
+
+  /// No description provided for @architectHatchSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Spacing'**
+  String get architectHatchSpacing;
+
+  /// No description provided for @architectHatchPhase.
+  ///
+  /// In en, this message translates to:
+  /// **'Offset'**
+  String get architectHatchPhase;
+
+  /// No description provided for @architectHatchShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Row shift'**
+  String get architectHatchShift;
+
+  /// No description provided for @architectHatchSymbolsOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Symbols only'**
+  String get architectHatchSymbolsOnly;
+
+  /// No description provided for @architectHatchFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get architectHatchFinish;
+
+  /// No description provided for @architectHatchDrawHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Place at least three vertices and close the contour.'**
+  String get architectHatchDrawHint;
+
+  /// No description provided for @architectLineHatchBrickJoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Joints'**
+  String get architectLineHatchBrickJoint;
+
+  /// No description provided for @architectLineHatchAggregate.
+  ///
+  /// In en, this message translates to:
+  /// **'Aggregate'**
+  String get architectLineHatchAggregate;
+
+  /// No description provided for @architectLineHatchGrain.
+  ///
+  /// In en, this message translates to:
+  /// **'Grain'**
+  String get architectLineHatchGrain;
+
+  /// No description provided for @architectLineHatchDots.
+  ///
+  /// In en, this message translates to:
+  /// **'Dots'**
+  String get architectLineHatchDots;
+
+  /// No description provided for @architectLineHatchEarth.
+  ///
+  /// In en, this message translates to:
+  /// **'Earth'**
+  String get architectLineHatchEarth;
+
   /// No description provided for @architectLineSymbolNewStroke.
   ///
   /// In en, this message translates to:

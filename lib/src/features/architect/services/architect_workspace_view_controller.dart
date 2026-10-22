@@ -79,6 +79,7 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
     source.commit(
       original.copyWith(
         lineStyles: next.lineStyles,
+        hatchPatterns: next.hatchPatterns,
         elevations: [
           for (final e in original.elevations)
             if (view == ArchitectWorkspaceView.elevation && e.id == viewId)

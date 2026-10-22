@@ -11,6 +11,11 @@ extension ArchitectLineStyleLabel on ArchitectLineStyle {
   String label(AppLocalizations l) => switch (id) {
     'solid' => l.architectLineSolid,
     'powerLine' => l.architectLinePowerLine,
+    'hatchBrickJoint' => l.architectLineHatchBrickJoint,
+    'hatchAggregate' => l.architectLineHatchAggregate,
+    'hatchGrain' => l.architectLineHatchGrain,
+    'hatchDots' => l.architectLineHatchDots,
+    'hatchEarth' => l.architectLineHatchEarth,
     'dashed' => l.architectLineDashed,
     'shortDashed' => l.architectLineShortDashed,
     'longDashed' => l.architectLineLongDashed,

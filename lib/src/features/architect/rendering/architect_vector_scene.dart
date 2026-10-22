@@ -226,7 +226,12 @@ class ArchitectVectorPath extends ArchitectVectorOp {
     super.role,
   );
   @override
-  Rect get bounds => path.getBounds().inflate(fill ? 0 : width / 2);
+  Rect get bounds {
+    final bounds = path.getBounds().inflate(fill ? 0 : width / 2);
+    if (clip == null) return bounds;
+    final region = clip!.getBounds();
+    return bounds.overlaps(region) ? bounds.intersect(region) : region.topLeft & Size.zero;
+  }
   @override
   void paint(Canvas canvas) => canvas.drawPath(
     path,

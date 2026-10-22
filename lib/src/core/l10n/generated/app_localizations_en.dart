@@ -7229,6 +7229,108 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectLineSymbolFreehand => 'Freehand';
 
   @override
+  String get architectToolHatch => 'Hatch';
+
+  @override
+  String architectSelectionHatchesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hatches',
+      one: '1 hatch',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get architectHatchPattern => 'Pattern';
+
+  @override
+  String get architectHatchCustom => 'Custom hatch';
+
+  @override
+  String get architectHatchHint =>
+      'Layers of lines or symbols. Spacing and sizes are in mm on paper.';
+
+  @override
+  String get architectHatchDiagonal => 'Diagonal';
+
+  @override
+  String get architectHatchReverseDiagonal => 'Reverse diagonal';
+
+  @override
+  String get architectHatchHorizontal => 'Horizontal';
+
+  @override
+  String get architectHatchVertical => 'Vertical';
+
+  @override
+  String get architectHatchCross => 'Grid';
+
+  @override
+  String get architectHatchDiagonalCross => 'Crosshatch';
+
+  @override
+  String get architectHatchBrick => 'Brick';
+
+  @override
+  String get architectHatchConcrete => 'Concrete';
+
+  @override
+  String get architectHatchDots => 'Dots';
+
+  @override
+  String get architectHatchEarth => 'Earth';
+
+  @override
+  String get architectHatchScale => 'Scale';
+
+  @override
+  String get architectHatchBorder => 'Boundary';
+
+  @override
+  String architectHatchLayer(int number) {
+    return 'Layer $number';
+  }
+
+  @override
+  String get architectHatchAddLayer => 'Add layer';
+
+  @override
+  String get architectHatchSpacing => 'Spacing';
+
+  @override
+  String get architectHatchPhase => 'Offset';
+
+  @override
+  String get architectHatchShift => 'Row shift';
+
+  @override
+  String get architectHatchSymbolsOnly => 'Symbols only';
+
+  @override
+  String get architectHatchFinish => 'Finish';
+
+  @override
+  String get architectHatchDrawHint =>
+      'Place at least three vertices and close the contour.';
+
+  @override
+  String get architectLineHatchBrickJoint => 'Joints';
+
+  @override
+  String get architectLineHatchAggregate => 'Aggregate';
+
+  @override
+  String get architectLineHatchGrain => 'Grain';
+
+  @override
+  String get architectLineHatchDots => 'Dots';
+
+  @override
+  String get architectLineHatchEarth => 'Earth';
+
+  @override
   String get architectLineSymbolNewStroke => 'New stroke';
 
   @override

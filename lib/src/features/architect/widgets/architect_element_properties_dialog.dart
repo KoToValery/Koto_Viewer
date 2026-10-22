@@ -1,6 +1,8 @@
 import 'dart:convert';
 import '../models/architect_elements.dart';
 import '../models/architect_line_style.dart';
+import '../models/architect_hatch_pattern.dart';
+import 'architect_hatch_picker.dart';
 import 'architect_line_style_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -44,6 +46,10 @@ class _ArchitectElementPropertiesDialogState
   final values = <String, double>{};
   final texts = <String, String>{};
   ArchitectLineStyle? _lineStyle;
+  ArchitectHatchPattern? _hatchPattern;
+  bool? _hatchBorder;
+  bool get _supportsHatch => widget.elementIds.every((id) =>
+    widget.project.activeStorey.cadPrimitives.any((p) => p.id == id && p.type == CadPrimitiveType.hatch));
   bool get _supportsLineStyle => widget.elementIds.every(
     (id) => widget.project.activeStorey.cadPrimitives.any(
       (p) => p.id == id && p.type != CadPrimitiveType.circle,
@@ -65,6 +71,13 @@ class _ArchitectElementPropertiesDialogState
       for (final id in widget.elementIds)
         ArchitectSelection.record(widget.project, id),
     ];
+    if (_supportsHatch) {
+      final hatches = widget.project.activeStorey.cadPrimitives.where((p) => widget.elementIds.contains(p.id)).toList();
+      final patterns = hatches.map((p) => p.hatchPattern).toSet();
+      if (patterns.length == 1) _hatchPattern = patterns.single;
+      final borders = hatches.map((p) => p.hatchBorder).toSet();
+      if (borders.length == 1) _hatchBorder = borders.single;
+    }
     if (_supportsLineStyle) {
       final styles = widget.project.activeStorey.cadPrimitives
           .where((p) => widget.elementIds.contains(p.id))
@@ -151,6 +164,8 @@ class _ArchitectElementPropertiesDialogState
       'coreThickness' => l.architectWallCoreThickness,
       'insulationThicknessOverride' => l.architectPropertyThickness,
       'rotationDeg' => l.architectPropertyAngle,
+      'hatchAngle' => l.architectPropertyAngle,
+      'hatchScale' => l.architectHatchScale,
       'stepCount' => l.architectPropertySteps,
       'sillHeight' => l.architectPropertySill,
       'elevation' => l.architectToolLevel,
@@ -162,7 +177,7 @@ class _ArchitectElementPropertiesDialogState
     };
   }
 
-  bool metric(String key) => key != 'rotationDeg' && key != 'stepCount';
+  bool metric(String key) => !{'rotationDeg', 'stepCount', 'hatchScale', 'hatchAngle'}.contains(key);
   double? fieldValue(String key) {
     if (key == 'height' &&
         records.every((e) => e.containsKey('referenceLine')) &&
@@ -186,7 +201,7 @@ class _ArchitectElementPropertiesDialogState
   Future<void> editNumber(String key) async {
     final unit = metric(key)
         ? widget.project.units.symbol
-        : key == 'rotationDeg'
+        : key == 'rotationDeg' || key == 'hatchAngle'
         ? '°'
         : '';
     final value = fieldValue(key) ?? 0;
@@ -206,7 +221,7 @@ class _ArchitectElementPropertiesDialogState
             showContinue: false,
             showDirection: false,
             minimumLength:
-                {'elevation', 'rotationDeg', 'offsetDistance', 'baseOffset'}.contains(key)
+                {'elevation', 'rotationDeg', 'hatchAngle', 'offsetDistance', 'baseOffset'}.contains(key)
                 ? -double.infinity
                 : {'sillHeight', 'insulationThicknessOverride'}.contains(key)
                 ? 0
@@ -801,6 +816,19 @@ class _ArchitectElementPropertiesDialogState
                   },
                 ),
                 const SizedBox(height: 8),
+              ],
+              if (_supportsHatch) ...[
+                ArchitectHatchPicker(key: const ValueKey('architect-property-hatch'), value: _hatchPattern,
+                  customPatterns: widget.project.hatchPatterns, lineStyles: widget.project.lineStyles,
+                  onChanged: (pattern) => setState(() {
+                    _hatchPattern = pattern; texts['hatchPattern'] = jsonEncode(pattern.toJson());
+                  })),
+                CheckboxListTile(key: const ValueKey('architect-property-hatch-border'),
+                  contentPadding: EdgeInsets.zero, dense: true, tristate: true,
+                  title: Text(l.architectHatchBorder), value: _hatchBorder,
+                  onChanged: (v) => setState(() {
+                    _hatchBorder = v ?? false; texts['hatchBorder'] = '${v ?? false}';
+                  })),
               ],
               if (_supportsLineStyle)
                 ArchitectLineStylePicker(

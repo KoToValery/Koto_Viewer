@@ -54,6 +54,7 @@ enum ArchitectToolCategory {
     ArchitectTool.measure => annotations,
     ArchitectTool.cadLine ||
     ArchitectTool.cadRect ||
+    ArchitectTool.hatch ||
     ArchitectTool.cadCircle => drawing,
   };
 }
@@ -594,6 +595,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     icon: Icons.crop_square_rounded,
                                     label: l10n.architectToolCadRect,
                                   ),
+                                if (category == ArchitectToolCategory.drawing)
+                                  _buildToolButton(tool: ArchitectTool.hatch,
+                                    icon: Icons.texture_rounded,
+                                    label: l10n.architectToolHatch),
                                 if (category ==
                                     ArchitectToolCategory.of(
                                       ArchitectTool.cadCircle,

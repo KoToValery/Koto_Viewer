@@ -7258,6 +7258,108 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectLineSymbolFreehand => 'Свободно';
 
   @override
+  String get architectToolHatch => 'Щриховка';
+
+  @override
+  String architectSelectionHatchesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count щриховки',
+      one: '1 щриховка',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get architectHatchPattern => 'Шарка';
+
+  @override
+  String get architectHatchCustom => 'Собствена щриховка';
+
+  @override
+  String get architectHatchHint =>
+      'Слоеве от линии или символи. Стъпката и размерите са в mm върху листа.';
+
+  @override
+  String get architectHatchDiagonal => 'Диагонална';
+
+  @override
+  String get architectHatchReverseDiagonal => 'Обратна диагонална';
+
+  @override
+  String get architectHatchHorizontal => 'Хоризонтална';
+
+  @override
+  String get architectHatchVertical => 'Вертикална';
+
+  @override
+  String get architectHatchCross => 'Мрежа';
+
+  @override
+  String get architectHatchDiagonalCross => 'Кръстосана';
+
+  @override
+  String get architectHatchBrick => 'Тухли';
+
+  @override
+  String get architectHatchConcrete => 'Бетон';
+
+  @override
+  String get architectHatchDots => 'Точки';
+
+  @override
+  String get architectHatchEarth => 'Почва';
+
+  @override
+  String get architectHatchScale => 'Мащаб';
+
+  @override
+  String get architectHatchBorder => 'Контур';
+
+  @override
+  String architectHatchLayer(int number) {
+    return 'Слой $number';
+  }
+
+  @override
+  String get architectHatchAddLayer => 'Добави слой';
+
+  @override
+  String get architectHatchSpacing => 'Стъпка';
+
+  @override
+  String get architectHatchPhase => 'Отместване';
+
+  @override
+  String get architectHatchShift => 'Разминаване';
+
+  @override
+  String get architectHatchSymbolsOnly => 'Само символи';
+
+  @override
+  String get architectHatchFinish => 'Завърши';
+
+  @override
+  String get architectHatchDrawHint =>
+      'Поставете поне три възела и затворете контура.';
+
+  @override
+  String get architectLineHatchBrickJoint => 'Фуги';
+
+  @override
+  String get architectLineHatchAggregate => 'Камъчета';
+
+  @override
+  String get architectLineHatchGrain => 'Зърна';
+
+  @override
+  String get architectLineHatchDots => 'Точки';
+
+  @override
+  String get architectLineHatchEarth => 'Почва';
+
+  @override
   String get architectLineSymbolNewStroke => 'Нов щрих';
 
   @override

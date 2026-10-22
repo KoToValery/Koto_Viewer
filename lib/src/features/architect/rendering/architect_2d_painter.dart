@@ -1,4 +1,5 @@
 import '../models/architect_line_style.dart';
+import '../models/architect_hatch_pattern.dart';
 import 'architect_clearance_badge_layout.dart';
 import 'architect_vector_scene.dart';
 import '../models/architect_wall_type.dart';
@@ -59,6 +60,7 @@ enum ArchitectTool {
   cadRect,
   cadCircle,
   measure,
+  hatch,
 }
 
 enum WallDraftingMode { singleLine, chained }
@@ -168,6 +170,7 @@ class Architect2dPainter extends CustomPainter {
 
   // Slab drafting state
   final List<Offset> slabDraftPoints;
+  final ArchitectHatchPattern activeHatchPattern;
   final Offset? slabCandidatePoint;
   final ArchitectRoofTool? roofTool;
   final bool polygonEditInvalid;
@@ -270,6 +273,7 @@ class Architect2dPainter extends CustomPainter {
     this.underlayDoc,
     this.underlayLayerVisibility = const {},
     this.slabDraftPoints = const [],
+    this.activeHatchPattern = ArchitectHatchPattern.diagonal,
     this.slabCandidatePoint,
     this.roofTool,
     this.polygonEditInvalid = false,
@@ -326,6 +330,11 @@ class Architect2dPainter extends CustomPainter {
         selectedElementId: selectedElementId,
       );
       _drawZones(canvas);
+      ArchitectElementsPainterHelper.drawCadPrimitives(
+        canvas: canvas, storey: _elementLayerStorey, zoomScale: zoomScale,
+        palette: palette, dimensionScale: _project.dimensionScale,
+        selectedElementId: selectedElementId, hatchesOnly: true,
+      );
       _drawZoneSchedule(canvas);
       if (showUpperOverhangs) {
         ArchitectOverhangPainterHelper.drawOverhangs(
@@ -397,6 +406,7 @@ class Architect2dPainter extends CustomPainter {
         },
       );
       ArchitectElementsPainterHelper.drawCadPrimitives(
+        hatchesOnly: false,
         dimensionScale: _project.dimensionScale,
         palette: palette,
         canvas: canvas,
@@ -501,6 +511,17 @@ class Architect2dPainter extends CustomPainter {
         palette: palette,
         visibleRect: viewport?.visibleRect,
       );
+      if (activeTool == ArchitectTool.hatch && slabDraftPoints.length >= 2 &&
+          (slabCandidatePoint != null || slabDraftPoints.length >= 3)) {
+        final points = [...slabDraftPoints, ?slabCandidatePoint];
+        final bounds = ArchitectSceneGeometry.boundsOf(points);
+        ArchitectElementsPainterHelper.drawCadPrimitives(canvas: canvas,
+          storey: ArchitectStorey(id: 'preview', name: '', cadPrimitives: [
+            ArchitectCadPrimitive(id: 'hatch-preview', type: CadPrimitiveType.hatch,
+              startPoint: bounds.topLeft, endPoint: bounds.bottomRight,
+              polygon: points, hatchPattern: activeHatchPattern, colorValue: 0xFF008F99),
+          ]), zoomScale: zoomScale, dimensionScale: _project.dimensionScale);
+      }
       ArchitectElementsPainterHelper.drawSlabDrafting(
         canvas: canvas,
         points: slabDraftPoints,
@@ -634,7 +655,7 @@ class Architect2dPainter extends CustomPainter {
       );
       return;
     }
-    if (selected.cadPrimitives.any((p) => p.type == CadPrimitiveType.rect)) {
+    if (selected.cadPrimitives.any((p) => p.isPolygon)) {
       ArchitectElementsPainterHelper.drawCadPrimitives(
         dimensionScale: _project.dimensionScale,
         palette: palette,
@@ -790,7 +811,7 @@ class Architect2dPainter extends CustomPainter {
     if (targetId == null) return;
     List<Offset>? polygon;
     for (final p in _project.activeStorey.cadPrimitives) {
-      if (p.id == targetId && p.type == CadPrimitiveType.rect) {
+      if (p.id == targetId && p.isPolygon) {
         polygon = p.polygonCorners;
       }
     }

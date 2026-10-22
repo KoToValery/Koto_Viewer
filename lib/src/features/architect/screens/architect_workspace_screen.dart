@@ -1,4 +1,7 @@
 import '../models/architect_line_style.dart';
+import '../models/architect_hatch_pattern.dart';
+import '../widgets/architect_hatch_picker.dart';
+import '../services/architect_hatch_patterns.dart';
 import '../widgets/architect_line_style_picker.dart';
 import '../services/architect_line_styles.dart';
 import '../services/architect_line_editing.dart';
@@ -759,6 +762,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           .any((p) => p.id == id && p.type == CadPrimitiveType.rect),
       ArchitectTool.cadCircle => storey.cadPrimitives
           .any((p) => p.id == id && p.type == CadPrimitiveType.circle),
+      ArchitectTool.hatch => storey.cadPrimitives
+          .any((p) => p.id == id && p.type == CadPrimitiveType.hatch),
       ArchitectTool.axis => _project.gridAxes.any((a) => a.id == id),
       ArchitectTool.zone => storey.zones.any((z) => z.id == id),
       _ => false,
@@ -1545,7 +1550,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _newPointTargetId != null || _duplicateMove != null ||
           const {
             ArchitectTool.wall, ArchitectTool.cadLine, ArchitectTool.cadRect,
-            ArchitectTool.cadCircle, ArchitectTool.slab, ArchitectTool.roof,
+            ArchitectTool.cadCircle, ArchitectTool.slab, ArchitectTool.hatch, ArchitectTool.roof,
             ArchitectTool.beam, ArchitectTool.opening, ArchitectTool.stair,
             ArchitectTool.zone, ArchitectTool.axis, ArchitectTool.column,
             ArchitectTool.dimension, ArchitectTool.measure,
@@ -2056,6 +2061,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   (Offset, Offset)? _wallEndpointLeaderLine;
   bool _wallParallelMove = false;
   ArchitectLineStyle _activeCadLineStyle = ArchitectLineStyle.solid;
+  ArchitectHatchPattern _activeHatchPattern = ArchitectHatchPattern.diagonal;
+  Widget _hatchControl() => ArchitectHatchDraftBar(
+    pattern: _activeHatchPattern,
+    customPatterns: _project.hatchPatterns,
+    lineStyles: _project.lineStyles,
+    pointCount: _elementTool.slabDraftPoints.length,
+    onUndo: () => setState(() {
+      _elementTool.slabDraftPoints.removeLast();
+      _elementTool.slabCandidatePoint = null;
+    }),
+    onFinish: _commitHatch,
+    onCancel: () => setState(_elementTool.cancelSlabDrafting),
+    onChanged: (pattern) {
+      if (!pattern.isPreset && !_project.hatchPatterns.any((p) => p == pattern)) {
+        _commands.execute(SaveArchitectHatchPattern(pattern));
+        _saveBiMProjectIfAttached();
+      }
+      setState(() => _activeHatchPattern = pattern);
+    },
+  );
+
+  void _commitHatch() {
+    final points = List<Offset>.unmodifiable(_elementTool.slabDraftPoints);
+    if (!ArchitectPolygonGeometry.valid(points)) { _operationError(); return; }
+    final bounds = ArchitectSceneGeometry.boundsOf(points);
+    try {
+      _commands.execute(PlaceArchitectCadPrimitive(storeyId: _project.activeStoreyId,
+        primitive: ArchitectCadPrimitive(id: ArchitectElementId.next('hatch'),
+          type: CadPrimitiveType.hatch, startPoint: bounds.topLeft, endPoint: bounds.bottomRight,
+          polygon: points, hatchPattern: _activeHatchPattern)));
+      setState(_elementTool.cancelSlabDrafting);
+      _saveBiMProjectIfAttached(); HapticFeedback.mediumImpact();
+    } on ArgumentError { _operationError(); }
+  }
   Widget _lineStyleControl() => Theme(
     data: ThemeData.dark(),
     child: ArchitectLineStylePicker(
@@ -3565,7 +3604,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final id = _selectedElementId ?? _selectedZoneId;
     if (id == null) return null;
     for (final p in _project.activeStorey.cadPrimitives) {
-      if (p.id == id && p.type == CadPrimitiveType.rect) {
+      if (p.id == id && p.isPolygon) {
         return p.polygonCorners;
       }
     }
@@ -4079,7 +4118,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     // 7. Slab or Roof drafting candidate
-    if (_activeTool == ArchitectTool.slab &&
+    if ((_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch) &&
         _elementTool.slabDraftPoints.isNotEmpty) {
       _elementTool.updateSlabCandidate(_resolveSlabPoint(rawModel));
       _cursorModel = _elementTool.slabCandidatePoint;
@@ -4735,6 +4774,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _selectionIds
               ..clear()
               ..addAll(storey.slabs.map((s) => s.id));
+            _selectedElementId = hitId;
+            _selectedZoneId = null;
+            _multiSelect = true;
+          });
+          HapticFeedback.mediumImpact();
+          return;
+        } else if ((_activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.select) &&
+            storey.cadPrimitives.any((p) => p.id == hitId && p.type == CadPrimitiveType.hatch)) {
+          setState(() {
+            _selectionIds
+              ..clear()
+              ..addAll(storey.cadPrimitives.where((p) => p.type == CadPrimitiveType.hatch).map((p) => p.id));
             _selectedElementId = hitId;
             _selectedZoneId = null;
             _multiSelect = true;
@@ -5472,12 +5523,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     // 9. In Slab tool
-    if (_activeTool == ArchitectTool.slab) {
+    if (_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch) {
       final pt = _resolveSlabPoint(rawModel);
 
       if (_elementTool.slabDraftPoints.length >= 3 &&
           (pt - _elementTool.slabDraftPoints.first).distance <=
               math.min(16.0 / _currentScale, .20)) {
+        if (_activeTool == ArchitectTool.hatch) { _commitHatch(); return; }
         final res = _elementTool.commitSlab(storey: _project.activeStorey);
         if (res != null) {
           setState(() {
@@ -5487,7 +5539,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           HapticFeedback.mediumImpact();
         }
       } else {
-        _elementTool.addSlabPoint(pt);
+        setState(() => _elementTool.addSlabPoint(pt));
         HapticFeedback.lightImpact();
       }
       return;
@@ -6929,7 +6981,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (roof.id == targetId) return roof.points;
     }
     for (final primitive in storey.cadPrimitives) {
-      if (primitive.id == targetId && primitive.type == CadPrimitiveType.rect) {
+      if (primitive.id == targetId && primitive.isPolygon) {
         return primitive.polygonCorners;
       }
     }
@@ -10356,6 +10408,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (hasRoofs) targetIds.addAll(storey.roofs.map((r) => r.id));
     if (hasZones) targetIds.addAll(storey.zones.map((z) => z.id));
     if (hasAxes) targetIds.addAll(_project.gridAxes.map((a) => a.id));
+    if (storey.cadPrimitives.any((p) => sel.contains(p.id) && p.type == CadPrimitiveType.hatch)) {
+      targetIds.addAll(storey.cadPrimitives.where((p) => p.type == CadPrimitiveType.hatch).map((p) => p.id));
+    }
 
     if (targetIds.isNotEmpty) {
       setState(() {
@@ -12763,6 +12818,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             child: Theme(data: ThemeData.dark(), child: _lineStyleControl()),
           ),
         ),
+      if (_activeTool == ArchitectTool.hatch && _effectiveSelection.isEmpty)
+        Positioned(top: 8, left: 8, child: _hatchControl()),
       if (_linearDraftTool && _effectiveSelection.isEmpty)
         Positioned(
           top: 8,
@@ -13327,6 +13384,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ? _activeTool
         : ArchitectTool.select,
     activeCadLineStyle: _activeCadLineStyle,
+    activeHatchPattern: _activeHatchPattern,
     cursorPosition: _cursorModel,
     columnPreview:
         _activeTool == ArchitectTool.column &&

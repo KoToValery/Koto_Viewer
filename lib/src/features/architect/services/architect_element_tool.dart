@@ -473,6 +473,7 @@ class ArchitectElementTool extends ChangeNotifier {
               ArchitectTool.cadLine => p.type == CadPrimitiveType.line,
               ArchitectTool.cadRect => p.type == CadPrimitiveType.rect,
               ArchitectTool.cadCircle => p.type == CadPrimitiveType.circle,
+              ArchitectTool.hatch => p.type == CadPrimitiveType.hatch,
               _ => false,
             },
           )
@@ -648,7 +649,7 @@ class ArchitectElementTool extends ChangeNotifier {
             tolerance) {
           yield prim.id;
         }
-      } else if (prim.type == CadPrimitiveType.rect) {
+      } else if (prim.isPolygon) {
         final points = prim.polygonCorners;
         final path = Path()..addPolygon(points, true);
         if (path.contains(point)) yield prim.id;

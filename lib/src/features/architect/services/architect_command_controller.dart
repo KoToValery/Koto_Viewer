@@ -1543,11 +1543,22 @@ class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
     ArchitectModelCommand.point(primitive.endPoint);
     ArchitectModelCommand.newId(project, primitive.id);
     if ((primitive.endPoint - primitive.startPoint).distance < .001 ||
-        (primitive.type == CadPrimitiveType.rect &&
+        (primitive.isPolygon &&
             !ArchitectPolygonGeometry.valid(primitive.polygonCorners))) {
       throw ArgumentError('Invalid CAD shape');
     }
     final floor = ArchitectModelCommand.storey(project, storeyId);
+    if (primitive.type == CadPrimitiveType.hatch) {
+      primitive.hatchPattern.validate();
+      if (!primitive.hatchScale.isFinite || primitive.hatchScale < .1 || primitive.hatchScale > 20 ||
+          !primitive.hatchAngle.isFinite || primitive.hatchAngle.abs() > 180) {
+        throw ArgumentError('Invalid hatch transform');
+      }
+      if (!primitive.hatchPattern.isPreset &&
+          !project.hatchPatterns.any((p) => p.id == primitive.hatchPattern.id)) {
+        project = project.copyWith(hatchPatterns: [...project.hatchPatterns, primitive.hatchPattern]);
+      }
+    }
     return ArchitectModelCommand.replace(
       primitive.lineStyle.isPreset ||
               project.lineStyles.any((s) => s.id == primitive.lineStyle.id)
@@ -1645,7 +1656,7 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
     final slab = floor.slabs.any((s) => s.id == elementId);
     final roof = floor.roofs.any((r) => r.id == elementId);
     final rect = floor.cadPrimitives.any(
-      (s) => s.id == elementId && s.type == CadPrimitiveType.rect,
+      (s) => s.id == elementId && s.isPolygon,
     );
     final zone = floor.zones.any((z) => z.id == elementId);
     final opening = floor.openings.any((o) => o.id == elementId);
@@ -1735,10 +1746,10 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     for (final p in storey.cadPrimitives) {
       if (p.id != id || p.type == CadPrimitiveType.circle) continue;
       return (
-        points: p.type == CadPrimitiveType.rect
+        points: p.isPolygon
             ? p.polygonCorners
             : [p.startPoint, p.endPoint],
-        closed: p.type == CadPrimitiveType.rect,
+        closed: p.isPolygon,
         width: 0,
       );
     }

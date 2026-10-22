@@ -1,4 +1,5 @@
 import 'architect_line_style.dart';
+import 'architect_hatch_pattern.dart';
 import 'architect_document.dart';
 export 'architect_document.dart';
 import 'architect_slab_assembly.dart';
@@ -304,6 +305,7 @@ class ArchitectProject {
   final List<StructuralGridAxis> gridAxes;
   final List<ArchitectWallType> wallTypes;
   final List<ArchitectLineStyle> lineStyles;
+  final List<ArchitectHatchPattern> hatchPatterns;
   final List<ArchitectFenestrationStyle> openingStyles;
   final List<ArchitectSlabAssembly> slabAssemblies;
   final List<ArchitectSection> sections;
@@ -325,6 +327,7 @@ class ArchitectProject {
     this.gridAxes = const [],
     this.wallTypes = const [],
     this.lineStyles = const [],
+    this.hatchPatterns = const [],
     this.openingStyles = const [],
     this.slabAssemblies = const [],
     this.sections = const [],
@@ -439,6 +442,7 @@ class ArchitectProject {
     List<StructuralGridAxis>? gridAxes,
     List<ArchitectWallType>? wallTypes,
     List<ArchitectLineStyle>? lineStyles,
+    List<ArchitectHatchPattern>? hatchPatterns,
     List<ArchitectFenestrationStyle>? openingStyles,
     List<ArchitectSlabAssembly>? slabAssemblies,
     List<ArchitectSection>? sections,
@@ -460,6 +464,7 @@ class ArchitectProject {
     gridAxes: gridAxes ?? this.gridAxes,
     wallTypes: wallTypes ?? this.wallTypes,
     lineStyles: lineStyles ?? this.lineStyles,
+    hatchPatterns: hatchPatterns ?? this.hatchPatterns,
     openingStyles: openingStyles ?? this.openingStyles,
     slabAssemblies: slabAssemblies ?? this.slabAssemblies,
     sections: sections ?? this.sections,
@@ -483,6 +488,7 @@ class ArchitectProject {
     'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
     'wallTypes': wallTypes.map((w) => w.toJson()).toList(),
     'lineStyles': lineStyles.map((s) => s.toJson()).toList(),
+    'hatchPatterns': hatchPatterns.map((s) => s.toJson()).toList(),
     'openingStyles': openingStyles.map((o) => o.toJson()).toList(),
     'slabAssemblies': slabAssemblies.map((a) => a.toJson()).toList(),
     'sections': sections.map((a) => a.toJson()).toList(),
@@ -565,6 +571,9 @@ class ArchitectProject {
         )
         .where((s) => !s.isPreset)
         .toList(),
+    hatchPatterns: (json['hatchPatterns'] as List? ?? [])
+        .map((s) => ArchitectHatchPattern.fromJson(Map<String, dynamic>.from(s as Map)))
+        .where((s) => !s.isPreset).toList(),
     openingStyles:
         (json['openingStyles'] as List<dynamic>?)
             ?.map(

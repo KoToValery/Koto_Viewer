@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'dart:ui';
-import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import 'architect_polygon_geometry.dart';
 
@@ -196,7 +195,7 @@ class ArchitectPolygonDimensions {
     }
     for (final primitive in storey.cadPrimitives) {
       if (primitive.id != elementId &&
-          primitive.type == CadPrimitiveType.rect) {
+          primitive.isPolygon) {
         inspect(primitive.id, primitive.polygonCorners, false);
       }
     }

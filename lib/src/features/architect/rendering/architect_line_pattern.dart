@@ -7,9 +7,14 @@ import '../models/architect_line_symbol.dart';
 class ArchitectLinePattern {
   /// All components are vector strokes. Dash phase follows the original contour
   /// even where a symbol interrupts it; rectangles retain phase around corners.
-  static Path path(Path source, ArchitectLineStyle style, double unitsPerMm) {
+  static Path path(
+    Path source,
+    ArchitectLineStyle style,
+    double unitsPerMm, {
+    double phase = 0,
+  }) {
     style.validate();
-    if (!unitsPerMm.isFinite || unitsPerMm <= 0) {
+    if (!unitsPerMm.isFinite || unitsPerMm <= 0 || !phase.isFinite) {
       throw ArgumentError('Invalid pattern scale');
     }
     if (style.isSolid && style.symbol == null) return source;
@@ -22,10 +27,14 @@ class ArchitectLinePattern {
       if (symbol != null && glyph != null && contour.length > 1e-9) {
         final spacing = symbol.spacingMm * unitsPerMm;
         final stations = <double>[];
-        if (contour.length < spacing) {
+        if (contour.length < spacing && phase == 0) {
           stations.add(contour.length / 2);
         } else {
-          for (var at = spacing / 2; at < contour.length; at += spacing) {
+          for (
+            var at = (spacing / 2 - phase) % spacing;
+            at < contour.length;
+            at += spacing
+          ) {
             stations.add(at);
           }
         }
@@ -107,10 +116,19 @@ class ArchitectLinePattern {
         baseline(0, contour.length);
       } else {
         var offset = 0.0, index = 0;
+        var remaining = phase % lengths.reduce((a, b) => a + b);
+        while (remaining >= lengths[index]) {
+          remaining -= lengths[index];
+          index = (index + 1) % lengths.length;
+        }
         while (offset < contour.length) {
-          final end = math.min(contour.length, offset + lengths[index]);
+          final end = math.min(
+            contour.length,
+            offset + lengths[index] - remaining,
+          );
           if (index.isEven) baseline(offset, end);
           offset = end;
+          remaining = 0;
           index = (index + 1) % lengths.length;
         }
       }
