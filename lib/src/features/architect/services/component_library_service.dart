@@ -13,10 +13,12 @@ import '../components/definitions/sanitary_components.dart';
 import '../components/dsl/parametric_script_parser.dart';
 import '../models/architect_component.dart';
 import '../models/architect_component_definition.dart';
+import 'component_geometry_cache.dart';
 
 /// Central repository and library manager for standard and custom architectural components.
 class ComponentLibraryService extends ChangeNotifier {
-  static final ComponentLibraryService instance = ComponentLibraryService._internal();
+  static final ComponentLibraryService instance =
+      ComponentLibraryService._internal();
   ComponentLibraryService._internal();
 
   static const String _storageKey = 'architect_component_custom_scripts_v1';
@@ -43,30 +45,41 @@ class ComponentLibraryService extends ChangeNotifier {
   ];
 
   final List<ScriptedComponentDefinition> _customScripted = [];
+  // Old placed instances retain their original countertop/table dimensions.
+  final Map<String, ArchitectComponentDefinition> _legacyDefinitions = {
+    'furniture_dining_table': FurnitureDiningTableSet(legacyDimensions: true),
+    'sanitary_washbasin_cabinet': SanitaryWashbasinCabinet(
+      legacyDimensions: true,
+    ),
+    'kitchen_sink_cabinet': KitchenSinkCabinet(legacyDimensions: true),
+  };
   bool _isLoaded = false;
+  Future<void>? _initialization;
 
-  late ArchitectComponentDefinition _activeDefinition;
+  ArchitectComponentDefinition? _activeDefinition;
   Map<String, dynamic> _activeParameters = {};
 
   ArchitectComponentDefinition get activeDefinition {
-    if (!_isLoaded) _initDefaults();
-    return _activeDefinition;
+    if (_activeDefinition == null) _initDefaults();
+    return _activeDefinition!;
   }
 
   Map<String, dynamic> get activeParameters {
-    if (!_isLoaded) _initDefaults();
-    return _activeParameters;
+    if (_activeDefinition == null) _initDefaults();
+    return Map.unmodifiable(_activeParameters);
   }
 
   void _initDefaults() {
     _activeDefinition = _standardDefinitions.first;
-    _activeParameters = Map.of(_activeDefinition.defaultParameters);
+    _activeParameters = Map.of(_activeDefinition!.defaultParameters);
   }
 
   /// Initializes the service and loads custom components from persistent storage.
-  Future<void> init() async {
+  Future<void> init() => _initialization ??= _load();
+
+  Future<void> _load() async {
     if (_isLoaded) return;
-    _initDefaults();
+    if (_activeDefinition == null) _initDefaults();
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -76,7 +89,11 @@ class ComponentLibraryService extends ChangeNotifier {
         for (final script in rawList) {
           try {
             final def = ParametricScriptParser.parse(script);
-            _customScripted.add(def);
+            if (!_standardDefinitions.any((d) => d.id == def.id) &&
+                !_legacyDefinitions.containsKey(def.id)) {
+              _customScripted.removeWhere((d) => d.id == def.id);
+              _customScripted.add(def);
+            }
           } catch (e) {
             debugPrint('Failed to parse custom component script: $e');
           }
@@ -92,20 +109,19 @@ class ComponentLibraryService extends ChangeNotifier {
 
   /// All registered component definitions (built-in followed by user custom).
   List<ArchitectComponentDefinition> getAllDefinitions() {
-    if (!_isLoaded) _initDefaults();
     return [..._standardDefinitions, ..._customScripted];
   }
 
   /// Finds a definition by ID.
   ArchitectComponentDefinition? findDefinition(String id) {
-    return getAllDefinitions().firstWhere(
-      (d) => d.id == id,
-      orElse: () => _standardDefinitions.first,
-    );
+    return getAllDefinitions().where((d) => d.id == id).firstOrNull ??
+        _legacyDefinitions[id];
   }
 
   /// Filter definitions by architectural category.
-  List<ArchitectComponentDefinition> getByCategory(ArchitectComponentCategory cat) {
+  List<ArchitectComponentDefinition> getByCategory(
+    ArchitectComponentCategory cat,
+  ) {
     return getAllDefinitions().where((d) => d.category == cat).toList();
   }
 
@@ -115,48 +131,75 @@ class ComponentLibraryService extends ChangeNotifier {
     Map<String, dynamic>? parameters,
   }) {
     _activeDefinition = def;
-    _activeParameters = parameters != null
-        ? Map.of(parameters)
-        : Map.of(def.defaultParameters);
+    _activeParameters = {...def.defaultParameters, ...?parameters};
     notifyListeners();
   }
 
   /// Updates an active parameter value (e.g. while editing in HUD or inspector).
   void updateActiveParameter(String key, dynamic value) {
+    if (_activeDefinition == null) _initDefaults();
     _activeParameters[key] = value;
+    notifyListeners();
+  }
+
+  void setActiveParameters(Map<String, dynamic> parameters) {
+    _activeParameters = {...activeDefinition.defaultParameters, ...parameters};
     notifyListeners();
   }
 
   /// Saves a new custom scripted definition to persistent storage.
   Future<void> saveCustomScript(String scriptJson) async {
+    await init();
     final def = ParametricScriptParser.parse(scriptJson);
+    if (_standardDefinitions.any((s) => s.id == def.id) ||
+        _legacyDefinitions.containsKey(def.id)) {
+      throw const FormatException('A built-in component cannot be overwritten');
+    }
     final idx = _customScripted.indexWhere((c) => c.id == def.id);
+    final previous = List<ScriptedComponentDefinition>.of(_customScripted);
     if (idx >= 0) {
       _customScripted[idx] = def;
     } else {
       _customScripted.add(def);
     }
-    await _persistCustomScripts();
+    try {
+      await _persistCustomScripts();
+    } catch (_) {
+      _customScripted
+        ..clear()
+        ..addAll(previous);
+      rethrow;
+    }
+    ComponentGeometryCache.instance.clear();
+    if (_activeDefinition?.id == def.id) setActiveDefinition(def);
     notifyListeners();
   }
 
   /// Deletes a custom scripted definition.
   Future<void> deleteCustomScript(String id) async {
+    await init();
+    final previous = List<ScriptedComponentDefinition>.of(_customScripted);
     _customScripted.removeWhere((c) => c.id == id);
-    await _persistCustomScripts();
-    if (_activeDefinition.id == id) {
+    try {
+      await _persistCustomScripts();
+    } catch (_) {
+      _customScripted
+        ..clear()
+        ..addAll(previous);
+      rethrow;
+    }
+    ComponentGeometryCache.instance.clear();
+    if (_activeDefinition?.id == id) {
       _initDefaults();
     }
     notifyListeners();
   }
 
   Future<void> _persistCustomScripts() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final scripts = _customScripted.map((c) => c.rawSourceJson).toList();
-      await prefs.setStringList(_storageKey, scripts);
-    } catch (e) {
-      debugPrint('Failed to persist custom component scripts: $e');
+    final prefs = await SharedPreferences.getInstance();
+    final scripts = _customScripted.map((c) => c.rawSourceJson).toList();
+    if (!await prefs.setStringList(_storageKey, scripts)) {
+      throw StateError('Could not persist component library');
     }
   }
 }

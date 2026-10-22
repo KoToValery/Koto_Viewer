@@ -37,6 +37,7 @@ import "../models/architect_component_definition.dart";
 import "../services/component_library_service.dart";
 import "../widgets/architect_component_library_dialog.dart";
 import "../widgets/component_studio_dialog.dart";
+import '../widgets/component_dimensions_dialog.dart';
 import '../../bim_editing/interaction/bim_edit_session.dart';
 import '../../bim_editing/interaction/bim_drag_session.dart';
 import '../../bim_projects/controllers/bim_viewport_controller.dart';
@@ -1536,6 +1537,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  void _onComponentLibraryChanged() {
+    if (mounted) setState(() {});
+  }
+
   void _onModelChanged() {
     if (!mounted) return;
     _midpointTracking.clear();
@@ -1802,6 +1807,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _radialMenuScreenPosition;
   String? _radialMenuElementId;
   List<ArchitectRadialMenuItem> _radialMenuItems = [];
+
+  List<Rect> get _radialElementBounds => [
+    for (final id in _effectiveSelection)
+      if (ArchitectSelection.bounds(_project, id) case final Rect bounds)
+        Rect.fromPoints(
+          _viewport.toScreen(bounds.topLeft),
+          _viewport.toScreen(bounds.bottomRight),
+        ).inflate(3),
+  ];
   bool _wallDirectionLocked = false;
   Offset? _wallPanelAnchor;
   WallReferenceLine _wallReference = WallReferenceLine.center;
@@ -2172,6 +2186,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   @override
   void initState() {
     super.initState();
+    ComponentLibraryService.instance.addListener(_onComponentLibraryChanged);
+    unawaited(ComponentLibraryService.instance.init());
     unawaited(_loadCanvasPreference());
     _modelCommands =
         widget.commandController ??
@@ -2273,6 +2289,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   @override
   void dispose() {
+    ComponentLibraryService.instance.removeListener(_onComponentLibraryChanged);
     if (_saveTimer != null) {
       unawaited(_flushSave());
     }
@@ -6525,6 +6542,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               center: _radialMenuScreenPosition!,
               count: _radialMenuItems.length,
               hasTitle: _effectiveSelection.length > 1,
+              elementBounds: _radialElementBounds,
             ).occupied,
         ];
         final placements = <String, Rect>{};
@@ -8996,10 +9014,50 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
+  Future<void> _showComponentDimensions(
+    ArchitectComponentInstance component,
+  ) async {
+    final definition = ComponentLibraryService.instance.findDefinition(
+      component.definitionId,
+    );
+    if (definition == null || component.isLocked) return;
+    final storeyId = _project.activeStoreyId;
+    final values = await ComponentDimensionsDialog.show(
+      context,
+      definition,
+      component.parameters,
+    );
+    if (!mounted || values == null) return;
+    final storey = _project.storeys.where((s) => s.id == storeyId).firstOrNull;
+    if (storey == null || !storey.components.any((c) => c.id == component.id)) {
+      return;
+    }
+    final updated = storey.copyWith(
+      components: [
+        for (final item in storey.components)
+          item.id == component.id ? item.copyWith(parameters: values) : item,
+      ],
+    );
+    _commands.commit(
+      _project.copyWith(
+        storeys: [
+          for (final item in _project.storeys)
+            item.id == storeyId ? updated : item,
+        ],
+      ),
+    );
+    _saveBiMProjectIfAttached();
+  }
+
   void _showProperties() {
     final ids = _effectiveSelection;
     if (ids.isEmpty) return;
     if (ids.length == 1) {
+      final component = _project.activeStorey.components.where((c) => ids.contains(c.id)).firstOrNull;
+      if (component != null) {
+        _showComponentDimensions(component);
+        return;
+      }
       final stairs = _project.activeStorey.stairs.where(
         (s) => ids.contains(s.id),
       );
@@ -11138,13 +11196,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ArchitectComponentLibraryDialog.show(
                       context,
                       onSelectComponent: (def) {
-                        setState(() {});
+                        setState(() => _activeTool = ArchitectTool.component);
                       },
                       onSelectFenestration: (style) {
                         setState(() {
                           if (style.kind == FenestrationKind.door) {
+                            _doorWidth = style.defaultWidth;
+                            _doorHeight = style.defaultHeight;
+                            _doorSill = style.defaultSillHeight;
+                            _elementTool.setDoorStyle(style);
+                            FenestrationLibraryService.instance
+                                .setActiveDoorStyle(style);
                             _activeTool = ArchitectTool.door;
                           } else {
+                            _elementTool.setWindowStyle(style);
+                            FenestrationLibraryService.instance
+                                .setActiveWindowStyle(style);
                             _activeTool = ArchitectTool.window;
                           }
                         });
@@ -12174,6 +12241,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           child: ArchitectRadialMenu(
             center: _radialMenuScreenPosition!,
             items: _radialMenuItems,
+            elementBounds: _radialElementBounds,
             title: _effectiveSelection.length > 1
                 ? ArchitectSelection.summary(
                     _project,

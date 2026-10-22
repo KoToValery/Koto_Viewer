@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'architect_wall_type_label.dart';
 import 'architect_stair_labels.dart';
+import 'architect_component_labels.dart';
+import 'component_dimensions_dialog.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
@@ -17,6 +19,7 @@ enum ArchitectToolCategory {
   plan,
   build,
   structure,
+  furnishing,
   annotations,
   drawing;
 
@@ -24,6 +27,7 @@ enum ArchitectToolCategory {
     plan => l.architectCategoryPlan,
     build => l.architectCategoryBuild,
     structure => l.architectCategoryStructure,
+    furnishing => l.architectFurnishing,
     annotations => l.architectCategoryAnnotations,
     drawing => l.architectCategoryDrawing,
   };
@@ -37,8 +41,8 @@ enum ArchitectToolCategory {
     ArchitectTool.door ||
     ArchitectTool.window ||
     ArchitectTool.opening ||
-    ArchitectTool.component ||
     ArchitectTool.stair => build,
+    ArchitectTool.component => furnishing,
     ArchitectTool.column ||
     ArchitectTool.beam ||
     ArchitectTool.slab ||
@@ -281,6 +285,9 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final compactComponents =
+        activeTool == ArchitectTool.component &&
+        category == ArchitectToolCategory.furnishing;
 
     return Theme(
       data: ThemeData.dark().copyWith(
@@ -325,7 +332,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 _buildBeamSubBar(context)
               else if (activeTool == ArchitectTool.stair)
                 _buildStairSubBar(context)
-              else if (activeTool == ArchitectTool.component)
+              else if (activeTool == ArchitectTool.component &&
+                  !compactComponents)
                 _buildComponentSubBar(context)
               else if (activeTool == ArchitectTool.opening)
                 _buildOpeningSubBar(context),
@@ -349,7 +357,13 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                     key: const ValueKey('architect-tool-category'),
                     tooltip: l10n.architectToolCategories,
                     initialValue: category,
-                    onSelected: (value) => setState(() => category = value),
+                    onSelected: (value) {
+                      setState(() => category = value);
+                      if (value == ArchitectToolCategory.furnishing) {
+                        widget.onToolChanged(ArchitectTool.component);
+                        widget.onOpenComponentLibrary?.call();
+                      }
+                    },
                     itemBuilder: (_) => [
                       for (final value in ArchitectToolCategory.values.where(
                         (c) =>
@@ -371,18 +385,26 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 92),
-                            child: Text(
-                              category.label(l10n),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
+                          if (compactComponents &&
+                              MediaQuery.sizeOf(context).width < 600)
+                            const Icon(
+                              Icons.chair_outlined,
+                              color: Colors.white70,
+                              size: 20,
+                            )
+                          else
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 92),
+                              child: Text(
+                                category.label(l10n),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
-                          ),
                           const Icon(
                             Icons.arrow_drop_down,
                             color: Colors.white70,
@@ -393,154 +415,197 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                     ),
                   ),
                   Expanded(
-                    child: SingleChildScrollView(
-                      key: ValueKey('architect-tools-${category.name}'),
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        children: [
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.wall))
-                            _buildToolButton(
-                              tool: ArchitectTool.wall,
-                              icon: Icons.line_weight_rounded,
-                              label: l10n.architectToolWall,
+                    child: compactComponents
+                        ? KeyedSubtree(
+                            key: ValueKey('architect-tools-${category.name}'),
+                            child: _buildComponentSubBar(context),
+                          )
+                        : SingleChildScrollView(
+                            key: ValueKey('architect-tools-${category.name}'),
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              children: [
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.wall,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.wall,
+                                    icon: Icons.line_weight_rounded,
+                                    label: l10n.architectToolWall,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.door,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.door,
+                                    icon: Icons.meeting_room_rounded,
+                                    label: l10n.architectToolDoor,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.window,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.window,
+                                    icon: Icons.window_rounded,
+                                    label: l10n.architectToolWindow,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.column,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.column,
+                                    icon: Icons.view_column_rounded,
+                                    label: l10n.architectToolColumn,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.beam,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.beam,
+                                    icon: Icons.horizontal_rule_rounded,
+                                    label: l10n.architectToolBeam,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.slab,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.slab,
+                                    icon: Icons.layers_rounded,
+                                    label: l10n.architectToolSlab,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.roof,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.roof,
+                                    icon: Icons.roofing_rounded,
+                                    label: l10n.architectToolRoof,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.opening,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.opening,
+                                    icon: Icons.crop_free_rounded,
+                                    label: l10n.architectToolOpening,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.stair,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.stair,
+                                    icon: Icons.stairs_rounded,
+                                    label: l10n.architectToolStair,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.component,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.component,
+                                    icon: Icons.chair_outlined,
+                                    label: l10n.architectLibrary,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.zone,
+                                    )) ...[
+                                  _buildToolButton(
+                                    tool: ArchitectTool.zone,
+                                    icon: Icons.space_dashboard_rounded,
+                                    label: l10n.architectToolZone,
+                                  ),
+                                  _buildToolButton(
+                                    tool: ArchitectTool.zoneTable,
+                                    icon: Icons.table_chart_rounded,
+                                    label: l10n.architectToolZoneTable,
+                                  ),
+                                ],
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.dimension,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.dimension,
+                                    icon: Icons.straighten_rounded,
+                                    label: l10n.architectToolDimension,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.level,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.level,
+                                    icon: Icons.change_history_rounded,
+                                    label: l10n.architectToolLevel,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.text,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.text,
+                                    icon: Icons.title_rounded,
+                                    label: l10n.architectToolText,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.cadLine,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.cadLine,
+                                    icon: Icons.timeline_rounded,
+                                    label: l10n.architectToolCadLine,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.cadRect,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.cadRect,
+                                    icon: Icons.crop_square_rounded,
+                                    label: l10n.architectToolCadRect,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.cadCircle,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.cadCircle,
+                                    icon: Icons.radio_button_unchecked_rounded,
+                                    label: l10n.architectToolCadCircle,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.axis,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.axis,
+                                    icon: Icons.grid_on_rounded,
+                                    label: l10n.architectToolAxis,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.measure,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.measure,
+                                    icon: Icons.square_foot_rounded,
+                                    label: l10n.architectToolMeasure,
+                                  ),
+                              ],
                             ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.door))
-                            _buildToolButton(
-                              tool: ArchitectTool.door,
-                              icon: Icons.meeting_room_rounded,
-                              label: l10n.architectToolDoor,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.window))
-                            _buildToolButton(
-                              tool: ArchitectTool.window,
-                              icon: Icons.window_rounded,
-                              label: l10n.architectToolWindow,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.column))
-                            _buildToolButton(
-                              tool: ArchitectTool.column,
-                              icon: Icons.view_column_rounded,
-                              label: l10n.architectToolColumn,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.beam))
-                            _buildToolButton(
-                              tool: ArchitectTool.beam,
-                              icon: Icons.horizontal_rule_rounded,
-                              label: l10n.architectToolBeam,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.slab))
-                            _buildToolButton(
-                              tool: ArchitectTool.slab,
-                              icon: Icons.layers_rounded,
-                              label: l10n.architectToolSlab,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.roof))
-                            _buildToolButton(
-                              tool: ArchitectTool.roof,
-                              icon: Icons.roofing_rounded,
-                              label: l10n.architectToolRoof,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.opening))
-                            _buildToolButton(
-                              tool: ArchitectTool.opening,
-                              icon: Icons.crop_free_rounded,
-                              label: l10n.architectToolOpening,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.stair))
-                            _buildToolButton(
-                              tool: ArchitectTool.stair,
-                              icon: Icons.stairs_rounded,
-                              label: l10n.architectToolStair,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.component))
-                            _buildToolButton(
-                              tool: ArchitectTool.component,
-                              icon: Icons.chair_outlined,
-                              label: l10n.architectComponentLibraryTitle,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.zone)) ...[
-                            _buildToolButton(
-                              tool: ArchitectTool.zone,
-                              icon: Icons.space_dashboard_rounded,
-                              label: l10n.architectToolZone,
-                            ),
-                            _buildToolButton(
-                              tool: ArchitectTool.zoneTable,
-                              icon: Icons.table_chart_rounded,
-                              label: l10n.architectToolZoneTable,
-                            ),
-                          ],
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.dimension))
-                            _buildToolButton(
-                              tool: ArchitectTool.dimension,
-                              icon: Icons.straighten_rounded,
-                              label: l10n.architectToolDimension,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.level))
-                            _buildToolButton(
-                              tool: ArchitectTool.level,
-                              icon: Icons.change_history_rounded,
-                              label: l10n.architectToolLevel,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.text))
-                            _buildToolButton(
-                              tool: ArchitectTool.text,
-                              icon: Icons.title_rounded,
-                              label: l10n.architectToolText,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.cadLine))
-                            _buildToolButton(
-                              tool: ArchitectTool.cadLine,
-                              icon: Icons.timeline_rounded,
-                              label: l10n.architectToolCadLine,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.cadRect))
-                            _buildToolButton(
-                              tool: ArchitectTool.cadRect,
-                              icon: Icons.crop_square_rounded,
-                              label: l10n.architectToolCadRect,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.cadCircle))
-                            _buildToolButton(
-                              tool: ArchitectTool.cadCircle,
-                              icon: Icons.radio_button_unchecked_rounded,
-                              label: l10n.architectToolCadCircle,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.axis))
-                            _buildToolButton(
-                              tool: ArchitectTool.axis,
-                              icon: Icons.grid_on_rounded,
-                              label: l10n.architectToolAxis,
-                            ),
-                          if (category ==
-                              ArchitectToolCategory.of(ArchitectTool.measure))
-                            _buildToolButton(
-                              tool: ArchitectTool.measure,
-                              icon: Icons.square_foot_rounded,
-                              label: l10n.architectToolMeasure,
-                            ),
-                        ],
-                      ),
-                    ),
+                          ),
                   ),
                 ],
               ),
@@ -566,7 +631,12 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
             : const Color(0xFF262630),
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
-          onTap: () => onToolChanged(tool),
+          onTap: () {
+            onToolChanged(tool);
+            if (tool == ArchitectTool.component) {
+              widget.onOpenComponentLibrary?.call();
+            }
+          },
           borderRadius: BorderRadius.circular(10),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
@@ -1097,49 +1167,61 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          OutlinedButton.icon(
-            key: const ValueKey("component-tool-library-btn"),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF00E5FF),
-              side: const BorderSide(color: Color(0xFF00E5FF)),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width < 600 ? 110 : 220,
             ),
-            icon: const Icon(Icons.widgets_outlined, size: 16),
-            label: Text(
-              activeDef.defaultName,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            onPressed: widget.onOpenComponentLibrary,
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF262633),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              "${(w * 100).round()}x${(d * 100).round()}x${(h * 100).round()} cm",
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            child: OutlinedButton.icon(
+              key: const ValueKey("component-tool-library-btn"),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF00E5FF),
+                side: const BorderSide(color: Color(0xFF00E5FF)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+              ),
+              icon: const Icon(Icons.widgets_outlined, size: 16),
+              label: Text(
+                componentLabel(l, activeDef),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onPressed: widget.onOpenComponentLibrary,
             ),
           ),
-          const SizedBox(width: 8),
-          TextButton.icon(
-            key: const ValueKey("component-tool-rotate-btn"),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.white70,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          const SizedBox(width: 4),
+          Tooltip(
+            message:
+                '${(w * 100).round()}×${(d * 100).round()}×${(h * 100).round()} cm',
+            child: TextButton.icon(
+              key: const ValueKey('component-tool-size-btn'),
+              icon: const Icon(Icons.straighten, size: 18),
+              label: Text(l.architectPropertySize),
+              style: TextButton.styleFrom(foregroundColor: Colors.white70),
+              onPressed: () async {
+                final values = await ComponentDimensionsDialog.show(
+                  context,
+                  activeDef,
+                  activeParams,
+                );
+                if (values != null) {
+                  ComponentLibraryService.instance.setActiveParameters(values);
+                }
+              },
             ),
-            icon: const Icon(Icons.rotate_right, size: 18),
-            label: Text("$deg°"),
-            onPressed: widget.onRotateComponent,
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           IconButton(
-            key: const ValueKey("component-tool-studio-btn"),
-            tooltip: l.architectComponentStudioTitle,
-            icon: const Icon(Icons.code, color: Colors.white70, size: 18),
-            onPressed: widget.onOpenComponentStudio,
+            key: const ValueKey("component-tool-rotate-btn"),
+            tooltip: '${l.architectComponentRotateBtn} ($deg°)',
+            icon: const Icon(
+              Icons.rotate_right,
+              size: 18,
+              color: Colors.white70,
+            ),
+            onPressed: widget.onRotateComponent,
           ),
         ],
       ),
@@ -1228,10 +1310,17 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
         style: const TextStyle(color: Colors.white, fontSize: 13),
         value: activeZoneCategory,
         isExpanded: true,
-        items: [for (final category in ArchitectZoneCategory.values)
-          DropdownMenuItem(value: category,
-            child: Text(widget.zonePresets.categoryName(category, l10n),
-              maxLines: 1, overflow: TextOverflow.ellipsis))],
+        items: [
+          for (final category in ArchitectZoneCategory.values)
+            DropdownMenuItem(
+              value: category,
+              child: Text(
+                widget.zonePresets.categoryName(category, l10n),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
         onChanged: (category) {
           if (category != null) onZoneCategoryChanged(category);
         },

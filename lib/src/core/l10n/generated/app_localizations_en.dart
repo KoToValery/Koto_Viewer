@@ -6848,13 +6848,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get snapMidpointAlignment => 'Align to midpoint';
 
   @override
-  String get architectComponentLibraryTitle => 'Library & Objects';
+  String get architectComponentLibraryTitle => 'Library';
 
   @override
   String get architectComponentStudioTitle => 'Component Studio';
 
   @override
-  String get architectComponentStudioBtn => 'Studio (Code)';
+  String get architectComponentStudioBtn => 'Code';
 
   @override
   String get architectCategorySanitary => 'Sanitary';
@@ -6866,10 +6866,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectCategoryKitchen => 'Kitchen';
 
   @override
-  String get architectCategoryStorage => 'Wardrobes & Storage';
+  String get architectCategoryStorage => 'Storage';
 
   @override
-  String get architectCategoryOffice => 'Office & Equipment';
+  String get architectCategoryOffice => 'Office';
 
   @override
   String get architectCategoryEquipment => 'Equipment';
@@ -6887,10 +6887,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectComponentSavedMsg => 'Component saved to custom library!';
 
   @override
-  String get architectComponentCompileBtn => 'Compile & Test';
+  String get architectComponentCompileBtn => 'Preview';
 
   @override
-  String get architectComponentSaveBtn => 'Save to Library';
+  String get architectComponentSaveBtn => 'Save';
 
   @override
   String get architectComponentTemplateHint => 'Select template...';
@@ -6920,4 +6920,122 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectComponentNoItems => 'No items found';
+
+  @override
+  String get architectFurnishing => 'Furnishing';
+
+  @override
+  String get architectLibrary => 'Library';
+
+  @override
+  String get architectLibraryAll => 'All';
+
+  @override
+  String get architectLibrarySourceAll => 'All sources';
+
+  @override
+  String get architectLibraryBuiltIn => 'Built-in';
+
+  @override
+  String get architectLibraryCustom => 'My objects';
+
+  @override
+  String get architectLibraryImport => 'Import JSON';
+
+  @override
+  String get architectLibraryImportHelp =>
+      'Import a parametric object (.json) with dimensions in metres. Preview and save it in the studio.';
+
+  @override
+  String get architectLibraryImportError => 'The object could not be imported.';
+
+  @override
+  String get architectComponentInvalid =>
+      'Check the object code, dimensions and supported shapes.';
+
+  @override
+  String get architectComponentCustomName => 'Custom object';
+
+  @override
+  String get architectComponentCode => 'Code';
+
+  @override
+  String get architectComponentPreview => 'Preview';
+
+  @override
+  String get architectComponentLockRatio => 'Lock X:Y:Z';
+
+  @override
+  String get architectComponentLockRatioHelp =>
+      'Changing one dimension scales all three by the same factor.';
+
+  @override
+  String get architectComponentDimensionError =>
+      'Enter a size from 0.1 to 10000 cm.';
+
+  @override
+  String get architectComponentDefaults => 'Default size';
+
+  @override
+  String get architectTemplateDesk => 'Desk';
+
+  @override
+  String get architectTemplateBasin => 'Basin';
+
+  @override
+  String get architectComponentToiletWall => 'Wall-hung toilet';
+
+  @override
+  String get architectComponentToiletFloor => 'Floor-standing toilet';
+
+  @override
+  String get architectComponentVanity => 'Washbasin cabinet';
+
+  @override
+  String get architectComponentBathtub => 'Bathtub';
+
+  @override
+  String get architectComponentShower => 'Shower';
+
+  @override
+  String get architectComponentBedDouble => 'Double bed';
+
+  @override
+  String get architectComponentBedSingle => 'Single bed';
+
+  @override
+  String get architectComponentWardrobe => 'Wardrobe';
+
+  @override
+  String get architectComponentDining => 'Table and chairs';
+
+  @override
+  String get architectComponentSofa => 'Sofa';
+
+  @override
+  String get architectComponentDesk => 'Desk';
+
+  @override
+  String get architectComponentKitchenBase => 'Base cabinet';
+
+  @override
+  String get architectComponentKitchenSink => 'Sink cabinet';
+
+  @override
+  String get architectComponentFridge => 'Refrigerator';
+
+  @override
+  String get architectComponentCooktop => 'Cooktop and oven';
+
+  @override
+  String get architectComponentExportJsonTooltip => 'Copy JSON';
+
+  @override
+  String get architectComponentExportJsonMsg => 'JSON copied to clipboard';
+
+  @override
+  String get architectComponentView2d => '2D view';
+
+  @override
+  String get architectComponentView3d => '3D view';
 }

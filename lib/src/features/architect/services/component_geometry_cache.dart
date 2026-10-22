@@ -26,14 +26,18 @@ class ComponentGeometryKey {
     required double depth,
     required double height,
     Map<String, dynamic> customParams = const {},
-  })  : quantizedWidthMm = (width * 1000.0).round(),
-        quantizedDepthMm = (depth * 1000.0).round(),
-        quantizedHeightMm = (height * 1000.0).round(),
-        customParamsKey = _serializeParams(customParams);
+  }) : quantizedWidthMm = (width * 1000.0).round(),
+       quantizedDepthMm = (depth * 1000.0).round(),
+       quantizedHeightMm = (height * 1000.0).round(),
+       customParamsKey = _serializeParams(customParams);
 
   static String _serializeParams(Map<String, dynamic> params) {
     if (params.isEmpty) return '';
-    final sortedKeys = params.keys.where((k) => k != 'width' && k != 'depth' && k != 'height').toList()..sort();
+    final sortedKeys =
+        params.keys
+            .where((k) => k != 'width' && k != 'depth' && k != 'height')
+            .toList()
+          ..sort();
     return sortedKeys.map((k) => '$k=${params[k]}').join('&');
   }
 
@@ -50,12 +54,12 @@ class ComponentGeometryKey {
 
   @override
   int get hashCode => Object.hash(
-        definitionId,
-        quantizedWidthMm,
-        quantizedDepthMm,
-        quantizedHeightMm,
-        customParamsKey,
-      );
+    definitionId,
+    quantizedWidthMm,
+    quantizedDepthMm,
+    quantizedHeightMm,
+    customParamsKey,
+  );
 
   @override
   String toString() =>
@@ -68,10 +72,12 @@ class ComponentGeometryKey {
 
 /// Fast in-memory cache for compiled 3D meshes and 2D CAD blocks.
 class ComponentGeometryCache {
-  static final ComponentGeometryCache instance = ComponentGeometryCache._internal();
+  static final ComponentGeometryCache instance =
+      ComponentGeometryCache._internal();
   ComponentGeometryCache._internal();
 
   final Map<ComponentGeometryKey, CachedComponentGeometry> _cache = {};
+  final Map<String, ArchitectComponentDefinition> _definitions = {};
   static const int _maxCacheSize = 250;
 
   /// Retrieves or synchronously generates and caches component geometry.
@@ -79,13 +85,21 @@ class ComponentGeometryCache {
     ArchitectComponentDefinition definition,
     Map<String, dynamic> parameters,
   ) {
-    final w = (parameters['width'] as num?)?.toDouble() ??
+    if (!identical(_definitions[definition.id], definition)) {
+      _cache.removeWhere((key, _) => key.definitionId == definition.id);
+      _definitions[definition.id] = definition;
+    }
+    parameters = {...definition.defaultParameters, ...parameters};
+    final w =
+        (parameters['width'] as num?)?.toDouble() ??
         (definition.defaultParameters['width'] as num?)?.toDouble() ??
         0.60;
-    final d = (parameters['depth'] as num?)?.toDouble() ??
+    final d =
+        (parameters['depth'] as num?)?.toDouble() ??
         (definition.defaultParameters['depth'] as num?)?.toDouble() ??
         0.60;
-    final h = (parameters['height'] as num?)?.toDouble() ??
+    final h =
+        (parameters['height'] as num?)?.toDouble() ??
         (definition.defaultParameters['height'] as num?)?.toDouble() ??
         0.80;
 
@@ -100,7 +114,7 @@ class ComponentGeometryCache {
     final existing = _cache[key];
     if (existing != null) return existing;
 
-    final computed = definition.generateGeometry(parameters);
+    final computed = definition.resolveGeometry(parameters);
 
     if (_cache.length >= _maxCacheSize) {
       // Evict oldest entries
@@ -121,6 +135,7 @@ class ComponentGeometryCache {
   /// Clears the memory cache (e.g. after editing definitions or unit change).
   void clear() {
     _cache.clear();
+    _definitions.clear();
   }
 
   int get size => _cache.length;
@@ -167,9 +182,6 @@ class ComponentGltfCoordinateConverter {
         ),
       );
     }
-    return Mesh3D(
-      name: '${meshZUp.name}_gltf',
-      triangles: convertedTriangles,
-    );
+    return Mesh3D(name: '${meshZUp.name}_gltf', triangles: convertedTriangles);
   }
 }

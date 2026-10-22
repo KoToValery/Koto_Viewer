@@ -80,6 +80,9 @@ class ArchitectSelection {
 
   static Rect? bounds(ArchitectProject project, String id) {
     final s = project.activeStorey;
+    for (final component in s.components) {
+      if (component.id == id) return component.worldBoundingRect;
+    }
     for (final stair in s.stairs) {
       if (stair.id == id) return stair.plan.bounds;
     }
@@ -137,6 +140,11 @@ class ArchitectSelection {
   static Path outline(ArchitectProject project, String id) {
     final s = project.activeStorey;
     final path = Path();
+    for (final component in s.components) {
+      if (component.id == id) {
+        return path..addPolygon(component.worldPolygonCorners, true);
+      }
+    }
     for (final d in s.dimensions) {
       if (d.id == id) {
         return path

@@ -12194,7 +12194,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectComponentLibraryTitle.
   ///
   /// In en, this message translates to:
-  /// **'Library & Objects'**
+  /// **'Library'**
   String get architectComponentLibraryTitle;
 
   /// No description provided for @architectComponentStudioTitle.
@@ -12206,7 +12206,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectComponentStudioBtn.
   ///
   /// In en, this message translates to:
-  /// **'Studio (Code)'**
+  /// **'Code'**
   String get architectComponentStudioBtn;
 
   /// No description provided for @architectCategorySanitary.
@@ -12230,13 +12230,13 @@ abstract class AppLocalizations {
   /// No description provided for @architectCategoryStorage.
   ///
   /// In en, this message translates to:
-  /// **'Wardrobes & Storage'**
+  /// **'Storage'**
   String get architectCategoryStorage;
 
   /// No description provided for @architectCategoryOffice.
   ///
   /// In en, this message translates to:
-  /// **'Office & Equipment'**
+  /// **'Office'**
   String get architectCategoryOffice;
 
   /// No description provided for @architectCategoryEquipment.
@@ -12272,13 +12272,13 @@ abstract class AppLocalizations {
   /// No description provided for @architectComponentCompileBtn.
   ///
   /// In en, this message translates to:
-  /// **'Compile & Test'**
+  /// **'Preview'**
   String get architectComponentCompileBtn;
 
   /// No description provided for @architectComponentSaveBtn.
   ///
   /// In en, this message translates to:
-  /// **'Save to Library'**
+  /// **'Save'**
   String get architectComponentSaveBtn;
 
   /// No description provided for @architectComponentTemplateHint.
@@ -12334,6 +12334,234 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No items found'**
   String get architectComponentNoItems;
+
+  /// No description provided for @architectFurnishing.
+  ///
+  /// In en, this message translates to:
+  /// **'Furnishing'**
+  String get architectFurnishing;
+
+  /// No description provided for @architectLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Library'**
+  String get architectLibrary;
+
+  /// No description provided for @architectLibraryAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get architectLibraryAll;
+
+  /// No description provided for @architectLibrarySourceAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All sources'**
+  String get architectLibrarySourceAll;
+
+  /// No description provided for @architectLibraryBuiltIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in'**
+  String get architectLibraryBuiltIn;
+
+  /// No description provided for @architectLibraryCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'My objects'**
+  String get architectLibraryCustom;
+
+  /// No description provided for @architectLibraryImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import JSON'**
+  String get architectLibraryImport;
+
+  /// No description provided for @architectLibraryImportHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a parametric object (.json) with dimensions in metres. Preview and save it in the studio.'**
+  String get architectLibraryImportHelp;
+
+  /// No description provided for @architectLibraryImportError.
+  ///
+  /// In en, this message translates to:
+  /// **'The object could not be imported.'**
+  String get architectLibraryImportError;
+
+  /// No description provided for @architectComponentInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the object code, dimensions and supported shapes.'**
+  String get architectComponentInvalid;
+
+  /// No description provided for @architectComponentCustomName.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom object'**
+  String get architectComponentCustomName;
+
+  /// No description provided for @architectComponentCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get architectComponentCode;
+
+  /// No description provided for @architectComponentPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get architectComponentPreview;
+
+  /// No description provided for @architectComponentLockRatio.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock X:Y:Z'**
+  String get architectComponentLockRatio;
+
+  /// No description provided for @architectComponentLockRatioHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing one dimension scales all three by the same factor.'**
+  String get architectComponentLockRatioHelp;
+
+  /// No description provided for @architectComponentDimensionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a size from 0.1 to 10000 cm.'**
+  String get architectComponentDimensionError;
+
+  /// No description provided for @architectComponentDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Default size'**
+  String get architectComponentDefaults;
+
+  /// No description provided for @architectTemplateDesk.
+  ///
+  /// In en, this message translates to:
+  /// **'Desk'**
+  String get architectTemplateDesk;
+
+  /// No description provided for @architectTemplateBasin.
+  ///
+  /// In en, this message translates to:
+  /// **'Basin'**
+  String get architectTemplateBasin;
+
+  /// No description provided for @architectComponentToiletWall.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall-hung toilet'**
+  String get architectComponentToiletWall;
+
+  /// No description provided for @architectComponentToiletFloor.
+  ///
+  /// In en, this message translates to:
+  /// **'Floor-standing toilet'**
+  String get architectComponentToiletFloor;
+
+  /// No description provided for @architectComponentVanity.
+  ///
+  /// In en, this message translates to:
+  /// **'Washbasin cabinet'**
+  String get architectComponentVanity;
+
+  /// No description provided for @architectComponentBathtub.
+  ///
+  /// In en, this message translates to:
+  /// **'Bathtub'**
+  String get architectComponentBathtub;
+
+  /// No description provided for @architectComponentShower.
+  ///
+  /// In en, this message translates to:
+  /// **'Shower'**
+  String get architectComponentShower;
+
+  /// No description provided for @architectComponentBedDouble.
+  ///
+  /// In en, this message translates to:
+  /// **'Double bed'**
+  String get architectComponentBedDouble;
+
+  /// No description provided for @architectComponentBedSingle.
+  ///
+  /// In en, this message translates to:
+  /// **'Single bed'**
+  String get architectComponentBedSingle;
+
+  /// No description provided for @architectComponentWardrobe.
+  ///
+  /// In en, this message translates to:
+  /// **'Wardrobe'**
+  String get architectComponentWardrobe;
+
+  /// No description provided for @architectComponentDining.
+  ///
+  /// In en, this message translates to:
+  /// **'Table and chairs'**
+  String get architectComponentDining;
+
+  /// No description provided for @architectComponentSofa.
+  ///
+  /// In en, this message translates to:
+  /// **'Sofa'**
+  String get architectComponentSofa;
+
+  /// No description provided for @architectComponentDesk.
+  ///
+  /// In en, this message translates to:
+  /// **'Desk'**
+  String get architectComponentDesk;
+
+  /// No description provided for @architectComponentKitchenBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Base cabinet'**
+  String get architectComponentKitchenBase;
+
+  /// No description provided for @architectComponentKitchenSink.
+  ///
+  /// In en, this message translates to:
+  /// **'Sink cabinet'**
+  String get architectComponentKitchenSink;
+
+  /// No description provided for @architectComponentFridge.
+  ///
+  /// In en, this message translates to:
+  /// **'Refrigerator'**
+  String get architectComponentFridge;
+
+  /// No description provided for @architectComponentCooktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooktop and oven'**
+  String get architectComponentCooktop;
+
+  /// No description provided for @architectComponentExportJsonTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy JSON'**
+  String get architectComponentExportJsonTooltip;
+
+  /// No description provided for @architectComponentExportJsonMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'JSON copied to clipboard'**
+  String get architectComponentExportJsonMsg;
+
+  /// No description provided for @architectComponentView2d.
+  ///
+  /// In en, this message translates to:
+  /// **'2D view'**
+  String get architectComponentView2d;
+
+  /// No description provided for @architectComponentView3d.
+  ///
+  /// In en, this message translates to:
+  /// **'3D view'**
+  String get architectComponentView3d;
 }
 
 class _AppLocalizationsDelegate
