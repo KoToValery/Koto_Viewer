@@ -29,16 +29,19 @@ class _ViewDepthState extends State<_ViewDepthDialog> {
     final value = double.tryParse(input.text.trim().replaceAll(',', '.'));
     return value == null ? null : widget.project.units.fromUnit(value);
   }
+
   void save() {
     if (form.currentState!.validate()) {
       Navigator.pop(context, (depth: unlimited ? null : depth));
     }
   }
+
   @override
   void dispose() {
     input.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
@@ -62,13 +65,18 @@ class _ViewDepthState extends State<_ViewDepthDialog> {
                 key: const ValueKey('architect-view-depth-input'),
                 controller: input,
                 enabled: !unlimited,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: '${l.architectViewDepth} (${widget.project.units.symbol})',
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
                 ),
-                validator: (_) => !unlimited &&
-                    (depth == null || !depth!.isFinite || depth! < .01)
-                    ? l.architectViewDepthInvalid : null,
+                decoration: InputDecoration(
+                  labelText:
+                      '${l.architectViewDepth} (${widget.project.units.symbol})',
+                ),
+                validator: (_) =>
+                    !unlimited &&
+                        (depth == null || !depth!.isFinite || depth! < .01)
+                    ? l.architectViewDepthInvalid
+                    : null,
                 onFieldSubmitted: (_) => save(),
               ),
             ],
@@ -76,7 +84,10 @@ class _ViewDepthState extends State<_ViewDepthDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.cancel),
+        ),
         FilledButton(
           key: const ValueKey('architect-view-depth-save'),
           onPressed: save,

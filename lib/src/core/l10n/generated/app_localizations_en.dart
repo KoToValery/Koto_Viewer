@@ -6215,7 +6215,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectViewDirectionHint =>
-      'Choose the viewing side shown by the arrows.';
+      'Choose the viewing side and click the far boundary.';
 
   @override
   String architectSectionNumber(int number) {
@@ -7340,4 +7340,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String architectLineSymbolRange(String minimum, String maximum, String unit) {
     return 'Enter $minimum–$maximum $unit.';
   }
+
+  @override
+  String get architectViewUnlimited => 'Unlimited';
+
+  @override
+  String get architectViewDepth => 'View depth';
+
+  @override
+  String get architectViewDepthInvalid =>
+      'Enter a finite distance of at least 1 cm.';
 }

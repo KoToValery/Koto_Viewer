@@ -13,15 +13,11 @@ import '../rendering/architect_path_solid.dart';
 import '../rendering/architect_wall_network.dart';
 import 'architect_element_id.dart';
 import 'architect_polygon_geometry.dart';
+import 'architect_roof_junctions.dart';
 
 // === SECTION: DATA STRUCTURES ===
 
-enum ArchitectRoofEdgeKind {
-  eaves,
-  ridge,
-  hipOrValley,
-  verge,
-}
+enum ArchitectRoofEdgeKind { eaves, ridge, hipOrValley, verge }
 
 enum ArchitectRoofMemberKind {
   layer,
@@ -61,10 +57,13 @@ class ArchitectRoofSectionSlice {
   final double fromS;
   final double toS;
   final List<ArchitectRoofSectionMember> members;
+
   /// Bottom boundary points `(s, z)` of the roof assembly along `[fromS, toS]`.
   final List<Offset> bottomProfile;
+
   /// Full outer envelope path of the roof slice (for boolean wall trimming).
   final Path envelopePath;
+
   /// Horizontal wall cap intervals `[fromS, toS]` where supporting walls terminate at `maxWallZ` (bottom of 10 cm concrete ring beam).
   final List<({double fromS, double toS, double maxWallZ})> wallCapIntervals;
 
@@ -320,15 +319,17 @@ class ArchitectRoofGeometry {
               eavesEdge: 0,
             ),
             // Left hip triangle
-            makePlane(
-              [Offset(left, bottom), Offset(left, top), rLeft],
-              eavesEdge: 0,
-            ),
+            makePlane([
+              Offset(left, bottom),
+              Offset(left, top),
+              rLeft,
+            ], eavesEdge: 0),
             // Right hip triangle
-            makePlane(
-              [Offset(right, top), Offset(right, bottom), rRight],
-              eavesEdge: 0,
-            ),
+            makePlane([
+              Offset(right, top),
+              Offset(right, bottom),
+              rRight,
+            ], eavesEdge: 0),
           ];
         } else {
           final halfSpan = width / 2.0;
@@ -358,22 +359,27 @@ class ArchitectRoofGeometry {
               eavesEdge: 0,
             ),
             // Top hip triangle
-            makePlane(
-              [Offset(left, top), Offset(right, top), rTop],
-              eavesEdge: 0,
-            ),
+            makePlane([
+              Offset(left, top),
+              Offset(right, top),
+              rTop,
+            ], eavesEdge: 0),
             // Bottom hip triangle
-            makePlane(
-              [Offset(right, bottom), Offset(left, bottom), rBottom],
-              eavesEdge: 0,
-            ),
+            makePlane([
+              Offset(right, bottom),
+              Offset(left, bottom),
+              rBottom,
+            ], eavesEdge: 0),
           ];
         }
     }
   }
 
   /// Offsets closed polygon [polygon] outwards by [distance].
-  static List<Offset> offsetPolygonOutwards(List<Offset> polygon, double distance) {
+  static List<Offset> offsetPolygonOutwards(
+    List<Offset> polygon,
+    double distance,
+  ) {
     if (distance <= 0.001 || polygon.length < 3) return polygon;
     final n = polygon.length;
     final isCcw = BimPolygonGeometry.signedArea(polygon) > 0;
@@ -421,7 +427,10 @@ class ArchitectRoofGeometry {
     String? roofGroupId,
     List<double>? perEdgeSlopeDegrees,
   }) {
-    final cleaned = BimPolygonGeometry.clean(eavesPolygon, removeCollinear: true);
+    final cleaned = BimPolygonGeometry.clean(
+      eavesPolygon,
+      removeCollinear: true,
+    );
     if (cleaned.length < 3) return const [];
 
     final isCcw = BimPolygonGeometry.signedArea(cleaned) > 0;
@@ -438,7 +447,8 @@ class ArchitectRoofGeometry {
       final edgeDir = b - a;
       if (edgeDir.distance < 0.05) continue;
 
-      final slopeDegI = perEdgeSlopeDegrees != null && i < perEdgeSlopeDegrees.length
+      final slopeDegI =
+          perEdgeSlopeDegrees != null && i < perEdgeSlopeDegrees.length
           ? perEdgeSlopeDegrees[i]
           : slopeDegrees;
       final tanI = math.tan(slopeDegI * math.pi / 180.0);
@@ -456,7 +466,8 @@ class ArchitectRoofGeometry {
         final edgeJDir = bJ - aJ;
         if (edgeJDir.distance < 0.05) continue;
 
-        final slopeDegJ = perEdgeSlopeDegrees != null && j < perEdgeSlopeDegrees.length
+        final slopeDegJ =
+            perEdgeSlopeDegrees != null && j < perEdgeSlopeDegrees.length
             ? perEdgeSlopeDegrees[j]
             : slopeDegrees;
         final tanJ = math.tan(slopeDegJ * math.pi / 180.0);
@@ -471,7 +482,8 @@ class ArchitectRoofGeometry {
         final deltaVec = vecI - vecJ;
         if (deltaVec.distance < 1e-6) continue;
 
-        final rhs = BimPolygonGeometry.dot(a, vecI) - BimPolygonGeometry.dot(aJ, vecJ);
+        final rhs =
+            BimPolygonGeometry.dot(a, vecI) - BimPolygonGeometry.dot(aJ, vecJ);
 
         facePoly = _clipPolygonByHalfPlane(facePoly, deltaVec, rhs);
         if (facePoly.length < 3) break;
@@ -480,7 +492,8 @@ class ArchitectRoofGeometry {
       if (facePoly.length >= 3) {
         // Ensure edge i is at index 0 (safeEavesEdgeIndex)
         final orderedFace = _alignFaceToEaves(facePoly, a, b);
-        if (orderedFace.length >= 3 && BimPolygonGeometry.signedArea(orderedFace).abs() > 0.05) {
+        if (orderedFace.length >= 3 &&
+            BimPolygonGeometry.signedArea(orderedFace).abs() > 0.05) {
           planes.add(
             ArchitectRoofPlane(
               id: ArchitectElementId.next('roof'),
@@ -544,7 +557,8 @@ class ArchitectRoofGeometry {
     if (poly.length < 3) return const [];
     final output = <Offset>[];
 
-    bool isInside(Offset p) => (p.dx * normal.dx + p.dy * normal.dy) <= c + 1e-6;
+    bool isInside(Offset p) =>
+        (p.dx * normal.dx + p.dy * normal.dy) <= c + 1e-6;
 
     Offset intersect(Offset p1, Offset p2) {
       final val1 = p1.dx * normal.dx + p1.dy * normal.dy - c;
@@ -596,10 +610,7 @@ class ArchitectRoofGeometry {
     }
     if (bestIdx == 0) return face;
     if (bestIdx > 0) {
-      return [
-        ...face.sublist(bestIdx),
-        ...face.sublist(0, bestIdx),
-      ];
+      return [...face.sublist(bestIdx), ...face.sublist(0, bestIdx)];
     }
     return face;
   }
@@ -650,17 +661,17 @@ class ArchitectRoofGeometry {
   /// clipped to the roof polygon.
   static (Offset, Offset)? wallBearingLine(ArchitectRoofPlane roof) {
     final distance = roof.manualSupportDistance ?? roof.eavesOverhang;
-    if (!distance.isFinite || distance < 0 || distance > roof.maxSlopeRun ||
+    if (!distance.isFinite ||
+        distance < 0 ||
+        distance > roof.maxSlopeRun ||
         roof.points.length < 3) {
       return null;
     }
     if (roof.manualSupportDistance == null && distance <= 0.01) return null;
     final (ea, eb) = roof.eavesEdge;
     final inward = roof.inwardNormalOfEdge(roof.safeEavesEdgeIndex);
-    final shift = inward *
-        (roof.reverseSlope
-            ? (roof.maxSlopeRun - distance)
-            : distance);
+    final shift =
+        inward * (roof.reverseSlope ? (roof.maxSlopeRun - distance) : distance);
     final lineA = ea + shift;
     final lineB = eb + shift;
     final edgeDir = eb - ea;
@@ -728,7 +739,9 @@ class ArchitectRoofGeometry {
         var maxTopZ = double.negativeInfinity;
         for (final w in lowerWalls) {
           final topZ =
-              lowerStorey.elevation + w.baseOffset + w.effectiveHeight(lowerStorey.height);
+              lowerStorey.elevation +
+              w.baseOffset +
+              w.effectiveHeight(lowerStorey.height);
           if (topZ > maxTopZ) maxTopZ = topZ;
         }
         return maxTopZ - storey.elevation;
@@ -747,6 +760,7 @@ class ArchitectRoofGeometry {
     required ArchitectStorey storey,
     required ArchitectSection sectionLine,
     ArchitectStorey? lowerStorey,
+    ArchitectProject? project,
   }) {
     if (storey.roofs.isEmpty) return const [];
     final lineVec = sectionLine.end - sectionLine.start;
@@ -796,7 +810,8 @@ class ArchitectRoofGeometry {
         final wSpan = wMax - wMin;
         // Transverse / oblique wall cross-section (exclude longitudinal gable wall cuts)
         if (wSpan >= 0.01 &&
-            (wall.isCurved || wSpan <= wall.coreThickness / transverse + 0.01)) {
+            (wall.isCurved ||
+                wSpan <= wall.coreThickness / transverse + 0.01)) {
           wallIntervals.add((
             fromS: wMin,
             toS: wMax,
@@ -809,32 +824,36 @@ class ArchitectRoofGeometry {
     // 1. Collect raw 1D intervals [fromS, toS] for each roof plane crossed by the section line.
     final rawIntervals =
         <({ArchitectRoofPlane roof, double fromS, double toS})>[];
+    final roofJunctions = ArchitectRoofJunctions.of(storey, project: project);
     for (final roof in storey.roofs) {
       if (roof.points.length < 3) continue;
+      final footprint = roofJunctions.footprint(roof);
       final hits = <double>[];
-      for (var i = 0; i < roof.points.length; i++) {
-        final a = roof.points[i];
-        final b = roof.points[(i + 1) % roof.points.length];
-        final hit = _intersectSegments(
-          sectionLine.start,
-          sectionLine.end,
-          a,
-          b,
-        );
-        if (hit != null) {
-          final s =
-              (hit - sectionLine.start).dx * lineDir.dx +
-              (hit - sectionLine.start).dy * lineDir.dy;
-          if (hits.every((h) => (h - s).abs() > 1e-4)) {
-            hits.add(s);
+      for (final contour in ArchitectPathSolid.contours(footprint)) {
+        for (var i = 0; i < contour.length; i++) {
+          final a = contour[i];
+          final b = contour[(i + 1) % contour.length];
+          final hit = _intersectSegments(
+            sectionLine.start,
+            sectionLine.end,
+            a,
+            b,
+          );
+          if (hit != null) {
+            final s =
+                (hit - sectionLine.start).dx * lineDir.dx +
+                (hit - sectionLine.start).dy * lineDir.dy;
+            if (hits.every((h) => (h - s).abs() > 1e-4)) {
+              hits.add(s);
+            }
           }
         }
       }
-      if (roof.containsPoint(sectionLine.start) &&
+      if (footprint.contains(sectionLine.start) &&
           hits.every((h) => h.abs() > 1e-4)) {
         hits.add(0.0);
       }
-      if (roof.containsPoint(sectionLine.end) &&
+      if (footprint.contains(sectionLine.end) &&
           hits.every((h) => (h - lineLen).abs() > 1e-4)) {
         hits.add(lineLen);
       }
@@ -844,7 +863,7 @@ class ArchitectRoofGeometry {
         final s1 = hits[i + 1];
         if (s1 - s0 < 0.02) continue;
         final midWorld = sectionLine.start + lineDir * ((s0 + s1) * 0.5);
-        if (roof.containsPoint(midWorld)) {
+        if (footprint.contains(midWorld)) {
           rawIntervals.add((roof: roof, fromS: s0, toS: s1));
         }
       }
@@ -864,7 +883,8 @@ class ArchitectRoofGeometry {
             double totalVerticalThick,
             List<ArchitectRoofSectionMember> layerMembers,
             List<ArchitectRoofSectionMember> discreteMembers,
-            List<({double fromS, double toS, double maxWallZ})> wallCapIntervals,
+            List<({double fromS, double toS, double maxWallZ})>
+            wallCapIntervals,
           })
         >[];
 
@@ -898,7 +918,8 @@ class ArchitectRoofGeometry {
 
       final layerMembers = <ArchitectRoofSectionMember>[];
       final discreteMembers = <ArchitectRoofSectionMember>[];
-      final wallCapIntervals = <({double fromS, double toS, double maxWallZ})>[];
+      final wallCapIntervals =
+          <({double fromS, double toS, double maxWallZ})>[];
       final timber = roof.assembly.timber;
 
       // Apparent slope along the section line:
@@ -1066,7 +1087,8 @@ class ArchitectRoofGeometry {
       // at intersected supporting walls (or at the nominal eaves bearing line if no walls are present).
       if ((timber.hasWallPlate || timber.hasRingBeam) &&
           slopeDirDotSection > 0.25) {
-        final sliceWallSpans = <({double fromS, double toS, double plateScale})>[];
+        final sliceWallSpans =
+            <({double fromS, double toS, double plateScale})>[];
         if (roof.manualSupportDistance == null) {
           for (final wSpan in wallIntervals) {
             final wCenter = (wSpan.fromS + wSpan.toS) * 0.5;
@@ -1093,7 +1115,8 @@ class ArchitectRoofGeometry {
             }
           }
           if (roof.manualSupportDistance == null &&
-              sWallPlate == null && roof.eavesOverhang > 0.05) {
+              sWallPlate == null &&
+              roof.eavesOverhang > 0.05) {
             final overhangS =
                 roof.eavesOverhang / math.max(0.3, slopeDirDotSection);
             sWallPlate = zTop0 <= zTop1 ? (s0 + overhangS) : (s1 - overhangS);
@@ -1102,12 +1125,17 @@ class ArchitectRoofGeometry {
               sWallPlate >= s0 - 1e-4 &&
               sWallPlate <= s1 + 1e-4) {
             final plateScale = 1.0 / slopeDirDotSection;
-            var nominalWidth = math.max(0.25, timber.wallPlateWidth) * plateScale;
-            if (roof.manualSupportDistance != null && wallIntervals.isNotEmpty) {
+            var nominalWidth =
+                math.max(0.25, timber.wallPlateWidth) * plateScale;
+            if (roof.manualSupportDistance != null &&
+                wallIntervals.isNotEmpty) {
               final station = sWallPlate;
-              final nearest = [...wallIntervals]..sort((a, b) =>
-                (((a.fromS + a.toS) * .5) - station).abs().compareTo(
-                  (((b.fromS + b.toS) * .5) - station).abs()));
+              final nearest = [...wallIntervals]
+                ..sort(
+                  (a, b) => (((a.fromS + a.toS) * .5) - station)
+                      .abs()
+                      .compareTo((((b.fromS + b.toS) * .5) - station).abs()),
+                );
               nominalWidth = nearest.first.toS - nearest.first.fromS;
             }
             final nominalHalfW = nominalWidth * .5;
@@ -1429,8 +1457,9 @@ class ArchitectRoofGeometry {
   /// Returns `null` if no roof plane covers [worldPt].
   static double? roofUndersideZAt(ArchitectStorey storey, Offset worldPt) {
     double? bestZ;
+    final junctions = ArchitectRoofJunctions.of(storey);
     for (final roof in storey.roofs) {
-      if (roof.containsPoint(worldPt)) {
+      if (junctions.footprint(roof).contains(worldPt)) {
         final z = storey.elevation + roof.undersideElevationAt(worldPt);
         if (bestZ == null || z < bestZ) {
           bestZ = z;
@@ -1443,8 +1472,9 @@ class ArchitectRoofGeometry {
   /// Evaluates the roof top elevation (world Z in metres) at [worldPt] on [storey].
   static double? roofTopZAt(ArchitectStorey storey, Offset worldPt) {
     double? bestZ;
+    final junctions = ArchitectRoofJunctions.of(storey);
     for (final roof in storey.roofs) {
-      if (roof.containsPoint(worldPt)) {
+      if (junctions.footprint(roof).contains(worldPt)) {
         final z = storey.elevation + roof.topElevationAt(worldPt);
         if (bestZ == null || z > bestZ) {
           bestZ = z;

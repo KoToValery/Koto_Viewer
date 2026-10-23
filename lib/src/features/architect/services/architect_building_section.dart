@@ -41,6 +41,7 @@ class ArchitectBuildingSection {
   final List<ArchitectSectionRegion> regions;
   final Rect bounds;
   final Map<String, Path> roofProfiles;
+
   /// Visible surfaces behind the cut, already masked by cut solids. These are
   /// projection lines only: they must never acquire section hatching.
   final ArchitectBuildingElevation? background;
@@ -162,6 +163,7 @@ class ArchitectBuildingSection {
         floor,
       );
       final slices = ArchitectRoofGeometry.buildSectionSlices(
+        project: project,
         storey: floor,
         sectionLine: cut,
         lowerStorey: lowerFloor,
@@ -538,23 +540,24 @@ class ArchitectBuildingSection {
       cutBody = Path.combine(PathOperation.union, cutBody, region.path);
     }
     final shift = Offset(cut.length / 2, 0);
-    Path exposed(Path path) => Path.combine(
-      PathOperation.difference, path.shift(shift), cutBody,
-    );
+    Path exposed(Path path) =>
+        Path.combine(PathOperation.difference, path.shift(shift), cutBody);
     final backgroundFaces = <Path>[];
     Rect? bounds;
     for (final face in projected.faces) {
       final visible = exposed(face);
       if (visible.getBounds().isEmpty) continue;
       backgroundFaces.add(visible);
-      bounds = bounds?.expandToInclude(visible.getBounds()) ?? visible.getBounds();
+      bounds =
+          bounds?.expandToInclude(visible.getBounds()) ?? visible.getBounds();
     }
     final background = ArchitectBuildingElevation(
       backgroundFaces,
       bounds ?? Rect.zero,
       elementPaths: {
         for (final entry in projected.elementPaths.entries)
-          if (!exposed(entry.value).getBounds().isEmpty) entry.key: exposed(entry.value),
+          if (!exposed(entry.value).getBounds().isEmpty)
+            entry.key: exposed(entry.value),
       },
       operations: [
         for (final op in projected.operations)

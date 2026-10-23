@@ -198,7 +198,10 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
           _updateRoof(roofId, (st, r) {
             var nextOffset = res.baseElevationOffset;
             if (res.attachToWalls && !r.attachToWalls) {
-              final lower = ArchitectRoofGeometry.supportingWallStorey(project, st);
+              final lower = ArchitectRoofGeometry.supportingWallStorey(
+                project,
+                st,
+              );
               nextOffset =
                   ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
                     roof: r.copyWith(
@@ -335,10 +338,18 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
       setState(() => secondPoint = point);
       return;
     }
-    final view = ArchitectViewPlacement.resolve(firstPoint!, secondPoint!, point);
+    final view = ArchitectViewPlacement.resolve(
+      firstPoint!,
+      secondPoint!,
+      point,
+    );
     if (view == null) return;
     var next =
-        cut?.copyWith(start: firstPoint, end: secondPoint, viewDepth: view.depth) ??
+        cut?.copyWith(
+          start: firstPoint,
+          end: secondPoint,
+          viewDepth: view.depth,
+        ) ??
         ArchitectSection(
           id: ArchitectElementId.next('section'),
           start: firstPoint!,
@@ -527,9 +538,18 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
   Future<void> changeDepth() async {
     final value = cut;
     if (value == null) return;
-    final result = await showArchitectViewDepth(context, project, value.viewDepth);
+    final result = await showArchitectViewDepth(
+      context,
+      project,
+      value.viewDepth,
+    );
     if (mounted && result != null) {
-      update(value.copyWith(viewDepth: result.depth, clearViewDepth: result.depth == null));
+      update(
+        value.copyWith(
+          viewDepth: result.depth,
+          clearViewDepth: result.depth == null,
+        ),
+      );
     }
   }
 
@@ -605,7 +625,10 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                   child: Text(l.architectFacadeReverse),
                 ),
                 PopupMenuItem(value: 'cut', child: Text(l.buildingSectionCut)),
-                PopupMenuItem(value: 'depth', child: Text(l.architectViewDepth)),
+                PopupMenuItem(
+                  value: 'depth',
+                  child: Text(l.architectViewDepth),
+                ),
                 PopupMenuItem(
                   value: 'name',
                   child: Text(l.architectPropertyName),
@@ -1217,9 +1240,13 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = .55;
       for (final face in background.faces) {
-        architectDrawingSources(canvas, background.elementPaths.entries
-            .where((e) => e.value.getBounds().overlaps(face.getBounds()))
-            .map((e) => e.key), 'sectionProjection');
+        architectDrawingSources(
+          canvas,
+          background.elementPaths.entries
+              .where((e) => e.value.getBounds().overlaps(face.getBounds()))
+              .map((e) => e.key),
+          'sectionProjection',
+        );
         canvas.drawPath(face.transform(matrix.storage), pen);
       }
       for (final op in background.operations) {
@@ -1230,7 +1257,17 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
       }
     }
     for (final region in drawing.data.drawingRegions) {
-      architectDrawingSources(canvas, drawing.data.regions.where((r) => r.material == region.material && r.path.getBounds().overlaps(region.path.getBounds())).map((r) => r.sourceId), 'sectionRegion');
+      architectDrawingSources(
+        canvas,
+        drawing.data.regions
+            .where(
+              (r) =>
+                  r.material == region.material &&
+                  r.path.getBounds().overlaps(region.path.getBounds()),
+            )
+            .map((r) => r.sourceId),
+        'sectionRegion',
+      );
       final path = region.path.transform(matrix.storage);
       final isSelectedRoof =
           drawing.selectedRoofId != null &&
@@ -1342,7 +1379,8 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
           ..strokeWidth = .5,
       );
       text(
-        ArchitectTextScope.current?.length(floor.elevation) ?? floor.elevationLabel,
+        ArchitectTextScope.current?.length(floor.elevation) ??
+            floor.elevationLabel,
         a + const Offset(2, -2),
         math.max(9, drawing.textHeight * scale),
         color,

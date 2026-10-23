@@ -4122,7 +4122,7 @@
   "architectRoofSectionDetailTitle": "Roof assembly",
   "architectSectionStartHint": "Choose the start of the cut.",
   "architectViewEndHint": "Set the end using the alignment guides.",
-  "architectViewDirectionHint": "Choose the viewing side shown by the arrows.",
+  "architectViewDirectionHint": "Choose the viewing side and click the far boundary.",
   "architectSectionNumber": "Section {number}",
   "architectManageViews": "Manage views",
   "architectViewDrawingEmpty": "Choose or create a view from the menu.",
@@ -4545,5 +4545,8 @@
   "architectLineSymbolNewStroke": "New stroke",
   "architectLineSymbolCloseStroke": "Close stroke",
   "architectLineSymbolRange": "Enter {minimum}–{maximum} {unit}.",
-  "@architectLineSymbolRange": {"placeholders": {"minimum": {"type": "String"}, "maximum": {"type": "String"}, "unit": {"type": "String"}}}
+  "@architectLineSymbolRange": {"placeholders": {"minimum": {"type": "String"}, "maximum": {"type": "String"}, "unit": {"type": "String"}}},
+  "architectViewUnlimited": "Unlimited",
+  "architectViewDepth": "View depth",
+  "architectViewDepthInvalid": "Enter a finite distance of at least 1 cm."
 }

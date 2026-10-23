@@ -2017,7 +2017,7 @@
   "architectRoofSectionDetailTitle": "Покривен детайл",
   "architectSectionStartHint": "Посочи началото на разреза.",
   "architectViewEndHint": "Посочи края по водачите за подравняване.",
-  "architectViewDirectionHint": "Посочи накъде да сочат стрелките.",
+  "architectViewDirectionHint": "Посочи посоката и кликни крайната граница на гледката.",
   "architectSectionNumber": "Разрез {number}",
   "architectManageViews": "Управление",
   "architectViewDrawingEmpty": "Изберете или създайте изглед от менюто.",
@@ -2408,5 +2408,8 @@
   "architectLineSymbolNewStroke": "Нов щрих",
   "architectLineSymbolCloseStroke": "Затвори щриха",
   "architectLineSymbolRange": "Въведете от {minimum} до {maximum} {unit}.",
-  "@architectLineSymbolRange": {"placeholders": {"minimum": {"type": "String"}, "maximum": {"type": "String"}, "unit": {"type": "String"}}}
+  "@architectLineSymbolRange": {"placeholders": {"minimum": {"type": "String"}, "maximum": {"type": "String"}, "unit": {"type": "String"}}},
+  "architectViewUnlimited": "Без ограничение",
+  "architectViewDepth": "Обхват",
+  "architectViewDepthInvalid": "Въведи крайно разстояние поне 1 cm."
 }

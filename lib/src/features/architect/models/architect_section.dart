@@ -52,6 +52,7 @@ class ArchitectSlabDetail {
 class ArchitectSection {
   final String id, name;
   final Offset start, end;
+
   /// Far clipping distance in model metres; null keeps legacy unlimited views.
   final double? viewDepth;
   final List<ArchitectSlabDetail> details;

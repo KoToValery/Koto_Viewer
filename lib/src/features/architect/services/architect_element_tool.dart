@@ -1,3 +1,4 @@
+import 'architect_roof_junctions.dart';
 import '../models/architect_line_style.dart';
 // === SECTION: ARCHITECTURAL ELEMENT TOOL ===
 import 'package:flutter/material.dart';
@@ -678,8 +679,9 @@ class ArchitectElementTool extends ChangeNotifier {
     }
 
     // Check Roofs
+    final roofJunctions = ArchitectRoofJunctions.of(storey, project: annotationProject);
     for (final roof in storey.roofs.reversed) {
-      if (roof.containsPoint(point)) {
+      if (roofJunctions.footprint(roof).contains(point)) {
         yield roof.id;
       }
     }

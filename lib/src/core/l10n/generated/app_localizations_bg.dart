@@ -6242,7 +6242,8 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectViewEndHint => 'Посочи края по водачите за подравняване.';
 
   @override
-  String get architectViewDirectionHint => 'Посочи накъде да сочат стрелките.';
+  String get architectViewDirectionHint =>
+      'Посочи посоката и кликни крайната граница на гледката.';
 
   @override
   String architectSectionNumber(int number) {
@@ -7369,4 +7370,13 @@ class AppLocalizationsBg extends AppLocalizations {
   String architectLineSymbolRange(String minimum, String maximum, String unit) {
     return 'Въведете от $minimum до $maximum $unit.';
   }
+
+  @override
+  String get architectViewUnlimited => 'Без ограничение';
+
+  @override
+  String get architectViewDepth => 'Обхват';
+
+  @override
+  String get architectViewDepthInvalid => 'Въведи крайно разстояние поне 1 cm.';
 }

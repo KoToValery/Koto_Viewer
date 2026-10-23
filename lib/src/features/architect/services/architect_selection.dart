@@ -1,3 +1,4 @@
+import 'architect_roof_junctions.dart';
 import 'dart:convert';
 import '../models/architect_line_style.dart';
 import '../models/architect_hatch_pattern.dart';
@@ -217,7 +218,7 @@ class ArchitectSelection {
       if (slab.id == id) return path..addPolygon(slab.polygon, true);
     }
     for (final roof in s.roofs) {
-      if (roof.id == id) return path..addPolygon(roof.points, true);
+      if (roof.id == id) return ArchitectRoofJunctions.of(s, project: project).footprint(roof);
     }
     for (final zone in s.zones) {
       if (zone.id == id) return path..addPolygon(zone.polygon, true);

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../models/architect_project.dart';
 import '../services/architect_roof_geometry.dart';
 import '../services/architect_roof_tool.dart';
+import '../services/architect_roof_junctions.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_path_solid.dart';
 import 'architect_wall_network.dart';
@@ -58,18 +59,22 @@ class ArchitectRoofPainterHelper {
   static void paintRoofs({
     required Canvas canvas,
     required ArchitectStorey storey,
+    ArchitectProject? project,
     required double scale,
     required Set<String> selectedIds,
     bool isGhost = false,
     bool isLowerLevel = false,
   }) {
     if (storey.roofs.isEmpty) return;
-
+    final junctions = ArchitectRoofJunctions.of(storey, project: project);
+    final drawnEdges = <String>{};
     for (final roof in storey.roofs) {
       architectDrawingSources(canvas, {roof.id}, 'roof');
       if (roof.points.length < 3) continue;
-      final isSelected = !isGhost && !isLowerLevel && selectedIds.contains(roof.id);
-      final path = Path()..addPolygon(roof.points, true);
+      final isSelected =
+          !isGhost && !isLowerLevel && selectedIds.contains(roof.id);
+      final path = junctions.footprint(roof);
+      if (path.getBounds().isEmpty) continue;
 
       final topMat = roof.assembly.layers.firstOrNull?.material;
       final baseColor = switch (topMat) {
@@ -108,9 +113,7 @@ class ArchitectRoofPainterHelper {
         final lineDir = Offset(-stepDir.dy, stepDir.dx);
         final step = isStandingSeam ? 0.60 : 0.35;
 
-        final hatchAlpha = isLowerLevel
-            ? 0.12
-            : (isSelected ? 0.35 : 0.22);
+        final hatchAlpha = isLowerLevel ? 0.12 : (isSelected ? 0.35 : 0.22);
         final hatchW = isLowerLevel ? 0.5 / scale : 0.8 / scale;
         final hatchPaint = Paint()
           ..color = baseColor.withValues(alpha: hatchAlpha)
@@ -132,6 +135,8 @@ class ArchitectRoofPainterHelper {
       // 3. Dashed inner wall bearing line (showing eaves overhang projection)
       final bearing = ArchitectRoofGeometry.wallBearingLine(roof);
       if (bearing != null && !isGhost && !isLowerLevel) {
+        canvas.save();
+        canvas.clipPath(path);
         _drawDashedLine(
           canvas,
           bearing.$1,
@@ -143,39 +148,51 @@ class ArchitectRoofPainterHelper {
           dashLength: 0.20,
           gapLength: 0.14,
         );
+        canvas.restore();
       }
 
       // 4. Perimeter edges:
       // "Покривите от долните нива да се показват с тънки линии и с кота.
       //  Покривите от ниво Покривни линии да са с дебели линии"
-      for (var i = 0; i < roof.points.length; i++) {
-        final a = roof.points[i];
-        final b = roof.points[(i + 1) % roof.points.length];
-        final kind = ArchitectRoofGeometry.classifyEdge(roof, i, storey.roofs);
-        final isEaves = i == roof.safeEavesEdgeIndex;
+      for (final contour in ArchitectPathSolid.contours(path)) {
+        for (var j = 0; j < contour.length; j++) {
+          final a = contour[j];
+          final b = contour[(j + 1) % contour.length];
+          final i = ArchitectRoofJunctions.originalEdge(roof, a, b);
+          final kind = i == null
+              ? ArchitectRoofEdgeKind.hipOrValley
+              : ArchitectRoofGeometry.classifyEdge(roof, i, storey.roofs);
+          final isEaves = i == roof.safeEavesEdgeIndex;
+          final endpoints = [
+            '${(a.dx * 1e5).round()},${(a.dy * 1e5).round()}',
+            '${(b.dx * 1e5).round()},${(b.dy * 1e5).round()}',
+          ]..sort();
+          if (!drawnEdges.add(endpoints.join(':')) && !isSelected) continue;
 
-        final edgeColor = isSelected
-            ? (isEaves ? const Color(0xFF00E676) : const Color(0xFFFFAB40))
-            : (isLowerLevel
-                ? baseColor.withValues(alpha: 0.65)
-                : baseColor.withValues(alpha: isGhost ? 0.30 : 0.88));
-        final strokeW = isLowerLevel
-            ? (1.0 / scale) // Тънка линия за покриви от долните нива!
-            : switch (kind) {
-                ArchitectRoofEdgeKind.ridge ||
-                ArchitectRoofEdgeKind.hipOrValley => 2.4 / scale,
-                ArchitectRoofEdgeKind.eaves => (isSelected ? 2.8 : 2.0) / scale,
-                ArchitectRoofEdgeKind.verge => 1.6 / scale,
-              };
+          final edgeColor = isSelected
+              ? (isEaves ? const Color(0xFF00E676) : const Color(0xFFFFAB40))
+              : (isLowerLevel
+                    ? baseColor.withValues(alpha: 0.65)
+                    : baseColor.withValues(alpha: isGhost ? 0.30 : 0.88));
+          final strokeW = isLowerLevel
+              ? (1.0 / scale) // Тънка линия за покриви от долните нива!
+              : switch (kind) {
+                  ArchitectRoofEdgeKind.ridge ||
+                  ArchitectRoofEdgeKind.hipOrValley => 2.4 / scale,
+                  ArchitectRoofEdgeKind.eaves =>
+                    (isSelected ? 2.8 : 2.0) / scale,
+                  ArchitectRoofEdgeKind.verge => 1.6 / scale,
+                };
 
-        canvas.drawLine(
-          a,
-          b,
-          Paint()
-            ..color = edgeColor
-            ..strokeWidth = strokeW
-            ..strokeCap = StrokeCap.round,
-        );
+          canvas.drawLine(
+            a,
+            b,
+            Paint()
+              ..color = edgeColor
+              ..strokeWidth = strokeW
+              ..strokeCap = StrokeCap.round,
+          );
+        }
       }
 
       // 5. Slope arrow and elevation/angle badge at centroid
@@ -188,6 +205,7 @@ class ArchitectRoofPainterHelper {
           color: isSelected ? const Color(0xFFFFCC80) : baseColor,
           isSelected: isSelected,
           isLowerLevel: isLowerLevel,
+          position: junctions.labelPoint(roof),
         );
       }
     }
@@ -198,10 +216,15 @@ class ArchitectRoofPainterHelper {
     ArchitectRoofPlane roof,
     Offset worldPoint, {
     required double scale,
+    ArchitectStorey? storey,
+    ArchitectProject? project,
   }) {
     if (roof.points.length < 3) return false;
     final radius = math.max(0.45, 22.0 / scale);
-    return (worldPoint - roof.centroid).distance <= radius;
+    final center = storey == null
+        ? roof.centroid
+        : ArchitectRoofJunctions.of(storey, project: project).labelPoint(roof);
+    return (worldPoint - center).distance <= radius;
   }
 
   static void _drawSlopeIndicator({
@@ -212,10 +235,13 @@ class ArchitectRoofPainterHelper {
     required Color color,
     bool isSelected = false,
     bool isLowerLevel = false,
+    Offset? position,
   }) {
     final scope = ArchitectTextScope.current;
-    if (scope != null) scale = 11 / scope.height(roof.id, ArchitectAnnotationRole.symbol);
-    final center = roof.centroid;
+    if (scope != null) {
+      scale = 11 / scope.height(roof.id, ArchitectAnnotationRole.symbol);
+    }
+    final center = position ?? roof.centroid;
     final dir = roof.slopeDirection;
     final arrowHalfLen = 18.0 / scale;
     final start = center - dir * arrowHalfLen;
@@ -270,7 +296,10 @@ class ArchitectRoofPainterHelper {
         : '$degText° ($pctText%)  $sign$ridgeLabel';
 
     final fontSize = 11.0 / scale;
-    final tp = ArchitectTextPainter(elementId: roof.id, role: ArchitectAnnotationRole.symbol, modelScale: 1,
+    final tp = ArchitectTextPainter(
+      elementId: roof.id,
+      role: ArchitectAnnotationRole.symbol,
+      modelScale: 1,
       text: TextSpan(
         text: label,
         style: TextStyle(
@@ -294,11 +323,7 @@ class ArchitectRoofPainterHelper {
       ),
       Radius.circular(4.0 / scale),
     );
-    canvas.drawRRect(
-      bgRect,
-      Paint()
-        ..color = ArchitectPaperStyle.paper,
-    );
+    canvas.drawRRect(bgRect, Paint()..color = ArchitectPaperStyle.paper);
     if (isLowerLevel) {
       canvas.drawRRect(
         bgRect,

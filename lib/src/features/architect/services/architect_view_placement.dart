@@ -18,9 +18,9 @@ class ArchitectViewPlacement {
     this.direction,
     this.target,
     this.wall,
-    this.aligned,
-    {this.viewDepth}
-  );
+    this.aligned, {
+    this.viewDepth,
+  });
   Offset get axis => (end - start) / (end - start).distance;
   Offset get centre => (start + end) / 2;
 
@@ -86,7 +86,9 @@ class ArchitectViewPlacement {
     ];
     var score = math.cos(math.pi / 15);
     Offset? axis;
-    for (final candidate in candidates) {
+    for (final candidate in [
+      for (final axis in candidates) ...[axis, Offset(-axis.dy, axis.dx)],
+    ]) {
       if (candidate.distance < .01) continue;
       final unit = candidate / candidate.distance;
       final alignment = _dot(delta, unit).abs() / delta.distance;
@@ -164,7 +166,8 @@ class ArchitectViewPlacement {
       targetWall,
       raw != null && (raw - candidate).distance > 1e-6,
       viewDepth: end == null || pointer == null
-          ? null : resolve(start, end, pointer)?.depth,
+          ? null
+          : resolve(start, end, pointer)?.depth,
     );
   }
 

@@ -1,3 +1,5 @@
+import '../services/architect_roof_junctions.dart';
+import 'architect_path_solid.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import '../../bim_editing/scene/bim_point_index.dart';
@@ -216,7 +218,11 @@ class ArchitectSnapGeometry {
       polygon(slab.polygon, slab.id);
     }
     for (final roof in floor.roofs) {
-      polygon(roof.points, roof.id);
+      for (final contour in ArchitectPathSolid.contours(
+        ArchitectRoofJunctions.of(floor, project: project).footprint(roof),
+      )) {
+        polygon(contour, roof.id);
+      }
     }
     for (final opening in floor.openings) {
       polygon(opening.boundary, opening.id);

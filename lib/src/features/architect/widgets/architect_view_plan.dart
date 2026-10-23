@@ -5,6 +5,7 @@ import '../models/architect_project.dart';
 import '../rendering/architect_elevation_markers.dart';
 import '../rendering/architect_stair_plan_painter.dart';
 import '../services/architect_view_placement.dart';
+import '../services/architect_roof_junctions.dart';
 
 /// Stable plan framing throughout a draft. Mouse hover and touch dragging share
 /// the same snapping and live guides; no model/history is changed by a preview.
@@ -229,6 +230,41 @@ class ArchitectViewPlanPainter extends CustomPainter {
     );
   }
 
+  void viewExtent(
+    Canvas canvas,
+    Offset start,
+    Offset end,
+    Offset direction,
+    double? depth,
+    Color color, {
+    bool label = false,
+  }) {
+    if (depth == null) return;
+    final offset = direction * depth;
+    dashed(canvas, start, start + offset, color);
+    dashed(canvas, end, end + offset, color);
+    dashed(canvas, start + offset, end + offset, color);
+    if (label) {
+      final text = TextPainter(
+        text: TextSpan(
+          text: project.units.format(depth, decimals: project.distanceDecimals),
+          style: TextStyle(
+            color: color,
+            fontSize: 11 / scale,
+            fontFamily: fontFamily,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      text.paint(
+        canvas,
+        (start + end) / 2 +
+            offset -
+            Offset(text.width / 2, text.height + 5 / scale),
+      );
+    }
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
@@ -263,7 +299,7 @@ class ArchitectViewPlanPainter extends CustomPainter {
       }
       for (final roof in floor.roofs) {
         canvas.drawPath(
-          Path()..addPolygon(roof.points, true),
+          ArchitectRoofJunctions.of(floor, project: project).footprint(roof),
           Paint()..color = const Color(0xffc85a32).withValues(alpha: .08),
         );
       }
@@ -318,6 +354,18 @@ class ArchitectViewPlanPainter extends CustomPainter {
       selected: selectedElevation,
       fontFamily: fontFamily,
     );
+    for (final view in project.elevations.where(
+      (e) => e.id == selectedElevation,
+    )) {
+      viewExtent(
+        canvas,
+        view.start,
+        view.end,
+        view.viewDirection,
+        view.viewDepth,
+        colors.primary.withValues(alpha: .6),
+      );
+    }
     for (final section in project.sections) {
       final color = section.id == selectedSection
           ? colors.primary
@@ -333,9 +381,19 @@ class ArchitectViewPlanPainter extends CustomPainter {
         canvas.drawCircle(p, 3 / scale, Paint()..color = color);
         arrow(canvas, p, section.viewDirection, color);
       }
+      if (section.id == selectedSection) {
+        viewExtent(
+          canvas,
+          section.start,
+          section.end,
+          section.viewDirection,
+          section.viewDepth,
+          color.withValues(alpha: .6),
+        );
+      }
     }
     final draft = this.draft;
-    if (draft != null) {
+    if (draft != null && (pointer != null || second != null)) {
       final axis = draft.axis, centre = draft.centre;
       final extent = math.max(bounds.width, bounds.height) * 3;
       dashed(
@@ -344,28 +402,27 @@ class ArchitectViewPlanPainter extends CustomPainter {
         draft.start + axis * extent,
         colors.primary.withValues(alpha: .55),
       );
-      final target = draft.target ?? centre + draft.direction * (70 / scale);
+      // The perpendicular guide refers to the marker, never to an inferred
+      // target wall. After the second click it becomes the depth direction.
+      final guideOrigin = second == null ? draft.end : centre;
       dashed(
         canvas,
-        centre - draft.direction * (20 / scale),
-        target,
-        colors.tertiary,
+        guideOrigin - draft.direction * extent,
+        guideOrigin + draft.direction * extent,
+        colors.primary.withValues(alpha: .35),
       );
-      if (draft.wall != null) {
-        canvas.drawLine(
-          draft.wall!.startPoint,
-          draft.wall!.endPoint,
-          Paint()
-            ..color = colors.tertiary.withValues(alpha: .7)
-            ..strokeWidth = 4 / scale,
+      if (second == null) {
+        dashed(
+          canvas,
+          Offset(bounds.left, draft.start.dy),
+          Offset(bounds.right, draft.start.dy),
+          colors.primary.withValues(alpha: .3),
         );
-        canvas.drawCircle(
-          target,
-          5 / scale,
-          Paint()
-            ..color = colors.tertiary
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5 / scale,
+        dashed(
+          canvas,
+          Offset(draft.start.dx, bounds.top),
+          Offset(draft.start.dx, bounds.bottom),
+          colors.primary.withValues(alpha: .3),
         );
       }
       if (draft.aligned && pointer != null) {
@@ -406,12 +463,35 @@ class ArchitectViewPlanPainter extends CustomPainter {
             ..strokeWidth = 2 / scale,
         );
       }
-      arrow(canvas, centre, draft.direction, colors.primary);
       if (second != null) {
+        viewExtent(
+          canvas,
+          draft.start,
+          draft.end,
+          draft.direction,
+          draft.viewDepth,
+          colors.primary,
+          label: true,
+        );
+        arrow(canvas, centre, draft.direction, colors.primary);
         arrow(canvas, draft.start, draft.direction, colors.primary);
         arrow(canvas, draft.end, draft.direction, colors.primary);
       }
     } else if (first != null) {
+      if (!north) {
+        dashed(
+          canvas,
+          Offset(bounds.left, first!.dy),
+          Offset(bounds.right, first!.dy),
+          colors.primary.withValues(alpha: .4),
+        );
+        dashed(
+          canvas,
+          Offset(first!.dx, bounds.top),
+          Offset(first!.dx, bounds.bottom),
+          colors.primary.withValues(alpha: .4),
+        );
+      }
       canvas.drawCircle(first!, 5 / scale, Paint()..color = colors.primary);
       if (north && pointer != null && (pointer! - first!).distance > .01) {
         arrow(

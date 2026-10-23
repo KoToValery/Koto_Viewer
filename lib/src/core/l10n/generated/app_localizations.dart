@@ -11012,7 +11012,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectViewDirectionHint.
   ///
   /// In en, this message translates to:
-  /// **'Choose the viewing side shown by the arrows.'**
+  /// **'Choose the viewing side and click the far boundary.'**
   String get architectViewDirectionHint;
 
   /// No description provided for @architectSectionNumber.
@@ -13126,6 +13126,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter {minimum}–{maximum} {unit}.'**
   String architectLineSymbolRange(String minimum, String maximum, String unit);
+
+  /// No description provided for @architectViewUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited'**
+  String get architectViewUnlimited;
+
+  /// No description provided for @architectViewDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'View depth'**
+  String get architectViewDepth;
+
+  /// No description provided for @architectViewDepthInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a finite distance of at least 1 cm.'**
+  String get architectViewDepthInvalid;
 }
 
 class _AppLocalizationsDelegate

@@ -155,15 +155,23 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
     }
     final view = ArchitectViewPlacement.resolve(first!, second!, point);
     if (view == null) return;
-    final previous = project.elevations.where((e) => e.id == editingId).firstOrNull;
+    final previous = project.elevations
+        .where((e) => e.id == editingId)
+        .firstOrNull;
     update(
-      previous?.copyWith(start: first!, end: second!, viewSide: view.side, viewDepth: view.depth) ?? ArchitectElevation(
-        id: editingId ?? ArchitectElementId.next('facade'),
-        start: first!,
-        end: second!,
-        viewSide: view.side,
-        viewDepth: view.depth,
-      ),
+      previous?.copyWith(
+            start: first!,
+            end: second!,
+            viewSide: view.side,
+            viewDepth: view.depth,
+          ) ??
+          ArchitectElevation(
+            id: editingId ?? ArchitectElementId.next('facade'),
+            start: first!,
+            end: second!,
+            viewSide: view.side,
+            viewDepth: view.depth,
+          ),
     );
     cancel();
     setState(() => plan = false);
@@ -194,9 +202,18 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
   Future<void> changeDepth() async {
     final value = selected;
     if (value == null) return;
-    final result = await showArchitectViewDepth(context, project, value.viewDepth);
+    final result = await showArchitectViewDepth(
+      context,
+      project,
+      value.viewDepth,
+    );
     if (mounted && result != null) {
-      update(value.copyWith(viewDepth: result.depth, clearViewDepth: result.depth == null));
+      update(
+        value.copyWith(
+          viewDepth: result.depth,
+          clearViewDepth: result.depth == null,
+        ),
+      );
     }
   }
 
@@ -255,7 +272,10 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
             },
             itemBuilder: (_) => [
               if (value != null) ...[
-                PopupMenuItem(value: 'depth', child: Text(l.architectViewDepth)),
+                PopupMenuItem(
+                  value: 'depth',
+                  child: Text(l.architectViewDepth),
+                ),
                 PopupMenuItem(
                   value: 'edit',
                   child: Text(l.architectFacadeEdit),
@@ -515,7 +535,13 @@ class ArchitectFacadePainter extends CustomPainter {
     canvas.clipRect(Offset.zero & size);
     // All fills precede all strokes, so shared depth boundaries remain crisp.
     for (final face in geometry.faces) {
-      architectDrawingSources(canvas, geometry.elementPaths.entries.where((e) => e.value.getBounds().overlaps(face.getBounds())).map((e) => e.key), 'elevationFace');
+      architectDrawingSources(
+        canvas,
+        geometry.elementPaths.entries
+            .where((e) => e.value.getBounds().overlaps(face.getBounds()))
+            .map((e) => e.key),
+        'elevationFace',
+      );
       canvas.drawPath(face.transform(matrix.storage), Paint()..color = fill);
     }
     for (final face in geometry.faces) {

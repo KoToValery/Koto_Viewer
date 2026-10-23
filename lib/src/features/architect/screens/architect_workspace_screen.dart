@@ -9009,6 +9009,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         selectedRoof,
         point,
         scale: _currentScale,
+        storey: _project.activeStorey,
+        project: _project,
       )) {
         final nextRoof = selectedRoof.nextSlopeEdge();
         setState(() {

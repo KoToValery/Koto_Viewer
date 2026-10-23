@@ -390,6 +390,7 @@ class Architect2dPainter extends CustomPainter {
           ArchitectRoofPainterHelper.paintRoofs(
             canvas: canvas,
             storey: lower,
+            project: _project,
             scale: zoomScale,
             selectedIds: selectedElementIds,
             isLowerLevel: true,
@@ -399,6 +400,7 @@ class Architect2dPainter extends CustomPainter {
       ArchitectRoofPainterHelper.paintRoofs(
         canvas: canvas,
         storey: _elementLayerStorey,
+        project: _project,
         scale: zoomScale,
         selectedIds: {
           ...selectedElementIds,
@@ -627,6 +629,7 @@ class Architect2dPainter extends CustomPainter {
       ArchitectRoofPainterHelper.paintRoofs(
         canvas: canvas,
         storey: selected,
+        project: _project,
         scale: zoomScale,
         selectedIds: {selectedElementId!},
       );

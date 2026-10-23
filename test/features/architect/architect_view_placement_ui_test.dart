@@ -99,6 +99,7 @@ void main() {
         );
         await mouse.removePointer();
         final selected = controller.project.sections.single;
+        expect(selected.viewDepth, closeTo(.9, .02));
         final l = AppLocalizations.of(
           tester.element(find.byType(ArchitectBuildingSectionsScreen)),
         )!;
@@ -115,6 +116,25 @@ void main() {
         expect(
           controller.project.sections.single.viewDirection,
           selected.viewDirection,
+        );
+        await tester.tap(find.byType(PopupMenuButton<String>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l.architectViewDepth));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('architect-view-depth-input')),
+          '3.5',
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('architect-view-depth-save')),
+        );
+        await tester.pumpAndSettle();
+        expect(controller.project.sections.single.viewDepth, 3.5);
+        controller.undo();
+        await tester.pumpAndSettle();
+        expect(
+          controller.project.sections.single.viewDepth,
+          selected.viewDepth,
         );
         expect(tester.takeException(), isNull);
       },
@@ -179,10 +199,44 @@ void main() {
           greaterThan(0),
         );
         expect(controller.project.elevations.single.length, closeTo(8, .01));
+        expect(
+          controller.project.elevations.single.viewDepth,
+          closeTo(3.1, .02),
+        );
         await mouse.removePointer();
         expect(
           find.byKey(const ValueKey('architect-facade-drawing')),
           findsOneWidget,
+        );
+        final l = AppLocalizations.of(
+          tester.element(find.byType(ArchitectElevationsScreen)),
+        )!;
+        await tester.tap(find.byType(PopupMenuButton<String>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l.architectViewDepth));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('architect-view-depth-input')),
+          '-1',
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('architect-view-depth-save')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(l.architectViewDepthInvalid), findsOneWidget);
+        await tester.tap(
+          find.byKey(const ValueKey('architect-view-depth-unlimited')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('architect-view-depth-save')),
+        );
+        await tester.pumpAndSettle();
+        expect(controller.project.elevations.single.viewDepth, isNull);
+        controller.undo();
+        await tester.pumpAndSettle();
+        expect(
+          controller.project.elevations.single.viewDepth,
+          closeTo(3.1, .02),
         );
         expect(tester.takeException(), isNull);
       },

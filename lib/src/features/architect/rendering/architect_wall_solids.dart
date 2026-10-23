@@ -1,3 +1,4 @@
+import '../services/architect_roof_junctions.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../services/architect_slab_geometry.dart';
@@ -81,11 +82,11 @@ class ArchitectWallSolids {
         }(),
     ];
     var roofFootprint = Path();
-    for (final (_, roof) in roofEnvelopes) {
+    for (final (floor, roof) in roofEnvelopes) {
       roofFootprint = Path.combine(
         PathOperation.union,
         roofFootprint,
-        Path()..addPolygon(roof.points, true),
+        ArchitectRoofJunctions.of(floor, project: project).footprint(roof),
       );
     }
     final slabs = <(Path, SlabLayerSurface)>[];
@@ -183,7 +184,7 @@ class ArchitectWallSolids {
         for (final (floor, roof) in roofEnvelopes) {
           parts = ArchitectVerticalClip.subtract(
             parts,
-            Path()..addPolygon(roof.points, true),
+            ArchitectRoofJunctions.of(floor, project: project).footprint(roof),
             (p) => floor.elevation + roof.undersideElevationAt(p),
             (p) => floor.elevation + roof.topElevationAt(p),
             removeAbove: true,

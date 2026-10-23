@@ -1,5 +1,7 @@
 import 'architect_solid_shell.dart';
 import '../services/architect_slab_geometry.dart';
+import '../services/architect_roof_junctions.dart';
+import 'architect_path_solid.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
@@ -19,6 +21,8 @@ class Architect3dBuilder {
     Map<Triangle3D, String>? sources,
   }) {
     final List<Triangle3D> allTris = [];
+    final roofSolids = <(String, List<Triangle3D>)>[];
+    var joinedRoofs = false;
     void mark(String id, int start) {
       if (sources == null) return;
       for (var i = start; i < allTris.length; i++) {
@@ -44,10 +48,13 @@ class Architect3dBuilder {
             (solid.wall.id, solid.triangles)
         else
           for (final wall in walls)
-            (wall.id, wall.build3D(
-              storeyElevation: storey.elevation,
-              includeOpeningMeshes: false,
-            )),
+            (
+              wall.id,
+              wall.build3D(
+                storeyElevation: storey.elevation,
+                includeOpeningMeshes: false,
+              ),
+            ),
       ];
       final shell = ArchitectSolidShell.build([
         for (final solid in wallSolids) solid.$2,
@@ -59,12 +66,14 @@ class Architect3dBuilder {
       }
       for (final wall in walls) {
         final first = allTris.length;
-        allTris.addAll(wall.build3D(
-          storeyElevation: storey.elevation,
-          sources: sources,
-          includeSolid: false,
-          resolveComposition: false,
-        ));
+        allTris.addAll(
+          wall.build3D(
+            storeyElevation: storey.elevation,
+            sources: sources,
+            includeSolid: false,
+            resolveComposition: false,
+          ),
+        );
         mark(wall.id, first);
       }
 
@@ -200,18 +209,34 @@ class Architect3dBuilder {
         mark(slab.id, first);
       }
 
-      for (final roof in storey.roofs) {
-        final first = allTris.length;
-        allTris.addAll(_buildRoofMesh(storey, roof, detailed: previewGeometry));
-        mark(roof.id, first);
+      final roofJunctions = ArchitectRoofJunctions.of(storey, project: project);
+      final roofMeshes = [
+        for (final roof in storey.roofs)
+          _buildRoofMesh(
+            storey,
+            roof,
+            detailed: previewGeometry,
+            footprint: roofJunctions.trimmed.contains(roof.id)
+                ? roofJunctions.footprint(roof)
+                : null,
+          ),
+      ];
+      joinedRoofs = joinedRoofs || roofJunctions.trimmed.isNotEmpty;
+      for (var i = 0; i < storey.roofs.length; i++) {
+        roofSolids.add((storey.roofs[i].id, roofMeshes[i]));
       }
 
       // Add 3D architectural components (furniture, sanitary, kitchen, equipment)
       for (final comp in storey.components) {
         if (!comp.isVisible) continue;
-        final def = ComponentLibraryService.instance.findDefinition(comp.definitionId);
+        final def = ComponentLibraryService.instance.findDefinition(
+          comp.definitionId,
+        );
         if (def == null) continue;
-        final geo = ComponentGeometryCache.instance.getOrCompute(def, comp.parameters);
+        final geo = ComponentGeometryCache.instance.getOrCompute(
+          def,
+          comp.parameters,
+        );
         final first = allTris.length;
         final cosR = math.cos(comp.rotation);
         final sinR = math.sin(comp.rotation);
@@ -220,7 +245,11 @@ class Architect3dBuilder {
         Vector3 transform(Vector3 p) {
           final rx = p.x * cosR - p.y * sinR;
           final ry = p.x * sinR + p.y * cosR;
-          return Vector3(comp.position.dx + rx, comp.position.dy + ry, zBase + p.z);
+          return Vector3(
+            comp.position.dx + rx,
+            comp.position.dy + ry,
+            zBase + p.z,
+          );
         }
 
         Vector3 transformNormal(Vector3 n) {
@@ -250,6 +279,16 @@ class Architect3dBuilder {
       }
     }
 
+    // Roofs on different storeys can meet at the same physical elevation.
+    // Remove their shared interfaces together, keeping per-roof source IDs.
+    final roofShell = joinedRoofs
+        ? ArchitectSolidShell.build([for (final solid in roofSolids) solid.$2])
+        : [for (final solid in roofSolids) solid.$2];
+    for (var i = 0; i < roofSolids.length; i++) {
+      final first = allTris.length;
+      allTris.addAll(roofShell[i]);
+      mark(roofSolids[i].$1, first);
+    }
     return Mesh3D(name: project.name, triangles: allTris);
   }
 
@@ -257,6 +296,7 @@ class Architect3dBuilder {
     ArchitectStorey storey,
     ArchitectRoofPlane roof, {
     bool detailed = true,
+    Path? footprint,
   }) {
     final pts = roof.points;
     if (pts.length < 3) return const [];
@@ -275,7 +315,13 @@ class Architect3dBuilder {
     if (!detailed ||
         !roof.assembly.timber.hasRafters ||
         roof.slopeDegrees < 1.0) {
-      return _buildSimpleRoofPrism(storey, roof, topColor, fasciaColor);
+      return _buildSimpleRoofPrism(
+        storey,
+        roof,
+        topColor,
+        fasciaColor,
+        footprint: footprint,
+      );
     }
 
     final tris = <Triangle3D>[];
@@ -305,7 +351,13 @@ class Architect3dBuilder {
     final spanS = maxS - minS;
     final spanD = maxD - minD;
     if (spanS < 0.05 || spanD < 0.05) {
-      return _buildSimpleRoofPrism(storey, roof, topColor, fasciaColor);
+      return _buildSimpleRoofPrism(
+        storey,
+        roof,
+        topColor,
+        fasciaColor,
+        footprint: footprint,
+      );
     }
 
     final timber = roof.assembly.timber;
@@ -339,11 +391,14 @@ class Architect3dBuilder {
     // 1. Wall plate (Mauerlat / Мауерлат) along wall bearing line & Ridge Purlin (Билова столица)
     final wpW = timber.wallPlateWidth.clamp(0.10, 0.24);
     final wpH = timber.wallPlateHeight.clamp(0.10, 0.24);
-    final dWall = minD + (roof.manualSupportDistance ??
-        math.min(roof.eavesOverhang, spanD * 0.45));
-    if (timber.hasWallPlate && (roof.manualSupportDistance != null
-        ? dWall - wpW * .5 < maxD && dWall + wpW * .5 > minD
-        : dWall + wpW < maxD)) {
+    final dWall =
+        minD +
+        (roof.manualSupportDistance ??
+            math.min(roof.eavesOverhang, spanD * 0.45));
+    if (timber.hasWallPlate &&
+        (roof.manualSupportDistance != null
+            ? dWall - wpW * .5 < maxD && dWall + wpW * .5 > minD
+            : dWall + wpW < maxD)) {
       final wpClipped = _clipPolygonToRect(
         polySD,
         minS,
@@ -361,6 +416,7 @@ class Architect3dBuilder {
         roof,
         -wpH,
         hRafterBottom,
+        planClip: footprint,
         topColor: purlinColor,
         sideColor: purlinColor,
       );
@@ -378,6 +434,7 @@ class Architect3dBuilder {
         roof,
         -wpH,
         hRafterBottom,
+        planClip: footprint,
         topColor: purlinColor,
         sideColor: purlinColor,
       );
@@ -410,6 +467,7 @@ class Architect3dBuilder {
         roof,
         hRafterBottom,
         hRafterTop,
+        planClip: footprint,
         topColor: rafterTopColor,
         sideColor: rafterSideColor,
       );
@@ -428,6 +486,7 @@ class Architect3dBuilder {
         roof,
         hBoardTop,
         hCounterTop,
+        planClip: footprint,
         topColor: counterBattenColor,
         sideColor: rafterSideColor,
       );
@@ -453,6 +512,7 @@ class Architect3dBuilder {
           roof,
           hRafterBottom + rafterH * 0.12,
           hRafterTop * 0.94,
+          planClip: footprint,
           topColor: insulationColor,
           sideColor: insulationColor,
         );
@@ -480,6 +540,7 @@ class Architect3dBuilder {
       roof,
       hRafterTop,
       hBoardTop,
+      planClip: footprint,
       topColor: membraneColor,
       bottomColor: boardColor,
       sideColor: boardColor,
@@ -510,6 +571,7 @@ class Architect3dBuilder {
         roof,
         hCounterTop,
         hBattenTop,
+        planClip: footprint,
         topColor: battenColor,
         sideColor: rafterSideColor,
       );
@@ -536,6 +598,7 @@ class Architect3dBuilder {
         roof,
         hBattenTop,
         hBattenTop + panH,
+        planClip: footprint,
         topColor: topColor,
         sideColor: const Color(0xFF37474F),
       );
@@ -563,6 +626,7 @@ class Architect3dBuilder {
           roof,
           hBattenTop + panH,
           hCoverTop,
+          planClip: footprint,
           topColor: seamLight,
           sideColor: seamDark,
         );
@@ -600,6 +664,7 @@ class Architect3dBuilder {
           roof,
           hBattenTop,
           hBattenTop + coveringH * 0.62,
+          planClip: footprint,
           topColor: courseColor,
           sideColor: shadeDark,
         );
@@ -631,6 +696,7 @@ class Architect3dBuilder {
             roof,
             hBattenTop + coveringH * 0.62,
             hCoverTop,
+            planClip: footprint,
             topColor: shadeLight,
             sideColor: shadeDark,
           );
@@ -654,6 +720,7 @@ class Architect3dBuilder {
         roof,
         hBattenTop,
         hCoverTop,
+        planClip: footprint,
         topColor: topColor,
         sideColor: fasciaColor,
       );
@@ -666,8 +733,19 @@ class Architect3dBuilder {
     ArchitectStorey storey,
     ArchitectRoofPlane roof,
     Color topColor,
-    Color fasciaColor,
-  ) {
+    Color fasciaColor, {
+    Path? footprint,
+  }) {
+    if (footprint != null) {
+      return _roofPrism(
+        footprint,
+        (p) => storey.elevation + roof.undersideElevationAt(p),
+        (p) => storey.elevation + roof.topElevationAt(p),
+        topColor,
+        fasciaColor,
+        fasciaColor,
+      );
+    }
     final pts = roof.points;
     final tris = <Triangle3D>[];
 
@@ -793,14 +871,32 @@ class Architect3dBuilder {
     required Color topColor,
     required Color sideColor,
     Color? bottomColor,
+    Path? planClip,
   }) {
     if (clippedSD.length < 3 || hTop <= hBottom) return;
     final botClr = bottomColor ?? sideColor;
-
     Offset toWorld2D(Offset sd) => Offset(
       p0.dx + u.dx * sd.dx + v.dx * sd.dy,
       p0.dy + u.dy * sd.dx + v.dy * sd.dy,
     );
+    if (planClip != null) {
+      final footprint = Path.combine(
+        PathOperation.intersect,
+        planClip,
+        Path()..addPolygon(clippedSD.map(toWorld2D).toList(), true),
+      );
+      tris.addAll(
+        _roofPrism(
+          footprint,
+          (p) => storeyElevation + roof.undersideElevationAt(p) + hBottom,
+          (p) => storeyElevation + roof.undersideElevationAt(p) + hTop,
+          topColor,
+          sideColor,
+          botClr,
+        ),
+      );
+      return;
+    }
 
     final topVerts = <Vector3>[];
     final botVerts = <Vector3>[];
@@ -858,4 +954,31 @@ class Architect3dBuilder {
       );
     }
   }
+
+  static List<Triangle3D> _roofPrism(
+    Path footprint,
+    double Function(Offset) bottom,
+    double Function(Offset) top,
+    Color topColor,
+    Color sideColor,
+    Color bottomColor,
+  ) => [
+    for (final triangle in ArchitectPathSolid.between(
+      footprint,
+      bottom,
+      top,
+      topColor,
+    ))
+      Triangle3D(
+        v0: triangle.v0,
+        v1: triangle.v1,
+        v2: triangle.v2,
+        color: triangle.normal.z > 1e-7
+            ? topColor
+            : triangle.normal.z < -1e-7
+            ? bottomColor
+            : sideColor,
+        isDoubleSided: true,
+      ),
+  ];
 }
