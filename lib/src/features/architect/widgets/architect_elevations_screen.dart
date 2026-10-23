@@ -162,6 +162,13 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
       previous?.copyWith(
             start: first!,
             end: second!,
+            steps: [
+              for (final p in previous.steps)
+                Offset(
+                  p.dx * (second! - first!).distance / previous.length,
+                  p.dy,
+                ),
+            ],
             viewSide: view.side,
             viewDepth: view.depth,
           ) ??
@@ -206,6 +213,8 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
       context,
       project,
       value.viewDepth,
+      minimumDepth:
+          value.steps.fold(0.0, (double a, p) => math.max(a, p.dy)) + .01,
     );
     if (mounted && result != null) {
       update(

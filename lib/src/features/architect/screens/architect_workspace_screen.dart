@@ -25,6 +25,7 @@ import '../services/architect_roof_drainage_geometry.dart';
 import '../services/architect_roof_tool.dart';
 import '../widgets/architect_building_sections_screen.dart';
 import '../widgets/architect_elevations_screen.dart';
+import '../widgets/architect_workspace_view_placement.dart';
 import '../widgets/architect_projection_editor.dart';
 import '../../bim_editing/widgets/bim_edit_actions.dart';
 import '../../bim_editing/geometry/bim_contour_drafting_geometry.dart';
@@ -356,6 +357,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 lastViewIds: _lastViewIds,
                 onSelected: _selectWorkspaceView,
                 onManage: _manageWorkspaceViews,
+                onDraft: _draftWorkspaceView,
               ),
             ),
             SizedBox(
@@ -403,6 +405,45 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   ArchitectProject? _projectionSource;
+  ({ArchitectWorkspaceView type, String? id, String mode})? _viewDraft;
+
+  void _draftWorkspaceView(
+    ArchitectWorkspaceView type,
+    String? id,
+    String mode,
+  ) {
+    if (mode == 'straight') {
+      final p = _modelCommands.project;
+      _modelCommands.commit(
+        p.copyWith(
+          sections: [
+            for (final s in p.sections)
+              if (s.id == id && type == ArchitectWorkspaceView.section)
+                s.copyWith(steps: const [])
+              else
+                s,
+          ],
+          elevations: [
+            for (final e in p.elevations)
+              if (e.id == id && type == ArchitectWorkspaceView.elevation)
+                e.copyWith(steps: const [])
+              else
+                e,
+          ],
+        ),
+      );
+      return;
+    }
+    _selectWorkspaceView(
+      ArchitectWorkspaceView.plan,
+      _modelCommands.project.activeStoreyId,
+    );
+    setState(
+      () =>
+          _viewDraft = (type: type, id: mode == 'new' ? null : id, mode: mode),
+    );
+  }
+
   String? _projectionKey;
   ArchitectBuildingElevation? _facadeGeometry;
   ArchitectBuildingSection? _sectionGeometry;
@@ -1710,6 +1751,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _cancelDrafting() {
+    _viewDraft = null;
     _placingDownpipe = false;
     _downpipeRoofId = null;
     _resetDimensionDraft();
@@ -13296,6 +13338,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _activeTool == ArchitectTool.select &&
           _effectiveSelection.isEmpty)
         Positioned.fill(child: _nativeProjectionEditor()),
+      if (_viewDraft != null)
+        Positioned.fill(
+          child: AnimatedBuilder(
+            animation: _viewport,
+            builder: (_, _) => ArchitectWorkspaceViewPlacement(
+              key: ValueKey(_viewDraft),
+              controller: _modelCommands,
+              type: _viewDraft!.type,
+              id: _viewDraft!.id,
+              mode: _viewDraft!.mode,
+              onNavigate: (delta, factor, focal) => _viewport.navigate(
+                previousFocal: focal - delta,
+                focal: focal,
+                scaleFactor: factor,
+              ),
+              toModel: _screenToModel,
+              toScreen: _viewport.toScreen,
+              scale: _viewport.scale,
+              onDone: (id) {
+                final type = _viewDraft!.type;
+                setState(() => _viewDraft = null);
+                if (id != null) {
+                  _saveBiMProjectIfAttached();
+                  _selectWorkspaceView(type, id);
+                }
+              },
+            ),
+          ),
+        ),
     ],
   );
 

@@ -5,16 +5,26 @@ import '../models/architect_project.dart';
 Future<({double? depth})?> showArchitectViewDepth(
   BuildContext context,
   ArchitectProject project,
-  double? depth,
-) => showDialog<({double? depth})>(
+  double? depth, {
+  double minimumDepth = .01,
+}) => showDialog<({double? depth})>(
   context: context,
-  builder: (_) => _ViewDepthDialog(project: project, depth: depth),
+  builder: (_) => _ViewDepthDialog(
+    project: project,
+    depth: depth,
+    minimumDepth: minimumDepth,
+  ),
 );
 
 class _ViewDepthDialog extends StatefulWidget {
   final ArchitectProject project;
   final double? depth;
-  const _ViewDepthDialog({required this.project, required this.depth});
+  final double minimumDepth;
+  const _ViewDepthDialog({
+    required this.project,
+    required this.depth,
+    required this.minimumDepth,
+  });
   @override
   State<_ViewDepthDialog> createState() => _ViewDepthState();
 }
@@ -74,8 +84,12 @@ class _ViewDepthState extends State<_ViewDepthDialog> {
                 ),
                 validator: (_) =>
                     !unlimited &&
-                        (depth == null || !depth!.isFinite || depth! < .01)
-                    ? l.architectViewDepthInvalid
+                        (depth == null ||
+                            !depth!.isFinite ||
+                            depth! < widget.minimumDepth)
+                    ? widget.minimumDepth > .01
+                          ? l.architectViewDepthBehindSteps
+                          : l.architectViewDepthInvalid
                     : null,
                 onFieldSubmitted: (_) => save(),
               ),

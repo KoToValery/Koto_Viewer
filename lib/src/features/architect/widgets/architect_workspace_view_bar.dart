@@ -11,6 +11,7 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
   final Map<ArchitectWorkspaceView, String> lastViewIds;
   final void Function(ArchitectWorkspaceView, String?) onSelected;
   final ValueChanged<ArchitectWorkspaceView> onManage;
+  final void Function(ArchitectWorkspaceView, String?, String)? onDraft;
 
   const ArchitectWorkspaceViewBar({
     super.key,
@@ -20,6 +21,7 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
     required this.lastViewIds,
     required this.onSelected,
     required this.onManage,
+    this.onDraft,
   });
 
   @override
@@ -57,6 +59,22 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                   ArchitectWorkspaceView.section => l.buildingSections,
                 },
                 onSelected: (id) {
+                  if ([
+                    'new',
+                    'edit',
+                    'depth',
+                    'step',
+                    'straight',
+                  ].contains(id)) {
+                    onDraft?.call(
+                      type,
+                      type == ArchitectWorkspaceView.section
+                          ? section?.id
+                          : elevation?.id,
+                      id,
+                    );
+                    return;
+                  }
                   if (id == 'manage') {
                     onManage(type);
                   } else {
@@ -134,6 +152,36 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                               : l.architectSectionNumber(i + 1),
                         ),
                       ),
+                  if (type != ArchitectWorkspaceView.plan)
+                    PopupMenuItem(
+                      value: 'new',
+                      child: Text(
+                        type == ArchitectWorkspaceView.section
+                            ? l.buildingSectionNew
+                            : l.architectFacadeNew,
+                      ),
+                    ),
+                  if (type != ArchitectWorkspaceView.plan &&
+                      (type == ArchitectWorkspaceView.section
+                          ? section != null
+                          : elevation != null)) ...[
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Text(l.architectFacadeEdit),
+                    ),
+                    PopupMenuItem(
+                      value: 'depth',
+                      child: Text(l.architectViewDepth),
+                    ),
+                    PopupMenuItem(
+                      value: 'step',
+                      child: Text(l.architectViewStep),
+                    ),
+                    PopupMenuItem(
+                      value: 'straight',
+                      child: Text(l.architectViewStraight),
+                    ),
+                  ],
                   if (type != ArchitectWorkspaceView.plan)
                     PopupMenuItem(
                       value: 'manage',

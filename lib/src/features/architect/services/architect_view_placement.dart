@@ -32,7 +32,14 @@ class ArchitectViewPlacement {
     Offset point,
   ) {
     final delta = end - start;
-    if (delta.distance < .01) return null;
+    if (!delta.distance.isFinite ||
+        delta.distance < .01 ||
+        !point.dx.isFinite ||
+        !point.dy.isFinite ||
+        !start.dx.isFinite ||
+        !start.dy.isFinite) {
+      return null;
+    }
     final normal = Offset(-delta.dy, delta.dx) / delta.distance;
     final distance = _dot(point - start, normal);
     if (distance.abs() < .01) return null;

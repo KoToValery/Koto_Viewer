@@ -1,0 +1,2781 @@
+{
+  "id": "bim_1792679162729_1ed6d0",
+  "name": "A",
+  "createdAt": "2026-10-22T17:26:02.729348",
+  "updatedAt": "2026-10-23T11:57:44.176901",
+  "units": "centimeters",
+  "distanceDecimals": 1,
+  "dimensionScale": 100,
+  "document": {
+    "version": 1,
+    "viewScales": {},
+    "profileMm": {},
+    "overrideMm": {},
+    "drawings": [],
+    "sheets": [],
+    "templates": [
+      {
+        "id": "standard",
+        "name": "",
+        "items": [
+          {
+            "id": "project",
+            "rect": [
+              0.0,
+              0.0,
+              180.0,
+              10.0
+            ],
+            "field": "project",
+            "text": "",
+            "textMm": 3.3,
+            "border": true
+          },
+          {
+            "id": "drawing",
+            "rect": [
+              0.0,
+              10.0,
+              180.0,
+              10.0
+            ],
+            "field": "drawing",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "number",
+            "rect": [
+              0.0,
+              20.0,
+              40.0,
+              10.0
+            ],
+            "field": "number",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "scale",
+            "rect": [
+              40.0,
+              20.0,
+              40.0,
+              10.0
+            ],
+            "field": "scale",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "author",
+            "rect": [
+              80.0,
+              20.0,
+              60.0,
+              10.0
+            ],
+            "field": "author",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "date",
+            "rect": [
+              140.0,
+              20.0,
+              40.0,
+              10.0
+            ],
+            "field": "date",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          }
+        ]
+      }
+    ]
+  },
+  "storeys": [
+    {
+      "id": "storey_0",
+      "name": "±0.00",
+      "elevation": 0.0,
+      "height": 3.0,
+      "cutPlaneHeight": 1.2,
+      "floorFinishThickness": 0.05,
+      "walls": [
+        {
+          "id": "wall_element_781d2791_1792679182989742_0",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 0.0,
+            "y": 6.6
+          },
+          "endPoint": {
+            "x": 0.0,
+            "y": 2.220446049250313e-16
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": [
+            {
+              "id": "win_element_781d2791_1792681122412727_34",
+              "wallId": "wall_element_781d2791_1792679182989742_0",
+              "offsetRatio": 0.6032729938087344,
+              "width": 1.2,
+              "height": 1.4,
+              "sillHeight": 0.85,
+              "frameThickness": 0.05,
+              "panesCount": 2,
+              "specId": "W1",
+              "uuid": "UUID_element_781d2791_1792681122412727_34",
+              "styleId": "win_double_casement",
+              "style": {
+                "id": "win_double_casement",
+                "name": "Двукрил 140/140 (5-камерен)",
+                "kind": "window",
+                "defaultWidth": 1.4,
+                "defaultHeight": 1.4,
+                "defaultSillHeight": 0.85,
+                "frameDepth": 0.07,
+                "frameFaceWidth": 0.07,
+                "centerInCore": true,
+                "glazingType": "double",
+                "glazingThickness": 0.024,
+                "glassColorValue": 2286928887,
+                "hasCasing": false,
+                "casingWidth": 0.1,
+                "casingProjection": 0.03,
+                "casingPlacement": "exterior",
+                "casingColorValue": 4293718001,
+                "includeBottomCasing": false,
+                "rootSubdivision": {
+                  "id": "root",
+                  "isSplit": true,
+                  "isVertical": true,
+                  "ratios": [
+                    0.5,
+                    0.5
+                  ],
+                  "children": [
+                    {
+                      "id": "sub_0",
+                      "isSplit": false,
+                      "isVertical": true,
+                      "ratios": [
+                        1.0
+                      ],
+                      "children": [],
+                      "pane": {
+                        "id": "p_left",
+                        "paneType": "casementLeft",
+                        "sashProfileWidth": 0.06,
+                        "hasHandle": false
+                      }
+                    },
+                    {
+                      "id": "sub_1",
+                      "isSplit": false,
+                      "isVertical": true,
+                      "ratios": [
+                        1.0
+                      ],
+                      "children": [],
+                      "pane": {
+                        "id": "p_right",
+                        "paneType": "tiltAndTurn",
+                        "sashProfileWidth": 0.06,
+                        "hasHandle": false
+                      }
+                    }
+                  ],
+                  "pane": null
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "wall_element_781d2791_1792679186404981_1",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 0.0,
+            "y": 2.220446049250313e-16
+          },
+          "endPoint": {
+            "x": 7.2,
+            "y": 2.220446049250313e-16
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": [
+            {
+              "id": "win_element_781d2791_1792681120289011_33",
+              "wallId": "wall_element_781d2791_1792679186404981_1",
+              "offsetRatio": 0.31068868326815907,
+              "width": 1.2,
+              "height": 1.4,
+              "sillHeight": 0.85,
+              "frameThickness": 0.05,
+              "panesCount": 2,
+              "specId": "W1",
+              "uuid": "UUID_element_781d2791_1792681120289011_33",
+              "styleId": "win_double_casement",
+              "style": {
+                "id": "win_double_casement",
+                "name": "Двукрил 140/140 (5-камерен)",
+                "kind": "window",
+                "defaultWidth": 1.4,
+                "defaultHeight": 1.4,
+                "defaultSillHeight": 0.85,
+                "frameDepth": 0.07,
+                "frameFaceWidth": 0.07,
+                "centerInCore": true,
+                "glazingType": "double",
+                "glazingThickness": 0.024,
+                "glassColorValue": 2286928887,
+                "hasCasing": false,
+                "casingWidth": 0.1,
+                "casingProjection": 0.03,
+                "casingPlacement": "exterior",
+                "casingColorValue": 4293718001,
+                "includeBottomCasing": false,
+                "rootSubdivision": {
+                  "id": "root",
+                  "isSplit": true,
+                  "isVertical": true,
+                  "ratios": [
+                    0.5,
+                    0.5
+                  ],
+                  "children": [
+                    {
+                      "id": "sub_0",
+                      "isSplit": false,
+                      "isVertical": true,
+                      "ratios": [
+                        1.0
+                      ],
+                      "children": [],
+                      "pane": {
+                        "id": "p_left",
+                        "paneType": "casementLeft",
+                        "sashProfileWidth": 0.06,
+                        "hasHandle": false
+                      }
+                    },
+                    {
+                      "id": "sub_1",
+                      "isSplit": false,
+                      "isVertical": true,
+                      "ratios": [
+                        1.0
+                      ],
+                      "children": [],
+                      "pane": {
+                        "id": "p_right",
+                        "paneType": "tiltAndTurn",
+                        "sashProfileWidth": 0.06,
+                        "hasHandle": false
+                      }
+                    }
+                  ],
+                  "pane": null
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "wall_element_781d2791_1792679190533892_2",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.2,
+            "y": 2.220446049250313e-16
+          },
+          "endPoint": {
+            "x": 7.2,
+            "y": 2.7605554834241497
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "id": "wall_element_781d2791_1792679193974546_3",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.2,
+            "y": 2.7605554834241497
+          },
+          "endPoint": {
+            "x": 14.4,
+            "y": 2.7605554834241497
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [
+            {
+              "id": "door_element_781d2791_1792681021134882_26",
+              "wallId": "wall_element_781d2791_1792679193974546_3",
+              "offsetRatio": 0.6833333333333335,
+              "width": 0.9,
+              "height": 2.0,
+              "sillHeight": 0.0,
+              "frameThickness": 0.04,
+              "leafThickness": 0.04,
+              "isHingeLeft": true,
+              "openInward": true,
+              "openAngleDeg": 90.0,
+              "specId": "1'",
+              "uuid": "UUID_element_781d2791_1792681021134882_26",
+              "styleId": "door_interior_standard",
+              "style": {
+                "id": "door_interior_standard",
+                "name": "Интериорна врата 90/200",
+                "kind": "door",
+                "defaultWidth": 0.9,
+                "defaultHeight": 2.0,
+                "defaultSillHeight": 0.0,
+                "frameDepth": 0.05,
+                "frameFaceWidth": 0.04,
+                "centerInCore": true,
+                "glazingType": "double",
+                "glazingThickness": 0.024,
+                "glassColorValue": 2286928887,
+                "hasCasing": false,
+                "casingWidth": 0.1,
+                "casingProjection": 0.03,
+                "casingPlacement": "exterior",
+                "casingColorValue": 4293718001,
+                "includeBottomCasing": false,
+                "rootSubdivision": {
+                  "id": "root",
+                  "isSplit": false,
+                  "isVertical": true,
+                  "ratios": [
+                    1.0
+                  ],
+                  "children": [],
+                  "pane": {
+                    "id": "p_door",
+                    "paneType": "doorLeaf",
+                    "sashProfileWidth": 0.06,
+                    "hasHandle": false
+                  }
+                }
+              }
+            }
+          ],
+          "windows": []
+        },
+        {
+          "id": "wall_element_781d2791_1792679199798612_4",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 14.4,
+            "y": 2.7605554834241497
+          },
+          "endPoint": {
+            "x": 14.4,
+            "y": 13.2
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "id": "wall_element_781d2791_1792679204231509_5",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 14.4,
+            "y": 13.2
+          },
+          "endPoint": {
+            "x": 7.2,
+            "y": 13.2
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "id": "wall_element_781d2791_1792679207858468_6",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.2,
+            "y": 13.2
+          },
+          "endPoint": {
+            "x": 7.2,
+            "y": 6.6
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": [
+            {
+              "id": "win_element_781d2791_1792681109318539_30",
+              "wallId": "wall_element_781d2791_1792679207858468_6",
+              "offsetRatio": 0.5492424242424243,
+              "width": 1.2,
+              "height": 1.4,
+              "sillHeight": 0.85,
+              "frameThickness": 0.05,
+              "panesCount": 2,
+              "specId": "W1",
+              "uuid": "UUID_element_781d2791_1792681109318539_30",
+              "styleId": "win_double_casement",
+              "style": {
+                "id": "win_double_casement",
+                "name": "Двукрил 140/140 (5-камерен)",
+                "kind": "window",
+                "defaultWidth": 1.4,
+                "defaultHeight": 1.4,
+                "defaultSillHeight": 0.85,
+                "frameDepth": 0.07,
+                "frameFaceWidth": 0.07,
+                "centerInCore": true,
+                "glazingType": "double",
+                "glazingThickness": 0.024,
+                "glassColorValue": 2286928887,
+                "hasCasing": false,
+                "casingWidth": 0.1,
+                "casingProjection": 0.03,
+                "casingPlacement": "exterior",
+                "casingColorValue": 4293718001,
+                "includeBottomCasing": false,
+                "rootSubdivision": {
+                  "id": "root",
+                  "isSplit": true,
+                  "isVertical": true,
+                  "ratios": [
+                    0.5,
+                    0.5
+                  ],
+                  "children": [
+                    {
+                      "id": "sub_0",
+                      "isSplit": false,
+                      "isVertical": true,
+                      "ratios": [
+                        1.0
+                      ],
+                      "children": [],
+                      "pane": {
+                        "id": "p_left",
+                        "paneType": "casementLeft",
+                        "sashProfileWidth": 0.06,
+                        "hasHandle": false
+                      }
+                    },
+                    {
+                      "id": "sub_1",
+                      "isSplit": false,
+                      "isVertical": true,
+                      "ratios": [
+                        1.0
+                      ],
+                      "children": [],
+                      "pane": {
+                        "id": "p_right",
+                        "paneType": "tiltAndTurn",
+                        "sashProfileWidth": 0.06,
+                        "hasHandle": false
+                      }
+                    }
+                  ],
+                  "pane": null
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "wall_element_781d2791_1792679211397081_7",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.2,
+            "y": 6.6
+          },
+          "endPoint": {
+            "x": 0.0,
+            "y": 6.6
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": [
+            {
+              "id": "win_element_781d2791_1792681103819350_29",
+              "wallId": "wall_element_781d2791_1792679211397081_7",
+              "offsetRatio": 0.24142434851347033,
+              "width": 1.2,
+              "height": 1.4,
+              "sillHeight": 0.85,
+              "frameThickness": 0.05,
+              "panesCount": 2,
+              "specId": "W1",
+              "uuid": "UUID_element_781d2791_1792681103819350_29",
+              "styleId": "win_double_casement",
+              "style": {
+                "id": "win_double_casement",
+                "name": "Двукрил 140/140 (5-камерен)",
+                "kind": "window",
+                "defaultWidth": 1.4,
+                "defaultHeight": 1.4,
+                "defaultSillHeight": 0.85,
+                "frameDepth": 0.07,
+                "frameFaceWidth": 0.07,
+                "centerInCore": true,
+                "glazingType": "double",
+                "glazingThickness": 0.024,
+                "glassColorValue": 2286928887,
+                "hasCasing": false,
+                "casingWidth": 0.1,
+                "casingProjection": 0.03,
+                "casingPlacement": "exterior",
+                "casingColorValue": 4293718001,
+                "includeBottomCasing": false,
+                "rootSubdivision": {
+                  "id": "root",
+                  "isSplit": true,
+                  "isVertical": true,
+                  "ratios": [
+                    0.5,
+                    0.5
+                  ],
+                  "children": [
+                    {
+                      "id": "sub_0",
+                      "isSplit": false,
+                      "isVertical": true,
+                      "ratios": [
+                        1.0
+                      ],
+                      "children": [],
+                      "pane": {
+                        "id": "p_left",
+                        "paneType": "casementLeft",
+                        "sashProfileWidth": 0.06,
+                        "hasHandle": false
+                      }
+                    },
+                    {
+                      "id": "sub_1",
+                      "isSplit": false,
+                      "isVertical": true,
+                      "ratios": [
+                        1.0
+                      ],
+                      "children": [],
+                      "pane": {
+                        "id": "p_right",
+                        "paneType": "tiltAndTurn",
+                        "sashProfileWidth": 0.06,
+                        "hasHandle": false
+                      }
+                    }
+                  ],
+                  "pane": null
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "wall_element_781d2791_1792680539933408_8",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.075,
+            "y": 2.8855554834241506
+          },
+          "endPoint": {
+            "x": 7.075,
+            "y": 6.474999999999999
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "inner",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_brick",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": [
+            {
+              "id": "win_element_781d2791_1792681114628627_32",
+              "wallId": "wall_element_781d2791_1792680539933408_8",
+              "offsetRatio": 0.1671567835160105,
+              "width": 1.2,
+              "height": 1.4,
+              "sillHeight": 0.85,
+              "frameThickness": 0.05,
+              "panesCount": 2,
+              "specId": "W1",
+              "uuid": "UUID_element_781d2791_1792681114628627_32",
+              "styleId": "win_double_casement",
+              "style": {
+                "id": "win_double_casement",
+                "name": "Двукрил 140/140 (5-камерен)",
+                "kind": "window",
+                "defaultWidth": 1.4,
+                "defaultHeight": 1.4,
+                "defaultSillHeight": 0.85,
+                "frameDepth": 0.07,
+                "frameFaceWidth": 0.07,
+                "centerInCore": true,
+                "glazingType": "double",
+                "glazingThickness": 0.024,
+                "glassColorValue": 2286928887,
+                "hasCasing": false,
+                "casingWidth": 0.1,
+                "casingProjection": 0.03,
+                "casingPlacement": "exterior",
+                "casingColorValue": 4293718001,
+                "includeBottomCasing": false,
+                "rootSubdivision": {
+                  "id": "root",
+                  "isSplit": true,
+                  "isVertical": true,
+                  "ratios": [
+                    0.5,
+                    0.5
+                  ],
+                  "children": [
+                    {
+                      "id": "sub_0",
+                      "isSplit": false,
+                      "isVertical": true,
+                      "ratios": [
+                        1.0
+                      ],
+                      "children": [],
+                      "pane": {
+                        "id": "p_left",
+                        "paneType": "casementLeft",
+                        "sashProfileWidth": 0.06,
+                        "hasHandle": false
+                      }
+                    },
+                    {
+                      "id": "sub_1",
+                      "isSplit": false,
+                      "isVertical": true,
+                      "ratios": [
+                        1.0
+                      ],
+                      "children": [],
+                      "pane": {
+                        "id": "p_right",
+                        "paneType": "tiltAndTurn",
+                        "sashProfileWidth": 0.06,
+                        "hasHandle": false
+                      }
+                    }
+                  ],
+                  "pane": null
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "wall_element_781d2791_1792680594854408_10",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.325,
+            "y": 6.474999999999999
+          },
+          "endPoint": {
+            "x": 14.4,
+            "y": 6.474999999999999
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "inner",
+          "exteriorSide": "left",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_brick",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [
+            {
+              "id": "door_element_781d2791_1792681017628274_25",
+              "wallId": "wall_element_781d2791_1792680594854408_10",
+              "offsetRatio": 0.6777385159010602,
+              "width": 0.9,
+              "height": 2.0,
+              "sillHeight": 0.0,
+              "frameThickness": 0.04,
+              "leafThickness": 0.04,
+              "isHingeLeft": true,
+              "openInward": true,
+              "openAngleDeg": 90.0,
+              "specId": "1'",
+              "uuid": "UUID_element_781d2791_1792681017628274_25",
+              "styleId": "door_interior_standard",
+              "style": {
+                "id": "door_interior_standard",
+                "name": "Интериорна врата 90/200",
+                "kind": "door",
+                "defaultWidth": 0.9,
+                "defaultHeight": 2.0,
+                "defaultSillHeight": 0.0,
+                "frameDepth": 0.05,
+                "frameFaceWidth": 0.04,
+                "centerInCore": true,
+                "glazingType": "double",
+                "glazingThickness": 0.024,
+                "glassColorValue": 2286928887,
+                "hasCasing": false,
+                "casingWidth": 0.1,
+                "casingProjection": 0.03,
+                "casingPlacement": "exterior",
+                "casingColorValue": 4293718001,
+                "includeBottomCasing": false,
+                "rootSubdivision": {
+                  "id": "root",
+                  "isSplit": false,
+                  "isVertical": true,
+                  "ratios": [
+                    1.0
+                  ],
+                  "children": [],
+                  "pane": {
+                    "id": "p_door",
+                    "paneType": "doorLeaf",
+                    "sashProfileWidth": 0.06,
+                    "hasHandle": false
+                  }
+                }
+              }
+            }
+          ],
+          "windows": []
+        },
+        {
+          "id": "wall_element_781d2791_1792680631698769_12",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.12
+            }
+          ],
+          "location": "interior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 10.8,
+            "y": 2.8855554834241497
+          },
+          "endPoint": {
+            "x": 10.8,
+            "y": 6.6
+          },
+          "thickness": 0.12,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "inner",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_12_partition",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "id": "wall_element_781d2791_1792680697126077_13",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.12
+            }
+          ],
+          "location": "interior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.325,
+            "y": 5.494301665827356
+          },
+          "endPoint": {
+            "x": 10.8,
+            "y": 5.494301665827356
+          },
+          "thickness": 0.12,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "outer",
+          "exteriorSide": "left",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_12_partition",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "id": "wall_element_781d2791_1792680709441836_14",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.12
+            }
+          ],
+          "location": "interior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 0.125,
+            "y": 4.338398240862352
+          },
+          "endPoint": {
+            "x": 4.179743809354388,
+            "y": 4.338398240862352
+          },
+          "thickness": 0.12,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "inner",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_12_partition",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [
+            {
+              "id": "door_element_781d2791_1792680933703958_20",
+              "wallId": "wall_element_781d2791_1792680709441836_14",
+              "offsetRatio": 0.2885509060525064,
+              "width": 0.9,
+              "height": 2.0,
+              "sillHeight": 0.0,
+              "frameThickness": 0.04,
+              "leafThickness": 0.04,
+              "isHingeLeft": true,
+              "openInward": false,
+              "openAngleDeg": 90.0,
+              "specId": "1'",
+              "uuid": "UUID_element_781d2791_1792680933703958_20",
+              "styleId": "door_interior_standard",
+              "style": {
+                "id": "door_interior_standard",
+                "name": "Интериорна врата 90/200",
+                "kind": "door",
+                "defaultWidth": 0.9,
+                "defaultHeight": 2.0,
+                "defaultSillHeight": 0.0,
+                "frameDepth": 0.05,
+                "frameFaceWidth": 0.04,
+                "centerInCore": true,
+                "glazingType": "double",
+                "glazingThickness": 0.024,
+                "glassColorValue": 2286928887,
+                "hasCasing": false,
+                "casingWidth": 0.1,
+                "casingProjection": 0.03,
+                "casingPlacement": "exterior",
+                "casingColorValue": 4293718001,
+                "includeBottomCasing": false,
+                "rootSubdivision": {
+                  "id": "root",
+                  "isSplit": false,
+                  "isVertical": true,
+                  "ratios": [
+                    1.0
+                  ],
+                  "children": [],
+                  "pane": {
+                    "id": "p_door",
+                    "paneType": "doorLeaf",
+                    "sashProfileWidth": 0.06,
+                    "hasHandle": false
+                  }
+                }
+              }
+            }
+          ],
+          "windows": []
+        },
+        {
+          "id": "wall_element_781d2791_1792680716986217_15",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.12
+            }
+          ],
+          "location": "interior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 4.086998183712459,
+            "y": 0.010562430794850367
+          },
+          "endPoint": {
+            "x": 4.093970485139121,
+            "y": 1.8672615512260262
+          },
+          "thickness": 0.12,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "outer",
+          "exteriorSide": "left",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_12_partition",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "id": "wall_element_781d2791_1792680761778841_16",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 4.304733752866959,
+            "y": 2.105113554057775
+          },
+          "endPoint": {
+            "x": 7.2,
+            "y": 2.106699120431176
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "outer",
+          "exteriorSide": "left",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_brick",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [
+            {
+              "id": "door_element_781d2791_1792680929008311_19",
+              "wallId": "wall_element_781d2791_1792680761778841_16",
+              "offsetRatio": 0.25544932196594466,
+              "width": 0.9,
+              "height": 2.0,
+              "sillHeight": 0.0,
+              "frameThickness": 0.04,
+              "leafThickness": 0.04,
+              "isHingeLeft": true,
+              "openInward": false,
+              "openAngleDeg": 90.0,
+              "specId": "1'",
+              "uuid": "UUID_element_781d2791_1792680929008311_19",
+              "styleId": "door_interior_standard",
+              "style": {
+                "id": "door_interior_standard",
+                "name": "Интериорна врата 90/200",
+                "kind": "door",
+                "defaultWidth": 0.9,
+                "defaultHeight": 2.0,
+                "defaultSillHeight": 0.0,
+                "frameDepth": 0.05,
+                "frameFaceWidth": 0.04,
+                "centerInCore": true,
+                "glazingType": "double",
+                "glazingThickness": 0.024,
+                "glassColorValue": 2286928887,
+                "hasCasing": false,
+                "casingWidth": 0.1,
+                "casingProjection": 0.03,
+                "casingPlacement": "exterior",
+                "casingColorValue": 4293718001,
+                "includeBottomCasing": false,
+                "rootSubdivision": {
+                  "id": "root",
+                  "isSplit": false,
+                  "isVertical": true,
+                  "ratios": [
+                    1.0
+                  ],
+                  "children": [],
+                  "pane": {
+                    "id": "p_door",
+                    "paneType": "doorLeaf",
+                    "sashProfileWidth": 0.06,
+                    "hasHandle": false
+                  }
+                }
+              }
+            }
+          ],
+          "windows": [
+            {
+              "id": "win_element_781d2791_1792681112513427_31",
+              "wallId": "wall_element_781d2791_1792680761778841_16",
+              "offsetRatio": 0.7495676379144882,
+              "width": 1.2,
+              "height": 1.4,
+              "sillHeight": 0.85,
+              "frameThickness": 0.05,
+              "panesCount": 2,
+              "specId": "W1",
+              "uuid": "UUID_element_781d2791_1792681112513427_31",
+              "styleId": "win_double_casement",
+              "style": {
+                "id": "win_double_casement",
+                "name": "Двукрил 140/140 (5-камерен)",
+                "kind": "window",
+                "defaultWidth": 1.4,
+                "defaultHeight": 1.4,
+                "defaultSillHeight": 0.85,
+                "frameDepth": 0.07,
+                "frameFaceWidth": 0.07,
+                "centerInCore": true,
+                "glazingType": "double",
+                "glazingThickness": 0.024,
+                "glassColorValue": 2286928887,
+                "hasCasing": false,
+                "casingWidth": 0.1,
+                "casingProjection": 0.03,
+                "casingPlacement": "exterior",
+                "casingColorValue": 4293718001,
+                "includeBottomCasing": false,
+                "rootSubdivision": {
+                  "id": "root",
+                  "isSplit": true,
+                  "isVertical": true,
+                  "ratios": [
+                    0.5,
+                    0.5
+                  ],
+                  "children": [
+                    {
+                      "id": "sub_0",
+                      "isSplit": false,
+                      "isVertical": true,
+                      "ratios": [
+                        1.0
+                      ],
+                      "children": [],
+                      "pane": {
+                        "id": "p_left",
+                        "paneType": "casementLeft",
+                        "sashProfileWidth": 0.06,
+                        "hasHandle": false
+                      }
+                    },
+                    {
+                      "id": "sub_1",
+                      "isSplit": false,
+                      "isVertical": true,
+                      "ratios": [
+                        1.0
+                      ],
+                      "children": [],
+                      "pane": {
+                        "id": "p_right",
+                        "paneType": "tiltAndTurn",
+                        "sashProfileWidth": 0.06,
+                        "hasHandle": false
+                      }
+                    }
+                  ],
+                  "pane": null
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "wall_element_781d2791_1792680767361745_17",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 4.219391090846435,
+            "y": 1.979032658054627
+          },
+          "endPoint": {
+            "x": 4.2367438093543885,
+            "y": 6.6
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "left",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_brick",
+          "parapetFinish": null,
+          "cutDisplayMode": "auto",
+          "doors": [
+            {
+              "id": "door_element_781d2791_1792680924214806_18",
+              "wallId": "wall_element_781d2791_1792680767361745_17",
+              "offsetRatio": 0.7161614960066347,
+              "width": 0.9,
+              "height": 2.0,
+              "sillHeight": 0.0,
+              "frameThickness": 0.04,
+              "leafThickness": 0.04,
+              "isHingeLeft": true,
+              "openInward": false,
+              "openAngleDeg": 90.0,
+              "specId": "1'",
+              "uuid": "UUID_element_781d2791_1792680924214806_18",
+              "styleId": "door_interior_standard",
+              "style": {
+                "id": "door_interior_standard",
+                "name": "Интериорна врата 90/200",
+                "kind": "door",
+                "defaultWidth": 0.9,
+                "defaultHeight": 2.0,
+                "defaultSillHeight": 0.0,
+                "frameDepth": 0.05,
+                "frameFaceWidth": 0.04,
+                "centerInCore": true,
+                "glazingType": "double",
+                "glazingThickness": 0.024,
+                "glassColorValue": 2286928887,
+                "hasCasing": false,
+                "casingWidth": 0.1,
+                "casingProjection": 0.03,
+                "casingPlacement": "exterior",
+                "casingColorValue": 4293718001,
+                "includeBottomCasing": false,
+                "rootSubdivision": {
+                  "id": "root",
+                  "isSplit": false,
+                  "isVertical": true,
+                  "ratios": [
+                    1.0
+                  ],
+                  "children": [],
+                  "pane": {
+                    "id": "p_door",
+                    "paneType": "doorLeaf",
+                    "sashProfileWidth": 0.06,
+                    "hasHandle": false
+                  }
+                }
+              }
+            }
+          ],
+          "windows": []
+        }
+      ],
+      "zones": [
+        {
+          "id": "zone_element_781d2791_1792680998226226_24",
+          "kind": "room",
+          "number": "1",
+          "name": "Living Room",
+          "category": "living",
+          "polygon": [
+            {
+              "x": 7.325,
+              "y": 6.724999999999999
+            },
+            {
+              "x": 14.275,
+              "y": 6.724999999999999
+            },
+            {
+              "x": 14.275,
+              "y": 13.075
+            },
+            {
+              "x": 7.325,
+              "y": 13.075
+            }
+          ],
+          "floorFinish": "",
+          "wallFinish": "",
+          "ceilingFinish": "",
+          "clearHeight": 2.6,
+          "isAutoBoundary": true,
+          "seedPoint": {
+            "x": 10.510039643377056,
+            "y": 9.640294825473452
+          },
+          "targetArea": null,
+          "customColorValue": null
+        },
+        {
+          "id": "zone_element_781d2791_1792681266240927_35",
+          "kind": "room",
+          "number": "2",
+          "name": "Living Room",
+          "category": "living",
+          "polygon": [
+            {
+              "x": 4.344865515397201,
+              "y": 2.105135531854546
+            },
+            {
+              "x": 7.075,
+              "y": 2.106630665311765
+            },
+            {
+              "x": 7.075,
+              "y": 2.7605554834241497
+            },
+            {
+              "x": 7.2,
+              "y": 2.7605554834241497
+            },
+            {
+              "x": 7.2,
+              "y": 2.8855554834241506
+            },
+            {
+              "x": 7.075,
+              "y": 2.8855554834241506
+            },
+            {
+              "x": 7.075,
+              "y": 6.474999999999999
+            },
+            {
+              "x": 4.3612752890273505,
+              "y": 6.474999999999999
+            }
+          ],
+          "floorFinish": "",
+          "wallFinish": "",
+          "ceilingFinish": "",
+          "clearHeight": 2.6,
+          "isAutoBoundary": true,
+          "seedPoint": {
+            "x": 5.485173480808505,
+            "y": 4.29599034698784
+          },
+          "targetArea": null,
+          "customColorValue": null
+        },
+        {
+          "id": "zone_element_781d2791_1792681274892966_36",
+          "kind": "room",
+          "number": "3",
+          "name": "Kitchen",
+          "category": "kitchen",
+          "polygon": [
+            {
+              "x": 0.125,
+              "y": 4.338398240862352
+            },
+            {
+              "x": 4.103250130762387,
+              "y": 4.338398240862352
+            },
+            {
+              "x": 4.1112735263301,
+              "y": 6.474999999999999
+            },
+            {
+              "x": 0.12500000000000044,
+              "y": 6.474999999999999
+            }
+          ],
+          "floorFinish": "",
+          "wallFinish": "",
+          "ceilingFinish": "",
+          "clearHeight": 2.6,
+          "isAutoBoundary": true,
+          "seedPoint": {
+            "x": 2.541517462799289,
+            "y": 4.8130064181396
+          },
+          "targetArea": null,
+          "customColorValue": null
+        },
+        {
+          "id": "zone_element_781d2791_1792681342150516_39",
+          "kind": "room",
+          "number": "4",
+          "name": "Corridor / Hall",
+          "category": "corridor",
+          "polygon": [
+            {
+              "x": 7.325,
+              "y": 5.494301665827356
+            },
+            {
+              "x": 10.8,
+              "y": 5.494301665827356
+            },
+            {
+              "x": 10.8,
+              "y": 6.474999999999999
+            },
+            {
+              "x": 7.325,
+              "y": 6.474999999999999
+            }
+          ],
+          "floorFinish": "",
+          "wallFinish": "",
+          "ceilingFinish": "",
+          "clearHeight": 2.6,
+          "isAutoBoundary": true,
+          "seedPoint": {
+            "x": 9.641915652549637,
+            "y": 6.023299055628509
+          },
+          "targetArea": null,
+          "customColorValue": null
+        },
+        {
+          "id": "zone_element_781d2791_1792681348995288_40",
+          "kind": "room",
+          "number": "5",
+          "name": "Storage / Utility",
+          "category": "storage",
+          "polygon": [
+            {
+              "x": 7.325,
+              "y": 2.885555483424151
+            },
+            {
+              "x": 10.8,
+              "y": 2.8855554834241506
+            },
+            {
+              "x": 10.8,
+              "y": 5.374301665827356
+            },
+            {
+              "x": 7.325000000000001,
+              "y": 5.374301665827356
+            }
+          ],
+          "floorFinish": "",
+          "wallFinish": "",
+          "ceilingFinish": "",
+          "clearHeight": 2.6,
+          "isAutoBoundary": true,
+          "seedPoint": {
+            "x": 10.102117489945046,
+            "y": 3.928421941651488
+          },
+          "targetArea": null,
+          "customColorValue": null
+        },
+        {
+          "id": "zone_element_781d2791_1792681355291561_41",
+          "kind": "room",
+          "number": "6",
+          "name": "Custom Space",
+          "category": "custom",
+          "polygon": [
+            {
+              "x": 10.92,
+              "y": 2.8855554834241506
+            },
+            {
+              "x": 14.275,
+              "y": 2.8855554834241506
+            },
+            {
+              "x": 14.275,
+              "y": 6.474999999999999
+            },
+            {
+              "x": 10.92,
+              "y": 6.474999999999999
+            }
+          ],
+          "floorFinish": "",
+          "wallFinish": "",
+          "ceilingFinish": "",
+          "clearHeight": 2.6,
+          "isAutoBoundary": true,
+          "seedPoint": {
+            "x": 13.323530351712918,
+            "y": 4.687635129125426
+          },
+          "targetArea": null,
+          "customColorValue": null
+        },
+        {
+          "id": "zone_element_781d2791_1792681441313102_42",
+          "kind": "room",
+          "number": "7",
+          "name": "Bathroom / WC",
+          "category": "bathroom",
+          "polygon": [
+            {
+              "x": 0.125,
+              "y": 0.125
+            },
+            {
+              "x": 4.086958519530746,
+              "y": 0.12500000000000022
+            },
+            {
+              "x": 4.102799505153751,
+              "y": 4.218398240862352
+            },
+            {
+              "x": 0.125,
+              "y": 4.218398240862352
+            }
+          ],
+          "floorFinish": "Terracotta",
+          "wallFinish": "Faience",
+          "ceilingFinish": "Suspended Ceiling",
+          "clearHeight": 2.6,
+          "isAutoBoundary": false,
+          "targetArea": null,
+          "customColorValue": null
+        }
+      ],
+      "columns": [
+        {
+          "id": "col_element_7b6f2310_1792695322169446_2",
+          "position": {
+            "x": 4.2367438093543885,
+            "y": 6.6
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "depth": 0.25,
+          "rotationDeg": 0.0,
+          "height": null,
+          "baseOffset": 0.0,
+          "cutDisplayMode": "auto",
+          "label": "C1"
+        },
+        {
+          "id": "col_element_7b6f2310_1792695335975359_3",
+          "position": {
+            "x": 7.2,
+            "y": 6.6
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "depth": 0.25,
+          "rotationDeg": 0.0,
+          "height": null,
+          "baseOffset": 0.0,
+          "cutDisplayMode": "auto",
+          "label": "C2"
+        }
+      ],
+      "beams": [
+        {
+          "id": "beam_element_7b6f2310_1792695356228182_4",
+          "startPoint": {
+            "x": 7.2,
+            "y": 6.6
+          },
+          "endPoint": {
+            "x": 8.4312491833255,
+            "y": 6.599999999999999
+          },
+          "width": 0.25,
+          "depth": 0.4,
+          "baseOffset": 2.2,
+          "cutDisplayMode": "auto",
+          "label": "B 25/50"
+        },
+        {
+          "id": "beam_element_7b6f2310_1792695368098198_5",
+          "startPoint": {
+            "x": 10.8,
+            "y": 2.5155554834241496
+          },
+          "endPoint": {
+            "x": 10.8,
+            "y": -0.7344015162772841
+          },
+          "width": 0.25,
+          "depth": 0.4,
+          "baseOffset": 2.2,
+          "cutDisplayMode": "auto",
+          "label": "B 25/50"
+        }
+      ],
+      "slabs": [],
+      "roofs": [],
+      "openings": [
+        {
+          "id": "op_element_7b6f2310_1792695232681255_0",
+          "boundary": [
+            {
+              "x": 0.6756350282496544,
+              "y": 5.737918971461314
+            },
+            {
+              "x": 1.0703825251560857,
+              "y": 5.737918971461314
+            },
+            {
+              "x": 1.0703825251560857,
+              "y": 6.132666468367745
+            },
+            {
+              "x": 0.6756350282496544,
+              "y": 6.132666468367745
+            }
+          ],
+          "label": "Opening 1",
+          "type": "shaft"
+        }
+      ],
+      "stairs": [
+        {
+          "id": "stair_7b6f2310_1792695250211514_1",
+          "startPoint": {
+            "x": 0.7249999999999996,
+            "y": 3.6983333333333333
+          },
+          "endPoint": {
+            "x": 0.7249999999999998,
+            "y": 2.6611551296569425
+          },
+          "width": 1.2,
+          "stepCount": 18,
+          "hasLanding": true,
+          "design": {
+            "rulesVersion": "BG-2025.1",
+            "shape": "halfTurn",
+            "code": "bulgaria",
+            "use": "common",
+            "evacuation": "unspecified",
+            "rise": 3.0,
+            "startOffset": 0.0,
+            "followStoreys": true,
+            "upperStoreyId": "storey_1",
+            "manualRisers": null,
+            "manualGoing": null,
+            "landingDepth": 1.2,
+            "innerRadius": 0.6,
+            "sweepDegrees": 270.0,
+            "winderSteps": false,
+            "cornerRiser": false,
+            "manualWinderSteps": null,
+            "manualWinderRadius": null,
+            "turnLeft": false,
+            "isDraft": false,
+            "showRailing": true,
+            "showLabel": true,
+            "guardHeight": 1.2,
+            "handrailHeight": 0.9,
+            "concreteThickness": 0.15,
+            "finishThickness": 0.02,
+            "nosingProjection": 0.03
+          }
+        }
+      ],
+      "dimensions": [],
+      "elevationMarkers": [],
+      "annotations": [],
+      "cadPrimitives": [
+        {
+          "id": "cad_element_781d2791_1792682821755982_48",
+          "type": "line",
+          "startPoint": {
+            "x": 2.187134349367529,
+            "y": 13.2
+          },
+          "endPoint": {
+            "x": 5.975292656655785,
+            "y": 13.2
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_element_781d2791_1792682825459627_49",
+          "type": "line",
+          "startPoint": {
+            "x": 5.975292656655785,
+            "y": 13.2
+          },
+          "endPoint": {
+            "x": 5.975292656655785,
+            "y": 14.875292321816973
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_element_7b6f2310_1792695470216151_6",
+          "type": "line",
+          "startPoint": {
+            "x": 9.059000000000001,
+            "y": -1.276
+          },
+          "endPoint": {
+            "x": 10.77210141848223,
+            "y": -2.9891014184822287
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_element_7b6f2310_1792695476325268_7",
+          "type": "line",
+          "startPoint": {
+            "x": 10.77210141848223,
+            "y": -2.9891014184822287
+          },
+          "endPoint": {
+            "x": 10.77210141848223,
+            "y": -1.3102715257464135
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_element_7b6f2310_1792695483161821_8",
+          "type": "line",
+          "startPoint": {
+            "x": 11.523961323009564,
+            "y": -1.405411621219079
+          },
+          "endPoint": {
+            "x": 9.18841162121908,
+            "y": -1.4054116212190793
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        }
+      ],
+      "components": [],
+      "zoneScheduleOrigin": {
+        "x": 15.671850647578577,
+        "y": 2.6055738947954037
+      }
+    },
+    {
+      "id": "storey_1",
+      "name": "+3.00",
+      "elevation": 3.0,
+      "height": 3.0,
+      "cutPlaneHeight": 1.2,
+      "floorFinishThickness": 0.05,
+      "walls": [],
+      "zones": [],
+      "columns": [],
+      "beams": [],
+      "slabs": [],
+      "roofs": [],
+      "openings": [],
+      "stairs": [],
+      "dimensions": [],
+      "elevationMarkers": [],
+      "annotations": [],
+      "cadPrimitives": [],
+      "components": []
+    },
+    {
+      "id": "storey_roof",
+      "name": "Покривни линии",
+      "elevation": 6.0,
+      "height": 2.8,
+      "cutPlaneHeight": 1.2,
+      "floorFinishThickness": 0.05,
+      "isRoof": true,
+      "walls": [],
+      "zones": [],
+      "columns": [],
+      "beams": [],
+      "slabs": [],
+      "roofs": [
+        {
+          "id": "roof_781d2791_1792681728247313_43",
+          "storeyId": "storey_roof",
+          "points": [
+            {
+              "x": -0.945000000000002,
+              "y": -0.9449999999999994
+            },
+            {
+              "x": 8.145,
+              "y": -0.9450000000000002
+            },
+            {
+              "x": 8.145,
+              "y": 2.5155554834241496
+            },
+            {
+              "x": -0.9450000000000003,
+              "y": 2.5155554834241496
+            }
+          ],
+          "eavesEdgeIndex": 0,
+          "reverseSlope": false,
+          "slopeDegrees": 22.0,
+          "baseElevationOffset": 0.6338723895889888,
+          "attachToWalls": false,
+          "placementResolved": true,
+          "eavesOverhang": 0.7000000000000001,
+          "eavesCut": "plumb",
+          "assembly": {
+            "preset": "pitchedTiles",
+            "layers": [
+              {
+                "id": "covering",
+                "role": "covering",
+                "material": "clayTiles",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "battens",
+                "role": "battens",
+                "material": "timberBoarding",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "counter_battens",
+                "role": "counterBattens",
+                "material": "timberBoarding",
+                "thickness": 0.05,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "membrane",
+                "role": "underlayment",
+                "material": "breathableMembrane",
+                "thickness": 0.003,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "boarding",
+                "role": "boarding",
+                "material": "timberBoarding",
+                "thickness": 0.025,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "rafters",
+                "role": "rafters",
+                "material": "timberBoarding",
+                "thickness": 0.16,
+                "isBetweenRafters": false
+              }
+            ],
+            "timber": {
+              "hasBattens": true,
+              "battenWidth": 0.05,
+              "battenHeight": 0.04,
+              "battenSpacing": 0.33,
+              "hasCounterBattens": true,
+              "counterBattenWidth": 0.05,
+              "counterBattenHeight": 0.05,
+              "hasRafters": true,
+              "rafterWidth": 0.08,
+              "rafterHeight": 0.16,
+              "rafterSpacing": 0.6,
+              "hasWallPlate": true,
+              "wallPlateWidth": 0.14,
+              "wallPlateHeight": 0.14,
+              "hasRingBeam": true,
+              "ringBeamHeight": 0.1,
+              "hasRidgePurlin": true,
+              "ridgePurlinWidth": 0.16,
+              "ridgePurlinHeight": 0.2,
+              "hasFasciaBoard": true,
+              "fasciaThickness": 0.025,
+              "hasMetalFlashing": true
+            }
+          },
+          "roofGroupId": null,
+          "isSlopeLocked": true,
+          "drainage": {
+            "showGutter": true,
+            "showDownpipes": true,
+            "profile": "halfRound",
+            "material": "galvanizedSteel",
+            "gutterWidth": 0.15,
+            "gutterDepth": 0.09,
+            "downpipes": [
+              {
+                "id": "downpipe_770c53f1_1792745753354230_0",
+                "offset": 0.3,
+                "diameter": 0.1,
+                "wallClearance": 0.05,
+                "bendAngle": 45.0,
+                "outletElevation": 0.15,
+                "facadeWallId": null,
+                "visible": true,
+                "waypoints": []
+              }
+            ]
+          }
+        },
+        {
+          "id": "roof_781d2791_1792681735116624_44",
+          "storeyId": "storey_roof",
+          "points": [
+            {
+              "x": -0.9450000000000003,
+              "y": 2.5155554834241496
+            },
+            {
+              "x": 14.645,
+              "y": 2.5155554834241496
+            },
+            {
+              "x": 14.645,
+              "y": 7.544999999999999
+            },
+            {
+              "x": -0.9449999999999985,
+              "y": 7.545
+            }
+          ],
+          "eavesEdgeIndex": 2,
+          "reverseSlope": false,
+          "slopeDegrees": 22.0,
+          "baseElevationOffset": 0.0,
+          "attachToWalls": true,
+          "placementResolved": true,
+          "eavesOverhang": 0.7000000000000001,
+          "eavesCut": "plumb",
+          "assembly": {
+            "preset": "pitchedTiles",
+            "layers": [
+              {
+                "id": "covering",
+                "role": "covering",
+                "material": "clayTiles",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "battens",
+                "role": "battens",
+                "material": "timberBoarding",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "counter_battens",
+                "role": "counterBattens",
+                "material": "timberBoarding",
+                "thickness": 0.05,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "membrane",
+                "role": "underlayment",
+                "material": "breathableMembrane",
+                "thickness": 0.003,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "boarding",
+                "role": "boarding",
+                "material": "timberBoarding",
+                "thickness": 0.025,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "rafters",
+                "role": "rafters",
+                "material": "timberBoarding",
+                "thickness": 0.16,
+                "isBetweenRafters": false
+              }
+            ],
+            "timber": {
+              "hasBattens": true,
+              "battenWidth": 0.05,
+              "battenHeight": 0.04,
+              "battenSpacing": 0.33,
+              "hasCounterBattens": true,
+              "counterBattenWidth": 0.05,
+              "counterBattenHeight": 0.05,
+              "hasRafters": true,
+              "rafterWidth": 0.08,
+              "rafterHeight": 0.16,
+              "rafterSpacing": 0.6,
+              "hasWallPlate": true,
+              "wallPlateWidth": 0.14,
+              "wallPlateHeight": 0.14,
+              "hasRingBeam": true,
+              "ringBeamHeight": 0.1,
+              "hasRidgePurlin": true,
+              "ridgePurlinWidth": 0.16,
+              "ridgePurlinHeight": 0.2,
+              "hasFasciaBoard": true,
+              "fasciaThickness": 0.025,
+              "hasMetalFlashing": true
+            }
+          },
+          "roofGroupId": null,
+          "isSlopeLocked": true,
+          "drainage": {
+            "showGutter": true,
+            "showDownpipes": true,
+            "profile": "halfRound",
+            "material": "galvanizedSteel",
+            "gutterWidth": 0.15,
+            "gutterDepth": 0.09,
+            "downpipes": []
+          }
+        },
+        {
+          "id": "roof_781d2791_1792681746544722_45",
+          "storeyId": "storey_roof",
+          "points": [
+            {
+              "x": 6.955,
+              "y": 6.724999999999999
+            },
+            {
+              "x": 10.8,
+              "y": 2.8855554834241497
+            },
+            {
+              "x": 10.8,
+              "y": 13.444999999999999
+            },
+            {
+              "x": 6.955,
+              "y": 13.444999999999999
+            }
+          ],
+          "eavesEdgeIndex": 3,
+          "reverseSlope": false,
+          "slopeDegrees": 22.0,
+          "baseElevationOffset": 0.0,
+          "attachToWalls": true,
+          "placementResolved": true,
+          "eavesOverhang": 0.5,
+          "eavesCut": "plumb",
+          "assembly": {
+            "preset": "pitchedTiles",
+            "layers": [
+              {
+                "id": "covering",
+                "role": "covering",
+                "material": "clayTiles",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "battens",
+                "role": "battens",
+                "material": "timberBoarding",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "counter_battens",
+                "role": "counterBattens",
+                "material": "timberBoarding",
+                "thickness": 0.05,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "membrane",
+                "role": "underlayment",
+                "material": "breathableMembrane",
+                "thickness": 0.003,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "boarding",
+                "role": "boarding",
+                "material": "timberBoarding",
+                "thickness": 0.025,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "rafters",
+                "role": "rafters",
+                "material": "timberBoarding",
+                "thickness": 0.16,
+                "isBetweenRafters": false
+              }
+            ],
+            "timber": {
+              "hasBattens": true,
+              "battenWidth": 0.05,
+              "battenHeight": 0.04,
+              "battenSpacing": 0.33,
+              "hasCounterBattens": true,
+              "counterBattenWidth": 0.05,
+              "counterBattenHeight": 0.05,
+              "hasRafters": true,
+              "rafterWidth": 0.08,
+              "rafterHeight": 0.16,
+              "rafterSpacing": 0.6,
+              "hasWallPlate": true,
+              "wallPlateWidth": 0.14,
+              "wallPlateHeight": 0.14,
+              "hasRingBeam": true,
+              "ringBeamHeight": 0.1,
+              "hasRidgePurlin": true,
+              "ridgePurlinWidth": 0.16,
+              "ridgePurlinHeight": 0.2,
+              "hasFasciaBoard": true,
+              "fasciaThickness": 0.025,
+              "hasMetalFlashing": true
+            }
+          },
+          "roofGroupId": null,
+          "isSlopeLocked": true,
+          "drainage": {
+            "showGutter": true,
+            "showDownpipes": true,
+            "profile": "halfRound",
+            "material": "galvanizedSteel",
+            "gutterWidth": 0.15,
+            "gutterDepth": 0.09,
+            "downpipes": []
+          }
+        },
+        {
+          "id": "roof_781d2791_1792681754043138_46",
+          "storeyId": "storey_roof",
+          "points": [
+            {
+              "x": 10.8,
+              "y": 2.8855554834241497
+            },
+            {
+              "x": 14.645,
+              "y": 6.724999999999999
+            },
+            {
+              "x": 14.645,
+              "y": 13.444999999999997
+            },
+            {
+              "x": 10.8,
+              "y": 13.444999999999997
+            }
+          ],
+          "eavesEdgeIndex": 1,
+          "reverseSlope": false,
+          "slopeDegrees": 22.0,
+          "baseElevationOffset": 0.0,
+          "attachToWalls": true,
+          "placementResolved": true,
+          "eavesOverhang": 0.5,
+          "eavesCut": "plumb",
+          "assembly": {
+            "preset": "pitchedTiles",
+            "layers": [
+              {
+                "id": "covering",
+                "role": "covering",
+                "material": "clayTiles",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "battens",
+                "role": "battens",
+                "material": "timberBoarding",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "counter_battens",
+                "role": "counterBattens",
+                "material": "timberBoarding",
+                "thickness": 0.05,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "membrane",
+                "role": "underlayment",
+                "material": "breathableMembrane",
+                "thickness": 0.003,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "boarding",
+                "role": "boarding",
+                "material": "timberBoarding",
+                "thickness": 0.025,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "rafters",
+                "role": "rafters",
+                "material": "timberBoarding",
+                "thickness": 0.16,
+                "isBetweenRafters": false
+              }
+            ],
+            "timber": {
+              "hasBattens": true,
+              "battenWidth": 0.05,
+              "battenHeight": 0.04,
+              "battenSpacing": 0.33,
+              "hasCounterBattens": true,
+              "counterBattenWidth": 0.05,
+              "counterBattenHeight": 0.05,
+              "hasRafters": true,
+              "rafterWidth": 0.08,
+              "rafterHeight": 0.16,
+              "rafterSpacing": 0.6,
+              "hasWallPlate": true,
+              "wallPlateWidth": 0.14,
+              "wallPlateHeight": 0.14,
+              "hasRingBeam": true,
+              "ringBeamHeight": 0.1,
+              "hasRidgePurlin": true,
+              "ridgePurlinWidth": 0.16,
+              "ridgePurlinHeight": 0.2,
+              "hasFasciaBoard": true,
+              "fasciaThickness": 0.025,
+              "hasMetalFlashing": true
+            }
+          },
+          "roofGroupId": null,
+          "isSlopeLocked": true,
+          "drainage": {
+            "showGutter": true,
+            "showDownpipes": true,
+            "profile": "halfRound",
+            "material": "galvanizedSteel",
+            "gutterWidth": 0.15,
+            "gutterDepth": 0.09,
+            "downpipes": []
+          }
+        }
+      ],
+      "openings": [],
+      "stairs": [],
+      "dimensions": [],
+      "elevationMarkers": [],
+      "annotations": [],
+      "cadPrimitives": [],
+      "components": []
+    }
+  ],
+  "activeStoreyId": "storey_0",
+  "gridAxes": [
+    {
+      "id": "axis_x_1",
+      "name": "1",
+      "start": {
+        "dx": 0.0,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 0.0,
+        "dy": 14.7
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_x_2",
+      "name": "2",
+      "start": {
+        "dx": 7.2,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 7.2,
+        "dy": 14.7
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_x_3",
+      "name": "3",
+      "start": {
+        "dx": 14.4,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 14.4,
+        "dy": 14.7
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_x_4",
+      "name": "4",
+      "start": {
+        "dx": 21.6,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 21.6,
+        "dy": 14.7
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_0",
+      "name": "A",
+      "start": {
+        "dx": -1.5,
+        "dy": 0.0
+      },
+      "end": {
+        "dx": 23.1,
+        "dy": 0.0
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_1",
+      "name": "B",
+      "start": {
+        "dx": -1.5,
+        "dy": 6.6
+      },
+      "end": {
+        "dx": 23.1,
+        "dy": 6.6
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_2",
+      "name": "C",
+      "start": {
+        "dx": -1.5,
+        "dy": 13.2
+      },
+      "end": {
+        "dx": 23.1,
+        "dy": 13.2
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    }
+  ],
+  "wallTypes": [
+    {
+      "id": "ext_25_12_eps",
+      "name": "",
+      "usage": "exterior",
+      "layers": [],
+      "location": "exterior",
+      "loadBearing": false,
+      "totalThickness": 0.37,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.12,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4293874512
+    },
+    {
+      "id": "int_12_partition",
+      "name": "",
+      "usage": "interior",
+      "layers": [],
+      "location": "interior",
+      "loadBearing": false,
+      "totalThickness": 0.12,
+      "brickThickness": 0.12,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4294944550
+    },
+    {
+      "id": "bearing_25_concrete",
+      "name": "",
+      "usage": "bearing",
+      "layers": [],
+      "location": "interior",
+      "loadBearing": true,
+      "totalThickness": 0.25,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4286091420
+    },
+    {
+      "id": "parapet_12",
+      "name": "",
+      "usage": "parapet",
+      "layers": [],
+      "location": "exterior",
+      "loadBearing": false,
+      "totalThickness": 0.12,
+      "brickThickness": 0.12,
+      "insulationThickness": 0.0,
+      "customHeight": 1.05,
+      "parapetFinish": "cap",
+      "colorValue": 4280723098
+    },
+    {
+      "id": "ext_25_brick",
+      "name": "",
+      "labelId": "ext_25_brick",
+      "usage": "exterior",
+      "layers": [
+        {
+          "id": "core",
+          "material": "brick",
+          "role": "core",
+          "thickness": 0.25
+        }
+      ],
+      "location": "exterior",
+      "loadBearing": false,
+      "totalThickness": 0.25,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4294930499
+    }
+  ],
+  "lineStyles": [],
+  "hatchPatterns": [],
+  "openingStyles": [],
+  "slabAssemblies": [],
+  "sections": [
+    {
+      "id": "section_781d2791_1792682600701811_47",
+      "name": "",
+      "start": {
+        "x": 2.5887073347857665,
+        "y": 11.913861655773408
+      },
+      "end": {
+        "x": 2.5160567522880966,
+        "y": -7.43273057651424
+      },
+      "viewDepth": null,
+      "details": [],
+      "drawing": {
+        "dimensions": [],
+        "elevationMarkers": [],
+        "annotations": [],
+        "cadPrimitives": []
+      }
+    }
+  ],
+  "elevations": [],
+  "slabCompositionNumbers": {
+    "[[],[\"concrete\",160000000],[]]": 1
+  }
+}

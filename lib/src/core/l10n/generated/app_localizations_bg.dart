@@ -7486,4 +7486,22 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectRoofTimberTab => 'Конструкция';
+
+  @override
+  String get architectViewStep => 'Добави чупка';
+
+  @override
+  String get architectViewEditHint =>
+      'Преместете краищата, чупките или далечната граница и приложете.';
+
+  @override
+  String get architectViewDepthBehindSteps =>
+      'Поставете далечната граница след всички сегменти.';
+
+  @override
+  String get architectViewStraight => 'Изправи';
+
+  @override
+  String get architectViewStepHint =>
+      'Посочете точка до маркера за мястото и отместването на чупката. Повторете „Добави чупка“ за още сегменти.';
 }

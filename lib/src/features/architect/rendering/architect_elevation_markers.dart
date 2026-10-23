@@ -15,7 +15,10 @@ void drawArchitectElevationMarkers(
   String? fontFamily,
 }) {
   void label(String value, Offset point, {Color? ink, String id = 'north'}) {
-    final text = ArchitectTextPainter(elementId: id, role: ArchitectAnnotationRole.symbol, modelScale: 1,
+    final text = ArchitectTextPainter(
+      elementId: id,
+      role: ArchitectAnnotationRole.symbol,
+      modelScale: 1,
       text: TextSpan(
         text: value,
         style: TextStyle(
@@ -44,40 +47,110 @@ void drawArchitectElevationMarkers(
   }
 
   for (final e in project.elevations) {
-    final symbolScale = ArchitectTextScope.current == null ? scale : 11 / ArchitectTextScope.current!.height(e.id, ArchitectAnnotationRole.symbol);
+    if (e.length < .01) continue;
+    final symbolScale = ArchitectTextScope.current == null
+        ? scale
+        : 11 /
+              ArchitectTextScope.current!.height(
+                e.id,
+                ArchitectAnnotationRole.symbol,
+              );
     final ink = selected == e.id ? Colors.blue : color;
     final paint = Paint()
       ..color = ink
       ..strokeWidth = (selected == e.id ? 2 : 1) / symbolScale;
-    canvas.drawLine(e.start, e.end, paint);
-    final tip = e.centre + e.viewDirection * (16 / symbolScale);
-    canvas.drawLine(e.centre, tip, paint);
+    final marker = Path()
+      ..moveTo(e.segments.first.start.dx, e.segments.first.start.dy);
+    for (final s in e.segments) {
+      marker
+        ..lineTo(s.start.dx, s.start.dy)
+        ..lineTo(s.end.dx, s.end.dy);
+    }
+    canvas.drawPath(marker, paint..style = PaintingStyle.stroke);
+    final middle = e.segments.lastWhere((s) => s.station <= e.length / 2);
+    final centre = middle.start + e.axis * (e.length / 2 - middle.station);
+    final tip = centre + e.viewDirection * (16 / symbolScale);
+    canvas.drawLine(centre, tip, paint);
     canvas.drawPath(
       Path()
         ..moveTo(tip.dx, tip.dy)
         ..lineTo(
-          (tip - e.viewDirection * (6 / symbolScale) + e.axis * (4 / symbolScale)).dx,
-          (tip - e.viewDirection * (6 / symbolScale) + e.axis * (4 / symbolScale)).dy,
+          (tip -
+                  e.viewDirection * (6 / symbolScale) +
+                  e.axis * (4 / symbolScale))
+              .dx,
+          (tip -
+                  e.viewDirection * (6 / symbolScale) +
+                  e.axis * (4 / symbolScale))
+              .dy,
         )
         ..lineTo(
-          (tip - e.viewDirection * (6 / symbolScale) - e.axis * (4 / symbolScale)).dx,
-          (tip - e.viewDirection * (6 / symbolScale) - e.axis * (4 / symbolScale)).dy,
+          (tip -
+                  e.viewDirection * (6 / symbolScale) -
+                  e.axis * (4 / symbolScale))
+              .dx,
+          (tip -
+                  e.viewDirection * (6 / symbolScale) -
+                  e.axis * (4 / symbolScale))
+              .dy,
         )
         ..close(),
       Paint()..color = ink,
     );
-    canvas.drawCircle(e.start, 3 / symbolScale, paint);
-    canvas.drawCircle(e.end, 3 / symbolScale, paint);
+    canvas.drawCircle(e.segments.first.start, 3 / symbolScale, paint);
+    canvas.drawCircle(e.segments.last.end, 3 / symbolScale, paint);
     label(
       architectElevationLabel(l, e, project.northSymbol?.angle ?? 0),
-      e.centre - e.viewDirection * (22 / symbolScale),
+      centre - e.viewDirection * (22 / symbolScale),
       ink: ink,
       id: e.id,
     );
   }
+  for (var i = 0; i < project.sections.length; i++) {
+    final s = project.sections[i];
+    if (s.length < .01) continue;
+    final segments = s.segments;
+    final path = Path()
+      ..moveTo(segments.first.start.dx, segments.first.start.dy);
+    for (final part in segments) {
+      path
+        ..lineTo(part.start.dx, part.start.dy)
+        ..lineTo(part.end.dx, part.end.dy);
+    }
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1 / scale;
+    canvas.drawPath(path, paint);
+    for (final p in [segments.first.start, segments.last.end]) {
+      final tip = p + s.viewDirection * (16 / scale);
+      canvas.drawLine(p, tip, paint);
+      canvas.drawLine(
+        tip,
+        tip - s.viewDirection * (5 / scale) + s.axis * (3 / scale),
+        paint,
+      );
+      canvas.drawLine(
+        tip,
+        tip - s.viewDirection * (5 / scale) - s.axis * (3 / scale),
+        paint,
+      );
+    }
+    label(
+      s.name.isEmpty ? l.architectSectionNumber(i + 1) : s.name,
+      segments.first.start - s.viewDirection * (20 / scale),
+      id: s.id,
+    );
+  }
   final north = project.northSymbol;
   if (north == null) return;
-  final symbolScale = ArchitectTextScope.current == null ? scale : 11 / ArchitectTextScope.current!.height('north', ArchitectAnnotationRole.symbol);
+  final symbolScale = ArchitectTextScope.current == null
+      ? scale
+      : 11 /
+            ArchitectTextScope.current!.height(
+              'north',
+              ArchitectAnnotationRole.symbol,
+            );
   final p = north.position, d = north.direction;
   final side = Offset(-d.dy, d.dx);
   final tip = p + d * (23 / symbolScale);

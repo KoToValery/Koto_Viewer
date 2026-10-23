@@ -7,6 +7,60 @@ Map<String, double> sectionPointJson(Offset p) => {'x': p.dx, 'y': p.dy};
 double? viewDepthFromJson(Object? value) =>
     value is num && value.isFinite && value > 0 ? value.toDouble() : null;
 
+/// Each point stores a station and the perpendicular offset of the segment
+/// starting there. Offsets share the original marker's far clipping plane.
+typedef ArchitectViewSegment = ({
+  double station,
+  Offset start,
+  Offset end,
+  double offset,
+});
+List<ArchitectViewSegment> viewSegments(
+  Offset start,
+  Offset end,
+  Offset normal,
+  List<Offset> steps,
+) {
+  final length = (end - start).distance;
+  if (!length.isFinite ||
+      length < .01 ||
+      !start.dx.isFinite ||
+      !start.dy.isFinite ||
+      !end.dx.isFinite ||
+      !end.dy.isFinite) {
+    throw ArgumentError('Invalid view span');
+  }
+  final axis = (end - start) / length;
+  var station = 0.0, offset = 0.0;
+  final result =
+      <({double station, Offset start, Offset end, double offset})>[];
+  void segment(double stop) {
+    if (stop > station) {
+      result.add((
+        station: station,
+        start: start + axis * station + normal * offset,
+        end: start + axis * stop + normal * offset,
+        offset: offset,
+      ));
+    }
+  }
+
+  for (final step in steps) {
+    if (!step.dx.isFinite ||
+        !step.dy.isFinite ||
+        step.dx < station ||
+        step.dx >= length ||
+        (step.dx > station && step.dx - station < .01)) {
+      throw ArgumentError('Invalid view step');
+    }
+    segment(step.dx);
+    station = step.dx;
+    offset = step.dy;
+  }
+  segment(length);
+  return result;
+}
+
 class ArchitectSlabDetail {
   final String id, slabId;
 
@@ -55,6 +109,7 @@ class ArchitectSection {
 
   /// Far clipping distance in model metres; null keeps legacy unlimited views.
   final double? viewDepth;
+  final List<Offset> steps;
   final List<ArchitectSlabDetail> details;
   final ArchitectViewDrawing drawing;
   const ArchitectSection({
@@ -62,6 +117,7 @@ class ArchitectSection {
     required this.start,
     required this.end,
     this.viewDepth,
+    this.steps = const [],
     this.name = '',
     this.details = const [],
     this.drawing = const ArchitectViewDrawing(),
@@ -69,7 +125,16 @@ class ArchitectSection {
   double get length => (end - start).distance;
   Offset get axis =>
       length > 1e-9 ? (end - start) / length : const Offset(1, 0);
-  Offset pointAt(double station) => start + axis * station;
+  List<ArchitectViewSegment> get segments =>
+      viewSegments(start, end, viewDirection, steps);
+  Offset pointAt(double station) {
+    if (steps.isEmpty) return start + axis * station;
+    final segment = segments.lastWhere(
+      (s) => s.station <= station,
+      orElse: () => segments.first,
+    );
+    return segment.start + axis * (station - segment.station);
+  }
 
   /// Looking left of the ordered cut line makes station increase to screen-right.
   /// Endpoint order persists the viewing direction in existing project files.
@@ -77,6 +142,13 @@ class ArchitectSection {
   ArchitectSection reversed() => copyWith(
     start: end,
     end: start,
+    steps: [
+      for (final s in segments.reversed)
+        if (steps.isNotEmpty &&
+            (s.station + (s.end - s.start).distance < length - 1e-8 ||
+                s.offset != 0))
+          Offset(length - s.station - (s.end - s.start).distance, -s.offset),
+    ],
     details: [
       for (final d in details)
         ArchitectSlabDetail(
@@ -96,6 +168,7 @@ class ArchitectSection {
     ArchitectViewDrawing? drawing,
     double? viewDepth,
     bool clearViewDepth = false,
+    List<Offset>? steps,
   }) => ArchitectSection(
     id: id,
     name: name ?? this.name,
@@ -104,6 +177,7 @@ class ArchitectSection {
     details: details ?? this.details,
     drawing: drawing ?? this.drawing,
     viewDepth: clearViewDepth ? null : viewDepth ?? this.viewDepth,
+    steps: steps ?? this.steps,
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -111,6 +185,7 @@ class ArchitectSection {
     'start': sectionPointJson(start),
     'end': sectionPointJson(end),
     'viewDepth': viewDepth,
+    'steps': steps.map(sectionPointJson).toList(),
     'details': details.map((d) => d.toJson()).toList(),
     'drawing': drawing.toJson(),
   };
@@ -123,6 +198,7 @@ class ArchitectSection {
     start: sectionPoint(j['start'] as Map),
     end: sectionPoint(j['end'] as Map),
     viewDepth: viewDepthFromJson(j['viewDepth']),
+    steps: [for (final p in j['steps'] as List? ?? []) sectionPoint(p as Map)],
     details: (j['details'] as List? ?? [])
         .map(
           (d) =>

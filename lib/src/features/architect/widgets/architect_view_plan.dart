@@ -50,8 +50,8 @@ class ArchitectViewPlan extends StatefulWidget {
           stair.displayBounds.bottomRight,
         ],
       ],
-      for (final e in project.elevations) ...[e.start, e.end],
-      for (final s in project.sections) ...[s.start, s.end],
+      for (final e in project.elevations) for (final s in e.segments) ...[s.start, s.end],
+      for (final e in project.sections) for (final s in e.segments) ...[s.start, s.end],
       if (project.northSymbol != null) project.northSymbol!.position,
     ];
     if (points.isEmpty) return const Rect.fromLTWH(-5, -5, 10, 10);
@@ -370,14 +370,27 @@ class ArchitectViewPlanPainter extends CustomPainter {
       final color = section.id == selectedSection
           ? colors.primary
           : colors.onSurface.withValues(alpha: .4);
-      canvas.drawLine(
-        section.start,
-        section.end,
+      final marker = Path()
+        ..moveTo(
+          section.segments.first.start.dx,
+          section.segments.first.start.dy,
+        );
+      for (final s in section.segments) {
+        marker
+          ..lineTo(s.start.dx, s.start.dy)
+          ..lineTo(s.end.dx, s.end.dy);
+      }
+      canvas.drawPath(
+        marker,
         Paint()
           ..color = color
+          ..style = PaintingStyle.stroke
           ..strokeWidth = 2 / scale,
       );
-      for (final p in [section.start, section.end]) {
+      for (final p in [
+        section.segments.first.start,
+        section.segments.last.end,
+      ]) {
         canvas.drawCircle(p, 3 / scale, Paint()..color = color);
         arrow(canvas, p, section.viewDirection, color);
       }

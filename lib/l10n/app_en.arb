@@ -4583,5 +4583,10 @@
   "architectDrainageBlocked": "Not enough room for the route. Adjust the position or waypoints.",
   "architectDrainageOutside": "Position is outside the exposed eaves.",
   "architectDrainageNoRoof": "Create a roof first.",
-  "architectRoofTimberTab": "Framing"
+  "architectRoofTimberTab": "Framing",
+  "architectViewStep": "Add jog",
+  "architectViewEditHint": "Drag endpoints, jogs or the far boundary, then apply.",
+  "architectViewDepthBehindSteps": "Place the far boundary beyond every segment.",
+  "architectViewStraight": "Straighten",
+  "architectViewStepHint": "Click beside the marker to set the jog station and offset. Repeat Add jog for more segments."
 }

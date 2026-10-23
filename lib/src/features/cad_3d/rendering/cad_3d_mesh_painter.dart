@@ -91,7 +91,17 @@ class Cad3DMeshPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (size.isEmpty || mesh.triangles.isEmpty) return;
+    if (size.isEmpty ||
+        !size.width.isFinite ||
+        !size.height.isFinite ||
+        mesh.triangles.isEmpty ||
+        !camera.yaw.isFinite ||
+        !camera.pitch.isFinite ||
+        !camera.zoom.isFinite ||
+        !_isDrawablePoint(camera.panOffset) ||
+        (camera.isFlyMode && !_isFiniteVector(camera.eyePosition))) {
+      return;
+    }
     if (overlayOnly) {
       _drawOrientationGizmo(canvas, size);
       return;
@@ -100,8 +110,10 @@ class Cad3DMeshPainter extends CustomPainter {
     final baseColor = customModelColor ?? theme.defaultMeshColor;
     final center = mesh.bounds.center;
     final maxDim = math.max(mesh.bounds.maxDimension, 1e-4);
+    if (!_isFiniteVector(center) || !maxDim.isFinite) return;
     // Base fit scale: fit the model to ~55% of the viewport dimension
     final modelScale = (math.min(size.width, size.height) * 0.55) / maxDim;
+    if (!modelScale.isFinite || modelScale <= 0) return;
 
     // 1. Draw 3D Ground Grid if enabled
     if (showGrid) {
@@ -175,6 +187,7 @@ class Cad3DMeshPainter extends CustomPainter {
 
     for (int i = 0; i < totalTris; i += stride) {
       final tri = displayTriangles[i];
+      if (!_hasFiniteVertices(tri)) continue;
 
       // Offset by model center so model rotates around its geometric centroid
       final v0Local = tri.v0 - center;
@@ -185,6 +198,11 @@ class Cad3DMeshPainter extends CustomPainter {
       final tv0 = camera.transformVertex(v0Local);
       final tv1 = camera.transformVertex(v1Local);
       final tv2 = camera.transformVertex(v2Local);
+      if (!_isFiniteVector(tv0) ||
+          !_isFiniteVector(tv1) ||
+          !_isFiniteVector(tv2)) {
+        continue;
+      }
 
       // Human-scale near plane (~15-20cm, 12.0 screen units ahead of eye):
       // Only discard triangle if ALL three vertices are completely behind the human eye
@@ -199,6 +217,13 @@ class Cad3DMeshPainter extends CustomPainter {
       final p0 = camera.projectToScreen(tv0, size, modelScale);
       final p1 = camera.projectToScreen(tv1, size, modelScale);
       final p2 = camera.projectToScreen(tv2, size, modelScale);
+      // Canvas vertices are encoded as float32. Reject invalid projections
+      // before culling: comparisons with NaN would otherwise let them through.
+      if (!_isDrawablePoint(p0) ||
+          !_isDrawablePoint(p1) ||
+          !_isDrawablePoint(p2)) {
+        continue;
+      }
 
       // Viewport Frustum Culling: discard triangles completely outside the screen
       final minX = math.min(p0.dx, math.min(p1.dx, p2.dx));
@@ -374,7 +399,9 @@ class Cad3DMeshPainter extends CustomPainter {
       final binding = tri.texture;
       final image = textureImages[binding?.texture];
       final uvs = tri.uvs;
-      if (binding == null || image == null || uvs == null) return false;
+      if (binding == null || image == null || uvs == null || uvs.length != 3) {
+        return false;
+      }
       ui.TileMode tileMode(int wrap) => switch (wrap) {
         33071 => ui.TileMode.clamp,
         33648 => ui.TileMode.mirror,
@@ -423,6 +450,8 @@ class Cad3DMeshPainter extends CustomPainter {
                 image.height,
           ),
       ];
+      // Fall back to the face color when UV data or its transform is invalid.
+      if (!mapped.every(_isDrawablePoint)) return false;
       final vertices = ui.Vertices(
         ui.VertexMode.triangles,
         [tri.p0, tri.p1, tri.p2],
@@ -482,6 +511,7 @@ class Cad3DMeshPainter extends CustomPainter {
             colors: colors,
           );
           canvas.drawVertices(vertices, BlendMode.srcOver, fillPaint);
+          vertices.dispose();
           positions.clear();
           colors.clear();
         }
@@ -562,7 +592,9 @@ class Cad3DMeshPainter extends CustomPainter {
       if (!camera.isFlyMode || (tv1.y > nearPlane && tv2.y > nearPlane)) {
         final p1 = camera.projectToScreen(tv1, size, modelScale);
         final p2 = camera.projectToScreen(tv2, size, modelScale);
-        canvas.drawLine(p1, p2, gridPaint);
+        if (_isDrawablePoint(p1) && _isDrawablePoint(p2)) {
+          canvas.drawLine(p1, p2, gridPaint);
+        }
       }
 
       final tv3 = camera.transformVertex(Vector3(-gridSize, i * step, zBottom));
@@ -570,7 +602,9 @@ class Cad3DMeshPainter extends CustomPainter {
       if (!camera.isFlyMode || (tv3.y > nearPlane && tv4.y > nearPlane)) {
         final p3 = camera.projectToScreen(tv3, size, modelScale);
         final p4 = camera.projectToScreen(tv4, size, modelScale);
-        canvas.drawLine(p3, p4, gridPaint);
+        if (_isDrawablePoint(p3) && _isDrawablePoint(p4)) {
+          canvas.drawLine(p3, p4, gridPaint);
+        }
       }
     }
   }
@@ -647,6 +681,21 @@ class Cad3DMeshPainter extends CustomPainter {
 
   static final Expando<List<Triangle3D>> _subdivisionCache =
       Expando<List<Triangle3D>>();
+
+  static bool _isFiniteVector(Vector3 v) =>
+      v.x.isFinite && v.y.isFinite && v.z.isFinite;
+
+  static bool _hasFiniteVertices(Triangle3D t) =>
+      _isFiniteVector(t.v0) && _isFiniteVector(t.v1) && _isFiniteVector(t.v2);
+
+  static bool _isDrawablePoint(Offset p) {
+    const maxFloat32 = 3.4028234663852886e38;
+    return p.dx.isFinite &&
+        p.dy.isFinite &&
+        p.dx.abs() <= maxFloat32 &&
+        p.dy.abs() <= maxFloat32;
+  }
+
   static final Expando<List<Triangle3D>> _textureSubdivisionCache =
       Expando<List<Triangle3D>>();
 
@@ -715,6 +764,7 @@ class Cad3DMeshPainter extends CustomPainter {
     int depth,
     List<Triangle3D> out,
   ) {
+    if (!_hasFiniteVertices(tri)) return;
     if (depth >= 5) {
       out.add(tri);
       return;

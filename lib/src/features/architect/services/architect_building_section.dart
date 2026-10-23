@@ -9,6 +9,7 @@ import '../models/architect_section.dart';
 import '../models/architect_elevation.dart';
 import '../models/architect_slab_assembly.dart';
 import '../rendering/architect_stair_mesh.dart';
+import '../rendering/architect_path_solid.dart';
 import '../rendering/architect_wall_solids.dart';
 import 'architect_roof_geometry.dart';
 import 'architect_slab_geometry.dart';
@@ -152,6 +153,76 @@ class ArchitectBuildingSection {
     ArchitectProject project,
     ArchitectSection cut,
   ) {
+    if (cut.steps.isNotEmpty) {
+      final regions = <ArchitectSectionRegion>[];
+      final profiles = <String, Path>{};
+      final faces = <Path>[];
+      final paths = <String, Path>{};
+      final operations = <({Path lines, Path clip})>[];
+      Rect? bounds;
+      for (final s in cut.segments) {
+        final depth = cut.viewDepth == null ? null : cut.viewDepth! - s.offset;
+        if (depth != null && depth <= 0) continue;
+        final part = build(
+          project,
+          cut.copyWith(
+            start: s.start,
+            end: s.end,
+            steps: const [],
+            details: const [],
+            viewDepth: depth,
+          ),
+        );
+        final shift = Offset(s.station, 0);
+        for (final r in part.regions) {
+          regions.add(
+            ArchitectSectionRegion(
+              r.sourceId,
+              r.material,
+              r.path.shift(shift),
+              slab: r.slab,
+              roof: r.roof,
+              customFillColor: r.customFillColor,
+              timberCrossSectionPolygon: r.timberCrossSectionPolygon
+                  ?.map((p) => p + shift)
+                  .toList(),
+            ),
+          );
+        }
+        void merge(Map<String, Path> target, Map<String, Path> source) {
+          for (final e in source.entries) {
+            final p = e.value.shift(shift);
+            target[e.key] = target.containsKey(e.key)
+                ? Path.combine(PathOperation.union, target[e.key]!, p)
+                : p;
+          }
+        }
+
+        merge(profiles, part.roofProfiles);
+        merge(paths, part.background?.elementPaths ?? {});
+        faces.addAll(part.background?.faces.map((p) => p.shift(shift)) ?? []);
+        operations.addAll([
+          for (final op
+              in part.background?.operations ?? <({Path lines, Path clip})>[])
+            (lines: op.lines.shift(shift), clip: op.clip.shift(shift)),
+        ]);
+        bounds =
+            bounds?.expandToInclude(part.bounds.shift(shift)) ??
+            part.bounds.shift(shift);
+      }
+      final box = bounds ?? Rect.fromLTWH(0, 0, cut.length, 3);
+      return ArchitectBuildingSection(
+        regions,
+        box,
+        roofProfiles: profiles,
+        background: ArchitectBuildingElevation(
+          faces,
+          box,
+          elementPaths: paths,
+          operations: operations,
+        ),
+      );
+    }
     final regions = <ArchitectSectionRegion>[];
     final highPriorityCutouts = <Path>[];
     final roofProfiles = <String, Path>{};
@@ -447,7 +518,14 @@ class ArchitectBuildingSection {
           ArchitectRoofDrainageMesh.build(project, floor, roof),
         );
         if (path != null) {
-          regions.add(ArchitectSectionRegion(roof.id, SlabMaterial.custom, path, customFillColor: const Color(0xffeeeeee)));
+          regions.add(
+            ArchitectSectionRegion(
+              roof.id,
+              SlabMaterial.custom,
+              path,
+              customFillColor: const Color(0xffeeeeee),
+            ),
+          );
         }
       }
 
@@ -536,6 +614,23 @@ class ArchitectBuildingSection {
 
     // Project the same 3D solids as facades, with real hidden-surface removal.
     // A slice alone cannot show a return flight, landing, or wall behind it.
+    final shift = Offset(cut.length / 2, 0);
+    // Keep disconnected members separate while triangulating: decomposing one
+    // large union creates artificial strips at every other member's X station.
+    final cutMasks = [
+      for (final region in regions)
+        for (final t in ArchitectPathSolid.extrude(
+          region.path,
+          0,
+          1,
+          const Color(0xff000000),
+          contourTolerance: .00001,
+        ))
+          if (t.normal.z > .5)
+            [
+              for (final p in [t.v0, t.v1, t.v2]) Offset(p.x, p.y) - shift,
+            ],
+    ];
     final projected = ArchitectBuildingElevation.build(
       project,
       ArchitectElevation(
@@ -544,14 +639,11 @@ class ArchitectBuildingSection {
         end: cut.end,
         viewDepth: cut.viewDepth,
       ),
+      occlusionMasks: cutMasks,
     );
-    var cutBody = Path();
-    for (final region in regions) {
-      cutBody = Path.combine(PathOperation.union, cutBody, region.path);
-    }
-    final shift = Offset(cut.length / 2, 0);
-    Path exposed(Path path) =>
-        Path.combine(PathOperation.difference, path.shift(shift), cutBody);
+    // Cut fills participate in the same double-precision visibility pass;
+    // never subtract them again from an already encoded float32 contour.
+    Path exposed(Path path) => path.shift(shift);
     final backgroundFaces = <Path>[];
     Rect? bounds;
     for (final face in projected.faces) {
@@ -594,6 +686,14 @@ class ArchitectBuildingSection {
     ArchitectSlabDetail detail,
   ) {
     if (detail.station < 0 || detail.station > cut.length) return null;
+    if (cut.steps.isNotEmpty) {
+      final s = cut.segments.lastWhere((s) => s.station <= detail.station);
+      return source(
+        project,
+        cut.copyWith(start: s.start, end: s.end, steps: const []),
+        detail.copyWith(station: detail.station - s.station),
+      );
+    }
     for (final floor in project.storeys) {
       for (final slab in floor.slabs.where((s) => s.id == detail.slabId)) {
         if (ArchitectSlabGeometry.intervals(floor, slab, cut).any(

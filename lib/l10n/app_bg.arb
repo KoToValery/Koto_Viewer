@@ -2446,5 +2446,10 @@
   "architectDrainageBlocked": "Недостатъчно място за трасе. Промени мястото или междинните точки.",
   "architectDrainageOutside": "Мястото е извън свободната стреха.",
   "architectDrainageNoRoof": "Първо създай покрив.",
-  "architectRoofTimberTab": "Конструкция"
+  "architectRoofTimberTab": "Конструкция",
+  "architectViewStep": "Добави чупка",
+  "architectViewEditHint": "Преместете краищата, чупките или далечната граница и приложете.",
+  "architectViewDepthBehindSteps": "Поставете далечната граница след всички сегменти.",
+  "architectViewStraight": "Изправи",
+  "architectViewStepHint": "Посочете точка до маркера за мястото и отместването на чупката. Повторете „Добави чупка“ за още сегменти."
 }

@@ -351,6 +351,13 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
         cut?.copyWith(
           start: firstPoint,
           end: secondPoint,
+          steps: [
+            for (final p in cut!.steps)
+              Offset(
+                p.dx * (secondPoint! - firstPoint!).distance / cut!.length,
+                p.dy,
+              ),
+          ],
           viewDepth: view.depth,
         ) ??
         ArchitectSection(
@@ -545,6 +552,8 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
       context,
       project,
       value.viewDepth,
+      minimumDepth:
+          value.steps.fold(0.0, (double a, p) => math.max(a, p.dy)) + .01,
     );
     if (mounted && result != null) {
       update(

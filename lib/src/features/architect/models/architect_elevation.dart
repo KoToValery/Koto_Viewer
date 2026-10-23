@@ -38,6 +38,7 @@ class ArchitectElevation {
   final Offset start, end;
   final int viewSide;
   final double? viewDepth;
+  final List<Offset> steps;
   final ArchitectViewDrawing drawing;
   const ArchitectElevation({
     required this.id,
@@ -45,6 +46,7 @@ class ArchitectElevation {
     required this.end,
     this.viewSide = 1,
     this.viewDepth,
+    this.steps = const [],
     this.drawing = const ArchitectViewDrawing(),
   });
   double get length => (end - start).distance;
@@ -53,6 +55,8 @@ class ArchitectElevation {
   Offset get centre => (start + end) / 2;
   Offset get viewDirection => Offset(-axis.dy, axis.dx) * viewSide.toDouble();
   Offset get right => axis * viewSide.toDouble();
+  List<ArchitectViewSegment> get segments =>
+      viewSegments(start, end, viewDirection, steps);
   ArchitectCompassDirection compassDirection(double northAngle) {
     final outward = -viewDirection;
     final bearing = math.atan2(outward.dx, -outward.dy) - northAngle;
@@ -67,6 +71,7 @@ class ArchitectElevation {
     ArchitectViewDrawing? drawing,
     double? viewDepth,
     bool clearViewDepth = false,
+    List<Offset>? steps,
   }) => ArchitectElevation(
     id: id,
     start: start ?? this.start,
@@ -74,6 +79,7 @@ class ArchitectElevation {
     viewSide: viewSide ?? this.viewSide,
     drawing: drawing ?? this.drawing,
     viewDepth: clearViewDepth ? null : viewDepth ?? this.viewDepth,
+    steps: steps ?? this.steps,
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -81,6 +87,7 @@ class ArchitectElevation {
     'end': sectionPointJson(end),
     'viewSide': viewSide,
     'viewDepth': viewDepth,
+    'steps': steps.map(sectionPointJson).toList(),
     'drawing': drawing.toJson(),
   };
   factory ArchitectElevation.fromJson(Map<String, dynamic> json) =>
@@ -90,6 +97,9 @@ class ArchitectElevation {
         end: sectionPoint(json['end'] as Map),
         viewSide: json['viewSide'] == -1 ? -1 : 1,
         viewDepth: viewDepthFromJson(json['viewDepth']),
+        steps: [
+          for (final p in json['steps'] as List? ?? []) sectionPoint(p as Map),
+        ],
         drawing: ArchitectViewDrawing.fromJson(
           Map<String, dynamic>.from(json['drawing'] as Map? ?? {}),
         ),

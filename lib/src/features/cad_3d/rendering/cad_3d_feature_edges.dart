@@ -32,6 +32,13 @@ class Cad3DFeatureEdges {
     final normals = <Triangle3D, Vector3>{};
     final masks = <Triangle3D, int>{};
     for (final triangle in triangles) {
+      if ([
+        triangle.v0,
+        triangle.v1,
+        triangle.v2,
+      ].any((p) => !p.x.isFinite || !p.y.isFinite || !p.z.isFinite)) {
+        continue;
+      }
       masks[triangle] = 0;
       normals[triangle] = (triangle.v1 - triangle.v0)
           .cross(triangle.v2 - triangle.v0)

@@ -13354,6 +13354,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Framing'**
   String get architectRoofTimberTab;
+
+  /// No description provided for @architectViewStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Add jog'**
+  String get architectViewStep;
+
+  /// No description provided for @architectViewEditHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag endpoints, jogs or the far boundary, then apply.'**
+  String get architectViewEditHint;
+
+  /// No description provided for @architectViewDepthBehindSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'Place the far boundary beyond every segment.'**
+  String get architectViewDepthBehindSteps;
+
+  /// No description provided for @architectViewStraight.
+  ///
+  /// In en, this message translates to:
+  /// **'Straighten'**
+  String get architectViewStraight;
+
+  /// No description provided for @architectViewStepHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click beside the marker to set the jog station and offset. Repeat Add jog for more segments.'**
+  String get architectViewStepHint;
 }
 
 class _AppLocalizationsDelegate

@@ -7458,4 +7458,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectRoofTimberTab => 'Framing';
+
+  @override
+  String get architectViewStep => 'Add jog';
+
+  @override
+  String get architectViewEditHint =>
+      'Drag endpoints, jogs or the far boundary, then apply.';
+
+  @override
+  String get architectViewDepthBehindSteps =>
+      'Place the far boundary beyond every segment.';
+
+  @override
+  String get architectViewStraight => 'Straighten';
+
+  @override
+  String get architectViewStepHint =>
+      'Click beside the marker to set the jog station and offset. Repeat Add jog for more segments.';
 }

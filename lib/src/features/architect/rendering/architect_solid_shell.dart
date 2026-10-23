@@ -10,8 +10,15 @@ class ArchitectSolidShell {
     final planes = <(int, int, int, int), List<_PlaneFaces>>{};
     for (var i = 0; i < solids.length; i++) {
       for (final triangle in solids[i]) {
-        if (triangle.area < 1e-12) continue;
-        final n = triangle.normal;
+        final cross = (triangle.v1 - triangle.v0).cross(
+          triangle.v2 - triangle.v0,
+        );
+        final magnitude = cross.length;
+        if (magnitude < 2e-12) continue;
+        // Vector3.normalized treats lengths below 1e-9 as zero. Small faces
+        // produced by roof/wall intersections are still real surfaces here;
+        // using that zero normal makes lift divide by zero and creates NaNs.
+        final n = cross / magnitude;
         final first = n.x.abs() > 1e-7
             ? n.x
             : n.y.abs() > 1e-7
@@ -170,7 +177,11 @@ class _PlaneFaces {
           final q = lift(fragment[i]), r = lift(fragment[i + 1]);
           final cross = (q - p).cross(r - p);
           if (cross.lengthSquared < 1e-20) continue;
-          final flip = cross.dot(triangle.normal) < 0;
+          final flip =
+              cross.dot(
+                (triangle.v1 - triangle.v0).cross(triangle.v2 - triangle.v0),
+              ) <
+              0;
           result[solid].add(
             Triangle3D(
               v0: p,

@@ -85,19 +85,28 @@ class ArchitectPathSolid {
     Path path,
     double bottom,
     double top,
-    Color color,
-  ) {
+    Color color, {
+    double contourTolerance = .000001,
+  }) {
     if (top - bottom < 1e-8) return const [];
-    return between(path, (_) => bottom, (_) => top, color);
+    return between(
+      path,
+      (_) => bottom,
+      (_) => top,
+      color,
+      contourTolerance: contourTolerance,
+    );
   }
 
   static List<Triangle3D> between(
     Path path,
     double Function(Offset) bottom,
     double Function(Offset) top,
-    Color color,
-  ) {
-    final loops = contours(path), tris = <Triangle3D>[];
+    Color color, {
+    double contourTolerance = .000001,
+  }) {
+    final loops = contours(path, tolerance: contourTolerance),
+        tris = <Triangle3D>[];
     final edges = <(Offset, Offset)>[];
     Vector3 v(Offset p, double z) => Vector3(p.dx, p.dy, z);
     void triangle(
