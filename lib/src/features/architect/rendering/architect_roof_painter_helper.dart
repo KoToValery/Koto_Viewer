@@ -1,3 +1,4 @@
+import 'architect_roof_drainage_painter.dart';
 import 'architect_vector_scene.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. Committed Roof Planes 2D Painter (Hatch, Eaves Overhang Dashed Line, Ridge/Hip Edges, Slope Arrow & Badge)
@@ -76,6 +77,15 @@ class ArchitectRoofPainterHelper {
       final path = junctions.footprint(roof);
       if (path.getBounds().isEmpty) continue;
 
+      if (project != null) {
+        ArchitectRoofDrainagePainter.paint(
+          canvas,
+          project,
+          storey,
+          roof,
+          scale,
+        );
+      }
       final topMat = roof.assembly.layers.firstOrNull?.material;
       final baseColor = switch (topMat) {
         ArchitectRoofMaterial.clayTiles => const Color(0xFFC85A32),

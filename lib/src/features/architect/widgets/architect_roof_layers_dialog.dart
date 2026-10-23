@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../services/architect_element_id.dart';
+import 'architect_roof_drainage_editor.dart';
 
 // === SECTION: ARCHITECT ROOF LAYERS DIALOG ===
 
@@ -19,6 +20,8 @@ class ArchitectRoofLayersResult {
   final double? baseElevationOffset;
   final bool attachToWalls;
   final double? manualSupportDistance;
+  final ArchitectRoofDrainage drainage;
+  final bool pickDownpipe;
 
   const ArchitectRoofLayersResult({
     required this.assembly,
@@ -28,6 +31,8 @@ class ArchitectRoofLayersResult {
     this.baseElevationOffset,
     this.attachToWalls = true,
     this.manualSupportDistance,
+    this.drainage = const ArchitectRoofDrainage(),
+    this.pickDownpipe = false,
   });
 }
 
@@ -40,6 +45,10 @@ class ArchitectRoofLayersDialog extends StatefulWidget {
   final bool initialAttachToWalls;
   final double? initialManualSupportDistance;
   final double? maxSupportDistance;
+  final ArchitectRoofDrainage initialDrainage;
+  final ArchitectProject? project;
+  final ArchitectRoofPlane? roof;
+  final bool canPickDownpipe;
   final ValueChanged<ArchitectRoofLayersResult> onApply;
 
   const ArchitectRoofLayersDialog({
@@ -52,6 +61,10 @@ class ArchitectRoofLayersDialog extends StatefulWidget {
     this.initialAttachToWalls = true,
     this.initialManualSupportDistance,
     this.maxSupportDistance,
+    this.initialDrainage = const ArchitectRoofDrainage(),
+    this.project,
+    this.roof,
+    this.canPickDownpipe = false,
     required this.onApply,
   });
 
@@ -70,10 +83,13 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
   late bool _manualSupport;
   late final TextEditingController _supportDistance;
   final _supportField = GlobalKey<FormFieldState<String>>();
+  final _drainageForm = GlobalKey<FormState>();
+  late ArchitectRoofDrainage _drainage;
 
   @override
   void initState() {
     super.initState();
+    _drainage = widget.initialDrainage;
     _assembly = widget.initialAssembly.copyWith();
     _slopeDegrees = widget.initialSlopeDegrees;
     _eavesOverhang = widget.initialEavesOverhang;
@@ -179,7 +195,8 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
     return null;
   }
 
-  void _save() {
+  void _save({bool pickDownpipe = false}) {
+    if (!(_drainageForm.currentState?.validate() ?? true)) return;
     if (_manualSupport &&
         _validateSupportDistance(_supportDistance.text) != null) {
       _supportField.currentState?.validate();
@@ -187,6 +204,8 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
     }
     widget.onApply(
       ArchitectRoofLayersResult(
+        drainage: _drainage,
+        pickDownpipe: pickDownpipe,
         assembly: _assembly,
         slopeDegrees: _slopeDegrees,
         eavesOverhang: _eavesOverhang,
@@ -206,7 +225,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
   Widget build(BuildContext context) {
     final l = context.l10n;
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Dialog(
         insetPadding: const EdgeInsets.all(12),
         backgroundColor: const Color(0xFF1E222B),
@@ -227,7 +246,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        l.architectRoofLayers,
+                        l.architectToolRoof,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -246,8 +265,9 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
                 ),
               ),
               TabBar(
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
+                isScrollable: false,
+                tabAlignment: TabAlignment.fill,
+                labelStyle: const TextStyle(fontSize: 12),
                 indicatorColor: const Color(0xFF00E5FF),
                 labelColor: const Color(0xFF00E5FF),
                 unselectedLabelColor: Colors.white70,
@@ -258,7 +278,11 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
                   ),
                   Tab(
                     icon: const Icon(Icons.carpenter_rounded, size: 18),
-                    text: l.architectRoofTimberSection,
+                    text: l.architectRoofTimberTab,
+                  ),
+                  Tab(
+                    icon: const Icon(Icons.water_drop_outlined, size: 18),
+                    text: l.architectDrainageTitle,
                   ),
                 ],
               ),
@@ -288,6 +312,18 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog> {
                   children: [
                     _buildLayersTab(context),
                     _buildTimberTab(context),
+                    Form(
+                      key: _drainageForm,
+                      child: ArchitectRoofDrainageEditor(
+                        value: _drainage,
+                        project: widget.project,
+                        roof: widget.roof,
+                        onChanged: (v) => setState(() => _drainage = v),
+                        onPlace: widget.canPickDownpipe
+                            ? () => _save(pickDownpipe: true)
+                            : null,
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -9,6 +9,8 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import 'architect_roof_drainage.dart';
+export 'architect_roof_drainage.dart';
 
 // === SECTION: ENUMS ===
 
@@ -695,12 +697,14 @@ class ArchitectRoofPlane {
   /// The initial support height has been materialized in model coordinates.
   bool placementResolved;
   double eavesOverhang;
+
   /// Horizontal eaves-to-support centreline distance; null follows the walls.
   double? manualSupportDistance;
   ArchitectRoofEavesCut eavesCut;
   ArchitectRoofAssembly assembly;
   String? roofGroupId;
   bool isSlopeLocked;
+  final ArchitectRoofDrainage drainage;
 
   ArchitectRoofPlane({
     required this.id,
@@ -718,6 +722,7 @@ class ArchitectRoofPlane {
     ArchitectRoofAssembly? assembly,
     this.roofGroupId,
     this.isSlopeLocked = true,
+    this.drainage = const ArchitectRoofDrainage(),
   }) : assembly =
            assembly ??
            ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles);
@@ -924,6 +929,7 @@ class ArchitectRoofPlane {
     ArchitectRoofAssembly? assembly,
     String? roofGroupId,
     bool? isSlopeLocked,
+    ArchitectRoofDrainage? drainage,
   }) => ArchitectRoofPlane(
     id: id ?? this.id,
     storeyId: storeyId ?? this.storeyId,
@@ -942,6 +948,7 @@ class ArchitectRoofPlane {
     assembly: assembly ?? this.assembly.copyWith(),
     roofGroupId: roofGroupId ?? this.roofGroupId,
     isSlopeLocked: isSlopeLocked ?? this.isSlopeLocked,
+    drainage: drainage ?? this.drainage,
   );
 
   ArchitectRoofPlane clone() => copyWith();
@@ -963,6 +970,7 @@ class ArchitectRoofPlane {
     'assembly': assembly.toJson(),
     'roofGroupId': roofGroupId,
     'isSlopeLocked': isSlopeLocked,
+    'drainage': drainage.toJson(),
   };
 
   factory ArchitectRoofPlane.fromJson(Map<String, dynamic> json) {
@@ -982,7 +990,8 @@ class ArchitectRoofPlane {
       attachToWalls: json['attachToWalls'] as bool? ?? true,
       placementResolved: json['placementResolved'] as bool? ?? false,
       eavesOverhang: (json['eavesOverhang'] as num?)?.toDouble() ?? 0.50,
-      manualSupportDistance: (json['manualSupportDistance'] as num?)?.toDouble(),
+      manualSupportDistance: (json['manualSupportDistance'] as num?)
+          ?.toDouble(),
       eavesCut: ArchitectRoofEavesCut.values.byName(
         json['eavesCut'] as String? ?? ArchitectRoofEavesCut.plumb.name,
       ),
@@ -993,6 +1002,7 @@ class ArchitectRoofPlane {
           : ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles),
       roofGroupId: json['roofGroupId'] as String?,
       isSlopeLocked: json['isSlopeLocked'] as bool? ?? true,
+      drainage: ArchitectRoofDrainage.fromJson(json['drainage'] as Map? ?? {}),
     );
   }
 

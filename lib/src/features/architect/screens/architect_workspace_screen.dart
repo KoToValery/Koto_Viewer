@@ -21,6 +21,7 @@ import '../widgets/architect_roof_layers_dialog.dart';
 import '../widgets/architect_roof_bar.dart';
 import '../rendering/architect_roof_painter_helper.dart';
 import '../services/architect_roof_geometry.dart';
+import '../services/architect_roof_drainage_geometry.dart';
 import '../services/architect_roof_tool.dart';
 import '../widgets/architect_building_sections_screen.dart';
 import '../widgets/architect_elevations_screen.dart';
@@ -1323,6 +1324,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   ArchitectTool _activeTool = ArchitectTool.select;
   bool _is3DView = false;
+  bool _placingDownpipe = false;
+  String? _downpipeRoofId;
   ArchitectCanvasPalette _canvasPalette = const ArchitectCanvasPalette.light();
   static const _darkCanvasPreference = 'architect_dark_canvas';
   bool _canvasPreferenceChanged = false;
@@ -1707,6 +1710,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _cancelDrafting() {
+    _placingDownpipe = false;
+    _downpipeRoofId = null;
     _resetDimensionDraft();
     _selectionCyclePoint = null;
     _polygonEditId = null;
@@ -1752,6 +1757,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _changeTool(ArchitectTool tool) => setState(() {
+    _placingDownpipe = false;
+    _downpipeRoofId = null;
     final nextTool =
         (_activeTool == tool && tool != ArchitectTool.select)
         ? ArchitectTool.select
@@ -4637,6 +4644,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _handleTap(Offset rawModel) {
+    if (_placingDownpipe) {
+      _placeDownpipe(rawModel);
+      return;
+    }
     if (_pendingShape != null || _polygonDistanceOpen) return;
 
     if (_mirrorActive) {
@@ -9203,6 +9214,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Future<void> _openRoofLayersDialog({ArchitectRoofPlane? roof}) async {
+    var pickDownpipe = false;
     final target =
         roof ??
         _selectedRoof ??
@@ -9219,6 +9231,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     await showDialog<void>(
       context: context,
       builder: (_) => ArchitectRoofLayersDialog(
+        initialDrainage: target?.drainage ?? _roofTool.drainage,
+        project: _modelCommands.project,
+        roof: target,
+        canPickDownpipe: target != null,
         initialAssembly: initialAssembly,
         initialSlopeDegrees: initialSlope,
         initialEavesOverhang: initialOverhang,
@@ -9230,7 +9246,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             : _roofTool.manualSupportDistance,
         maxSupportDistance: target?.maxSlopeRun,
         onApply: (result) {
+          pickDownpipe = result.pickDownpipe;
           setState(() {
+            _roofTool.drainage = result.drainage.copyWith(downpipes: const []);
             _roofTool.setAssembly(result.assembly);
             _roofTool.setSlopeDegrees(result.slopeDegrees);
             _roofTool.setEavesOverhang(result.eavesOverhang);
@@ -9265,6 +9283,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 UpdateArchitectRoofPlane(
                   storeyId: storey.id,
                   roof: currentRoof.copyWith(
+                    drainage: result.drainage,
                     assembly: result.assembly,
                     slopeDegrees: result.slopeDegrees,
                     eavesOverhang: result.eavesOverhang,
@@ -9284,6 +9303,101 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         },
       ),
     );
+    if (mounted && pickDownpipe && target != null) {
+      _beginDownpipePlacement(target.id);
+    }
+  }
+
+  void _beginDownpipePlacement([String? roofId]) {
+    final project = _modelCommands.project;
+    final floors = project.storeys
+        .where((s) => s.roofs.any((r) => roofId == null || r.id == roofId))
+        .toList();
+    if (floors.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.architectDrainageNoRoof)),
+      );
+      return;
+    }
+    final floor =
+        floors.where((s) => s.id == project.activeStoreyId).firstOrNull ??
+        floors.last;
+    _selectWorkspaceView(ArchitectWorkspaceView.plan, floor.id);
+    setState(() {
+      _placingDownpipe = true;
+      _downpipeRoofId = roofId;
+    });
+  }
+
+  void _placeDownpipe(Offset point) {
+    final project = _modelCommands.project;
+    ArchitectRoofPlane? selected;
+    ArchitectStorey? floor;
+    var distance = double.infinity, offset = 0.0;
+    for (final storey in project.storeys) {
+      if (storey.id != project.activeStoreyId) continue;
+      for (final roof in storey.roofs) {
+        if (_downpipeRoofId != null && roof.id != _downpipeRoofId) continue;
+        final (start, end) = ArchitectRoofDrainageGeometry.eaves(roof);
+        final axis = (end - start) / (end - start).distance;
+        for (final (a, b) in ArchitectRoofDrainageGeometry.visibleEaves(
+          project,
+          storey,
+          roof,
+        )) {
+          final d = b - a;
+          final t =
+              (((point - a).dx * d.dx + (point - a).dy * d.dy) /
+                      d.distanceSquared)
+                  .clamp(0.0, 1.0);
+          final p = a + d * t;
+          if ((p - point).distance >= distance) continue;
+          distance = (p - point).distance;
+          selected = roof;
+          floor = storey;
+          offset = (p - start).dx * axis.dx + (p - start).dy * axis.dy;
+        }
+      }
+    }
+    if (selected == null ||
+        floor == null ||
+        distance > (24 / _viewport.scale).clamp(.15, .6)) {
+      return;
+    }
+    final pipe = ArchitectDownpipe(
+      id: ArchitectElementId.next('downpipe'),
+      offset: offset,
+    );
+    final next = selected.copyWith(
+      drainage: selected.drainage.copyWith(
+        showGutter: true,
+        showDownpipes: true,
+        downpipes: [...selected.drainage.downpipes, pipe],
+      ),
+    );
+    final route = ArchitectRoofDrainageGeometry.route(project, floor, next, pipe);
+    if (route.status != ArchitectDownpipeStatus.ready) {
+      final l = context.l10n;
+      final message = switch (route.status) {
+        ArchitectDownpipeStatus.noFacade => l.architectDrainageNoFacade,
+        ArchitectDownpipeStatus.outsideEaves => l.architectDrainageOutside,
+        _ => l.architectDrainageBlocked,
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      return;
+    }
+    setState(() {
+      _modelCommands.execute(
+        UpdateArchitectRoofPlane(storeyId: floor!.id, roof: next),
+      );
+      _placingDownpipe = false;
+      _downpipeRoofId = null;
+      _selectionIds
+        ..clear()
+        ..add(next.id);
+      _selectedElementId = next.id;
+    });
+    _saveBiMProjectIfAttached();
   }
 
   void _handleAutoRoof(AutoRoofType type) {
@@ -11645,6 +11759,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   onOpenComponentLibrary: () {
                     ArchitectComponentLibraryDialog.show(
                       context,
+                      onSelectDownpipe: () => _beginDownpipePlacement(),
                       onSelectComponent: (def) {
                         setState(() => _activeTool = ArchitectTool.component);
                       },
@@ -12781,6 +12896,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         ),
       _buildWallClearanceOverlay(),
+      if (_placingDownpipe)
+        Positioned(
+          top: 8,
+          left: 8,
+          right: 8,
+          child: Material(
+            color: const Color(0xff1e242c),
+            borderRadius: BorderRadius.circular(8),
+            child: ListTile(
+              dense: true,
+              title: Text(
+                context.l10n.architectDrainagePrompt,
+                style: const TextStyle(color: Colors.white),
+              ),
+              trailing: IconButton(
+                tooltip: context.l10n.cancel,
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => setState(_cancelDrafting),
+              ),
+            ),
+          ),
+        ),
       _buildPolygonDistanceOverlay(),
       _buildShapeDimensionOverlay(),
       if (_activeTool == ArchitectTool.dimension &&

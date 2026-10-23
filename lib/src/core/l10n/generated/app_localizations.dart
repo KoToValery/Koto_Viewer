@@ -13144,6 +13144,216 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a finite distance of at least 1 cm.'**
   String get architectViewDepthInvalid;
+
+  /// No description provided for @architectDrainageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Drainage'**
+  String get architectDrainageTitle;
+
+  /// No description provided for @architectDrainageGutter.
+  ///
+  /// In en, this message translates to:
+  /// **'Gutter'**
+  String get architectDrainageGutter;
+
+  /// No description provided for @architectDrainagePipes.
+  ///
+  /// In en, this message translates to:
+  /// **'Downpipes'**
+  String get architectDrainagePipes;
+
+  /// No description provided for @architectDrainagePipe.
+  ///
+  /// In en, this message translates to:
+  /// **'Downpipe'**
+  String get architectDrainagePipe;
+
+  /// No description provided for @architectDrainageSmart.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart downpipe'**
+  String get architectDrainageSmart;
+
+  /// No description provided for @architectDrainageProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get architectDrainageProfile;
+
+  /// No description provided for @architectDrainageHalfRound.
+  ///
+  /// In en, this message translates to:
+  /// **'Half-round'**
+  String get architectDrainageHalfRound;
+
+  /// No description provided for @architectDrainageBox.
+  ///
+  /// In en, this message translates to:
+  /// **'Box'**
+  String get architectDrainageBox;
+
+  /// No description provided for @architectDrainageMaterial.
+  ///
+  /// In en, this message translates to:
+  /// **'Material'**
+  String get architectDrainageMaterial;
+
+  /// No description provided for @architectDrainageSteel.
+  ///
+  /// In en, this message translates to:
+  /// **'Galvanized steel'**
+  String get architectDrainageSteel;
+
+  /// No description provided for @architectDrainageAluminium.
+  ///
+  /// In en, this message translates to:
+  /// **'Aluminium'**
+  String get architectDrainageAluminium;
+
+  /// No description provided for @architectDrainagePvc.
+  ///
+  /// In en, this message translates to:
+  /// **'PVC'**
+  String get architectDrainagePvc;
+
+  /// No description provided for @architectDrainageCopper.
+  ///
+  /// In en, this message translates to:
+  /// **'Copper'**
+  String get architectDrainageCopper;
+
+  /// No description provided for @architectDrainageWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get architectDrainageWidth;
+
+  /// No description provided for @architectDrainageDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Depth'**
+  String get architectDrainageDepth;
+
+  /// No description provided for @architectDrainageAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add downpipe'**
+  String get architectDrainageAdd;
+
+  /// No description provided for @architectDrainagePlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Place on plan'**
+  String get architectDrainagePlace;
+
+  /// No description provided for @architectDrainagePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a position on the eaves.'**
+  String get architectDrainagePrompt;
+
+  /// No description provided for @architectDrainageOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'From eaves start'**
+  String get architectDrainageOffset;
+
+  /// No description provided for @architectDrainageDiameter.
+  ///
+  /// In en, this message translates to:
+  /// **'Diameter'**
+  String get architectDrainageDiameter;
+
+  /// No description provided for @architectDrainageClearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall clearance'**
+  String get architectDrainageClearance;
+
+  /// No description provided for @architectDrainageOutlet.
+  ///
+  /// In en, this message translates to:
+  /// **'Outlet elevation'**
+  String get architectDrainageOutlet;
+
+  /// No description provided for @architectDrainageBend.
+  ///
+  /// In en, this message translates to:
+  /// **'Bend angle'**
+  String get architectDrainageBend;
+
+  /// No description provided for @architectDrainageFacade.
+  ///
+  /// In en, this message translates to:
+  /// **'Facade'**
+  String get architectDrainageFacade;
+
+  /// No description provided for @architectDrainageWall.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall'**
+  String get architectDrainageWall;
+
+  /// No description provided for @architectDrainageAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get architectDrainageAuto;
+
+  /// No description provided for @architectDrainageWaypoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Waypoints'**
+  String get architectDrainageWaypoints;
+
+  /// No description provided for @architectDrainageWaypointsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty: automatic route. Manual: one point per line — inward offset; absolute elevation (m), top to bottom.'**
+  String get architectDrainageWaypointsHelp;
+
+  /// No description provided for @architectDrainageInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid value.'**
+  String get architectDrainageInvalid;
+
+  /// No description provided for @architectDrainageReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Route is clear.'**
+  String get architectDrainageReady;
+
+  /// No description provided for @architectDrainageNoFacade.
+  ///
+  /// In en, this message translates to:
+  /// **'No facade found. Select a wall.'**
+  String get architectDrainageNoFacade;
+
+  /// No description provided for @architectDrainageBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough room for the route. Adjust the position or waypoints.'**
+  String get architectDrainageBlocked;
+
+  /// No description provided for @architectDrainageOutside.
+  ///
+  /// In en, this message translates to:
+  /// **'Position is outside the exposed eaves.'**
+  String get architectDrainageOutside;
+
+  /// No description provided for @architectDrainageNoRoof.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a roof first.'**
+  String get architectDrainageNoRoof;
+
+  /// No description provided for @architectRoofTimberTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Framing'**
+  String get architectRoofTimberTab;
 }
 
 class _AppLocalizationsDelegate

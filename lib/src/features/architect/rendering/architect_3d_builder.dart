@@ -1,3 +1,4 @@
+import 'architect_roof_drainage_mesh.dart';
 import 'architect_solid_shell.dart';
 import '../services/architect_slab_geometry.dart';
 import '../services/architect_roof_junctions.dart';
@@ -224,6 +225,12 @@ class Architect3dBuilder {
       joinedRoofs = joinedRoofs || roofJunctions.trimmed.isNotEmpty;
       for (var i = 0; i < storey.roofs.length; i++) {
         roofSolids.add((storey.roofs[i].id, roofMeshes[i]));
+      }
+
+      for (final roof in storey.roofs) {
+        final first = allTris.length;
+        allTris.addAll(ArchitectRoofDrainageMesh.build(project, storey, roof));
+        mark(roof.id, first);
       }
 
       // Add 3D architectural components (furniture, sanitary, kitchen, equipment)

@@ -186,6 +186,9 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
     await showDialog<void>(
       context: context,
       builder: (_) => ArchitectRoofLayersDialog(
+        initialDrainage: hit.roof.drainage,
+        project: project,
+        roof: hit.roof,
         initialAssembly: hit.roof.assembly,
         initialSlopeDegrees: hit.roof.slopeDegrees,
         initialEavesOverhang: hit.roof.eavesOverhang,

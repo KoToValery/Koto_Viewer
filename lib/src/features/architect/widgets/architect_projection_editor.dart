@@ -214,6 +214,9 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
       await showDialog<void>(
         context: context,
         builder: (_) => ArchitectRoofLayersDialog(
+          initialDrainage: roof.drainage,
+          project: project,
+          roof: roof,
           initialAssembly: roof.assembly,
           initialSlopeDegrees: roof.slopeDegrees,
           initialEavesOverhang: roof.eavesOverhang,
@@ -226,6 +229,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
             () => UpdateArchitectRoofPlane(
               storeyId: ref.storey.id,
               roof: roof.copyWith(
+                drainage: result.drainage,
                 assembly: result.assembly,
                 slopeDegrees: result.slopeDegrees,
                 eavesOverhang: result.eavesOverhang,
@@ -233,7 +237,8 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                 baseElevationOffset: result.baseElevationOffset,
                 attachToWalls: result.attachToWalls,
                 manualSupportDistance: result.manualSupportDistance,
-                clearManualSupportDistance: result.manualSupportDistance == null,
+                clearManualSupportDistance:
+                    result.manualSupportDistance == null,
               ),
             ).apply(project),
           ),

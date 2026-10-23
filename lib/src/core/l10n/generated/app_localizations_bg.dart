@@ -7379,4 +7379,111 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectViewDepthInvalid => 'Въведи крайно разстояние поне 1 cm.';
+
+  @override
+  String get architectDrainageTitle => 'Отводняване';
+
+  @override
+  String get architectDrainageGutter => 'Улук';
+
+  @override
+  String get architectDrainagePipes => 'Водосточни тръби';
+
+  @override
+  String get architectDrainagePipe => 'ВТ';
+
+  @override
+  String get architectDrainageSmart => 'Смарт ВТ';
+
+  @override
+  String get architectDrainageProfile => 'Профил';
+
+  @override
+  String get architectDrainageHalfRound => 'Полукръгъл';
+
+  @override
+  String get architectDrainageBox => 'Правоъгълен';
+
+  @override
+  String get architectDrainageMaterial => 'Материал';
+
+  @override
+  String get architectDrainageSteel => 'Поцинкована стомана';
+
+  @override
+  String get architectDrainageAluminium => 'Алуминий';
+
+  @override
+  String get architectDrainagePvc => 'PVC';
+
+  @override
+  String get architectDrainageCopper => 'Мед';
+
+  @override
+  String get architectDrainageWidth => 'Ширина';
+
+  @override
+  String get architectDrainageDepth => 'Дълбочина';
+
+  @override
+  String get architectDrainageAdd => 'Добави ВТ';
+
+  @override
+  String get architectDrainagePlace => 'Посочи в плана';
+
+  @override
+  String get architectDrainagePrompt => 'Посочи място върху стрехата.';
+
+  @override
+  String get architectDrainageOffset => 'От началото на стрехата';
+
+  @override
+  String get architectDrainageDiameter => 'Диаметър';
+
+  @override
+  String get architectDrainageClearance => 'От фасадата';
+
+  @override
+  String get architectDrainageOutlet => 'Кота на изхода';
+
+  @override
+  String get architectDrainageBend => 'Ъгъл на колената';
+
+  @override
+  String get architectDrainageFacade => 'Фасада';
+
+  @override
+  String get architectDrainageWall => 'Стена';
+
+  @override
+  String get architectDrainageAuto => 'Автоматично';
+
+  @override
+  String get architectDrainageWaypoints => 'Междинни точки';
+
+  @override
+  String get architectDrainageWaypointsHelp =>
+      'Празно: автоматично трасе. За ръчно: един ред за точка — отместване навътре; абсолютна кота (m), отгоре надолу.';
+
+  @override
+  String get architectDrainageInvalid => 'Невалидна стойност.';
+
+  @override
+  String get architectDrainageReady => 'Трасето е свободно.';
+
+  @override
+  String get architectDrainageNoFacade => 'Не е намерена фасада. Избери стена.';
+
+  @override
+  String get architectDrainageBlocked =>
+      'Недостатъчно място за трасе. Промени мястото или междинните точки.';
+
+  @override
+  String get architectDrainageOutside => 'Мястото е извън свободната стреха.';
+
+  @override
+  String get architectDrainageNoRoof => 'Първо създай покрив.';
+
+  @override
+  String get architectRoofTimberTab => 'Конструкция';
 }

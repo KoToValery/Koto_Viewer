@@ -14,6 +14,7 @@ enum RoofDrawMode { rectangle, polygon, multiPitch }
 // === SECTION: ARCHITECT ROOF TOOL ===
 
 class ArchitectRoofTool extends ChangeNotifier {
+  ArchitectRoofDrainage drainage = const ArchitectRoofDrainage();
   RoofDrawMode drawMode = RoofDrawMode.rectangle;
   double slopeDegrees = 22.0;
   double eavesOverhang = 0.50;
@@ -170,7 +171,10 @@ class ArchitectRoofTool extends ChangeNotifier {
     return planes.isNotEmpty
         ? [
             for (final plane in planes)
-              plane.copyWith(manualSupportDistance: manualSupportDistance),
+              plane.copyWith(
+                manualSupportDistance: manualSupportDistance,
+                drainage: drainage,
+              ),
           ]
         : null;
   }
@@ -222,6 +226,7 @@ class ArchitectRoofTool extends ChangeNotifier {
     manualSupportDistance: manualSupportDistance,
     eavesCut: eavesCut,
     assembly: activeAssembly.copyWith(),
+    drainage: drainage,
   );
 
   /// Finds if [worldPoint] taps near an edge of [roof] (within [tolerance] metres)
@@ -261,6 +266,7 @@ class ArchitectRoofTool extends ChangeNotifier {
           .map(
             (roof) => roof.copyWith(
               manualSupportDistance: tool.manualSupportDistance,
+              drainage: tool.drainage,
             ),
           )
           .toList();

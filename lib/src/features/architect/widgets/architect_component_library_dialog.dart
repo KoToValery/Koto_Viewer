@@ -18,21 +18,25 @@ import 'component_preview_painters.dart';
 class ArchitectComponentLibraryDialog extends StatefulWidget {
   final ValueChanged<ArchitectComponentDefinition>? onSelectComponent;
   final ValueChanged<ArchitectFenestrationStyle>? onSelectFenestration;
+  final VoidCallback? onSelectDownpipe;
   const ArchitectComponentLibraryDialog({
     super.key,
     this.onSelectComponent,
     this.onSelectFenestration,
+    this.onSelectDownpipe,
   });
 
   static Future<void> show(
     BuildContext context, {
     ValueChanged<ArchitectComponentDefinition>? onSelectComponent,
     ValueChanged<ArchitectFenestrationStyle>? onSelectFenestration,
+    VoidCallback? onSelectDownpipe,
   }) => showDialog(
     context: context,
     builder: (_) => ArchitectComponentLibraryDialog(
       onSelectComponent: onSelectComponent,
       onSelectFenestration: onSelectFenestration,
+      onSelectDownpipe: onSelectDownpipe,
     ),
   );
 
@@ -264,6 +268,24 @@ class _ArchitectComponentLibraryDialogState
               ),
             ),
             const Divider(height: 1, color: Colors.white12),
+            if (widget.onSelectDownpipe != null &&
+                _category == null &&
+                _source != _Source.custom &&
+                _matches(l.architectDrainageSmart))
+              ListTile(
+                leading: const Icon(
+                  Icons.water_drop_outlined,
+                  color: Colors.white70,
+                ),
+                title: Text(
+                  l.architectDrainageSmart,
+                  style: const TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  widget.onSelectDownpipe!();
+                },
+              ),
             Expanded(
               child: definitions.isEmpty && styles.isEmpty
                   ? Center(

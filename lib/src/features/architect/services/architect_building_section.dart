@@ -1,3 +1,4 @@
+import '../rendering/architect_roof_drainage_mesh.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
@@ -438,6 +439,15 @@ class ArchitectBuildingSection {
               ArchitectSectionRegion(wall.id, SlabMaterial.plaster, wallPath),
             );
           }
+        }
+      }
+
+      for (final roof in floor.roofs) {
+        final path = sliceMesh(
+          ArchitectRoofDrainageMesh.build(project, floor, roof),
+        );
+        if (path != null) {
+          regions.add(ArchitectSectionRegion(roof.id, SlabMaterial.custom, path, customFillColor: const Color(0xffeeeeee)));
         }
       }
 

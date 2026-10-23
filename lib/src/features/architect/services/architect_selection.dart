@@ -1,3 +1,4 @@
+import 'architect_roof_drainage_geometry.dart';
 import 'architect_roof_junctions.dart';
 import 'dart:convert';
 import '../models/architect_line_style.dart';
@@ -218,7 +219,9 @@ class ArchitectSelection {
       if (slab.id == id) return path..addPolygon(slab.polygon, true);
     }
     for (final roof in s.roofs) {
-      if (roof.id == id) return ArchitectRoofJunctions.of(s, project: project).footprint(roof);
+      if (roof.id == id) { return Path.combine(PathOperation.union,
+        ArchitectRoofJunctions.of(s, project: project).footprint(roof),
+        ArchitectRoofDrainageGeometry.build(project, s, roof).planPath(roof.drainage.gutterWidth)); }
     }
     for (final zone in s.zones) {
       if (zone.id == id) return path..addPolygon(zone.polygon, true);

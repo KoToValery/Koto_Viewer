@@ -1,3 +1,4 @@
+import 'architect_roof_drainage_geometry.dart';
 import 'architect_roof_junctions.dart';
 import '../models/architect_line_style.dart';
 // === SECTION: ARCHITECTURAL ELEMENT TOOL ===
@@ -681,7 +682,9 @@ class ArchitectElementTool extends ChangeNotifier {
     // Check Roofs
     final roofJunctions = ArchitectRoofJunctions.of(storey, project: annotationProject);
     for (final roof in storey.roofs.reversed) {
-      if (roofJunctions.footprint(roof).contains(point)) {
+      if (roofJunctions.footprint(roof).contains(point) ||
+          (annotationProject != null && ArchitectRoofDrainageGeometry.build(annotationProject, storey, roof)
+            .planPath(roof.drainage.gutterWidth, tolerance: tolerance).contains(point))) {
         yield roof.id;
       }
     }
@@ -1154,10 +1157,16 @@ class ArchitectElementTool extends ChangeNotifier {
       final n = roof.points.length;
       final newEaves = n > 0 ? (n - 2 - roof.eavesEdgeIndex) % n : 0;
       final safeEaves = newEaves < 0 ? newEaves + n : newEaves;
+      final (eavesStart, eavesEnd) = ArchitectRoofDrainageGeometry.eaves(roof);
+      final eavesLength = (eavesEnd - eavesStart).distance;
       final newRoof = roof.copyWith(
         id: targetId,
         points: newPoints,
         eavesEdgeIndex: safeEaves,
+        drainage: roof.drainage.copyWith(downpipes: [
+          for (final pipe in roof.drainage.downpipes) pipe.copyWith(
+            offset: pipe.offset <= eavesLength ? eavesLength - pipe.offset : pipe.offset),
+        ]),
       );
       if (isDuplicate) {
         return (storey.copyWith(roofs: [...storey.roofs, newRoof]), targetId);

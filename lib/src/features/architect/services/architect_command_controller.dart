@@ -1577,6 +1577,7 @@ class CreateArchitectRoofPlane extends ArchitectModelCommand {
   const CreateArchitectRoofPlane({required this.storeyId, required this.roof});
   @override
   ArchitectProject apply(ArchitectProject project) {
+    roof.drainage.validate();
     if (!ArchitectPolygonGeometry.valid(roof.points)) {
       throw ArgumentError('Invalid roof contour');
     }
@@ -1595,6 +1596,7 @@ class UpdateArchitectRoofPlane extends ArchitectModelCommand {
   const UpdateArchitectRoofPlane({required this.storeyId, required this.roof});
   @override
   ArchitectProject apply(ArchitectProject project) {
+    roof.drainage.validate();
     if (!ArchitectPolygonGeometry.valid(roof.points)) {
       throw ArgumentError('Invalid roof contour');
     }
@@ -1614,6 +1616,9 @@ class ReplaceStoreyRoofs extends ArchitectModelCommand {
   const ReplaceStoreyRoofs({required this.storeyId, required this.roofs});
   @override
   ArchitectProject apply(ArchitectProject project) {
+    for (final roof in roofs) {
+      roof.drainage.validate();
+    }
     final floor = ArchitectModelCommand.storey(project, storeyId);
     return ArchitectModelCommand.replace(project, floor.copyWith(roofs: roofs));
   }

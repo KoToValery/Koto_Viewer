@@ -7350,4 +7350,112 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectViewDepthInvalid =>
       'Enter a finite distance of at least 1 cm.';
+
+  @override
+  String get architectDrainageTitle => 'Drainage';
+
+  @override
+  String get architectDrainageGutter => 'Gutter';
+
+  @override
+  String get architectDrainagePipes => 'Downpipes';
+
+  @override
+  String get architectDrainagePipe => 'Downpipe';
+
+  @override
+  String get architectDrainageSmart => 'Smart downpipe';
+
+  @override
+  String get architectDrainageProfile => 'Profile';
+
+  @override
+  String get architectDrainageHalfRound => 'Half-round';
+
+  @override
+  String get architectDrainageBox => 'Box';
+
+  @override
+  String get architectDrainageMaterial => 'Material';
+
+  @override
+  String get architectDrainageSteel => 'Galvanized steel';
+
+  @override
+  String get architectDrainageAluminium => 'Aluminium';
+
+  @override
+  String get architectDrainagePvc => 'PVC';
+
+  @override
+  String get architectDrainageCopper => 'Copper';
+
+  @override
+  String get architectDrainageWidth => 'Width';
+
+  @override
+  String get architectDrainageDepth => 'Depth';
+
+  @override
+  String get architectDrainageAdd => 'Add downpipe';
+
+  @override
+  String get architectDrainagePlace => 'Place on plan';
+
+  @override
+  String get architectDrainagePrompt => 'Pick a position on the eaves.';
+
+  @override
+  String get architectDrainageOffset => 'From eaves start';
+
+  @override
+  String get architectDrainageDiameter => 'Diameter';
+
+  @override
+  String get architectDrainageClearance => 'Wall clearance';
+
+  @override
+  String get architectDrainageOutlet => 'Outlet elevation';
+
+  @override
+  String get architectDrainageBend => 'Bend angle';
+
+  @override
+  String get architectDrainageFacade => 'Facade';
+
+  @override
+  String get architectDrainageWall => 'Wall';
+
+  @override
+  String get architectDrainageAuto => 'Automatic';
+
+  @override
+  String get architectDrainageWaypoints => 'Waypoints';
+
+  @override
+  String get architectDrainageWaypointsHelp =>
+      'Empty: automatic route. Manual: one point per line — inward offset; absolute elevation (m), top to bottom.';
+
+  @override
+  String get architectDrainageInvalid => 'Invalid value.';
+
+  @override
+  String get architectDrainageReady => 'Route is clear.';
+
+  @override
+  String get architectDrainageNoFacade => 'No facade found. Select a wall.';
+
+  @override
+  String get architectDrainageBlocked =>
+      'Not enough room for the route. Adjust the position or waypoints.';
+
+  @override
+  String get architectDrainageOutside =>
+      'Position is outside the exposed eaves.';
+
+  @override
+  String get architectDrainageNoRoof => 'Create a roof first.';
+
+  @override
+  String get architectRoofTimberTab => 'Framing';
 }
