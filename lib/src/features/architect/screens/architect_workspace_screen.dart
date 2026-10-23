@@ -9346,10 +9346,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           roof,
         )) {
           final d = b - a;
+          // Leave room for the outlet collar and end cap when a phone tap
+          // lands exactly at the end of an exposed gutter run.
+          const endClearance = .061;
+          if (d.distance <= endClearance * 2) continue;
           final t =
               (((point - a).dx * d.dx + (point - a).dy * d.dy) /
                       d.distanceSquared)
-                  .clamp(0.0, 1.0);
+                  .clamp(
+                    endClearance / d.distance,
+                    1 - endClearance / d.distance,
+                  );
           final p = a + d * t;
           if ((p - point).distance >= distance) continue;
           distance = (p - point).distance;

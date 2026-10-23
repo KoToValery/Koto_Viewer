@@ -64,6 +64,19 @@ void main() {
         2,
       );
       await begin();
+      await tester.tapAt(workspace.screen(tester, Offset.zero));
+      await tester.pumpAndSettle();
+      expect(
+        model.project.activeStorey.roofs.single.drainage.downpipes.length,
+        3,
+      );
+      expect(
+        model.project.activeStorey.roofs.single.drainage.downpipes.last.offset,
+        closeTo(.061, .001),
+      );
+      model.undo();
+      await tester.pumpAndSettle();
+      await begin();
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(find.text(l.architectDrainagePrompt), findsNothing);

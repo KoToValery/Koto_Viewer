@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_section.dart';
 import 'package:kotoview/src/features/architect/services/architect_building_section.dart';
+import 'package:kotoview/src/features/architect/services/architect_roof_drainage_geometry.dart';
 import 'architect_roof_drainage_test.dart' as fixture;
 import 'architect_elevation_ui_test.dart' as qa;
 
@@ -28,7 +29,15 @@ void main() {
     expect(drainage.contains(const Offset(1.75, 1)), isFalse);
     expect(drainage.contains(const Offset(1.7005, 1)), isTrue);
     // The gutter floor is perforated at the pipe center, including in section.
-    expect(drainage.contains(const Offset(.95, 6.8705)), isFalse);
+    final roof = project.activeStorey.roofs.single;
+    final gutterFloor =
+        ArchitectRoofDrainageGeometry.gutterElevation(
+          project.activeStorey,
+          roof,
+          const Offset(2, 0),
+        ) -
+        roof.drainage.gutterDepth;
+    expect(drainage.contains(Offset(.95, gutterFloor + .0005)), isFalse);
     if (!const bool.fromEnvironment('ELEVATION_QA_CAPTURE')) return;
     final recorder = ui.PictureRecorder(), canvas = Canvas(recorder);
     canvas.drawColor(Colors.white, BlendMode.src);
@@ -90,7 +99,7 @@ void main() {
     text('Връзка с улука — кух профил', const Offset(710, 104), 20);
     panel(
       const Rect.fromLTWH(710, 160, 640, 390),
-      const Rect.fromLTWH(.84, 6.73, .24, .29),
+      Rect.fromLTWH(.84, gutterFloor - .14, .24, .29),
       onlyDrainage: true,
     );
     text('Отместване под еркера', const Offset(710, 590), 20);

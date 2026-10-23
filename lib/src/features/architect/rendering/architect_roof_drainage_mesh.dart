@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../models/architect_project.dart';
 import '../services/architect_roof_drainage_geometry.dart';
 import 'architect_path_solid.dart';
@@ -62,9 +63,23 @@ class ArchitectRoofDrainageMesh {
         gutter.start.dy + axis.dx * p.x + axis.dy * p.z,
         gutter.elevation + p.y,
       );
+      var channel = Path()..addPolygon(profile, true);
+      // Rolled edges stiffen both lips and make the open channel legible in 3D.
+      for (final side in [-1.0, 1.0]) {
+        channel = Path.combine(
+          PathOperation.union,
+          channel,
+          Path()..addOval(
+            Rect.fromCircle(
+              center: Offset(side * (d.gutterWidth / 2 - thickness / 2), 0),
+              radius: .0035,
+            ),
+          ),
+        );
+      }
       final triangles = [
         for (final t in ArchitectPathSolid.extrude(
-          Path()..addPolygon(profile, true),
+          channel,
           0,
           delta.distance,
           ink,
@@ -137,9 +152,87 @@ class ArchitectRoofDrainageMesh {
           );
         }
       }
+      void fitting(Path section, double start, double end) {
+        for (final t in ArchitectPathSolid.extrude(section, start, end, ink)) {
+          result.add(
+            Triangle3D(
+              v0: world(t.v0),
+              v1: world(t.v1),
+              v2: world(t.v2),
+              color: ink,
+            ),
+          );
+        }
+      }
+
+      // Close only the channel ends; the mouth and punched outlets stay open.
+      final cavity = d.profile == ArchitectGutterProfile.box
+          ? [
+              Offset(-d.gutterWidth / 2 + thickness, 0),
+              Offset(
+                -d.gutterWidth / 2 + thickness,
+                -d.gutterDepth + thickness,
+              ),
+              Offset(d.gutterWidth / 2 - thickness, -d.gutterDepth + thickness),
+              Offset(d.gutterWidth / 2 - thickness, 0),
+            ]
+          : [
+              for (var i = 0; i <= 16; i++)
+                Offset(
+                  (d.gutterWidth / 2 - thickness) * math.cos(i * math.pi / 16),
+                  -(d.gutterDepth - thickness) * math.sin(i * math.pi / 16),
+                ),
+            ];
+      final cap = Path()..addPolygon(cavity, true);
+      fitting(cap, 0, thickness);
+      fitting(cap, delta.distance - thickness, delta.distance);
+      // Strap hangers sit on the outside of the sheet at regular centres.
+      final strap = d.profile == ArchitectGutterProfile.box
+          ? [
+              Offset(-d.gutterWidth / 2 - .003, -.015),
+              Offset(-d.gutterWidth / 2 - .003, -d.gutterDepth - .003),
+              Offset(d.gutterWidth / 2 + .003, -d.gutterDepth - .003),
+              Offset(d.gutterWidth / 2 + .003, -.015),
+              Offset(d.gutterWidth / 2, -.015),
+              Offset(d.gutterWidth / 2, -d.gutterDepth),
+              Offset(-d.gutterWidth / 2, -d.gutterDepth),
+              Offset(-d.gutterWidth / 2, -.015),
+            ]
+          : [
+              for (var i = 0; i <= 16; i++)
+                Offset(
+                  (d.gutterWidth / 2 + .003) * math.cos(i * math.pi / 16),
+                  -(d.gutterDepth + .003) * math.sin(i * math.pi / 16),
+                ),
+              for (var i = 16; i >= 0; i--)
+                Offset(
+                  d.gutterWidth / 2 * math.cos(i * math.pi / 16),
+                  -d.gutterDepth * math.sin(i * math.pi / 16),
+                ),
+            ];
+      final hangerCount = math.max(1, (delta.distance / .6).ceil());
+      for (var i = 0; i < hangerCount; i++) {
+        final position = delta.distance * (i + .5) / hangerCount;
+        if (ready.any(
+          (route) =>
+              (Offset(route.points.first.x, route.points.first.y) -
+                      (gutter.start + axis * position))
+                  .distance <
+              route.pipe.diameter,
+        )) {
+          continue;
+        }
+        fitting(
+          Path()..addPolygon(strap, true),
+          position - .009,
+          position + .009,
+        );
+      }
     }
     for (final route in ready) {
-      final points = route.points, r = route.pipe.diameter / 2;
+      final rings = _pipeRings(route);
+      final points = [for (final ring in rings) ring.$1];
+      final r = route.pipe.diameter / 2;
       final samples = angles[route.pipe.id]!;
       final u = Vector3(-route.inward.dy, route.inward.dx, 0);
       final outer = <List<Vector3>>[], inner = <List<Vector3>>[];
@@ -189,7 +282,7 @@ class ArchitectRoofDrainageMesh {
               return Vector3(p.x, p.y, points.first.z + d.gutterDepth + z);
             }(),
         ];
-        outer.add(ring(r, false));
+        outer.add(ring(r + rings[i].$2, false));
         inner.add(ring(r - thickness, true));
       }
       void triangle(Vector3 a, Vector3 b, Vector3 c) =>
@@ -212,6 +305,136 @@ class ArchitectRoofDrainageMesh {
         triangle(outer.last[j], outer.last[k], inner.last[k]);
         triangle(outer.last[j], inner.last[k], inner.last[j]);
       }
+      for (var i = 0; i + 1 < rings.length; i++) {
+        if (rings[i].$2 != .007 || rings[i + 1].$2 != .007) continue;
+        final center = (rings[i].$1 + rings[i + 1].$1) / 2;
+        final plan = Offset(center.x, center.y);
+        Offset? anchor;
+        var distance = route.pipe.wallClearance + route.pipe.diameter * 1.5;
+        for (final floor in project.storeys) {
+          for (final wall in floor.walls) {
+            final bottom = floor.elevation + wall.baseOffset;
+            if (center.z < bottom + .03 ||
+                center.z > bottom + wall.effectiveHeight(floor.height) - .03) {
+              continue;
+            }
+            final corners = wall.polygonCorners;
+            for (var j = 0; j < corners.length; j++) {
+              final p = BimLineGeometry.closest(
+                plan,
+                corners[j],
+                corners[(j + 1) % corners.length],
+              );
+              final delta = p - plan;
+              if (delta.dx * route.inward.dx + delta.dy * route.inward.dy <=
+                      0 ||
+                  delta.distance <= r + .012 ||
+                  delta.distance >= distance) {
+                continue;
+              }
+              anchor = p;
+              distance = delta.distance;
+            }
+          }
+        }
+        if (anchor == null) continue;
+        final direction = (anchor - plan) / distance;
+        final side = Offset(-direction.dy, direction.dx);
+        void mountingBar(Offset a, Offset b, double width, double height) {
+          result.addAll(
+            ArchitectPathSolid.extrude(
+              Path()..addPolygon([
+                a + side * width / 2,
+                b + side * width / 2,
+                b - side * width / 2,
+                a - side * width / 2,
+              ], true),
+              center.z - height / 2,
+              center.z + height / 2,
+              ink,
+            ),
+          );
+        }
+
+        mountingBar(
+          plan + direction * (r + .007),
+          anchor - direction * .004,
+          .012,
+          .018,
+        );
+        mountingBar(anchor - direction * .004, anchor, .04, .045);
+      }
+    }
+    return result;
+  }
+
+  /// Tangential circular elbows and socket/clamp beads share one hollow shell.
+  /// No capped cylinders or overlapping sleeves can seal the drainage bore.
+  static List<(Vector3, double)> _pipeRings(ArchitectDownpipeRoute route) {
+    final source = route.points;
+    final diameter = route.pipe.diameter;
+    final smooth = <Vector3>[source.first];
+    for (var i = 1; i + 1 < source.length; i++) {
+      final a = source[i] - source[i - 1], b = source[i + 1] - source[i];
+      final incoming = a.normalized(), outgoing = b.normalized();
+      final angle = math.acos(incoming.dot(outgoing).clamp(-1.0, 1.0));
+      if (angle < 1e-5 || angle > math.pi - 1e-5) {
+        smooth.add(source[i]);
+        continue;
+      }
+      final tangent = math.min(
+        diameter * .75 * math.tan(angle / 2),
+        math.min(a.length, b.length) * .4,
+      );
+      final radius = tangent / math.tan(angle / 2);
+      final entry = source[i] - incoming * tangent;
+      final towardCenter = (outgoing - incoming * incoming.dot(outgoing))
+          .normalized();
+      final center = entry + towardCenter * radius;
+      final radial = entry - center;
+      smooth.add(entry);
+      final steps = math.max(4, (angle / (math.pi / 24)).ceil());
+      for (var j = 1; j <= steps; j++) {
+        final theta = angle * j / steps;
+        smooth.add(
+          center +
+              radial * math.cos(theta) +
+              incoming * (radius * math.sin(theta)),
+        );
+      }
+    }
+    smooth.add(source.last);
+    final result = <(Vector3, double)>[(smooth.first, 0)];
+    for (var i = 0; i + 1 < smooth.length; i++) {
+      final a = smooth[i], b = smooth[i + 1], delta = b - a;
+      // Add sockets on straight lengths, and clamp bands on vertical drops.
+      if (delta.length > diameter * 3) {
+        final axis = delta.normalized();
+        final positions = <(double, double)>[(diameter * .75, .004)];
+        if ((b.x - a.x).abs() < 1e-6 && (b.y - a.y).abs() < 1e-6) {
+          final count = math.max(1, (delta.length / 1.8).ceil());
+          for (var j = 0; j < count; j++) {
+            positions.add((delta.length * (j + .5) / count, .007));
+          }
+        }
+        positions.sort((a, b) => a.$1.compareTo(b.$1));
+        var last = 0.0;
+        for (final (position, bead) in positions) {
+          const half = .012;
+          if (position - half - .003 <= last ||
+              position + half + .003 >= delta.length) {
+            continue;
+          }
+          result.addAll([
+            (a + axis * (position - half - .003), 0),
+            (a + axis * (position - half), bead),
+            (a + axis * (position + half), bead),
+            (a + axis * (position + half + .003), 0),
+          ]);
+          last = position + half + .003;
+        }
+      }
+      result.add((b, 0));
     }
     return result;
   }

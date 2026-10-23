@@ -526,14 +526,11 @@ class Architect3dBuilder {
       }
     }
 
-    // Stepped constructive reveal on the last verge strip so rafters, boarding,
-    // counter-battens, and battens remain visible from above as well as from below.
-    final revealSpanS = spanS > 1.6
-        ? math.min(rafterStep * 0.85, spanS * 0.22)
-        : 0.0;
-    final boardMaxS = maxS - revealSpanS * 0.35;
-    final coverMaxS = maxS - revealSpanS;
-    final coverMinD = minD + math.min(0.06, spanD * 0.04);
+    // A finished roof covers the full footprint. Construction layers remain
+    // visible in sections and below the eaves, without a permanent cutaway.
+    final boardMaxS = maxS;
+    final coverMaxS = maxS;
+    final coverMinD = minD;
 
     // 4. Sub-roof boarding + waterproofing membrane (Обшивка + Мембрана)
     final boardClip = _clipPolygonToRect(polySD, minS, boardMaxS, minD, maxD);

@@ -50,6 +50,14 @@ class ArchitectRoofDrainageGeometry {
   static double gutterOffset(ArchitectRoofPlane roof) =>
       roof.drainage.gutterWidth / 3;
 
+  /// The channel catches water at the covering, above the rafter/fascia foot.
+  /// Keep a small drop below the drip edge, shared by the channel and outlet.
+  static double gutterElevation(
+    ArchitectStorey floor,
+    ArchitectRoofPlane roof,
+    Offset onEaves,
+  ) => floor.elevation + roof.topElevationAt(onEaves) - .04;
+
   Path planPath(double gutterWidth, {double tolerance = 0}) {
     var result = Path();
     void stroke(Offset a, Offset b, double radius) {
@@ -137,7 +145,7 @@ class ArchitectRoofDrainageGeometry {
             ArchitectGutterRun(
               a + shift,
               b + shift,
-              floor.elevation + roof.undersideElevationAt(a) - .04,
+              gutterElevation(floor, roof, a),
             ),
       ],
       [
@@ -154,9 +162,81 @@ class ArchitectRoofDrainageGeometry {
     ArchitectRoofPlane roof,
     ArchitectDownpipe pipe,
   ) {
+    final direct = _route(project, floor, roof, pipe);
+    if (direct.status == ArchitectDownpipeStatus.ready ||
+        direct.status == ArchitectDownpipeStatus.outsideEaves ||
+        pipe.facadeWallId != null ||
+        pipe.waypoints.isNotEmpty) {
+      return direct;
+    }
+    // At a verge corner the upslope ray can miss every wall. Try the nearest
+    // facade faces/corners as well, retaining the same physical gutter outlet.
     final (a, b) = eaves(roof);
     final length = (b - a).distance;
-    var inward = roof.slopeDirection;
+    if (length < 1e-6) return direct;
+    final origin =
+        a +
+        (b - a) * (pipe.offset / length) -
+        roof.slopeDirection * gutterOffset(roof);
+    final candidates = <(double, Offset, String)>[];
+    for (final storey in project.storeys) {
+      for (final wall in storey.walls) {
+        final bottom = storey.elevation + wall.baseOffset;
+        final top = bottom + wall.effectiveHeight(storey.height);
+        if (top < pipe.outletElevation ||
+            bottom > gutterElevation(floor, roof, origin)) {
+          continue;
+        }
+        final corners = wall.polygonCorners;
+        final targets =
+            [
+              for (var i = 0; i < corners.length; i++)
+                BimLineGeometry.closest(
+                  origin,
+                  corners[i],
+                  corners[(i + 1) % corners.length],
+                ),
+            ]..sort(
+              (a, b) => (a - origin).distance.compareTo((b - origin).distance),
+            );
+        final delta = targets.first - origin;
+        if (delta.distance < 1e-5 ||
+            delta.dx * roof.slopeDirection.dx +
+                    delta.dy * roof.slopeDirection.dy <
+                -1e-5) {
+          continue;
+        }
+        candidates.add((delta.distance, delta / delta.distance, wall.id));
+      }
+    }
+    candidates.sort((a, b) => a.$1.compareTo(b.$1));
+    for (final candidate in candidates) {
+      final alternative = _route(
+        project,
+        floor,
+        roof,
+        pipe,
+        direction: candidate.$2,
+        targetWallId: candidate.$3,
+      );
+      if (alternative.status == ArchitectDownpipeStatus.ready) {
+        return alternative;
+      }
+    }
+    return direct;
+  }
+
+  static ArchitectDownpipeRoute _route(
+    ArchitectProject project,
+    ArchitectStorey floor,
+    ArchitectRoofPlane roof,
+    ArchitectDownpipe pipe, {
+    Offset? direction,
+    String? targetWallId,
+  }) {
+    final (a, b) = eaves(roof);
+    final length = (b - a).distance;
+    var inward = direction ?? roof.slopeDirection;
     ArchitectDownpipeRoute failure(ArchitectDownpipeStatus status) =>
         ArchitectDownpipeRoute(pipe, status, const [], inward);
     try {
@@ -197,12 +277,9 @@ class ArchitectRoofDrainageGeometry {
     )) {
       return failure(ArchitectDownpipeStatus.blocked);
     }
-    final origin = onEaves - inward * gutterOffset(roof);
+    final origin = onEaves - roof.slopeDirection * gutterOffset(roof);
     final startZ =
-        floor.elevation +
-        roof.undersideElevationAt(onEaves) -
-        .04 -
-        roof.drainage.gutterDepth;
+        gutterElevation(floor, roof, onEaves) - roof.drainage.gutterDepth;
     if (pipe.facadeWallId != null) {
       final walls = project.storeys
           .expand((s) => s.walls)
@@ -239,8 +316,8 @@ class ArchitectRoofDrainageGeometry {
       }
       final o = _Obstacle(range.$1 - margin, bottom - margin, top + margin);
       obstacles.add(o);
-      if (wallId != null &&
-          (pipe.facadeWallId == null || wallId == pipe.facadeWallId)) {
+      final target = pipe.facadeWallId ?? targetWallId;
+      if (wallId != null && (target == null || wallId == target)) {
         wallTargets.add(o);
       }
     }
@@ -371,6 +448,9 @@ class ArchitectRoofDrainageGeometry {
     if (startZ - pipe.outletElevation <= neck) {
       return failure(ArchitectDownpipeStatus.blocked);
     }
+    // Do not tuck in past the final facade only to turn back out at its top.
+    // This also avoids an unnecessary double-angle cusp beneath the eaves.
+    bands.add(_Obstacle(math.max(0, facade), pipe.outletElevation, startZ));
     bands.add(_Obstacle(0, startZ - neck, startZ));
     final k = math.tan(pipe.bendAngle * math.pi / 180);
     double envelope(double z) => bands
