@@ -1,3 +1,4 @@
+import '../widgets/architect_terrain_editor.dart';
 import '../models/architect_line_style.dart';
 import '../models/architect_hatch_pattern.dart';
 import '../widgets/architect_hatch_picker.dart';
@@ -453,6 +454,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       : '${_commands.view.name}:${_commands.viewId}';
 
   void _selectWorkspaceView(ArchitectWorkspaceView type, String? id) {
+    _terrainDrafting = false;
     _cancelDrafting();
     _clearSelection();
     _viewCameras[_workspaceViewKey] = (
@@ -490,6 +492,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Future<void> _manageWorkspaceViews(ArchitectWorkspaceView type) async {
     _cancelDrafting();
     String? selected = _lastViewIds[type];
+    ArchitectTool? draftTool;
+    var terrainRequested = false;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => type == ArchitectWorkspaceView.elevation
@@ -497,15 +501,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 controller: _modelCommands,
                 initialSelectedId: selected,
                 onViewSelected: (id) => selected = id,
+                onDraftRequested: (tool) => draftTool = tool,
+                onTerrainRequested: () => terrainRequested = true,
               )
             : ArchitectBuildingSectionsScreen(
                 controller: _modelCommands,
                 initialSelectedId: selected,
                 onViewSelected: (id) => selected = id,
+                onDraftRequested: (tool) => draftTool = tool,
               ),
       ),
     );
-    if (mounted) _selectWorkspaceView(type, selected);
+    if (mounted) {
+      _selectWorkspaceView(type, selected);
+      if (draftTool != null) _changeTool(draftTool!);
+      if (terrainRequested) _startTerrainDraft();
+    }
   }
 
   String? _selectedSectionRoofId;
@@ -1751,6 +1762,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _cancelDrafting() {
+    _terrainDrafting = false;
     _viewDraft = null;
     _placingDownpipe = false;
     _downpipeRoofId = null;
@@ -1798,7 +1810,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
   }
 
+  bool _terrainDrafting = false;
+
+  void _startTerrainDraft() {
+    _cancelDrafting(); _clearSelection();
+    setState(() { _activeTool = ArchitectTool.select; _terrainDrafting = true; });
+  }
+
   void _changeTool(ArchitectTool tool) => setState(() {
+    _terrainDrafting = false;
     _placingDownpipe = false;
     _downpipeRoofId = null;
     final nextTool =
@@ -11691,6 +11711,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               : ArchitectToolPalette(
                   zonePresets: _zonePresets,
                   drawingOnly: !_commands.isPlan,
+                  onTerrain: _commands.view == ArchitectWorkspaceView.elevation ? _startTerrainDraft : null,
                   activeTool: _activeTool,
                   onToolChanged: _changeTool,
                   multiSelect: _multiSelect,
@@ -12394,8 +12415,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return _dimensionAnchors.firstOrNull?.point ??
         _draftStart ??
         _axisTool.draftStart ??
-        _zoneTool.draftPoints.firstOrNull ??
-        _elementTool.slabDraftPoints.firstOrNull ??
+        _zoneTool.draftPoints.lastOrNull ??
+        _elementTool.slabDraftPoints.lastOrNull ??
         _roofTool.draftPoints.firstOrNull;
   }
 
@@ -12417,10 +12438,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _roofTool.drawMode == RoofDrawMode.multiPitch) &&
       _roofTool.draftPoints.length >= 3;
 
-  bool get _canConfirmDraft => _canConfirmDimension || _canConfirmRoofDraft;
+  bool get _canConfirmContour =>
+      (_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch) &&
+      ArchitectPolygonGeometry.valid(_elementTool.slabDraftPoints);
+
+  bool get _canConfirmZone => _activeTool == ArchitectTool.zone &&
+      _zoneTool.canCloseDraft && !_zoneTool.hasDraftCrossings;
+
+  bool get _canConfirmDraft => _canConfirmDimension || _canConfirmRoofDraft ||
+      _canConfirmContour || _canConfirmZone;
 
   void _onConfirmDraft() {
-    if (_canConfirmRoofDraft) {
+    if (_canConfirmContour) {
+      if (_activeTool == ArchitectTool.hatch) { _commitHatch(); return; }
+      final result = _elementTool.commitSlab(storey: _project.activeStorey);
+      if (result != null) {
+        setState(() => _project = _project.updateActiveStorey(result.$1));
+        _saveBiMProjectIfAttached();
+        HapticFeedback.mediumImpact();
+      }
+    } else if (_canConfirmZone) {
+      _commitDraftedZone();
+    } else if (_canConfirmRoofDraft) {
       _commitRoofDraft();
     } else if (_canConfirmDimension) {
       _commitDimensionDraft();
@@ -12530,6 +12569,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 key: ValueKey(
                   _canConfirmRoofDraft
                       ? 'architect-roof-confirm'
+                      : _canConfirmContour || _canConfirmZone
+                      ? 'architect-draft-confirm'
                       : 'architect-dimension-confirm',
                 ),
                 constraints: const BoxConstraints.tightFor(
@@ -12540,7 +12581,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 style: const ButtonStyle(
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                tooltip: _canConfirmRoofDraft
+                tooltip: _canConfirmRoofDraft || _canConfirmContour || _canConfirmZone
                     ? context.l10n.architectDimensionFinish
                     : context.l10n.architectDimensionConfirm,
                 onPressed: _onConfirmDraft,
@@ -13338,6 +13379,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _activeTool == ArchitectTool.select &&
           _effectiveSelection.isEmpty)
         Positioned.fill(child: _nativeProjectionEditor()),
+      if (_terrainDrafting)
+        Positioned.fill(child: AnimatedBuilder(animation: _viewport,builder: (_, _) {
+          final view=_modelCommands.project.elevations.firstWhere((e)=>e.id==_commands.viewId);
+          return ArchitectTerrainEditor(initial:view.terrain,
+            toView:(p)=>_modelToSection(_screenToModel(p)),
+            toScreen:(p)=>_viewport.toScreen(Offset(p.dx,-p.dy)),
+            onCancel:()=>setState(()=>_terrainDrafting=false),
+            onApply:(points) {
+              final original=_modelCommands.project;
+              _modelCommands.commit(original.copyWith(elevations:[for(final e in original.elevations)
+                if(e.id==view.id) e.copyWith(terrain:points) else e]));
+              setState(()=>_terrainDrafting=false);
+              _saveBiMProjectIfAttached();
+            });
+        })),
       if (_viewDraft != null)
         Positioned.fill(
           child: AnimatedBuilder(

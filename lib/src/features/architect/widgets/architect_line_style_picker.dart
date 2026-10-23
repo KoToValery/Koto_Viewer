@@ -9,6 +9,7 @@ import 'architect_wall_drafting_panel.dart';
 
 extension ArchitectLineStyleLabel on ArchitectLineStyle {
   String label(AppLocalizations l) => switch (id) {
+    'woodGrain' => l.architectHatchWood,
     'solid' => l.architectLineSolid,
     'powerLine' => l.architectLinePowerLine,
     'hatchBrickJoint' => l.architectLineHatchBrickJoint,

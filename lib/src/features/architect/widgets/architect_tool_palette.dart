@@ -63,6 +63,7 @@ enum ArchitectToolCategory {
 class ArchitectToolPalette extends StatefulWidget {
   final ArchitectTool activeTool;
   final bool drawingOnly;
+  final VoidCallback? onTerrain;
   final ValueChanged<ArchitectTool> onToolChanged;
   final bool multiSelect;
   final VoidCallback? onToggleMultiSelect;
@@ -147,6 +148,7 @@ class ArchitectToolPalette extends StatefulWidget {
     this.zonePresets = const ArchitectZonePresets(),
     required this.activeTool,
     this.drawingOnly = false,
+    this.onTerrain,
     required this.onToolChanged,
     this.multiSelect = false,
     this.onToggleMultiSelect,
@@ -595,6 +597,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     icon: Icons.crop_square_rounded,
                                     label: l10n.architectToolCadRect,
                                   ),
+                                if (category == ArchitectToolCategory.drawing && widget.onTerrain != null)
+                                  IconButton(key:const ValueKey('architect-tool-terrain'),
+                                    tooltip:l10n.architectTerrain, onPressed:widget.onTerrain,
+                                    icon:const Icon(Icons.landscape_outlined,color:Colors.white70)),
                                 if (category == ArchitectToolCategory.drawing)
                                   _buildToolButton(tool: ArchitectTool.hatch,
                                     icon: Icons.texture_rounded,

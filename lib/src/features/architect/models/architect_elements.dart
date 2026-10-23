@@ -793,6 +793,8 @@ class ArchitectAnnotation {
 enum CadPrimitiveType { line, rect, circle, hatch }
 
 class ArchitectCadPrimitive {
+  // Publication renders eight legacy stroke units per paper millimetre.
+  static const strokeUnitsPerPaperMm = 8.0;
   final String id;
   final CadPrimitiveType type;
   final Offset startPoint;

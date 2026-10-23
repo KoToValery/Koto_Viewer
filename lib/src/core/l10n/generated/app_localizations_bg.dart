@@ -7504,4 +7504,58 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectViewStepHint =>
       'Посочете точка до маркера за мястото и отместването на чупката. Повторете „Добави чупка“ за още сегменти.';
+
+  @override
+  String get stairConstruction => 'Конструкция';
+
+  @override
+  String get stairSteel => 'Стомана';
+
+  @override
+  String get stairTreadThickness => 'Дебелина на стъпалото';
+
+  @override
+  String get stairStringerWidth => 'Ширина на косоура/тетивата';
+
+  @override
+  String get stairStringerDepth => 'Височина на косоура/тетивата';
+
+  @override
+  String get architectHatchWood => 'Дърво';
+
+  @override
+  String get architectHatchMetal => 'Метал';
+
+  @override
+  String get architectHatchGenerator => 'Генератор на модел';
+
+  @override
+  String get architectHatchGeneratorHint =>
+      'Начертай мотив с отсечки. Задай размер и разстояние между редовете; прегледът се обновява при чертане.';
+
+  @override
+  String get architectSketchOrtho => 'Ортогонални линии';
+
+  @override
+  String get architectSketchPreview => 'Преглед на повторението';
+
+  @override
+  String get architectTerrain => 'Линия терен';
+
+  @override
+  String get architectTerrainHint =>
+      'Поставяй точки отляво надясно. Потвърди, за да скриеш сградата под линията в тази фасада.';
+
+  @override
+  String get architectRoofPitchEdit => 'Наклон на покрив';
+
+  @override
+  String get architectRoofPitchHint =>
+      'Мести зелената точка за наклона. Натисни върху ската, за да избереш неподвижната ос, успоредна на стрехата.';
+
+  @override
+  String get architectRoofPitchAxis => 'Ос при стрехата';
+
+  @override
+  String get architectStrokeWeight => 'Дебелина на линия';
 }

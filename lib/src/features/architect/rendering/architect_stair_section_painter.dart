@@ -1,3 +1,5 @@
+import 'architect_hatch_geometry.dart';
+import '../models/architect_hatch_pattern.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/architect_wall.dart';
@@ -29,7 +31,7 @@ class ArchitectStairSectionPainter extends CustomPainter {
     final ink = palette.foreground(const Color(0xFF263238));
     final concrete = section.regions[StairSolidMaterial.concrete];
     if (concrete != null) {
-      canvas.drawPath(concrete, Paint()..color = ink.withValues(alpha: .05));
+
       ArchitectWallHatch.paint(
         canvas,
         const ArchitectWall(
@@ -55,20 +57,21 @@ class ArchitectStairSectionPainter extends CustomPainter {
       canvas.drawPath(
         finish,
         Paint()
-          ..color = palette.isDark
-              ? const Color(0xFF887E6B)
-              : ArchitectStairMesh.finishColor,
-      );
-      canvas.drawPath(
-        finish,
-        Paint()
           ..color = ink
           ..style = PaintingStyle.stroke
           ..strokeWidth = .7 / scale,
       );
     }
     final metal = section.regions[StairSolidMaterial.metal];
-    if (metal != null) canvas.drawPath(metal, Paint()..color = ink);
+    for(final (region,id) in [(metal,'metal'),(section.regions[StairSolidMaterial.timber],'wood')]) {
+      if(region==null) continue;
+      canvas.save();canvas.clipPath(region);
+      canvas.drawPath(ArchitectHatchGeometry.path(boundary:region,
+        pattern:ArchitectHatchPattern.presets.firstWhere((p)=>p.id==id),unitsPerMm:3/scale),
+        Paint()..color=ink..style=PaintingStyle.stroke..strokeWidth=.7/scale);
+      canvas.restore();
+      canvas.drawPath(region,Paint()..color=ink..style=PaintingStyle.stroke..strokeWidth=1.3/scale);
+    }
     final guide = Paint()
       ..color = const Color(0xFFCC5555)
       ..strokeWidth = .7 / scale;

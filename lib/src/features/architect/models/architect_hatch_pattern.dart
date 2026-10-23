@@ -223,6 +223,12 @@ class ArchitectHatchPattern {
         ),
       ],
     ),
+    ArchitectHatchPattern(id: 'wood', layers: [
+      ArchitectHatchLayer(angleDeg: 0, spacingMm: 2.5),
+      ArchitectHatchLayer(angleDeg: 0, spacingMm: 5, phaseMm: .6,
+        lineStyle: ArchitectLineStyle(id: 'woodGrain', name: '_', segmentsMm: [4, 5])),
+    ]),
+    ArchitectHatchPattern(id: 'metal', layers: [ArchitectHatchLayer(spacingMm: 1.5)]),
   ];
   bool get isPreset => presets.any((p) => p.id == id);
   void validate() {

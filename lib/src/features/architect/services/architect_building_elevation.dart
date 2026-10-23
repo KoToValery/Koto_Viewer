@@ -16,12 +16,14 @@ class ArchitectBuildingElevation {
   final Map<String, Path> elementPaths;
   final List<({Path lines, Path clip})> operations;
   final List<ArchitectElevationSlope> slopes;
+  final List<Offset> terrain;
   const ArchitectBuildingElevation(
     this.faces,
     this.bounds, {
     this.elementPaths = const {},
     this.operations = const [],
     this.slopes = const [],
+    this.terrain = const [],
   });
 
   static ArchitectBuildingElevation build(
@@ -35,20 +37,54 @@ class ArchitectBuildingElevation {
       previewGeometry: false,
       sources: sources,
     );
-    return _fromTriangles(
+    return withTerrain(_fromTriangles(
       mesh.triangles,
       view,
       sources: sources,
       project: project,
       occlusionMasks: occlusionMasks,
-    );
+    ), view);
   }
 
   static ArchitectBuildingElevation fromTriangles(
     List<Triangle3D> triangles,
     ArchitectElevation view, {
     Map<Triangle3D, String> sources = const {},
-  }) => _fromTriangles(triangles, view, sources: sources);
+  }) => withTerrain(_fromTriangles(triangles, view, sources: sources), view);
+
+  static void validateTerrain(List<Offset> points) {
+    if (points.isNotEmpty && points.length < 2) throw ArgumentError('Terrain needs two points');
+    for (var i=0;i<points.length;i++) {
+      if (!points[i].dx.isFinite || !points[i].dy.isFinite ||
+          (i>0 && points[i].dx-points[i-1].dx < .001)) {
+        throw ArgumentError('Terrain must run from left to right');
+      }
+    }
+  }
+
+  static ArchitectBuildingElevation withTerrain(ArchitectBuildingElevation geometry,
+      ArchitectElevation view) {
+    final points=view.terrain;
+    if (points.isEmpty) return geometry;
+    validateTerrain(points);
+    final left=math.min(-view.length/2,math.min(geometry.bounds.left,points.first.dx))-.5;
+    final right=math.max(view.length/2,math.max(geometry.bounds.right,points.last.dx))+.5;
+    final bottom=math.min(geometry.bounds.top,points.map((p)=>p.dy).reduce(math.min))-10;
+    final ground=[Offset(left,points.first.dy),...points,Offset(right,points.last.dy)];
+    final mask=Path()..addPolygon([...ground,Offset(right,bottom),Offset(left,bottom)],true);
+    Path visible(Path p)=>Path.combine(PathOperation.difference,p,mask);
+    final faces=[for(final p in geometry.faces) visible(p)]
+      .where((p)=>!p.getBounds().isEmpty).toList();
+    final paths={for(final e in geometry.elementPaths.entries) e.key: visible(e.value)};
+    paths.removeWhere((id,p)=>p.getBounds().isEmpty);
+    final bounds=Rect.fromLTRB(left, ground.map((p)=>p.dy).reduce(math.min)-.4,
+      right, math.max(geometry.bounds.bottom,ground.map((p)=>p.dy).reduce(math.max)));
+    return ArchitectBuildingElevation(faces,bounds,elementPaths:paths,
+      operations:[for(final op in geometry.operations) (lines:op.lines,clip:visible(op.clip))],
+      slopes:[for(final slope in geometry.slopes)
+        if(!mask.contains(slope.start) && !mask.contains(slope.end)) slope],
+      terrain:ground);
+  }
 
   static ArchitectBuildingElevation _fromTriangles(
     List<Triangle3D> triangles,

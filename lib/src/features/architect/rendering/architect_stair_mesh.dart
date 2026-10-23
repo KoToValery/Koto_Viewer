@@ -6,7 +6,7 @@ import '../models/architect_project.dart';
 import '../services/architect_stair_geometry.dart';
 import '../services/architect_stair_railings.dart';
 
-enum StairSolidMaterial { concrete, finish, metal }
+enum StairSolidMaterial { concrete, finish, metal, timber }
 
 class StairSolid {
   final StairSolidMaterial material;
@@ -30,6 +30,7 @@ class ArchitectStairMesh {
     final d = stair.design;
     if (d == null) return [];
     final geometry = ArchitectStairGeometry.of(stair), result = <StairSolid>[];
+    if (d.construction != StairConstruction.concrete) return _framed(stair);
     final f = d.finishThickness, thickness = d.concreteThickness;
     if (d.hasWinders) {
       for (final surface in stair.plan.surfaces) {
@@ -288,6 +289,91 @@ class ArchitectStairMesh {
     ];
   }
 
+  /// Open risers on two side stringers. The same solids drive 3D and cuts.
+  static List<StairSolid> _framed(ArchitectStair stair) {
+    final d = stair.design!;
+    final material = d.construction == StairConstruction.steel
+        ? StairSolidMaterial.metal : StairSolidMaterial.timber;
+    final result = <StairSolid>[];
+    final geometry = ArchitectStairGeometry.of(stair);
+    for (final surface in stair.plan.surfaces) {
+      result.add(verticalPrism(surface.polygon,
+        surface.elevation + d.startOffset - d.treadThickness,
+        surface.elevation + d.startOffset, material));
+    }
+    void stringer(Offset a, Offset b, double za, double zb) {
+      final v = b - a;
+      if (v.distance < 1e-8) return;
+      final n = Offset(-v.dy, v.dx) / v.distance * d.stringerWidth / 2;
+      final lower = [
+        Vector3(a.dx-n.dx,a.dy-n.dy,za-d.stringerDepth),
+        Vector3(b.dx-n.dx,b.dy-n.dy,zb-d.stringerDepth),
+        Vector3(b.dx+n.dx,b.dy+n.dy,zb-d.stringerDepth),
+        Vector3(a.dx+n.dx,a.dy+n.dy,za-d.stringerDepth),
+      ];
+      result.add(hexahedron(lower, [for(final p in lower)
+        Vector3(p.x,p.y,p.z+d.stringerDepth)], material));
+    }
+    if (geometry.flights.isNotEmpty) {
+      for (final flight in geometry.flights) {
+        for (final side in [-1.0, 1.0]) {
+          final across = side * (flight.width-d.stringerWidth)/2;
+          // Notched upper edge bears directly under each tread. A straight
+          // rising top would otherwise project through the next tread surface.
+          final profile=<Offset>[];
+          for(var i=0;i<flight.count-1;i++) {
+            final z=flight.base+d.startOffset+(i+1)*d.riser-d.treadThickness;
+            profile.addAll([Offset(i*d.going,z),Offset((i+1)*d.going,z)]);
+          }
+          profile.addAll([
+            Offset(flight.run,flight.top+d.startOffset-d.riser-d.treadThickness-d.stringerDepth),
+            Offset(0,flight.base+d.startOffset+d.riser-d.treadThickness-d.stringerDepth),
+          ]);
+          result.add(profilePrism(profile,StairFlightGeometry(
+            flight.point(0,across),flight.axis,d.stringerWidth,
+            d.going,d.riser,flight.count,flight.firstRiser),material));
+        }
+      }
+      for (final landing in geometry.landings) {
+        final p=landing.polygon;
+        for(var i=0;i<p.length;i++) {
+          stringer(p[i],p[(i+1)%p.length],
+            landing.elevation+d.startOffset-d.treadThickness,
+            landing.elevation+d.startOffset-d.treadThickness);
+        }
+      }
+    } else {
+      // Side strips follow the actual curved/winding tread patches. Their
+      // flat tops touch tread undersides and stay inside the stair footprint.
+      final surfaces=stair.plan.surfaces;
+      for(var i=0;i<surfaces.length;i++) {
+        final surface=surfaces[i], p=surface.polygon;
+        if(p.length!=4) continue;
+        final near=p[1]-p[0],far=p[2]-p[3];
+        final a=near/near.distance*d.stringerWidth;
+        final b=far/far.distance*d.stringerWidth;
+        final sliced=d.isSpiral && !d.hasWinders;
+        final lowA=surface.slopeBase?.first ?? (sliced ?
+          (i~/ArchitectStairDesign.spiralSlicesPerGoing+
+            (i%ArchitectStairDesign.spiralSlicesPerGoing)/ArchitectStairDesign.spiralSlicesPerGoing)*d.riser
+          : surface.elevation-d.riser);
+        final lowB=surface.slopeBase?.last ??
+          (sliced?lowA+d.riser/ArchitectStairDesign.spiralSlicesPerGoing:surface.elevation);
+        final top=surface.elevation+d.startOffset-d.treadThickness;
+        for(final polygon in [
+          [p[0],p[0]+a,p[3]+b,p[3]],
+          [p[1]-a,p[1],p[2],p[2]-b],
+        ]) {
+          result.add(hexahedron([
+            for(var j=0;j<4;j++) Vector3(polygon[j].dx,polygon[j].dy,
+              (j<2?lowA:lowB)+d.startOffset-d.treadThickness-d.stringerDepth),
+          ],[for(final q in polygon) Vector3(q.dx,q.dy,top)],material));
+        }
+      }
+    }
+    return result;
+  }
+
   static List<StairSolid> railings(
     ArchitectStair stair, {
     required ArchitectStorey storey,
@@ -396,6 +482,7 @@ class ArchitectStairMesh {
     StairSolidMaterial.concrete => concreteColor,
     StairSolidMaterial.finish => finishColor,
     StairSolidMaterial.metal => metalColor,
+    StairSolidMaterial.timber => const Color(0xFFB58A59),
   };
   static List<(int, int, int)> triangulate(List<Offset> input) {
     final ids = List<int>.generate(input.length, (i) => i);

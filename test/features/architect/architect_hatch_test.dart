@@ -81,9 +81,9 @@ ArchitectProject fixture([
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
-    'Ten localized presets retain distinct vector definitions and old projects load',
+    'Twelve localized presets retain distinct vector definitions and old projects load',
     () async {
-      expect(ArchitectHatchPattern.presets, hasLength(10));
+      expect(ArchitectHatchPattern.presets, hasLength(12));
       final definitions = <String>{};
       for (final p in ArchitectHatchPattern.presets) {
         p.validate();
@@ -100,7 +100,7 @@ void main() {
           expect(p.label(l), isNotEmpty);
         }
       }
-      expect(definitions, hasLength(10));
+      expect(definitions, hasLength(12));
       final old = fixture([]).toJson()..remove('hatchPatterns');
       expect(ArchitectProject.fromJson(old).hatchPatterns, isEmpty);
     },

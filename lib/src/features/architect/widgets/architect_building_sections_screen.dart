@@ -1,3 +1,6 @@
+import '../rendering/architect_hatch_geometry.dart';
+import 'architect_projection_drawing_menu.dart';
+import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 import '../rendering/architect_vector_scene.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -22,11 +25,13 @@ class ArchitectBuildingSectionsScreen extends StatefulWidget {
   final ArchitectCommandController controller;
   final String? initialSelectedId;
   final ValueChanged<String?>? onViewSelected;
+  final ValueChanged<ArchitectTool>? onDraftRequested;
   const ArchitectBuildingSectionsScreen({
     super.key,
     required this.controller,
     this.initialSelectedId,
     this.onViewSelected,
+    this.onDraftRequested,
   });
   @override
   State<ArchitectBuildingSectionsScreen> createState() =>
@@ -573,6 +578,11 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
       appBar: AppBar(
         title: Text(l.buildingSections),
         actions: [
+          if (value != null && widget.onDraftRequested != null)
+            ArchitectProjectionDrawingMenu(onSelected: (tool) {
+              widget.onDraftRequested!(tool);
+              Navigator.pop(context);
+            }),
           IconButton(
             tooltip: l.architectZoneUndoAction,
             onPressed: widget.controller.canUndo ? historyAction : null,
@@ -1284,10 +1294,6 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
       final isSelectedRoof =
           drawing.selectedRoofId != null &&
           region.slabId == drawing.selectedRoofId;
-      final fillColor =
-          region.customFillColor ??
-          ArchitectSlabGeometry.materialColor(region.material);
-      canvas.drawPath(path, Paint()..color = fillColor.withValues(alpha: .72));
       canvas.drawPath(
         path,
         Paint()
@@ -1300,7 +1306,14 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
                     ? 1.1
                     : .65),
       );
-      if (region.timberCrossSectionPolygon != null &&
+      if (region.hatchPattern != null) {
+        canvas.save(); canvas.clipPath(path);
+        canvas.drawPath(ArchitectHatchGeometry.path(boundary:path,
+          pattern:region.hatchPattern!,unitsPerMm:ArchitectTextScope.current==null?3:
+            ArchitectTextScope.current!.denominator/1000*scale),
+          Paint()..style=PaintingStyle.stroke..color=color..strokeWidth=.65);
+        canvas.restore();
+      } else if (region.timberCrossSectionPolygon != null &&
           region.timberCrossSectionPolygon!.length == 4) {
         final pts = region.timberCrossSectionPolygon!.map(p).toList();
         final diagPaint = Paint()

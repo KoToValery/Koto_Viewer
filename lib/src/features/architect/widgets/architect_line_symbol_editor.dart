@@ -34,6 +34,7 @@ class ArchitectLineSymbolEditor extends StatelessWidget {
     final strokes = await showDialog<List<List<Offset>>>(
       context: context,
       builder: (_) => ArchitectLineSymbolSketch(
+        previewSizeMm:value?.sizeMm??4,previewSpacingMm:value?.spacingMm??8,
         initial: value?.shape == ArchitectLineSymbolShape.custom
             ? value!.strokes
             : const [],

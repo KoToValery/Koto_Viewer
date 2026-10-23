@@ -277,6 +277,12 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(l.stairLegacy),
                 ),
+              dropdown('construction', l.stairConstruction, d.construction,
+                StairConstruction.values, (v) => switch(v) {
+                  StairConstruction.concrete => l.architectMaterialConcrete,
+                  StairConstruction.steel => l.stairSteel,
+                  StairConstruction.timber => l.architectMaterialTimber,
+                }, (v) => update(d.copyWith(construction: v))),
               Row(
                 children: [
                   Expanded(
@@ -651,7 +657,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                     minimum: .1,
                     maximum: 2,
                   ),
-                  number(
+                  if (d.construction == StairConstruction.concrete) number(
                     'concrete',
                     l.stairConcreteThickness,
                     d.concreteThickness,
@@ -659,7 +665,15 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                     minimum: .01,
                     maximum: 1,
                   ),
-                  number(
+                  if (d.construction != StairConstruction.concrete) ...[
+                    number('tread-thickness', l.stairTreadThickness, d.treadThickness,
+                      (v) => update(d.copyWith(treadThickness: v)), minimum: .005, maximum: .2),
+                    number('stringer-width', l.stairStringerWidth, d.stringerWidth,
+                      (v) => update(d.copyWith(stringerWidth: v)), minimum: .01, maximum: .3),
+                    number('stringer-depth', l.stairStringerDepth, d.stringerDepth,
+                      (v) => update(d.copyWith(stringerDepth: v)), minimum: d.riser + .001, maximum: 1),
+                  ],
+                  if (d.construction == StairConstruction.concrete) number(
                     'finish',
                     l.stairFinishThickness,
                     d.finishThickness,

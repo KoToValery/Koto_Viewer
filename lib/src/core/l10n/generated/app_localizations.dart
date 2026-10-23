@@ -13384,6 +13384,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Click beside the marker to set the jog station and offset. Repeat Add jog for more segments.'**
   String get architectViewStepHint;
+
+  /// No description provided for @stairConstruction.
+  ///
+  /// In en, this message translates to:
+  /// **'Construction'**
+  String get stairConstruction;
+
+  /// No description provided for @stairSteel.
+  ///
+  /// In en, this message translates to:
+  /// **'Steel'**
+  String get stairSteel;
+
+  /// No description provided for @stairTreadThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Tread thickness'**
+  String get stairTreadThickness;
+
+  /// No description provided for @stairStringerWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Stringer width'**
+  String get stairStringerWidth;
+
+  /// No description provided for @stairStringerDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Stringer depth'**
+  String get stairStringerDepth;
+
+  /// No description provided for @architectHatchWood.
+  ///
+  /// In en, this message translates to:
+  /// **'Wood'**
+  String get architectHatchWood;
+
+  /// No description provided for @architectHatchMetal.
+  ///
+  /// In en, this message translates to:
+  /// **'Metal'**
+  String get architectHatchMetal;
+
+  /// No description provided for @architectHatchGenerator.
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern generator'**
+  String get architectHatchGenerator;
+
+  /// No description provided for @architectHatchGeneratorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw a motif with connected lines. Set its size and row spacing; the preview updates as you draw.'**
+  String get architectHatchGeneratorHint;
+
+  /// No description provided for @architectSketchOrtho.
+  ///
+  /// In en, this message translates to:
+  /// **'Orthogonal lines'**
+  String get architectSketchOrtho;
+
+  /// No description provided for @architectSketchPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat preview'**
+  String get architectSketchPreview;
+
+  /// No description provided for @architectTerrain.
+  ///
+  /// In en, this message translates to:
+  /// **'Terrain line'**
+  String get architectTerrain;
+
+  /// No description provided for @architectTerrainHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Place points from left to right. Confirm to hide the building below this line in this elevation.'**
+  String get architectTerrainHint;
+
+  /// No description provided for @architectRoofPitchEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Roof pitch'**
+  String get architectRoofPitchEdit;
+
+  /// No description provided for @architectRoofPitchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag the green point to change pitch. Tap the roof to choose the fixed axis, parallel to the eaves.'**
+  String get architectRoofPitchHint;
+
+  /// No description provided for @architectRoofPitchAxis.
+  ///
+  /// In en, this message translates to:
+  /// **'Use eaves axis'**
+  String get architectRoofPitchAxis;
+
+  /// No description provided for @architectStrokeWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Line weight'**
+  String get architectStrokeWeight;
 }
 
 class _AppLocalizationsDelegate

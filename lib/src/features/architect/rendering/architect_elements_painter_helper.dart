@@ -145,7 +145,7 @@ class ArchitectElementsPainterHelper {
       }
       path.close();
 
-      canvas.drawPath(path, slabFillPaint);
+      if (isSelected) canvas.drawPath(path, slabFillPaint);
       canvas.drawPath(path, border);
 
       if (ArchitectTextScope.current != null || zoomScale > 12.0) {
@@ -214,12 +214,6 @@ class ArchitectElementsPainterHelper {
         ..lineTo(corners[3].dx, corners[3].dy)
         ..close();
 
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = const Color(0x18000000)
-          ..style = PaintingStyle.fill,
-      );
       canvas.drawPath(path, paint);
 
       // Centerline
@@ -229,8 +223,11 @@ class ArchitectElementsPainterHelper {
         final mid = (beam.startPoint + beam.endPoint) / 2.0;
         canvas.save();
         canvas.translate(mid.dx, mid.dy);
-        canvas.scale(ArchitectPaperStyle.annotationScale);
-        final tp = ArchitectTextPainter(elementId: beam.id, role: ArchitectAnnotationRole.ordinary, modelScale: ArchitectPaperStyle.annotationScale,
+        canvas.rotate(ArchitectDimensionLayout.textAngle(beam.unitVector));
+        final scope = ArchitectTextScope.current;
+        final fontSize = scope?.fontSize(beam.id, ArchitectAnnotationRole.ordinary) ??
+            11 * ArchitectPaperStyle.annotationScale;
+        final tp = ArchitectTextPainter(elementId: beam.id, role: ArchitectAnnotationRole.ordinary, modelScale: 1,
           text: TextSpan(
             text: beam.label,
             style: TextStyle(
@@ -238,12 +235,17 @@ class ArchitectElementsPainterHelper {
                   ? const Color(0xFF00E5FF)
                   : palette.foreground(const Color(0xFF263238)),
               fontFamily: 'Roboto',
-              fontSize: 11.0,
+              fontSize: fontSize,
               fontWeight: FontWeight.bold,
             ),
           ),
           textDirection: TextDirection.ltr,
         )..layout();
+        // Like column lettering, fit the designation to the physical element.
+        final fit = math.min(1.0, math.min(
+          beam.width * .8 / math.max(tp.height, .0001),
+          beam.length * .8 / math.max(tp.width, .0001)));
+        canvas.scale(fit);
         tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
         canvas.restore();
       }
@@ -316,7 +318,7 @@ class ArchitectElementsPainterHelper {
       canvas.drawPath(
         path,
         Paint()
-          ..color = const Color(0x1AFF5722)
+          ..color = Colors.transparent
           ..style = PaintingStyle.fill,
       );
       canvas.drawPath(path, pBorder);
@@ -725,12 +727,6 @@ class ArchitectElementsPainterHelper {
       canvas.save();
       canvas.translate(comp.position.dx, comp.position.dy);
       canvas.rotate(comp.rotation);
-
-      // 1. Whiteout mask underneath (print-first clean style, masks floor hatch)
-      final maskPaint = Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.fill;
-      canvas.drawPath(geo.block2d.boundsMask, maskPaint);
 
       // 2. Outer outline
       final outlinePaint = Paint()

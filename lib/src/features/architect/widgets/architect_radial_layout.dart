@@ -35,12 +35,48 @@ class ArchitectRadialLayout {
     bool hasTitle = false,
     List<Rect> elementBounds = const [],
   }) {
+    final rings = _rings(size, center, count, hasTitle, elementBounds);
+    if (rings != null) return rings;
     final result = _fit(size, center, count, hasTitle, elementBounds);
     if (result != null) return result;
     // Very short viewports keep touch targets usable and scroll the fan.
     final tall = Size(size.width, math.max(size.height, 640));
     final fallback = _fit(tall, center, count, hasTitle, elementBounds);
     return fallback ?? ArchitectRadialLayout(const [], Rect.zero);
+  }
+
+  static ArchitectRadialLayout? _rings(Size size, Offset center, int count,
+      bool hasTitle, List<Rect> elements) {
+    if (count == 0) return null;
+    const button = 52.0, gap = 8.0;
+    final available = (Offset.zero & size).deflate(8);
+    final targets = <Offset>[];
+    var remaining = count, ring = 0;
+    while (remaining > 0) {
+      final radius = 72.0 + ring * (button + gap);
+      final capacity = (math.pi / math.asin((button + gap) / (2 * radius))).floor();
+      final n = math.min(remaining, capacity);
+      for (var i = 0; i < n; i++) {
+        final angle = -math.pi / 2 + i * math.pi * 2 / n;
+        targets.add(center + Offset(math.cos(angle), math.sin(angle)) * radius);
+      }
+      remaining -= n;
+      ring++;
+    }
+    final badge = Rect.fromCenter(center: center,
+      width: hasTitle ? 80 : 6, height: hasTitle ? 28 : 6);
+    var bounds = badge;
+    for (final target in targets) {
+      final rect = Rect.fromCenter(center: target, width: button, height: button);
+      if (!available.contains(rect.topLeft) || !available.contains(rect.bottomRight) ||
+          rect.overlaps(badge) ||
+          (hasTitle && elements.any((e) => rect.overlaps(e.inflate(4))))) {
+        return null;
+      }
+      bounds = bounds.expandToInclude(rect);
+    }
+    if (elements.any((e) => hasTitle && badge.overlaps(e))) return null;
+    return ArchitectRadialLayout(targets, badge, bounds, button, size.height);
   }
 
   static ArchitectRadialLayout? _fit(
@@ -81,12 +117,12 @@ class ArchitectRadialLayout {
         var remaining = count;
         var radius = button * 1.35;
         while (remaining > 0) {
-          final step = 2 * math.asin((button + 6) / (2 * radius));
+          final step = 2 * math.asin((button + 8) / (2 * radius));
           final capacity = (sweep / step).floor() + 1;
           final n = math.min(remaining, capacity);
           arcs.add((radius, n, step));
           remaining -= n;
-          radius += button + 6;
+          radius += button + 8;
         }
         for (var direction = 0; direction < 24; direction++) {
           final angle = -math.pi / 2 + direction * math.pi / 12;

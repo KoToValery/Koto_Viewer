@@ -160,7 +160,7 @@ class _ArchitectElementPropertiesDialogState
         records.every((e) => e.containsKey('referenceLine'))
             ? l.architectPropertyTotal
             : l.architectPropertyThickness,
-      'strokeWidth' => l.architectPropertyThickness,
+      'strokeWidth' => l.architectStrokeWeight,
       'coreThickness' => l.architectWallCoreThickness,
       'insulationThicknessOverride' => l.architectPropertyThickness,
       'rotationDeg' => l.architectPropertyAngle,
@@ -177,7 +177,8 @@ class _ArchitectElementPropertiesDialogState
     };
   }
 
-  bool metric(String key) => !{'rotationDeg', 'stepCount', 'hatchScale', 'hatchAngle'}.contains(key);
+  // Legacy stroke weights are shown as paper mm, independently of model units.
+  bool metric(String key) => !{'strokeWidth', 'rotationDeg', 'stepCount', 'hatchScale', 'hatchAngle'}.contains(key);
   double? fieldValue(String key) {
     if (key == 'height' &&
         records.every((e) => e.containsKey('referenceLine')) &&
@@ -201,11 +202,13 @@ class _ArchitectElementPropertiesDialogState
   Future<void> editNumber(String key) async {
     final unit = metric(key)
         ? widget.project.units.symbol
+        : key == 'strokeWidth' ? 'mm'
         : key == 'rotationDeg' || key == 'hatchAngle'
         ? '°'
         : '';
     final value = fieldValue(key) ?? 0;
-    var draft = metric(key) ? widget.project.units.toUnit(value) : value;
+    var draft = key == 'strokeWidth' ? value / ArchitectCadPrimitive.strokeUnitsPerPaperMm
+        : metric(key) ? widget.project.units.toUnit(value) : value;
     await showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
@@ -214,7 +217,7 @@ class _ArchitectElementPropertiesDialogState
           child: ArchitectWallDraftingPanel(
             length: draft,
             unit: unit,
-            decimals: metric(key) ? widget.project.distanceDecimals : key == 'stepCount' ? 0 : 2,
+            decimals: metric(key) ? widget.project.distanceDecimals : key == 'strokeWidth' ? 3 : key == 'stepCount' ? 0 : 2,
             title: label(key),
             endLabel: context.l10n.save,
             keypadInitiallyOpen: true,
@@ -229,9 +232,9 @@ class _ArchitectElementPropertiesDialogState
             onLength: (v) => draft = v,
             onEnd: () {
               setState(
-                () => values[key] = metric(key)
-                    ? widget.project.units.fromUnit(draft)
-                    : draft,
+                () => values[key] = key == 'strokeWidth'
+                    ? draft * ArchitectCadPrimitive.strokeUnitsPerPaperMm
+                    : metric(key) ? widget.project.units.fromUnit(draft) : draft,
               );
               Navigator.pop(ctx);
             },
@@ -463,6 +466,7 @@ class _ArchitectElementPropertiesDialogState
           ? '—'
           : metric(key)
           ? widget.project.formatLength(fieldValue(key)!)
+          : key == 'strokeWidth' ? '${(fieldValue(key)! / ArchitectCadPrimitive.strokeUnitsPerPaperMm).toStringAsFixed(3)} mm'
           : fieldValue(key)!.toStringAsFixed(key == 'stepCount' ? 0 : 1),
     ),
     onTap:
@@ -839,6 +843,31 @@ class _ArchitectElementPropertiesDialogState
                     _lineStyle = style;
                     texts['lineStyle'] = jsonEncode(style.toJson());
                   }),
+                ),
+              if (_supportsLineStyle)
+                TextButton.icon(
+                  key: const ValueKey('architect-property-line-pattern'),
+                  icon: const Icon(Icons.tune),
+                  label: Text(l.architectLinePatternEditor),
+                  onPressed: () async {
+                    final current = _lineStyle ?? ArchitectLineStyle.presets[1];
+                    final edited = await showDialog<ArchitectLineStyle>(
+                      context: context,
+                      builder: (_) => ArchitectLinePatternEditor(initial:
+                        current.isPreset ? ArchitectLineStyle(
+                          id: 'custom-${DateTime.now().microsecondsSinceEpoch}',
+                          name: current.label(l),
+                          segmentsMm: current.isSolid ? const [3, 1.5] : current.segmentsMm,
+                          symbol: current.symbol,
+                        ) : current),
+                    );
+                    if (edited != null && mounted) {
+                      setState(() {
+                        _lineStyle = edited;
+                        texts['lineStyle'] = jsonEncode(edited.toJson());
+                      });
+                    }
+                  },
                 ),
               if (!walls && !isZone)
                 for (final key in fields.keys) numberField(key, false),

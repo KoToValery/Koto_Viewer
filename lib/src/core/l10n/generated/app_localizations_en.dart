@@ -7476,4 +7476,58 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectViewStepHint =>
       'Click beside the marker to set the jog station and offset. Repeat Add jog for more segments.';
+
+  @override
+  String get stairConstruction => 'Construction';
+
+  @override
+  String get stairSteel => 'Steel';
+
+  @override
+  String get stairTreadThickness => 'Tread thickness';
+
+  @override
+  String get stairStringerWidth => 'Stringer width';
+
+  @override
+  String get stairStringerDepth => 'Stringer depth';
+
+  @override
+  String get architectHatchWood => 'Wood';
+
+  @override
+  String get architectHatchMetal => 'Metal';
+
+  @override
+  String get architectHatchGenerator => 'Pattern generator';
+
+  @override
+  String get architectHatchGeneratorHint =>
+      'Draw a motif with connected lines. Set its size and row spacing; the preview updates as you draw.';
+
+  @override
+  String get architectSketchOrtho => 'Orthogonal lines';
+
+  @override
+  String get architectSketchPreview => 'Repeat preview';
+
+  @override
+  String get architectTerrain => 'Terrain line';
+
+  @override
+  String get architectTerrainHint =>
+      'Place points from left to right. Confirm to hide the building below this line in this elevation.';
+
+  @override
+  String get architectRoofPitchEdit => 'Roof pitch';
+
+  @override
+  String get architectRoofPitchHint =>
+      'Drag the green point to change pitch. Tap the roof to choose the fixed axis, parallel to the eaves.';
+
+  @override
+  String get architectRoofPitchAxis => 'Use eaves axis';
+
+  @override
+  String get architectStrokeWeight => 'Line weight';
 }

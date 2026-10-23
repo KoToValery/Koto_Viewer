@@ -4588,5 +4588,22 @@
   "architectViewEditHint": "Drag endpoints, jogs or the far boundary, then apply.",
   "architectViewDepthBehindSteps": "Place the far boundary beyond every segment.",
   "architectViewStraight": "Straighten",
-  "architectViewStepHint": "Click beside the marker to set the jog station and offset. Repeat Add jog for more segments."
+  "architectViewStepHint": "Click beside the marker to set the jog station and offset. Repeat Add jog for more segments.",
+  "stairConstruction": "Construction",
+  "stairSteel": "Steel",
+  "stairTreadThickness": "Tread thickness",
+  "stairStringerWidth": "Stringer width",
+  "stairStringerDepth": "Stringer depth",
+  "architectHatchWood": "Wood",
+  "architectHatchMetal": "Metal",
+  "architectHatchGenerator": "Pattern generator",
+  "architectHatchGeneratorHint": "Draw a motif with connected lines. Set its size and row spacing; the preview updates as you draw.",
+  "architectSketchOrtho": "Orthogonal lines",
+  "architectSketchPreview": "Repeat preview",
+  "architectTerrain": "Terrain line",
+  "architectTerrainHint": "Place points from left to right. Confirm to hide the building below this line in this elevation.",
+  "architectRoofPitchEdit": "Roof pitch",
+  "architectRoofPitchHint": "Drag the green point to change pitch. Tap the roof to choose the fixed axis, parallel to the eaves.",
+  "architectRoofPitchAxis": "Use eaves axis",
+  "architectStrokeWeight": "Line weight"
 }

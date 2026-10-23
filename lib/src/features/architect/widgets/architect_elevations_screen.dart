@@ -1,3 +1,7 @@
+import '../rendering/architect_hatch_geometry.dart';
+import '../models/architect_hatch_pattern.dart';
+import 'architect_projection_drawing_menu.dart';
+import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 import '../rendering/architect_vector_scene.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -21,11 +25,15 @@ class ArchitectElevationsScreen extends StatefulWidget {
   final ArchitectCommandController controller;
   final String? initialSelectedId;
   final ValueChanged<String?>? onViewSelected;
+  final ValueChanged<ArchitectTool>? onDraftRequested;
+  final VoidCallback? onTerrainRequested;
   const ArchitectElevationsScreen({
     super.key,
     required this.controller,
     this.initialSelectedId,
     this.onViewSelected,
+    this.onDraftRequested,
+    this.onTerrainRequested,
   });
   @override
   State<ArchitectElevationsScreen> createState() => _ElevationsState();
@@ -233,6 +241,13 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
       appBar: AppBar(
         title: Text(l.architectFacades),
         actions: [
+          if (value != null && widget.onDraftRequested != null)
+            ArchitectProjectionDrawingMenu(onTerrain:widget.onTerrainRequested==null?null:() {
+              widget.onTerrainRequested!();Navigator.pop(context);
+            },onSelected: (tool) {
+              widget.onDraftRequested!(tool);
+              Navigator.pop(context);
+            }),
           IconButton(
             key: const ValueKey('architect-facade-new'),
             tooltip: l.architectFacadeNew,
@@ -433,7 +448,7 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
                       .9;
                   return ColoredBox(
                     color: Colors.white,
-                    child: geometry.faces.isEmpty
+                    child: geometry.faces.isEmpty && geometry.terrain.isEmpty
                         ? Center(
                             child: Text(
                               l.architectFacadeEmpty,
@@ -551,7 +566,7 @@ class ArchitectFacadePainter extends CustomPainter {
             .map((e) => e.key),
         'elevationFace',
       );
-      canvas.drawPath(face.transform(matrix.storage), Paint()..color = fill);
+      // Visibility has already removed hidden faces; keep the paper transparent.
     }
     for (final face in geometry.faces) {
       canvas.drawPath(
@@ -580,6 +595,21 @@ class ArchitectFacadePainter extends CustomPainter {
         }
       }
       canvas.restore();
+    }
+    if (geometry.terrain.length >= 2) {
+      final ground=geometry.terrain;
+      final band=Path()..addPolygon([...ground,
+        for(final p in ground.reversed) p-const Offset(0,.35)],true);
+      final screenBand=band.transform(matrix.storage);
+      canvas.save(); canvas.clipPath(screenBand);
+      canvas.drawPath(ArchitectHatchGeometry.path(boundary:screenBand,
+        pattern:ArchitectHatchPattern.presets.firstWhere((p)=>p.id=='earth'),
+        unitsPerMm:ArchitectTextScope.current==null ? 3 :
+          ArchitectTextScope.current!.denominator/1000*scale),
+        Paint()..color=stroke..style=PaintingStyle.stroke..strokeWidth=.65);
+      canvas.restore();
+      canvas.drawPath((Path()..addPolygon(ground,false)).transform(matrix.storage),
+        Paint()..color=stroke..style=PaintingStyle.stroke..strokeWidth=1.3);
     }
     final labels = <Rect>[];
     Offset screen(Offset p) => MatrixUtils.transformPoint(matrix, p);
@@ -615,7 +645,7 @@ class ArchitectFacadePainter extends CustomPainter {
         box = box.shift(Offset(0, -box.height - 2));
       }
       labels.add(box);
-      canvas.drawRect(box, Paint()..color = fill);
+
       text.paint(canvas, box.topLeft + const Offset(3, 1));
     }
   }

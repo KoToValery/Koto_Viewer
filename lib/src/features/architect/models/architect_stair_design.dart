@@ -3,6 +3,8 @@ import 'dart:ui';
 
 enum StairShape { straight, quarterTurn, halfTurn, spiral, spiralOverlap }
 
+enum StairConstruction { concrete, steel, timber }
+
 enum StairCode { bulgaria, geometryOnly }
 
 enum StairUse { private, common, public, assembly, outdoorRoute }
@@ -41,6 +43,8 @@ class ArchitectStairDesign {
   final bool showLabel;
   final double guardHeight;
   final double handrailHeight;
+  final StairConstruction construction;
+  final double treadThickness, stringerWidth, stringerDepth;
   final double concreteThickness;
   final double finishThickness;
   final double nosingProjection;
@@ -70,6 +74,10 @@ class ArchitectStairDesign {
     this.showLabel = true,
     this.guardHeight = 1.2,
     this.handrailHeight = .9,
+    this.construction = StairConstruction.concrete,
+    this.treadThickness = .04,
+    this.stringerWidth = .06,
+    this.stringerDepth = .24,
     this.concreteThickness = .15,
     this.finishThickness = .02,
     this.nosingProjection = .03,
@@ -222,6 +230,7 @@ class ArchitectStairDesign {
       guardHeight,
       handrailHeight,
       concreteThickness,
+      treadThickness, stringerWidth, stringerDepth,
     ]) {
       if (!value.isFinite || value <= 0) {
         throw ArgumentError('Invalid stair dimension');
@@ -233,6 +242,8 @@ class ArchitectStairDesign {
         finishThickness > .15 ||
         nosingProjection < 0 ||
         nosingProjection > .1 ||
+        treadThickness > .2 || stringerWidth > .3 || stringerDepth > 1 ||
+        (construction != StairConstruction.concrete && stringerDepth <= riser) ||
         concreteThickness > 1 ||
         guardHeight > 2 ||
         handrailHeight > guardHeight) {
@@ -287,6 +298,8 @@ class ArchitectStairDesign {
     bool? showLabel,
     double? guardHeight,
     double? handrailHeight,
+    StairConstruction? construction,
+    double? treadThickness, stringerWidth, stringerDepth,
     double? concreteThickness,
     double? finishThickness,
     double? nosingProjection,
@@ -329,6 +342,10 @@ class ArchitectStairDesign {
     showLabel: showLabel ?? this.showLabel,
     guardHeight: guardHeight ?? this.guardHeight,
     handrailHeight: handrailHeight ?? this.handrailHeight,
+    construction: construction ?? this.construction,
+    treadThickness: treadThickness ?? this.treadThickness,
+    stringerWidth: stringerWidth ?? this.stringerWidth,
+    stringerDepth: stringerDepth ?? this.stringerDepth,
     concreteThickness: concreteThickness ?? this.concreteThickness,
     finishThickness: finishThickness ?? this.finishThickness,
     nosingProjection: nosingProjection ?? this.nosingProjection,
@@ -359,6 +376,10 @@ class ArchitectStairDesign {
     'showLabel': showLabel,
     'guardHeight': guardHeight,
     'handrailHeight': handrailHeight,
+    'construction': construction.name,
+    'treadThickness': treadThickness,
+    'stringerWidth': stringerWidth,
+    'stringerDepth': stringerDepth,
     'concreteThickness': concreteThickness,
     'finishThickness': finishThickness,
     'nosingProjection': nosingProjection,
@@ -395,6 +416,10 @@ class ArchitectStairDesign {
       showLabel: json['showLabel'] as bool? ?? true,
       guardHeight: (json['guardHeight'] as num?)?.toDouble() ?? 1.2,
       handrailHeight: (json['handrailHeight'] as num?)?.toDouble() ?? .9,
+      construction: readEnum(StairConstruction.values, 'construction', StairConstruction.concrete),
+      treadThickness: (json['treadThickness'] as num?)?.toDouble() ?? .04,
+      stringerWidth: (json['stringerWidth'] as num?)?.toDouble() ?? .06,
+      stringerDepth: (json['stringerDepth'] as num?)?.toDouble() ?? .24,
       concreteThickness: (json['concreteThickness'] as num?)?.toDouble() ?? .15,
       finishThickness: (json['finishThickness'] as num?)?.toDouble() ?? .02,
       nosingProjection: (json['nosingProjection'] as num?)?.toDouble() ?? .03,

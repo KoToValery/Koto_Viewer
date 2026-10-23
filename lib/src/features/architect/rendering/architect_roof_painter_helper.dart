@@ -96,18 +96,6 @@ class ArchitectRoofPainterHelper {
         _ => const Color(0xFFC85A32),
       };
 
-      // 1. Subtle translucent fill so walls underneath remain visible
-      // Lower level roofs use softer alpha
-      final fillAlpha = isGhost
-          ? 0.05
-          : (isLowerLevel ? 0.04 : (isSelected ? 0.12 : 0.06));
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = baseColor.withValues(alpha: fillAlpha)
-          ..style = PaintingStyle.fill,
-      );
-
       // 2. Architectural roof hatch (tile course lines perpendicular to slope, or seam lines along slope)
       if (!isGhost && scale > 6.0) {
         canvas.save();
@@ -333,7 +321,7 @@ class ArchitectRoofPainterHelper {
       ),
       Radius.circular(4.0 / scale),
     );
-    canvas.drawRRect(bgRect, Paint()..color = ArchitectPaperStyle.paper);
+
     if (isLowerLevel) {
       canvas.drawRRect(
         bgRect,

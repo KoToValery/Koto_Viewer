@@ -1,3 +1,4 @@
+import '../models/architect_hatch_pattern.dart';
 import '../rendering/architect_roof_drainage_mesh.dart';
 import 'dart:math' as math;
 import 'dart:ui';
@@ -26,6 +27,7 @@ class ArchitectSectionRegion {
   final bool roof;
   final List<Offset>? timberCrossSectionPolygon;
   final Color? customFillColor;
+  final ArchitectHatchPattern? hatchPattern;
 
   const ArchitectSectionRegion(
     this.sourceId,
@@ -35,6 +37,7 @@ class ArchitectSectionRegion {
     this.roof = false,
     this.timberCrossSectionPolygon,
     this.customFillColor,
+    this.hatchPattern,
   });
 }
 
@@ -60,7 +63,7 @@ class ArchitectBuildingSection {
       _drawingCache[this] ??= _mergeDrawingRegions();
   List<ArchitectSectionRegion> _mergeDrawingRegions() {
     final result = <ArchitectSectionRegion>[],
-        indices = <(SlabMaterial, int?, bool), int>{};
+        indices = <(SlabMaterial, int?, bool, ArchitectHatchPattern?), int>{};
     for (final region in regions) {
       if (region.roof || region.timberCrossSectionPolygon != null) {
         result.add(region);
@@ -70,6 +73,7 @@ class ArchitectBuildingSection {
             region.material,
             region.customFillColor?.toARGB32(),
             region.slab,
+            region.hatchPattern,
           ),
           index = indices[key];
       if (index == null) {
@@ -84,6 +88,7 @@ class ArchitectBuildingSection {
         Path.combine(PathOperation.union, previous.path, region.path),
         slab: previous.slab,
         customFillColor: previous.customFillColor,
+        hatchPattern: previous.hatchPattern,
       );
     }
     return result;
@@ -183,6 +188,7 @@ class ArchitectBuildingSection {
               slab: r.slab,
               roof: r.roof,
               customFillColor: r.customFillColor,
+              hatchPattern: r.hatchPattern,
               timberCrossSectionPolygon: r.timberCrossSectionPolygon
                   ?.map((p) => p + shift)
                   .toList(),
@@ -580,10 +586,16 @@ class ArchitectBuildingSection {
             regions.add(
               ArchitectSectionRegion(
                 stair.id,
-                solid.material == StairSolidMaterial.concrete
-                    ? SlabMaterial.concrete
-                    : SlabMaterial.tile,
+                solid.material == StairSolidMaterial.concrete ? SlabMaterial.concrete
+                    : solid.material == StairSolidMaterial.timber ? SlabMaterial.parquet : SlabMaterial.custom,
                 stairPath,
+                hatchPattern: ArchitectHatchPattern.presets.firstWhere((p)=>p.id ==
+                  switch(solid.material) {
+                    StairSolidMaterial.concrete => 'concrete',
+                    StairSolidMaterial.timber => 'wood',
+                    StairSolidMaterial.metal => 'metal',
+                    StairSolidMaterial.finish => 'diagonal',
+                  }),
               ),
             );
           }

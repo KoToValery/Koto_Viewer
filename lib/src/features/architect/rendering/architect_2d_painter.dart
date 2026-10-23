@@ -1146,7 +1146,6 @@ class Architect2dPainter extends CustomPainter {
     }
     for(final material in layers.materials.where((r)=>r.wall.layers.isNotEmpty||r.wall.plinth.enabled)) {
       final region=material.path;
-      canvas.drawPath(region,Paint()..color=material.layer.material.color.withValues(alpha:.06));
       if(material.layer.role==ArchitectLayerRole.core) {
         ArchitectWallHatch.paint(canvas,material.wall,region,zoomScale,hatchColor,material:WallCoreMaterial.values.where((m)=>m.name==material.layer.material.name).firstOrNull);
       }

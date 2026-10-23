@@ -40,6 +40,8 @@ class ArchitectElevation {
   final double? viewDepth;
   final List<Offset> steps;
   final ArchitectViewDrawing drawing;
+  /// Elevation-view coordinates: horizontal metres and positive elevation.
+  final List<Offset> terrain;
   const ArchitectElevation({
     required this.id,
     required this.start,
@@ -48,6 +50,7 @@ class ArchitectElevation {
     this.viewDepth,
     this.steps = const [],
     this.drawing = const ArchitectViewDrawing(),
+    this.terrain = const [],
   });
   double get length => (end - start).distance;
   Offset get axis =>
@@ -72,6 +75,7 @@ class ArchitectElevation {
     double? viewDepth,
     bool clearViewDepth = false,
     List<Offset>? steps,
+    List<Offset>? terrain,
   }) => ArchitectElevation(
     id: id,
     start: start ?? this.start,
@@ -80,6 +84,7 @@ class ArchitectElevation {
     drawing: drawing ?? this.drawing,
     viewDepth: clearViewDepth ? null : viewDepth ?? this.viewDepth,
     steps: steps ?? this.steps,
+    terrain: terrain ?? this.terrain,
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -89,6 +94,7 @@ class ArchitectElevation {
     'viewDepth': viewDepth,
     'steps': steps.map(sectionPointJson).toList(),
     'drawing': drawing.toJson(),
+    'terrain': terrain.map(sectionPointJson).toList(),
   };
   factory ArchitectElevation.fromJson(Map<String, dynamic> json) =>
       ArchitectElevation(
@@ -103,5 +109,6 @@ class ArchitectElevation {
         drawing: ArchitectViewDrawing.fromJson(
           Map<String, dynamic>.from(json['drawing'] as Map? ?? {}),
         ),
+        terrain: [for (final p in json['terrain'] as List? ?? []) sectionPoint(p as Map)],
       );
 }

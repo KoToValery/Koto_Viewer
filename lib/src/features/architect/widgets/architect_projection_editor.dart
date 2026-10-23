@@ -1,3 +1,4 @@
+import 'architect_roof_pitch_editor.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart';
@@ -64,6 +65,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   Offset delta = Offset.zero;
   double lastScale = 1;
   bool roofSnapEnabled = true;
+  bool pitchEditing = false;
   ArchitectProjectionSnap? roofSnap;
   Offset? snapContact;
   Path? dragPath;
@@ -105,6 +107,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
     super.didUpdateWidget(oldWidget);
     if (id != null && (!widget.paths.containsKey(id) || selected == null)) {
       id = null;
+      pitchEditing = false;
       delta = Offset.zero;
       _errorTimer?.cancel();
       error = null;
@@ -320,6 +323,17 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   @override
   Widget build(BuildContext context) {
     final ref = selected, l = context.l10n;
+    if (pitchEditing && ref?.kind == ArchitectProjectionKind.roof) {
+      final roof=ref!.storey.roofs.firstWhere((r)=>r.id==ref.id);
+      return ArchitectRoofPitchEditor(roof:roof,elevation:ref.storey.elevation,
+        origin:widget.origin,right:widget.right,toView:widget.toView,toScreen:widget.toScreen,
+        onCancel:()=>setState(()=>pitchEditing=false),
+        onApply:(next) {
+          if(apply(()=>UpdateArchitectRoofPlane(storeyId:ref.storey.id,roof:next).apply(project))) {
+            setState(()=>pitchEditing=false);
+          }
+        });
+    }
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -525,6 +539,10 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                             onPressed: () => moveNumber(false),
                             icon: const Icon(Icons.swap_vert),
                           ),
+                          if (ref.kind == ArchitectProjectionKind.roof)
+                            IconButton(key:const ValueKey('projection-roof-pitch'),
+                              tooltip:l.architectRoofPitchEdit,icon:const Icon(Icons.rotate_right),
+                              onPressed:()=>setState(()=>pitchEditing=true)),
                           if (ref.kind == ArchitectProjectionKind.roof)
                             IconButton(
                               key: const ValueKey('projection-roof-snap'),

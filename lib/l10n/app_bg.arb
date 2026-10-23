@@ -2451,5 +2451,22 @@
   "architectViewEditHint": "Преместете краищата, чупките или далечната граница и приложете.",
   "architectViewDepthBehindSteps": "Поставете далечната граница след всички сегменти.",
   "architectViewStraight": "Изправи",
-  "architectViewStepHint": "Посочете точка до маркера за мястото и отместването на чупката. Повторете „Добави чупка“ за още сегменти."
+  "architectViewStepHint": "Посочете точка до маркера за мястото и отместването на чупката. Повторете „Добави чупка“ за още сегменти.",
+  "stairConstruction": "Конструкция",
+  "stairSteel": "Стомана",
+  "stairTreadThickness": "Дебелина на стъпалото",
+  "stairStringerWidth": "Ширина на косоура/тетивата",
+  "stairStringerDepth": "Височина на косоура/тетивата",
+  "architectHatchWood": "Дърво",
+  "architectHatchMetal": "Метал",
+  "architectHatchGenerator": "Генератор на модел",
+  "architectHatchGeneratorHint": "Начертай мотив с отсечки. Задай размер и разстояние между редовете; прегледът се обновява при чертане.",
+  "architectSketchOrtho": "Ортогонални линии",
+  "architectSketchPreview": "Преглед на повторението",
+  "architectTerrain": "Линия терен",
+  "architectTerrainHint": "Поставяй точки отляво надясно. Потвърди, за да скриеш сградата под линията в тази фасада.",
+  "architectRoofPitchEdit": "Наклон на покрив",
+  "architectRoofPitchHint": "Мести зелената точка за наклона. Натисни върху ската, за да избереш неподвижната ос, успоредна на стрехата.",
+  "architectRoofPitchAxis": "Ос при стрехата",
+  "architectStrokeWeight": "Дебелина на линия"
 }
