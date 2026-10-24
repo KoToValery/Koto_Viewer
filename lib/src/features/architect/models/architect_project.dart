@@ -8,6 +8,7 @@ import 'architect_slab_assembly.dart';
 import 'architect_roof.dart';
 export 'architect_roof.dart';
 import 'architect_section.dart';
+import 'architect_section_visibility.dart';
 import 'architect_elevation.dart';
 import '../../bim_editing/properties/bim_distance_unit.dart';
 export '../../bim_editing/properties/bim_distance_unit.dart';
@@ -23,6 +24,7 @@ import 'architect_wall_type.dart';
 import 'architect_zone.dart';
 import 'architect_fenestration_style.dart';
 import 'architect_component.dart';
+import 'architect_floor_drain.dart';
 export 'architect_component.dart';
 
 typedef ArchitectUnit = BimDistanceUnit;
@@ -55,7 +57,7 @@ class ArchitectStorey {
     ...roofs.map((e) => e.id), ...openings.map((e) => e.id),
     ...stairs.map((e) => e.id), ...dimensions.map((e) => e.id),
     ...elevationMarkers.map((e) => e.id), ...annotations.map((e) => e.id),
-    ...cadPrimitives.map((e) => e.id), ...components.map((e) => e.id),
+    ...cadPrimitives.map((e) => e.id), ...components.map((e) => e.id), ...floorDrains.map((e) => e.id),
     ...zones.where((e) => !e.isAutoBoundary).map((e) => e.id),
   };
   List<ArchitectElementGroup> get groups => _groups.isEmpty
@@ -90,6 +92,7 @@ class ArchitectStorey {
   final List<ArchitectAnnotation> annotations;
   final List<ArchitectCadPrimitive> cadPrimitives;
   final List<ArchitectComponentInstance> components;
+  final List<ArchitectFloorDrain> floorDrains;
   final Offset? zoneScheduleOrigin;
   final bool isRoof;
 
@@ -115,6 +118,7 @@ class ArchitectStorey {
     this.annotations = const [],
     this.cadPrimitives = const [],
     this.components = const [],
+    this.floorDrains = const [],
     this.zoneScheduleOrigin,
   }) : _zones = zones, _groups = groups;
 
@@ -146,6 +150,7 @@ class ArchitectStorey {
     List<ArchitectAnnotation>? annotations,
     List<ArchitectCadPrimitive>? cadPrimitives,
     List<ArchitectComponentInstance>? components,
+    List<ArchitectFloorDrain>? floorDrains,
     Offset? zoneScheduleOrigin,
     bool clearZoneScheduleOrigin = false,
   }) => ArchitectStorey(
@@ -175,6 +180,7 @@ class ArchitectStorey {
     annotations: annotations ?? this.annotations,
     cadPrimitives: cadPrimitives ?? this.cadPrimitives,
     components: components ?? this.components,
+    floorDrains: floorDrains ?? this.floorDrains,
     zoneScheduleOrigin: clearZoneScheduleOrigin
         ? null
         : (zoneScheduleOrigin ?? this.zoneScheduleOrigin),
@@ -204,6 +210,7 @@ class ArchitectStorey {
     'annotations': annotations.map((a) => a.toJson()).toList(),
     'cadPrimitives': cadPrimitives.map((p) => p.toJson()).toList(),
     'components': components.map((c) => c.toJson()).toList(),
+    if (floorDrains.isNotEmpty) 'floorDrains': floorDrains.map((d) => d.toJson()).toList(),
     if (zoneScheduleOrigin != null)
       'zoneScheduleOrigin': {
         'x': zoneScheduleOrigin!.dx,
@@ -292,6 +299,7 @@ class ArchitectStorey {
             )
             .toList() ??
         const [],
+    floorDrains: [for (final d in json['floorDrains'] as List? ?? const []) if (d is Map) ArchitectFloorDrain.fromJson(Map<String, dynamic>.from(d))],
     components:
         (json['components'] as List<dynamic>?)
             ?.map(
@@ -338,6 +346,7 @@ class ArchitectProject {
   final List<ArchitectFenestrationStyle> openingStyles;
   final List<ArchitectSlabAssembly> slabAssemblies;
   final List<ArchitectSection> sections;
+  final ArchitectSectionVisibility sectionVisibility;
   final List<ArchitectElevation> elevations;
   final ArchitectNorthSymbol? northSymbol;
   final Map<String, int> slabCompositionNumbers;
@@ -360,6 +369,7 @@ class ArchitectProject {
     this.openingStyles = const [],
     this.slabAssemblies = const [],
     this.sections = const [],
+    this.sectionVisibility = const ArchitectSectionVisibility(),
     this.elevations = const [],
     this.northSymbol,
     this.slabCompositionNumbers = const {},
@@ -475,6 +485,7 @@ class ArchitectProject {
     List<ArchitectFenestrationStyle>? openingStyles,
     List<ArchitectSlabAssembly>? slabAssemblies,
     List<ArchitectSection>? sections,
+    ArchitectSectionVisibility? sectionVisibility,
     List<ArchitectElevation>? elevations,
     ArchitectNorthSymbol? northSymbol,
     bool clearNorthSymbol = false,
@@ -497,6 +508,7 @@ class ArchitectProject {
     openingStyles: openingStyles ?? this.openingStyles,
     slabAssemblies: slabAssemblies ?? this.slabAssemblies,
     sections: sections ?? this.sections,
+    sectionVisibility: sectionVisibility ?? this.sectionVisibility,
     elevations: elevations ?? this.elevations,
     northSymbol: clearNorthSymbol ? null : northSymbol ?? this.northSymbol,
     slabCompositionNumbers:
@@ -521,6 +533,7 @@ class ArchitectProject {
     'openingStyles': openingStyles.map((o) => o.toJson()).toList(),
     'slabAssemblies': slabAssemblies.map((a) => a.toJson()).toList(),
     'sections': sections.map((a) => a.toJson()).toList(),
+    'sectionVisibility': sectionVisibility.toJson(),
     'elevations': elevations.map((a) => a.toJson()).toList(),
     if (northSymbol != null) 'northSymbol': northSymbol!.toJson(),
     'slabCompositionNumbers': slabCompositionNumbers,
@@ -557,6 +570,9 @@ class ArchitectProject {
             .toList() ??
         const [],
     activeStoreyId: json['activeStoreyId'] as String? ?? '',
+    sectionVisibility: ArchitectSectionVisibility.fromJson(
+      json['sectionVisibility'],
+    ),
     slabAssemblies: (json['slabAssemblies'] as List? ?? [])
         .map(
           (a) => ArchitectSlabAssembly.fromJson(

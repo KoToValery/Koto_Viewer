@@ -13613,6 +13613,60 @@ abstract class AppLocalizations {
   /// **'Settings could not be saved. Try again.'**
   String get uiSettingsSaveFailed;
 
+  /// No description provided for @architectViewVisibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Visibility'**
+  String get architectViewVisibility;
+
+  /// No description provided for @architectSectionVisibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Section visibility'**
+  String get architectSectionVisibility;
+
+  /// No description provided for @architectSectionProjectRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Project defaults'**
+  String get architectSectionProjectRules;
+
+  /// No description provided for @architectSectionViewRules.
+  ///
+  /// In en, this message translates to:
+  /// **'This section'**
+  String get architectSectionViewRules;
+
+  /// No description provided for @architectSectionInherit.
+  ///
+  /// In en, this message translates to:
+  /// **'Use project'**
+  String get architectSectionInherit;
+
+  /// No description provided for @architectSectionCutAndView.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut and view'**
+  String get architectSectionCutAndView;
+
+  /// No description provided for @architectSectionCutOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut only'**
+  String get architectSectionCutOnly;
+
+  /// No description provided for @architectSectionHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get architectSectionHidden;
+
+  /// No description provided for @architectSectionVisibilityHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Project defaults apply to all sections unless a section overrides them. Cut only shows the actual intersection with the section plane and omits the projection behind it. 3D and elevations keep their normal visibility.'**
+  String get architectSectionVisibilityHelp;
+
   /// No description provided for @bimGroup.
   ///
   /// In en, this message translates to:
@@ -13678,6 +13732,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a distance and pick a side. Copy creates parallel elements; uncheck it to change the selection. Connected segments meet at shared corners. Openings in closed contours stay in place. Copying a whole group creates a new group; copies made while editing a group stay in it. For branched chains or groups containing text and symbols, use Edit group to select applicable segments without branches.'**
   String get bimOffsetHelp;
+
+  /// Floor drain tool: wet-area floor with falls to a drain
+  ///
+  /// In en, this message translates to:
+  /// **'Drain'**
+  String get architectToolFloorDrain;
+
+  /// Round floor drain
+  ///
+  /// In en, this message translates to:
+  /// **'Round'**
+  String get architectDrainRound;
+
+  /// Linear channel floor drain
+  ///
+  /// In en, this message translates to:
+  /// **'Linear'**
+  String get architectDrainLinear;
+
+  /// Floor fall towards the drain
+  ///
+  /// In en, this message translates to:
+  /// **'Fall'**
+  String get architectDrainSlope;
+
+  /// Round drain grate diameter
+  ///
+  /// In en, this message translates to:
+  /// **'Diameter'**
+  String get architectDrainDiameter;
+
+  /// Linear drain length
+  ///
+  /// In en, this message translates to:
+  /// **'Length'**
+  String get architectDrainLength;
+
+  /// Linear drain grate width
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get architectDrainWidth;
+
+  /// Take the floor outline from the closed room under the click
+  ///
+  /// In en, this message translates to:
+  /// **'Room'**
+  String get architectDrainFromRoom;
+
+  /// Draw the floor outline point by point
+  ///
+  /// In en, this message translates to:
+  /// **'Outline'**
+  String get architectDrainOutline;
+
+  /// Floor drain tool tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Click the first point or the green tick to confirm the floor. Drag the grip to move the drain.'**
+  String get architectDrainHint;
+
+  /// Floor drain validation
+  ///
+  /// In en, this message translates to:
+  /// **'Drain is outside the floor'**
+  String get architectDrainOutsideFloor;
+
+  /// Floor drain validation
+  ///
+  /// In en, this message translates to:
+  /// **'Drain is close to a door'**
+  String get architectDrainNearDoor;
+
+  /// Floor drain automatic room detection failed
+  ///
+  /// In en, this message translates to:
+  /// **'No closed room here'**
+  String get architectDrainRoomNotFound;
+
+  /// Floor drain placement rejected
+  ///
+  /// In en, this message translates to:
+  /// **'Drain cannot be placed here'**
+  String get architectDrainInvalid;
+
+  /// No description provided for @architectSelectionDrainsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 drain} other{{count} drains}}'**
+  String architectSelectionDrainsCount(int count);
 }
 
 class _AppLocalizationsDelegate

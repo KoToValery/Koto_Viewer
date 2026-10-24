@@ -7,6 +7,7 @@ import '../models/architect_elements.dart';
 import '../models/architect_material_layer.dart';
 import '../models/architect_project.dart';
 import '../models/architect_section.dart';
+import '../models/architect_section_visibility.dart';
 import '../models/architect_elevation.dart';
 import '../models/architect_slab_assembly.dart';
 import '../rendering/architect_stair_mesh.dart';
@@ -229,6 +230,7 @@ class ArchitectBuildingSection {
         ),
       );
     }
+    final visibility = cut.visibility.resolved(project.sectionVisibility);
     final regions = <ArchitectSectionRegion>[];
     final highPriorityCutouts = <Path>[];
     final roofProfiles = <String, Path>{};
@@ -521,7 +523,17 @@ class ArchitectBuildingSection {
 
       for (final roof in floor.roofs) {
         final path = sliceMesh(
-          ArchitectRoofDrainageMesh.build(project, floor, roof),
+          ArchitectRoofDrainageMesh.build(
+            project,
+            floor,
+            roof,
+            includeGutters: visibility
+                .modeFor(ArchitectSectionCategory.gutters)
+                .showsCut,
+            includeDownpipes: visibility
+                .modeFor(ArchitectSectionCategory.downpipes)
+                .showsCut,
+          ),
         );
         if (path != null) {
           regions.add(
@@ -652,6 +664,7 @@ class ArchitectBuildingSection {
         viewDepth: cut.viewDepth,
       ),
       occlusionMasks: cutMasks,
+      sectionVisibility: visibility,
     );
     // Cut fills participate in the same double-precision visibility pass;
     // never subtract them again from an already encoded float32 contour.

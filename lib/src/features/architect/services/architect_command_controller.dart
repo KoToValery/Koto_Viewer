@@ -73,6 +73,7 @@ abstract class ArchitectModelCommand {
             ...s.elevationMarkers.map((e) => e.id),
             ...s.cadPrimitives.map((e) => e.id),
             ...s.components.map((e) => e.id),
+            ...s.floorDrains.map((e) => e.id),
             ...s.walls.expand(
               (w) => [
                 ...w.doors.map((e) => e.id),
@@ -1101,6 +1102,9 @@ class MoveArchitectElement extends ArchitectModelCommand {
               ? const ArchitectCadEditingAdapter().translate(e, delta)
               : e,
       ],
+      floorDrains: [
+        for (final e in s.floorDrains) matches(e.id) ? e.translate(delta) : e,
+      ],
     );
     final axes = [
       for (final e in project.gridAxes)
@@ -1648,6 +1652,9 @@ class CutArchitectContourOpening extends ArchitectModelCommand {
     required this.elementId, required this.polygon});
 
   static (List<Offset>, List<List<Offset>>)? target(ArchitectStorey s, String id) {
+    for (final drain in s.floorDrains) {
+      if (drain.id == id) return (drain.polygon, drain.holes);
+    }
     for (final slab in s.slabs) {
       if (slab.id == id) return (slab.polygon, slab.holes);
     }
@@ -1669,6 +1676,7 @@ class CutArchitectContourOpening extends ArchitectModelCommand {
     }
     final holes = [...host.$2, List<Offset>.unmodifiable(polygon)];
     return ArchitectModelCommand.replace(project, s.copyWith(
+      floorDrains: [for (final p in s.floorDrains) p.id == elementId ? p.copyWith(holes: holes) : p],
       slabs: [for (final p in s.slabs) p.id == elementId ? p.copyWith(holes: holes) : p],
       roofs: [for (final p in s.roofs) p.id == elementId ? p.copyWith(holes: holes) : p],
       cadPrimitives: [for (final p in s.cadPrimitives) p.id == elementId ? p.copyWith(holes: holes) : p],
@@ -1812,7 +1820,8 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
     );
     final zone = floor.zones.any((z) => z.id == elementId);
     final opening = floor.openings.any((o) => o.id == elementId);
-    if (!slab && !roof && !rect && !zone && !opening) {
+    final drain = floor.floorDrains.any((d) => d.id == elementId);
+    if (!slab && !roof && !rect && !zone && !opening && !drain) {
       throw ArgumentError('Unknown polygon element');
     }
     final host = CutArchitectContourOpening.target(floor, elementId);
@@ -1824,6 +1833,10 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
     return ArchitectModelCommand.replace(
       project,
       floor.copyWith(
+        floorDrains: [
+          for (final d in floor.floorDrains)
+            d.id == elementId ? d.copyWith(polygon: points) : d,
+        ],
         slabs: [
           for (final s in floor.slabs)
             s.id == elementId ? s.copyWith(polygon: points) : s,

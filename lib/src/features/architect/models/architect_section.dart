@@ -1,4 +1,5 @@
 import 'architect_view_drawing.dart';
+import 'architect_section_visibility.dart';
 import 'dart:ui';
 
 Offset sectionPoint(Map j) =>
@@ -112,6 +113,7 @@ class ArchitectSection {
   final List<Offset> steps;
   final List<ArchitectSlabDetail> details;
   final ArchitectViewDrawing drawing;
+  final ArchitectSectionVisibility visibility;
   const ArchitectSection({
     required this.id,
     required this.start,
@@ -121,6 +123,7 @@ class ArchitectSection {
     this.name = '',
     this.details = const [],
     this.drawing = const ArchitectViewDrawing(),
+    this.visibility = const ArchitectSectionVisibility(),
   });
   double get length => (end - start).distance;
   Offset get axis =>
@@ -166,6 +169,7 @@ class ArchitectSection {
     Offset? end,
     List<ArchitectSlabDetail>? details,
     ArchitectViewDrawing? drawing,
+    ArchitectSectionVisibility? visibility,
     double? viewDepth,
     bool clearViewDepth = false,
     List<Offset>? steps,
@@ -176,6 +180,7 @@ class ArchitectSection {
     end: end ?? this.end,
     details: details ?? this.details,
     drawing: drawing ?? this.drawing,
+    visibility: visibility ?? this.visibility,
     viewDepth: clearViewDepth ? null : viewDepth ?? this.viewDepth,
     steps: steps ?? this.steps,
   );
@@ -188,10 +193,12 @@ class ArchitectSection {
     'steps': steps.map(sectionPointJson).toList(),
     'details': details.map((d) => d.toJson()).toList(),
     'drawing': drawing.toJson(),
+    if (visibility.categories.isNotEmpty) 'visibility': visibility.toJson(),
   };
   factory ArchitectSection.fromJson(Map<String, dynamic> j) => ArchitectSection(
     id: j['id'] as String,
     name: j['name'] as String? ?? '',
+    visibility: ArchitectSectionVisibility.fromJson(j['visibility']),
     drawing: ArchitectViewDrawing.fromJson(
       Map<String, dynamic>.from(j['drawing'] as Map? ?? {}),
     ),

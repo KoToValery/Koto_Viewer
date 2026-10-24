@@ -1,6 +1,7 @@
 import '../models/architect_line_style.dart';
 import '../models/architect_hatch_pattern.dart';
 import 'architect_clearance_badge_layout.dart';
+import 'architect_floor_drain_painter_helper.dart';
 import 'architect_vector_scene.dart';
 import '../models/architect_wall_type.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -61,6 +62,7 @@ enum ArchitectTool {
   cadCircle,
   measure,
   hatch,
+  floorDrain,
 }
 
 enum WallDraftingMode { singleLine, chained }
@@ -335,6 +337,13 @@ class Architect2dPainter extends CustomPainter {
         palette: palette, dimensionScale: _project.dimensionScale,
         selectedElementId: selectedElementId, hatchesOnly: true,
       );
+      ArchitectFloorDrainPainterHelper.draw(
+        canvas: canvas,
+        storey: _elementLayerStorey,
+        walls: _project.activeStorey.walls,
+        zoomScale: zoomScale,
+        palette: palette,
+      );
       _drawZoneSchedule(canvas);
       if (showUpperOverhangs) {
         ArchitectOverhangPainterHelper.drawOverhangs(
@@ -593,6 +602,7 @@ class Architect2dPainter extends CustomPainter {
           .where((e) => keep(e.id))
           .toList(),
       cadPrimitives: storey.cadPrimitives.where((e) => keep(e.id)).toList(),
+      floorDrains: storey.floorDrains.where((e) => keep(e.id)).toList(),
       zones: selectedOnly ? [] : storey.zones,
     );
   }
@@ -615,6 +625,25 @@ class Architect2dPainter extends CustomPainter {
       return;
     }
     final selected = _filterElements(project.activeStorey, selectedOnly: true);
+    if (selected.floorDrains.isNotEmpty) {
+      ArchitectFloorDrainPainterHelper.draw(
+        canvas: canvas,
+        storey: selected,
+        walls: _project.activeStorey.walls,
+        zoomScale: zoomScale,
+        palette: palette,
+        selectedIds: {selectedElementId!},
+      );
+      for (final drain in selected.floorDrains) {
+        ArchitectFloorDrainPainterHelper.drawHandles(
+          canvas: canvas,
+          drain: drain,
+          zoomScale: zoomScale,
+          handleOffsetLength: handleOffsetLength,
+        );
+      }
+      return;
+    }
     if (selected.slabs.isNotEmpty) {
       ArchitectElementsPainterHelper.drawSlabs(
         palette: palette,

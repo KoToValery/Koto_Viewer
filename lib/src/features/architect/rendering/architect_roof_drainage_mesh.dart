@@ -18,8 +18,11 @@ class ArchitectRoofDrainageMesh {
   static List<Triangle3D> build(
     ArchitectProject project,
     ArchitectStorey storey,
-    ArchitectRoofPlane roof,
-  ) {
+    ArchitectRoofPlane roof, {
+    bool includeGutters = true,
+    bool includeDownpipes = true,
+  }) {
+    if (!includeGutters && !includeDownpipes) return [];
     final geometry = ArchitectRoofDrainageGeometry.build(project, storey, roof);
     final d = roof.drainage, ink = color(d.material);
     final result = <Triangle3D>[];
@@ -29,7 +32,10 @@ class ArchitectRoofDrainageMesh {
     final angles = {
       for (final route in ready) route.pipe.id: _angles(roof, route),
     };
-    for (final gutter in geometry.gutters) {
+    // Keep the full routing geometry for physical outlet cuts even when a
+    // drawing omits the pipes. Visibility must not alter the gutter itself.
+    for (final gutter
+        in includeGutters ? geometry.gutters : <ArchitectGutterRun>[]) {
       final delta = gutter.end - gutter.start, axis = delta / delta.distance;
       if (delta.distance < 1e-6) continue;
       final profile = d.profile == ArchitectGutterProfile.box
@@ -287,6 +293,19 @@ class ArchitectRoofDrainageMesh {
       }
       void triangle(Vector3 a, Vector3 b, Vector3 c) =>
           result.add(Triangle3D(v0: a, v1: b, v2: c, color: ink));
+      if (!includeDownpipes) {
+        // Gutter and pipe normally share an open mesh interface. Close the
+        // retained sheet edge at that interface when the drawing omits the
+        // pipe, so a real section can still trace the gutter's material.
+        if (d.showGutter) {
+          for (var j = 0; j < samples.length; j++) {
+            final k = (j + 1) % samples.length;
+            triangle(outer.first[j], outer.first[k], inner.first[k]);
+            triangle(outer.first[j], inner.first[k], inner.first[j]);
+          }
+        }
+        continue;
+      }
       for (var i = 0; i + 1 < points.length; i++) {
         for (var j = 0; j < samples.length; j++) {
           final k = (j + 1) % samples.length;
@@ -298,7 +317,7 @@ class ArchitectRoofDrainageMesh {
       }
       for (var j = 0; j < samples.length; j++) {
         final k = (j + 1) % samples.length;
-        if (!d.showGutter) {
+        if (!d.showGutter || !includeGutters) {
           triangle(outer.first[j], inner.first[j], inner.first[k]);
           triangle(outer.first[j], inner.first[k], outer.first[k]);
         }

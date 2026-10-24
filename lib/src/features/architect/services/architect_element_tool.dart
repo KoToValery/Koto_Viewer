@@ -20,6 +20,7 @@ import '../models/architect_zone.dart';
 import '../../bim_editing/geometry/bim_transform_2d.dart';
 import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 import 'architect_wall_relations.dart';
+import 'architect_floor_drain_geometry.dart';
 
 /// Unified controller and interaction manager for specialized architectural drafting elements
 /// (windows, columns, beams, slabs, openings, stairs, dimensions, elevation markers, annotations, and CAD primitives).
@@ -469,6 +470,7 @@ class ArchitectElementTool extends ChangeNotifier {
           ? storey.elevationMarkers
           : [],
       components: tool == ArchitectTool.component ? storey.components : [],
+      floorDrains: tool == ArchitectTool.floorDrain ? storey.floorDrains : [],
       zones: tool == ArchitectTool.zone ? storey.zones : [],
       cadPrimitives: storey.cadPrimitives
           .where(
@@ -690,6 +692,14 @@ class ArchitectElementTool extends ChangeNotifier {
       }
     }
 
+    // Check Floor Drains: the grate or the outline, never the whole room.
+    for (final drain in storey.floorDrains) {
+      if (ArchitectFloorDrainGeometry.distanceToGrate(drain, point) <= tolerance ||
+          ArchitectFloorDrainGeometry.boundaryDistance(drain, point) <= tolerance) {
+        yield drain.id;
+      }
+    }
+
     // Check Slabs
     for (final slab in storey.slabs) {
       if (slab.containsPoint(point)) {
@@ -724,6 +734,7 @@ class ArchitectElementTool extends ChangeNotifier {
           .where((e) => e.id != elementId)
           .toList(),
       annotations: storey.annotations.where((a) => a.id != elementId).toList(),
+      floorDrains: storey.floorDrains.where((d) => d.id != elementId).toList(),
       cadPrimitives: storey.cadPrimitives
           .where((c) => c.id != elementId)
           .toList(),

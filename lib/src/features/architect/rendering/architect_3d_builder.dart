@@ -1,4 +1,5 @@
 import 'architect_roof_drainage_mesh.dart';
+import 'architect_floor_drain_mesh.dart';
 import 'architect_solid_shell.dart';
 import '../services/architect_slab_geometry.dart';
 import '../services/architect_roof_junctions.dart';
@@ -7,6 +8,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_project.dart';
+import '../models/architect_section_visibility.dart';
 import 'architect_wall_network.dart';
 import 'architect_wall_solids.dart';
 import 'architect_stair_mesh.dart';
@@ -20,6 +22,7 @@ class Architect3dBuilder {
     ArchitectProject project, {
     bool previewGeometry = true,
     Map<Triangle3D, String>? sources,
+    ArchitectSectionVisibility? sectionVisibility,
   }) {
     final List<Triangle3D> allTris = [];
     final roofSolids = <(String, List<Triangle3D>)>[];
@@ -210,6 +213,12 @@ class Architect3dBuilder {
         mark(slab.id, first);
       }
 
+      for (final drain in storey.floorDrains) {
+        final first = allTris.length;
+        allTris.addAll(ArchitectFloorDrainMesh.build(project, storey, drain));
+        mark(drain.id, first);
+      }
+
       final roofJunctions = ArchitectRoofJunctions.of(storey, project: project);
       final roofMeshes = [
         for (final roof in storey.roofs)
@@ -229,7 +238,19 @@ class Architect3dBuilder {
 
       for (final roof in storey.roofs) {
         final first = allTris.length;
-        allTris.addAll(ArchitectRoofDrainageMesh.build(project, storey, roof));
+        allTris.addAll(
+          ArchitectRoofDrainageMesh.build(
+            project,
+            storey,
+            roof,
+            includeGutters: sectionVisibility == null ||
+                sectionVisibility.modeFor(ArchitectSectionCategory.gutters)
+                    .showsProjection,
+            includeDownpipes: sectionVisibility == null ||
+                sectionVisibility.modeFor(ArchitectSectionCategory.downpipes)
+                    .showsProjection,
+          ),
+        );
         mark(roof.id, first);
       }
 

@@ -65,6 +65,7 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                     'depth',
                     'step',
                     'straight',
+                    'visibility',
                   ].contains(id)) {
                     onDraft?.call(
                       type,
@@ -191,6 +192,12 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                             : 'architect-building-sections',
                       ),
                       child: Text(l.architectManageViews),
+                    ),
+                  if (type == ArchitectWorkspaceView.section)
+                    PopupMenuItem(
+                      value: 'visibility',
+                      key: const ValueKey('architect-section-visibility'),
+                      child: Text(l.architectViewVisibility),
                     ),
                 ],
                 child: Container(

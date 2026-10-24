@@ -218,6 +218,9 @@ class ArchitectSelection {
     for (final b in s.beams) {
       if (b.id == id) return path..addPolygon(b.polygonCorners, true);
     }
+    for (final drain in s.floorDrains) {
+      if (drain.id == id) return ArchitectContour.path(drain.polygon, drain.holes);
+    }
     for (final slab in s.slabs) {
       if (slab.id == id) return ArchitectContour.path(slab.polygon, slab.holes);
     }
@@ -275,6 +278,7 @@ class ArchitectSelection {
     final colCount = s.columns.where((c) => ids.contains(c.id)).length;
     final beamCount = s.beams.where((b) => ids.contains(b.id)).length;
     final slabCount = s.slabs.where((b) => ids.contains(b.id)).length;
+    final drainCount = s.floorDrains.where((d) => ids.contains(d.id)).length;
     final roofCount = s.roofs.where((r) => ids.contains(r.id)).length;
     final zoneCount = s.zones.where((z) => ids.contains(z.id)).length;
     final doorCount = s.walls
@@ -294,6 +298,7 @@ class ArchitectSelection {
     if (colCount > 0) parts.add(l.architectSelectionColumnsCount(colCount));
     if (beamCount > 0) parts.add(l.architectSelectionBeamsCount(beamCount));
     if (slabCount > 0) parts.add(l.architectSelectionSlabsCount(slabCount));
+    if (drainCount > 0) parts.add(l.architectSelectionDrainsCount(drainCount));
     if (roofCount > 0) parts.add('${l.architectRoofs}: $roofCount');
     if (doorCount > 0) parts.add(l.architectSelectionDoorsCount(doorCount));
     if (winCount > 0) parts.add(l.architectSelectionWindowsCount(winCount));

@@ -4,6 +4,7 @@ import 'dart:ui';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_elevation.dart';
 import '../models/architect_project.dart';
+import '../models/architect_section_visibility.dart';
 import '../rendering/architect_3d_builder.dart';
 import 'architect_elevation_symbols.dart';
 
@@ -30,12 +31,14 @@ class ArchitectBuildingElevation {
     ArchitectProject project,
     ArchitectElevation view, {
     List<List<Offset>> occlusionMasks = const [],
+    ArchitectSectionVisibility? sectionVisibility,
   }) {
     final sources = <Triangle3D, String>{};
     final mesh = Architect3dBuilder.buildProjectMesh(
       project,
       previewGeometry: false,
       sources: sources,
+      sectionVisibility: sectionVisibility,
     );
     return withTerrain(_fromTriangles(
       mesh.triangles,

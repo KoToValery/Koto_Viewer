@@ -43,7 +43,8 @@ enum ArchitectToolCategory {
     ArchitectTool.window ||
     ArchitectTool.opening ||
     ArchitectTool.stair => build,
-    ArchitectTool.component => furnishing,
+    ArchitectTool.component ||
+    ArchitectTool.floorDrain => furnishing,
     ArchitectTool.column ||
     ArchitectTool.beam ||
     ArchitectTool.slab ||
@@ -500,6 +501,15 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     tool: ArchitectTool.slab,
                                     icon: Icons.layers_rounded,
                                     label: l10n.architectToolSlab,
+                                  ),
+                                if (category ==
+                                    ArchitectToolCategory.of(
+                                      ArchitectTool.floorDrain,
+                                    ))
+                                  _buildToolButton(
+                                    tool: ArchitectTool.floorDrain,
+                                    icon: Icons.water_drop_outlined,
+                                    label: l10n.architectToolFloorDrain,
                                   ),
                                 if (category ==
                                     ArchitectToolCategory.of(

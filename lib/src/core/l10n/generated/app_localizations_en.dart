@@ -7601,6 +7601,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get uiSettingsSaveFailed => 'Settings could not be saved. Try again.';
 
   @override
+  String get architectViewVisibility => 'Visibility';
+
+  @override
+  String get architectSectionVisibility => 'Section visibility';
+
+  @override
+  String get architectSectionProjectRules => 'Project defaults';
+
+  @override
+  String get architectSectionViewRules => 'This section';
+
+  @override
+  String get architectSectionInherit => 'Use project';
+
+  @override
+  String get architectSectionCutAndView => 'Cut and view';
+
+  @override
+  String get architectSectionCutOnly => 'Cut only';
+
+  @override
+  String get architectSectionHidden => 'Hidden';
+
+  @override
+  String get architectSectionVisibilityHelp =>
+      'Project defaults apply to all sections unless a section overrides them. Cut only shows the actual intersection with the section plane and omits the projection behind it. 3D and elevations keep their normal visibility.';
+
+  @override
   String get bimGroup => 'Group';
 
   @override
@@ -7634,4 +7662,58 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bimOffsetHelp =>
       'Enter a distance and pick a side. Copy creates parallel elements; uncheck it to change the selection. Connected segments meet at shared corners. Openings in closed contours stay in place. Copying a whole group creates a new group; copies made while editing a group stay in it. For branched chains or groups containing text and symbols, use Edit group to select applicable segments without branches.';
+
+  @override
+  String get architectToolFloorDrain => 'Drain';
+
+  @override
+  String get architectDrainRound => 'Round';
+
+  @override
+  String get architectDrainLinear => 'Linear';
+
+  @override
+  String get architectDrainSlope => 'Fall';
+
+  @override
+  String get architectDrainDiameter => 'Diameter';
+
+  @override
+  String get architectDrainLength => 'Length';
+
+  @override
+  String get architectDrainWidth => 'Width';
+
+  @override
+  String get architectDrainFromRoom => 'Room';
+
+  @override
+  String get architectDrainOutline => 'Outline';
+
+  @override
+  String get architectDrainHint =>
+      'Click the first point or the green tick to confirm the floor. Drag the grip to move the drain.';
+
+  @override
+  String get architectDrainOutsideFloor => 'Drain is outside the floor';
+
+  @override
+  String get architectDrainNearDoor => 'Drain is close to a door';
+
+  @override
+  String get architectDrainRoomNotFound => 'No closed room here';
+
+  @override
+  String get architectDrainInvalid => 'Drain cannot be placed here';
+
+  @override
+  String architectSelectionDrainsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count drains',
+      one: '1 drain',
+    );
+    return '$_temp0';
+  }
 }

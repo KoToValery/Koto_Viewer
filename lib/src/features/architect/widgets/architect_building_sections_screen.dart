@@ -18,6 +18,7 @@ import 'architect_slab_labels.dart';
 import 'architect_view_plan.dart';
 import 'architect_projection_editor.dart';
 import 'architect_view_depth_dialog.dart';
+import 'architect_section_visibility_dialog.dart';
 import '../services/architect_view_placement.dart';
 
 /// Uses the workspace controller so changes, autosave and history remain live.
@@ -614,6 +615,13 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
               }
               if (action == 'name') rename();
               if (action == 'depth') changeDepth();
+              if (action == 'visibility') {
+                showArchitectSectionVisibility(
+                  context,
+                  widget.controller,
+                  sectionId: sectionId,
+                );
+              }
               if (action == 'flip' && value != null) {
                 setState(() {
                   firstPoint = secondPoint = null;
@@ -641,6 +649,11 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
             },
             itemBuilder: (_) => [
               PopupMenuItem(value: 'new', child: Text(l.buildingSectionNew)),
+              PopupMenuItem(
+                value: 'visibility',
+                key: const ValueKey('architect-section-visibility'),
+                child: Text(l.architectViewVisibility),
+              ),
               if (value != null) ...[
                 PopupMenuItem(
                   value: 'flip',

@@ -7631,6 +7631,34 @@ class AppLocalizationsBg extends AppLocalizations {
       'Настройките не могат да се запазят. Опитайте отново.';
 
   @override
+  String get architectViewVisibility => 'Видимост';
+
+  @override
+  String get architectSectionVisibility => 'Видимост в разрез';
+
+  @override
+  String get architectSectionProjectRules => 'За проекта';
+
+  @override
+  String get architectSectionViewRules => 'Този разрез';
+
+  @override
+  String get architectSectionInherit => 'По проекта';
+
+  @override
+  String get architectSectionCutAndView => 'Разрез и изглед';
+
+  @override
+  String get architectSectionCutOnly => 'Само разрез';
+
+  @override
+  String get architectSectionHidden => 'Скрито';
+
+  @override
+  String get architectSectionVisibilityHelp =>
+      'Настройките за проекта важат за всички разрези, освен ако конкретен разрез има изключение. „Само разрез“ показва действителното сечение с разрезната равнина и пропуска изгледа зад нея. 3D и фасадите запазват обичайната си видимост.';
+
+  @override
   String get bimGroup => 'Групирай';
 
   @override
@@ -7664,4 +7692,58 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get bimOffsetHelp =>
       'Въведи разстояние и посочи страна. Копие създава успоредни елементи; без отметката променя избраните. Свързаните отсечки се срещат в общи ъгли. Отворите в затворени контури се запазват. Копие на цяла група създава нова група; при редактиране на група копията остават в нея. За разклонени вериги или групи с текстове и символи избери приложимите отсечки без разклонение чрез Редактирай групата.';
+
+  @override
+  String get architectToolFloorDrain => 'Сифон';
+
+  @override
+  String get architectDrainRound => 'Кръгъл';
+
+  @override
+  String get architectDrainLinear => 'Линеен';
+
+  @override
+  String get architectDrainSlope => 'Наклон';
+
+  @override
+  String get architectDrainDiameter => 'Диаметър';
+
+  @override
+  String get architectDrainLength => 'Дължина';
+
+  @override
+  String get architectDrainWidth => 'Ширина';
+
+  @override
+  String get architectDrainFromRoom => 'Помещение';
+
+  @override
+  String get architectDrainOutline => 'Контур';
+
+  @override
+  String get architectDrainHint =>
+      'Кликни първата точка или зеленото тикче за потвърждение на пода. Дръпни дръжката, за да преместиш сифона.';
+
+  @override
+  String get architectDrainOutsideFloor => 'Сифонът е извън пода';
+
+  @override
+  String get architectDrainNearDoor => 'Сифонът е близо до врата';
+
+  @override
+  String get architectDrainRoomNotFound => 'Тук няма затворено помещение';
+
+  @override
+  String get architectDrainInvalid => 'Сифонът не може да се постави тук';
+
+  @override
+  String architectSelectionDrainsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count сифона',
+      one: '1 сифон',
+    );
+    return '$_temp0';
+  }
 }
