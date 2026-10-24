@@ -36,8 +36,9 @@ class ArchitectRoofDrainageMesh {
     // drawing omits the pipes. Visibility must not alter the gutter itself.
     for (final gutter
         in includeGutters ? geometry.gutters : <ArchitectGutterRun>[]) {
-      final delta = gutter.end - gutter.start, axis = delta / delta.distance;
-      if (delta.distance < 1e-6) continue;
+      final delta = gutter.end - gutter.start;
+      if (delta.distance < 1e-5) continue;
+      final axis = delta / delta.distance;
       final profile = d.profile == ArchitectGutterProfile.box
           ? [
               Offset(-d.gutterWidth / 2, 0),
@@ -356,7 +357,7 @@ class ArchitectRoofDrainageMesh {
             }
           }
         }
-        if (anchor == null) continue;
+        if (anchor == null || distance < 1e-5) continue;
         final direction = (anchor - plan) / distance;
         final side = Offset(-direction.dy, direction.dx);
         void mountingBar(Offset a, Offset b, double width, double height) {
@@ -469,6 +470,7 @@ class ArchitectRoofDrainageMesh {
     }
     final (a, b) = ArchitectRoofDrainageGeometry.eaves(roof);
     final d = b - a;
+    if (d.distance < 1e-5) return result;
     final side = Offset(-d.dy, d.dx) / d.distance;
     final u = Offset(-route.inward.dy, route.inward.dx), v = route.inward;
     final phase = math.atan2(

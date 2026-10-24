@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -190,7 +191,7 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
     final attached = viewer.app.renderManager
         .getAttachedSwapChains(viewer.view)
         .toList();
-    if (attached.length > 1) {
+    if (Platform.isWindows && attached.length > 1) {
       final primary = (await viewer.app.getSwapChains()).first;
       for (final chain in attached) {
         if (chain.getNativeHandle() == primary.getNativeHandle()) continue;
@@ -239,7 +240,7 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
     final batches = <(bool, bool), List<Triangle3D>>{};
     if (!useMaterials) {
       for (final t in mesh.triangles) {
-        if (t.area < 1e-16) continue;
+        if (t.area < 1e-8) continue;
         final color =
             widget.modelColor ?? t.color ?? widget.theme.defaultMeshColor;
         (batches[(t.isDoubleSided || xray, color.a < .999 || xray)] ??= []).add(
@@ -286,7 +287,12 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
           var vertex = 0;
           for (var i = start; i < end; i++) {
             final t = triangles[i];
-            final n = (t.v1 - t.v0).cross(t.v2 - t.v0).normalized();
+            final cross = (t.v1 - t.v0).cross(t.v2 - t.v0);
+            final n = cross.lengthSquared > 1e-10
+                ? cross.normalized()
+                : (t.normal.lengthSquared > 1e-10
+                    ? t.normal.normalized()
+                    : const Vector3(0, 0, 1));
             final c =
                 widget.modelColor ?? t.color ?? widget.theme.defaultMeshColor;
             final points = [t.v0, t.v1, t.v2];
@@ -296,18 +302,28 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
               final vertexNormal =
                   widget.shadingMode != Cad3DShadingMode.flatShaded &&
                       authoredNormal != null &&
-                      authoredNormal.lengthSquared > 1e-12
+                      authoredNormal.lengthSquared > 1e-10
                   ? authoredNormal.normalized()
                   : n;
               final vertexColor = widget.modelColor == null
                   ? (t.vertexColors?[corner] ?? c)
                   : c;
               final local = (p - center) * scale;
-              positions.setAll(vertex * 3, [local.x, local.y, local.z]);
+              final safeLocal = Vector3(
+                local.x.isFinite ? local.x : 0,
+                local.y.isFinite ? local.y : 0,
+                local.z.isFinite ? local.z : 0,
+              );
+              final safeNormal = Vector3(
+                vertexNormal.x.isFinite ? vertexNormal.x : 0,
+                vertexNormal.y.isFinite ? vertexNormal.y : 0,
+                vertexNormal.z.isFinite ? vertexNormal.z : 1,
+              );
+              positions.setAll(vertex * 3, [safeLocal.x, safeLocal.y, safeLocal.z]);
               normals.setAll(vertex * 3, [
-                vertexNormal.x,
-                vertexNormal.y,
-                vertexNormal.z,
+                safeNormal.x,
+                safeNormal.y,
+                safeNormal.z,
               ]);
               colors.setAll(vertex * 4, [
                 _linear(vertexColor.r),
@@ -362,6 +378,7 @@ class _Cad3DGpuSurfaceState extends State<Cad3DGpuSurface>
       // normals. Per-face copies intersected each other and produced dotted
       // z-fighting along corners even when their individual bias was increased.
       for (final (a, b, normal) in edges.values) {
+        if (normal.lengthSquared < 1e-10) continue;
         final bias = normal.normalized() * (mesh.bounds.maxDimension * .001);
         points.addAll([a + bias, b + bias]);
       }

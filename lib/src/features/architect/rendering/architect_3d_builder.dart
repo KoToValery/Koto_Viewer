@@ -835,6 +835,23 @@ class Architect3dBuilder {
     return tris;
   }
 
+  static List<Offset> _cleanPolygon(
+    List<Offset> poly, {
+    double tolerance = 1e-4,
+  }) {
+    if (poly.length < 3) return const [];
+    final clean = <Offset>[];
+    for (final p in poly) {
+      if (clean.isEmpty || (p - clean.last).distance > tolerance) {
+        clean.add(p);
+      }
+    }
+    if (clean.length > 1 && (clean.last - clean.first).distance <= tolerance) {
+      clean.removeLast();
+    }
+    return clean.length >= 3 ? clean : const [];
+  }
+
   /// Clips a 2D polygon in local `(s, d)` coordinates against `[s0, s1] x [d0, d1]`.
   static List<Offset> _clipPolygonToRect(
     List<Offset> poly,
@@ -852,7 +869,7 @@ class Architect3dBuilder {
     current = _clipHalfPlane(current, (p) => p.dy - d0);
     if (current.length < 3) return const [];
     current = _clipHalfPlane(current, (p) => d1 - p.dy);
-    return current.length >= 3 ? current : const [];
+    return _cleanPolygon(current);
   }
 
   static List<Offset> _clipHalfPlane(
@@ -898,17 +915,19 @@ class Architect3dBuilder {
     Color? bottomColor,
     Path? planClip,
   }) {
-    if (clippedSD.length < 3 || hTop <= hBottom) return;
+    final cleanSD = _cleanPolygon(clippedSD);
+    if (cleanSD.length < 3 || hTop <= hBottom) return;
     final botClr = bottomColor ?? sideColor;
     Offset toWorld2D(Offset sd) => Offset(
       p0.dx + u.dx * sd.dx + v.dx * sd.dy,
       p0.dy + u.dy * sd.dx + v.dy * sd.dy,
     );
+
     if (planClip != null) {
       final footprint = Path.combine(
         PathOperation.intersect,
         planClip,
-        Path()..addPolygon(clippedSD.map(toWorld2D).toList(), true),
+        Path()..addPolygon(cleanSD.map(toWorld2D).toList(), true),
       );
       tris.addAll(
         _roofPrism(
@@ -925,58 +944,41 @@ class Architect3dBuilder {
 
     final topVerts = <Vector3>[];
     final botVerts = <Vector3>[];
-    for (final sd in clippedSD) {
+    for (final sd in cleanSD) {
       final p = toWorld2D(sd);
       final baseZ = storeyElevation + roof.undersideElevationAt(p);
       botVerts.add(Vector3(p.dx, p.dy, baseZ + hBottom));
       topVerts.add(Vector3(p.dx, p.dy, baseZ + hTop));
     }
 
-    final v0T = topVerts[0];
-    final v0B = botVerts[0];
-    for (var i = 1; i < clippedSD.length - 1; i++) {
+    void addTri(Vector3 a, Vector3 b, Vector3 c, Color color) {
+      final cross = (b - a).cross(c - a);
+      if (cross.lengthSquared < 1e-10) return;
       tris.add(
         Triangle3D(
-          v0: v0T,
-          v1: topVerts[i],
-          v2: topVerts[i + 1],
-          color: topColor,
-          isDoubleSided: true,
-        ),
-      );
-      tris.add(
-        Triangle3D(
-          v0: v0B,
-          v1: botVerts[i + 1],
-          v2: botVerts[i],
-          color: botClr,
+          v0: a,
+          v1: b,
+          v2: c,
+          normal: cross.normalized(),
+          color: color,
           isDoubleSided: true,
         ),
       );
     }
 
-    for (var i = 0; i < clippedSD.length; i++) {
-      final next = (i + 1) % clippedSD.length;
+    final v0T = topVerts[0];
+    final v0B = botVerts[0];
+    for (var i = 1; i < cleanSD.length - 1; i++) {
+      addTri(v0T, topVerts[i], topVerts[i + 1], topColor);
+      addTri(v0B, botVerts[i + 1], botVerts[i], botClr);
+    }
+
+    for (var i = 0; i < cleanSD.length; i++) {
+      final next = (i + 1) % cleanSD.length;
       final aB = botVerts[i], bB = botVerts[next];
       final aT = topVerts[i], bT = topVerts[next];
-      tris.add(
-        Triangle3D(
-          v0: aB,
-          v1: bB,
-          v2: bT,
-          color: sideColor,
-          isDoubleSided: true,
-        ),
-      );
-      tris.add(
-        Triangle3D(
-          v0: aB,
-          v1: bT,
-          v2: aT,
-          color: sideColor,
-          isDoubleSided: true,
-        ),
-      );
+      addTri(aB, bB, bT, sideColor);
+      addTri(aB, bT, aT, sideColor);
     }
   }
 
