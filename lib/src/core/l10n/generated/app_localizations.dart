@@ -6059,6 +6059,18 @@ abstract class AppLocalizations {
   /// **'Opening'**
   String get architectDoorSwingDirection;
 
+  /// Quick action to flip door swing direction
+  ///
+  /// In en, this message translates to:
+  /// **'Flip swing (in/out)'**
+  String get architectDoorFlipSwing;
+
+  /// Quick action to flip door hinge side
+  ///
+  /// In en, this message translates to:
+  /// **'Flip hinge (left/right)'**
+  String get architectDoorFlipHinge;
+
   /// Guidance prompt when wall tool is active
   ///
   /// In en, this message translates to:
@@ -7006,6 +7018,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sill'**
   String get architectWindowSill;
+
+  /// Quick action to flip window exterior/interior orientation
+  ///
+  /// In en, this message translates to:
+  /// **'Flip exterior/interior side'**
+  String get architectWindowFlipSide;
 
   /// Column shape label
   ///
@@ -11213,6 +11231,30 @@ abstract class AppLocalizations {
   /// **'{angle}° Hip / Valley'**
   String architectRoofSnapHipAngle(String angle);
 
+  /// Snap label for intersection of converging hip rays
+  ///
+  /// In en, this message translates to:
+  /// **'Hip intersection (45°)'**
+  String get architectRoofSnapHipIntersection;
+
+  /// Snap label for hip ray intersecting corner 45 guide
+  ///
+  /// In en, this message translates to:
+  /// **'Corner hip intersection (45°)'**
+  String get architectRoofSnapCornerHipIntersection;
+
+  /// Snap label for hip ray intersecting perpendicular from corner
+  ///
+  /// In en, this message translates to:
+  /// **'Perpendicular to inner corner'**
+  String get architectRoofSnapPerpToCorner;
+
+  /// Snap label for hip ray intersecting ridge parallel guide
+  ///
+  /// In en, this message translates to:
+  /// **'Ridge / edge alignment'**
+  String get architectRoofSnapRidgeAlignment;
+
   /// 3D orbit navigation tooltip
   ///
   /// In en, this message translates to:
@@ -13822,6 +13864,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, one{1 drain} other{{count} drains}}'**
   String architectSelectionDrainsCount(int count);
+
+  /// Architectural views tool category
+  ///
+  /// In en, this message translates to:
+  /// **'Views'**
+  String get architectCategoryViews;
+
+  /// Architectural section cut tool
+  ///
+  /// In en, this message translates to:
+  /// **'Section'**
+  String get architectToolSection;
+
+  /// Architectural facade elevation tool
+  ///
+  /// In en, this message translates to:
+  /// **'Elevation'**
+  String get architectToolElevation;
+
+  /// Action to open a section or elevation projection view
+  ///
+  /// In en, this message translates to:
+  /// **'Open View'**
+  String get architectOpenView;
+
+  /// Action to open section view
+  ///
+  /// In en, this message translates to:
+  /// **'Open Section'**
+  String get architectOpenSection;
+
+  /// Action to open elevation view
+  ///
+  /// In en, this message translates to:
+  /// **'Open Elevation'**
+  String get architectOpenElevation;
+
+  /// Action to rename section or elevation
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get architectViewRename;
+
+  /// Hint for placing a section line
+  ///
+  /// In en, this message translates to:
+  /// **'Click start and end points to place the section cut.'**
+  String get architectSectionHint;
+
+  /// Hint for placing an elevation line
+  ///
+  /// In en, this message translates to:
+  /// **'Click start and end points to place the elevation marker.'**
+  String get architectElevationHint;
+
+  /// Rectangular marquee selection mode
+  ///
+  /// In en, this message translates to:
+  /// **'Rectangle'**
+  String get architectSelectModeRect;
+
+  /// Polygonal marquee selection mode
+  ///
+  /// In en, this message translates to:
+  /// **'Point by point'**
+  String get architectSelectModePolygon;
+
+  /// Hint for rectangular marquee selection
+  ///
+  /// In en, this message translates to:
+  /// **'Click or drag opposite corners to select'**
+  String get architectSelectMarqueeHint;
+
+  /// Hint for polygon marquee selection
+  ///
+  /// In en, this message translates to:
+  /// **'Click points to outline selection area'**
+  String get architectSelectPolygonHint;
+
+  /// Confirm button for polygon marquee selection
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get architectSelectFinish;
 }
 
 class _AppLocalizationsDelegate

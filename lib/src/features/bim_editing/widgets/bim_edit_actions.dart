@@ -24,6 +24,7 @@ enum BimEditAction {
   group,
   ungroup,
   editGroup,
+  openView,
 }
 
 class BimEditActions {
@@ -50,6 +51,7 @@ class BimEditActions {
         BimEditAction.group => l.bimGroup,
         BimEditAction.ungroup => l.bimUngroup,
         BimEditAction.editGroup => l.bimEditGroup,
+        BimEditAction.openView => l.architectOpenView,
       };
   static IconData icon(BimEditAction action) => switch (action) {
     BimEditAction.move => Icons.open_with_rounded,
@@ -73,6 +75,7 @@ class BimEditActions {
     BimEditAction.group => Icons.group_work_outlined,
     BimEditAction.ungroup => Icons.workspaces_outline,
     BimEditAction.editGroup => Icons.edit_note,
+    BimEditAction.openView => Icons.visibility_outlined,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};

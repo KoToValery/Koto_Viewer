@@ -2641,6 +2641,10 @@
   "@architectDoorHingeSide": { "description": "Door hinge side label" },
   "architectDoorSwingDirection": "Opening",
   "@architectDoorSwingDirection": { "description": "Door swing direction label" },
+  "architectDoorFlipSwing": "Flip swing (in/out)",
+  "@architectDoorFlipSwing": { "description": "Quick action to flip door swing direction" },
+  "architectDoorFlipHinge": "Flip hinge (left/right)",
+  "@architectDoorFlipHinge": { "description": "Quick action to flip door hinge side" },
   "architectWallDrawPrompt": "Tap to start wall, tap again to place",
   "@architectWallDrawPrompt": { "description": "Guidance prompt when wall tool is active" },
   "architectView2D": "2D Plan",
@@ -3004,6 +3008,8 @@
   "@architectWindowHeight": { "description": "Window height label" },
   "architectWindowSill": "Sill",
   "@architectWindowSill": { "description": "Window sill label" },
+  "architectWindowFlipSide": "Flip exterior/interior side",
+  "@architectWindowFlipSide": { "description": "Quick action to flip window exterior/interior orientation" },
   "architectColumnShape": "Shape",
   "@architectColumnShape": { "description": "Column shape label" },
   "architectColumnRect": "Rect.",
@@ -4198,6 +4204,22 @@
       }
     }
   },
+  "architectRoofSnapHipIntersection": "Hip intersection (45°)",
+  "@architectRoofSnapHipIntersection": {
+    "description": "Snap label for intersection of converging hip rays"
+  },
+  "architectRoofSnapCornerHipIntersection": "Corner hip intersection (45°)",
+  "@architectRoofSnapCornerHipIntersection": {
+    "description": "Snap label for hip ray intersecting corner 45 guide"
+  },
+  "architectRoofSnapPerpToCorner": "Perpendicular to inner corner",
+  "@architectRoofSnapPerpToCorner": {
+    "description": "Snap label for hip ray intersecting perpendicular from corner"
+  },
+  "architectRoofSnapRidgeAlignment": "Ridge / edge alignment",
+  "@architectRoofSnapRidgeAlignment": {
+    "description": "Snap label for hip ray intersecting ridge parallel guide"
+  },
   "cad3dOrbit": "Orbit",
   "@cad3dOrbit": {"description": "3D orbit navigation tooltip"},
   "cad3dPan": "Pan",
@@ -4678,4 +4700,33 @@
   "@architectDrainInvalid": { "description": "Floor drain placement rejected" },
   "architectSelectionDrainsCount": "{count, plural, one{1 drain} other{{count} drains}}",
   "@architectSelectionDrainsCount": { "placeholders": { "count": { "type": "int" } } }
+,
+  "architectCategoryViews": "Views",
+  "@architectCategoryViews": { "description": "Architectural views tool category" },
+  "architectToolSection": "Section",
+  "@architectToolSection": { "description": "Architectural section cut tool" },
+  "architectToolElevation": "Elevation",
+  "@architectToolElevation": { "description": "Architectural facade elevation tool" },
+  "architectOpenView": "Open View",
+  "@architectOpenView": { "description": "Action to open a section or elevation projection view" },
+  "architectOpenSection": "Open Section",
+  "@architectOpenSection": { "description": "Action to open section view" },
+  "architectOpenElevation": "Open Elevation",
+  "@architectOpenElevation": { "description": "Action to open elevation view" },
+  "architectViewRename": "Rename",
+  "@architectViewRename": { "description": "Action to rename section or elevation" },
+  "architectSectionHint": "Click start and end points to place the section cut.",
+  "@architectSectionHint": { "description": "Hint for placing a section line" },
+  "architectElevationHint": "Click start and end points to place the elevation marker.",
+  "@architectElevationHint": { "description": "Hint for placing an elevation line" },
+  "architectSelectModeRect": "Rectangle",
+  "@architectSelectModeRect": { "description": "Rectangular marquee selection mode" },
+  "architectSelectModePolygon": "Point by point",
+  "@architectSelectModePolygon": { "description": "Polygonal marquee selection mode" },
+  "architectSelectMarqueeHint": "Click or drag opposite corners to select",
+  "@architectSelectMarqueeHint": { "description": "Hint for rectangular marquee selection" },
+  "architectSelectPolygonHint": "Click points to outline selection area",
+  "@architectSelectPolygonHint": { "description": "Hint for polygon marquee selection" },
+  "architectSelectFinish": "Select",
+  "@architectSelectFinish": { "description": "Confirm button for polygon marquee selection" }
 }

@@ -23,6 +23,7 @@ class ArchitectWindow {
   final int panesCount; // 1 = fixed, 2 = double casement, 3 = triple
   final String specId; // Specification tag, e.g. "П1"
   final String uuid; // Unique persistent identifier
+  final bool isFlipped;
   final String? styleId;
   final ArchitectFenestrationStyle? style;
 
@@ -44,6 +45,7 @@ class ArchitectWindow {
     this.panesCount = 2,
     this.specId = 'W1',
     required this.uuid,
+    this.isFlipped = false,
 
     this.styleId,
     this.style,
@@ -60,6 +62,7 @@ class ArchitectWindow {
     int? panesCount,
     String? specId,
     String? uuid,
+    bool? isFlipped,
     String? styleId,
     ArchitectFenestrationStyle? style,
   }) => ArchitectWindow(
@@ -73,6 +76,7 @@ class ArchitectWindow {
     panesCount: panesCount ?? this.panesCount,
     specId: specId ?? this.specId,
     uuid: uuid ?? this.uuid,
+    isFlipped: isFlipped ?? this.isFlipped,
     styleId: styleId ?? this.styleId,
     style: style ?? this.style,
   );
@@ -88,6 +92,7 @@ class ArchitectWindow {
     'panesCount': panesCount,
     'specId': specId,
     'uuid': uuid,
+    'isFlipped': isFlipped,
     if (styleId != null) 'styleId': styleId,
     if (style != null) 'style': style!.toJson(),
   };
@@ -104,6 +109,7 @@ class ArchitectWindow {
         panesCount: (json['panesCount'] as num?)?.toInt() ?? 2,
         specId: json['specId'] as String? ?? 'W1',
         uuid: json['uuid'] as String? ?? json['id'] as String,
+        isFlipped: json['isFlipped'] as bool? ?? false,
 
         styleId: json['styleId'] as String?,
         style: json['style'] != null
@@ -132,6 +138,7 @@ class ArchitectWindow {
     double exteriorSign = 1.0,
   }) {
     architectDrawingSources(canvas, {id}, 'opening');
+    final effectiveExtSign = (isFlipped ? -1.0 : 1.0) * exteriorSign;
     final wallVec = wallEnd - wallStart;
     final wallLen = wallVec.distance;
     if (wallLen < 1e-4) return;
@@ -157,8 +164,8 @@ class ArchitectWindow {
         wallThickness: wallThickness,
         coreThickness: coreThickness,
         insulationThickness: insulationThickness,
-        coreCenterShift: coreCenterShift,
-        exteriorSign: exteriorSign,
+        coreCenterShift: coreCenterShift != null ? (isFlipped ? -coreCenterShift : coreCenterShift) : null,
+        exteriorSign: effectiveExtSign,
         offsetRatio: offsetRatio,
         elementWidth: width,
         elementHeight: height,
@@ -171,7 +178,7 @@ class ArchitectWindow {
         elementId: id,
         canvas: canvas,
         centerPos: centerPos,
-        normal: n * exteriorSign,
+        normal: n * effectiveExtSign,
         wallThickness: wallThickness,
         width: width,
         height: height,
@@ -230,7 +237,7 @@ class ArchitectWindow {
       canvas: canvas,
       center: centerPos,
       direction: u,
-      exteriorNormal: n * exteriorSign,
+      exteriorNormal: n * effectiveExtSign,
       sillHeight: sillHeight,
       width: width,
       wallThickness: wallThickness,
@@ -242,8 +249,9 @@ class ArchitectWindow {
     // A compact frame sits in the masonry core; its profiles do not span
     // the entire wall depth. Each closed sash has its own glazing and end caps.
     final frameDepth = math.min(.07, wallThickness);
-    final shift =
-        coreCenterShift ?? -(wallThickness - coreThickness) / 2 * exteriorSign;
+    final shift = coreCenterShift != null
+        ? (isFlipped ? -coreCenterShift : coreCenterShift)
+        : -(wallThickness - coreThickness) / 2 * effectiveExtSign;
     final frameCenter = centerPos + n * shift;
     void profile(double station, double faceWidth) {
       final point = frameCenter + u * station;
@@ -292,7 +300,7 @@ class ArchitectWindow {
       elementId: id,
       canvas: canvas,
       centerPos: centerPos,
-      normal: n * exteriorSign,
+      normal: n * effectiveExtSign,
       wallThickness: wallThickness,
       width: width,
       height: height,
@@ -327,7 +335,8 @@ class ArchitectWindow {
     final dOpening = _distToSegment(point, pLeftBase, pRightBase);
     if (dOpening <= (wallThickness / 2.0) + tolerance) return true;
 
-    final n = Offset(-u.dy, u.dx) * exteriorSign;
+    final effectiveExtSign = (isFlipped ? -1.0 : 1.0) * exteriorSign;
+    final n = Offset(-u.dy, u.dx) * effectiveExtSign;
     return ArchitectOpeningPlanPainter.containsPoint(
       point,
       center: centerPos,
@@ -365,6 +374,7 @@ class ArchitectWindow {
     double? coreCenterShift,
     double exteriorSign = 1.0,
   }) {
+    final effectiveExtSign = (isFlipped ? -1.0 : 1.0) * exteriorSign;
     final effectiveStyle = resolvedStyle;
     if (effectiveStyle != null) {
       return Fenestration3dBuilder.buildOpening3D(
@@ -374,8 +384,8 @@ class ArchitectWindow {
         wallThickness: wallThickness,
         coreThickness: coreThickness,
         insulationThickness: insulationThickness,
-        coreCenterShift: coreCenterShift,
-        exteriorSign: exteriorSign,
+        coreCenterShift: coreCenterShift != null ? (isFlipped ? -coreCenterShift : coreCenterShift) : null,
+        exteriorSign: effectiveExtSign,
         offsetRatio: offsetRatio,
         width: width,
         height: height,
@@ -486,7 +496,7 @@ class ArchitectWindow {
     );
 
     // Interior-facing window hinges
-    final interiorDir = -exteriorSign;
+    final interiorDir = -effectiveExtSign;
     final hingePos =
         (centerPos - u * (halfW - jWidth * 0.7)) +
         n * (interiorDir * halfThick + interiorDir * 0.009);

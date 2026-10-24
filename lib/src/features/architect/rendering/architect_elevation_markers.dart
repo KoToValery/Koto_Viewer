@@ -55,10 +55,11 @@ void drawArchitectElevationMarkers(
                 e.id,
                 ArchitectAnnotationRole.symbol,
               );
-    final ink = selected == e.id ? Colors.blue : color;
+    final isSelected = selected == e.id;
+    final ink = isSelected ? const Color(0xFF00E5FF) : color;
     final paint = Paint()
       ..color = ink
-      ..strokeWidth = (selected == e.id ? 2 : 1) / symbolScale;
+      ..strokeWidth = (isSelected ? 2.5 : 1.2) / symbolScale;
     final marker = Path()
       ..moveTo(e.segments.first.start.dx, e.segments.first.start.dy);
     for (final s in e.segments) {
@@ -69,36 +70,48 @@ void drawArchitectElevationMarkers(
     canvas.drawPath(marker, paint..style = PaintingStyle.stroke);
     final middle = e.segments.lastWhere((s) => s.station <= e.length / 2);
     final centre = middle.start + e.axis * (e.length / 2 - middle.station);
-    final tip = centre + e.viewDirection * (16 / symbolScale);
+    final tip = centre + e.viewDirection * (20 / symbolScale);
     canvas.drawLine(centre, tip, paint);
     canvas.drawPath(
       Path()
         ..moveTo(tip.dx, tip.dy)
         ..lineTo(
           (tip -
-                  e.viewDirection * (6 / symbolScale) +
-                  e.axis * (4 / symbolScale))
+                  e.viewDirection * (8 / symbolScale) +
+                  e.axis * (5 / symbolScale))
               .dx,
           (tip -
-                  e.viewDirection * (6 / symbolScale) +
-                  e.axis * (4 / symbolScale))
+                  e.viewDirection * (8 / symbolScale) +
+                  e.axis * (5 / symbolScale))
               .dy,
         )
         ..lineTo(
           (tip -
-                  e.viewDirection * (6 / symbolScale) -
-                  e.axis * (4 / symbolScale))
+                  e.viewDirection * (8 / symbolScale) -
+                  e.axis * (5 / symbolScale))
               .dx,
           (tip -
-                  e.viewDirection * (6 / symbolScale) -
-                  e.axis * (4 / symbolScale))
+                  e.viewDirection * (8 / symbolScale) -
+                  e.axis * (5 / symbolScale))
               .dy,
         )
         ..close(),
       Paint()..color = ink,
     );
-    canvas.drawCircle(e.segments.first.start, 3 / symbolScale, paint);
-    canvas.drawCircle(e.segments.last.end, 3 / symbolScale, paint);
+    canvas.drawCircle(e.segments.first.start, (isSelected ? 4.0 : 3.0) / symbolScale, paint..style = PaintingStyle.fill);
+    canvas.drawCircle(e.segments.last.end, (isSelected ? 4.0 : 3.0) / symbolScale, paint);
+    if (isSelected && e.viewDepth != null) {
+      final forward = e.viewDirection;
+      final d = e.viewDepth!;
+      final a = e.start + forward * d, b = e.end + forward * d;
+      final depthPaint = Paint()
+        ..color = ink.withValues(alpha: .5)
+        ..strokeWidth = 1 / symbolScale
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(a, b, depthPaint);
+      canvas.drawLine(e.start, a, depthPaint);
+      canvas.drawLine(e.end, b, depthPaint);
+    }
     label(
       architectElevationLabel(l, e, project.northSymbol?.angle ?? 0),
       centre - e.viewDirection * (22 / symbolScale),
@@ -109,6 +122,8 @@ void drawArchitectElevationMarkers(
   for (var i = 0; i < project.sections.length; i++) {
     final s = project.sections[i];
     if (s.length < .01) continue;
+    final isSelected = selected == s.id;
+    final ink = isSelected ? const Color(0xFF00E5FF) : color;
     final segments = s.segments;
     final path = Path()
       ..moveTo(segments.first.start.dx, segments.first.start.dy);
@@ -118,27 +133,44 @@ void drawArchitectElevationMarkers(
         ..lineTo(part.end.dx, part.end.dy);
     }
     final paint = Paint()
-      ..color = color
+      ..color = ink
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1 / scale;
+      ..strokeWidth = (isSelected ? 2.5 : 1.2) / scale;
     canvas.drawPath(path, paint);
     for (final p in [segments.first.start, segments.last.end]) {
-      final tip = p + s.viewDirection * (16 / scale);
+      final tip = p + s.viewDirection * (18 / scale);
       canvas.drawLine(p, tip, paint);
-      canvas.drawLine(
-        tip,
-        tip - s.viewDirection * (5 / scale) + s.axis * (3 / scale),
-        paint,
-      );
-      canvas.drawLine(
-        tip,
-        tip - s.viewDirection * (5 / scale) - s.axis * (3 / scale),
-        paint,
-      );
+      final headPath = Path()
+        ..moveTo(tip.dx, tip.dy)
+        ..lineTo(
+          (tip - s.viewDirection * (6 / scale) + s.axis * (4 / scale)).dx,
+          (tip - s.viewDirection * (6 / scale) + s.axis * (4 / scale)).dy,
+        )
+        ..lineTo(
+          (tip - s.viewDirection * (6 / scale) - s.axis * (4 / scale)).dx,
+          (tip - s.viewDirection * (6 / scale) - s.axis * (4 / scale)).dy,
+        )
+        ..close();
+      canvas.drawPath(headPath, Paint()..color = ink);
+    }
+    canvas.drawCircle(segments.first.start, (isSelected ? 4.0 : 3.0) / scale, Paint()..color = ink);
+    canvas.drawCircle(segments.last.end, (isSelected ? 4.0 : 3.0) / scale, Paint()..color = ink);
+    if (isSelected && s.viewDepth != null) {
+      final forward = s.viewDirection;
+      final d = s.viewDepth!;
+      final a = s.start + forward * d, b = s.end + forward * d;
+      final depthPaint = Paint()
+        ..color = ink.withValues(alpha: .5)
+        ..strokeWidth = 1 / scale
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(a, b, depthPaint);
+      canvas.drawLine(s.start, a, depthPaint);
+      canvas.drawLine(s.end, b, depthPaint);
     }
     label(
       s.name.isEmpty ? l.architectSectionNumber(i + 1) : s.name,
       segments.first.start - s.viewDirection * (20 / scale),
+      ink: ink,
       id: s.id,
     );
   }

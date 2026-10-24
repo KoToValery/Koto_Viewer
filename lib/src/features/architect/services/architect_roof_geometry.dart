@@ -4,6 +4,7 @@
 // 3. Plan Edge Classification & Wall Support Line
 // 4. Section Cut Geometry (Mitered Layers, Discrete Battens, Rafters, Mauerlat, Ridge Purlin)
 // 5. Wall-to-Roof Clipping & Height Adaptation
+// 6. Roof Drafting Snap Guides (Hip/Valley Intersections & Inner Corner Alignments)
 
 import 'dart:math' as math;
 import 'dart:ui';
@@ -1502,4 +1503,405 @@ class ArchitectRoofGeometry {
     }
     return a1 + r * t.clamp(0.0, 1.0);
   }
+
+  // === SECTION: ROOF DRAFTING SNAP GUIDES ===
+
+  /// Resolves intelligent drafting guide snapping for roof polygons and hip lines.
+  ///
+  /// Evaluates 45° and hip angle rays from [anchor] and projects [raw] onto the best matching ray.
+  /// If the cursor is close to a key architectural intersection along the ray:
+  /// - Hip apex (intersection with symmetrical hip ray from eaves start P0)
+  /// - 45° valley/hip ray from wall corners (inner or exterior building corners)
+  /// - Perpendicular from an inner wall corner to the eaves
+  /// - Ridge line / parallel alignment passing through a wall corner
+  /// it snaps directly to the intersection and emits dual magnetic guides meeting at that point.
+  /// Otherwise, it tracks smoothly along the active ray.
+  static RoofSnapGuideResult? resolveRoofGuideSnap({
+    required Offset raw,
+    required Offset anchor,
+    required List<Offset> draftPoints,
+    required ArchitectStorey activeStorey,
+    required double currentSlopeDegrees,
+    required double snapTolerance,
+    required String Function() hip45Label,
+    required String Function(String deg) hipAngleLabel,
+    required String Function() hipIntersectionLabel,
+    required String Function() cornerHipIntersectionLabel,
+    required String Function() ridgeAlignmentLabel,
+    required String Function() perpToCornerLabel,
+  }) {
+    final delta = raw - anchor;
+    final dist = delta.distance;
+    if (dist < 0.10) return null;
+
+    // 1. Calculate base hip angle (45° or custom angle for unequal slopes with adjacent roof)
+    double baseHip = 45.0;
+    final nearRoof = activeStorey.roofs.where((r) {
+      return r.points.any((p) => (p - anchor).distance < 0.5);
+    }).firstOrNull;
+    if (nearRoof != null &&
+        (nearRoof.slopeDegrees - currentSlopeDegrees).abs() > 0.5) {
+      baseHip = calculateHipAngle(
+        slopeDeg1: currentSlopeDegrees,
+        slopeDeg2: nearRoof.slopeDegrees,
+      );
+    }
+
+    // 2. Identify eaves orientation if available
+    double? eavesAngleRad;
+    Offset? eavesUnit;
+    Offset? p0;
+    if (draftPoints.isNotEmpty) {
+      p0 = draftPoints.first;
+    }
+    if (draftPoints.length >= 2) {
+      final p1 = draftPoints[1];
+      final eavesDelta = p1 - p0!;
+      if (eavesDelta.distance > 0.05) {
+        eavesAngleRad = math.atan2(eavesDelta.dy, eavesDelta.dx);
+        eavesUnit = eavesDelta / eavesDelta.distance;
+      }
+    }
+
+    // 3. Assemble candidate ray angles from anchor (in degrees, [0, 360))
+    final angles = <double>{
+      baseHip,
+      (180.0 - baseHip) % 360.0,
+      (180.0 + baseHip) % 360.0,
+      (360.0 - baseHip) % 360.0,
+      45.0,
+      135.0,
+      225.0,
+      315.0,
+      0.0,
+      90.0,
+      180.0,
+      270.0,
+    };
+
+    if (eavesAngleRad != null) {
+      final eavesDeg = (eavesAngleRad * 180.0 / math.pi) % 360.0;
+      angles.add((eavesDeg + baseHip) % 360.0);
+      angles.add((eavesDeg - baseHip + 360.0) % 360.0);
+      angles.add((eavesDeg + 180.0 - baseHip + 360.0) % 360.0);
+      angles.add((eavesDeg + 180.0 + baseHip) % 360.0);
+      angles.add((eavesDeg + 90.0) % 360.0);
+      angles.add((eavesDeg + 270.0) % 360.0);
+      angles.add((eavesDeg + 360.0) % 360.0);
+      angles.add((eavesDeg + 180.0) % 360.0);
+    }
+
+    // 4. Find the best matching ray from anchor
+    double? bestPerpDist;
+    double? bestProjT;
+    Offset? bestDir;
+    double? bestAngleDeg;
+    Offset? bestProjPt;
+
+    for (final angleDeg in angles) {
+      final rad = angleDeg * math.pi / 180.0;
+      final dir = Offset(math.cos(rad), math.sin(rad));
+      final proj = delta.dx * dir.dx + delta.dy * dir.dy;
+      if (proj <= 0.08) continue; // Behind anchor or too close
+
+      final guidePt = anchor + dir * proj;
+      final perpDist = (raw - guidePt).distance;
+      if (perpDist <= snapTolerance) {
+        if (bestPerpDist == null || perpDist < bestPerpDist) {
+          bestPerpDist = perpDist;
+          bestProjT = proj;
+          bestDir = dir;
+          bestAngleDeg = angleDeg;
+          bestProjPt = guidePt;
+        }
+      }
+    }
+
+    if (bestProjPt == null ||
+        bestDir == null ||
+        bestProjT == null ||
+        bestAngleDeg == null) {
+      return null;
+    }
+
+    final activeDir = bestDir;
+    final activeProjPt = bestProjPt;
+    final activeProjT = bestProjT;
+    final activeAngleDeg = bestAngleDeg;
+
+    // 5. Collect candidate intersection points along the active ray
+    final candidates = <_RoofGuideCandidate>[];
+
+    // Helper to test intersection with a ray (origin, dir)
+    void checkRayIntersection({
+      required Offset origin,
+      required Offset dir,
+      required String label,
+      required Offset sourcePt,
+      required int priority,
+      double maxDistFromSource = 45.0,
+    }) {
+      final cross = activeDir.dx * dir.dy - activeDir.dy * dir.dx;
+      if (cross.abs() < 1e-4) return; // Parallel or anti-parallel
+
+      final dOrigin = origin - anchor;
+      final tAnchor = (dOrigin.dx * dir.dy - dOrigin.dy * dir.dx) / cross;
+      final tSource =
+          (dOrigin.dx * activeDir.dy - dOrigin.dy * activeDir.dx) / cross;
+
+      if (tAnchor > 0.10 && tSource > 0.05 && tSource <= maxDistFromSource) {
+        final interPt = anchor + activeDir * tAnchor;
+        final distAlongRay = (interPt - activeProjPt).distance;
+        candidates.add(_RoofGuideCandidate(
+          point: interPt,
+          label: label,
+          guideLine: (sourcePt, interPt),
+          distanceToCursor: distAlongRay,
+          priority: priority,
+        ));
+      }
+    }
+
+    // Helper to test intersection with an infinite line passing through [ptOnLine] with direction [lineDir]
+    void checkLineIntersection({
+      required Offset ptOnLine,
+      required Offset lineDir,
+      required String label,
+      required Offset sourcePt,
+      required int priority,
+      double maxDistFromSource = 45.0,
+    }) {
+      final cross = activeDir.dx * lineDir.dy - activeDir.dy * lineDir.dx;
+      if (cross.abs() < 1e-4) return;
+
+      final dOrigin = ptOnLine - anchor;
+      final tAnchor =
+          (dOrigin.dx * lineDir.dy - dOrigin.dy * lineDir.dx) / cross;
+      final tLine =
+          (dOrigin.dx * activeDir.dy - dOrigin.dy * activeDir.dx) / cross;
+
+      if (tAnchor > 0.10 && tLine.abs() <= maxDistFromSource) {
+        final interPt = anchor + activeDir * tAnchor;
+        final distAlongRay = (interPt - activeProjPt).distance;
+        candidates.add(_RoofGuideCandidate(
+          point: interPt,
+          label: label,
+          guideLine: (sourcePt, interPt),
+          distanceToCursor: distAlongRay,
+          priority: priority,
+        ));
+      }
+    }
+
+    // Candidate Type A: Symmetrical hip from P0 (start of eaves / draft)
+    if (p0 != null && (p0 - anchor).distance > 0.25) {
+      final p0Angles = <double>{
+        baseHip,
+        (180.0 - baseHip) % 360.0,
+        (180.0 + baseHip) % 360.0,
+        (360.0 - baseHip) % 360.0,
+        45.0,
+        135.0,
+        225.0,
+        315.0,
+      };
+      if (eavesAngleRad != null) {
+        final eavesDeg = (eavesAngleRad * 180.0 / math.pi) % 360.0;
+        p0Angles.add((eavesDeg + baseHip) % 360.0);
+        p0Angles.add((eavesDeg - baseHip + 360.0) % 360.0);
+        p0Angles.add((eavesDeg + 180.0 - baseHip + 360.0) % 360.0);
+        p0Angles.add((eavesDeg + 180.0 + baseHip) % 360.0);
+      }
+      for (final a in p0Angles) {
+        final rad = a * math.pi / 180.0;
+        final dir = Offset(math.cos(rad), math.sin(rad));
+        checkRayIntersection(
+          origin: p0,
+          dir: dir,
+          label: hipIntersectionLabel(),
+          sourcePt: p0,
+          priority: 10,
+        );
+      }
+    }
+
+    // Candidate Types B, C, D: Wall corners, Slabs, and other Roof Vertices
+    final refCorners = <Offset>[];
+    void addCorner(Offset pt) {
+      if ((pt - anchor).distance < 0.15) return;
+      if ((pt - raw).distance > 45.0) return;
+      for (final existing in refCorners) {
+        if ((existing - pt).distance < 0.04) return;
+      }
+      refCorners.add(pt);
+    }
+
+    for (final w in activeStorey.walls) {
+      addCorner(w.startPoint);
+      addCorner(w.endPoint);
+    }
+    for (final s in activeStorey.slabs) {
+      for (final c in s.polygon) {
+        addCorner(c);
+      }
+    }
+    for (final r in activeStorey.roofs) {
+      for (final c in r.points) {
+        addCorner(c);
+      }
+    }
+    for (final dp in draftPoints) {
+      addCorner(dp);
+    }
+
+    // Type B: 45° / Valley rays from corner C
+    final cornerHipAngles = <double>[45.0, 135.0, 225.0, 315.0];
+    if (eavesAngleRad != null) {
+      final eavesDeg = (eavesAngleRad * 180.0 / math.pi) % 360.0;
+      cornerHipAngles.add((eavesDeg + baseHip) % 360.0);
+      cornerHipAngles.add((eavesDeg - baseHip + 360.0) % 360.0);
+      cornerHipAngles.add((eavesDeg + 180.0 - baseHip + 360.0) % 360.0);
+      cornerHipAngles.add((eavesDeg + 180.0 + baseHip) % 360.0);
+    }
+    for (final c in refCorners) {
+      for (final a in cornerHipAngles) {
+        final rad = a * math.pi / 180.0;
+        final dir = Offset(math.cos(rad), math.sin(rad));
+        checkRayIntersection(
+          origin: c,
+          dir: dir,
+          label: cornerHipIntersectionLabel(),
+          sourcePt: c,
+          priority: 8,
+        );
+      }
+    }
+
+    // Type C: Ridge / parallel alignment through corner C
+    if (eavesUnit != null) {
+      for (final c in refCorners) {
+        checkLineIntersection(
+          ptOnLine: c,
+          lineDir: eavesUnit,
+          label: ridgeAlignmentLabel(),
+          sourcePt: c,
+          priority: 6,
+        );
+      }
+    }
+
+    // Type D: Perpendicular to eaves through corner C
+    if (eavesUnit != null) {
+      final eavesPerp = Offset(-eavesUnit.dy, eavesUnit.dx);
+      for (final c in refCorners) {
+        checkLineIntersection(
+          ptOnLine: c,
+          lineDir: eavesPerp,
+          label: perpToCornerLabel(),
+          sourcePt: c,
+          priority: 7,
+        );
+      }
+    }
+
+    // 6. Select closest intersection candidate within snap tolerance
+    final maxSnapDist = math.max(snapTolerance * 2.2, 0.40);
+    final validCandidates =
+        candidates.where((c) => c.distanceToCursor <= maxSnapDist).toList();
+
+    if (validCandidates.isNotEmpty) {
+      // Deduplicate nearby candidates within 12cm, keeping the highest priority
+      final clustered = <_RoofGuideCandidate>[];
+      for (final c in validCandidates) {
+        final existingIdx = clustered
+            .indexWhere((u) => (u.point - c.point).distance < 0.12);
+        if (existingIdx == -1) {
+          clustered.add(c);
+        } else if (c.priority > clustered[existingIdx].priority) {
+          clustered[existingIdx] = c;
+        }
+      }
+
+      // Sort clustered candidates:
+      // If a candidate has priority >= 10 (Hip Apex) and is within maxSnapDist,
+      // it takes precedence unless another candidate is more than 0.25m closer.
+      clustered.sort((a, b) {
+        if (a.priority >= 10 &&
+            b.priority < 10 &&
+            (a.distanceToCursor - b.distanceToCursor) < 0.25) {
+          return -1;
+        }
+        if (b.priority >= 10 &&
+            a.priority < 10 &&
+            (b.distanceToCursor - a.distanceToCursor) < 0.25) {
+          return 1;
+        }
+        final dDiff = (a.distanceToCursor - b.distanceToCursor).abs();
+        if (dDiff < 0.05) {
+          return b.priority.compareTo(a.priority);
+        }
+        return a.distanceToCursor.compareTo(b.distanceToCursor);
+      });
+
+      final bestCandidate = clustered.first;
+      return RoofSnapGuideResult(
+        point: bestCandidate.point,
+        snapLabel: bestCandidate.label,
+        magneticGuides: [
+          (anchor, bestCandidate.point),
+          bestCandidate.guideLine,
+        ],
+        isIntersectionSnap: true,
+      );
+    }
+
+    // 7. Fallback to continuous ray tracking along anchorDir
+    final guideSpan = math.max(activeProjT + 2.0, 10.0);
+    final rayLabel = (activeAngleDeg - 45.0).abs() < 0.5 ||
+            (activeAngleDeg - 135.0).abs() < 0.5 ||
+            (activeAngleDeg - 225.0).abs() < 0.5 ||
+            (activeAngleDeg - 315.0).abs() < 0.5
+        ? hip45Label()
+        : hipAngleLabel(activeAngleDeg.toStringAsFixed(1));
+
+    return RoofSnapGuideResult(
+      point: activeProjPt,
+      snapLabel: rayLabel,
+      magneticGuides: [
+        (anchor, anchor + activeDir * guideSpan),
+      ],
+      isIntersectionSnap: false,
+    );
+  }
+}
+
+/// Result of roof drafting magnetic guide snapping.
+class RoofSnapGuideResult {
+  final Offset point;
+  final String snapLabel;
+  final List<(Offset, Offset)> magneticGuides;
+  final bool isIntersectionSnap;
+
+  const RoofSnapGuideResult({
+    required this.point,
+    required this.snapLabel,
+    required this.magneticGuides,
+    this.isIntersectionSnap = false,
+  });
+}
+
+class _RoofGuideCandidate {
+  final Offset point;
+  final String label;
+  final (Offset, Offset) guideLine;
+  final double distanceToCursor;
+  final int priority;
+
+  _RoofGuideCandidate({
+    required this.point,
+    required this.label,
+    required this.guideLine,
+    required this.distanceToCursor,
+    required this.priority,
+  });
 }

@@ -965,6 +965,20 @@ class ArchitectElementTool extends ChangeNotifier {
       }
     }
 
+    // 1.1 Window
+    for (var w = 0; w < storey.walls.length; w++) {
+      final wall = storey.walls[w];
+      final winIdx = wall.windows.indexWhere((win) => win.id == elementId);
+      if (winIdx != -1) {
+        final win = wall.windows[winIdx];
+        final newWindows = List<ArchitectWindow>.from(wall.windows);
+        newWindows[winIdx] = win.copyWith(isFlipped: !win.isFlipped);
+        final newWalls = List<ArchitectWall>.from(storey.walls);
+        newWalls[w] = wall.copyWith(windows: newWindows);
+        return storey.copyWith(walls: newWalls);
+      }
+    }
+
     // 2. Wall
     final wallIndex = storey.walls.indexWhere((w) => w.id == elementId);
     if (wallIndex != -1) {

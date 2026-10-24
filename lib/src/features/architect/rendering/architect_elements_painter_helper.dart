@@ -858,6 +858,47 @@ class ArchitectElementsPainterHelper {
           decimals: decimals,
         );
       }
+    } else if (activeTool == ArchitectTool.section) {
+      canvas.drawLine(p1, p2, previewPaint..strokeWidth = 2.5 / zoomScale);
+      final delta = p2 - p1;
+      if (delta.distance >= .01) {
+        final axis = delta / delta.distance;
+        final normal = Offset(-axis.dy, axis.dx);
+        final arrowLen = 18.0 / zoomScale;
+        final headSize = 6.0 / zoomScale;
+        for (final p in [p1, p2]) {
+          final tip = p + normal * arrowLen;
+          canvas.drawLine(p, tip, previewPaint);
+          final headPath = Path()
+            ..moveTo(tip.dx, tip.dy)
+            ..lineTo((tip - normal * headSize + axis * (headSize * 0.6)).dx, (tip - normal * headSize + axis * (headSize * 0.6)).dy)
+            ..lineTo((tip - normal * headSize - axis * (headSize * 0.6)).dx, (tip - normal * headSize - axis * (headSize * 0.6)).dy)
+            ..close();
+          canvas.drawPath(headPath, fillPreview..color = const Color(0xFF00E5FF));
+        }
+      }
+      canvas.drawCircle(p1, 4 / zoomScale, previewPaint..style = PaintingStyle.fill);
+      canvas.drawCircle(p2, 4 / zoomScale, previewPaint);
+    } else if (activeTool == ArchitectTool.elevation) {
+      canvas.drawLine(p1, p2, previewPaint..strokeWidth = 2.0 / zoomScale);
+      final delta = p2 - p1;
+      if (delta.distance >= .01) {
+        final axis = delta / delta.distance;
+        final normal = Offset(-axis.dy, axis.dx);
+        final centre = (p1 + p2) / 2;
+        final arrowLen = 22.0 / zoomScale;
+        final headSize = 8.0 / zoomScale;
+        final tip = centre + normal * arrowLen;
+        canvas.drawLine(centre, tip, previewPaint);
+        final headPath = Path()
+          ..moveTo(tip.dx, tip.dy)
+          ..lineTo((tip - normal * headSize + axis * (headSize * 0.6)).dx, (tip - normal * headSize + axis * (headSize * 0.6)).dy)
+          ..lineTo((tip - normal * headSize - axis * (headSize * 0.6)).dx, (tip - normal * headSize - axis * (headSize * 0.6)).dy)
+          ..close();
+        canvas.drawPath(headPath, fillPreview..color = const Color(0xFF00E5FF));
+      }
+      canvas.drawCircle(p1, 4 / zoomScale, previewPaint..style = PaintingStyle.fill);
+      canvas.drawCircle(p2, 4 / zoomScale, previewPaint);
     } else if (activeTool == ArchitectTool.cadCircle) {
       final r = (p2 - p1).distance;
       canvas.drawCircle(p1, r, previewPaint);

@@ -7,6 +7,7 @@ import '../services/architect_floor_drain_commands.dart';
 import '../services/architect_floor_drain_geometry.dart';
 
 import '../widgets/architect_floor_drain_bar.dart';
+import '../services/architect_marquee_tool.dart';
 
 import '../rendering/architect_floor_drain_painter_helper.dart';
 
@@ -75,6 +76,9 @@ import '../widgets/architect_section_visibility_dialog.dart';
 import '../widgets/architect_elevations_screen.dart';
 
 import '../widgets/architect_workspace_view_placement.dart';
+import '../widgets/architect_view_properties_dialog.dart';
+import '../models/architect_section.dart';
+import '../models/architect_elevation.dart';
 
 import '../widgets/architect_projection_editor.dart';
 
@@ -1669,6 +1673,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ArchitectTool.axis => _project.gridAxes.any((a) => a.id == id),
 
       ArchitectTool.zone => storey.zones.any((z) => z.id == id),
+      ArchitectTool.section => _project.sections.any((s) => s.id == id),
+      ArchitectTool.elevation => _project.elevations.any((e) => e.id == id),
 
       _ => false,
 
@@ -1827,7 +1833,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               14 / _currentScale)
 
             axis.id,
-
+        ?_hitSection(point),
+        ?_hitElevation(point),
       }.toList();
 
     }
@@ -1858,6 +1865,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       return hitZone != null ? [hitZone.id] : const [];
 
+    }
+
+    if (_activeTool == ArchitectTool.section) {
+      final hit = _hitSection(point);
+      return hit != null ? [hit] : const [];
+    }
+
+    if (_activeTool == ArchitectTool.elevation) {
+      final hit = _hitElevation(point);
+      return hit != null ? [hit] : const [];
     }
 
 
@@ -3425,6 +3442,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_offsetOptions != null && !identical(_offsetSource, _project)) {
 
       _cancelActiveDrags();
+      _marqueeTool.cancel();
 
     }
 
@@ -3641,6 +3659,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _elementTool.cancelSlabDrafting();
 
     _roofTool.clearDraft();
+    _marqueeTool.cancel();
 
     if (_selectionContextActive ||
 
@@ -4181,6 +4200,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   ArchitectWallAttachment? _wallStartAttachment;
 
   final Set<String> _selectionIds = {};
+  final _marqueeTool = ArchitectMarqueeTool();
 
   Set<String> _groupDragIds = {};
 
@@ -4851,8 +4871,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   );
 
   bool get _linearDraftTool =>
-
-      _activeTool == ArchitectTool.wall || _activeTool == ArchitectTool.cadLine;
+      _activeTool == ArchitectTool.wall ||
+      _activeTool == ArchitectTool.cadLine ||
+      _activeTool == ArchitectTool.section ||
+      _activeTool == ArchitectTool.elevation;
 
 
 
@@ -4875,36 +4897,72 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   ArchitectWall? get _selectedLinearElement {
-
     if (_effectiveSelection.length != 1) return null;
-
     final id = _effectiveSelection.single;
-
     final line = _project.activeStorey.cadPrimitives
-
         .where((p) => p.id == id && p.type == CadPrimitiveType.line)
-
         .firstOrNull;
-
-    return line == null ? _selectedWall : ArchitectLineEditing.segment(line);
-
+    if (line != null) return ArchitectLineEditing.segment(line);
+    final sec = _project.sections.where((s) => s.id == id).firstOrNull;
+    if (sec != null) {
+      return ArchitectWall(
+        id: sec.id,
+        startPoint: sec.start,
+        endPoint: sec.end,
+        wallTypeId: 'section',
+        thickness: 0.001,
+      );
+    }
+    final elv = _project.elevations.where((e) => e.id == id).firstOrNull;
+    if (elv != null) {
+      return ArchitectWall(
+        id: elv.id,
+        startPoint: elv.start,
+        endPoint: elv.end,
+        wallTypeId: 'elevation',
+        thickness: 0.001,
+      );
+    }
+    return _selectedWall;
   }
 
-
-
-  List<ArchitectWall> get _linearEditWalls =>
-
-      _activeTool == ArchitectTool.cadLine || _selectedLineIds.isNotEmpty
-
-      ? _project.activeStorey.cadPrimitives
-
-            .where((p) => p.type == CadPrimitiveType.line)
-
-            .map(ArchitectLineEditing.segment)
-
-            .toList()
-
-      : _project.activeStorey.walls;
+  List<ArchitectWall> get _linearEditWalls {
+    if (_activeTool == ArchitectTool.cadLine || _selectedLineIds.isNotEmpty) {
+      return _project.activeStorey.cadPrimitives
+          .where((p) => p.type == CadPrimitiveType.line)
+          .map(ArchitectLineEditing.segment)
+          .toList();
+    }
+    final sec = _project.sections
+        .where((s) => _effectiveSelection.contains(s.id))
+        .firstOrNull;
+    if (sec != null) {
+      return [
+        ArchitectWall(
+          id: sec.id,
+          startPoint: sec.start,
+          endPoint: sec.end,
+          wallTypeId: 'section',
+          thickness: 0.001,
+        )
+      ];
+    }
+    final elv = _project.elevations
+        .where((e) => _effectiveSelection.contains(e.id))
+        .firstOrNull;
+    if (elv != null) {
+      return [
+        ArchitectWall(
+          id: elv.id,
+          startPoint: elv.start,
+          endPoint: elv.end,
+          wallTypeId: 'elevation',
+          thickness: 0.001,
+        )
+      ];
+    }
+    return _project.activeStorey.walls;
+  }
 
 
 
@@ -8834,6 +8892,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+    if (_activeTool == ArchitectTool.select && _marqueeTool.isDrafting) {
+      _marqueeTool.updateCandidate(rawModel);
+      _repaintPreview();
+      return;
+    }
+
     // 5. Wall drafting preview
 
     if (_linearDraftTool && _draftStart != null) {
@@ -9124,112 +9188,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    // Check hip angle guides from anchor (45° for equal slopes, or custom angle for unequal slopes)
-
+    // Check hip angle guides and intersections from anchor
     if (anchor != null && _magnetEnabled && !midpointSnap) {
+      final l10n = context.l10n;
+      final snapTol = (_touchInput ? 16 : 10) / _currentScale;
+      final roofGuide = ArchitectRoofGeometry.resolveRoofGuideSnap(
+        raw: raw,
+        anchor: anchor,
+        draftPoints: points,
+        activeStorey: _project.activeStorey,
+        currentSlopeDegrees: _roofTool.slopeDegrees,
+        snapTolerance: snapTol,
+        hip45Label: () => l10n.architectRoofSnap45Degrees,
+        hipAngleLabel: (deg) => l10n.architectRoofSnapHipAngle(deg),
+        hipIntersectionLabel: () => l10n.architectRoofSnapHipIntersection,
+        cornerHipIntersectionLabel: () =>
+            l10n.architectRoofSnapCornerHipIntersection,
+        ridgeAlignmentLabel: () => l10n.architectRoofSnapRidgeAlignment,
+        perpToCornerLabel: () => l10n.architectRoofSnapPerpToCorner,
+      );
 
-      final delta = raw - anchor;
-
-      final dist = delta.distance;
-
-      if (dist > 0.15) {
-
-        // Look for adjacent roof near anchor to detect unequal slopes
-
-        double baseHip = 45.0;
-
-        final nearRoof = _project.activeStorey.roofs.where((r) {
-
-          return r.points.any((p) => (p - anchor).distance < 0.5);
-
-        }).firstOrNull;
-
-        if (nearRoof != null &&
-
-            (nearRoof.slopeDegrees - _roofTool.slopeDegrees).abs() > 0.5) {
-
-          baseHip = ArchitectRoofGeometry.calculateHipAngle(
-
-            slopeDeg1: _roofTool.slopeDegrees,
-
-            slopeDeg2: nearRoof.slopeDegrees,
-
-          );
-
-        }
-
-
-
-        final angles = [
-
-          baseHip,
-
-          180.0 - baseHip,
-
-          180.0 + baseHip,
-
-          360.0 - baseHip,
-
-          if ((baseHip - 45.0).abs() > 0.5) ...const [
-
-            45.0,
-
-            135.0,
-
-            225.0,
-
-            315.0,
-
-          ],
-
-        ];
-
-
-
-        for (final angleDeg in angles) {
-
-          final rad = angleDeg * math.pi / 180.0;
-
-          final dir = Offset(math.cos(rad), math.sin(rad));
-
-          final proj = delta.dx * dir.dx + delta.dy * dir.dy;
-
-          if (proj > 0.10) {
-
-            final guidePt = anchor + dir * proj;
-
-            final perpDist = (raw - guidePt).distance;
-
-            final snapTol = (_touchInput ? 16 : 10) / _currentScale;
-
-            if (perpDist <= snapTol) {
-
-              pt = guidePt;
-
-              snapLabel = (angleDeg - 45.0).abs() < 0.5
-
-                  ? context.l10n.architectRoofSnap45Degrees
-
-                  : context.l10n.architectRoofSnapHipAngle(
-
-                      angleDeg.toStringAsFixed(1),
-
-                    );
-
-              final guideSpan = math.max(dist + 2.0, 10.0);
-
-              guides = [(anchor, anchor + dir * guideSpan)];
-
-              break;
-
-            }
-
-          }
-
-        }
-
+      if (roofGuide != null) {
+        pt = roofGuide.point;
+        snapLabel = roofGuide.snapLabel;
+        guides = roofGuide.magneticGuides;
       }
-
     }
 
 
@@ -9599,6 +9582,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _controlTrimClick = false;
 
     _groupDragIds = {};
+
+    _isHandleEngaged = false;
+    _handleMoved = false;
+    _handlePointerDown = null;
+    _draggingElementId = null;
+    _elementMoveStart = null;
+    _elementMoveDelta = null;
+    _elementMoveOriginal = null;
+    _elementMovePreview = null;
 
     _placingWithHold = false;
 
@@ -10870,20 +10862,77 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    if (_activeTool == ArchitectTool.select && _multiSelect) {
+    if (_activeTool == ArchitectTool.select) {
+      if (_marqueeTool.isDrafting) {
+        if (_marqueeTool.mode == ArchitectSelectMode.rectangle) {
+          _marqueeTool.addPoint(rawModel);
+          final poly = _marqueeTool.previewPolygon;
+          final hits = ArchitectMarqueeTool.evaluateSelection(
+            storey: _project.activeStorey,
+            project: _project,
+            polygon: poly,
+          );
+          setState(() {
+            if (_multiSelect) {
+              _selectionIds.addAll(hits);
+            } else {
+              _selectionIds
+                ..clear()
+                ..addAll(hits);
+            }
+            if (_selectionIds.isNotEmpty) _selectionContextActive = true;
+            _marqueeTool.cancel();
+          });
+          HapticFeedback.selectionClick();
+          return;
+        } else {
+          // Polygon mode
+          if (_marqueeTool.points.length >= 3 &&
+              (rawModel - _marqueeTool.points.first).distance <=
+                  math.min(20.0 / _currentScale, 0.40)) {
+            final poly = _marqueeTool.previewPolygon;
+            final hits = ArchitectMarqueeTool.evaluateSelection(
+              storey: _project.activeStorey,
+              project: _project,
+              polygon: poly,
+            );
+            setState(() {
+              if (_multiSelect) {
+                _selectionIds.addAll(hits);
+              } else {
+                _selectionIds
+                  ..clear()
+                  ..addAll(hits);
+              }
+              if (_selectionIds.isNotEmpty) _selectionContextActive = true;
+              _marqueeTool.cancel();
+            });
+            HapticFeedback.selectionClick();
+            return;
+          } else {
+            setState(() {
+              _marqueeTool.addPoint(rawModel);
+            });
+            HapticFeedback.lightImpact();
+            return;
+          }
+        }
+      }
 
-      if (!_selectAt(rawModel, toggle: true)) _clearSelection();
+      if (_selectionContextActive) {
+        _handleSelectionTap(rawModel);
+        return;
+      }
 
+      if (_selectAt(rawModel, toggle: _multiSelect)) {
+        return;
+      }
+
+      setState(() {
+        _marqueeTool.addPoint(rawModel);
+      });
+      HapticFeedback.selectionClick();
       return;
-
-    }
-
-    if (_selectionContextActive) {
-
-      _handleSelectionTap(rawModel);
-
-      return;
-
     }
 
 
@@ -13022,6 +13071,72 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       return;
 
+    }
+
+    if (_activeTool == ArchitectTool.section) {
+      final end = targetPoint;
+      if ((end - _draftStart!).distance < .01) return;
+      final sId = ArchitectElementId.next('sec');
+      final existingCount = _project.sections.length;
+      final label = String.fromCharCode(65 + (existingCount % 26));
+      final sec = ArchitectSection(
+        id: sId,
+        name: '${context.l10n.architectToolSection} $label-$label',
+        start: _draftStart!,
+        end: end,
+      );
+      _modelCommands.commit(
+        _project.copyWith(
+          sections: [..._project.sections, sec],
+        ),
+      );
+      setState(() {
+        _draftStart = null;
+        _draftEnd = null;
+        _wallDirectionLocked = false;
+        _wallPanelAnchor = null;
+        _activeSnapLabel = null;
+        _activeMagneticGuides = [];
+        _selectedElementId = sId;
+        _selectionIds
+          ..clear()
+          ..add(sId);
+      });
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      return;
+    }
+
+    if (_activeTool == ArchitectTool.elevation) {
+      final end = targetPoint;
+      if ((end - _draftStart!).distance < .01) return;
+      final eId = ArchitectElementId.next('elv');
+      final elv = ArchitectElevation(
+        id: eId,
+        start: _draftStart!,
+        end: end,
+        viewSide: 1,
+      );
+      _modelCommands.commit(
+        _project.copyWith(
+          elevations: [..._project.elevations, elv],
+        ),
+      );
+      setState(() {
+        _draftStart = null;
+        _draftEnd = null;
+        _wallDirectionLocked = false;
+        _wallPanelAnchor = null;
+        _activeSnapLabel = null;
+        _activeMagneticGuides = [];
+        _selectedElementId = eId;
+        _selectionIds
+          ..clear()
+          ..add(eId);
+      });
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      return;
     }
 
     final p1 = _draftStart!;
@@ -16130,9 +16245,48 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  String? _hitSection(Offset point) {
+    final tol = 16.0 / _currentScale;
+    for (final s in _project.sections.reversed) {
+      if ((point - BimLineGeometry.closest(point, s.start, s.end)).distance <= tol) {
+        return s.id;
+      }
+      final norm = s.viewDirection * (18.0 / _currentScale);
+      if ((point - (s.start + norm)).distance <= tol ||
+          (point - (s.end + norm)).distance <= tol) {
+        return s.id;
+      }
+    }
+    return null;
+  }
+
+  String? _hitElevation(Offset point) {
+    final tol = 16.0 / _currentScale;
+    for (final e in _project.elevations.reversed) {
+      if ((point - BimLineGeometry.closest(point, e.start, e.end)).distance <= tol) {
+        return e.id;
+      }
+      final mid = e.centre;
+      final dir = e.viewDirection;
+      final norm = (dir.distance > 0 ? dir / dir.distance : const Offset(0, 1)) * (24.0 / _currentScale);
+      final tip = mid + norm;
+      if ((point - tip).distance <= tol ||
+          (point - BimLineGeometry.closest(point, mid, tip)).distance <= tol) {
+        return e.id;
+      }
+    }
+    return null;
+  }
+
   String? _hitSelection(Offset point) {
+    if (_activeTool == ArchitectTool.section) return _hitSection(point);
+    if (_activeTool == ArchitectTool.elevation) return _hitElevation(point);
 
     if (_acceptsAnySelection || _activeTool == ArchitectTool.component) {
+      final secHit = _hitSection(point);
+      if (secHit != null) return secHit;
+      final elvHit = _hitElevation(point);
+      if (elvHit != null) return elvHit;
 
       if (_showFurnitureLayer) {
 
@@ -17018,6 +17172,42 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+    final isSection = _project.sections.any((s) => s.id == elementId);
+    final isElevation = _project.elevations.any((e) => e.id == elementId);
+    if (isSection || isElevation) {
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.openView,
+          color: const Color(0xFF00E5FF),
+        ),
+      );
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.flip,
+          color: const Color(0xFF40C4FF),
+        ),
+      );
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.move,
+          color: const Color(0xFFFFB300),
+        ),
+      );
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.properties,
+          color: const Color(0xFFB388FF),
+        ),
+      );
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.delete,
+          color: const Color(0xFFFF5252),
+        ),
+      );
+      return items;
+    }
+
     final storey = _project.activeStorey;
 
     final isBeam = storey.beams.any((b) => b.id == elementId);
@@ -17254,23 +17444,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       );
 
-      if (isDoor) {
-
-        items.add(
-
-          _radialItem(
-
-            action: ArchitectRadialAction.flip,
-
-
-
-            color: const Color(0xFF40C4FF),
-
-          ),
-
-        );
-
-      }
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.flip,
+          color: const Color(0xFF40C4FF),
+        ),
+      );
 
       items.add(
 
@@ -18700,6 +18879,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     switch (action) {
 
+      case ArchitectRadialAction.openView:
+        _openSectionOrElevationView(id);
+        break;
+
       case ArchitectRadialAction.group:
 
       case ArchitectRadialAction.ungroup:
@@ -18919,6 +19102,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
       case ArchitectRadialAction.flip:
+        if (_project.sections.any((s) => s.id == id)) {
+          _flipSection(id);
+          break;
+        }
+        if (_project.elevations.any((e) => e.id == id)) {
+          _flipElevation(id);
+          break;
+        }
 
         final roofToFlip = _project.activeStorey.roofs
 
@@ -19021,15 +19212,45 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
       case ArchitectRadialAction.properties:
-
+        if (_project.sections.any((s) => s.id == id) ||
+            _project.elevations.any((e) => e.id == id)) {
+          _showSectionElevationProperties(id);
+          break;
+        }
         _showProperties();
-
         break;
 
 
 
       case ArchitectRadialAction.delete:
-
+        if (_project.sections.any((s) => s.id == id)) {
+          _modelCommands.commit(
+            _project.copyWith(
+              sections: _project.sections.where((s) => s.id != id).toList(),
+            ),
+          );
+          _saveBiMProjectIfAttached();
+          setState(() {
+            _selectedElementId = null;
+            _selectionIds.remove(id);
+          });
+          HapticFeedback.heavyImpact();
+          break;
+        }
+        if (_project.elevations.any((e) => e.id == id)) {
+          _modelCommands.commit(
+            _project.copyWith(
+              elevations: _project.elevations.where((e) => e.id != id).toList(),
+            ),
+          );
+          _saveBiMProjectIfAttached();
+          setState(() {
+            _selectedElementId = null;
+            _selectionIds.remove(id);
+          });
+          HapticFeedback.heavyImpact();
+          break;
+        }
         var storey = _project.activeStorey;
 
         storey = _elementTool.deleteElementById(storey, id);
@@ -19262,6 +19483,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    if (!_multiSelect && id == _selectedElementId && _selectionIds.length == 1) {
+      final sec = _project.sections.where((s) => s.id == id).firstOrNull;
+      if (sec != null) {
+        final tol = 20.0 / _currentScale;
+        final norm = sec.viewDirection * (18.0 / _currentScale);
+        if ((point - (sec.start + norm)).distance <= tol ||
+            (point - (sec.end + norm)).distance <= tol) {
+          _flipSection(sec.id);
+          return true;
+        }
+      }
+      final elv = _project.elevations.where((e) => e.id == id).firstOrNull;
+      if (elv != null) {
+        final tol = 20.0 / _currentScale;
+        final mid = elv.centre;
+        final dir = elv.viewDirection;
+        final norm = (dir.distance > 0 ? dir / dir.distance : const Offset(0, 1)) * (24.0 / _currentScale);
+        final tip = mid + norm;
+        if ((point - tip).distance <= tol ||
+            (point - BimLineGeometry.closest(point, mid, tip)).distance <= tol) {
+          _flipElevation(elv.id);
+          return true;
+        }
+      }
+    }
+
     _cancelActiveDrags();
 
     _polygonEditId = null;
@@ -19332,8 +19579,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           : _selectionIds.lastOrNull;
 
-      if (primary != _selectedElementId || _selectionIds.length != 1) {
 
+
+      if (primary != _selectedElementId || _selectionIds.length != 1) {
         _wallEndpointClearanceId = null;
 
         _wallParallelMove = false;
@@ -20417,7 +20665,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (ids.isEmpty) return;
 
     if (ids.length == 1) {
-
+      final sec = _project.sections.where((s) => ids.contains(s.id)).firstOrNull;
+      if (sec != null) {
+        _showSectionElevationProperties(sec.id);
+        return;
+      }
+      final elv = _project.elevations.where((e) => ids.contains(e.id)).firstOrNull;
+      if (elv != null) {
+        _showSectionElevationProperties(elv.id);
+        return;
+      }
       final component = _project.activeStorey.components.where((c) => ids.contains(c.id)).firstOrNull;
 
       if (component != null) {
@@ -20917,6 +21174,117 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
 
+
+
+  Widget _buildSelectControl() {
+    final l10n = context.l10n;
+    final isPoly = _marqueeTool.mode == ArchitectSelectMode.polygon;
+    final drafting = _marqueeTool.isDrafting;
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xE61E293B),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white24),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black38,
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SegmentedButton<ArchitectSelectMode>(
+              style: const ButtonStyle(
+                visualDensity: VisualDensity.compact,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              segments: [
+                ButtonSegment<ArchitectSelectMode>(
+                  value: ArchitectSelectMode.rectangle,
+                  icon: const Icon(Icons.crop_square_rounded, size: 18),
+                  label: Text(
+                    l10n.architectSelectModeRect,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                ButtonSegment<ArchitectSelectMode>(
+                  value: ArchitectSelectMode.polygon,
+                  icon: const Icon(Icons.polyline_rounded, size: 18),
+                  label: Text(
+                    l10n.architectSelectModePolygon,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+              selected: {_marqueeTool.mode},
+              onSelectionChanged: (set) {
+                setState(() {
+                  _marqueeTool.setMode(set.first);
+                });
+              },
+            ),
+            if (drafting) ...[
+              const SizedBox(width: 8),
+              if (isPoly && _marqueeTool.points.length >= 3)
+                IconButton(
+                  tooltip: l10n.architectSelectFinish,
+                  icon: const Icon(Icons.check_circle_rounded,
+                      color: Color(0xFF00E676), size: 22),
+                  onPressed: () {
+                    final poly = _marqueeTool.previewPolygon;
+                    final hits = ArchitectMarqueeTool.evaluateSelection(
+                      storey: _project.activeStorey,
+                      project: _project,
+                      polygon: poly,
+                    );
+                    setState(() {
+                      if (_multiSelect) {
+                        _selectionIds.addAll(hits);
+                      } else {
+                        _selectionIds
+                          ..clear()
+                          ..addAll(hits);
+                      }
+                      if (_selectionIds.isNotEmpty) _selectionContextActive = true;
+                      _marqueeTool.cancel();
+                    });
+                    HapticFeedback.selectionClick();
+                  },
+                ),
+              if (isPoly && _marqueeTool.points.isNotEmpty)
+                IconButton(
+                  tooltip: l10n.undoPoint,
+                  icon: const Icon(Icons.undo_rounded,
+                      color: Colors.white70, size: 20),
+                  onPressed: () {
+                    setState(() {
+                      _marqueeTool.removeLastPoint();
+                    });
+                  },
+                ),
+              IconButton(
+                tooltip: l10n.cancel,
+                icon: const Icon(Icons.close_rounded,
+                    color: Colors.redAccent, size: 20),
+                onPressed: () {
+                  setState(() {
+                    _marqueeTool.cancel();
+                  });
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildWallSelectionActions(Set<String> wallIds) {
 
@@ -21663,13 +22031,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
 
     final nextProject = _project
-
         .updateActiveStorey(nextStorey)
-
         .copyWithGridAxes(
-
           _project.gridAxes.where((a) => !ids.contains(a.id)).toList(),
-
+        )
+        .copyWith(
+          sections: _project.sections.where((s) => !ids.contains(s.id)).toList(),
+          elevations: _project.elevations.where((e) => !ids.contains(e.id)).toList(),
         );
 
     _commands.commit(nextProject);
@@ -22284,6 +22652,52 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  void _openSectionOrElevationView(String id) {
+    if (_project.sections.any((s) => s.id == id)) {
+      _selectWorkspaceView(ArchitectWorkspaceView.section, id);
+    } else if (_project.elevations.any((e) => e.id == id)) {
+      _selectWorkspaceView(ArchitectWorkspaceView.elevation, id);
+    }
+  }
+
+  void _flipSection(String id) {
+    final sec = _project.sections.where((s) => s.id == id).firstOrNull;
+    if (sec == null) return;
+    _modelCommands.commit(
+      _project.copyWith(
+        sections: [
+          for (final s in _project.sections)
+            if (s.id == id) s.reversed() else s,
+        ],
+      ),
+    );
+    HapticFeedback.lightImpact();
+  }
+
+  void _flipElevation(String id) {
+    final elv = _project.elevations.where((e) => e.id == id).firstOrNull;
+    if (elv == null) return;
+    _modelCommands.commit(
+      _project.copyWith(
+        elevations: [
+          for (final e in _project.elevations)
+            if (e.id == id) e.copyWith(viewSide: -e.viewSide) else e,
+        ],
+      ),
+    );
+    HapticFeedback.lightImpact();
+  }
+
+  void _showSectionElevationProperties(String id) {
+    showArchitectViewPropertiesDialog(
+      context: context,
+      project: _project,
+      viewId: id,
+      controller: _modelCommands,
+      onOpenView: () => _openSectionOrElevationView(id),
+    );
+  }
+
   void _selectConnectedWalls() {
 
     final wallIds = _selectedLineIds.isNotEmpty
@@ -22718,10 +23132,74 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+    void _flipDoorsSwing(Set<String> doorIds) {
+    if (doorIds.isEmpty) return;
+    for (final id in doorIds) {
+      final door = _project.activeStorey.walls
+          .expand((w) => w.doors)
+          .where((d) => d.id == id)
+          .firstOrNull;
+      if (door != null) {
+        _commands.execute(
+          SetArchitectElementProperties(
+            storeyId: _project.activeStoreyId,
+            elementIds: {id},
+            textValues: {'openInward': (!door.openInward).toString()},
+          ),
+        );
+      }
+    }
+    _saveBiMProjectIfAttached();
+    HapticFeedback.lightImpact();
+    setState(() {});
+  }
+
+  void _flipDoorsHinge(Set<String> doorIds) {
+    if (doorIds.isEmpty) return;
+    for (final id in doorIds) {
+      final door = _project.activeStorey.walls
+          .expand((w) => w.doors)
+          .where((d) => d.id == id)
+          .firstOrNull;
+      if (door != null) {
+        _commands.execute(
+          SetArchitectElementProperties(
+            storeyId: _project.activeStoreyId,
+            elementIds: {id},
+            textValues: {'isHingeLeft': (!door.isHingeLeft).toString()},
+          ),
+        );
+      }
+    }
+    _saveBiMProjectIfAttached();
+    HapticFeedback.lightImpact();
+    setState(() {});
+  }
+
+  void _flipWindowsSide(Set<String> windowIds) {
+    if (windowIds.isEmpty) return;
+    for (final id in windowIds) {
+      final window = _project.activeStorey.walls
+          .expand((w) => w.windows)
+          .where((w) => w.id == id)
+          .firstOrNull;
+      if (window != null) {
+        _commands.execute(
+          SetArchitectElementProperties(
+            storeyId: _project.activeStoreyId,
+            elementIds: {id},
+            textValues: {'isFlipped': (!window.isFlipped).toString()},
+          ),
+        );
+      }
+    }
+    _saveBiMProjectIfAttached();
+    HapticFeedback.lightImpact();
+    setState(() {});
+  }
+
   Widget _buildSelectionBar() {
-
     final l = context.l10n;
-
     final ids = _effectiveSelection;
 
     final wallIds = _selectedWallIds;
@@ -22731,16 +23209,226 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final segmentIds = lineIds.isNotEmpty ? lineIds : wallIds;
 
     final dimension = ids.length == 1
-
         ? _project.activeStorey.dimensions
-
               .where((d) => ids.contains(d.id))
-
               .firstOrNull
-
+        : null;
+    final selectedSection = ids.length == 1
+        ? _project.sections.where((s) => ids.contains(s.id)).firstOrNull
+        : null;
+    final selectedElevation = ids.length == 1
+        ? _project.elevations.where((e) => ids.contains(e.id)).firstOrNull
         : null;
 
+        final selectedDoors = _project.activeStorey.walls
+        .expand((w) => w.doors)
+        .where((d) => ids.contains(d.id))
+        .toList();
+    final selectedWindows = _project.activeStorey.walls
+        .expand((w) => w.windows)
+        .where((w) => ids.contains(w.id))
+        .toList();
+
+    final isDoorSelection = selectedDoors.isNotEmpty && selectedDoors.length == ids.length;
+    final isWindowSelection = selectedWindows.isNotEmpty && selectedWindows.length == ids.length;
+
     void clear() => _clearSelection();
+
+    if (isDoorSelection) {
+      return Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E26),
+          border: Border(top: BorderSide(color: Colors.white12, width: 1.0)),
+        ),
+        child: Material(
+          key: const ValueKey('architect-selection-bar'),
+          color: Colors.transparent,
+          child: IconButtonTheme(
+            data: const IconButtonThemeData(
+              style: ButtonStyle(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    key: const ValueKey('architect-door-flip-swing'),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                    padding: EdgeInsets.zero,
+                    tooltip: l.architectDoorFlipSwing,
+                    icon: const Icon(
+                      Icons.swap_vert,
+                      color: Color(0xFF40C4FF),
+                      size: 20,
+                    ),
+                    onPressed: () => _flipDoorsSwing(selectedDoors.map((d) => d.id).toSet()),
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-door-flip-hinge'),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                    padding: EdgeInsets.zero,
+                    tooltip: l.architectDoorFlipHinge,
+                    icon: const Icon(
+                      Icons.swap_horiz,
+                      color: Color(0xFF40C4FF),
+                      size: 20,
+                    ),
+                    onPressed: () => _flipDoorsHinge(selectedDoors.map((d) => d.id).toSet()),
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-selection-move'),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                    padding: EdgeInsets.zero,
+                    tooltip: l.architectSelectionMove,
+                    icon: Icon(
+                      Icons.open_with,
+                      size: 18,
+                      color: _moveSelection ? Colors.amber : Colors.white70,
+                    ),
+                    onPressed: () => setState(() {
+                      _radialMenuScreenPosition = null;
+                      _polygonEditId = null;
+                      _polygonSelectedEdge = null;
+                      _wallParallelMove = false;
+                      _moveSelection = !_moveSelection;
+                    }),
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-selection-properties'),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                    padding: EdgeInsets.zero,
+                    tooltip: l.architectProperties,
+                    icon: const Icon(Icons.tune, color: Colors.white70, size: 18),
+                    onPressed: () {
+                      setState(() => _radialMenuScreenPosition = null);
+                      _showProperties();
+                    },
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-selection-delete'),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                    padding: EdgeInsets.zero,
+                    tooltip: l.delete,
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
+                    onPressed: _deleteSelection,
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-clear-selection'),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                    padding: EdgeInsets.zero,
+                    tooltip: l.close,
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.redAccent,
+                      size: 18,
+                      weight: 800,
+                    ),
+                    onPressed: clear,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (isWindowSelection) {
+      return Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E26),
+          border: Border(top: BorderSide(color: Colors.white12, width: 1.0)),
+        ),
+        child: Material(
+          key: const ValueKey('architect-selection-bar'),
+          color: Colors.transparent,
+          child: IconButtonTheme(
+            data: const IconButtonThemeData(
+              style: ButtonStyle(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    key: const ValueKey('architect-window-flip-side'),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                    padding: EdgeInsets.zero,
+                    tooltip: l.architectWindowFlipSide,
+                    icon: const Icon(
+                      Icons.flip,
+                      color: Color(0xFF40C4FF),
+                      size: 20,
+                    ),
+                    onPressed: () => _flipWindowsSide(selectedWindows.map((w) => w.id).toSet()),
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-selection-move'),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                    padding: EdgeInsets.zero,
+                    tooltip: l.architectSelectionMove,
+                    icon: Icon(
+                      Icons.open_with,
+                      size: 18,
+                      color: _moveSelection ? Colors.amber : Colors.white70,
+                    ),
+                    onPressed: () => setState(() {
+                      _radialMenuScreenPosition = null;
+                      _polygonEditId = null;
+                      _polygonSelectedEdge = null;
+                      _wallParallelMove = false;
+                      _moveSelection = !_moveSelection;
+                    }),
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-selection-properties'),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                    padding: EdgeInsets.zero,
+                    tooltip: l.architectProperties,
+                    icon: const Icon(Icons.tune, color: Colors.white70, size: 18),
+                    onPressed: () {
+                      setState(() => _radialMenuScreenPosition = null);
+                      _showProperties();
+                    },
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-selection-delete'),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                    padding: EdgeInsets.zero,
+                    tooltip: l.delete,
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
+                    onPressed: _deleteSelection,
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-clear-selection'),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+                    padding: EdgeInsets.zero,
+                    tooltip: l.close,
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.redAccent,
+                      size: 18,
+                      weight: 800,
+                    ),
+                    onPressed: clear,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Container(
 
@@ -22775,7 +23463,70 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               mainAxisSize: MainAxisSize.min,
 
               children: [
-
+                if (selectedSection != null) ...[
+                  IconButton(
+                    key: const ValueKey('architect-section-open-view'),
+                    tooltip: l.architectOpenView,
+                    icon: const Icon(
+                      Icons.visibility_outlined,
+                      color: Colors.cyanAccent,
+                      size: 18,
+                    ),
+                    onPressed: () => _openSectionOrElevationView(selectedSection.id),
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-section-flip'),
+                    tooltip: l.architectRadialFlip,
+                    icon: const Icon(
+                      Icons.flip,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
+                    onPressed: () => _flipSection(selectedSection.id),
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-section-properties'),
+                    tooltip: l.architectProperties,
+                    icon: const Icon(
+                      Icons.tune,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
+                    onPressed: () => _showSectionElevationProperties(selectedSection.id),
+                  ),
+                ],
+                if (selectedElevation != null) ...[
+                  IconButton(
+                    key: const ValueKey('architect-elevation-open-view'),
+                    tooltip: l.architectOpenView,
+                    icon: const Icon(
+                      Icons.visibility_outlined,
+                      color: Colors.cyanAccent,
+                      size: 18,
+                    ),
+                    onPressed: () => _openSectionOrElevationView(selectedElevation.id),
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-elevation-flip'),
+                    tooltip: l.architectRadialFlip,
+                    icon: const Icon(
+                      Icons.flip,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
+                    onPressed: () => _flipElevation(selectedElevation.id),
+                  ),
+                  IconButton(
+                    key: const ValueKey('architect-elevation-properties'),
+                    tooltip: l.architectProperties,
+                    icon: const Icon(
+                      Icons.tune,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
+                    onPressed: () => _showSectionElevationProperties(selectedElevation.id),
+                  ),
+                ],
                 if (dimension != null) ...[
 
                   IconButton(
@@ -23563,7 +24314,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ...storey.elevationMarkers.map((e) => e.id),
 
       ...storey.cadPrimitives.map((e) => e.id),
-
+      ..._project.sections.map((e) => e.id),
+      ..._project.elevations.map((e) => e.id),
     ].contains(id);
 
     _zoneTool.cancelEditingZone();
@@ -27310,6 +28062,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         ),
 
+      if (_activeTool == ArchitectTool.select && _effectiveSelection.isEmpty)
+        Positioned(top: 8, left: 8, child: _buildSelectControl()),
+
       if (_activeTool == ArchitectTool.hatch && _effectiveSelection.isEmpty)
 
         Positioned(top: 8, left: 8, child: _hatchControl()),
@@ -27320,7 +28075,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         Positioned(top: 8, left: 8, child: _floorDrainControl()),
 
-      if (_linearDraftTool && _effectiveSelection.isEmpty)
+      if ((_activeTool == ArchitectTool.wall || _activeTool == ArchitectTool.cadLine) && _effectiveSelection.isEmpty)
 
         Positioned(
 
@@ -28835,6 +29590,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     slabDraftPoints: _elementTool.slabDraftPoints,
 
     slabCandidatePoint: _elementTool.slabCandidatePoint,
+    marqueePoints: _marqueeTool.points,
+    marqueePolygon: _marqueeTool.previewPolygon,
 
     roofTool: _roofTool,
 

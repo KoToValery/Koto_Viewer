@@ -3526,6 +3526,12 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectDoorSwingDirection => 'Отваряне';
 
   @override
+  String get architectDoorFlipSwing => 'Обръщане навътре/навън';
+
+  @override
+  String get architectDoorFlipHinge => 'Обръщане на пантите (лява/дясна)';
+
+  @override
   String get architectWallDrawPrompt =>
       'Докоснете за начало, докоснете отново за край на стената';
 
@@ -4039,6 +4045,9 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectWindowSill => 'Подпр.';
+
+  @override
+  String get architectWindowFlipSide => 'Обръщане на външна/вътрешна страна';
 
   @override
   String get architectColumnShape => 'Форма';
@@ -6364,6 +6373,19 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
+  String get architectRoofSnapHipIntersection => 'Пресечна точка на маии (45°)';
+
+  @override
+  String get architectRoofSnapCornerHipIntersection =>
+      'Пресечна точка с 45° от ръб';
+
+  @override
+  String get architectRoofSnapPerpToCorner => 'Перпендикуляр към вътрешен ръб';
+
+  @override
+  String get architectRoofSnapRidgeAlignment => 'Подравняване по било / ръб';
+
+  @override
   String get cad3dOrbit => 'Завъртане';
 
   @override
@@ -7746,4 +7768,50 @@ class AppLocalizationsBg extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get architectCategoryViews => 'Изгледи';
+
+  @override
+  String get architectToolSection => 'Разрез';
+
+  @override
+  String get architectToolElevation => 'Фасада';
+
+  @override
+  String get architectOpenView => 'Отвори изглед';
+
+  @override
+  String get architectOpenSection => 'Отвори разрез';
+
+  @override
+  String get architectOpenElevation => 'Отвори фасада';
+
+  @override
+  String get architectViewRename => 'Преименувай';
+
+  @override
+  String get architectSectionHint =>
+      'Посочи начална и крайна точка за поставяне на разреза.';
+
+  @override
+  String get architectElevationHint =>
+      'Посочи начална и крайна точка за поставяне на фасадата.';
+
+  @override
+  String get architectSelectModeRect => 'Правоъгълно';
+
+  @override
+  String get architectSelectModePolygon => 'Точка по точка';
+
+  @override
+  String get architectSelectMarqueeHint =>
+      'Посочи срещуположни ъгли за селекция';
+
+  @override
+  String get architectSelectPolygonHint =>
+      'Посочи точки за ограждане на селекцията';
+
+  @override
+  String get architectSelectFinish => 'Селектирай';
 }

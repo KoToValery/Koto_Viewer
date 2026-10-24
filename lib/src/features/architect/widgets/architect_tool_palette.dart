@@ -21,6 +21,7 @@ enum ArchitectToolCategory {
   build,
   structure,
   furnishing,
+  views,
   annotations,
   drawing;
 
@@ -29,6 +30,7 @@ enum ArchitectToolCategory {
     build => l.architectCategoryBuild,
     structure => l.architectCategoryStructure,
     furnishing => l.architectFurnishing,
+    views => l.architectCategoryViews,
     annotations => l.architectCategoryAnnotations,
     drawing => l.architectCategoryDrawing,
   };
@@ -49,6 +51,8 @@ enum ArchitectToolCategory {
     ArchitectTool.beam ||
     ArchitectTool.slab ||
     ArchitectTool.roof => structure,
+    ArchitectTool.section ||
+    ArchitectTool.elevation => views,
     ArchitectTool.dimension ||
     ArchitectTool.level ||
     ArchitectTool.text ||
@@ -345,7 +349,9 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   !compactComponents)
                 _buildComponentSubBar(context)
               else if (activeTool == ArchitectTool.opening)
-                _buildOpeningSubBar(context),
+                _buildOpeningSubBar(context)
+              else if (activeTool == ArchitectTool.section || activeTool == ArchitectTool.elevation)
+                _buildViewsSubBar(context),
 
               const SizedBox(height: 6),
 
@@ -624,6 +630,18 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     icon: Icons.radio_button_unchecked_rounded,
                                     label: l10n.architectToolCadCircle,
                                   ),
+                                if (category == ArchitectToolCategory.views) ...[
+                                  _buildToolButton(
+                                    tool: ArchitectTool.section,
+                                    icon: Icons.splitscreen_outlined,
+                                    label: l10n.architectToolSection,
+                                  ),
+                                  _buildToolButton(
+                                    tool: ArchitectTool.elevation,
+                                    icon: Icons.apartment,
+                                    label: l10n.architectToolElevation,
+                                  ),
+                                ],
                                 if (category ==
                                     ArchitectToolCategory.of(
                                       ArchitectTool.axis,
@@ -1486,6 +1504,30 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildViewsSubBar(BuildContext context) {
+    final l10n = context.l10n;
+    final isSection = activeTool == ArchitectTool.section;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isSection ? Icons.splitscreen_outlined : Icons.apartment,
+            color: const Color(0xFF00E5FF),
+            size: 16,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isSection ? l10n.architectSectionHint : l10n.architectElevationHint,
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+        ],
+      ),
     );
   }
 }

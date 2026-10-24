@@ -3512,6 +3512,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectDoorSwingDirection => 'Opening';
 
   @override
+  String get architectDoorFlipSwing => 'Flip swing (in/out)';
+
+  @override
+  String get architectDoorFlipHinge => 'Flip hinge (left/right)';
+
+  @override
   String get architectWallDrawPrompt => 'Tap to start wall, tap again to place';
 
   @override
@@ -4022,6 +4028,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectWindowSill => 'Sill';
+
+  @override
+  String get architectWindowFlipSide => 'Flip exterior/interior side';
 
   @override
   String get architectColumnShape => 'Shape';
@@ -6336,6 +6345,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get architectRoofSnapHipIntersection => 'Hip intersection (45°)';
+
+  @override
+  String get architectRoofSnapCornerHipIntersection =>
+      'Corner hip intersection (45°)';
+
+  @override
+  String get architectRoofSnapPerpToCorner => 'Perpendicular to inner corner';
+
+  @override
+  String get architectRoofSnapRidgeAlignment => 'Ridge / edge alignment';
+
+  @override
   String get cad3dOrbit => 'Orbit';
 
   @override
@@ -7716,4 +7738,50 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get architectCategoryViews => 'Views';
+
+  @override
+  String get architectToolSection => 'Section';
+
+  @override
+  String get architectToolElevation => 'Elevation';
+
+  @override
+  String get architectOpenView => 'Open View';
+
+  @override
+  String get architectOpenSection => 'Open Section';
+
+  @override
+  String get architectOpenElevation => 'Open Elevation';
+
+  @override
+  String get architectViewRename => 'Rename';
+
+  @override
+  String get architectSectionHint =>
+      'Click start and end points to place the section cut.';
+
+  @override
+  String get architectElevationHint =>
+      'Click start and end points to place the elevation marker.';
+
+  @override
+  String get architectSelectModeRect => 'Rectangle';
+
+  @override
+  String get architectSelectModePolygon => 'Point by point';
+
+  @override
+  String get architectSelectMarqueeHint =>
+      'Click or drag opposite corners to select';
+
+  @override
+  String get architectSelectPolygonHint =>
+      'Click points to outline selection area';
+
+  @override
+  String get architectSelectFinish => 'Select';
 }

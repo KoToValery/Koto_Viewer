@@ -396,11 +396,61 @@ class ArchitectRoofPainterHelper {
     final draftingScale = math.max(scale, 80.0);
     for (var i = 0; i < poly.length; i++) {
       final a = poly[i];
-      canvas.drawCircle(
-        a,
-        4.5 / draftingScale,
-        Paint()..color = i == 0 ? const Color(0xFF00E676) : accent,
-      );
+      if (i == 0) {
+        // High-contrast clear start marker (Feature 2)
+        canvas.drawCircle(
+          a,
+          7.5 / draftingScale,
+          Paint()
+            ..color = const Color(0xFF00E676).withValues(alpha: 0.25)
+            ..style = PaintingStyle.fill,
+        );
+        canvas.drawCircle(
+          a,
+          5.5 / draftingScale,
+          Paint()
+            ..color = const Color(0xDE000000)
+            ..strokeWidth = 2.4 / draftingScale
+            ..style = PaintingStyle.stroke,
+        );
+        canvas.drawCircle(
+          a,
+          4.8 / draftingScale,
+          Paint()
+            ..color = const Color(0xFF00E676)
+            ..strokeWidth = 1.6 / draftingScale
+            ..style = PaintingStyle.stroke,
+        );
+        canvas.drawCircle(
+          a,
+          2.8 / draftingScale,
+          Paint()..color = const Color(0xFF00E676),
+        );
+        canvas.drawCircle(
+          a,
+          1.3 / draftingScale,
+          Paint()..color = Colors.white,
+        );
+      } else {
+        canvas.drawCircle(
+          a,
+          4.2 / draftingScale,
+          Paint()
+            ..color = const Color(0xDE000000)
+            ..strokeWidth = 2.0 / draftingScale
+            ..style = PaintingStyle.stroke,
+        );
+        canvas.drawCircle(
+          a,
+          3.4 / draftingScale,
+          Paint()..color = accent,
+        );
+        canvas.drawCircle(
+          a,
+          1.2 / draftingScale,
+          Paint()..color = Colors.white,
+        );
+      }
       if (i + 1 < poly.length || poly.length >= 3) {
         final b = poly[(i + 1) % poly.length];
         final len = (b - a).distance;

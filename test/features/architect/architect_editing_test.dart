@@ -42,6 +42,8 @@ ArchitectCommandController seeded(
   final project = base.project.copyWith(
     storeys: [storey],
     gridAxes: axes,
+    sections: const [],
+    elevations: const [],
     wallTypes: ArchitectWallType.standardCatalog(),
   );
   base.dispose();
@@ -460,6 +462,7 @@ void main() {
             name: 'z',
             category: ArchitectZoneCategory.custom,
             polygon: polygon,
+            isAutoBoundary: false,
           ),
         ],
       ),
@@ -710,7 +713,7 @@ void main() {
         const Offset(-2, 1),
       );
       final second = await tester.startGesture(
-        workspace.screen(tester, const Offset(3, 2)),
+        workspace.screen(tester, const Offset(2, 2)),
         pointer: 82,
       );
       await second.up();

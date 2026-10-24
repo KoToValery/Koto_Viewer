@@ -1,3 +1,4 @@
+import '../widgets/architect_elevation_labels.dart';
 import '../models/architect_contour.dart';
 import 'architect_roof_drainage_geometry.dart';
 import 'architect_roof_junctions.dart';
@@ -42,9 +43,6 @@ class ArchitectSelection {
     Map<String, dynamic> json,
     String storeyId,
   ) sync* {
-    for (final axis in json['gridAxes'] as List) {
-      yield axis as Map<String, dynamic>;
-    }
     final storey = (json['storeys'] as List)
         .cast<Map<String, dynamic>>()
         .firstWhere((s) => s['id'] == storeyId);
@@ -59,6 +57,15 @@ class ArchitectSelection {
           }
         }
       }
+    }
+    for (final axis in json['gridAxes'] as List? ?? []) {
+      yield axis as Map<String, dynamic>;
+    }
+    for (final s in json['sections'] as List? ?? []) {
+      yield s as Map<String, dynamic>;
+    }
+    for (final el in json['elevations'] as List? ?? []) {
+      yield el as Map<String, dynamic>;
     }
   }
 
@@ -132,6 +139,12 @@ class ArchitectSelection {
       if (d.id == id) {
         return Rect.fromPoints(d.lineStart, d.lineEnd).inflate(.02);
       }
+    }
+    for (final sec in project.sections) {
+      if (sec.id == id) return Rect.fromPoints(sec.start, sec.end).inflate(.02);
+    }
+    for (final el in project.elevations) {
+      if (el.id == id) return Rect.fromPoints(el.start, el.end).inflate(.02);
     }
     final e = record(project, id);
     Offset point(dynamic json) =>
@@ -290,6 +303,8 @@ class ArchitectSelection {
         .where((win) => ids.contains(win.id))
         .length;
     final axisCount = project.gridAxes.where((a) => ids.contains(a.id)).length;
+    final sectionCount = project.sections.where((s) => ids.contains(s.id)).length;
+    final elevationCount = project.elevations.where((e) => ids.contains(e.id)).length;
     final cadCount = s.cadPrimitives.where((c) => ids.contains(c.id) && c.type != CadPrimitiveType.hatch).length;
     final hatchCount = s.cadPrimitives.where((c) => ids.contains(c.id) && c.type == CadPrimitiveType.hatch).length;
 
@@ -306,6 +321,23 @@ class ArchitectSelection {
     if (axisCount > 0) parts.add(l.architectSelectionAxesCount(axisCount));
     if (cadCount > 0) parts.add(l.architectSelectionCadCount(cadCount));
     if (hatchCount > 0) parts.add(l.architectSelectionHatchesCount(hatchCount));
+    if (sectionCount > 0) {
+      if (sectionCount == 1 && ids.length == 1) {
+        final sec = project.sections.firstWhere((s) => ids.contains(s.id));
+        final idx = project.sections.indexOf(sec) + 1;
+        parts.add(sec.name.isNotEmpty ? sec.name : l.architectSectionNumber(idx));
+      } else {
+        parts.add('${l.buildingSections}: $sectionCount');
+      }
+    }
+    if (elevationCount > 0) {
+      if (elevationCount == 1 && ids.length == 1) {
+        final el = project.elevations.firstWhere((e) => ids.contains(e.id));
+        parts.add(architectElevationLabel(l, el, project.northSymbol?.angle ?? 0));
+      } else {
+        parts.add('${l.architectFacades}: $elevationCount');
+      }
+    }
 
 
     if (parts.length == 1) {
@@ -436,6 +468,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
               'cutDisplayMode',
               'isHingeLeft',
               'openInward',
+              'isFlipped',
               'number',
               'category',
               'floorFinish',
@@ -458,7 +491,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
             throw ArgumentError('Invalid boolean value');
           }
           e[value.key] = value.value == 'true';
-        } else if (value.key == 'isHingeLeft' || value.key == 'openInward') {
+        } else if (value.key == 'isHingeLeft' || value.key == 'openInward' || value.key == 'isFlipped') {
           if (!{'true', 'false'}.contains(value.value)) {
             throw ArgumentError('Invalid boolean value');
           }

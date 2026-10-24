@@ -1106,6 +1106,8 @@
   "architectDoorSpecId": "Марка (ID)",
   "architectDoorHingeSide": "Панти",
   "architectDoorSwingDirection": "Отваряне",
+  "architectDoorFlipSwing": "Обръщане навътре/навън",
+  "architectDoorFlipHinge": "Обръщане на пантите (лява/дясна)",
   "architectWallDrawPrompt": "Докоснете за начало, докоснете отново за край на стената",
   "architectView2D": "2D План",
   "architectView3D": "3D Модел",
@@ -1321,6 +1323,7 @@
   "architectWindowWidth": "Шир.",
   "architectWindowHeight": "Височина",
   "architectWindowSill": "Подпр.",
+  "architectWindowFlipSide": "Обръщане на външна/вътрешна страна",
   "architectColumnShape": "Форма",
   "architectColumnRect": "Правоъг.",
   "architectColumnCircle": "Кръгла",
@@ -2082,6 +2085,10 @@
       }
     }
   },
+  "architectRoofSnapHipIntersection": "Пресечна точка на маии (45°)",
+  "architectRoofSnapCornerHipIntersection": "Пресечна точка с 45° от ръб",
+  "architectRoofSnapPerpToCorner": "Перпендикуляр към вътрешен ръб",
+  "architectRoofSnapRidgeAlignment": "Подравняване по било / ръб",
   "cad3dOrbit": "Завъртане",
   "cad3dPan": "Преместване",
   "cad3dWalk": "Разходка",
@@ -2526,4 +2533,19 @@
   "architectDrainRoomNotFound": "Тук няма затворено помещение",
   "architectDrainInvalid": "Сифонът не може да се постави тук",
   "architectSelectionDrainsCount": "{count, plural, one{1 сифон} other{{count} сифона}}"
+,
+  "architectCategoryViews": "Изгледи",
+  "architectToolSection": "Разрез",
+  "architectToolElevation": "Фасада",
+  "architectOpenView": "Отвори изглед",
+  "architectOpenSection": "Отвори разрез",
+  "architectOpenElevation": "Отвори фасада",
+  "architectViewRename": "Преименувай",
+  "architectSectionHint": "Посочи начална и крайна точка за поставяне на разреза.",
+  "architectElevationHint": "Посочи начална и крайна точка за поставяне на фасадата.",
+  "architectSelectModeRect": "Правоъгълно",
+  "architectSelectModePolygon": "Точка по точка",
+  "architectSelectMarqueeHint": "Посочи срещуположни ъгли за селекция",
+  "architectSelectPolygonHint": "Посочи точки за ограждане на селекцията",
+  "architectSelectFinish": "Селектирай"
 }

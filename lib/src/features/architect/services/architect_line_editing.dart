@@ -36,6 +36,22 @@ class ArchitectLineEditing {
     ArchitectProject project,
     ArchitectModelCommand command,
   ) {
+    if (command is UpdateArchitectWall) {
+      if (project.sections.any((s) => s.id == command.wall.id)) {
+        return UpdateArchitectSection(
+          sectionId: command.wall.id,
+          startPoint: command.wall.startPoint,
+          endPoint: command.wall.endPoint,
+        );
+      }
+      if (project.elevations.any((e) => e.id == command.wall.id)) {
+        return UpdateArchitectElevation(
+          elevationId: command.wall.id,
+          startPoint: command.wall.startPoint,
+          endPoint: command.wall.endPoint,
+        );
+      }
+    }
     final (String, Set<String>)? target = switch (command) {
       UpdateArchitectWall c => (c.storeyId, {c.wall.id}),
       ExtendArchitectWall c => (c.storeyId, {c.wallId}),

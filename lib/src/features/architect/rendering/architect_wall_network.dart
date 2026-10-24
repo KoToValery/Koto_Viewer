@@ -26,17 +26,64 @@ class ArchitectWallNetwork {
   }) {
     final cached = faceOffsets == null ? _cache[walls] : null;
     if (cached != null) return cached;
+    final juncs = junctions(walls, faceOffsets: faceOffsets);
     var result = Path();
     for (final wall in walls) {
       if (wall.length < 1e-6) continue;
       final (low, high) = _faces(wall, faceOffsets);
+      var from = 0.0;
+      var to = 1.0;
+      if (faceOffsets != null && !wall.isCurved) {
+        for (final other in walls) {
+          if (other == wall || other.isCurved) continue;
+          final node = intersection(
+            wall.startPoint,
+            wall.endPoint,
+            other.startPoint,
+            other.endPoint,
+          );
+          if (node == null) continue;
+          final isStart = (node - wall.startPoint).distance < 1e-4;
+          final isEnd = (node - wall.endPoint).distance < 1e-4;
+          if (!isStart && !isEnd) continue;
+
+          final fa = _faces(wall, faceOffsets), fb = _faces(other, faceOffsets);
+          final juncPoints = <Offset>[];
+          for (final sa in [fa.$1, fa.$2]) {
+            for (final sb in [fb.$1, fb.$2]) {
+              final p = intersection(
+                wall.startPoint + wall.normalVector * sa,
+                wall.endPoint + wall.normalVector * sa,
+                other.startPoint + other.normalVector * sb,
+                other.endPoint + other.normalVector * sb,
+              );
+              if (p != null) juncPoints.add(p);
+            }
+          }
+          if (juncPoints.length != 4) continue;
+          double along(Offset p) {
+            final d = p - wall.startPoint;
+            return d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
+          }
+
+          final alongs = juncPoints.map(along).toList();
+          final minP = alongs.reduce(math.min);
+          final maxP = alongs.reduce(math.max);
+          if (isEnd && wall.length > maxP + 1e-4) {
+            to = math.min(to, (maxP / wall.length).clamp(0.0, 1.0));
+          }
+          if (isStart && 0 < minP - 1e-4) {
+            from = math.max(from, (minP / wall.length).clamp(0.0, 1.0));
+          }
+        }
+      }
       result = Path.combine(
         PathOperation.union,
         result,
-        polygon(wall.facePolygon(low, high)),
+        polygon(wall.facePolygon(low, high, from: from, to: to)),
       );
     }
-    for (final junction in junctions(walls, faceOffsets: faceOffsets)) {
+    for (final junction in juncs) {
       result = Path.combine(PathOperation.union, result, polygon(junction.$1));
     }
     if (faceOffsets == null) _cache[walls] = result;
@@ -157,18 +204,24 @@ class ArchitectWallNetwork {
         // A layer need not contain its reference node (an edge reference may
         // lie in the insulation). Extend its end faces to the shared mitre.
         if (faceOffsets != null) {
-          points.addAll([
-            node + a.normalVector * fa.$1,
-            node + a.normalVector * fa.$2,
-            node + b.normalVector * fb.$1,
-            node + b.normalVector * fb.$2,
-          ]);
           for (final wall in [a, b]) {
-            final d = node - wall.startPoint;
-            final along = d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
-            if (along < 0 || along > wall.length) {
-              final cap = along < 0 ? wall.startPoint : wall.endPoint;
-              final face = _faces(wall, faceOffsets);
+            double along(Offset p) {
+              final d = p - wall.startPoint;
+              return d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
+            }
+
+            final alongs = points.map(along).toList();
+            final minP = alongs.reduce(math.min);
+            final maxP = alongs.reduce(math.max);
+            final face = _faces(wall, faceOffsets);
+            if (wall.length < minP - 1e-8) {
+              final cap = wall.endPoint;
+              points.addAll([
+                cap + wall.normalVector * face.$1,
+                cap + wall.normalVector * face.$2,
+              ]);
+            } else if (0 > maxP + 1e-8) {
+              final cap = wall.startPoint;
               points.addAll([
                 cap + wall.normalVector * face.$1,
                 cap + wall.normalVector * face.$2,

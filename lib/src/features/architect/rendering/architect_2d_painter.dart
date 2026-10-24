@@ -63,6 +63,8 @@ enum ArchitectTool {
   measure,
   hatch,
   floorDrain,
+  section,
+  elevation,
 }
 
 enum WallDraftingMode { singleLine, chained }
@@ -186,6 +188,8 @@ class Architect2dPainter extends CustomPainter {
   final bool showUpperOverhangs;
   final bool showFurniture;
   final ArchitectComponentInstance? componentPreview;
+  final List<Offset> marqueePoints;
+  final List<Offset> marqueePolygon;
 
   Architect2dPainter({
     required ArchitectProject project,
@@ -200,6 +204,8 @@ class Architect2dPainter extends CustomPainter {
     this.showUpperOverhangs = true,
     this.showFurniture = true,
     this.componentPreview,
+    this.marqueePoints = const [],
+    this.marqueePolygon = const [],
     required this.activeTool,
     this.activeCadLineStyle = ArchitectLineStyle.solid,
     this.activeWallLayers = const [],
@@ -510,7 +516,7 @@ class Architect2dPainter extends CustomPainter {
         selectedElementId: selectedElementId,
       );
       if (l10n != null) {
-        drawArchitectElevationMarkers(canvas, _project, zoomScale, palette.foreground(Colors.black87), l10n!);
+        drawArchitectElevationMarkers(canvas, _project, zoomScale, palette.foreground(Colors.black87), l10n!, selected: selectedElementId);
       }
     }
     if (layer != ArchitectPaintLayer.model) {
@@ -1588,14 +1594,81 @@ class Architect2dPainter extends CustomPainter {
           ..strokeWidth = 1.0 / draftingScale,
       );
     }
-    if ((activeTool == ArchitectTool.wall ||
-            activeTool == ArchitectTool.cadLine) &&
-        activeDraftStart != null) {
-      canvas.drawCircle(
+    // --- CLEAR, NEAT PLACEMENT POINTS DURING DRAFTING ---
+    if (activeDraftStart != null) {
+      _drawDraftMarker(
+        canvas,
         activeDraftStart!,
-        3 / draftingScale,
-        Paint()..color = Colors.orangeAccent,
+        draftingScale: draftingScale,
+        isStart: true,
       );
+    }
+
+    if (slabDraftPoints.isNotEmpty) {
+      _drawDraftMarker(
+        canvas,
+        slabDraftPoints.first,
+        draftingScale: draftingScale,
+        isStart: true,
+      );
+      for (int i = 1; i < slabDraftPoints.length; i++) {
+        _drawDraftMarker(
+          canvas,
+          slabDraftPoints[i],
+          draftingScale: draftingScale,
+          isStart: false,
+        );
+      }
+    }
+
+    // --- MARQUEE SELECTION PREVIEW (Archicad-style dashed frame) ---
+    if (marqueePoints.isNotEmpty) {
+      final poly = marqueePolygon;
+      if (poly.length >= 3) {
+        final fillPath = Path()..addPolygon(poly, true);
+        canvas.drawPath(
+          fillPath,
+          Paint()
+            ..color = const Color(0xFF00E5FF).withValues(alpha: 0.14)
+            ..style = PaintingStyle.fill,
+        );
+
+        final darkUnderlay = Paint()
+          ..color = const Color(0xCC000000)
+          ..strokeWidth = 2.4 / draftingScale
+          ..style = PaintingStyle.stroke;
+        final cyanDash = Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..strokeWidth = 1.6 / draftingScale
+          ..style = PaintingStyle.stroke;
+
+        for (int i = 0; i < poly.length; i++) {
+          final p1 = poly[i];
+          final p2 = poly[(i + 1) % poly.length];
+          _drawDashedLine(canvas, p1, p2, darkUnderlay, draftingScale);
+          _drawDashedLine(canvas, p1, p2, cyanDash, draftingScale);
+        }
+      } else if (poly.length == 2) {
+        final p1 = poly[0];
+        final p2 = poly[1];
+        final darkUnderlay = Paint()
+          ..color = const Color(0xCC000000)
+          ..strokeWidth = 2.4 / draftingScale;
+        final cyanDash = Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..strokeWidth = 1.6 / draftingScale;
+        _drawDashedLine(canvas, p1, p2, darkUnderlay, draftingScale);
+        _drawDashedLine(canvas, p1, p2, cyanDash, draftingScale);
+      }
+
+      for (int i = 0; i < marqueePoints.length; i++) {
+        _drawDraftMarker(
+          canvas,
+          marqueePoints[i],
+          draftingScale: draftingScale,
+          isStart: i == 0,
+        );
+      }
     }
     if (activeTool == ArchitectTool.wall &&
         cursorPosition != null &&
@@ -1707,6 +1780,77 @@ class Architect2dPainter extends CustomPainter {
       );
       tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
       canvas.restore();
+    }
+  }
+
+  static void _drawDraftMarker(
+    Canvas canvas,
+    Offset point, {
+    required double draftingScale,
+    bool isStart = true,
+    Color? color,
+  }) {
+    final primary = color ??
+        (isStart ? const Color(0xFF00E5FF) : const Color(0xFFFFB300));
+
+    if (isStart) {
+      // 1. Soft orienting aura
+      canvas.drawCircle(
+        point,
+        7.5 / draftingScale,
+        Paint()
+          ..color = primary.withValues(alpha: 0.25)
+          ..style = PaintingStyle.fill,
+      );
+      // 2. High-contrast dark outer rim
+      canvas.drawCircle(
+        point,
+        5.5 / draftingScale,
+        Paint()
+          ..color = const Color(0xDE000000)
+          ..strokeWidth = 2.4 / draftingScale
+          ..style = PaintingStyle.stroke,
+      );
+      // 3. Crisp vibrant ring
+      canvas.drawCircle(
+        point,
+        4.8 / draftingScale,
+        Paint()
+          ..color = primary
+          ..strokeWidth = 1.6 / draftingScale
+          ..style = PaintingStyle.stroke,
+      );
+      // 4. Solid core with pinpoint white center dot
+      canvas.drawCircle(
+        point,
+        2.8 / draftingScale,
+        Paint()..color = primary,
+      );
+      canvas.drawCircle(
+        point,
+        1.3 / draftingScale,
+        Paint()..color = Colors.white,
+      );
+    } else {
+      // Intermediate vertex node (neat, compact, dual-tone)
+      canvas.drawCircle(
+        point,
+        4.2 / draftingScale,
+        Paint()
+          ..color = const Color(0xDE000000)
+          ..strokeWidth = 2.0 / draftingScale
+          ..style = PaintingStyle.stroke,
+      );
+      canvas.drawCircle(
+        point,
+        3.4 / draftingScale,
+        Paint()..color = primary,
+      );
+      canvas.drawCircle(
+        point,
+        1.2 / draftingScale,
+        Paint()..color = Colors.white,
+      );
     }
   }
 

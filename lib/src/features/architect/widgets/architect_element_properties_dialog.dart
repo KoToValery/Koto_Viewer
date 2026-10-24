@@ -115,6 +115,12 @@ class _ArchitectElementPropertiesDialogState
         texts['styleId'] = styleIds.first!;
       }
     }
+    if (isWindow) {
+      final flips = records.map((e) => e['isFlipped'] as bool? ?? false).toSet();
+      if (flips.length == 1) {
+        texts['isFlipped'] = '${flips.first}';
+      }
+    }
     final isZone = records.isNotEmpty &&
         records.every((e) => e.containsKey('category') && e.containsKey('floorFinish'));
     if (isZone) {
@@ -786,6 +792,23 @@ class _ArchitectElementPropertiesDialogState
                       showSelectedIcon: false,
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+              ],
+              if (isWindow) ...[
+                ListTile(
+                  key: const ValueKey('architect-property-window-flip'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l.architectWindowFlipSide),
+                  trailing: Switch(
+                    value: texts['isFlipped'] == 'true' ||
+                        (texts['isFlipped'] == null &&
+                            (records.first['isFlipped'] as bool? ?? false)),
+                    onChanged: (val) {
+                      setState(() => texts['isFlipped'] = '$val');
+                    },
+                  ),
                 ),
                 const SizedBox(height: 8),
               ],

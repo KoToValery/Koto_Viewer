@@ -1112,8 +1112,25 @@ class MoveArchitectElement extends ArchitectModelCommand {
             ? e.copyWith(start: e.start + delta, end: e.end + delta)
             : e,
     ];
-    if (!found) throw ArgumentError('Unknown movable element: $elementId');
-    return ArchitectModelCommand.replace(project, next).copyWithGridAxes(axes);
+    final sections = [
+      for (final s in project.sections)
+        matches(s.id)
+            ? s.copyWith(start: s.start + delta, end: s.end + delta)
+            : s,
+    ];
+    final elevations = [
+      for (final el in project.elevations)
+        matches(el.id)
+            ? el.copyWith(start: el.start + delta, end: el.end + delta)
+            : el,
+    ];
+    final foundAny = found ||
+        project.sections.any((s) => matches(s.id)) ||
+        project.elevations.any((el) => matches(el.id));
+    if (!foundAny) throw ArgumentError('Unknown movable element: $elementId');
+    return ArchitectModelCommand.replace(project, next)
+        .copyWithGridAxes(axes)
+        .copyWith(sections: sections, elevations: elevations);
   }
 }
 
@@ -1523,10 +1540,10 @@ class JoinArchitectWalls extends ArchitectModelCommand {
     void extend(ArchitectWall wall, Offset point) {
       final d = point - wall.startPoint;
       final along = wall.isCurved?wall.arc!.parameter(point)*wall.length:d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
-      final atStart = along < -1e-8;
-      if (!atStart && along <= wall.length + 1e-8) return;
-      final key = (wall.id, atStart);
+      final atStart = along < wall.length / 2;
       final end = atStart ? wall.startPoint : wall.endPoint;
+      if ((point - end).distance < 1e-8) return;
+      final key = (wall.id, atStart);
       if (!targets.containsKey(key) ||
           (point - end).distance < (targets[key]! - end).distance) {
         targets[key] = point;
@@ -2121,6 +2138,55 @@ class ArchitectCommandController
       distanceDecimals: current.distanceDecimals,
       dimensionScale: current.dimensionScale,
       document: snapshot.document.copyWith(viewScales: current.document.viewScales),
+    );
+  }
+}
+
+
+class UpdateArchitectSection extends ArchitectModelCommand {
+  final String sectionId;
+  final Offset startPoint, endPoint;
+  const UpdateArchitectSection({
+    required this.sectionId,
+    required this.startPoint,
+    required this.endPoint,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectModelCommand.point(startPoint);
+    ArchitectModelCommand.point(endPoint);
+    return project.copyWith(
+      sections: [
+        for (final s in project.sections)
+          if (s.id == sectionId)
+            s.copyWith(start: startPoint, end: endPoint)
+          else
+            s,
+      ],
+    );
+  }
+}
+
+class UpdateArchitectElevation extends ArchitectModelCommand {
+  final String elevationId;
+  final Offset startPoint, endPoint;
+  const UpdateArchitectElevation({
+    required this.elevationId,
+    required this.startPoint,
+    required this.endPoint,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectModelCommand.point(startPoint);
+    ArchitectModelCommand.point(endPoint);
+    return project.copyWith(
+      elevations: [
+        for (final e in project.elevations)
+          if (e.id == elevationId)
+            e.copyWith(start: startPoint, end: endPoint)
+          else
+            e,
+      ],
     );
   }
 }
