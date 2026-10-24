@@ -45,11 +45,11 @@ enum ArchitectToolCategory {
     ArchitectTool.window ||
     ArchitectTool.opening ||
     ArchitectTool.stair => build,
-    ArchitectTool.component ||
-    ArchitectTool.floorDrain => furnishing,
+    ArchitectTool.component => furnishing,
     ArchitectTool.column ||
     ArchitectTool.beam ||
     ArchitectTool.slab ||
+    ArchitectTool.floorDrain ||
     ArchitectTool.roof => structure,
     ArchitectTool.section ||
     ArchitectTool.elevation => views,
@@ -508,10 +508,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     icon: Icons.layers_rounded,
                                     label: l10n.architectToolSlab,
                                   ),
-                                if (category ==
-                                    ArchitectToolCategory.of(
-                                      ArchitectTool.floorDrain,
-                                    ))
+                                if (category == ArchitectToolCategory.structure ||
+                                    category == ArchitectToolCategory.build)
                                   _buildToolButton(
                                     tool: ArchitectTool.floorDrain,
                                     icon: Icons.water_drop_outlined,
@@ -1255,6 +1253,28 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               ),
               onPressed: widget.onOpenComponentLibrary,
             ),
+          ),
+          const SizedBox(width: 4),
+          OutlinedButton.icon(
+            key: const ValueKey("component-tool-floor-drain-btn"),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white70,
+              side: const BorderSide(color: Colors.white24),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 6,
+              ),
+            ),
+            icon: const Icon(
+              Icons.water_drop_outlined,
+              size: 16,
+              color: Color(0xFF00E5FF),
+            ),
+            label: Text(
+              l.architectToolFloorDrain,
+              style: const TextStyle(fontSize: 12),
+            ),
+            onPressed: () => widget.onToolChanged(ArchitectTool.floorDrain),
           ),
           const SizedBox(width: 4),
           Tooltip(

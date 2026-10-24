@@ -19,11 +19,13 @@ class ArchitectComponentLibraryDialog extends StatefulWidget {
   final ValueChanged<ArchitectComponentDefinition>? onSelectComponent;
   final ValueChanged<ArchitectFenestrationStyle>? onSelectFenestration;
   final VoidCallback? onSelectDownpipe;
+  final VoidCallback? onSelectFloorDrain;
   const ArchitectComponentLibraryDialog({
     super.key,
     this.onSelectComponent,
     this.onSelectFenestration,
     this.onSelectDownpipe,
+    this.onSelectFloorDrain,
   });
 
   static Future<void> show(
@@ -31,12 +33,14 @@ class ArchitectComponentLibraryDialog extends StatefulWidget {
     ValueChanged<ArchitectComponentDefinition>? onSelectComponent,
     ValueChanged<ArchitectFenestrationStyle>? onSelectFenestration,
     VoidCallback? onSelectDownpipe,
+    VoidCallback? onSelectFloorDrain,
   }) => showDialog(
     context: context,
     builder: (_) => ArchitectComponentLibraryDialog(
       onSelectComponent: onSelectComponent,
       onSelectFenestration: onSelectFenestration,
       onSelectDownpipe: onSelectDownpipe,
+      onSelectFloorDrain: onSelectFloorDrain,
     ),
   );
 
@@ -268,6 +272,37 @@ class _ArchitectComponentLibraryDialogState
               ),
             ),
             const Divider(height: 1, color: Colors.white12),
+            if (widget.onSelectFloorDrain != null &&
+                (_category == null ||
+                    _category == ArchitectComponentCategory.sanitary) &&
+                _source != _Source.custom &&
+                _matches(l.architectToolFloorDrain))
+              ListTile(
+                leading: const Icon(
+                  Icons.water_drop_outlined,
+                  color: Color(0xFF00E5FF),
+                ),
+                title: Text(
+                  l.architectToolFloorDrain,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: Text(
+                  l.architectFloorDrainLibraryDesc,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: Colors.white54,
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  widget.onSelectFloorDrain!();
+                },
+              ),
             if (widget.onSelectDownpipe != null &&
                 _category == null &&
                 _source != _Source.custom &&

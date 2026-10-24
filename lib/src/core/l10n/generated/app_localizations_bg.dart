@@ -7770,6 +7770,16 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
+  String get architectComponentLinearDrain => 'Линеен сифон';
+
+  @override
+  String get architectComponentFloorDrain => 'Подов сифон';
+
+  @override
+  String get architectFloorDrainLibraryDesc =>
+      'Чертане на под с наклони и коти към сифон';
+
+  @override
   String get architectCategoryViews => 'Изгледи';
 
   @override

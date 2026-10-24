@@ -2532,7 +2532,10 @@
   "architectDrainNearDoor": "Сифонът е близо до врата",
   "architectDrainRoomNotFound": "Тук няма затворено помещение",
   "architectDrainInvalid": "Сифонът не може да се постави тук",
-  "architectSelectionDrainsCount": "{count, plural, one{1 сифон} other{{count} сифона}}"
+  "architectSelectionDrainsCount": "{count, plural, one{1 сифон} other{{count} сифона}}",
+  "architectComponentLinearDrain": "Линеен сифон",
+  "architectComponentFloorDrain": "Подов сифон",
+  "architectFloorDrainLibraryDesc": "Чертане на под с наклони и коти към сифон"
 ,
   "architectCategoryViews": "Изгледи",
   "architectToolSection": "Разрез",

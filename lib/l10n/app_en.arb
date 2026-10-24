@@ -4699,7 +4699,13 @@
   "architectDrainInvalid": "Drain cannot be placed here",
   "@architectDrainInvalid": { "description": "Floor drain placement rejected" },
   "architectSelectionDrainsCount": "{count, plural, one{1 drain} other{{count} drains}}",
-  "@architectSelectionDrainsCount": { "placeholders": { "count": { "type": "int" } } }
+  "@architectSelectionDrainsCount": { "placeholders": { "count": { "type": "int" } } },
+  "architectComponentLinearDrain": "Linear Floor Drain",
+  "@architectComponentLinearDrain": { "description": "Linear shower channel floor drain component" },
+  "architectComponentFloorDrain": "Floor Drain",
+  "@architectComponentFloorDrain": { "description": "Round or square point floor drain component" },
+  "architectFloorDrainLibraryDesc": "Draft wet room floor with falls and levels to drain",
+  "@architectFloorDrainLibraryDesc": { "description": "Description in library dialog for the sloped floor drain tool" }
 ,
   "architectCategoryViews": "Views",
   "@architectCategoryViews": { "description": "Architectural views tool category" },

@@ -25682,6 +25682,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       context,
 
                       onSelectDownpipe: () => _beginDownpipePlacement(),
+                      onSelectFloorDrain: () => setState(() => _activeTool = ArchitectTool.floorDrain),
 
                       onSelectComponent: (def) {
 

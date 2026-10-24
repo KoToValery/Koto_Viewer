@@ -16,6 +16,8 @@ String componentLabel(AppLocalizations l, ArchitectComponentDefinition d) {
     'sanitary_vanity' => l.architectComponentVanity,
     'sanitary_bathtub' => l.architectComponentBathtub,
     'sanitary_shower' => l.architectComponentShower,
+    'sanitary_linear_drain' => l.architectComponentLinearDrain,
+    'sanitary_floor_drain' => l.architectComponentFloorDrain,
     'furniture_bed_double' => l.architectComponentBedDouble,
     'furniture_bed_single' => l.architectComponentBedSingle,
     'furniture_wardrobe' => l.architectComponentWardrobe,

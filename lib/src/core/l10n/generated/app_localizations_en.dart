@@ -7740,6 +7740,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get architectComponentLinearDrain => 'Linear Floor Drain';
+
+  @override
+  String get architectComponentFloorDrain => 'Floor Drain';
+
+  @override
+  String get architectFloorDrainLibraryDesc =>
+      'Draft wet room floor with falls and levels to drain';
+
+  @override
   String get architectCategoryViews => 'Views';
 
   @override

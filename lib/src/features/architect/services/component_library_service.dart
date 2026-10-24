@@ -30,6 +30,8 @@ class ComponentLibraryService extends ChangeNotifier {
     SanitaryWashbasinCabinet(),
     SanitaryBathtub(),
     SanitaryShower(),
+    SanitaryLinearDrain(),
+    SanitaryFloorDrain(),
     // Furniture
     FurnitureBedDouble(),
     FurnitureBedSingle(),

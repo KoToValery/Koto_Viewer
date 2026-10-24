@@ -13865,6 +13865,24 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{1 drain} other{{count} drains}}'**
   String architectSelectionDrainsCount(int count);
 
+  /// Linear shower channel floor drain component
+  ///
+  /// In en, this message translates to:
+  /// **'Linear Floor Drain'**
+  String get architectComponentLinearDrain;
+
+  /// Round or square point floor drain component
+  ///
+  /// In en, this message translates to:
+  /// **'Floor Drain'**
+  String get architectComponentFloorDrain;
+
+  /// Description in library dialog for the sloped floor drain tool
+  ///
+  /// In en, this message translates to:
+  /// **'Draft wet room floor with falls and levels to drain'**
+  String get architectFloorDrainLibraryDesc;
+
   /// Architectural views tool category
   ///
   /// In en, this message translates to:

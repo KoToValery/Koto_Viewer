@@ -5,6 +5,8 @@
 // 3. WASHBASIN & VANITY (SanitaryWashbasinCabinet)
 // 4. BATHTUB (SanitaryBathtub)
 // 5. SHOWER TRAY & ENCLOSURE (SanitaryShower)
+// 6. LINEAR FLOOR DRAIN (SanitaryLinearDrain)
+// 7. FLOOR DRAIN (SanitaryFloorDrain)
 
 import 'dart:math' as math;
 import 'dart:ui';
@@ -427,3 +429,256 @@ class SanitaryShower extends ArchitectComponentDefinition {
     return builder.build(defaultName);
   }
 }
+
+// ===========================================================================
+// 6. LINEAR FLOOR DRAIN (SanitaryLinearDrain)
+// ===========================================================================
+
+class SanitaryLinearDrain extends ArchitectComponentDefinition {
+  @override
+  String get id => 'sanitary_linear_drain';
+
+  @override
+  String get defaultName => 'Linear Shower Drain';
+
+  @override
+  ArchitectComponentCategory get category => ArchitectComponentCategory.sanitary;
+
+  @override
+  ComponentPlacementMode get placementMode => ComponentPlacementMode.freeStanding;
+
+  @override
+  List<ParametricFieldSchema> get schema => const [
+    ParametricFieldSchema(
+      key: 'width',
+      label: 'Length',
+      defaultValue: 0.80,
+      min: 0.50,
+      max: 1.50,
+      step: 0.05,
+    ),
+    ParametricFieldSchema(
+      key: 'depth',
+      label: 'Width',
+      defaultValue: 0.09,
+      min: 0.06,
+      max: 0.20,
+      step: 0.01,
+    ),
+    ParametricFieldSchema(
+      key: 'height',
+      label: 'Depth',
+      defaultValue: 0.06,
+      min: 0.04,
+      max: 0.12,
+      step: 0.01,
+    ),
+  ];
+
+  @override
+  CachedComponentGeometry generateGeometry(Map<String, dynamic> params) {
+    final w = (params['width'] as num?)?.toDouble() ?? 0.80;
+    final d = (params['depth'] as num?)?.toDouble() ?? 0.09;
+    final h = (params['height'] as num?)?.toDouble() ?? 0.06;
+
+    final builder = ParametricSolidBuilder(width: w, depth: d, height: h);
+    final wHalf = w / 2.0;
+
+    // 1. Stainless steel outer flange frame
+    const flange = 0.015;
+    builder.addBox(
+      origin: Offset(-wHalf, 0.0),
+      boxWidth: w,
+      boxDepth: d,
+      boxHeight: h * 0.25,
+      color: const Color(0xFFB0BEC5),
+    );
+
+    // 2. Linear drainage trough / channel basin
+    builder.addBasin(
+      center: Offset(0, d / 2),
+      basinWidth: math.max(0.10, w - flange * 2),
+      basinDepth: math.max(0.04, d - flange * 2),
+      basinHeight: h * 0.70,
+      zBottom: h * 0.25,
+      wall: 0.008,
+      base: 0.01,
+      rectangular: true,
+    );
+
+    // 3. Central siphon discharge trap outlet underneath
+    builder.addCylinder(
+      center: Offset(0, d / 2),
+      radius: math.min(0.025, (d - flange * 2) * 0.40),
+      cylinderHeight: h * 0.60,
+      zBottom: 0.0,
+      color: const Color(0xFF78909C),
+    );
+
+    // 2D CAD Plan Details
+    final outerRect = Rect.fromLTWH(-wHalf, 0, w, d);
+    builder.add2DDetailPath(Path()..addRect(outerRect));
+
+    final innerW = math.max(0.10, w - flange * 2);
+    final innerD = math.max(0.03, d - flange * 2);
+    final innerRect = Rect.fromCenter(
+      center: Offset(0, d / 2),
+      width: innerW,
+      height: innerD,
+    );
+    builder.add2DDetailPath(Path()..addRect(innerRect));
+
+    final slotSpacing = 0.04;
+    final slotCount = (innerW / slotSpacing).floor();
+    if (slotCount > 1) {
+      final actualSpacing = innerW / (slotCount + 1);
+      final startX = -innerW / 2.0;
+      final slotTop = d / 2 - innerD * 0.38;
+      final slotBottom = d / 2 + innerD * 0.38;
+      for (var i = 1; i <= slotCount; i++) {
+        final x = startX + i * actualSpacing;
+        builder.add2DDetailLine(Offset(x, slotTop), Offset(x, slotBottom));
+      }
+    }
+
+    final drainCircle = Path()
+      ..addOval(
+        Rect.fromCenter(
+          center: Offset(0, d / 2),
+          width: math.min(0.04, innerD * 0.8),
+          height: math.min(0.04, innerD * 0.8),
+        ),
+      );
+    builder.add2DDetailPath(drainCircle);
+
+    return builder.build(defaultName);
+  }
+}
+
+// ===========================================================================
+// 7. FLOOR DRAIN (SanitaryFloorDrain)
+// ===========================================================================
+
+class SanitaryFloorDrain extends ArchitectComponentDefinition {
+  @override
+  String get id => 'sanitary_floor_drain';
+
+  @override
+  String get defaultName => 'Floor Drain';
+
+  @override
+  ArchitectComponentCategory get category => ArchitectComponentCategory.sanitary;
+
+  @override
+  ComponentPlacementMode get placementMode => ComponentPlacementMode.freeStanding;
+
+  @override
+  List<ParametricFieldSchema> get schema => const [
+    ParametricFieldSchema(
+      key: 'width',
+      label: 'Width',
+      defaultValue: 0.15,
+      min: 0.10,
+      max: 0.30,
+      step: 0.01,
+    ),
+    ParametricFieldSchema(
+      key: 'depth',
+      label: 'Depth',
+      defaultValue: 0.15,
+      min: 0.10,
+      max: 0.30,
+      step: 0.01,
+    ),
+    ParametricFieldSchema(
+      key: 'height',
+      label: 'Depth',
+      defaultValue: 0.06,
+      min: 0.04,
+      max: 0.12,
+      step: 0.01,
+    ),
+  ];
+
+  @override
+  CachedComponentGeometry generateGeometry(Map<String, dynamic> params) {
+    final w = (params['width'] as num?)?.toDouble() ?? 0.15;
+    final d = (params['depth'] as num?)?.toDouble() ?? 0.15;
+    final h = (params['height'] as num?)?.toDouble() ?? 0.06;
+
+    final builder = ParametricSolidBuilder(width: w, depth: d, height: h);
+    final wHalf = w / 2.0;
+
+    // 1. Stainless steel square bezel frame (15×15 cm)
+    builder.addBox(
+      origin: Offset(-wHalf, 0.0),
+      boxWidth: w,
+      boxDepth: d,
+      boxHeight: h * 0.20,
+      color: const Color(0xFFB0BEC5),
+    );
+
+    // 2. Inner round basin / drain sump
+    final radius = math.min(w, d) * 0.40;
+    builder.addBasin(
+      center: Offset(0, d / 2),
+      basinWidth: radius * 2,
+      basinDepth: radius * 2,
+      basinHeight: h * 0.75,
+      zBottom: h * 0.20,
+      wall: 0.006,
+      base: 0.01,
+      roundedBody: true,
+    );
+
+    // 3. Central siphon discharge pipe
+    builder.addCylinder(
+      center: Offset(0, d / 2),
+      radius: radius * 0.45,
+      cylinderHeight: h * 0.50,
+      zBottom: 0.0,
+      color: const Color(0xFF78909C),
+    );
+
+    // 2D CAD Plan Details
+    final outerRect = Rect.fromLTWH(-wHalf, 0, w, d);
+    builder.add2DDetailPath(Path()..addRect(outerRect));
+
+    final grateRect = Rect.fromCenter(
+      center: Offset(0, d / 2),
+      width: radius * 2,
+      height: radius * 2,
+    );
+    builder.add2DDetailPath(Path()..addOval(grateRect));
+
+    final coreRect = Rect.fromCenter(
+      center: Offset(0, d / 2),
+      width: radius * 0.9,
+      height: radius * 0.9,
+    );
+    builder.add2DDetailPath(Path()..addOval(coreRect));
+
+    final center = Offset(0, d / 2);
+    builder.add2DDetailLine(
+      Offset(center.dx - radius, center.dy),
+      Offset(center.dx + radius, center.dy),
+    );
+    builder.add2DDetailLine(
+      Offset(center.dx, center.dy - radius),
+      Offset(center.dx, center.dy + radius),
+    );
+
+    final diag = radius * 0.7071;
+    builder.add2DDetailLine(
+      Offset(center.dx - diag, center.dy - diag),
+      Offset(center.dx + diag, center.dy + diag),
+    );
+    builder.add2DDetailLine(
+      Offset(center.dx - diag, center.dy + diag),
+      Offset(center.dx + diag, center.dy - diag),
+    );
+
+    return builder.build(defaultName);
+  }
+}
+
