@@ -1,3 +1,4 @@
+import 'architect_contour.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. Enums (ArchitectRoofPreset, ArchitectRoofLayerRole, ArchitectRoofMaterial, ArchitectRoofEavesCut, AutoRoofType)
 // 2. ArchitectRoofLayer (Individual roof layer specification)
@@ -685,6 +686,7 @@ class ArchitectRoofAssembly {
 /// - Moving inward perpendicular to the `eavesEdge` by horizontal distance `d`,
 ///   the elevation rises by `d * tan(slopeRadians)`.
 class ArchitectRoofPlane {
+  final List<List<Offset>> holes;
   final String id;
   final String storeyId;
   List<Offset> points;
@@ -708,6 +710,7 @@ class ArchitectRoofPlane {
 
   ArchitectRoofPlane({
     required this.id,
+    this.holes = const [],
     required this.storeyId,
     required this.points,
     this.eavesEdgeIndex = 0,
@@ -888,7 +891,7 @@ class ArchitectRoofPlane {
       final b = points[(i + 1) % points.length];
       sum += a.dx * b.dy - b.dx * a.dy;
     }
-    return sum.abs() * 0.5;
+    return sum.abs() * 0.5 - ArchitectContour.area(holes);
   }
 
   double get slopedArea {
@@ -909,11 +912,12 @@ class ArchitectRoofPlane {
                   xi);
       if (intersect) inside = !inside;
     }
-    return inside;
+    return inside && !holes.any((h) => (Path()..addPolygon(h, true)).contains(pt));
   }
 
   ArchitectRoofPlane copyWith({
     String? id,
+    List<List<Offset>>? holes,
     String? storeyId,
     List<Offset>? points,
     int? eavesEdgeIndex,
@@ -932,6 +936,7 @@ class ArchitectRoofPlane {
     ArchitectRoofDrainage? drainage,
   }) => ArchitectRoofPlane(
     id: id ?? this.id,
+    holes: holes ?? this.holes,
     storeyId: storeyId ?? this.storeyId,
     points: points ?? List<Offset>.from(this.points),
     eavesEdgeIndex: eavesEdgeIndex ?? this.eavesEdgeIndex,
@@ -955,6 +960,7 @@ class ArchitectRoofPlane {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    if (holes.isNotEmpty) 'holes': ArchitectContour.write(holes),
     'storeyId': storeyId,
     'points': points.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
     'eavesEdgeIndex': eavesEdgeIndex,
@@ -977,6 +983,7 @@ class ArchitectRoofPlane {
     final rawPts = json['points'] as List<dynamic>? ?? const [];
     return ArchitectRoofPlane(
       id: json['id'] as String,
+      holes: ArchitectContour.read(json['holes']),
       storeyId: json['storeyId'] as String? ?? 'storey_0',
       points: rawPts.map((e) {
         final m = e as Map<String, dynamic>;

@@ -7530,4 +7530,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectStrokeWeight => 'Line weight';
+
+  @override
+  String get architectCutOpening => 'Cut opening';
+
+  @override
+  String get architectCutOpeningHint =>
+      'Draw a closed contour inside the selected element, then confirm.';
+
+  @override
+  String get architectCutOpeningInvalid =>
+      'Keep the opening inside the element, without touching its boundary or another opening.';
+
+  @override
+  String get architectHatchAutoHint => 'Fill: tap inside a closed contour.';
+
+  @override
+  String get architectHatchAutoFailed =>
+      'No closed contour found. Close the boundary or draw it manually.';
 }

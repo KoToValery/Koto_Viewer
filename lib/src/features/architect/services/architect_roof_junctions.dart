@@ -1,3 +1,4 @@
+import '../models/architect_contour.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_project.dart';
@@ -37,6 +38,7 @@ class ArchitectRoofJunctions {
           roof.id,
           roof.roofGroupId,
           Object.hashAll(roof.points),
+          Object.hashAll(roof.holes.map(Object.hashAll)),
           roof.eavesEdgeIndex,
           roof.reverseSlope,
           roof.slopeDegrees,
@@ -62,7 +64,7 @@ class ArchitectRoofJunctions {
 
   static ArchitectRoofJunctions resolve(List<ArchitectRoofPlane> roofs) {
     final original = {
-      for (final roof in roofs) roof.id: Path()..addPolygon(roof.points, true),
+      for (final roof in roofs) roof.id: ArchitectContour.path(roof.points, roof.holes),
     };
     String group(ArchitectRoofPlane roof) => roof.roofGroupId == null
         ? 'plane:${roof.id}'
@@ -152,7 +154,7 @@ class ArchitectRoofJunctions {
     }
     return ArchitectRoofJunctions._(result, {
       for (final roof in roofs)
-        if (!Path.combine(
+        if (roof.holes.isNotEmpty || !Path.combine(
           PathOperation.xor,
           original[roof.id]!,
           result[roof.id]!,
@@ -162,7 +164,7 @@ class ArchitectRoofJunctions {
   }
 
   Path footprint(ArchitectRoofPlane roof) =>
-      footprints[roof.id] ?? (Path()..addPolygon(roof.points, true));
+      footprints[roof.id] ?? (ArchitectContour.path(roof.points, roof.holes));
 
   /// The datum remains tied to the original eaves, while a label follows the
   /// remaining visible part when the old polygon centroid has been cut away.

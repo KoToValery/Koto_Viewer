@@ -1,3 +1,4 @@
+import '../models/architect_contour.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import '../../bim_editing/geometry/bim_transform_2d.dart';
@@ -114,6 +115,7 @@ class ArchitectSlabEditingAdapter extends BimElementAdapter<ArchitectSlab> {
       ? source
       : source.copyWith(
           polygon: translatedContour(source.polygon, deltaMetres),
+          holes: ArchitectContour.transform(source.holes, (p) => p + deltaMetres),
         );
   @override
   BimElementSnapshot describe(
@@ -144,6 +146,7 @@ class ArchitectRoofEditingAdapter
       ? source
       : source.copyWith(
           points: translatedContour(source.points, deltaMetres),
+          holes: ArchitectContour.transform(source.holes, (p) => p + deltaMetres),
         );
   @override
   BimElementSnapshot describe(
@@ -315,6 +318,11 @@ class ArchitectCadEditingAdapter
     extends BimPathEditingAdapter<ArchitectCadPrimitive> {
   const ArchitectCadEditingAdapter()
     : super(points: _points, withPoints: _withPoints);
+  @override
+  ArchitectCadPrimitive translate(ArchitectCadPrimitive source, Offset deltaMetres) =>
+      deltaMetres == Offset.zero ? source : super.translate(source, deltaMetres).copyWith(
+        holes: ArchitectContour.transform(source.holes, (p) => p + deltaMetres),
+      );
   static List<Offset> _points(ArchitectCadPrimitive source) => [
     source.startPoint,
     source.endPoint,

@@ -286,6 +286,8 @@ class ArchitectHatchDraftBar extends StatelessWidget {
   final int pointCount;
   final ValueChanged<ArchitectHatchPattern> onChanged;
   final VoidCallback onUndo, onFinish, onCancel;
+  final bool automatic;
+  final ValueChanged<bool>? onAutomaticChanged;
   const ArchitectHatchDraftBar({
     super.key,
     required this.pattern,
@@ -296,6 +298,8 @@ class ArchitectHatchDraftBar extends StatelessWidget {
     required this.onUndo,
     required this.onFinish,
     required this.onCancel,
+    this.automatic = false,
+    this.onAutomaticChanged,
   });
   @override
   Widget build(BuildContext context) {
@@ -308,6 +312,22 @@ class ArchitectHatchDraftBar extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (onAutomaticChanged != null) ...[
+              IconButton(
+                key: const ValueKey('hatch-mode-auto'),
+                tooltip: l.architectHatchAutoHint,
+                isSelected: automatic,
+                icon: const Icon(Icons.format_color_fill, size: 20),
+                onPressed: () => onAutomaticChanged!(true),
+              ),
+              IconButton(
+                key: const ValueKey('hatch-mode-manual'),
+                tooltip: l.architectHatchDrawHint,
+                isSelected: !automatic,
+                icon: const Icon(Icons.polyline_outlined, size: 20),
+                onPressed: () => onAutomaticChanged!(false),
+              ),
+            ],
             ArchitectHatchPicker(
               key: const ValueKey('architect-draft-hatch'),
               value: pattern,
@@ -337,11 +357,11 @@ class ArchitectHatchDraftBar extends StatelessWidget {
               ),
             ] else
               Tooltip(
-                message: l.architectHatchDrawHint,
-                child: const Padding(
+                message: automatic ? l.architectHatchAutoHint : l.architectHatchDrawHint,
+                child: Padding(
                   padding: EdgeInsets.only(right: 12),
                   child: Icon(
-                    Icons.polyline_outlined,
+                    automatic ? Icons.format_color_fill : Icons.polyline_outlined,
                     color: Colors.white70,
                     size: 20,
                   ),

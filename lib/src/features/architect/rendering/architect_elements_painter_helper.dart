@@ -1,3 +1,4 @@
+import '../models/architect_contour.dart';
 import '../models/architect_line_style.dart';
 import 'architect_hatch_geometry.dart';
 import 'architect_line_pattern.dart';
@@ -139,11 +140,7 @@ class ArchitectElementsPainterHelper {
               ..style = PaintingStyle.stroke)
           : slabBorderPaint;
 
-      final path = Path()..moveTo(slab.polygon[0].dx, slab.polygon[0].dy);
-      for (int i = 1; i < slab.polygon.length; i++) {
-        path.lineTo(slab.polygon[i].dx, slab.polygon[i].dy);
-      }
-      path.close();
+      final path = ArchitectContour.path(slab.polygon, slab.holes);
 
       if (isSelected) canvas.drawPath(path, slabFillPaint);
       canvas.drawPath(path, border);
@@ -658,7 +655,7 @@ class ArchitectElementsPainterHelper {
         ..style = PaintingStyle.stroke;
 
       if (prim.type == CadPrimitiveType.hatch) {
-        final boundary = Path()..addPolygon(prim.polygonCorners, true);
+        final boundary = ArchitectContour.path(prim.polygonCorners, prim.holes);
         canvas.save();
         canvas.clipPath(boundary);
         canvas.drawPath(ArchitectHatchGeometry.path(boundary: boundary,
@@ -689,7 +686,7 @@ class ArchitectElementsPainterHelper {
       } else if (prim.type == CadPrimitiveType.rect) {
         canvas.drawPath(
           ArchitectLinePattern.path(
-            Path()..addPolygon(prim.polygonCorners, true),
+            ArchitectContour.path(prim.polygonCorners, prim.holes),
             prim.lineStyle,
             unitsPerMm,
           ),

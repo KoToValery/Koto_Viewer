@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../models/architect_contour.dart';
 import '../models/architect_wall_type.dart';
 import 'architect_slab_assemblies.dart';
 import 'architect_roof_placement.dart';
@@ -1529,6 +1530,41 @@ class SetArchitectWallDimensions extends ArchitectModelCommand {
 }
 
 /// Shared transaction/Undo pipeline for UI and external automation.
+class CutArchitectContourOpening extends ArchitectModelCommand {
+  final String storeyId, elementId;
+  final List<Offset> polygon;
+  const CutArchitectContourOpening({required this.storeyId,
+    required this.elementId, required this.polygon});
+
+  static (List<Offset>, List<List<Offset>>)? target(ArchitectStorey s, String id) {
+    for (final slab in s.slabs) {
+      if (slab.id == id) return (slab.polygon, slab.holes);
+    }
+    for (final roof in s.roofs) {
+      if (roof.id == id) return (roof.points, roof.holes);
+    }
+    for (final p in s.cadPrimitives) {
+      if (p.id == id && p.isPolygon) return (p.polygonCorners, p.holes);
+    }
+    return null;
+  }
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final s = ArchitectModelCommand.storey(project, storeyId);
+    final host = target(s, elementId);
+    if (host == null || !ArchitectContour.canAdd(host.$1, host.$2, polygon)) {
+      throw ArgumentError('Opening must be strictly inside the host, without overlapping another opening');
+    }
+    final holes = [...host.$2, List<Offset>.unmodifiable(polygon)];
+    return ArchitectModelCommand.replace(project, s.copyWith(
+      slabs: [for (final p in s.slabs) p.id == elementId ? p.copyWith(holes: holes) : p],
+      roofs: [for (final p in s.roofs) p.id == elementId ? p.copyWith(holes: holes) : p],
+      cadPrimitives: [for (final p in s.cadPrimitives) p.id == elementId ? p.copyWith(holes: holes) : p],
+    ));
+  }
+}
+
 class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
   final String storeyId;
   final ArchitectCadPrimitive primitive;
@@ -1544,7 +1580,7 @@ class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
     ArchitectModelCommand.newId(project, primitive.id);
     if ((primitive.endPoint - primitive.startPoint).distance < .001 ||
         (primitive.isPolygon &&
-            !ArchitectPolygonGeometry.valid(primitive.polygonCorners))) {
+            !ArchitectContour.valid(primitive.polygonCorners, primitive.holes))) {
       throw ArgumentError('Invalid CAD shape');
     }
     final floor = ArchitectModelCommand.storey(project, storeyId);
@@ -1578,7 +1614,7 @@ class CreateArchitectRoofPlane extends ArchitectModelCommand {
   @override
   ArchitectProject apply(ArchitectProject project) {
     roof.drainage.validate();
-    if (!ArchitectPolygonGeometry.valid(roof.points)) {
+    if (!ArchitectContour.valid(roof.points, roof.holes)) {
       throw ArgumentError('Invalid roof contour');
     }
     ArchitectModelCommand.newId(project, roof.id);
@@ -1597,7 +1633,7 @@ class UpdateArchitectRoofPlane extends ArchitectModelCommand {
   @override
   ArchitectProject apply(ArchitectProject project) {
     roof.drainage.validate();
-    if (!ArchitectPolygonGeometry.valid(roof.points)) {
+    if (!ArchitectContour.valid(roof.points, roof.holes)) {
       throw ArgumentError('Invalid roof contour');
     }
     final floor = ArchitectModelCommand.storey(project, storeyId);
@@ -1667,6 +1703,10 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
     final opening = floor.openings.any((o) => o.id == elementId);
     if (!slab && !roof && !rect && !zone && !opening) {
       throw ArgumentError('Unknown polygon element');
+    }
+    final host = CutArchitectContourOpening.target(floor, elementId);
+    if (host != null && !ArchitectContour.valid(polygon, host.$2)) {
+      throw ArgumentError('Contour would cross an opening');
     }
     final points = List<Offset>.unmodifiable(polygon);
     final bounds = ArchitectSceneGeometry.boundsOf(points);

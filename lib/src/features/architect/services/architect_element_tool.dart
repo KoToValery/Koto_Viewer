@@ -1,3 +1,4 @@
+import '../models/architect_contour.dart';
 import 'architect_roof_drainage_geometry.dart';
 import 'architect_roof_junctions.dart';
 import '../models/architect_line_style.dart';
@@ -653,7 +654,7 @@ class ArchitectElementTool extends ChangeNotifier {
         }
       } else if (prim.isPolygon) {
         final points = prim.polygonCorners;
-        final path = Path()..addPolygon(points, true);
+        final path = ArchitectContour.path(points, prim.holes);
         if (path.contains(point)) yield prim.id;
         for (var i = 0; i < points.length; i++) {
           if (_pointToSegmentDistance(
@@ -895,6 +896,7 @@ class ArchitectElementTool extends ChangeNotifier {
         final newSlabs = List<ArchitectSlab>.from(storey.slabs);
         newSlabs[slabIndex] = slab.copyWith(
           polygon: rotatedPoly,
+          holes: ArchitectContour.transform(slab.holes, (p) { final d = p - center; return center + Offset(-d.dy, d.dx); }),
           slopeDirection: slab.slopeDirection == null ? null : slab.slopeDirection! + math.pi / 2,
         );
         return storey.copyWith(slabs: newSlabs);
@@ -912,7 +914,7 @@ class ArchitectElementTool extends ChangeNotifier {
           return center + Offset(-rel.dy, rel.dx);
         }).toList();
         final newRoofs = List<ArchitectRoofPlane>.from(storey.roofs);
-        newRoofs[roofIndex] = roof.copyWith(points: rotatedPts);
+        newRoofs[roofIndex] = roof.copyWith(points: rotatedPts, holes: ArchitectContour.transform(roof.holes, (p) { final d = p - center; return center + Offset(-d.dy, d.dx); }));
         return storey.copyWith(roofs: newRoofs);
       }
     }
@@ -926,6 +928,8 @@ class ArchitectElementTool extends ChangeNotifier {
       final perp = Offset(-delta.dy, delta.dx) / 2;
       final newCad = List<ArchitectCadPrimitive>.from(storey.cadPrimitives);
       newCad[cadIndex] = prim.copyWith(
+        holes: ArchitectContour.transform(prim.holes, (p) { final d = p - mid; return mid + Offset(-d.dy, d.dx); }),
+        polygon: prim.polygon?.map((p) { final d = p - mid; return mid + Offset(-d.dy, d.dx); }).toList(),
         startPoint: mid - perp,
         endPoint: mid + perp,
       );
@@ -1135,6 +1139,7 @@ class ArchitectElementTool extends ChangeNotifier {
       final newSlab = slab.copyWith(
         id: targetId,
         polygon: newPoly,
+        holes: ArchitectContour.transform(slab.holes, (p) => BimTransform2D.mirror(p, origin, direction)),
         slopeDirection: newSlope,
       );
       if (isDuplicate) {
@@ -1162,6 +1167,7 @@ class ArchitectElementTool extends ChangeNotifier {
       final newRoof = roof.copyWith(
         id: targetId,
         points: newPoints,
+        holes: ArchitectContour.transform(roof.holes, (p) => BimTransform2D.mirror(p, origin, direction)),
         eavesEdgeIndex: safeEaves,
         drainage: roof.drainage.copyWith(downpipes: [
           for (final pipe in roof.drainage.downpipes) pipe.copyWith(
@@ -1315,6 +1321,7 @@ class ArchitectElementTool extends ChangeNotifier {
       final prim = storey.cadPrimitives[cadIndex];
       final newPrim = prim.copyWith(
         id: targetId,
+        holes: ArchitectContour.transform(prim.holes, (p) => BimTransform2D.mirror(p, origin, direction)),
         startPoint: BimTransform2D.mirror(prim.startPoint, origin, direction),
         endPoint: BimTransform2D.mirror(prim.endPoint, origin, direction),
         polygon: prim.polygon != null

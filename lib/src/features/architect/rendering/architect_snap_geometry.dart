@@ -216,6 +216,7 @@ class ArchitectSnapGeometry {
     }
     for (final slab in floor.slabs) {
       polygon(slab.polygon, slab.id);
+      for (final h in slab.holes) { polygon(h, slab.id); }
     }
     for (final roof in floor.roofs) {
       for (final contour in ArchitectPathSolid.contours(
@@ -262,6 +263,7 @@ class ArchitectSnapGeometry {
         case CadPrimitiveType.rect:
         case CadPrimitiveType.hatch:
           polygon(primitive.polygonCorners, primitive.id);
+          for (final h in primitive.holes) { polygon(h, primitive.id); }
           point(
             Rect.fromPoints(primitive.startPoint, primitive.endPoint).center,
             'Center',

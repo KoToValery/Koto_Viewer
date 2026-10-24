@@ -1,3 +1,4 @@
+import 'architect_contour.dart';
 import 'architect_line_style.dart';
 import 'architect_hatch_pattern.dart';
 // === SECTION: ARCHITECTURAL ELEMENT MODELS ===
@@ -165,6 +166,7 @@ class ArchitectBeam {
 // ===========================================================================
 
 class ArchitectSlab {
+  final List<List<Offset>> holes;
   final String id;
   final List<Offset> polygon;
   final double thickness; // in meters (default 0.20 m = 20 cm)
@@ -175,6 +177,7 @@ class ArchitectSlab {
 
   const ArchitectSlab({
     required this.id,
+    this.holes = const [],
     required this.polygon,
     this.thickness = 0.20,
     this.label = 'Slab d=20cm',
@@ -191,7 +194,7 @@ class ArchitectSlab {
       final p2 = polygon[(i + 1) % polygon.length];
       sum += (p1.dx * p2.dy - p2.dx * p1.dy);
     }
-    return (sum.abs() / 2.0);
+    return (sum.abs() / 2.0) - ArchitectContour.area(holes);
   }
 
   Offset get centroid {
@@ -206,6 +209,7 @@ class ArchitectSlab {
 
   ArchitectSlab copyWith({
     String? id,
+    List<List<Offset>>? holes,
     List<Offset>? polygon,
     double? thickness,
     String? label,
@@ -215,6 +219,7 @@ class ArchitectSlab {
     double? slopeDirection,
   }) => ArchitectSlab(
     id: id ?? this.id,
+    holes: holes ?? this.holes,
     polygon: polygon ?? this.polygon,
     thickness: thickness ?? this.thickness,
     label: label ?? this.label,
@@ -225,6 +230,7 @@ class ArchitectSlab {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    if (holes.isNotEmpty) 'holes': ArchitectContour.write(holes),
     'polygon': polygon.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
     'thickness': thickness,
     'label': label,
@@ -235,6 +241,7 @@ class ArchitectSlab {
 
   factory ArchitectSlab.fromJson(Map<String, dynamic> json) => ArchitectSlab(
     id: json['id'] as String,
+    holes: ArchitectContour.read(json['holes']),
     polygon:
         (json['polygon'] as List<dynamic>?)
             ?.map(
@@ -265,7 +272,7 @@ class ArchitectSlab {
         inside = !inside;
       }
     }
-    return inside;
+    return inside && !holes.any((h) => (Path()..addPolygon(h, true)).contains(pt));
   }
 }
 
@@ -795,6 +802,7 @@ enum CadPrimitiveType { line, rect, circle, hatch }
 class ArchitectCadPrimitive {
   // Publication renders eight legacy stroke units per paper millimetre.
   static const strokeUnitsPerPaperMm = 8.0;
+  final List<List<Offset>> holes;
   final String id;
   final CadPrimitiveType type;
   final Offset startPoint;
@@ -809,6 +817,7 @@ class ArchitectCadPrimitive {
 
   const ArchitectCadPrimitive({
     required this.id,
+    this.holes = const [],
     required this.type,
     required this.startPoint,
     required this.endPoint,
@@ -832,6 +841,7 @@ class ArchitectCadPrimitive {
 
   ArchitectCadPrimitive copyWith({
     String? id,
+    List<List<Offset>>? holes,
     CadPrimitiveType? type,
     Offset? startPoint,
     Offset? endPoint,
@@ -845,6 +855,7 @@ class ArchitectCadPrimitive {
     List<Offset>? polygon,
   }) => ArchitectCadPrimitive(
     id: id ?? this.id,
+    holes: holes ?? this.holes,
     type: type ?? this.type,
     startPoint: startPoint ?? this.startPoint,
     endPoint: endPoint ?? this.endPoint,
@@ -860,6 +871,7 @@ class ArchitectCadPrimitive {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    if (holes.isNotEmpty) 'holes': ArchitectContour.write(holes),
     'type': type.name,
     'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
@@ -879,6 +891,7 @@ class ArchitectCadPrimitive {
   factory ArchitectCadPrimitive.fromJson(Map<String, dynamic> json) =>
       ArchitectCadPrimitive(
         id: json['id'] as String,
+        holes: ArchitectContour.read(json['holes']),
         type: CadPrimitiveType.values.firstWhere(
           (t) => t.name == json['type'],
           orElse: () => CadPrimitiveType.line,

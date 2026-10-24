@@ -1,3 +1,4 @@
+import '../models/architect_contour.dart';
 import 'architect_roof_drainage_geometry.dart';
 import 'architect_roof_junctions.dart';
 import 'dart:convert';
@@ -216,7 +217,7 @@ class ArchitectSelection {
       if (b.id == id) return path..addPolygon(b.polygonCorners, true);
     }
     for (final slab in s.slabs) {
-      if (slab.id == id) return path..addPolygon(slab.polygon, true);
+      if (slab.id == id) return ArchitectContour.path(slab.polygon, slab.holes);
     }
     for (final roof in s.roofs) {
       if (roof.id == id) { return Path.combine(PathOperation.union,
@@ -249,7 +250,7 @@ class ArchitectSelection {
           radius: (p.endPoint - p.startPoint).distance));
       }
       if (p.id == id && p.isPolygon) {
-        return path..addPolygon(p.polygonCorners, true);
+        return ArchitectContour.path(p.polygonCorners, p.holes);
       }
     }
     final rect = bounds(project, id);

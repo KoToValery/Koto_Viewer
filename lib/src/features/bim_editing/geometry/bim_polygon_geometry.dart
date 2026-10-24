@@ -106,6 +106,9 @@ class BimPolygonGeometry {
     return true;
   }
 
+  static bool segmentsIntersect(Offset a, Offset b, Offset c, Offset d) =>
+      _intersects(a, b, c, d);
+
   static bool _intersects(Offset a, Offset b, Offset c, Offset d) {
     final u = b - a, v = d - c;
     final den = cross(u, v);

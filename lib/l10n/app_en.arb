@@ -4605,5 +4605,10 @@
   "architectRoofPitchEdit": "Roof pitch",
   "architectRoofPitchHint": "Drag the green point to change pitch. Tap the roof to choose the fixed axis, parallel to the eaves.",
   "architectRoofPitchAxis": "Use eaves axis",
-  "architectStrokeWeight": "Line weight"
+  "architectStrokeWeight": "Line weight",
+  "architectCutOpening": "Cut opening",
+  "architectCutOpeningHint": "Draw a closed contour inside the selected element, then confirm.",
+  "architectCutOpeningInvalid": "Keep the opening inside the element, without touching its boundary or another opening.",
+  "architectHatchAutoHint": "Fill: tap inside a closed contour.",
+  "architectHatchAutoFailed": "No closed contour found. Close the boundary or draw it manually."
 }

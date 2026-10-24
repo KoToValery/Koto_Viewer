@@ -1,3 +1,4 @@
+import '../services/architect_closed_contour.dart';
 import '../widgets/architect_terrain_editor.dart';
 import '../models/architect_line_style.dart';
 import '../models/architect_hatch_pattern.dart';
@@ -1762,6 +1763,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _cancelDrafting() {
+    if (_cutOpeningTargetId != null) _activeTool = ArchitectTool.select;
+    _cutOpeningTargetId = null;
     _terrainDrafting = false;
     _viewDraft = null;
     _placingDownpipe = false;
@@ -1818,6 +1821,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _changeTool(ArchitectTool tool) => setState(() {
+    _cutOpeningTargetId = null;
     _terrainDrafting = false;
     _placingDownpipe = false;
     _downpipeRoofId = null;
@@ -2130,8 +2134,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   (Offset, Offset)? _wallEndpointLeaderLine;
   bool _wallParallelMove = false;
   ArchitectLineStyle _activeCadLineStyle = ArchitectLineStyle.solid;
+  bool _automaticHatch = false;
+  String? _cutOpeningTargetId;
   ArchitectHatchPattern _activeHatchPattern = ArchitectHatchPattern.diagonal;
   Widget _hatchControl() => ArchitectHatchDraftBar(
+    automatic: _automaticHatch,
+    onAutomaticChanged: (v) => setState(() {
+      _automaticHatch = v;
+      _elementTool.cancelSlabDrafting();
+    }),
     pattern: _activeHatchPattern,
     customPatterns: _project.hatchPatterns,
     lineStyles: _project.lineStyles,
@@ -2151,19 +2162,70 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     },
   );
 
-  void _commitHatch() {
-    final points = List<Offset>.unmodifiable(_elementTool.slabDraftPoints);
+  void _commitHatch({ArchitectClosedContour? contour}) {
+    final points = List<Offset>.unmodifiable(contour?.polygon ?? _elementTool.slabDraftPoints);
     if (!ArchitectPolygonGeometry.valid(points)) { _operationError(); return; }
     final bounds = ArchitectSceneGeometry.boundsOf(points);
     try {
       _commands.execute(PlaceArchitectCadPrimitive(storeyId: _project.activeStoreyId,
         primitive: ArchitectCadPrimitive(id: ArchitectElementId.next('hatch'),
           type: CadPrimitiveType.hatch, startPoint: bounds.topLeft, endPoint: bounds.bottomRight,
-          polygon: points, hatchPattern: _activeHatchPattern)));
+          polygon: points, holes: contour?.holes ?? const [], hatchPattern: _activeHatchPattern)));
       setState(_elementTool.cancelSlabDrafting);
       _saveBiMProjectIfAttached(); HapticFeedback.mediumImpact();
     } on ArgumentError { _operationError(); }
   }
+  void _startCutOpening(String id) {
+    _cancelDrafting();
+    setState(() {
+      _cutOpeningTargetId = id;
+      _activeTool = ArchitectTool.slab;
+      _selectionContextActive = false;
+    });
+  }
+
+  void _commitCutOpening() {
+    final id = _cutOpeningTargetId;
+    if (id == null) return;
+    try {
+      _commands.execute(CutArchitectContourOpening(
+        storeyId: _project.activeStoreyId, elementId: id,
+        polygon: List.of(_elementTool.slabDraftPoints)));
+      _cancelDrafting();
+      setState(() => _activeTool = ArchitectTool.select);
+      _saveBiMProjectIfAttached();
+      HapticFeedback.mediumImpact();
+    } on ArgumentError {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(context.l10n.architectCutOpeningInvalid)));
+    }
+  }
+
+  Widget _cutOpeningControl() => Material(
+    color: Theme.of(context).colorScheme.surface,
+    borderRadius: BorderRadius.circular(8),
+    child: Row(children: [
+      Expanded(child: Tooltip(
+        message: context.l10n.architectCutOpeningHint,
+        child: Padding(padding: const EdgeInsets.only(left: 12),
+          child: Text(context.l10n.architectCutOpening)),
+      )),
+      IconButton(key: const ValueKey('opening-draft-undo'),
+        tooltip: context.l10n.undoAction, icon: const Icon(Icons.undo),
+        onPressed: _elementTool.slabDraftPoints.isEmpty ? null : () => setState(() {
+          _elementTool.slabDraftPoints.removeLast();
+          _elementTool.slabCandidatePoint = null;
+        })),
+      IconButton(key: const ValueKey('opening-draft-finish'),
+        tooltip: context.l10n.architectCutOpening,
+        icon: const Icon(Icons.check),
+        onPressed: _canConfirmContour ? _commitCutOpening : null),
+      IconButton(key: const ValueKey('opening-draft-cancel'),
+        tooltip: context.l10n.cancel, icon: const Icon(Icons.close),
+        onPressed: _cancelDrafting),
+    ]),
+  );
+
   Widget _lineStyleControl() => Theme(
     data: ThemeData.dark(),
     child: ArchitectLineStylePicker(
@@ -4706,6 +4768,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _handleTap(Offset rawModel) {
+    if (_cutOpeningTargetId != null) {
+      final pt = _resolveSlabPoint(rawModel);
+      if (_elementTool.slabDraftPoints.length >= 3 &&
+          (pt - _elementTool.slabDraftPoints.first).distance <=
+            math.min(16.0 / _currentScale, .20)) {
+        _commitCutOpening();
+      } else {
+        setState(() => _elementTool.addSlabPoint(pt));
+      }
+      return;
+    }
+    if (_activeTool == ArchitectTool.hatch && _automaticHatch &&
+        _effectiveSelection.isEmpty) {
+      final contour = ArchitectClosedContour.detect(_project.activeStorey, rawModel);
+      if (contour == null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(context.l10n.architectHatchAutoFailed)));
+      } else {
+        _commitHatch(contour: contour);
+      }
+      return;
+    }
+
     if (_placingDownpipe) {
       _placeDownpipe(rawModel);
       return;
@@ -8345,6 +8430,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
     }
 
+    if (_effectiveSelection.length <= 1 &&
+        CutArchitectContourOpening.target(storey, elementId) != null &&
+        _commands.view == ArchitectWorkspaceView.plan) {
+      items.add(_radialItem(action: ArchitectRadialAction.cutOpening,
+        color: const Color(0xFF80CBC4)));
+    }
+
     if (!items.any((it) => it.action == ArchitectRadialAction.newPoint) &&
         InsertArchitectElementPoint.pathOf(storey, elementId) != null) {
       items.add(
@@ -8867,6 +8959,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     switch (action) {
+      case ArchitectRadialAction.cutOpening:
+        _startCutOpening(id);
+        break;
       case ArchitectRadialAction.schedule:
         _showRoomScheduleDialog();
         break;
@@ -12449,6 +12544,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _canConfirmContour || _canConfirmZone;
 
   void _onConfirmDraft() {
+    if (_cutOpeningTargetId != null && _canConfirmContour) {
+      _commitCutOpening();
+      return;
+    }
     if (_canConfirmContour) {
       if (_activeTool == ArchitectTool.hatch) { _commitHatch(); return; }
       final result = _elementTool.commitSlab(storey: _project.activeStorey);
@@ -13008,6 +13107,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           ),
         ),
+      if (_cutOpeningTargetId != null)
+        Positioned(top: 8, left: 8, right: 8, child: _cutOpeningControl()),
       _buildPolygonDistanceOverlay(),
       _buildShapeDimensionOverlay(),
       if (_activeTool == ArchitectTool.dimension &&

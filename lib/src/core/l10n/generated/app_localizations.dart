@@ -13486,6 +13486,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Line weight'**
   String get architectStrokeWeight;
+
+  /// No description provided for @architectCutOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut opening'**
+  String get architectCutOpening;
+
+  /// No description provided for @architectCutOpeningHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw a closed contour inside the selected element, then confirm.'**
+  String get architectCutOpeningHint;
+
+  /// No description provided for @architectCutOpeningInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the opening inside the element, without touching its boundary or another opening.'**
+  String get architectCutOpeningInvalid;
+
+  /// No description provided for @architectHatchAutoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill: tap inside a closed contour.'**
+  String get architectHatchAutoHint;
+
+  /// No description provided for @architectHatchAutoFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'No closed contour found. Close the boundary or draw it manually.'**
+  String get architectHatchAutoFailed;
 }
 
 class _AppLocalizationsDelegate

@@ -7558,4 +7558,23 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectStrokeWeight => 'Дебелина на линия';
+
+  @override
+  String get architectCutOpening => 'Изрежи отвор';
+
+  @override
+  String get architectCutOpeningHint =>
+      'Очертайте затворен контур вътре в избрания елемент и потвърдете.';
+
+  @override
+  String get architectCutOpeningInvalid =>
+      'Отворът трябва да е вътре в елемента, без да докосва границата му или друг отвор.';
+
+  @override
+  String get architectHatchAutoHint =>
+      'Запълване: посочете вътре в затворен контур.';
+
+  @override
+  String get architectHatchAutoFailed =>
+      'Не е намерен затворен контур. Затворете границата или я очертайте ръчно.';
 }

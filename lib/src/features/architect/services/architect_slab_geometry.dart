@@ -71,6 +71,7 @@ class ArchitectSlabGeometry {
 
   static bool contains(ArchitectStorey storey, ArchitectSlab slab, Offset p) =>
       inside(slab.polygon, p) &&
+      !slab.holes.any((h) => inside(h, p)) &&
       !storey.openings.any((o) => inside(o.boundary, p));
 
   /// Partition at every contour crossing, then classify midpoints. Handles
@@ -85,6 +86,7 @@ class ArchitectSlabGeometry {
     double cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
     for (final polygon in [
       slab.polygon,
+      ...slab.holes,
       ...storey.openings.map((o) => o.boundary),
     ]) {
       for (var i = 0; i < polygon.length; i++) {
@@ -125,14 +127,14 @@ class ArchitectSlabGeometry {
       for (final (a, b, c) in ArchitectStairMesh.triangulate(slab.polygon))
         [slab.polygon[a], slab.polygon[b], slab.polygon[c]],
     ];
-    for (final opening in storey.openings) {
+    for (final boundary in [...slab.holes, ...storey.openings.map((o) => o.boundary)]) {
       for (final (a, b, c) in ArchitectStairMesh.triangulate(
-        opening.boundary,
+        boundary,
       )) {
         final clip = [
-          opening.boundary[a],
-          opening.boundary[b],
-          opening.boundary[c],
+          boundary[a],
+          boundary[b],
+          boundary[c],
         ];
         if (_cross(clip[1] - clip[0], clip[2] - clip[0]) < 0) {
           final temp = clip[1];
