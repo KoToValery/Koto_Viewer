@@ -1,6 +1,7 @@
 import 'architect_contour.dart';
 import 'architect_line_style.dart';
 import 'architect_hatch_pattern.dart';
+import 'architect_drawing_color.dart';
 // === SECTION: ARCHITECTURAL ELEMENT MODELS ===
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -808,6 +809,8 @@ class ArchitectCadPrimitive {
   final Offset startPoint;
   final Offset endPoint;
   final int colorValue; // ARGB
+  final String? colorPresetId;
+  ArchitectDrawingColor get drawingColor => ArchitectDrawingColor(colorValue, presetId: colorPresetId);
   final List<Offset>? polygon;
   final double strokeWidth;
   final ArchitectLineStyle lineStyle;
@@ -822,6 +825,7 @@ class ArchitectCadPrimitive {
     required this.startPoint,
     required this.endPoint,
     this.colorValue = 0xFF424242,
+    this.colorPresetId,
     this.strokeWidth = 1.0,
     this.lineStyle = ArchitectLineStyle.solid,
     this.hatchPattern = ArchitectHatchPattern.diagonal,
@@ -846,6 +850,8 @@ class ArchitectCadPrimitive {
     Offset? startPoint,
     Offset? endPoint,
     int? colorValue,
+    String? colorPresetId,
+    bool clearColorPreset = false,
     double? strokeWidth,
     ArchitectLineStyle? lineStyle,
     ArchitectHatchPattern? hatchPattern,
@@ -860,6 +866,8 @@ class ArchitectCadPrimitive {
     startPoint: startPoint ?? this.startPoint,
     endPoint: endPoint ?? this.endPoint,
     colorValue: colorValue ?? this.colorValue,
+    colorPresetId: clearColorPreset || (colorValue != null && colorPresetId == null &&
+        (colorValue & 0xFFFFFF) != (this.colorValue & 0xFFFFFF)) ? null : colorPresetId ?? this.colorPresetId,
     strokeWidth: strokeWidth ?? this.strokeWidth,
     lineStyle: lineStyle ?? this.lineStyle,
     hatchPattern: hatchPattern ?? this.hatchPattern,
@@ -876,6 +884,7 @@ class ArchitectCadPrimitive {
     'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'colorValue': colorValue,
+    if (colorPresetId != null) 'colorPresetId': colorPresetId,
     'strokeWidth': strokeWidth,
     if (type != CadPrimitiveType.circle) 'lineStyle': lineStyle.toJson(),
     if (type == CadPrimitiveType.hatch) ...{
@@ -905,6 +914,7 @@ class ArchitectCadPrimitive {
           (json['endPoint']['y'] as num).toDouble(),
         ),
         colorValue: (json['colorValue'] as num?)?.toInt() ?? 0xFF424242,
+        colorPresetId: json['colorPresetId'] as String?,
         strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 1.0,
         hatchPattern: json['hatchPattern'] is Map ? ArchitectHatchPattern.fromJson(
           Map<String, dynamic>.from(json['hatchPattern'] as Map)) : ArchitectHatchPattern.diagonal,

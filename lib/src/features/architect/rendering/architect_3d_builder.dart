@@ -307,9 +307,9 @@ class Architect3dBuilder {
       }
     }
 
-    // Roofs on different storeys can meet at the same physical elevation.
-    // Remove their shared interfaces together, keeping per-roof source IDs.
-    final roofShell = joinedRoofs
+    // For simple envelope prisms (!previewGeometry), remove shared internal interfaces.
+    // Detailed carpentry (previewGeometry) is already cleanly clipped to plan footprints.
+    final roofShell = (joinedRoofs && !previewGeometry)
         ? ArchitectSolidShell.build([for (final solid in roofSolids) solid.$2])
         : [for (final solid in roofSolids) solid.$2];
     for (var i = 0; i < roofSolids.length; i++) {

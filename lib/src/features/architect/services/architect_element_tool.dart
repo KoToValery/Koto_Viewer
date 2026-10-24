@@ -658,14 +658,12 @@ class ArchitectElementTool extends ChangeNotifier {
         final points = prim.polygonCorners;
         final path = ArchitectContour.path(points, prim.holes);
         if (path.contains(point)) yield prim.id;
-        for (var i = 0; i < points.length; i++) {
-          if (_pointToSegmentDistance(
-                point,
-                points[i],
-                points[(i + 1) % points.length],
-              ) <=
-              tolerance) {
-            yield prim.id;
+        for (final ring in [points, ...prim.holes]) {
+          for (var i = 0; i < ring.length; i++) {
+            if (_pointToSegmentDistance(point, ring[i],
+                  ring[(i + 1) % ring.length]) <= tolerance) {
+              yield prim.id;
+            }
           }
         }
       } else if (prim.type == CadPrimitiveType.circle) {
@@ -686,6 +684,7 @@ class ArchitectElementTool extends ChangeNotifier {
     final roofJunctions = ArchitectRoofJunctions.of(storey, project: annotationProject);
     for (final roof in storey.roofs.reversed) {
       if (roofJunctions.footprint(roof).contains(point) ||
+          _hitsInnerContour(roof.holes, point, tolerance) ||
           (annotationProject != null && ArchitectRoofDrainageGeometry.build(annotationProject, storey, roof)
             .planPath(roof.drainage.gutterWidth, tolerance: tolerance).contains(point))) {
         yield roof.id;
@@ -695,14 +694,15 @@ class ArchitectElementTool extends ChangeNotifier {
     // Check Floor Drains: the grate or the outline, never the whole room.
     for (final drain in storey.floorDrains) {
       if (ArchitectFloorDrainGeometry.distanceToGrate(drain, point) <= tolerance ||
-          ArchitectFloorDrainGeometry.boundaryDistance(drain, point) <= tolerance) {
+          ArchitectFloorDrainGeometry.boundaryDistance(drain, point) <= tolerance ||
+          _hitsInnerContour(drain.holes, point, tolerance)) {
         yield drain.id;
       }
     }
 
     // Check Slabs
     for (final slab in storey.slabs) {
-      if (slab.containsPoint(point)) {
+      if (slab.containsPoint(point) || _hitsInnerContour(slab.holes, point, tolerance)) {
         yield slab.id;
       }
     }
@@ -711,6 +711,15 @@ class ArchitectElementTool extends ChangeNotifier {
   // ===========================================================================
   // 13. ELEMENT DELETION
   // ===========================================================================
+
+  static bool _hitsInnerContour(List<List<Offset>> holes, Offset point, double tolerance) {
+    for (final ring in holes) {
+      for (var i = 0; i < ring.length; i++) {
+        if (_pointToSegmentDistance(point, ring[i], ring[(i + 1) % ring.length]) <= tolerance) return true;
+      }
+    }
+    return false;
+  }
 
   ArchitectStorey deleteElementById(ArchitectStorey storey, String elementId) {
     return storey.copyWith(

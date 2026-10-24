@@ -103,6 +103,9 @@ class ArchitectHatchPattern {
     id: 'diagonal',
     layers: [ArchitectHatchLayer()],
   );
+  static const solid = ArchitectHatchPattern(id: 'solidFill', layers: []);
+  static Iterable<ArchitectHatchPattern> get allPresets => [solid, ...presets];
+  bool get isSolid => id == solid.id;
   static const presets = [
     diagonal,
     ArchitectHatchPattern(
@@ -230,12 +233,12 @@ class ArchitectHatchPattern {
     ]),
     ArchitectHatchPattern(id: 'metal', layers: [ArchitectHatchLayer(spacingMm: 1.5)]),
   ];
-  bool get isPreset => presets.any((p) => p.id == id);
+  bool get isPreset => allPresets.any((p) => p.id == id);
   void validate() {
     if (id.isEmpty ||
-        layers.isEmpty ||
+        (layers.isEmpty && !isSolid) ||
         layers.length > 8 ||
-        (isPreset && this != presets.firstWhere((p) => p.id == id)) ||
+        (isPreset && this != allPresets.firstWhere((p) => p.id == id)) ||
         (!isPreset && name.trim().isEmpty)) {
       throw ArgumentError('Invalid hatch pattern');
     }
@@ -250,7 +253,7 @@ class ArchitectHatchPattern {
     if (!isPreset) 'layers': layers.map((l) => l.toJson()).toList(),
   };
   factory ArchitectHatchPattern.fromJson(Map<String, dynamic> j) {
-    final preset = presets.where((p) => p.id == j['id']).firstOrNull;
+    final preset = allPresets.where((p) => p.id == j['id']).firstOrNull;
     if (preset != null) return preset;
     final pattern = ArchitectHatchPattern(
       id: j['id'] as String? ?? '',

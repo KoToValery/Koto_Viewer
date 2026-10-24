@@ -175,9 +175,11 @@ class Architect2dPainter extends CustomPainter {
   // Slab drafting state
   final List<Offset> slabDraftPoints;
   final ArchitectHatchPattern activeHatchPattern;
+  final int activeHatchColorValue;
   final Offset? slabCandidatePoint;
   final ArchitectRoofTool? roofTool;
   final bool polygonEditInvalid;
+  final int? polygonEditHoleIndex;
   final (Offset, Offset)? polygonLeaderLine;
   final double handleOffsetLength;
   final (Offset, Offset)? wallEndpointLeaderLine;
@@ -282,9 +284,11 @@ class Architect2dPainter extends CustomPainter {
     this.underlayLayerVisibility = const {},
     this.slabDraftPoints = const [],
     this.activeHatchPattern = ArchitectHatchPattern.diagonal,
+    this.activeHatchColorValue = 0xFF424242,
     this.slabCandidatePoint,
     this.roofTool,
     this.polygonEditInvalid = false,
+    this.polygonEditHoleIndex,
     this.polygonLeaderLine,
     this.handleOffsetLength = 50.0,
     this.wallEndpointLeaderLine,
@@ -329,6 +333,11 @@ class Architect2dPainter extends CustomPainter {
         );
       }
       if (paintGrid) _drawDraftingGrid(canvas, size);
+      ArchitectElementsPainterHelper.drawCadPrimitives(
+        canvas: canvas, storey: _elementLayerStorey, zoomScale: zoomScale,
+        palette: palette, dimensionScale: _project.dimensionScale,
+        selectedElementId: null, hatchesOnly: true,
+      );
       _drawGridAxes(canvas);
       ArchitectElementsPainterHelper.drawSlabs(
         palette: palette,
@@ -338,11 +347,6 @@ class Architect2dPainter extends CustomPainter {
         selectedElementId: selectedElementId,
       );
       _drawZones(canvas);
-      ArchitectElementsPainterHelper.drawCadPrimitives(
-        canvas: canvas, storey: _elementLayerStorey, zoomScale: zoomScale,
-        palette: palette, dimensionScale: _project.dimensionScale,
-        selectedElementId: selectedElementId, hatchesOnly: true,
-      );
       ArchitectFloorDrainPainterHelper.draw(
         canvas: canvas,
         storey: _elementLayerStorey,
@@ -536,7 +540,7 @@ class Architect2dPainter extends CustomPainter {
           storey: ArchitectStorey(id: 'preview', name: '', cadPrimitives: [
             ArchitectCadPrimitive(id: 'hatch-preview', type: CadPrimitiveType.hatch,
               startPoint: bounds.topLeft, endPoint: bounds.bottomRight,
-              polygon: points, hatchPattern: activeHatchPattern, colorValue: 0xFF008F99),
+              polygon: points, hatchPattern: activeHatchPattern, colorValue: activeHatchColorValue),
           ]), zoomScale: zoomScale, dimensionScale: _project.dimensionScale);
       }
       ArchitectElementsPainterHelper.drawSlabDrafting(
@@ -607,7 +611,7 @@ class Architect2dPainter extends CustomPainter {
       elevationMarkers: storey.elevationMarkers
           .where((e) => keep(e.id))
           .toList(),
-      cadPrimitives: storey.cadPrimitives.where((e) => keep(e.id)).toList(),
+      cadPrimitives: storey.cadPrimitives.where((e) => keep(e.id) || (!selectedOnly && e.type == CadPrimitiveType.hatch)).toList(),
       floorDrains: storey.floorDrains.where((e) => keep(e.id)).toList(),
       zones: selectedOnly ? [] : storey.zones,
     );
@@ -695,6 +699,7 @@ class Architect2dPainter extends CustomPainter {
     }
     if (selected.cadPrimitives.any((p) => p.isPolygon)) {
       ArchitectElementsPainterHelper.drawCadPrimitives(
+        hatchSelectionOnly: true,
         dimensionScale: _project.dimensionScale,
         palette: palette,
         canvas: canvas,
@@ -848,22 +853,27 @@ class Architect2dPainter extends CustomPainter {
     final targetId = selectedElementId ?? selectedZoneId;
     if (targetId == null) return;
     List<Offset>? polygon;
+    List<List<Offset>> holes = const [];
     for (final p in _project.activeStorey.cadPrimitives) {
       if (p.id == targetId && p.isPolygon) {
         polygon = p.polygonCorners;
+        holes = p.holes;
       }
     }
     for (final slab in _project.activeStorey.slabs) {
-      if (slab.id == targetId) polygon = slab.polygon;
+      if (slab.id == targetId) { polygon = slab.polygon; holes = slab.holes; }
     }
     for (final roof in _project.activeStorey.roofs) {
-      if (roof.id == targetId) polygon = roof.points;
+      if (roof.id == targetId) { polygon = roof.points; holes = roof.holes; }
     }
     for (final zone in _project.activeStorey.zones) {
       if (zone.id == targetId && !zone.isAutoBoundary) polygon = zone.polygon;
     }
     for (final opening in _project.activeStorey.openings) {
       if (opening.id == targetId) polygon = opening.boundary;
+    }
+    for (final drain in _project.activeStorey.floorDrains) {
+      if (drain.id == targetId) { polygon = drain.polygon; holes = drain.holes; }
     }
     if (polygon == null) return;
     ArchitectPolygonPainter.draw(
@@ -873,13 +883,24 @@ class Architect2dPainter extends CustomPainter {
       unit: _project.units,
       decimals: _project.distanceDecimals,
       handles: true,
-      invalid: polygonEditInvalid,
-      leaderLine: polygonLeaderLine,
+      invalid: polygonEditInvalid && polygonEditHoleIndex == null,
+      leaderLine: polygonEditHoleIndex == null ? polygonLeaderLine : null,
       offsetLengthPx: handleOffsetLength,
       obstacles:
           dimensionWallObstacles ??
           ArchitectWallNetwork.body(_project.activeStorey.walls),
     );
+    for (var i = 0; i < holes.length; i++) {
+      ArchitectPolygonPainter.draw(
+        canvas: canvas, polygon: holes[i], scale: zoomScale,
+        unit: _project.units, decimals: _project.distanceDecimals,
+        handles: true,
+        invalid: polygonEditInvalid && polygonEditHoleIndex == i,
+        leaderLine: polygonEditHoleIndex == i ? polygonLeaderLine : null,
+        offsetLengthPx: handleOffsetLength,
+        obstacles: dimensionWallObstacles ?? ArchitectWallNetwork.body(_project.activeStorey.walls),
+      );
+    }
   }
 
   void _drawZones(Canvas canvas) {

@@ -21,7 +21,7 @@ class ArchitectPathSolid {
           at((a + b) / 2),
           at(a + (b - a) * .75),
         ];
-        if (depth >= 28 ||
+        if (depth >= 14 ||
             ((b - a - length).abs() < tolerance &&
                 samples.every((r) => error(r) < tolerance))) {
           points.add(p);

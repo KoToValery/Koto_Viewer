@@ -639,6 +639,7 @@ class ArchitectElementsPainterHelper {
     ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
     String? selectedElementId,
     bool? hatchesOnly,
+    bool hatchSelectionOnly = false,
   }) {
     final unitsPerMm = ArchitectDrawingScale(
       ArchitectTextScope.current?.denominator ?? dimensionScale.denominator,
@@ -656,21 +657,46 @@ class ArchitectElementsPainterHelper {
 
       if (prim.type == CadPrimitiveType.hatch) {
         final boundary = ArchitectContour.path(prim.polygonCorners, prim.holes);
-        canvas.save();
-        canvas.clipPath(boundary);
-        canvas.drawPath(ArchitectHatchGeometry.path(boundary: boundary,
-          pattern: prim.hatchPattern, unitsPerMm: unitsPerMm,
-          scale: prim.hatchScale, angleDeg: prim.hatchAngle,
-          visibleBounds: canvas.getLocalClipBounds(),
-          origin: prim.polygonCorners.first),
-          Paint()..color = paint.color..style = PaintingStyle.stroke
-            ..strokeWidth = .13 * unitsPerMm);
-        canvas.restore();
+        final color = Color(prim.colorValue);
+        // Keep fill interiors below walls and draw only an outline in the
+        // selection layer, without compounding their transparency.
+        if (!hatchSelectionOnly) {
+          canvas.save();
+          canvas.clipPath(boundary);
+          if (prim.hatchPattern.isSolid) {
+            architectDrawingSources(canvas, {prim.id}, 'cadFill');
+            canvas.drawPath(
+              boundary,
+              Paint()..color = color..style = PaintingStyle.fill,
+            );
+          } else {
+            canvas.drawPath(
+              ArchitectHatchGeometry.path(
+                boundary: boundary,
+                pattern: prim.hatchPattern,
+                unitsPerMm: unitsPerMm,
+                scale: prim.hatchScale,
+                angleDeg: prim.hatchAngle,
+                visibleBounds: canvas.getLocalClipBounds(),
+                origin: prim.polygonCorners.first,
+              ),
+              Paint()..color = color..style = PaintingStyle.stroke
+                ..strokeWidth = .13 * unitsPerMm,
+            );
+          }
+          canvas.restore();
+        }
+        architectDrawingSources(canvas, {prim.id}, 'cadPrimitives');
         if (prim.hatchBorder || isSelected) {
-          canvas.drawPath(prim.hatchBorder
-            ? ArchitectLinePattern.path(boundary, prim.lineStyle, unitsPerMm)
-            : boundary, Paint()..color = paint.color..style = PaintingStyle.stroke
-              ..strokeWidth = isSelected ? paint.strokeWidth : .18 * unitsPerMm);
+          final borderColor = isSelected ? paint.color : prim.hatchPattern.isSolid
+              ? palette.foreground(ArchitectPaperStyle.rule) : color;
+          canvas.drawPath(
+            prim.hatchBorder
+                ? ArchitectLinePattern.path(boundary, prim.lineStyle, unitsPerMm)
+                : boundary,
+            Paint()..color = borderColor..style = PaintingStyle.stroke
+              ..strokeWidth = isSelected ? paint.strokeWidth : .18 * unitsPerMm,
+          );
         }
       } else if (prim.type == CadPrimitiveType.line) {
         canvas.drawPath(

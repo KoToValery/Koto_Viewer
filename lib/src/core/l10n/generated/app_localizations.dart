@@ -13948,6 +13948,330 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select'**
   String get architectSelectFinish;
+
+  /// No description provided for @architectFillSolid.
+  ///
+  /// In en, this message translates to:
+  /// **'Solid'**
+  String get architectFillSolid;
+
+  /// No description provided for @architectDrawingColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get architectDrawingColor;
+
+  /// No description provided for @architectColorGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic'**
+  String get architectColorGeneral;
+
+  /// No description provided for @architectColorBgOup.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulgaria · OUP'**
+  String get architectColorBgOup;
+
+  /// No description provided for @architectColorBgPup.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulgaria · PUP'**
+  String get architectColorBgPup;
+
+  /// No description provided for @architectColorGermany.
+  ///
+  /// In en, this message translates to:
+  /// **'Germany · PlanZV'**
+  String get architectColorGermany;
+
+  /// No description provided for @architectColorSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Code or name'**
+  String get architectColorSearch;
+
+  /// No description provided for @architectColorCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get architectColorCustom;
+
+  /// No description provided for @architectColorOpacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Opacity'**
+  String get architectColorOpacity;
+
+  /// No description provided for @architectColorInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'About the palette'**
+  String get architectColorInfo;
+
+  /// No description provided for @architectColorHexError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter six hexadecimal digits.'**
+  String get architectColorHexError;
+
+  /// No description provided for @architectColorApprox.
+  ///
+  /// In en, this message translates to:
+  /// **'Screen colors are approximate. The RAL reference is stored separately; use a calibrated palette for precise print matching.'**
+  String get architectColorApprox;
+
+  /// No description provided for @architectColorBgInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Ordinance No. 8, Annex 2: table 1 for OUP, table 2 for PUP. + and ++ mean lighter shades; − means darker. These are color palettes; complete planning symbols may also require borders, stripes and labels. PUP zone colors apply to PRZ/PZ drawings.'**
+  String get architectColorBgInfo;
+
+  /// No description provided for @architectColorDeInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'FNP/B-Plan color groups from PlanZV. The ordinance specifies named tones, not mandatory RGB or RAL codes. These are working approximations; complete planning symbols also include lines, hatching and labels.'**
+  String get architectColorDeInfo;
+
+  /// No description provided for @architectColorBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Black'**
+  String get architectColorBlack;
+
+  /// No description provided for @architectColorWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'White'**
+  String get architectColorWhite;
+
+  /// No description provided for @architectColorGray.
+  ///
+  /// In en, this message translates to:
+  /// **'Gray'**
+  String get architectColorGray;
+
+  /// No description provided for @architectColorRed.
+  ///
+  /// In en, this message translates to:
+  /// **'Red'**
+  String get architectColorRed;
+
+  /// No description provided for @architectColorBlue.
+  ///
+  /// In en, this message translates to:
+  /// **'Blue'**
+  String get architectColorBlue;
+
+  /// No description provided for @architectColorGreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Green'**
+  String get architectColorGreen;
+
+  /// No description provided for @architectColorYellow.
+  ///
+  /// In en, this message translates to:
+  /// **'Yellow'**
+  String get architectColorYellow;
+
+  /// No description provided for @architectColorOrange.
+  ///
+  /// In en, this message translates to:
+  /// **'Orange'**
+  String get architectColorOrange;
+
+  /// No description provided for @architectColorResidential.
+  ///
+  /// In en, this message translates to:
+  /// **'Residential use'**
+  String get architectColorResidential;
+
+  /// No description provided for @architectColorPublicServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Public services'**
+  String get architectColorPublicServices;
+
+  /// No description provided for @architectColorIndustrial.
+  ///
+  /// In en, this message translates to:
+  /// **'Industrial use'**
+  String get architectColorIndustrial;
+
+  /// No description provided for @architectColorStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage'**
+  String get architectColorStorage;
+
+  /// No description provided for @architectColorGreenSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Green space'**
+  String get architectColorGreenSpace;
+
+  /// No description provided for @architectColorArable.
+  ///
+  /// In en, this message translates to:
+  /// **'Arable land'**
+  String get architectColorArable;
+
+  /// No description provided for @architectColorPerennial.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanent crops'**
+  String get architectColorPerennial;
+
+  /// No description provided for @architectColorUncultivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Uncultivated land'**
+  String get architectColorUncultivated;
+
+  /// No description provided for @architectColorForest.
+  ///
+  /// In en, this message translates to:
+  /// **'Forest'**
+  String get architectColorForest;
+
+  /// No description provided for @architectColorRecreationalForest.
+  ///
+  /// In en, this message translates to:
+  /// **'Recreational forest'**
+  String get architectColorRecreationalForest;
+
+  /// No description provided for @architectColorWater.
+  ///
+  /// In en, this message translates to:
+  /// **'Water'**
+  String get architectColorWater;
+
+  /// No description provided for @architectColorTransport.
+  ///
+  /// In en, this message translates to:
+  /// **'Transport'**
+  String get architectColorTransport;
+
+  /// No description provided for @architectColorUtilities.
+  ///
+  /// In en, this message translates to:
+  /// **'Utilities'**
+  String get architectColorUtilities;
+
+  /// No description provided for @architectColorHousingLowHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'Housing zones · Zhm/Zhg'**
+  String get architectColorHousingLowHigh;
+
+  /// No description provided for @architectColorHousingMediumComplex.
+  ///
+  /// In en, this message translates to:
+  /// **'Housing zones · Zhs/Zhk'**
+  String get architectColorHousingMediumComplex;
+
+  /// No description provided for @architectColorVillas.
+  ///
+  /// In en, this message translates to:
+  /// **'Villa zones · base'**
+  String get architectColorVillas;
+
+  /// No description provided for @architectColorSpecialPurpose.
+  ///
+  /// In en, this message translates to:
+  /// **'Special purpose'**
+  String get architectColorSpecialPurpose;
+
+  /// No description provided for @architectColorCulturalLand.
+  ///
+  /// In en, this message translates to:
+  /// **'Cultural heritage land'**
+  String get architectColorCulturalLand;
+
+  /// No description provided for @architectColorPrimaryRoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Primary roads'**
+  String get architectColorPrimaryRoad;
+
+  /// No description provided for @architectColorSecondaryRoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary roads'**
+  String get architectColorSecondaryRoad;
+
+  /// No description provided for @architectColorCollectingRoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Collector roads'**
+  String get architectColorCollectingRoad;
+
+  /// No description provided for @architectColorServingRoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Local roads and parking'**
+  String get architectColorServingRoad;
+
+  /// No description provided for @architectColorPedestrian.
+  ///
+  /// In en, this message translates to:
+  /// **'Sidewalks and pedestrian areas'**
+  String get architectColorPedestrian;
+
+  /// No description provided for @architectColorHousingExisting.
+  ///
+  /// In en, this message translates to:
+  /// **'Housing · existing'**
+  String get architectColorHousingExisting;
+
+  /// No description provided for @architectColorHousingNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Housing · proposed'**
+  String get architectColorHousingNew;
+
+  /// No description provided for @architectColorPublicExisting.
+  ///
+  /// In en, this message translates to:
+  /// **'Public buildings · existing'**
+  String get architectColorPublicExisting;
+
+  /// No description provided for @architectColorPublicNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Public buildings · proposed'**
+  String get architectColorPublicNew;
+
+  /// No description provided for @architectColorHeritageBuilding.
+  ///
+  /// In en, this message translates to:
+  /// **'Heritage buildings'**
+  String get architectColorHeritageBuilding;
+
+  /// No description provided for @architectColorMixedUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Mixed use'**
+  String get architectColorMixedUse;
+
+  /// No description provided for @architectColorSpecialUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Special building areas'**
+  String get architectColorSpecialUse;
+
+  /// No description provided for @architectColorRailway.
+  ///
+  /// In en, this message translates to:
+  /// **'Railway land'**
+  String get architectColorRailway;
+
+  /// No description provided for @architectColorAgriculture.
+  ///
+  /// In en, this message translates to:
+  /// **'Agricultural land'**
+  String get architectColorAgriculture;
 }
 
 class _AppLocalizationsDelegate

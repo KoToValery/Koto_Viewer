@@ -7814,4 +7814,169 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectSelectFinish => 'Селектирай';
+
+  @override
+  String get architectFillSolid => 'Плътно';
+
+  @override
+  String get architectDrawingColor => 'Цвят';
+
+  @override
+  String get architectColorGeneral => 'Основни';
+
+  @override
+  String get architectColorBgOup => 'България · ОУП';
+
+  @override
+  String get architectColorBgPup => 'България · ПУП';
+
+  @override
+  String get architectColorGermany => 'Германия · PlanZV';
+
+  @override
+  String get architectColorSearch => 'Код или име';
+
+  @override
+  String get architectColorCustom => 'Собствен';
+
+  @override
+  String get architectColorOpacity => 'Непрозрачност';
+
+  @override
+  String get architectColorInfo => 'За палитрата';
+
+  @override
+  String get architectColorHexError => 'Въведете шест шестнадесетични цифри.';
+
+  @override
+  String get architectColorApprox =>
+      'Екранните цветове са приблизителни. RAL кодът се пази отделно; за точно съвпадение при печат използвайте калибрирана палитра.';
+
+  @override
+  String get architectColorBgInfo =>
+      'Наредба № 8, приложение № 2: таблица 1 за ОУП, таблица 2 за ПУП. + и ++ означават изсветляване, − означава потъмняване. Палитрата съдържа цветове, а пълните условни знаци може да изискват контури, ивици и надписи. За ПУП оцветяването на зоните е за ПРЗ/ПЗ.';
+
+  @override
+  String get architectColorDeInfo =>
+      'Цветови групи за FNP/B-Plan по PlanZV. Наредбата задава цветови наименования, а не задължителни RGB или RAL кодове. Нюансите тук са работни приближения; пълните означения включват и линии, щрихи и надписи.';
+
+  @override
+  String get architectColorBlack => 'Черно';
+
+  @override
+  String get architectColorWhite => 'Бяло';
+
+  @override
+  String get architectColorGray => 'Сиво';
+
+  @override
+  String get architectColorRed => 'Червено';
+
+  @override
+  String get architectColorBlue => 'Синьо';
+
+  @override
+  String get architectColorGreen => 'Зелено';
+
+  @override
+  String get architectColorYellow => 'Жълто';
+
+  @override
+  String get architectColorOrange => 'Оранжево';
+
+  @override
+  String get architectColorResidential => 'Жилищни функции';
+
+  @override
+  String get architectColorPublicServices => 'Обществено обслужване';
+
+  @override
+  String get architectColorIndustrial => 'Производствени дейности';
+
+  @override
+  String get architectColorStorage => 'Складови дейности';
+
+  @override
+  String get architectColorGreenSpace => 'Озеленяване';
+
+  @override
+  String get architectColorArable => 'Ниви';
+
+  @override
+  String get architectColorPerennial => 'Трайни насаждения';
+
+  @override
+  String get architectColorUncultivated => 'Необработваеми земи';
+
+  @override
+  String get architectColorForest => 'Гори';
+
+  @override
+  String get architectColorRecreationalForest => 'Рекреационни гори';
+
+  @override
+  String get architectColorWater => 'Водни площи';
+
+  @override
+  String get architectColorTransport => 'Транспорт';
+
+  @override
+  String get architectColorUtilities => 'Техническа инфраструктура';
+
+  @override
+  String get architectColorHousingLowHigh => 'Жилищни зони · Жм/Жг';
+
+  @override
+  String get architectColorHousingMediumComplex => 'Жилищни зони · Жс/Жк';
+
+  @override
+  String get architectColorVillas => 'Вилни зони · фон';
+
+  @override
+  String get architectColorSpecialPurpose => 'Специално предназначение';
+
+  @override
+  String get architectColorCulturalLand => 'Терени на културното наследство';
+
+  @override
+  String get architectColorPrimaryRoad => 'Първостепенни улици';
+
+  @override
+  String get architectColorSecondaryRoad => 'Второстепенни улици';
+
+  @override
+  String get architectColorCollectingRoad => 'Събирателни улици';
+
+  @override
+  String get architectColorServingRoad => 'Обслужващи улици и паркинги';
+
+  @override
+  String get architectColorPedestrian => 'Тротоари и пешеходни площи';
+
+  @override
+  String get architectColorHousingExisting => 'Жилищни сгради · съществуващи';
+
+  @override
+  String get architectColorHousingNew => 'Жилищни сгради · нови';
+
+  @override
+  String get architectColorPublicExisting => 'Обществени сгради · съществуващи';
+
+  @override
+  String get architectColorPublicNew => 'Обществени сгради · нови';
+
+  @override
+  String get architectColorHeritageBuilding => 'Сгради · културни ценности';
+
+  @override
+  String get architectColorMixedUse => 'Смесено предназначение';
+
+  @override
+  String get architectColorSpecialUse => 'Специални строителни територии';
+
+  @override
+  String get architectColorRailway => 'Железопътни терени';
+
+  @override
+  String get architectColorAgriculture => 'Земеделски площи';
 }

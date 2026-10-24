@@ -1721,6 +1721,7 @@ class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
     }
     final floor = ArchitectModelCommand.storey(project, storeyId);
     if (primitive.type == CadPrimitiveType.hatch) {
+        primitive.drawingColor.validate();
       primitive.hatchPattern.validate();
       if (!primitive.hatchScale.isFinite || primitive.hatchScale < .1 || primitive.hatchScale > 20 ||
           !primitive.hatchAngle.isFinite || primitive.hatchAngle.abs() > 180) {
@@ -1816,10 +1817,13 @@ class DeleteArchitectRoofPlane extends ArchitectModelCommand {
 class UpdateArchitectPolygon extends ArchitectModelCommand {
   final String storeyId, elementId;
   final List<Offset> polygon;
+  /// Null edits the outer boundary; otherwise edits one persistent inner ring.
+  final int? holeIndex;
   const UpdateArchitectPolygon({
     required this.storeyId,
     required this.elementId,
     required this.polygon,
+    this.holeIndex,
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
@@ -1827,6 +1831,23 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
       throw ArgumentError('Invalid contour');
     }
     final floor = ArchitectModelCommand.storey(project, storeyId);
+    if (holeIndex case final int index) {
+      final host = CutArchitectContourOpening.target(floor, elementId);
+      if (host == null || index < 0 || index >= host.$2.length) {
+        throw ArgumentError('Unknown contour opening');
+      }
+      final holes = List<List<Offset>>.of(host.$2);
+      holes[index] = List<Offset>.unmodifiable(polygon);
+      if (!ArchitectContour.valid(host.$1, holes)) {
+        throw ArgumentError('Opening would cross its host or another opening');
+      }
+      return ArchitectModelCommand.replace(project, floor.copyWith(
+        floorDrains: [for (final p in floor.floorDrains) p.id == elementId ? p.copyWith(holes: holes) : p],
+        slabs: [for (final p in floor.slabs) p.id == elementId ? p.copyWith(holes: holes) : p],
+        roofs: [for (final p in floor.roofs) p.id == elementId ? p.copyWith(holes: holes) : p],
+        cadPrimitives: [for (final p in floor.cadPrimitives) p.id == elementId ? p.copyWith(holes: holes) : p],
+      ));
+    }
     if (floor.zones.any((z) => z.id == elementId && z.isAutoBoundary)) {
       throw ArgumentError('Automatic zone boundaries are controlled by walls');
     }
@@ -1902,15 +1923,23 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     required this.point,
     required this.newElementId,
     this.atMidpoint = false,
+    this.holeIndex,
   });
   final String storeyId, elementId, newElementId;
   final Offset point;
   final bool atMidpoint;
+  final int? holeIndex;
 
   static ({List<Offset> points, bool closed, double width})? pathOf(
     ArchitectStorey storey,
-    String id,
-  ) {
+    String id, {
+    int? holeIndex,
+  }) {
+    if (holeIndex != null) {
+      final host = CutArchitectContourOpening.target(storey, id);
+      if (host == null || holeIndex < 0 || holeIndex >= host.$2.length) return null;
+      return (points: host.$2[holeIndex], closed: true, width: 0);
+    }
     for (final w in storey.walls) {
       if (w.id == id) {
         return (
@@ -1963,7 +1992,7 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     ArchitectModelCommand.point(point);
     final storey = ArchitectModelCommand.storey(project, storeyId);
-    final path = pathOf(storey, elementId);
+    final path = pathOf(storey, elementId, holeIndex: holeIndex);
     if (path == null) throw ArgumentError('Element has no editable path');
     // The pick identifies the segment; midpoint insertion ignores its distance
     // along that segment and works equally for open paths and closing edges.
@@ -1988,6 +2017,7 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
         storeyId: storeyId,
         elementId: elementId,
         polygon: points,
+        holeIndex: holeIndex,
       ).apply(project);
     }
     if (storey.dimensions.any((d) => d.id == elementId)) {

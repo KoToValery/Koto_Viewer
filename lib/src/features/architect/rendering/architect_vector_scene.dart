@@ -380,7 +380,7 @@ class ArchitectVectorCanvas implements Canvas {
     if (paint.color.a == 0) return;
     final transformed = path.transform(_matrix.storage);
     var color = paint.color;
-    if (paint.style == PaintingStyle.fill &&
+    if (paint.style == PaintingStyle.fill && _role != 'cadFill' &&
         transformed.getBounds().size.width *
                 transformed.getBounds().size.height >
             2 &&

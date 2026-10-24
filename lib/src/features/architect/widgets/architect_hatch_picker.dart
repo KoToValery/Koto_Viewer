@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_hatch_pattern.dart';
+import '../models/architect_drawing_color.dart';
+import 'architect_drawing_color_picker.dart';
 import '../models/architect_line_style.dart';
 import '../rendering/architect_hatch_geometry.dart';
 import 'architect_line_style_picker.dart';
@@ -10,6 +12,7 @@ import '../models/architect_line_symbol.dart';
 
 extension ArchitectHatchLabel on ArchitectHatchPattern {
   String label(AppLocalizations l) => switch (id) {
+    'solidFill' => l.architectFillSolid,
     'wood' => l.architectHatchWood,
     'metal' => l.architectHatchMetal,
     'diagonal' => l.architectHatchDiagonal,
@@ -29,18 +32,20 @@ extension ArchitectHatchLabel on ArchitectHatchPattern {
 class ArchitectHatchSample extends StatelessWidget {
   final ArchitectHatchPattern pattern;
   final double width, height;
+  final Color? color;
   const ArchitectHatchSample({
     super.key,
     required this.pattern,
     this.width = 76,
     this.height = 38,
+    this.color,
   });
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: Size(width, height),
     painter: _HatchSamplePainter(
       pattern,
-      Theme.of(context).colorScheme.onSurface,
+      color ?? Theme.of(context).colorScheme.onSurface,
     ),
   );
 }
@@ -52,6 +57,10 @@ class _HatchSamplePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final boundary = Path()..addRect(Offset.zero & size);
+    if (pattern.isSolid) {
+      canvas.drawPath(boundary, Paint()..color = color);
+      return;
+    }
     canvas.save();
     canvas.clipPath(boundary);
     canvas.drawPath(
@@ -80,6 +89,7 @@ class ArchitectHatchPicker extends StatelessWidget {
   final List<ArchitectLineStyle> lineStyles;
   final ValueChanged<ArchitectHatchPattern> onChanged;
   final bool compact;
+  final int? colorValue;
   const ArchitectHatchPicker({
     super.key,
     required this.value,
@@ -87,11 +97,12 @@ class ArchitectHatchPicker extends StatelessWidget {
     this.customPatterns = const [],
     this.lineStyles = const [],
     this.compact = false,
+    this.colorValue,
   });
   Future<void> _choose(BuildContext context) async {
     final l = context.l10n;
     final options = <String, ArchitectHatchPattern>{
-      for (final p in ArchitectHatchPattern.presets) p.id: p,
+      for (final p in ArchitectHatchPattern.allPresets) p.id: p,
       for (final p in customPatterns) p.id: p,
       if (value != null &&
           !value!.isPreset &&
@@ -118,7 +129,7 @@ class ArchitectHatchPicker extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  trailing: ArchitectHatchSample(pattern: p),
+                  trailing: ArchitectHatchSample(pattern: p, color: colorValue == null ? null : Color(colorValue!)),
                   selected: p == value,
                   onTap: () => Navigator.pop(ctx, p),
                 ),
@@ -134,7 +145,7 @@ class ArchitectHatchPicker extends StatelessWidget {
               final result = await showDialog<ArchitectHatchPattern>(
                 context: ctx,
                 builder: (_) => ArchitectHatchGenerator(
-                  initial: value ?? ArchitectHatchPattern.diagonal,
+                  initial: value == null || value!.isSolid ? ArchitectHatchPattern.diagonal : value!,
                   lineStyles: lineStyles,
                 ),
               );
@@ -165,6 +176,7 @@ class ArchitectHatchPicker extends StatelessWidget {
             child: Center(
               child: ArchitectHatchSample(
                 pattern: value ?? ArchitectHatchPattern.diagonal,
+                color: colorValue == null ? null : Color(colorValue!),
                 width: 42,
                 height: 28,
               ),
@@ -184,7 +196,7 @@ class ArchitectHatchPicker extends StatelessWidget {
       ),
       trailing: value == null
           ? const Text('—')
-          : ArchitectHatchSample(pattern: value!),
+          : ArchitectHatchSample(pattern: value!, color: colorValue == null ? null : Color(colorValue!)),
       onTap: () => _choose(context),
     );
   }
@@ -220,7 +232,7 @@ class _HatchGeneratorState extends State<ArchitectHatchGenerator> {
   @override
   void initState() {
     super.initState();
-    final layer=widget.initial.layers.first;
+    final layer=widget.initial.layers.firstOrNull ?? const ArchitectHatchLayer();
     final symbol=layer.lineStyle.symbol;
     if(widget.initial.layers.length==1 && layer.symbolsOnly &&
         symbol?.shape==ArchitectLineSymbolShape.custom) {
@@ -288,6 +300,8 @@ class ArchitectHatchDraftBar extends StatelessWidget {
   final VoidCallback onUndo, onFinish, onCancel;
   final bool automatic;
   final ValueChanged<bool>? onAutomaticChanged;
+  final ArchitectDrawingColor color;
+  final ValueChanged<ArchitectDrawingColor>? onColorChanged;
   const ArchitectHatchDraftBar({
     super.key,
     required this.pattern,
@@ -300,12 +314,16 @@ class ArchitectHatchDraftBar extends StatelessWidget {
     required this.onCancel,
     this.automatic = false,
     this.onAutomaticChanged,
+    this.color = ArchitectDrawingColor.ink,
+    this.onColorChanged,
   });
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
     return Theme(
-      data: ThemeData.dark(),
+      data: ThemeData.dark().copyWith(iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(
+        minimumSize: const Size(40, 40), maximumSize: const Size(40, 40), padding: const EdgeInsets.all(8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap))),
       child: Material(
         color: const Color(0xEE1E242C),
         borderRadius: BorderRadius.circular(8),
@@ -331,11 +349,15 @@ class ArchitectHatchDraftBar extends StatelessWidget {
             ArchitectHatchPicker(
               key: const ValueKey('architect-draft-hatch'),
               value: pattern,
+              colorValue: color.argb,
               compact: true,
               customPatterns: customPatterns,
               lineStyles: lineStyles,
               onChanged: onChanged,
             ),
+            if (onColorChanged != null) ArchitectDrawingColorPicker(
+              key: const ValueKey('architect-draft-hatch-color'), value: color,
+              compact: true, onChanged: onColorChanged!),
             if (pointCount > 0) ...[
               IconButton(
                 key: const ValueKey('hatch-draft-undo'),
@@ -383,7 +405,7 @@ class _ArchitectHatchEditorState extends State<ArchitectHatchEditor> {
     _name = TextEditingController(
       text: widget.initial.isPreset ? '' : widget.initial.name,
     );
-    _layers = List.of(widget.initial.layers);
+    _layers = List.of(widget.initial.isSolid ? ArchitectHatchPattern.diagonal.layers : widget.initial.layers);
   }
 
   @override

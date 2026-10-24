@@ -2,6 +2,8 @@ import 'dart:convert';
 import '../models/architect_elements.dart';
 import '../models/architect_line_style.dart';
 import '../models/architect_hatch_pattern.dart';
+import '../models/architect_drawing_color.dart';
+import 'architect_drawing_color_picker.dart';
 import 'architect_hatch_picker.dart';
 import 'architect_line_style_picker.dart';
 import 'package:flutter/material.dart';
@@ -47,6 +49,7 @@ class _ArchitectElementPropertiesDialogState
   final texts = <String, String>{};
   ArchitectLineStyle? _lineStyle;
   ArchitectHatchPattern? _hatchPattern;
+  ArchitectDrawingColor? _hatchColor;
   bool? _hatchBorder;
   bool get _supportsHatch => widget.elementIds.every((id) =>
     widget.project.activeStorey.cadPrimitives.any((p) => p.id == id && p.type == CadPrimitiveType.hatch));
@@ -75,6 +78,8 @@ class _ArchitectElementPropertiesDialogState
       final hatches = widget.project.activeStorey.cadPrimitives.where((p) => widget.elementIds.contains(p.id)).toList();
       final patterns = hatches.map((p) => p.hatchPattern).toSet();
       if (patterns.length == 1) _hatchPattern = patterns.single;
+      final colors = hatches.map((p) => p.drawingColor).toSet();
+      if (colors.length == 1) _hatchColor = colors.single;
       final borders = hatches.map((p) => p.hatchBorder).toSet();
       if (borders.length == 1) _hatchBorder = borders.single;
     }
@@ -846,9 +851,14 @@ class _ArchitectElementPropertiesDialogState
               ],
               if (_supportsHatch) ...[
                 ArchitectHatchPicker(key: const ValueKey('architect-property-hatch'), value: _hatchPattern,
+                  colorValue: _hatchColor?.argb,
                   customPatterns: widget.project.hatchPatterns, lineStyles: widget.project.lineStyles,
                   onChanged: (pattern) => setState(() {
                     _hatchPattern = pattern; texts['hatchPattern'] = jsonEncode(pattern.toJson());
+                  })),
+                ArchitectDrawingColorPicker(key: const ValueKey('architect-property-hatch-color'), value: _hatchColor,
+                  onChanged: (color) => setState(() {
+                    _hatchColor = color; texts['drawingColor'] = jsonEncode(color.toJson());
                   })),
                 CheckboxListTile(key: const ValueKey('architect-property-hatch-border'),
                   contentPadding: EdgeInsets.zero, dense: true, tristate: true,

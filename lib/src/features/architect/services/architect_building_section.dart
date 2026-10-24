@@ -253,19 +253,21 @@ class ArchitectBuildingSection {
         for (final s in slices) {
           highPriorityCutouts.add(s.envelopePath);
           final roof = floor.roofs.firstWhere((r) => r.id == s.roofId);
-          final a = s.bottomProfile.first, b = s.bottomProfile.last;
-          (roofProfiles[s.roofId] ??= Path()).addPolygon([
-            a,
-            b,
-            Offset(
-              b.dx,
-              floor.elevation + roof.topElevationAt(cut.pointAt(b.dx)),
-            ),
-            Offset(
-              a.dx,
-              floor.elevation + roof.topElevationAt(cut.pointAt(a.dx)),
-            ),
-          ], true);
+          if (s.bottomProfile.length >= 2) {
+            final a = s.bottomProfile.first, b = s.bottomProfile.last;
+            (roofProfiles[s.roofId] ??= Path()).addPolygon([
+              a,
+              b,
+              Offset(
+                b.dx,
+                floor.elevation + roof.topElevationAt(cut.pointAt(b.dx)),
+              ),
+              Offset(
+                a.dx,
+                floor.elevation + roof.topElevationAt(cut.pointAt(a.dx)),
+              ),
+            ], true);
+          }
         }
       }
     }
@@ -419,6 +421,7 @@ class ArchitectBuildingSection {
                 ),
               );
             }
+            if (slice.bottomProfile.length < 2) continue;
             final p0 = slice.bottomProfile.first;
             final p1 = slice.bottomProfile.last;
             ceilingClip.addPolygon([

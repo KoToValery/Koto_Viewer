@@ -18,6 +18,7 @@ import '../widgets/architect_terrain_editor.dart';
 import '../models/architect_line_style.dart';
 
 import '../models/architect_hatch_pattern.dart';
+import '../models/architect_drawing_color.dart';
 
 import '../widgets/architect_hatch_picker.dart';
 
@@ -4119,6 +4120,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   int? _polygonSelectedEdge;
 
+  String? _polygonContourElementId;
+  int _polygonContourIndex = 0;
+
+  int? get _selectedPolygonHoleIndex {
+    final id = _selectedElementId ?? _selectedZoneId;
+    if (id == null || _polygonContourElementId != id || _polygonContourIndex <= 0) return null;
+    final host = CutArchitectContourOpening.target(_project.activeStorey, id);
+    final index = _polygonContourIndex - 1;
+    return host != null && index < host.$2.length ? index : null;
+  }
+
+  void _selectPolygonContour(Offset point) {
+    final id = _selectedElementId ?? _selectedZoneId;
+    if (id == null || _effectiveSelection.length > 1) return;
+    final host = CutArchitectContourOpening.target(_project.activeStorey, id);
+    if (host == null) return;
+    final ring = ArchitectPolygonEditor.hitContour(host.$1, host.$2,
+        point, _currentScale, offsetLengthPx: _handleOffsetLength);
+    if (ring == null) return;
+    if (_polygonContourElementId != id || _polygonContourIndex != ring) {
+      _polygonSelectedEdge = null;
+    }
+    _polygonContourElementId = id;
+    _polygonContourIndex = ring;
+  }
+
   bool _polygonDistanceOpen = false;
 
   Offset? _radialMenuScreenPosition;
@@ -4355,6 +4382,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   String? _newPointTargetId;
+  int? _newPointHoleIndex;
 
   Offset? _newPointCandidate;
 
@@ -4659,6 +4687,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   String? _cutOpeningTargetId;
 
   ArchitectHatchPattern _activeHatchPattern = ArchitectHatchPattern.diagonal;
+  ArchitectDrawingColor _activeHatchColor = ArchitectDrawingColor.ink;
 
   Widget _hatchControl() => ArchitectHatchDraftBar(
 
@@ -4673,6 +4702,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }),
 
     pattern: _activeHatchPattern,
+    color: _activeHatchColor,
+    onColorChanged: (color) => setState(() => _activeHatchColor = color),
 
     customPatterns: _project.hatchPatterns,
 
@@ -4726,7 +4757,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           type: CadPrimitiveType.hatch, startPoint: bounds.topLeft, endPoint: bounds.bottomRight,
 
-          polygon: points, holes: contour?.holes ?? const [], hatchPattern: _activeHatchPattern)));
+          polygon: points, holes: contour?.holes ?? const [], hatchPattern: _activeHatchPattern,
+          colorValue: _activeHatchColor.argb, colorPresetId: _activeHatchColor.presetId)));
 
       setState(_elementTool.cancelSlabDrafting);
 
@@ -6194,6 +6226,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_polygonDistanceOpen) return;
 
+    _selectPolygonContour(rawModel);
     if (_polygonEditId != null) _selectPolygonEdge(rawModel);
 
     if (_linearDraftTool &&
@@ -7972,6 +8005,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (id == null) return null;
 
+    final holeIndex = _selectedPolygonHoleIndex;
+    final host = CutArchitectContourOpening.target(_project.activeStorey, id);
+    if (holeIndex != null && host != null && holeIndex < host.$2.length) {
+      return host.$2[holeIndex];
+    }
+
     for (final p in _project.activeStorey.cadPrimitives) {
 
       if (p.id == id && p.isPolygon) {
@@ -8176,15 +8215,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _activeMagneticGuides = snap?.magneticGuides ?? [];
 
-      _elementMovePreview = UpdateArchitectPolygon(
+      try {
+        _elementMovePreview = UpdateArchitectPolygon(
 
         storeyId: _project.activeStoreyId,
 
         elementId: _polygonEditor.elementId!,
 
         polygon: _polygonEditor.preview!,
+        holeIndex: _selectedPolygonHoleIndex,
 
-      ).apply(_elementMoveOriginal!);
+        ).apply(_elementMoveOriginal!);
+      } on ArgumentError {
+        _polygonEditor.invalid = true;
+      }
 
       _repaintPreview();
 
@@ -9787,6 +9831,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_polygonEditor.active) {
 
       final id = _polygonEditor.elementId!, points = _polygonEditor.preview!;
+      final holeIndex = _selectedPolygonHoleIndex;
 
       final original = _polygonEditor.original!;
 
@@ -9833,6 +9878,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             elementId: id,
 
             polygon: points,
+            holeIndex: holeIndex,
 
           ),
 
@@ -14996,6 +15042,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     final storey = (_elementMovePreview ?? _project).activeStorey;
+    final holeIndex = _selectedPolygonHoleIndex;
+    final host = CutArchitectContourOpening.target(storey, targetId);
+    if (holeIndex != null && host != null && holeIndex < host.$2.length) {
+      return host.$2[holeIndex];
+    }
 
     for (final slab in storey.slabs) {
 
@@ -15034,6 +15085,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _selectPolygonEdge(Offset point) {
 
     if (_polygonDistanceOpen) return;
+    _selectPolygonContour(point);
 
     final polygon = _editablePolygon;
 
@@ -15378,6 +15430,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final polygon = _editablePolygon, edge = _polygonSelectedEdge;
 
     final id = _activePolygonDistanceElementId;
+    final holeIndex = _selectedPolygonHoleIndex;
 
     if (polygon == null || edge == null || id == null) return;
 
@@ -15487,19 +15540,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       : dimension.setDistance(original, meters, mode: mode);
 
-                  dialogSetState(() {});
-
                   if (candidate != null) {
-
-                    _elementMovePreview = UpdateArchitectPolygon(
+                    try {
+                      _elementMovePreview = UpdateArchitectPolygon(
 
                       storeyId: project.activeStoreyId,
 
                       elementId: id,
 
                       polygon: candidate!,
+                      holeIndex: holeIndex,
 
                     ).apply(project);
+                    } on ArgumentError {
+                      candidate = null;
+                      _elementMovePreview = null;
+                    }
+                  }
+
+                  dialogSetState(() {});
+                  if (candidate != null) {
 
                     _polygonSelectedEdge = ArchitectPolygonDimensions.hitEdge(
 
@@ -15532,6 +15592,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     final roof = _selectedRoof;
 
                     if (roof != null &&
+                        holeIndex == null &&
 
                         roof.id == id &&
 
@@ -15572,6 +15633,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           elementId: id,
 
                           polygon: candidate!,
+                          holeIndex: holeIndex,
 
                         ),
 
@@ -17793,7 +17855,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _startNewPointSession(String id, {Offset? initialPick}) {
 
-    final path = InsertArchitectElementPoint.pathOf(_project.activeStorey, id);
+    if (initialPick != null) _selectPolygonContour(initialPick);
+    final holeIndex = _selectedPolygonHoleIndex;
+    final path = InsertArchitectElementPoint.pathOf(_project.activeStorey, id,
+        holeIndex: holeIndex);
 
     if (path == null || path.points.length < 2) return;
 
@@ -17802,6 +17867,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     setState(() {
 
       _newPointTargetId = id;
+      _newPointHoleIndex = holeIndex;
 
       _newPointCandidate = null;
 
@@ -17828,6 +17894,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     setState(() {
 
       _newPointTargetId = null;
+      _newPointHoleIndex = null;
 
       _newPointCandidate = null;
 
@@ -17854,6 +17921,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _project.activeStorey,
 
       _newPointTargetId!,
+      holeIndex: _newPointHoleIndex,
 
     );
 
@@ -18456,6 +18524,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_newPointTargetId == null) return;
 
     final targetId = _newPointTargetId!;
+    final holeIndex = _newPointHoleIndex;
 
     final pt = _newPointCandidate;
 
@@ -18474,6 +18543,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _project.activeStorey,
 
       targetId,
+      holeIndex: holeIndex,
 
     );
 
@@ -18500,6 +18570,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         newElementId: ArchitectElementId.next('point'),
 
         atMidpoint: false,
+        holeIndex: holeIndex,
 
       ),
 
@@ -18528,6 +18599,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _activeMagneticGuides = [];
 
       if (path != null && path.closed && hit != null) {
+        _polygonContourElementId = targetId;
+        _polygonContourIndex = holeIndex == null ? 0 : holeIndex + 1;
 
         _polygonEditId = targetId;
 
@@ -18906,6 +18979,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
       case ArchitectRadialAction.edit:
+        if (pick != null) _selectPolygonContour(pick);
 
         final zoneToEdit = _project.activeStorey.zones.where((z) => z.id == id).firstOrNull;
 
@@ -18943,11 +19017,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             _polygonEditId = id;
 
-            _polygonSelectedEdge = _selectedRoof?.safeEavesEdgeIndex;
+            _polygonSelectedEdge = _selectedPolygonHoleIndex == null
+                ? _selectedRoof?.safeEavesEdgeIndex : null;
 
             _moveSelection = false;
 
           });
+          if (pick != null) _selectPolygonEdge(pick);
 
         } else if (_selectedLinearElement != null) {
 
@@ -19516,6 +19592,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _polygonSelectedEdge = null;
 
     _zoneTool.cancelAll();
+    _polygonContourElementId = null;
+    _polygonContourIndex = 0;
 
     _axisTool.cancelAll();
 
@@ -19664,6 +19742,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     HapticFeedback.selectionClick();
 
+    _selectPolygonContour(point);
     return true;
 
   }
@@ -25823,6 +25902,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     if ((_activeTool == ArchitectTool.roof ||
 
                             _selectedRoof != null) &&
+                        _selectedPolygonHoleIndex == null &&
 
                         !_is3DView &&
 
@@ -29316,6 +29396,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     activeCadLineStyle: _activeCadLineStyle,
 
     activeHatchPattern: _activeHatchPattern,
+    activeHatchColorValue: _activeHatchColor.argb,
 
     cursorPosition: _cursorModel,
 
@@ -29596,6 +29677,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     roofTool: _roofTool,
 
     polygonEditInvalid: _polygonEditor.invalid,
+    polygonEditHoleIndex: _selectedPolygonHoleIndex,
 
     polygonLeaderLine: _polygonEditor.leaderLine,
 

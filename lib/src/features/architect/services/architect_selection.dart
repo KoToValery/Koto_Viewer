@@ -5,6 +5,7 @@ import 'architect_roof_junctions.dart';
 import 'dart:convert';
 import '../models/architect_line_style.dart';
 import '../models/architect_hatch_pattern.dart';
+import '../models/architect_drawing_color.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../models/architect_column.dart';
@@ -413,6 +414,16 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         }
       }
       for (final value in textValues.entries) {
+        if (value.key == 'drawingColor') {
+          if (!project.activeStorey.cadPrimitives.any((p) => p.id == e['id'] && p.type == CadPrimitiveType.hatch)) {
+            throw ArgumentError('Drawing fill colors require hatch elements');
+          }
+          final color = ArchitectDrawingColor.fromJson(Map<String, dynamic>.from(jsonDecode(value.value) as Map));
+          e['colorValue'] = color.argb;
+          if (color.presetId == null) { e.remove('colorPresetId'); }
+          else { e['colorPresetId'] = color.presetId; }
+          continue;
+        }
         if (value.key == 'hatchPattern' || value.key == 'hatchBorder') {
           if (!project.activeStorey.cadPrimitives.any((p) =>
               p.id == e['id'] && p.type == CadPrimitiveType.hatch)) {

@@ -71,10 +71,13 @@ class ArchitectRoofJunctions {
         : 'group:${roof.roofGroupId}';
     final parent = {for (final roof in roofs) group(roof): group(roof)};
     String root(String key) {
-      while (parent[key] != key) {
-        key = parent[key]!;
+      var current = key;
+      final visited = <String>{};
+      while (parent.containsKey(current) && parent[current] != current) {
+        if (!visited.add(current)) break;
+        current = parent[current]!;
       }
-      return key;
+      return current;
     }
 
     final overlaps = <(String, String), Path>{};

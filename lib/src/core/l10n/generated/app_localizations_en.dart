@@ -7784,4 +7784,169 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectSelectFinish => 'Select';
+
+  @override
+  String get architectFillSolid => 'Solid';
+
+  @override
+  String get architectDrawingColor => 'Color';
+
+  @override
+  String get architectColorGeneral => 'Basic';
+
+  @override
+  String get architectColorBgOup => 'Bulgaria · OUP';
+
+  @override
+  String get architectColorBgPup => 'Bulgaria · PUP';
+
+  @override
+  String get architectColorGermany => 'Germany · PlanZV';
+
+  @override
+  String get architectColorSearch => 'Code or name';
+
+  @override
+  String get architectColorCustom => 'Custom';
+
+  @override
+  String get architectColorOpacity => 'Opacity';
+
+  @override
+  String get architectColorInfo => 'About the palette';
+
+  @override
+  String get architectColorHexError => 'Enter six hexadecimal digits.';
+
+  @override
+  String get architectColorApprox =>
+      'Screen colors are approximate. The RAL reference is stored separately; use a calibrated palette for precise print matching.';
+
+  @override
+  String get architectColorBgInfo =>
+      'Ordinance No. 8, Annex 2: table 1 for OUP, table 2 for PUP. + and ++ mean lighter shades; − means darker. These are color palettes; complete planning symbols may also require borders, stripes and labels. PUP zone colors apply to PRZ/PZ drawings.';
+
+  @override
+  String get architectColorDeInfo =>
+      'FNP/B-Plan color groups from PlanZV. The ordinance specifies named tones, not mandatory RGB or RAL codes. These are working approximations; complete planning symbols also include lines, hatching and labels.';
+
+  @override
+  String get architectColorBlack => 'Black';
+
+  @override
+  String get architectColorWhite => 'White';
+
+  @override
+  String get architectColorGray => 'Gray';
+
+  @override
+  String get architectColorRed => 'Red';
+
+  @override
+  String get architectColorBlue => 'Blue';
+
+  @override
+  String get architectColorGreen => 'Green';
+
+  @override
+  String get architectColorYellow => 'Yellow';
+
+  @override
+  String get architectColorOrange => 'Orange';
+
+  @override
+  String get architectColorResidential => 'Residential use';
+
+  @override
+  String get architectColorPublicServices => 'Public services';
+
+  @override
+  String get architectColorIndustrial => 'Industrial use';
+
+  @override
+  String get architectColorStorage => 'Storage';
+
+  @override
+  String get architectColorGreenSpace => 'Green space';
+
+  @override
+  String get architectColorArable => 'Arable land';
+
+  @override
+  String get architectColorPerennial => 'Permanent crops';
+
+  @override
+  String get architectColorUncultivated => 'Uncultivated land';
+
+  @override
+  String get architectColorForest => 'Forest';
+
+  @override
+  String get architectColorRecreationalForest => 'Recreational forest';
+
+  @override
+  String get architectColorWater => 'Water';
+
+  @override
+  String get architectColorTransport => 'Transport';
+
+  @override
+  String get architectColorUtilities => 'Utilities';
+
+  @override
+  String get architectColorHousingLowHigh => 'Housing zones · Zhm/Zhg';
+
+  @override
+  String get architectColorHousingMediumComplex => 'Housing zones · Zhs/Zhk';
+
+  @override
+  String get architectColorVillas => 'Villa zones · base';
+
+  @override
+  String get architectColorSpecialPurpose => 'Special purpose';
+
+  @override
+  String get architectColorCulturalLand => 'Cultural heritage land';
+
+  @override
+  String get architectColorPrimaryRoad => 'Primary roads';
+
+  @override
+  String get architectColorSecondaryRoad => 'Secondary roads';
+
+  @override
+  String get architectColorCollectingRoad => 'Collector roads';
+
+  @override
+  String get architectColorServingRoad => 'Local roads and parking';
+
+  @override
+  String get architectColorPedestrian => 'Sidewalks and pedestrian areas';
+
+  @override
+  String get architectColorHousingExisting => 'Housing · existing';
+
+  @override
+  String get architectColorHousingNew => 'Housing · proposed';
+
+  @override
+  String get architectColorPublicExisting => 'Public buildings · existing';
+
+  @override
+  String get architectColorPublicNew => 'Public buildings · proposed';
+
+  @override
+  String get architectColorHeritageBuilding => 'Heritage buildings';
+
+  @override
+  String get architectColorMixedUse => 'Mixed use';
+
+  @override
+  String get architectColorSpecialUse => 'Special building areas';
+
+  @override
+  String get architectColorRailway => 'Railway land';
+
+  @override
+  String get architectColorAgriculture => 'Agricultural land';
 }
