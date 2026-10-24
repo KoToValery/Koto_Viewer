@@ -8,6 +8,8 @@ import '../services/architect_hatch_patterns.dart';
 import '../widgets/architect_line_style_picker.dart';
 import '../services/architect_line_styles.dart';
 import '../services/architect_line_editing.dart';
+import '../services/architect_offset.dart';
+import '../../bim_editing/widgets/bim_offset_dialog.dart';
 import '../services/architect_apartment_zones.dart';
 import '../widgets/architect_sheets_screen.dart';
 import '../widgets/architect_annotation_settings.dart';
@@ -1356,6 +1358,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     // Tool configuration/selection changes refresh controls; pointer coordinates
     // only refresh the interaction painter and the tool's own HUD listeners.
     final state = (
+      _offsetOptions,
       _axisTool.selectedAxisId,
       _axisTool.isDrafting,
       _zoneTool.isDrafting,
@@ -1696,6 +1699,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _onModelChanged() {
     if (!mounted) return;
+    if (_offsetOptions != null && !identical(_offsetSource, _project)) {
+      _cancelActiveDrags();
+    }
     if (!_commands.isPlan || _editingGroup == null) _editingGroupId = null;
     _midpointTracking.clear();
     _restoreWallType();
@@ -2128,6 +2134,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   bool _mirrorActive = false;
+  BimElementOffsetOptions? _offsetOptions;
+  ArchitectProject? _offsetSource;
+  Set<String> _offsetIds = {};
+  Map<String, String> _offsetIdMap = {}, _offsetGroupIdMap = {};
+  Offset? _offsetSide;
+  bool _offsetValid = false;
+  int _offsetEpoch = 0;
   bool _mirrorIsDuplicate = false;
   Set<String> _mirrorSourceIds = {};
   Offset? _mirrorAnchor;
@@ -2843,6 +2856,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _isHandleEngaged = false;
 
     final rawModel = _screenToModel(event.localPosition);
+    if (_offsetOptions != null) {
+      _previewOffset(_screenToModel(_placementPosition(event.localPosition)));
+      return;
+    }
     if (_newPointTargetId != null) {
       _touchPosition = event.localPosition;
       _placingWithHold = true;
@@ -3003,6 +3020,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _selectedLinearElement != null &&
         _wallJoinSourceId == null &&
         !_mirrorActive &&
+        _offsetOptions == null &&
         !_splitActive) {
       final wall = _selectedLinearElement!;
       final uStart = wall.tangentAt(0);
@@ -3289,6 +3307,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _wallCutIds.isEmpty &&
         _wallExtendId == null &&
         !_mirrorActive &&
+        _offsetOptions == null &&
         !_splitActive) {
       // A hold on empty space resumes placement with the same active tool.
       setState(() {
@@ -3308,6 +3327,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool get _canPlaceWithMarker =>
       ((_activeTool != ArchitectTool.select && !_selectionContextActive) ||
           _mirrorActive ||
+          _offsetOptions != null ||
           _splitActive ||
           _newPointTargetId != null) &&
       !_wallDirectionLocked &&
@@ -3789,6 +3809,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _updatePointerPreview(Offset screenPosition) {
     if (_pendingShape != null) return;
     final rawModel = _screenToModel(screenPosition);
+    if (_offsetOptions != null) {
+      _previewOffset(rawModel);
+      return;
+    }
     _updateMidpointReferences(rawModel);
     if (_sectionRoofDragStartModelY != null &&
         _sectionRoofDragInitialOffset != null &&
@@ -4559,6 +4583,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _cancelActiveDrags() {
+    _offsetEpoch++;
+    _offsetOptions = null;
+    _offsetSource = null;
+    _offsetSide = null;
+    _offsetValid = false;
+    _offsetIds = {};
+    _offsetIdMap = {};
+    _offsetGroupIdMap = {};
     _midpointTracking.clear();
     if (_sectionRoofDragStartModelY != null ||
         _sectionRoofDragPreviewOffset != null) {
@@ -4801,6 +4833,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _handleTap(Offset rawModel) {
+    if (_offsetOptions != null) {
+      _commitOffset(rawModel);
+      return;
+    }
     if (_cutOpeningTargetId != null) {
       final pt = _resolveSlabPoint(rawModel);
       if (_elementTool.slabDraftPoints.length >= 3 &&
@@ -8105,7 +8141,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     icon: BimEditActions.icon(action),
     label: BimEditActions.label(action, context.l10n),
     color: color,
-    tooltip: action == BimEditAction.rename
+    tooltip: action == BimEditAction.offset &&
+        ArchitectOffset.supports(_project.activeStorey, _effectiveSelection)
+        ? context.l10n.bimOffsetHelp
+        : action == BimEditAction.rename
         ? context.l10n.renameGridAxis
         : action == BimEditAction.newPoint
         ? (_selectedWall != null
@@ -8120,6 +8159,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   List<ArchitectRadialMenuItem> _buildRadialMenuItems(String elementId) {
     final items = _buildElementRadialMenuItems(elementId);
+    if (!_is3DView && ArchitectOffset.supports(_project.activeStorey, _effectiveSelection)) {
+      items.add(_radialItem(action: ArchitectRadialAction.offset, color: const Color(0xFF80CBC4)));
+    }
     if (_commands.isPlan && _editingGroupId == null) {
       final group = _selectedGroup;
       if (group != null) {
@@ -9034,6 +9076,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (action == ArchitectRadialAction.group) { _groupSelection(); return; }
     if (action == ArchitectRadialAction.ungroup) { _ungroupSelection(); return; }
     if (action == ArchitectRadialAction.editGroup) { _enterGroup(); return; }
+    if (action == ArchitectRadialAction.offset &&
+        ArchitectOffset.supports(_project.activeStorey, _effectiveSelection)) {
+      _startOffset();
+      return;
+    }
 
     if (_effectiveSelection.length > 1) {
       switch (action) {
@@ -10615,6 +10662,94 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
     HapticFeedback.lightImpact();
   }
+
+  Future<void> _startOffset() async {
+    final ids = Set<String>.of(_effectiveSelection);
+    if (!ArchitectOffset.supports(_project.activeStorey, ids)) return;
+    _cancelActiveDrags();
+    final source = _project;
+    final epoch = _offsetEpoch;
+    final options = await showBimElementOffsetDialog(context,
+      unitToMeters: source.units.scaleToMeters, unitSymbol: source.units.symbol);
+    if (!mounted || options == null || epoch != _offsetEpoch || !identical(source, _project)) return;
+    setState(() {
+      _offsetOptions = options;
+      _offsetSource = source;
+      _offsetIds = ids;
+      _offsetIdMap = options.copy
+          ? {for (final id in ids) id: ArchitectElementId.next('offset')} : {};
+      _offsetGroupIdMap = options.copy && _editingGroupId == null
+          ? {for (final g in source.activeStorey.groups.where((g) => ids.containsAll(g.elementIds)))
+              g.id: ArchitectElementId.next('group')} : {};
+      _offsetSide = null;
+      _offsetValid = false;
+      _polygonEditId = null;
+      _polygonSelectedEdge = null;
+      _moveSelection = false;
+      _wallParallelMove = false;
+      _zoneTool.cancelAll();
+      _placingWithHold = false;
+      _touchPosition = null;
+    });
+  }
+
+  OffsetArchitectElements _offsetCommand(Offset side) => OffsetArchitectElements(
+    storeyId: _offsetSource!.activeStoreyId, elementIds: _offsetIds,
+    distance: _offsetOptions!.distance, side: side, idMap: _offsetIdMap,
+    groupIdMap: _offsetGroupIdMap, editingGroupId: _editingGroupId);
+
+  void _previewOffset(Offset side) {
+    if (_offsetOptions == null || _offsetSource == null) return;
+    final wasValid = _offsetValid;
+    final wasAiming = _offsetSide != null;
+    _offsetSide = side;
+    _cursorModel = side;
+    try {
+      _elementMovePreview = _offsetCommand(side).apply(_offsetSource!);
+      _offsetValid = true;
+    } on ArgumentError {
+      _elementMovePreview = null;
+      _offsetValid = false;
+    }
+    if (wasValid != _offsetValid || !wasAiming) setState(() {});
+    _repaintPreview();
+  }
+
+  void _commitOffset(Offset side) {
+    _previewOffset(side);
+    if (!_offsetValid || _elementMovePreview == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.bimOffsetInvalid)));
+      return;
+    }
+    final next = _elementMovePreview!;
+    final ids = _offsetOptions!.copy ? _offsetIdMap.values.toSet() : Set<String>.of(_offsetIds);
+    _cancelActiveDrags();
+    _commands.commit(next);
+    _saveBiMProjectIfAttached();
+    setState(() {
+      _selectionIds..clear()..addAll(ids);
+      _selectedElementId = ids.length == 1 ? ids.single : null;
+      _selectedZoneId = null;
+      _moveSelection = true;
+    });
+    HapticFeedback.mediumImpact();
+    _repaintPreview();
+  }
+
+  Widget _offsetBanner() => Material(
+    key: const ValueKey('architect-offset-banner'),
+    color: Theme.of(context).colorScheme.surface,
+    borderRadius: BorderRadius.circular(8),
+    child: Padding(padding: const EdgeInsets.only(left: 12), child: Row(children: [
+      Expanded(child: Tooltip(message: context.l10n.bimOffsetHelp, child: Text(
+        _offsetSide != null && !_offsetValid ? context.l10n.bimOffsetInvalid : context.l10n.bimOffsetSide,
+        maxLines: 2, overflow: TextOverflow.ellipsis))),
+      IconButton(key: const ValueKey('architect-offset-cancel'), tooltip: context.l10n.cancel,
+        icon: const Icon(Icons.close), onPressed: () {
+          setState(_cancelActiveDrags); _repaintPreview();
+        }),
+    ])),
+  );
 
   void _startMirrorSession({required bool isDuplicate}) {
     if (_selectionHasAutoZones) return;
@@ -12878,6 +13013,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         singlePointerPan: true,
         holdToEdit:
             _duplicateMove == null &&
+            _offsetOptions == null &&
             _effectiveSelection.isNotEmpty &&
             !_multiSelect &&
             !_moveSelection &&
@@ -12888,10 +13024,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _newPointTargetId == null,
         touchHoldToPlace: _canPlaceWithMarker,
         onToolHoldStart: _beginPlacementHold,
-        onSelectionHold: _duplicateMove == null && _newPointTargetId == null
+        onSelectionHold: _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null
             ? _onSelectionHold
             : null,
-        onContextHold: _duplicateMove == null && _newPointTargetId == null
+        onContextHold: _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null
             ? _onContextHold
             : null,
         onEditTap: _polygonEditId == null
@@ -13226,6 +13362,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         ),
       if (_selectedWallIds.isNotEmpty &&
+          _offsetOptions == null &&
           !_mirrorActive &&
           !_splitActive &&
           _radialMenuScreenPosition == null &&
@@ -13265,7 +13402,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_cutOpeningTargetId != null)
         Positioned(top: 8, left: 8, right: 8, child: _cutOpeningControl()),
       if (_editingGroupId != null)
-        Positioned(top: 8, left: 8, right: 8, child: _groupEditBanner()),
+        Positioned(top: _offsetOptions == null ? 8 : 64, left: 8, right: 8, child: _groupEditBanner()),
+      if (_offsetOptions != null)
+        Positioned(top: 8, left: 8, right: 8, child: _offsetBanner()),
       _buildPolygonDistanceOverlay(),
       _buildShapeDimensionOverlay(),
       if (_activeTool == ArchitectTool.dimension &&

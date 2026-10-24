@@ -7647,4 +7647,21 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get bimGroupLabel => 'Група';
+
+  @override
+  String get bimOffsetDistance => 'Разстояние';
+
+  @override
+  String get bimOffsetCopy => 'Копие';
+
+  @override
+  String get bimOffsetSide => 'Посочи страна';
+
+  @override
+  String get bimOffsetInvalid =>
+      'Невъзможен офсет. Провери избора, разстоянието и страната.';
+
+  @override
+  String get bimOffsetHelp =>
+      'Въведи разстояние и посочи страна. Копие създава успоредни елементи; без отметката променя избраните. Свързаните отсечки се срещат в общи ъгли. Отворите в затворени контури се запазват. Копие на цяла група създава нова група; при редактиране на група копията остават в нея. За разклонени вериги или групи с текстове и символи избери приложимите отсечки без разклонение чрез Редактирай групата.';
 }

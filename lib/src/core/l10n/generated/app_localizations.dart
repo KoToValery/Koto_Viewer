@@ -13648,6 +13648,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Group'**
   String get bimGroupLabel;
+
+  /// No description provided for @bimOffsetDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance'**
+  String get bimOffsetDistance;
+
+  /// No description provided for @bimOffsetCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get bimOffsetCopy;
+
+  /// No description provided for @bimOffsetSide.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a side'**
+  String get bimOffsetSide;
+
+  /// No description provided for @bimOffsetInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot offset. Check the selection, distance and side.'**
+  String get bimOffsetInvalid;
+
+  /// No description provided for @bimOffsetHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a distance and pick a side. Copy creates parallel elements; uncheck it to change the selection. Connected segments meet at shared corners. Openings in closed contours stay in place. Copying a whole group creates a new group; copies made while editing a group stay in it. For branched chains or groups containing text and symbols, use Edit group to select applicable segments without branches.'**
+  String get bimOffsetHelp;
 }
 
 class _AppLocalizationsDelegate

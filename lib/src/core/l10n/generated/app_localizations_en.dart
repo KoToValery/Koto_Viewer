@@ -7617,4 +7617,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bimGroupLabel => 'Group';
+
+  @override
+  String get bimOffsetDistance => 'Distance';
+
+  @override
+  String get bimOffsetCopy => 'Copy';
+
+  @override
+  String get bimOffsetSide => 'Pick a side';
+
+  @override
+  String get bimOffsetInvalid =>
+      'Cannot offset. Check the selection, distance and side.';
+
+  @override
+  String get bimOffsetHelp =>
+      'Enter a distance and pick a side. Copy creates parallel elements; uncheck it to change the selection. Connected segments meet at shared corners. Openings in closed contours stay in place. Copying a whole group creates a new group; copies made while editing a group stay in it. For branched chains or groups containing text and symbols, use Edit group to select applicable segments without branches.';
 }

@@ -9,6 +9,8 @@ import '../../bim_editing/commands/bim_edit_history.dart';
 import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../../bim_editing/geometry/bim_transform_2d.dart';
 import 'architect_element_tool.dart';
+import 'architect_offset.dart';
+import 'architect_room_detector.dart';
 import '../models/architect_column.dart';
 import '../models/architect_project.dart';
 import '../models/architect_elements.dart';
@@ -81,6 +83,59 @@ abstract class ArchitectModelCommand {
         )) {
       throw ArgumentError('Element ID already exists or is empty: $id');
     }
+  }
+}
+
+/// One atomic offset, including copied group membership and hosted openings.
+class OffsetArchitectElements extends ArchitectModelCommand {
+  final String storeyId;
+  final Set<String> elementIds;
+  final double distance;
+  final Offset side;
+  final Map<String, String> idMap, groupIdMap;
+  final String? editingGroupId;
+  const OffsetArchitectElements({
+    required this.storeyId,
+    required this.elementIds,
+    required this.distance,
+    required this.side,
+    this.idMap = const {},
+    this.groupIdMap = const {},
+    this.editingGroupId,
+  });
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final storey = ArchitectModelCommand.storey(project, storeyId);
+    // Every generated identity, including hosted elements, must be globally new.
+    final generated = [...idMap.values, ...groupIdMap.values];
+    for (final w in storey.walls.where((w) => idMap.containsKey(w.id))) {
+      for (final d in w.doors) {
+        generated.add('${idMap[w.id]}_door_${d.id}');
+      }
+      for (final d in w.windows) {
+        generated.add('${idMap[w.id]}_window_${d.id}');
+      }
+    }
+    if (generated.toSet().length != generated.length) {
+      throw ArgumentError('Duplicate offset IDs');
+    }
+    for (final id in generated) {
+      ArchitectModelCommand.newId(project, id);
+    }
+    var next = ArchitectOffset.apply(
+      storey, elementIds, distance: distance, side: side, idMap: idMap,
+      groupIdMap: groupIdMap, editingGroupId: editingGroupId,
+    );
+    if (idMap.isEmpty && storey.walls.any((w) => elementIds.contains(w.id))) {
+      next = next.copyWith(zones: [
+        for (final zone in next.zones)
+          zone.isAutoBoundary
+              ? ArchitectRoomDetector.automaticZone(zone, next.walls) ?? zone
+              : zone,
+      ]);
+    }
+    return ArchitectModelCommand.replace(project, next);
   }
 }
 
