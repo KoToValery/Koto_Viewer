@@ -7577,4 +7577,74 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectHatchAutoFailed =>
       'Не е намерен затворен контур. Затворете границата или я очертайте ръчно.';
+
+  @override
+  String get appSettingsTitle => 'Настройки';
+
+  @override
+  String get uiSettingsCategory => 'UI';
+
+  @override
+  String get contextMenuTitle => 'Контекстно меню';
+
+  @override
+  String get contextMenuLayout => 'Подредба';
+
+  @override
+  String get contextMenuCircle => 'Постоянен кръг';
+
+  @override
+  String get contextMenuGrid => 'Постоянна решетка';
+
+  @override
+  String get contextMenuCombination => 'Комбинация';
+
+  @override
+  String get contextMenuDefault => 'Стандартна';
+
+  @override
+  String get contextMenuSaveAs => 'Нова комбинация';
+
+  @override
+  String get contextMenuEdit => 'Редактирай';
+
+  @override
+  String get contextMenuName => 'Име';
+
+  @override
+  String get contextMenuEmpty => 'Празно';
+
+  @override
+  String get contextMenuMore => 'Още';
+
+  @override
+  String get contextMenuAssignHint =>
+      'Посочете място, за да изберете команда. Ако тя вече присъства, двете места се разменят. Останалите команди са в „Още“.';
+
+  @override
+  String contextMenuPage(int page, int total) {
+    return 'Още команди: страница $page от $total. Натиснете за следващата.';
+  }
+
+  @override
+  String get uiSettingsSaveFailed =>
+      'Настройките не могат да се запазят. Опитайте отново.';
+
+  @override
+  String get bimGroup => 'Групирай';
+
+  @override
+  String get bimUngroup => 'Разгрупирай';
+
+  @override
+  String get bimEditGroup => 'Редактирай групата';
+
+  @override
+  String get bimInsideGroup => 'В група';
+
+  @override
+  String get bimGroupDone => 'Готово';
+
+  @override
+  String get bimGroupLabel => 'Група';
 }

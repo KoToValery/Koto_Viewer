@@ -857,7 +857,7 @@ void main() {
   );
 
   testWidgets(
-    'Single and multiple selection cycle overlaps and provide a group context menu',
+    'Single selection cycles overlaps; explicit multiple selection exposes grouping',
     (tester) async {
       final model = editing.seeded(
         const ArchitectStorey(
@@ -881,13 +881,14 @@ void main() {
       await workspace.wallTap(tester, Offset.zero);
       expect(workspace.overlay(tester).selectedElementIds, {'column'});
       await workspace.wallTap(tester, Offset.zero);
-      expect(workspace.overlay(tester).selectedElementIds, {'column', 'wall'});
-      await workspace.wallTap(tester, Offset.zero);
       expect(workspace.overlay(tester).selectedElementIds, {'wall'});
-      await workspace.wallTap(tester, Offset.zero);
+      await tester.tap(find.byKey(const ValueKey('architect-deselect')));
+      await tester.pumpAndSettle();
       expect(workspace.overlay(tester).selectedElementIds, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
+      await tester.pumpAndSettle();
       await workspace.wallTap(tester, Offset.zero);
-      await workspace.wallTap(tester, Offset.zero);
+      await workspace.wallTap(tester, const Offset(1, 0));
       expect(workspace.overlay(tester).selectedElementIds, {'column', 'wall'});
       final held = await tester.startGesture(workspace.screen(tester, const Offset(1, 0)));
       await tester.pump(const Duration(milliseconds: 750));
@@ -902,6 +903,7 @@ void main() {
         ArchitectRadialAction.mirrorCopy,
         ArchitectRadialAction.properties,
         ArchitectRadialAction.delete,
+        ArchitectRadialAction.group,
       ]);
       menu.onActionSelected(ArchitectRadialAction.delete);
       await tester.pump();

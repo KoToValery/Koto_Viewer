@@ -976,9 +976,11 @@ class ArchitectElementTool extends ChangeNotifier {
     ArchitectStorey storey,
     Set<String> elementIds, {
     Offset offset = const Offset(0.5, 0.5),
+    bool copyGroups = true,
   }) {
     var currentStorey = storey;
     final newIds = <String>[];
+    final copied = <String, String>{};
     for (final id in elementIds) {
       final (updated, copyId) = duplicateElementById(
         currentStorey,
@@ -988,15 +990,25 @@ class ArchitectElementTool extends ChangeNotifier {
       if (copyId != null) {
         currentStorey = updated;
         newIds.add(copyId);
+        copied[id] = copyId;
       }
+    }
+    if (copyGroups) {
+      currentStorey = currentStorey.copyWith(groups: [...currentStorey.groups,
+        ...ArchitectElementGroup.copies(storey.groups, copied, () => ArchitectElementId.next('group'))]);
     }
     return (currentStorey, newIds);
   }
 
   ArchitectStorey rotateElementsByIds(
     ArchitectStorey storey,
-    Set<String> elementIds,
-  ) {
+    Set<String> elementIds, {
+    Offset? origin,
+  }) {
+    if (origin != null) {
+      final (first, _) = mirrorElementsByIds(storey, elementIds, origin: origin, direction: const Offset(1, 0));
+      return mirrorElementsByIds(first, elementIds, origin: origin, direction: const Offset(1, 1)).$1;
+    }
     var currentStorey = storey;
     for (final id in elementIds) {
       currentStorey = rotateElementById(currentStorey, id);
@@ -1352,10 +1364,12 @@ class ArchitectElementTool extends ChangeNotifier {
     required Offset origin,
     required Offset direction,
     bool isDuplicate = false,
+    bool copyGroups = true,
     Map<String, String>? idMap,
   }) {
     var currentStorey = storey;
     final affectedIds = <String>[];
+    final copied = <String, String>{};
     for (final id in elementIds) {
       final (updated, affectedId) = mirrorElementById(
         currentStorey,
@@ -1368,7 +1382,12 @@ class ArchitectElementTool extends ChangeNotifier {
       if (affectedId != null) {
         currentStorey = updated;
         affectedIds.add(affectedId);
+        copied[id] = affectedId;
       }
+    }
+    if (isDuplicate && copyGroups) {
+      currentStorey = currentStorey.copyWith(groups: [...currentStorey.groups,
+        ...ArchitectElementGroup.copies(storey.groups, copied, () => ArchitectElementId.next('group'))]);
     }
     return (currentStorey, affectedIds);
   }

@@ -1,3 +1,4 @@
+import '../../../core/widgets/app_settings_screen.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -114,6 +115,10 @@ class _ArchitectWorkspaceSettingsDialogState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              ListTile(key: const ValueKey('architect-settings-ui'), contentPadding: EdgeInsets.zero,
+                title: Text(l.uiSettingsCategory), leading: const Icon(Icons.dashboard_customize_outlined),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AppSettingsScreen()))),
               if(widget.onWalls!=null)ListTile(key:const ValueKey('architect-settings-walls'),contentPadding:EdgeInsets.zero,title:Text(l.wallTypesTitle),leading:const Icon(Icons.line_weight),trailing:const Icon(Icons.chevron_right),onTap:widget.onWalls),
               ExpansionTile(
                 key: const ValueKey('architect-settings-zone-presets'),

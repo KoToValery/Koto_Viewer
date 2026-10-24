@@ -48,7 +48,9 @@ class ArchitectSelection {
     final storey = (json['storeys'] as List)
         .cast<Map<String, dynamic>>()
         .firstWhere((s) => s['id'] == storeyId);
-    for (final list in storey.values.whereType<List>()) {
+    for (final entry in storey.entries) {
+      if (entry.key == 'groups' || entry.value is! List) continue;
+      final list = entry.value as List;
       for (final e in list.cast<Map<String, dynamic>>()) {
         yield e;
         for (final key in ['doors', 'windows']) {
@@ -266,6 +268,9 @@ class ArchitectSelection {
   }) {
     if (ids.isEmpty) return '';
     final s = project.activeStorey;
+    if (s.groups.any((g) => g.elementIds.length == ids.length && g.elementIds.containsAll(ids))) {
+      return '${l.bimGroupLabel} · ${l.architectSelectionCount(ids.length)}';
+    }
     final wallCount = s.walls.where((w) => ids.contains(w.id)).length;
     final colCount = s.columns.where((c) => ids.contains(c.id)).length;
     final beamCount = s.beams.where((b) => ids.contains(b.id)).length;

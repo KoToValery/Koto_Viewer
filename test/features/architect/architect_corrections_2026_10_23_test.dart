@@ -273,17 +273,16 @@ void main() {
     },
   );
 
-  test('Concentric menu stays centered around the clicked point', () {
+  test('Fixed circle stays centered around the clicked point', () {
     const anchor = Offset(500, 400);
     final layout = ArchitectRadialLayout.compute(
       size: const Size(1000, 800),
       center: anchor,
-      count: 12,
     );
     final radii = layout.targets
         .map((p) => (p - anchor).distance.round())
         .toSet();
-    expect(radii, {72, 132});
+    expect(radii, {84});
   });
 
   testWidgets(

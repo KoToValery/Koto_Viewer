@@ -1,3 +1,4 @@
+import '../../core/widgets/app_settings_screen.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -3105,12 +3106,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
-            tooltip: 'More options',
+            tooltip: l10n.contextMenuMore,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
             onSelected: (value) {
-              if (value == 'coords') {
+              if (value == 'settings') {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AppSettingsScreen()));
+              } else if (value == 'coords') {
                 _showCoordinateSettings();
               } else if (value == 'lang') {
                 LanguageSelectionDialog.show(context);
@@ -3124,6 +3127,10 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
             itemBuilder: (context) => [
+              PopupMenuItem(value: 'settings', child: Row(children: [
+                Icon(Icons.settings_outlined, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 12), Text(l10n.appSettingsTitle),
+              ])),
               PopupMenuItem(
                 value: 'coords',
                 child: Row(

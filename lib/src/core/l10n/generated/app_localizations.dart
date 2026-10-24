@@ -13516,6 +13516,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No closed contour found. Close the boundary or draw it manually.'**
   String get architectHatchAutoFailed;
+
+  /// No description provided for @appSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get appSettingsTitle;
+
+  /// No description provided for @uiSettingsCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'UI'**
+  String get uiSettingsCategory;
+
+  /// No description provided for @contextMenuTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Context menu'**
+  String get contextMenuTitle;
+
+  /// No description provided for @contextMenuLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Layout'**
+  String get contextMenuLayout;
+
+  /// No description provided for @contextMenuCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed circle'**
+  String get contextMenuCircle;
+
+  /// No description provided for @contextMenuGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed grid'**
+  String get contextMenuGrid;
+
+  /// No description provided for @contextMenuCombination.
+  ///
+  /// In en, this message translates to:
+  /// **'Combination'**
+  String get contextMenuCombination;
+
+  /// No description provided for @contextMenuDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get contextMenuDefault;
+
+  /// No description provided for @contextMenuSaveAs.
+  ///
+  /// In en, this message translates to:
+  /// **'New combination'**
+  String get contextMenuSaveAs;
+
+  /// No description provided for @contextMenuEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get contextMenuEdit;
+
+  /// No description provided for @contextMenuName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get contextMenuName;
+
+  /// No description provided for @contextMenuEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty'**
+  String get contextMenuEmpty;
+
+  /// No description provided for @contextMenuMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get contextMenuMore;
+
+  /// No description provided for @contextMenuAssignHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a slot to choose a command. Choosing a command already in use swaps the two slots. Other commands remain under More.'**
+  String get contextMenuAssignHint;
+
+  /// No description provided for @contextMenuPage.
+  ///
+  /// In en, this message translates to:
+  /// **'More commands: page {page} of {total}. Tap for the next page.'**
+  String contextMenuPage(int page, int total);
+
+  /// No description provided for @uiSettingsSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings could not be saved. Try again.'**
+  String get uiSettingsSaveFailed;
+
+  /// No description provided for @bimGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get bimGroup;
+
+  /// No description provided for @bimUngroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Ungroup'**
+  String get bimUngroup;
+
+  /// No description provided for @bimEditGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit group'**
+  String get bimEditGroup;
+
+  /// No description provided for @bimInsideGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside group'**
+  String get bimInsideGroup;
+
+  /// No description provided for @bimGroupDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get bimGroupDone;
+
+  /// No description provided for @bimGroupLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get bimGroupLabel;
 }
 
 class _AppLocalizationsDelegate

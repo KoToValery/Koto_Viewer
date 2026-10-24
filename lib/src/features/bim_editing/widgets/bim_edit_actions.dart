@@ -21,6 +21,9 @@ enum BimEditAction {
   mirrorMove,
   mirrorCopy,
   schedule,
+  group,
+  ungroup,
+  editGroup,
 }
 
 class BimEditActions {
@@ -44,6 +47,9 @@ class BimEditActions {
         BimEditAction.mirrorMove => l.architectMirrorMove,
         BimEditAction.mirrorCopy => l.architectMirrorCopy,
         BimEditAction.schedule => l.architectZoneScheduleTitle,
+        BimEditAction.group => l.bimGroup,
+        BimEditAction.ungroup => l.bimUngroup,
+        BimEditAction.editGroup => l.bimEditGroup,
       };
   static IconData icon(BimEditAction action) => switch (action) {
     BimEditAction.move => Icons.open_with_rounded,
@@ -64,6 +70,9 @@ class BimEditActions {
     BimEditAction.mirrorMove => Icons.flip,
     BimEditAction.mirrorCopy => Icons.copy_all,
     BimEditAction.schedule => Icons.table_chart_rounded,
+    BimEditAction.group => Icons.group_work_outlined,
+    BimEditAction.ungroup => Icons.workspaces_outline,
+    BimEditAction.editGroup => Icons.edit_note,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};

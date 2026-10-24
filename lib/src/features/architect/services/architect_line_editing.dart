@@ -93,6 +93,7 @@ class _EditLines extends ArchitectModelCommand {
     return ArchitectModelCommand.replace(
       project,
       original.copyWith(
+        groups: after.groups,
         cadPrimitives: [
           for (final p in original.cadPrimitives)
             if (p.type == CadPrimitiveType.line) ...?result[p.id] else p,

@@ -7548,4 +7548,73 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectHatchAutoFailed =>
       'No closed contour found. Close the boundary or draw it manually.';
+
+  @override
+  String get appSettingsTitle => 'Settings';
+
+  @override
+  String get uiSettingsCategory => 'UI';
+
+  @override
+  String get contextMenuTitle => 'Context menu';
+
+  @override
+  String get contextMenuLayout => 'Layout';
+
+  @override
+  String get contextMenuCircle => 'Fixed circle';
+
+  @override
+  String get contextMenuGrid => 'Fixed grid';
+
+  @override
+  String get contextMenuCombination => 'Combination';
+
+  @override
+  String get contextMenuDefault => 'Default';
+
+  @override
+  String get contextMenuSaveAs => 'New combination';
+
+  @override
+  String get contextMenuEdit => 'Edit';
+
+  @override
+  String get contextMenuName => 'Name';
+
+  @override
+  String get contextMenuEmpty => 'Empty';
+
+  @override
+  String get contextMenuMore => 'More';
+
+  @override
+  String get contextMenuAssignHint =>
+      'Tap a slot to choose a command. Choosing a command already in use swaps the two slots. Other commands remain under More.';
+
+  @override
+  String contextMenuPage(int page, int total) {
+    return 'More commands: page $page of $total. Tap for the next page.';
+  }
+
+  @override
+  String get uiSettingsSaveFailed => 'Settings could not be saved. Try again.';
+
+  @override
+  String get bimGroup => 'Group';
+
+  @override
+  String get bimUngroup => 'Ungroup';
+
+  @override
+  String get bimEditGroup => 'Edit group';
+
+  @override
+  String get bimInsideGroup => 'Inside group';
+
+  @override
+  String get bimGroupDone => 'Done';
+
+  @override
+  String get bimGroupLabel => 'Group';
 }

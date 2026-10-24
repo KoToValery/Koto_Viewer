@@ -58,9 +58,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ArchitectRadialMenu), findsOneWidget);
-      expect(find.text('Edit'), findsOneWidget);
       expect(find.text('Move'), findsOneWidget);
       expect(find.text('Delete'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('architect-radial-more')));
+      await tester.pumpAndSettle();
+      expect(find.text('Edit'), findsOneWidget);
 
       await tester.tap(find.text('Edit'));
       await tester.pumpAndSettle();

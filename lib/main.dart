@@ -11,6 +11,7 @@ import 'src/core/services/dwg_converter_service.dart';
 import 'src/core/services/project_bundle_service.dart';
 import 'src/core/services/file_opener_service.dart';
 import 'src/core/services/locale_service.dart';
+import 'src/core/services/ui_settings_service.dart';
 import 'src/core/l10n/l10n_extensions.dart';
 import 'src/features/home/home_screen.dart';
 
@@ -25,6 +26,7 @@ void main(List<String> args) {
 
     await CoordinateSystemService.init();
     await LocaleService.init();
+    await UiSettingsService.init();
 
     // Startup background cleanup for orphaned temp files and cache pruning
     unawaited(DwgConverterService.cleanupStaleTempFiles(isStartup: true));

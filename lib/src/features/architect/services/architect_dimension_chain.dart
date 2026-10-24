@@ -244,7 +244,9 @@ class ArchitectDimensionChain {
     for (final a in project.gridAxes) {
       yield a.toJson();
     }
-    for (final list in storey.toJson().values.whereType<List>()) {
+    for (final entry in storey.toJson().entries) {
+      if (entry.key == 'groups' || entry.value is! List) continue;
+      final list = entry.value as List;
       for (final e in list.cast<Map<String, dynamic>>()) {
         yield e;
       }

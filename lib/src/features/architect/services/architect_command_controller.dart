@@ -57,6 +57,7 @@ abstract class ArchitectModelCommand {
         project.gridAxes.any((a) => a.id == id) ||
         project.storeys.any(
           (s) => [
+            ...s.groups.map((e) => e.id),
             ...s.walls.map((e) => e.id),
             ...s.zones.map((e) => e.id),
             ...s.columns.map((e) => e.id),
@@ -69,6 +70,7 @@ abstract class ArchitectModelCommand {
             ...s.annotations.map((e) => e.id),
             ...s.elevationMarkers.map((e) => e.id),
             ...s.cadPrimitives.map((e) => e.id),
+            ...s.components.map((e) => e.id),
             ...s.walls.expand(
               (w) => [
                 ...w.doors.map((e) => e.id),
@@ -79,6 +81,51 @@ abstract class ArchitectModelCommand {
         )) {
       throw ArgumentError('Element ID already exists or is empty: $id');
     }
+  }
+}
+
+class GroupArchitectElements extends ArchitectModelCommand {
+  final String storeyId, groupId;
+  final Set<String> elementIds;
+  const GroupArchitectElements({required this.storeyId, required this.groupId, required this.elementIds});
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final s = ArchitectModelCommand.storey(project, storeyId);
+    if (elementIds.length < 2 || !s.groupableIds.containsAll(elementIds) ||
+        s.groups.any((g) => g.elementIds.any(elementIds.contains))) {
+      throw ArgumentError('Groups require at least two ungrouped editable elements on one storey');
+    }
+    ArchitectModelCommand.newId(project, groupId);
+    return ArchitectModelCommand.replace(project, s.copyWith(groups: [
+      ...s.groups, ArchitectElementGroup(id: groupId, elementIds: Set.unmodifiable(elementIds)),
+    ]));
+  }
+}
+
+class UngroupArchitectElements extends ArchitectModelCommand {
+  final String storeyId, groupId;
+  const UngroupArchitectElements({required this.storeyId, required this.groupId});
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final s = ArchitectModelCommand.storey(project, storeyId);
+    if (!s.groups.any((g) => g.id == groupId)) throw ArgumentError('Unknown group');
+    return ArchitectModelCommand.replace(project, s.copyWith(groups: s.groups.where((g) => g.id != groupId).toList()));
+  }
+}
+
+class AddArchitectGroupMembers extends ArchitectModelCommand {
+  final String storeyId, groupId;
+  final Set<String> elementIds;
+  const AddArchitectGroupMembers({required this.storeyId, required this.groupId, required this.elementIds});
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final s = ArchitectModelCommand.storey(project, storeyId);
+    if (!s.groups.any((g) => g.id == groupId) || !s.groupableIds.containsAll(elementIds) ||
+        s.groups.any((g) => g.id != groupId && g.elementIds.any(elementIds.contains))) {
+      throw ArgumentError('Invalid group members');
+    }
+    return ArchitectModelCommand.replace(project, s.copyWith(groups: [for (final g in s.groups)
+      g.id == groupId ? ArchitectElementGroup(id: g.id, elementIds: {...g.elementIds, ...elementIds}) : g]));
   }
 }
 
@@ -279,6 +326,8 @@ class SplitArchitectWall extends ArchitectModelCommand {
           for (final w in s.walls)
             if (w.id == wallId) ...[first, second] else w,
         ],
+        groups: [for (final g in s.groups) g.elementIds.contains(wallId)
+          ? ArchitectElementGroup(id: g.id, elementIds: {...g.elementIds, newWallId}) : g],
       ),
     );
   }
@@ -460,6 +509,10 @@ class TrimArchitectWall extends ArchitectModelCommand {
     return ArchitectModelCommand.replace(
       project,
       storey.copyWith(
+        groups: [for (final g in storey.groups) g.elementIds.contains(wall.id)
+          ? ArchitectElementGroup(id: g.id, elementIds: {
+            ...g.elementIds.where((id) => id != wall.id), ...retained.map((w) => w.id),
+          }) : g],
         walls: [
           for (final w in storey.walls)
             if (w.id == wall.id) ...retained else w,
@@ -733,6 +786,7 @@ class MirrorArchitectElements extends ArchitectModelCommand {
   final Offset origin;
   final Offset direction;
   final bool isDuplicate;
+  final bool copyGroups;
   final Map<String, String>? idMap;
 
   const MirrorArchitectElements({
@@ -741,6 +795,7 @@ class MirrorArchitectElements extends ArchitectModelCommand {
     required this.origin,
     required this.direction,
     this.isDuplicate = false,
+    this.copyGroups = true,
     this.idMap,
   });
 
@@ -758,6 +813,7 @@ class MirrorArchitectElements extends ArchitectModelCommand {
       origin: origin,
       direction: direction,
       isDuplicate: isDuplicate,
+      copyGroups: copyGroups,
       idMap: idMap,
     );
     var axes = project.gridAxes;
@@ -1881,6 +1937,8 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     return ArchitectModelCommand.replace(
       project,
       storey.copyWith(
+        groups: [for (final g in storey.groups) g.elementIds.contains(elementId)
+          ? ArchitectElementGroup(id: g.id, elementIds: {...g.elementIds, newElementId}) : g],
         beams: [
           for (final b in storey.beams)
             if (b.id == elementId) ...[

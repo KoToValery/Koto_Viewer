@@ -1,229 +1,117 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../bim_editing/models/bim_context_menu_settings.dart';
 
-/// Concentric arcs leave the picked point and the spaces between buttons open.
-/// The same occupied bounds are used by nearby drawing readouts.
+/// Slots always run clockwise from north. Only the complete cluster translates.
 class ArchitectRadialLayout {
   final List<Offset> targets;
-  final Rect badge;
-  final Rect clusterRect;
-  final double buttonSize;
-  final double contentHeight;
-
+  final Rect badge, clusterRect;
+  final Offset moreTarget;
+  final double buttonSize, contentHeight;
   const ArchitectRadialLayout(
     this.targets,
-    this.badge, [
-    this.clusterRect = Rect.zero,
-    this.buttonSize = 52,
-    this.contentHeight = 0,
-  ]);
-
+    this.badge,
+    this.clusterRect,
+    this.moreTarget,
+    this.buttonSize,
+    this.contentHeight,
+  );
   List<Rect> get occupied => [
     if (!badge.isEmpty) badge.inflate(4),
-    for (final target in targets)
+    for (final target in [...targets, moreTarget])
       Rect.fromCenter(
         center: target,
         width: buttonSize + 8,
         height: buttonSize + 8,
       ),
   ];
-
   static ArchitectRadialLayout compute({
     required Size size,
     required Offset center,
-    required int count,
+    BimContextMenuMode mode = BimContextMenuMode.circle,
     bool hasTitle = false,
     List<Rect> elementBounds = const [],
   }) {
-    final rings = _rings(size, center, count, hasTitle, elementBounds);
-    if (rings != null) return rings;
-    final result = _fit(size, center, count, hasTitle, elementBounds);
-    if (result != null) return result;
-    // Very short viewports keep touch targets usable and scroll the fan.
-    final tall = Size(size.width, math.max(size.height, 640));
-    final fallback = _fit(tall, center, count, hasTitle, elementBounds);
-    return fallback ?? ArchitectRadialLayout(const [], Rect.zero);
-  }
-
-  static ArchitectRadialLayout? _rings(Size size, Offset center, int count,
-      bool hasTitle, List<Rect> elements) {
-    if (count == 0) return null;
-    const button = 52.0, gap = 8.0;
-    final available = (Offset.zero & size).deflate(8);
-    final targets = <Offset>[];
-    var remaining = count, ring = 0;
-    while (remaining > 0) {
-      final radius = 72.0 + ring * (button + gap);
-      final capacity = (math.pi / math.asin((button + gap) / (2 * radius))).floor();
-      final n = math.min(remaining, capacity);
-      for (var i = 0; i < n; i++) {
-        final angle = -math.pi / 2 + i * math.pi * 2 / n;
-        targets.add(center + Offset(math.cos(angle), math.sin(angle)) * radius);
-      }
-      remaining -= n;
-      ring++;
-    }
-    final badge = Rect.fromCenter(center: center,
-      width: hasTitle ? 80 : 6, height: hasTitle ? 28 : 6);
-    var bounds = badge;
-    for (final target in targets) {
-      final rect = Rect.fromCenter(center: target, width: button, height: button);
-      if (!available.contains(rect.topLeft) || !available.contains(rect.bottomRight) ||
-          rect.overlaps(badge) ||
-          (hasTitle && elements.any((e) => rect.overlaps(e.inflate(4))))) {
-        return null;
-      }
-      bounds = bounds.expandToInclude(rect);
-    }
-    if (elements.any((e) => hasTitle && badge.overlaps(e))) return null;
-    return ArchitectRadialLayout(targets, badge, bounds, button, size.height);
-  }
-
-  static ArchitectRadialLayout? _fit(
-    Size size,
-    Offset center,
-    int count,
-    bool hasTitle,
-    List<Rect> elementBounds,
-  ) {
-    const margin = 8.0;
-    final available = (Offset.zero & size).deflate(margin);
-    if (available.width < 44 || available.height < 44) return null;
-    final anchor = Offset(
-      center.dx.clamp(available.left + 4, available.right - 4),
-      center.dy.clamp(available.top + 4, available.bottom - 4),
+    const button = 52.0, gap = 8.0, radius = 84.0, margin = 12.0;
+    final side = mode == BimContextMenuMode.circle
+        ? radius * 2 + button
+        : button * 3 + gap * 2;
+    final titleHeight = hasTitle ? 36.0 : 0.0;
+    final height = side + titleHeight;
+    final contentHeight = math.max(size.height, height + margin * 2);
+    final available = Rect.fromLTWH(
+      margin,
+      margin,
+      math.max(0, size.width - margin * 2),
+      contentHeight - margin * 2,
     );
-    final dot = Rect.fromCenter(center: anchor, width: 6, height: 6);
-    if (count == 0) return ArchitectRadialLayout(const [], dot);
-    final protected = [
-      for (final rect in elementBounds)
-        if (rect.overlaps(available)) rect.intersect(available).inflate(4),
+    final origin = center - Offset(side / 2, side / 2 + titleHeight);
+    final desired = Rect.fromLTWH(origin.dx, origin.dy, side, height);
+    Rect clamp(Rect r) => r.shift(
+      Offset(
+        r.left < available.left
+            ? available.left - r.left
+            : r.right > available.right
+            ? available.right - r.right
+            : 0,
+        r.top < available.top
+            ? available.top - r.top
+            : r.bottom > available.bottom
+            ? available.bottom - r.bottom
+            : 0,
+      ),
+    );
+    final candidates = <Rect>[
+      clamp(desired),
+      for (final e in elementBounds) ...[
+        clamp(desired.shift(Offset(e.left - gap - desired.right, 0))),
+        clamp(desired.shift(Offset(e.right + gap - desired.left, 0))),
+        clamp(desired.shift(Offset(0, e.top - gap - desired.bottom))),
+        clamp(desired.shift(Offset(0, e.bottom + gap - desired.top))),
+      ],
     ];
-    final element = protected.isEmpty
-        ? null
-        : protected.reduce((a, b) => a.expandToInclude(b));
-    final picked = Rect.fromCircle(center: anchor, radius: 24);
-    // Prefer full-size controls. Compact controls are only used if none fit.
-    for (final button in [52.0, 48.0, 44.0]) {
-      ArchitectRadialLayout? best;
-      var bestScore = double.infinity;
-      for (final sweep in [
-        math.pi * 5 / 6,
-        math.pi,
-        math.pi * 2 / 3,
-        math.pi / 2,
-      ]) {
-        final arcs = <(double radius, int count, double step)>[];
-        var remaining = count;
-        var radius = button * 1.35;
-        while (remaining > 0) {
-          final step = 2 * math.asin((button + 8) / (2 * radius));
-          final capacity = (sweep / step).floor() + 1;
-          final n = math.min(remaining, capacity);
-          arcs.add((radius, n, step));
-          remaining -= n;
-          radius += button + 8;
-        }
-        for (var direction = 0; direction < 24; direction++) {
-          final angle = -math.pi / 2 + direction * math.pi / 12;
-          final targets = <Offset>[];
-          for (final (r, n, step) in arcs) {
-            for (var i = 0; i < n; i++) {
-              final a = angle + (i - (n - 1) / 2) * step;
-              targets.add(anchor + Offset(math.cos(a), math.sin(a)) * r);
-            }
-          }
-          Rect buttonRect(Offset target) =>
-              Rect.fromCenter(center: target, width: button, height: button);
-          var bounds = targets
-              .map(buttonRect)
-              .reduce((a, b) => a.expandToInclude(b));
-          var badge = dot;
-          if (hasTitle) {
-            final width = math.min(196.0, math.max(120.0, bounds.width * .7));
-            badge = Rect.fromCenter(
-              center: Offset(
-                bounds.center.dx,
-                math.sin(angle) > .2 ? bounds.bottom + 20 : bounds.top - 20,
-              ),
-              width: width,
-              height: 28,
-            );
-            bounds = bounds.expandToInclude(badge);
-          }
-          if (bounds.width > available.width + 1e-8 ||
-              bounds.height > available.height + 1e-8) {
-            continue;
-          }
-          final offsets = [
-            Offset.zero,
-            if (element != null) ...[
-              Offset(element.left - 8 - bounds.right, 0),
-              Offset(element.right + 8 - bounds.left, 0),
-              Offset(0, element.top - 8 - bounds.bottom),
-              Offset(0, element.bottom + 8 - bounds.top),
-            ],
-          ];
-          for (final offset in offsets) {
-            final moved = bounds.shift(offset);
-            final shift =
-                offset +
-                Offset(
-                  moved.left < available.left
-                      ? available.left - moved.left
-                      : moved.right > available.right
-                      ? available.right - moved.right
-                      : 0,
-                  moved.top < available.top
-                      ? available.top - moved.top
-                      : moved.bottom > available.bottom
-                      ? available.bottom - moved.bottom
-                      : 0,
-                );
-            final placed = targets.map((p) => p + shift).toList();
-            final placedBadge = hasTitle ? badge.shift(shift) : dot;
-            final occupied = [
-              for (final p in placed) buttonRect(p),
-              if (hasTitle) placedBadge,
-            ];
-            double overlap(Rect a, Rect b) {
-              if (!a.overlaps(b)) return 0;
-              final intersection = a.intersect(b);
-              return intersection.width *
-                  intersection.height /
-                  (button * button);
-            }
-
-            final score =
-                occupied.fold<double>(
-                  0,
-                  (sum, rect) =>
-                      sum +
-                      overlap(rect, picked) * 100000 +
-                      protected.fold<double>(
-                        0,
-                        (v, element) => v + overlap(rect, element) * 1000,
-                      ),
-                ) +
-                shift.distance * 2 +
-                bounds.width * bounds.height * .001 +
-                arcs.last.$1 * .1 +
-                direction * .001;
-            if (score < bestScore) {
-              bestScore = score;
-              best = ArchitectRadialLayout(
-                placed,
-                placedBadge,
-                bounds.shift(shift),
-                button,
-                size.height,
-              );
-            }
-          }
+    double score(Rect r) {
+      var overlap = 0.0;
+      for (final e in elementBounds) {
+        if (r.overlaps(e)) {
+          final i = r.intersect(e);
+          overlap += i.width * i.height;
         }
       }
-      if (best != null) return best;
+      return overlap * 100 + (r.center - desired.center).distance;
     }
-    return null;
+
+    candidates.sort((a, b) => score(a).compareTo(score(b)));
+    final frame = candidates.first;
+    final middle = Offset(frame.center.dx, frame.top + titleHeight + side / 2);
+    const grid = [
+      Offset(0, -1),
+      Offset(1, -1),
+      Offset(1, 0),
+      Offset(1, 1),
+      Offset(0, 1),
+      Offset(-1, 1),
+      Offset(-1, 0),
+      Offset(-1, -1),
+    ];
+    final targets = [
+      for (var i = 0; i < 8; i++)
+        middle +
+            (mode == BimContextMenuMode.circle
+                ? Offset(
+                        math.cos(-math.pi / 2 + i * math.pi / 4),
+                        math.sin(-math.pi / 2 + i * math.pi / 4),
+                      ) *
+                      radius
+                : grid[i] * (button + gap)),
+    ];
+    return ArchitectRadialLayout(
+      targets,
+      hasTitle ? Rect.fromLTWH(frame.left, frame.top, side, 28) : Rect.zero,
+      frame,
+      middle,
+      button,
+      contentHeight,
+    );
   }
 }

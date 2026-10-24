@@ -5,6 +5,7 @@ import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_radial_menu.dart';
+import 'package:kotoview/src/features/bim_editing/models/bim_context_menu_settings.dart';
 import 'package:kotoview/src/features/bim_editing/geometry/bim_line_geometry.dart';
 import 'architect_editing_test.dart' as editing;
 import 'architect_workspace_interaction_test.dart' as workspace;
@@ -62,7 +63,7 @@ void main() {
         final badge = find.byKey(const ValueKey('wall-clearance-b'));
         expect(badge, findsOneWidget);
         expect(
-          find.descendant(of: badge, matching: find.text('11.750 m')),
+          find.descendant(of: badge, matching: find.text(model.project.formatLength(11.75))),
           findsOneWidget,
         );
         await gesture.up();
@@ -98,7 +99,7 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        final actions = ArchitectRadialAction.values.take(8).toList();
+        final actions = const BimContextMenuSettings().slots.whereType<ArchitectRadialAction>().toList();
         ArchitectRadialAction? selected;
         await tester.pumpWidget(
           MaterialApp(

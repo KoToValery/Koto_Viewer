@@ -1,3 +1,4 @@
+import '../../../core/services/ui_settings_service.dart';
 import '../services/architect_closed_contour.dart';
 import '../widgets/architect_terrain_editor.dart';
 import '../models/architect_line_style.dart';
@@ -871,6 +872,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   List<String> _selectionCandidates(Offset point) {
+    final candidates = _rawSelectionCandidates(point);
+    final group = _editingGroup;
+    return group == null ? candidates : candidates.where(group.elementIds.contains).toList();
+  }
+
+  List<String> _rawSelectionCandidates(Offset point) {
     if (_acceptsAnySelection) {
       final first = _hitSelection(point);
       return <String>{
@@ -1689,6 +1696,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _onModelChanged() {
     if (!mounted) return;
+    if (!_commands.isPlan || _editingGroup == null) _editingGroupId = null;
     _midpointTracking.clear();
     _restoreWallType();
     final valid = {
@@ -1763,6 +1771,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _cancelDrafting() {
+    _editingGroupId = null;
+    _resetDraftGroup();
     if (_cutOpeningTargetId != null) _activeTool = ArchitectTool.select;
     _cutOpeningTargetId = null;
     _terrainDrafting = false;
@@ -1821,6 +1831,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _changeTool(ArchitectTool tool) => setState(() {
+    _finishDraftGroup();
+    _editingGroupId = null;
     _cutOpeningTargetId = null;
     _terrainDrafting = false;
     _placingDownpipe = false;
@@ -2072,7 +2084,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _moveSelection = false;
   DateTime? _lastTapTime;
   Offset? _lastTapPos;
+  String? _editingGroupId;
+  ArchitectElementGroup? get _editingGroup => _project.activeStorey.groups.where((g) => g.id == _editingGroupId).firstOrNull;
+  ArchitectElementGroup? get _selectedGroup {
+    if (!_commands.isPlan || _editingGroupId != null) return null;
+    final ids = _effectiveSelection;
+    return _project.activeStorey.groups.where((g) => g.elementIds.length == ids.length && g.elementIds.containsAll(ids)).firstOrNull;
+  }
   Set<String> get _effectiveSelection {
+    final raw = _rawSelection;
+    if (!_commands.isPlan) return raw;
+    final group = _editingGroup;
+    return group != null ? raw.where(group.elementIds.contains).toSet() : _project.activeStorey.expandGroups(raw);
+  }
+  Set<String> get _rawSelection {
     if (_acceptsAnySelection) {
       if (_selectionIds.isNotEmpty) return Set.of(_selectionIds);
       return {
@@ -2330,6 +2355,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   ArchitectWall? get _selectedWall {
+    if (_effectiveSelection.length > 1) return null;
     if (_activeTool != ArchitectTool.select &&
         _activeTool != ArchitectTool.wall) {
       return null;
@@ -2438,7 +2464,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       offset: Offset.zero,
     );
     if (copyId == null) return;
-    final draft = _project.updateActiveStorey(floor);
+    var draft = _project.updateActiveStorey(floor);
+    if (_editingGroupId != null) {
+      draft = AddArchitectGroupMembers(storeyId: _project.activeStoreyId,
+        groupId: _editingGroupId!, elementIds: {copyId}).apply(draft);
+    }
     final bounds = ArchitectSelection.bounds(draft, copyId);
     if (bounds == null) return;
     final storeyId = _project.activeStoreyId;
@@ -2519,6 +2549,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _handleMoved = false;
 
   ArchitectZone? get _selectedZone {
+    if (_effectiveSelection.length > 1) return null;
     if (_activeTool != ArchitectTool.select &&
         _activeTool != ArchitectTool.zone) {
       return null;
@@ -3732,6 +3763,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   List<Offset>? get _selectedPolygon {
+    if (_effectiveSelection.length > 1) return null;
     final id = _selectedElementId ?? _selectedZoneId;
     if (id == null) return null;
     for (final p in _project.activeStorey.cadPrimitives) {
@@ -4629,6 +4661,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (preview != null) {
         _commands.commit(preview);
         setState(() {
+          _selectionIds..clear()..addAll({?id});
           _selectedElementId = id;
           _selectedZoneId = null;
         });
@@ -4879,7 +4912,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _lastTapTime = now;
     _lastTapPos = rawModel;
 
-    if (isDoubleTap && !_multiSelect && !_selectionContextActive) {
+    if (isDoubleTap && !_multiSelect && !_selectionContextActive && _editingGroupId == null) {
       final hitId = _hitSelection(rawModel);
       if (hitId != null && _isElementAllowedForTool(hitId, _activeTool)) {
         final storey = _project.activeStorey;
@@ -6169,6 +6202,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   // === SECTION: WALL & DOOR CONCEPT DRAFTING ===
 
+  final List<String> _draftChainIds = [];
+  bool _groupDraftChain = false;
+  Set<String> get _liveDraftChainIds => _draftChainIds.where(_project.activeStorey.groupableIds.contains).toSet();
+  bool get _draftGroupChoiceVisible => _commands.isPlan &&
+      _liveDraftChainIds.length + (_wallDirectionLocked ? 1 : 0) > 1;
+  void _resetDraftGroup() { _draftChainIds.clear(); _groupDraftChain = false; }
+  void _finishDraftGroup() {
+    final ids = _liveDraftChainIds;
+    if (_commands.isPlan && _groupDraftChain && ids.length > 1) {
+      _commands.execute(GroupArchitectElements(storeyId: _project.activeStoreyId,
+        groupId: ArchitectElementId.next('group'), elementIds: ids));
+      _saveBiMProjectIfAttached();
+    }
+    _resetDraftGroup();
+  }
+  void _placeDraftSegment(ArchitectModelCommand command, String id, bool chain) {
+    final ids = {..._liveDraftChainIds, id};
+    _commands.executeBatch([command,
+      if (!chain && _commands.isPlan && _groupDraftChain && ids.length > 1)
+        GroupArchitectElements(storeyId: _project.activeStoreyId,
+          groupId: ArchitectElementId.next('group'), elementIds: ids),
+    ]);
+    if (chain) { _draftChainIds.add(id); } else { _resetDraftGroup(); }
+  }
+
   void _commitCurrentWallSegment(
     Offset targetPoint, {
     bool? continueChain,
@@ -6178,18 +6236,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_activeTool == ArchitectTool.cadLine) {
       final end = targetPoint;
       if ((end - _draftStart!).distance < .001) return;
-      _commands.execute(
+      final id = ArchitectElementId.next('cad');
+      final chain = continueChain ?? (_wallMode == WallDraftingMode.chained);
+      _placeDraftSegment(
         PlaceArchitectCadPrimitive(
           storeyId: _project.activeStoreyId,
           primitive: ArchitectCadPrimitive(
-            id: ArchitectElementId.next('cad'),
+            id: id,
             type: CadPrimitiveType.line,
             startPoint: _draftStart!,
             endPoint: end,
             colorValue: 0xFF9E9E9E,
             lineStyle: _activeCadLineStyle,
           ),
-        ),
+        ), id, chain,
       );
       setState(() {
         if (continueChain == true) _wallMode = WallDraftingMode.chained;
@@ -6234,8 +6294,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
 
     setState(() {
-      _commands.execute(
-        CreateArchitectWall(storeyId: _project.activeStorey.id, wall: newWall),
+      _placeDraftSegment(
+        CreateArchitectWall(storeyId: _project.activeStorey.id, wall: newWall), newWall.id,
+        continueChain ?? (_wallMode == WallDraftingMode.chained),
       );
       _syncAutoZones(_project.activeStorey);
       _wallDirectionLocked = false;
@@ -6259,6 +6320,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _finishChainedWall() {
+    _finishDraftGroup();
     setState(() {
       _wallArcEnd = null;
       _draftStart = null;
@@ -6937,7 +6999,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Widget _buildWallClearanceOverlay() => Positioned.fill(
     child: AnimatedBuilder(
-      animation: Listenable.merge([_viewport, _previewRevision]),
+      animation: Listenable.merge([_viewport, _previewRevision, UiSettingsService.contextMenu]),
       builder: (context, child) {
         final clearances = _wallClearances;
         final openingClearances = _draggingElementId == null
@@ -6962,7 +7024,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ...ArchitectRadialLayout.compute(
               size: _viewport.size,
               center: _radialMenuScreenPosition!,
-              count: _radialMenuItems.length,
+              mode: UiSettingsService.contextMenu.value.mode,
               hasTitle: _effectiveSelection.length > 1,
               elementBounds: _radialElementBounds,
             ).occupied,
@@ -8057,6 +8119,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   );
 
   List<ArchitectRadialMenuItem> _buildRadialMenuItems(String elementId) {
+    final items = _buildElementRadialMenuItems(elementId);
+    if (_commands.isPlan && _editingGroupId == null) {
+      final group = _selectedGroup;
+      if (group != null) {
+        items.addAll([
+          _radialItem(action: ArchitectRadialAction.ungroup, color: const Color(0xFF80CBC4)),
+          _radialItem(action: ArchitectRadialAction.editGroup, color: const Color(0xFF80CBC4)),
+        ]);
+      } else if (_effectiveSelection.length > 1 &&
+          _project.activeStorey.groupableIds.containsAll(_effectiveSelection) &&
+          !_project.activeStorey.groups.any((g) => g.elementIds.any(_effectiveSelection.contains))) {
+        items.add(_radialItem(action: ArchitectRadialAction.group, color: const Color(0xFF80CBC4)));
+      }
+    }
+    return items;
+  }
+
+  List<ArchitectRadialMenuItem> _buildElementRadialMenuItems(String elementId) {
     final items = <ArchitectRadialMenuItem>[];
 
     if (_effectiveSelection.length > 1) {
@@ -8896,6 +8976,51 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
+  void _groupSelection() {
+    final ids = _effectiveSelection;
+    try {
+      _commands.execute(GroupArchitectElements(storeyId: _project.activeStoreyId,
+        groupId: ArchitectElementId.next('group'), elementIds: ids));
+      setState(() {
+        _selectionIds..clear()..addAll(ids);
+        _selectedElementId = null; _selectedZoneId = null;
+        _activeTool = ArchitectTool.select; _selectionContextActive = true; _moveSelection = true;
+      });
+      _saveBiMProjectIfAttached();
+    } on ArgumentError { _operationError(); }
+  }
+  void _ungroupSelection() {
+    final group = _selectedGroup;
+    if (group == null) return;
+    _commands.execute(UngroupArchitectElements(storeyId: _project.activeStoreyId, groupId: group.id));
+    _clearSelection(); _saveBiMProjectIfAttached();
+  }
+  void _enterGroup() {
+    final group = _selectedGroup;
+    if (group == null) return;
+    _clearSelection();
+    setState(() { _editingGroupId = group.id; _activeTool = ArchitectTool.select; });
+  }
+  void _exitGroup() {
+    final group = _editingGroup;
+    _clearSelection();
+    setState(() {
+      _editingGroupId = null;
+      if (group != null) {
+        _selectionIds.addAll(group.elementIds);
+        _selectionContextActive = true; _moveSelection = true;
+      }
+    });
+  }
+  Widget _groupEditBanner() => Material(
+    borderRadius: BorderRadius.circular(8), color: Theme.of(context).colorScheme.surface,
+    child: Padding(padding: const EdgeInsets.only(left: 12), child: Row(children: [
+      Expanded(child: Text(context.l10n.bimInsideGroup, overflow: TextOverflow.ellipsis)),
+      TextButton(key: const ValueKey('architect-group-done'), onPressed: _exitGroup,
+        child: Text(context.l10n.bimGroupDone)),
+    ])),
+  );
+
   void _handleRadialAction(ArchitectRadialAction action) {
     final id = _radialMenuElementId;
     final pick = _radialMenuScreenPosition == null
@@ -8906,6 +9031,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _radialMenuElementId = null;
     });
     if (id == null) return;
+    if (action == ArchitectRadialAction.group) { _groupSelection(); return; }
+    if (action == ArchitectRadialAction.ungroup) { _ungroupSelection(); return; }
+    if (action == ArchitectRadialAction.editGroup) { _enterGroup(); return; }
 
     if (_effectiveSelection.length > 1) {
       switch (action) {
@@ -8922,9 +9050,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           HapticFeedback.mediumImpact();
           return;
         case ArchitectRadialAction.rotate:
+          final bounds = _selectedGroup == null ? <Rect>[] : [
+            for (final id in _effectiveSelection)
+              if (ArchitectSelection.bounds(_project, id) case final Rect r) r,
+          ];
+          final origin = bounds.isEmpty ? null : bounds.reduce((a, b) => a.expandToInclude(b)).center;
           final next = _elementTool.rotateElementsByIds(
             _project.activeStorey,
-            _effectiveSelection,
+            _effectiveSelection, origin: origin,
           );
           _commands.commit(_project.updateActiveStorey(next));
           _saveBiMProjectIfAttached();
@@ -8959,6 +9092,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     switch (action) {
+      case ArchitectRadialAction.group:
+      case ArchitectRadialAction.ungroup:
+      case ArchitectRadialAction.editGroup:
+        break;
       case ArchitectRadialAction.cutOpening:
         _startCutOpening(id);
         break;
@@ -9256,15 +9393,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         } else if (_selectionIds.isEmpty && _selectedZoneId != null) {
           _selectionIds.add(_selectedZoneId!);
         }
-        if (toggle && _selectionIds.contains(id)) {
-          _selectionIds.remove(id);
+        final members = _commands.isPlan && _editingGroupId == null
+          ? _project.activeStorey.expandGroups({id}) : {id};
+        if (toggle && members.every(_selectionIds.contains)) {
+          _selectionIds.removeAll(members);
         } else {
-          _selectionIds.add(id);
+          _selectionIds.addAll(members);
         }
       } else {
         _selectionIds
           ..clear()
-          ..add(id);
+          ..addAll(_commands.isPlan && _editingGroupId == null ? _project.activeStorey.expandGroups({id}) : {id});
       }
       final primary = _selectionIds.contains(id)
           ? id
@@ -9274,13 +9413,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _wallParallelMove = false;
         _moveSelection = false;
       }
-      _selectedElementId = primary;
+      final grouped = _editingGroupId == null && _commands.isPlan && _project.activeStorey.groupFor(id) != null;
+      _selectedElementId = grouped ? null : primary;
       _selectedZoneId = null;
-      if (adoptTool && primary != null) {
+      if (grouped) {
+        _activeTool = ArchitectTool.select;
+        _selectionContextActive = true;
+        _moveSelection = true;
+      }
+      if (!grouped && adoptTool && primary != null) {
         _activeTool = _toolForElement(primary);
         _selectionContextActive = true;
       }
-      if (primary != null) {
+      if (!grouped && primary != null) {
         final zone = _project.activeStorey.zones
             .where((e) => e.id == primary)
             .firstOrNull;
@@ -10451,9 +10596,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _project.activeStorey,
       ids,
       offset: const Offset(0.5, 0.5),
+      copyGroups: _editingGroupId == null,
     );
     if (copyIds.isEmpty) return;
-    final updated = _project.updateActiveStorey(nextStorey);
+    var updated = _project.updateActiveStorey(nextStorey);
+    if (_editingGroupId != null) {
+      updated = AddArchitectGroupMembers(storeyId: _project.activeStoreyId,
+        groupId: _editingGroupId!, elementIds: copyIds.toSet()).apply(updated);
+    }
     _commands.commit(updated);
     _saveBiMProjectIfAttached();
     setState(() {
@@ -10518,9 +10668,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         origin: anchor,
         direction: direction,
         isDuplicate: _mirrorIsDuplicate,
+        copyGroups: _editingGroupId == null,
         idMap: finalIdMap,
       );
-      _commands.execute(command);
+      _commands.executeBatch([command,
+        if (_mirrorIsDuplicate && finalIdMap != null && _editingGroupId != null)
+          AddArchitectGroupMembers(storeyId: _project.activeStoreyId,
+            groupId: _editingGroupId!, elementIds: finalIdMap.values.toSet()),
+      ]);
       _saveBiMProjectIfAttached();
       if (_mirrorIsDuplicate && finalIdMap != null) {
         _selectionIds
@@ -13109,6 +13264,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
       if (_cutOpeningTargetId != null)
         Positioned(top: 8, left: 8, right: 8, child: _cutOpeningControl()),
+      if (_editingGroupId != null)
+        Positioned(top: 8, left: 8, right: 8, child: _groupEditBanner()),
       _buildPolygonDistanceOverlay(),
       _buildShapeDimensionOverlay(),
       if (_activeTool == ArchitectTool.dimension &&
@@ -13169,7 +13326,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (_activeTool == ArchitectTool.cadLine)
@@ -13370,6 +13527,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         ),
                     ],
                   ),
+                  if (_draftGroupChoiceVisible)
+                    Theme(data: ThemeData.dark(), child: Row(children: [
+                      Checkbox(key: const ValueKey('architect-draft-group'), value: _groupDraftChain,
+                        onChanged: (v) => setState(() => _groupDraftChain = v ?? false)),
+                      Text(context.l10n.bimGroup),
+                      const Spacer(),
+                      if (!_wallDirectionLocked)
+                        IconButton(key: const ValueKey('architect-draft-group-finish'),
+                          tooltip: context.l10n.bimGroupDone,
+                          icon: const Icon(Icons.check), onPressed: _finishChainedWall),
+                    ])),
+                  ]),
                 ),
               ),
             ),
@@ -13379,7 +13548,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _wallCurved &&
           _effectiveSelection.isEmpty)
         Positioned(
-          top: 60,
+          top: _draftGroupChoiceVisible ? 108 : 60,
           left: 8,
           right: 8,
           child: IgnorePointer(

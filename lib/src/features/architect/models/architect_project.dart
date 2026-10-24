@@ -1,3 +1,5 @@
+import 'architect_element_group.dart';
+export 'architect_element_group.dart';
 import 'architect_line_style.dart';
 import 'architect_hatch_pattern.dart';
 import 'architect_document.dart';
@@ -46,6 +48,27 @@ enum ArchitectDimensionScale {
 /// Represents an architectural storey level with its height, elevation, walls, zones,
 /// and comprehensive architectural drafting elements.
 class ArchitectStorey {
+  final List<ArchitectElementGroup> _groups;
+  Set<String> get groupableIds => {
+    ...walls.map((e) => e.id), ...columns.map((e) => e.id),
+    ...beams.map((e) => e.id), ...slabs.map((e) => e.id),
+    ...roofs.map((e) => e.id), ...openings.map((e) => e.id),
+    ...stairs.map((e) => e.id), ...dimensions.map((e) => e.id),
+    ...elevationMarkers.map((e) => e.id), ...annotations.map((e) => e.id),
+    ...cadPrimitives.map((e) => e.id), ...components.map((e) => e.id),
+    ...zones.where((e) => !e.isAutoBoundary).map((e) => e.id),
+  };
+  List<ArchitectElementGroup> get groups => _groups.isEmpty
+      ? const [] : ArchitectElementGroup.normalize(_groups, groupableIds);
+  ArchitectElementGroup? groupFor(String id) => groups.where((g) => g.elementIds.contains(id)).firstOrNull;
+  Set<String> expandGroups(Set<String> selection) {
+    final result = Set<String>.of(selection);
+    for (final group in groups) {
+      if (group.elementIds.any(selection.contains)) result.addAll(group.elementIds);
+    }
+    return result;
+  }
+
   final String id;
   final String name;
   final double elevation; // in meters (кота готов под)
@@ -71,6 +94,7 @@ class ArchitectStorey {
   final bool isRoof;
 
   const ArchitectStorey({
+    List<ArchitectElementGroup> groups = const [],
     required this.id,
     required this.name,
     this.elevation = 0.0,
@@ -92,7 +116,7 @@ class ArchitectStorey {
     this.cadPrimitives = const [],
     this.components = const [],
     this.zoneScheduleOrigin,
-  }) : _zones = zones;
+  }) : _zones = zones, _groups = groups;
 
   String get elevationLabel {
     if (elevation.abs() < 1e-4) return '±0.00';
@@ -101,6 +125,7 @@ class ArchitectStorey {
   }
 
   ArchitectStorey copyWith({
+    List<ArchitectElementGroup>? groups,
     String? id,
     String? name,
     double? elevation,
@@ -124,6 +149,7 @@ class ArchitectStorey {
     Offset? zoneScheduleOrigin,
     bool clearZoneScheduleOrigin = false,
   }) => ArchitectStorey(
+    groups: groups ?? _groups,
     id: id ?? this.id,
     name: name ?? this.name,
     elevation: elevation ?? this.elevation,
@@ -156,6 +182,7 @@ class ArchitectStorey {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    if (groups.isNotEmpty) 'groups': groups.map((g) => g.toJson()).toList(),
     'name': name,
     'elevation': elevation,
     'height': height,
@@ -187,6 +214,8 @@ class ArchitectStorey {
   factory ArchitectStorey.fromJson(
     Map<String, dynamic> json,
   ) => ArchitectStorey(
+    groups: [for (final g in json['groups'] as List? ?? const [])
+      if (g is Map) ArchitectElementGroup.fromJson(Map<String, dynamic>.from(g))],
     id: json['id'] as String,
     name: json['name'] as String,
     elevation: (json['elevation'] as num?)?.toDouble() ?? 0.0,
