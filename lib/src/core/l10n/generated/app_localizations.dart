@@ -13556,7 +13556,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectRoofPitchHint.
   ///
   /// In en, this message translates to:
-  /// **'Drag the green point to change pitch. Tap the roof to choose the fixed axis, parallel to the eaves.'**
+  /// **'Drag the green point to change pitch and snap to a neighbouring roof. Tap the roof to choose a fixed axis. Pinch or use the mouse wheel to zoom.'**
   String get architectRoofPitchHint;
 
   /// No description provided for @architectRoofPitchAxis.
@@ -13970,13 +13970,13 @@ abstract class AppLocalizations {
   /// Hint for placing a section line
   ///
   /// In en, this message translates to:
-  /// **'Click start and end points to place the section cut.'**
+  /// **'Two points → direction'**
   String get architectSectionHint;
 
   /// Hint for placing an elevation line
   ///
   /// In en, this message translates to:
-  /// **'Click start and end points to place the elevation marker.'**
+  /// **'Two points → direction'**
   String get architectElevationHint;
 
   /// Rectangular marquee selection mode
@@ -14362,6 +14362,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pick anchor again'**
   String get architectMirrorPickAnchor;
+
+  /// No description provided for @architectViewChooseArrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an arrow'**
+  String get architectViewChooseArrow;
+
+  /// Tooltip for one of the two viewing direction arrows
+  ///
+  /// In en, this message translates to:
+  /// **'Viewing direction {side}'**
+  String architectViewDirectionSide(int side);
 }
 
 class _AppLocalizationsDelegate

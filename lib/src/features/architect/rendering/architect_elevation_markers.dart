@@ -12,6 +12,7 @@ void drawArchitectElevationMarkers(
   Color color,
   AppLocalizations l, {
   String? selected,
+  Set<String> selectedIds = const {},
   String? fontFamily,
 }) {
   void label(String value, Offset point, {Color? ink, String id = 'north'}) {
@@ -55,7 +56,7 @@ void drawArchitectElevationMarkers(
                 e.id,
                 ArchitectAnnotationRole.symbol,
               );
-    final isSelected = selected == e.id;
+    final isSelected = selected == e.id || selectedIds.contains(e.id);
     final ink = isSelected ? const Color(0xFF00E5FF) : color;
     final paint = Paint()
       ..color = ink
@@ -100,18 +101,6 @@ void drawArchitectElevationMarkers(
     );
     canvas.drawCircle(e.segments.first.start, (isSelected ? 4.0 : 3.0) / symbolScale, paint..style = PaintingStyle.fill);
     canvas.drawCircle(e.segments.last.end, (isSelected ? 4.0 : 3.0) / symbolScale, paint);
-    if (isSelected && e.viewDepth != null) {
-      final forward = e.viewDirection;
-      final d = e.viewDepth!;
-      final a = e.start + forward * d, b = e.end + forward * d;
-      final depthPaint = Paint()
-        ..color = ink.withValues(alpha: .5)
-        ..strokeWidth = 1 / symbolScale
-        ..style = PaintingStyle.stroke;
-      canvas.drawLine(a, b, depthPaint);
-      canvas.drawLine(e.start, a, depthPaint);
-      canvas.drawLine(e.end, b, depthPaint);
-    }
     label(
       architectElevationLabel(l, e, project.northSymbol?.angle ?? 0),
       centre - e.viewDirection * (22 / symbolScale),
@@ -122,7 +111,7 @@ void drawArchitectElevationMarkers(
   for (var i = 0; i < project.sections.length; i++) {
     final s = project.sections[i];
     if (s.length < .01) continue;
-    final isSelected = selected == s.id;
+    final isSelected = selected == s.id || selectedIds.contains(s.id);
     final ink = isSelected ? const Color(0xFF00E5FF) : color;
     final segments = s.segments;
     final path = Path()
@@ -155,18 +144,6 @@ void drawArchitectElevationMarkers(
     }
     canvas.drawCircle(segments.first.start, (isSelected ? 4.0 : 3.0) / scale, Paint()..color = ink);
     canvas.drawCircle(segments.last.end, (isSelected ? 4.0 : 3.0) / scale, Paint()..color = ink);
-    if (isSelected && s.viewDepth != null) {
-      final forward = s.viewDirection;
-      final d = s.viewDepth!;
-      final a = s.start + forward * d, b = s.end + forward * d;
-      final depthPaint = Paint()
-        ..color = ink.withValues(alpha: .5)
-        ..strokeWidth = 1 / scale
-        ..style = PaintingStyle.stroke;
-      canvas.drawLine(a, b, depthPaint);
-      canvas.drawLine(s.start, a, depthPaint);
-      canvas.drawLine(s.end, b, depthPaint);
-    }
     label(
       s.name.isEmpty ? l.architectSectionNumber(i + 1) : s.name,
       segments.first.start - s.viewDirection * (20 / scale),

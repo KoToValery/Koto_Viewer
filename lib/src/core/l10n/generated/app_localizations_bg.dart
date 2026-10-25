@@ -7593,7 +7593,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectRoofPitchHint =>
-      'Мести зелената точка за наклона. Натисни върху ската, за да избереш неподвижната ос, успоредна на стрехата.';
+      'Мести зелената точка за наклона; тя прилепва към съседния покрив. Натисни върху ската за неподвижна ос. Приближавай с два пръста или колелцето на мишката.';
 
   @override
   String get architectRoofPitchAxis => 'Ос при стрехата';
@@ -7821,12 +7821,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectViewRename => 'Преименувай';
 
   @override
-  String get architectSectionHint =>
-      'Посочи начална и крайна точка за поставяне на разреза.';
+  String get architectSectionHint => 'Две точки → посока';
 
   @override
-  String get architectElevationHint =>
-      'Посочи начална и крайна точка за поставяне на фасадата.';
+  String get architectElevationHint => 'Две точки → посока';
 
   @override
   String get architectSelectModeRect => 'Правоъгълно';
@@ -8024,4 +8022,12 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectMirrorPickAnchor => 'Избери друга опорна точка';
+
+  @override
+  String get architectViewChooseArrow => 'Избери стрелка';
+
+  @override
+  String architectViewDirectionSide(int side) {
+    return 'Посока на гледане $side';
+  }
 }

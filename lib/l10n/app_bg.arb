@@ -2480,7 +2480,7 @@
   "architectTerrain": "Линия терен",
   "architectTerrainHint": "Поставяй точки отляво надясно. Потвърди, за да скриеш сградата под линията в тази фасада.",
   "architectRoofPitchEdit": "Наклон на покрив",
-  "architectRoofPitchHint": "Мести зелената точка за наклона. Натисни върху ската, за да избереш неподвижната ос, успоредна на стрехата.",
+  "architectRoofPitchHint": "Мести зелената точка за наклона; тя прилепва към съседния покрив. Натисни върху ската за неподвижна ос. Приближавай с два пръста или колелцето на мишката.",
   "architectRoofPitchAxis": "Ос при стрехата",
   "architectStrokeWeight": "Дебелина на линия",
   "architectCutOpening": "Изрежи отвор",
@@ -2551,8 +2551,8 @@
   "architectOpenSection": "Отвори разрез",
   "architectOpenElevation": "Отвори фасада",
   "architectViewRename": "Преименувай",
-  "architectSectionHint": "Посочи начална и крайна точка за поставяне на разреза.",
-  "architectElevationHint": "Посочи начална и крайна точка за поставяне на фасадата.",
+  "architectSectionHint": "Две точки → посока",
+  "architectElevationHint": "Две точки → посока",
   "architectSelectModeRect": "Правоъгълно",
   "architectSelectModePolygon": "Точка по точка",
   "architectSelectMarqueeHint": "Посочи срещуположни ъгли за селекция",
@@ -2616,5 +2616,8 @@
   "architectRotationReference": "Избери точка от елемента",
   "architectRotationTarget": "Избери ъгъл",
   "architectRotationPickPivot": "Избери друг център",
-  "architectMirrorPickAnchor": "Избери друга опорна точка"
+  "architectMirrorPickAnchor": "Избери друга опорна точка",
+  "architectViewChooseArrow": "Избери стрелка",
+  "architectViewDirectionSide": "Посока на гледане {side}",
+  "@architectViewDirectionSide": {"description": "Tooltip for one of the two viewing direction arrows", "placeholders": {"side": {"type": "int"}}}
 }

@@ -32,8 +32,15 @@ void main() {
       await command('new');
       await tap(const Offset(-1, 2));
       await tap(const Offset(5, 2));
-      await tap(const Offset(0, -1));
+      expect(source.project.elevations, isEmpty);
+      await tester.tap(
+        find.byKey(const ValueKey('architect-view-direction-negative')),
+      );
+      await tester.pumpAndSettle();
       expect(source.project.elevations.single.viewSide, -1);
+      expect(source.project.elevations.single.viewDepth, isNull);
+      await command('depth');
+      await tap(const Offset(0, -1));
       expect(source.project.elevations.single.viewDepth, closeTo(3, .01));
       await command('step');
       await tap(const Offset(1, 1));
@@ -87,9 +94,13 @@ void main() {
       await command('new');
       await tap(const Offset(-1, 0));
       await tap(const Offset(5, 0));
-      await tap(const Offset(0, 3));
+      expect(source.project.sections, isEmpty);
+      await tester.tap(
+        find.byKey(const ValueKey('architect-view-direction-positive')),
+      );
+      await tester.pumpAndSettle();
       expect(source.project.sections, hasLength(1));
-      expect(source.project.sections.single.viewDepth, closeTo(3, .01));
+      expect(source.project.sections.single.viewDepth, isNull);
       await command('depth');
       await tap(const Offset(0, 4));
       expect(source.project.sections.single.viewDepth, closeTo(4, .01));

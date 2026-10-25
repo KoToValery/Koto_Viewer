@@ -520,7 +520,7 @@ class Architect2dPainter extends CustomPainter {
         selectedElementId: selectedElementId,
       );
       if (l10n != null) {
-        drawArchitectElevationMarkers(canvas, _project, zoomScale, palette.foreground(Colors.black87), l10n!, selected: selectedElementId);
+        drawArchitectElevationMarkers(canvas, _project, zoomScale, palette.foreground(Colors.black87), l10n!, selected: selectedElementId, selectedIds: selectedElementIds);
       }
     }
     if (layer != ArchitectPaintLayer.model) {

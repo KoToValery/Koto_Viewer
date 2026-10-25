@@ -6,7 +6,8 @@ import 'architect_projection_editing.dart';
 class ArchitectProjectionSnapResult {
   final Offset delta;
   final Offset? contact;
-  const ArchitectProjectionSnapResult(this.delta, [this.contact]);
+  final (Offset, Offset)? guide;
+  const ArchitectProjectionSnapResult(this.delta, [this.contact, this.guide]);
 }
 
 /// Frozen at drag start: wall tops that follow a roof must not chase its snap.
@@ -16,6 +17,9 @@ class ArchitectProjectionSnap {
   final _targets = <(Offset, Offset)>[];
   final _roofMoving = <(Offset, Offset)>[];
   final _roofTargets = <(Offset, Offset)>[];
+  final _pitchRoofTargets =
+      <({List<(Offset, Offset)> edges, double Function(double)? topAt})>[];
+  final _pitchRoofEdges = <(Offset, Offset)>{};
   final Set<String> movingIds;
 
   ArchitectProjectionSnap(
@@ -23,6 +27,8 @@ class ArchitectProjectionSnap {
     Map<String, Path> paths,
     String id, {
     Map<String, Path> roofProfiles = const {},
+    Offset? sectionOrigin,
+    Offset? sectionRight,
   }) : movingIds = {id} {
     final selected = ArchitectProjectionEditing.find(project, id);
     final roof = selected?.storey.roofs.where((r) => r.id == id).firstOrNull;
@@ -39,6 +45,27 @@ class ArchitectProjectionSnap {
           edges.add((loop[i], loop[(i + 1) % loop.length]));
         }
       }
+    }
+
+    // Pitch edits affect one plane, so sibling slopes are valid references even
+    // when translating the whole roof group would exclude them from snapping.
+    for (final entry in paths.entries) {
+      final ref = ArchitectProjectionEditing.find(project, entry.key);
+      if (entry.key == id || ref?.kind != ArchitectProjectionKind.roof) {
+        continue;
+      }
+      final roof = ref!.storey.roofs.firstWhere((r) => r.id == entry.key);
+      final edges = <(Offset, Offset)>[];
+      addEdges(roofProfiles[entry.key] ?? entry.value, edges);
+      _pitchRoofTargets.add((
+        edges: edges,
+        topAt: sectionOrigin == null || sectionRight == null
+            ? null
+            : (x) =>
+                  ref.storey.elevation +
+                  roof.topElevationAt(sectionOrigin + sectionRight * x),
+      ));
+      _pitchRoofEdges.addAll(edges);
     }
 
     for (final entry in roofProfiles.entries) {
@@ -69,6 +96,66 @@ class ArchitectProjectionSnap {
         _targets.add((Offset(bounds.left, z), Offset(bounds.right, z)));
       }
     }
+  }
+
+  /// The control point travels vertically at a fixed plan station. Prefer the
+  /// exterior top of neighbouring roof profiles over their undersides/trim.
+  ArchitectProjectionSnapResult resolvePitchPoint(
+    Offset raw,
+    double tolerance,
+  ) {
+    if (tolerance <= 0) return const ArchitectProjectionSnapResult(Offset.zero);
+    double? heightAt(Offset a, Offset b) {
+      final dx = b.dx - a.dx;
+      if (dx.abs() < 1e-8) {
+        return (raw.dx - a.dx).abs() <= 1e-6
+            ? (a.dy > b.dy ? a.dy : b.dy)
+            : null;
+      }
+      final t = (raw.dx - a.dx) / dx;
+      return t < -1e-6 || t > 1 + 1e-6 ? null : a.dy + (b.dy - a.dy) * t;
+    }
+
+    var best = tolerance;
+    var result = const ArchitectProjectionSnapResult(Offset.zero);
+    void consider(double z, (Offset, Offset) edge) {
+      if ((z - raw.dy).abs() > best) return;
+      best = (z - raw.dy).abs();
+      result = ArchitectProjectionSnapResult(
+        Offset(0, z - raw.dy),
+        Offset(raw.dx, z),
+        edge,
+      );
+    }
+
+    for (final target in _pitchRoofTargets) {
+      double? top;
+      (Offset, Offset)? topEdge;
+      for (final edge in target.edges) {
+        final z = heightAt(edge.$1, edge.$2);
+        if (z != null && (top == null || z > top)) {
+          top = z;
+          topEdge = edge;
+        }
+      }
+      if (top != null) {
+        if (target.topAt != null) {
+          top = target.topAt!(raw.dx);
+          topEdge = (
+            Offset(raw.dx - .01, target.topAt!(raw.dx - .01)),
+            Offset(raw.dx + .01, target.topAt!(raw.dx + .01)),
+          );
+        }
+        consider(top, topEdge!);
+      }
+    }
+    if (result.contact != null) return result;
+    for (final edge in _targets) {
+      if (_pitchRoofEdges.contains(edge)) continue;
+      final z = heightAt(edge.$1, edge.$2);
+      if (z != null) consider(z, edge);
+    }
+    return result;
   }
 
   ArchitectProjectionSnapResult resolve(

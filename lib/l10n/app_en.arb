@@ -4632,7 +4632,7 @@
   "architectTerrain": "Terrain line",
   "architectTerrainHint": "Place points from left to right. Confirm to hide the building below this line in this elevation.",
   "architectRoofPitchEdit": "Roof pitch",
-  "architectRoofPitchHint": "Drag the green point to change pitch. Tap the roof to choose the fixed axis, parallel to the eaves.",
+  "architectRoofPitchHint": "Drag the green point to change pitch and snap to a neighbouring roof. Tap the roof to choose a fixed axis. Pinch or use the mouse wheel to zoom.",
   "architectRoofPitchAxis": "Use eaves axis",
   "architectStrokeWeight": "Line weight",
   "architectCutOpening": "Cut opening",
@@ -4728,9 +4728,9 @@
   "@architectOpenElevation": { "description": "Action to open elevation view" },
   "architectViewRename": "Rename",
   "@architectViewRename": { "description": "Action to rename section or elevation" },
-  "architectSectionHint": "Click start and end points to place the section cut.",
+  "architectSectionHint": "Two points → direction",
   "@architectSectionHint": { "description": "Hint for placing a section line" },
-  "architectElevationHint": "Click start and end points to place the elevation marker.",
+  "architectElevationHint": "Two points → direction",
   "@architectElevationHint": { "description": "Hint for placing an elevation line" },
   "architectSelectModeRect": "Rectangle",
   "@architectSelectModeRect": { "description": "Rectangular marquee selection mode" },
@@ -4800,5 +4800,8 @@
   "architectRotationReference": "Pick point on element",
   "architectRotationTarget": "Pick angle",
   "architectRotationPickPivot": "Pick centre again",
-  "architectMirrorPickAnchor": "Pick anchor again"
+  "architectMirrorPickAnchor": "Pick anchor again",
+  "architectViewChooseArrow": "Choose an arrow",
+  "architectViewDirectionSide": "Viewing direction {side}",
+  "@architectViewDirectionSide": {"description": "Tooltip for one of the two viewing direction arrows", "placeholders": {"side": {"type": "int"}}}
 }

@@ -81,6 +81,7 @@ import '../widgets/architect_section_visibility_dialog.dart';
 import '../widgets/architect_elevations_screen.dart';
 
 import '../widgets/architect_workspace_view_placement.dart';
+import '../widgets/architect_view_direction_picker.dart';
 import '../widgets/architect_view_properties_dialog.dart';
 import '../models/architect_section.dart';
 import '../models/architect_elevation.dart';
@@ -845,6 +846,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   ({ArchitectWorkspaceView type, String? id, String mode})? _viewDraft;
 
+  ({ArchitectProject source, ArchitectTool tool, Offset start, Offset end})? _viewDirectionDraft;
+
 
 
   void _draftWorkspaceView(
@@ -856,6 +859,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     String mode,
 
   ) {
+
+    if (mode == 'new') {
+      _selectWorkspaceView(ArchitectWorkspaceView.plan, _modelCommands.project.activeStoreyId);
+      _changeTool(type == ArchitectWorkspaceView.section ? ArchitectTool.section : ArchitectTool.elevation,
+        toggle: false);
+      return;
+    }
 
     if (mode == 'visibility' && type == ArchitectWorkspaceView.section) {
 
@@ -3449,7 +3459,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (!mounted) return;
 
     if ((_offsetOptions != null && !identical(_offsetSource, _project)) ||
-        (_rotationSource != null && !identical(_rotationSource, _project))) {
+        (_rotationSource != null && !identical(_rotationSource, _project)) ||
+        (_viewDirectionDraft != null && !identical(_viewDirectionDraft!.source, _project))) {
 
       _cancelActiveDrags();
       _marqueeTool.cancel();
@@ -3725,7 +3736,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  void _changeTool(ArchitectTool tool) => setState(() {
+  void _changeTool(ArchitectTool tool, {bool toggle = true}) => setState(() {
 
     _finishDraftGroup();
 
@@ -3741,7 +3752,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final nextTool =
 
-        (_activeTool == tool && tool != ArchitectTool.select)
+        (toggle && _activeTool == tool && tool != ArchitectTool.select)
 
         ? ArchitectTool.select
 
@@ -4914,6 +4925,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     ),
 
   );
+
+  bool get _viewMarkerTool => _activeTool == ArchitectTool.section || _activeTool == ArchitectTool.elevation;
 
   bool get _linearDraftTool =>
       _activeTool == ArchitectTool.wall ||
@@ -9622,6 +9635,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _cancelActiveDrags() {
 
+    _viewDirectionDraft = null;
     _rotationSource = null;
     _rotationIds = {};
     _offsetEpoch++;
@@ -11792,7 +11806,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         if ((snap.point - _draftStart!).distance >= .001 &&
 
-            _wallPrecisionMode) {
+            _wallPrecisionMode && !_viewMarkerTool) {
 
           setState(() {
 
@@ -13070,6 +13084,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  void _commitViewDirection(int side) {
+    final draft = _viewDirectionDraft;
+    if (draft == null || (side != 1 && side != -1)) return;
+    final section = draft.tool == ArchitectTool.section;
+    final id = ArchitectElementId.next(section ? 'sec' : 'elv');
+    final label = String.fromCharCode(65 + (_project.sections.length % 26));
+    final next = section ? _project.copyWith(sections: [..._project.sections,
+      ArchitectSection(id: id, name: '${context.l10n.architectToolSection} $label-$label',
+        start: side == 1 ? draft.start : draft.end, end: side == 1 ? draft.end : draft.start),
+    ]) : _project.copyWith(elevations: [..._project.elevations,
+      ArchitectElevation(id: id, start: draft.start, end: draft.end, viewSide: side),
+    ]);
+    _viewDirectionDraft = null;
+    _modelCommands.commit(next);
+    setState(() {
+      _selectedElementId = id;
+      _selectionIds..clear()..add(id);
+      _lastViewIds[section ? ArchitectWorkspaceView.section : ArchitectWorkspaceView.elevation] = id;
+    });
+    _saveBiMProjectIfAttached();
+    _repaintPreview();
+    HapticFeedback.lightImpact();
+  }
+
   void _commitCurrentWallSegment(
 
     Offset targetPoint, {
@@ -13146,69 +13184,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    if (_activeTool == ArchitectTool.section) {
-      final end = targetPoint;
-      if ((end - _draftStart!).distance < .01) return;
-      final sId = ArchitectElementId.next('sec');
-      final existingCount = _project.sections.length;
-      final label = String.fromCharCode(65 + (existingCount % 26));
-      final sec = ArchitectSection(
-        id: sId,
-        name: '${context.l10n.architectToolSection} $label-$label',
-        start: _draftStart!,
-        end: end,
-      );
-      _modelCommands.commit(
-        _project.copyWith(
-          sections: [..._project.sections, sec],
-        ),
-      );
+    if (_viewMarkerTool) {
+      if ((targetPoint - _draftStart!).distance < .01) return;
       setState(() {
+        _viewDirectionDraft = (source: _project, tool: _activeTool,
+          start: _draftStart!, end: targetPoint);
         _draftStart = null;
         _draftEnd = null;
         _wallDirectionLocked = false;
         _wallPanelAnchor = null;
         _activeSnapLabel = null;
         _activeMagneticGuides = [];
-        _selectedElementId = sId;
-        _selectionIds
-          ..clear()
-          ..add(sId);
+        _placingWithHold = false;
+        _touchPosition = null;
       });
-      _saveBiMProjectIfAttached();
-      HapticFeedback.lightImpact();
-      return;
-    }
-
-    if (_activeTool == ArchitectTool.elevation) {
-      final end = targetPoint;
-      if ((end - _draftStart!).distance < .01) return;
-      final eId = ArchitectElementId.next('elv');
-      final elv = ArchitectElevation(
-        id: eId,
-        start: _draftStart!,
-        end: end,
-        viewSide: 1,
-      );
-      _modelCommands.commit(
-        _project.copyWith(
-          elevations: [..._project.elevations, elv],
-        ),
-      );
-      setState(() {
-        _draftStart = null;
-        _draftEnd = null;
-        _wallDirectionLocked = false;
-        _wallPanelAnchor = null;
-        _activeSnapLabel = null;
-        _activeMagneticGuides = [];
-        _selectedElementId = eId;
-        _selectionIds
-          ..clear()
-          ..add(eId);
-      });
-      _saveBiMProjectIfAttached();
-      HapticFeedback.lightImpact();
+      // Keep both screen-space choices reachable even when the cut is drawn
+      // near an edge of a phone viewport. Only the camera moves.
+      final centre = _viewport.toScreen((_viewDirectionDraft!.start + targetPoint) / 2);
+      final size = _viewport.size;
+      if (size.width > 180 && size.height > 240) {
+        _viewport.panBy(Offset(centre.dx.clamp(88, size.width - 88) - centre.dx,
+          centre.dy.clamp(144, size.height - 88) - centre.dy));
+      }
+      HapticFeedback.selectionClick();
       return;
     }
 
@@ -28944,6 +28942,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             onNavigate: (delta, factor, focal) => _viewport.navigate(
               previousFocal: focal - delta, focal: focal, scaleFactor: factor),
             onCancel: () { setState(_cancelActiveDrags); _repaintPreview(); },
+          ),
+        )),
+      if (_viewDirectionDraft case final draft?)
+        Positioned.fill(child: AnimatedBuilder(animation: _viewport,
+          builder: (_, _) => ArchitectViewDirectionPicker(
+            key: ValueKey(draft), start: draft.start, end: draft.end,
+            toScreen: _viewport.toScreen, onSelected: _commitViewDirection,
+            onCancel: () { setState(() => _viewDirectionDraft = null); _repaintPreview(); },
+            onNavigate: (delta, factor, focal) => _viewport.navigate(
+              previousFocal: focal - delta, focal: focal, scaleFactor: factor),
           ),
         )),
     ],

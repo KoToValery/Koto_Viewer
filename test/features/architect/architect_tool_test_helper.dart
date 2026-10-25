@@ -23,6 +23,8 @@ final toolsByIcon = {
   Icons.texture_rounded: ArchitectTool.hatch,
   Icons.grid_on_rounded: ArchitectTool.axis,
   Icons.square_foot_rounded: ArchitectTool.measure,
+  Icons.splitscreen_outlined: ArchitectTool.section,
+  Icons.apartment: ArchitectTool.elevation,
 };
 
 Future<void> prepare(WidgetTester tester, IconData icon) async {

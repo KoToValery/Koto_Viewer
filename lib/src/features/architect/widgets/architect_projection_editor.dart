@@ -66,6 +66,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   double lastScale = 1;
   bool roofSnapEnabled = true;
   bool pitchEditing = false;
+  ArchitectProjectionSnap? pitchSnap;
   ArchitectProjectionSnap? roofSnap;
   Offset? snapContact;
   Path? dragPath;
@@ -327,6 +328,8 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
       final roof=ref!.storey.roofs.firstWhere((r)=>r.id==ref.id);
       return ArchitectRoofPitchEditor(roof:roof,elevation:ref.storey.elevation,
         origin:widget.origin,right:widget.right,toView:widget.toView,toScreen:widget.toScreen,
+        onNavigate:widget.onNavigate, snap:pitchSnap, snapEnabled:roofSnapEnabled,
+        onSnapEnabled:(value)=>setState(()=>roofSnapEnabled=value),
         onCancel:()=>setState(()=>pitchEditing=false),
         onApply:(next) {
           if(apply(()=>UpdateArchitectRoofPlane(storeyId:ref.storey.id,roof:next).apply(project))) {
@@ -542,7 +545,13 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                           if (ref.kind == ArchitectProjectionKind.roof)
                             IconButton(key:const ValueKey('projection-roof-pitch'),
                               tooltip:l.architectRoofPitchEdit,icon:const Icon(Icons.rotate_right),
-                              onPressed:()=>setState(()=>pitchEditing=true)),
+                              onPressed:()=>setState(() {
+                                pitchSnap = ArchitectProjectionSnap(project, widget.paths, ref.id,
+                                  roofProfiles: widget.roofProfiles,
+                                  sectionOrigin: widget.elevation ? null : widget.origin,
+                                  sectionRight: widget.elevation ? null : widget.right);
+                                pitchEditing = true;
+                              })),
                           if (ref.kind == ArchitectProjectionKind.roof)
                             IconButton(
                               key: const ValueKey('projection-roof-snap'),

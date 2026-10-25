@@ -7567,7 +7567,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectRoofPitchHint =>
-      'Drag the green point to change pitch. Tap the roof to choose the fixed axis, parallel to the eaves.';
+      'Drag the green point to change pitch and snap to a neighbouring roof. Tap the roof to choose a fixed axis. Pinch or use the mouse wheel to zoom.';
 
   @override
   String get architectRoofPitchAxis => 'Use eaves axis';
@@ -7793,12 +7793,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectViewRename => 'Rename';
 
   @override
-  String get architectSectionHint =>
-      'Click start and end points to place the section cut.';
+  String get architectSectionHint => 'Two points → direction';
 
   @override
-  String get architectElevationHint =>
-      'Click start and end points to place the elevation marker.';
+  String get architectElevationHint => 'Two points → direction';
 
   @override
   String get architectSelectModeRect => 'Rectangle';
@@ -7996,4 +7994,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectMirrorPickAnchor => 'Pick anchor again';
+
+  @override
+  String get architectViewChooseArrow => 'Choose an arrow';
+
+  @override
+  String architectViewDirectionSide(int side) {
+    return 'Viewing direction $side';
+  }
 }

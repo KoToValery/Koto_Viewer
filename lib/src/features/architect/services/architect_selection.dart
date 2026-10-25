@@ -272,6 +272,17 @@ class ArchitectSelection {
         return ArchitectContour.path(p.polygonCorners, p.holes);
       }
     }
+    for (final segments in [
+      for (final cut in project.sections.where((e) => e.id == id)) cut.segments,
+      for (final facade in project.elevations.where((e) => e.id == id)) facade.segments,
+    ]) {
+      path.moveTo(segments.first.start.dx, segments.first.start.dy);
+      for (final segment in segments) {
+        path.lineTo(segment.start.dx, segment.start.dy);
+        path.lineTo(segment.end.dx, segment.end.dy);
+      }
+      return path;
+    }
     final rect = bounds(project, id);
     if (rect != null) path.addRect(rect.inflate(.015));
     return path;
