@@ -29,6 +29,7 @@ enum ArchitectRoofMemberKind {
   wallPlate,
   ringBeam,
   ridgePurlin,
+  intermediatePurlin,
   fascia,
   metalFlashing,
 }
@@ -865,6 +866,23 @@ class ArchitectRoofGeometry {
         if (s1 - s0 < 0.02) continue;
         final midWorld = sectionLine.start + lineDir * ((s0 + s1) * 0.5);
         if (footprint.contains(midWorld)) {
+          if (roof.isMansard) {
+            final p0 = sectionLine.start + lineDir * s0;
+            final p1 = sectionLine.start + lineDir * s1;
+            final d0 = roof.signedDistanceFromEaves(p0);
+            final d1 = roof.signedDistanceFromEaves(p1);
+            final k = roof.effectiveBreakDistance;
+            final denom = d1 - d0;
+            if (denom.abs() > 1e-4) {
+              final t = (k - d0) / denom;
+              if (t > 0.03 && t < 0.97) {
+                final sK = s0 + t * (s1 - s0);
+                rawIntervals.add((roof: roof, fromS: s0, toS: sK));
+                rawIntervals.add((roof: roof, fromS: sK, toS: s1));
+                continue;
+              }
+            }
+          }
           rawIntervals.add((roof: roof, fromS: s0, toS: s1));
         }
       }
@@ -1251,6 +1269,60 @@ class ArchitectRoofGeometry {
         }
       }
 
+      // 6b. Mansard Intermediate Purlin (Междинна столица) at knuckle fold
+      if (roof.isMansard && slopeDirDotSection > 0.25) {
+        final d0 = roof.signedDistanceFromEaves(p0);
+        final d1 = roof.signedDistanceFromEaves(p1);
+        final k = roof.effectiveBreakDistance;
+        final isKnuckleAtS0 = (d0 - k).abs() < 0.05;
+        final isKnuckleAtS1 = (d1 - k).abs() < 0.05;
+        if (isKnuckleAtS1 && d1 > d0) {
+          final halfKp = 0.08;
+          final sa = s1 - halfKp;
+          final sb = s1 + halfKp;
+          final zKpTop = zBot1;
+          final zKpBot = zKpTop - 0.16;
+          final kpPoly = <Offset>[
+            Offset(sa, zKpTop),
+            Offset(sb, zKpTop),
+            Offset(sb, zKpBot),
+            Offset(sa, zKpBot),
+          ];
+          discreteMembers.add(
+            ArchitectRoofSectionMember(
+              roofId: roof.id,
+              kind: ArchitectRoofMemberKind.intermediatePurlin,
+              material: ArchitectRoofMaterial.timberBoarding,
+              polygon: kpPoly,
+              path: Path()..addPolygon(kpPoly, true),
+              drawTimberDiagonals: true,
+            ),
+          );
+        } else if (isKnuckleAtS0 && d0 > d1) {
+          final halfKp = 0.08;
+          final sa = s0 - halfKp;
+          final sb = s0 + halfKp;
+          final zKpTop = zBot0;
+          final zKpBot = zKpTop - 0.16;
+          final kpPoly = <Offset>[
+            Offset(sa, zKpTop),
+            Offset(sb, zKpTop),
+            Offset(sb, zKpBot),
+            Offset(sa, zKpBot),
+          ];
+          discreteMembers.add(
+            ArchitectRoofSectionMember(
+              roofId: roof.id,
+              kind: ArchitectRoofMemberKind.intermediatePurlin,
+              material: ArchitectRoofMaterial.timberBoarding,
+              polygon: kpPoly,
+              path: Path()..addPolygon(kpPoly, true),
+              drawTimberDiagonals: true,
+            ),
+          );
+        }
+      }
+
       // 7. Fascia Board (Челна дъска) & Metal Flashing / Drip Edge (Метална обшивка / капелник) at the free lower eaves end
       final lowAtStart = zTop0 <= zTop1;
       final hasFreeLowStart = lowAtStart && !sharesStart;
@@ -1365,6 +1437,7 @@ class ArchitectRoofGeometry {
             dm.kind == ArchitectRoofMemberKind.wallPlate ||
             dm.kind == ArchitectRoofMemberKind.ringBeam ||
             dm.kind == ArchitectRoofMemberKind.ridgePurlin ||
+            dm.kind == ArchitectRoofMemberKind.intermediatePurlin ||
             dm.kind == ArchitectRoofMemberKind.fascia ||
             dm.kind == ArchitectRoofMemberKind.metalFlashing) {
           allDiscreteCutouts.add(dm.path);
@@ -1411,6 +1484,7 @@ class ArchitectRoofGeometry {
         if (m.kind == ArchitectRoofMemberKind.wallPlate ||
             m.kind == ArchitectRoofMemberKind.ringBeam ||
             m.kind == ArchitectRoofMemberKind.ridgePurlin ||
+            m.kind == ArchitectRoofMemberKind.intermediatePurlin ||
             m.kind == ArchitectRoofMemberKind.fascia ||
             m.kind == ArchitectRoofMemberKind.metalFlashing) {
           try {

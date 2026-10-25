@@ -2058,6 +2058,13 @@
     }
   },
   "architectRoofDrawMultiPitch": "Многоскатен",
+  "architectRoofDrawMansard": "Мансарден",
+  "architectRoofIsMansard": "Мансарден",
+  "architectRoofMakeMansard": "Пречупи скат",
+  "architectRoofUpperSlope": "Горен наклон",
+  "architectRoofBreakDistance": "Пречупване",
+  "architectRoofMansardKnuckleTooltip": "Провлачете за преместване на линията на пречупване",
+  "architectRoofKnucklePurlin": "Междинна столица",
   "architectRoofLinkedSlopes": "Свързани скатове",
   "architectRoofLinkedSlopesTooltip": "Всички скатове в тази покривна група споделят общ наклон и височина на стрехата",
   "architectRoofSnap45Degrees": "45° Скат / Било",
@@ -2604,5 +2611,8 @@
   "architectColorMixedUse": "Смесено предназначение",
   "architectColorSpecialUse": "Специални строителни територии",
   "architectColorRailway": "Железопътни терени",
-  "architectColorAgriculture": "Земеделски площи"
+  "architectColorAgriculture": "Земеделски площи",
+  "architectRotationPivot": "Избери център",
+  "architectRotationReference": "Избери начална посока",
+  "architectRotationTarget": "Избери ъгъл"
 }

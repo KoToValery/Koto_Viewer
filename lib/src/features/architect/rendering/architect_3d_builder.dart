@@ -456,6 +456,37 @@ class Architect3dBuilder {
       );
     }
 
+    final dKnuckle = minD + roof.effectiveBreakDistance;
+    final hasKnuckle =
+        roof.isMansard && dKnuckle > minD + 0.10 && dKnuckle < maxD - 0.10;
+
+    // Intermediate Mansard Purlin (Междинна столица) under the knuckle joint
+    if (hasKnuckle) {
+      const purlinW = 0.14;
+      const purlinH = 0.16;
+      final purlinClip = _clipPolygonToRect(
+        polySD,
+        minS,
+        maxS,
+        dKnuckle - purlinW * 0.5,
+        dKnuckle + purlinW * 0.5,
+      );
+      _addExtrudedClippedPrism(
+        tris,
+        purlinClip,
+        p0,
+        u,
+        v,
+        storey.elevation,
+        roof,
+        -purlinH,
+        hRafterBottom,
+        planClip: footprint,
+        topColor: purlinColor,
+        sideColor: purlinColor,
+      );
+    }
+
     // 2. Rafters (Ребра) along slope direction (prominently visible at eaves overhang)
     final rafterW = timber.rafterWidth.clamp(0.05, 0.16);
     final rafterStep = math.max(timber.rafterSpacing, 0.35);
@@ -471,57 +502,164 @@ class Architect3dBuilder {
 
     for (final s0 in rafterPositions) {
       final s1 = math.min(s0 + rafterW, maxS);
-      final rafterClip = _clipPolygonToRect(polySD, s0, s1, minD, maxD);
+      if (hasKnuckle) {
+        final lowerRafterClip =
+            _clipPolygonToRect(polySD, s0, s1, minD, dKnuckle);
+        _addExtrudedClippedPrism(
+          tris,
+          lowerRafterClip,
+          p0,
+          u,
+          v,
+          storey.elevation,
+          roof,
+          hRafterBottom,
+          hRafterTop,
+          planClip: footprint,
+          topColor: rafterTopColor,
+          sideColor: rafterSideColor,
+        );
+        final upperRafterClip =
+            _clipPolygonToRect(polySD, s0, s1, dKnuckle, maxD);
+        _addExtrudedClippedPrism(
+          tris,
+          upperRafterClip,
+          p0,
+          u,
+          v,
+          storey.elevation,
+          roof,
+          hRafterBottom,
+          hRafterTop,
+          planClip: footprint,
+          topColor: rafterTopColor,
+          sideColor: rafterSideColor,
+        );
+      } else {
+        final rafterClip = _clipPolygonToRect(polySD, s0, s1, minD, maxD);
+        _addExtrudedClippedPrism(
+          tris,
+          rafterClip,
+          p0,
+          u,
+          v,
+          storey.elevation,
+          roof,
+          hRafterBottom,
+          hRafterTop,
+          planClip: footprint,
+          topColor: rafterTopColor,
+          sideColor: rafterSideColor,
+        );
+      }
+    }
+
+    // 3. Sub-roof boarding (Дъсчена обшивка / стреха над ребрата)
+    if (hasKnuckle) {
+      final boardLower =
+          _clipPolygonToRect(polySD, minS, maxS, minD, dKnuckle);
       _addExtrudedClippedPrism(
         tris,
-        rafterClip,
+        boardLower,
         p0,
         u,
         v,
         storey.elevation,
         roof,
-        hRafterBottom,
         hRafterTop,
+        hBoardTop,
         planClip: footprint,
-        topColor: rafterTopColor,
-        sideColor: rafterSideColor,
+        topColor: membraneColor,
+        bottomColor: boardColor,
+        sideColor: boardColor,
+      );
+      final boardUpper =
+          _clipPolygonToRect(polySD, minS, maxS, dKnuckle, maxD);
+      _addExtrudedClippedPrism(
+        tris,
+        boardUpper,
+        p0,
+        u,
+        v,
+        storey.elevation,
+        roof,
+        hRafterTop,
+        hBoardTop,
+        planClip: footprint,
+        topColor: membraneColor,
+        bottomColor: boardColor,
+        sideColor: boardColor,
+      );
+    } else {
+      final boardClip = _clipPolygonToRect(polySD, minS, maxS, minD, maxD);
+      _addExtrudedClippedPrism(
+        tris,
+        boardClip,
+        p0,
+        u,
+        v,
+        storey.elevation,
+        roof,
+        hRafterTop,
+        hBoardTop,
+        planClip: footprint,
+        topColor: membraneColor,
+        bottomColor: boardColor,
+        sideColor: boardColor,
       );
     }
 
-    // 3. Sub-roof boarding (Дъсчена обшивка / стреха над ребрата)
-    final boardClip = _clipPolygonToRect(polySD, minS, maxS, minD, maxD);
-    _addExtrudedClippedPrism(
-      tris,
-      boardClip,
-      p0,
-      u,
-      v,
-      storey.elevation,
-      roof,
-      hRafterTop,
-      hBoardTop,
-      planClip: footprint,
-      topColor: membraneColor,
-      bottomColor: boardColor,
-      sideColor: boardColor,
-    );
-
     // 4. Finished Roof Covering (Покритие - керемиди / ламарина / битум)
-    final coverClip = _clipPolygonToRect(polySD, minS, maxS, minD, maxD);
-    _addExtrudedClippedPrism(
-      tris,
-      coverClip,
-      p0,
-      u,
-      v,
-      storey.elevation,
-      roof,
-      hBoardTop,
-      hCoverTop,
-      planClip: footprint,
-      topColor: topColor,
-      sideColor: fasciaColor,
-    );
+    if (hasKnuckle) {
+      final coverLower =
+          _clipPolygonToRect(polySD, minS, maxS, minD, dKnuckle);
+      _addExtrudedClippedPrism(
+        tris,
+        coverLower,
+        p0,
+        u,
+        v,
+        storey.elevation,
+        roof,
+        hBoardTop,
+        hCoverTop,
+        planClip: footprint,
+        topColor: topColor,
+        sideColor: fasciaColor,
+      );
+      final coverUpper =
+          _clipPolygonToRect(polySD, minS, maxS, dKnuckle, maxD);
+      _addExtrudedClippedPrism(
+        tris,
+        coverUpper,
+        p0,
+        u,
+        v,
+        storey.elevation,
+        roof,
+        hBoardTop,
+        hCoverTop,
+        planClip: footprint,
+        topColor: topColor,
+        sideColor: fasciaColor,
+      );
+    } else {
+      final coverClip = _clipPolygonToRect(polySD, minS, maxS, minD, maxD);
+      _addExtrudedClippedPrism(
+        tris,
+        coverClip,
+        p0,
+        u,
+        v,
+        storey.elevation,
+        roof,
+        hBoardTop,
+        hCoverTop,
+        planClip: footprint,
+        topColor: topColor,
+        sideColor: fasciaColor,
+      );
+    }
 
     // 5. Standing seams for metal sheet roofs
     if (topMat == ArchitectRoofMaterial.metalSeam) {
@@ -530,27 +668,72 @@ class Architect3dBuilder {
       const seamDark = Color(0xFF37474F);
       const seamLight = Color(0xFF607D8B);
       for (var s = minS + 0.04; s <= maxS - seamWidth; s += seamSpacing) {
-        final seamClip = _clipPolygonToRect(
-          polySD,
-          s,
-          s + seamWidth,
-          minD,
-          maxD,
-        );
-        _addExtrudedClippedPrism(
-          tris,
-          seamClip,
-          p0,
-          u,
-          v,
-          storey.elevation,
-          roof,
-          hCoverTop,
-          hCoverTop + 0.025,
-          planClip: footprint,
-          topColor: seamLight,
-          sideColor: seamDark,
-        );
+        if (hasKnuckle) {
+          final seamLower = _clipPolygonToRect(
+            polySD,
+            s,
+            s + seamWidth,
+            minD,
+            dKnuckle,
+          );
+          _addExtrudedClippedPrism(
+            tris,
+            seamLower,
+            p0,
+            u,
+            v,
+            storey.elevation,
+            roof,
+            hCoverTop,
+            hCoverTop + 0.025,
+            planClip: footprint,
+            topColor: seamLight,
+            sideColor: seamDark,
+          );
+          final seamUpper = _clipPolygonToRect(
+            polySD,
+            s,
+            s + seamWidth,
+            dKnuckle,
+            maxD,
+          );
+          _addExtrudedClippedPrism(
+            tris,
+            seamUpper,
+            p0,
+            u,
+            v,
+            storey.elevation,
+            roof,
+            hCoverTop,
+            hCoverTop + 0.025,
+            planClip: footprint,
+            topColor: seamLight,
+            sideColor: seamDark,
+          );
+        } else {
+          final seamClip = _clipPolygonToRect(
+            polySD,
+            s,
+            s + seamWidth,
+            minD,
+            maxD,
+          );
+          _addExtrudedClippedPrism(
+            tris,
+            seamClip,
+            p0,
+            u,
+            v,
+            storey.elevation,
+            roof,
+            hCoverTop,
+            hCoverTop + 0.025,
+            planClip: footprint,
+            topColor: seamLight,
+            sideColor: seamDark,
+          );
+        }
       }
     }
 

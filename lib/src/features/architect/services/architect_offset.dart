@@ -23,6 +23,39 @@ class ArchitectOffset {
   static bool supports(ArchitectStorey s, Set<String> ids) =>
       ids.isNotEmpty && supportedIds(s).containsAll(ids);
 
+  /// Nearest selected boundary is the visual origin of the direction arrow.
+  static Offset directionAnchor(ArchitectStorey s, Set<String> ids, Offset side) {
+    var best = double.infinity;
+    var anchor = side;
+    void consider(Offset point) {
+      final distance = (point - side).distanceSquared;
+      if (distance < best) { best = distance; anchor = point; }
+    }
+    void ring(List<Offset> points) {
+      for (var i = 0; i < points.length; i++) {
+        final a = points[i], d = points[(i + 1) % points.length] - a;
+        if (d.distanceSquared < 1e-12) continue;
+        final t = (BimPolygonGeometry.dot(side - a, d) / d.distanceSquared).clamp(0.0, 1.0);
+        consider(a + d * t);
+      }
+    }
+    for (final e in _axes(s, ids)) {
+      consider(e.referencePointAt(e.projectPoint(side).$1.clamp(0.0, 1.0)));
+    }
+    for (final e in s.slabs.where((e) => ids.contains(e.id))) { ring(e.polygon); }
+    for (final e in s.roofs.where((e) => ids.contains(e.id))) { ring(e.points); }
+    for (final e in s.openings.where((e) => ids.contains(e.id))) { ring(e.boundary); }
+    for (final e in s.zones.where((e) => ids.contains(e.id))) { ring(e.polygon); }
+    for (final e in s.cadPrimitives.where((e) => ids.contains(e.id))) {
+      if (e.isPolygon) ring(e.polygonCorners);
+      if (e.type == CadPrimitiveType.circle) {
+        final d = side - e.startPoint;
+        if (d.distance > 1e-12) consider(e.startPoint + d / d.distance * (e.endPoint - e.startPoint).distance);
+      }
+    }
+    return anchor;
+  }
+
   static List<ArchitectWall> _axes(ArchitectStorey s, Set<String> ids) => [
     ...s.walls.where((e) => ids.contains(e.id)),
     for (final e in s.beams.where((e) => ids.contains(e.id)))

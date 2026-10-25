@@ -31,6 +31,9 @@ import '../services/architect_line_styles.dart';
 import '../services/architect_line_editing.dart';
 
 import '../services/architect_offset.dart';
+import '../services/architect_rotation.dart';
+import '../widgets/architect_rotation_overlay.dart';
+import '../widgets/architect_offset_direction.dart';
 
 import '../../bim_editing/widgets/bim_offset_dialog.dart';
 
@@ -1080,6 +1083,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   double? _sectionRoofDragInitialOffset;
 
   double? _sectionRoofDragPreviewOffset;
+  bool _isDraggingRoofKnuckle = false;
+  String? _draggingRoofKnuckleId;
+  double? _knuckleDragInitialBreakDist;
+  Offset? _knuckleDragStartPoint;
 
 
 
@@ -3440,7 +3447,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (!mounted) return;
 
-    if (_offsetOptions != null && !identical(_offsetSource, _project)) {
+    if ((_offsetOptions != null && !identical(_offsetSource, _project)) ||
+        (_rotationSource != null && !identical(_rotationSource, _project))) {
 
       _cancelActiveDrags();
       _marqueeTool.cancel();
@@ -4338,6 +4346,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool _mirrorActive = false;
+
+  ArchitectProject? _rotationSource;
+  Set<String> _rotationIds = {};
+  Offset _rotationPivot = Offset.zero;
 
   BimElementOffsetOptions? _offsetOptions;
 
@@ -6301,6 +6313,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    final selectedMansardRoof = _selectedRoof;
+    if (selectedMansardRoof != null &&
+        selectedMansardRoof.isMansard &&
+        ArchitectRoofPainterHelper.hitTestKnuckleHandle(
+          selectedMansardRoof,
+          rawModel,
+          scale: _currentScale,
+        )) {
+      _isDraggingRoofKnuckle = true;
+      _draggingRoofKnuckleId = selectedMansardRoof.id;
+      _knuckleDragInitialBreakDist =
+          selectedMansardRoof.effectiveBreakDistance;
+      _knuckleDragStartPoint = rawModel;
+      _isHandleEngaged = true;
+      HapticFeedback.selectionClick();
+      ArchitectLogger.log(
+        'HANDLE',
+        'Roof knuckle drag engaged for ${selectedMansardRoof.id}',
+      );
+      return;
+    }
+
     final polygon = _selectedPolygon;
 
     final isDirectContour =
@@ -8091,6 +8125,34 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    if (_isDraggingRoofKnuckle &&
+        _draggingRoofKnuckleId != null &&
+        _knuckleDragStartPoint != null &&
+        _knuckleDragInitialBreakDist != null) {
+      final roof = _project.activeStorey.roofs
+          .where((r) => r.id == _draggingRoofKnuckleId)
+          .firstOrNull;
+      if (roof != null) {
+        final delta = rawModel - _knuckleDragStartPoint!;
+        final slopeDir = roof.slopeDirection;
+        final dProj = delta.dx * slopeDir.dx + delta.dy * slopeDir.dy;
+        final maxRun = roof.maxSlopeRun;
+        final nextDist = (_knuckleDragInitialBreakDist! + dProj)
+            .clamp(0.25, math.max(0.35, maxRun - 0.25))
+            .toDouble();
+        final updated = roof.copyWith(breakDistance: nextDist);
+        setState(() {
+          _commands.execute(
+            UpdateArchitectRoofPlane(
+              storeyId: _project.activeStoreyId,
+              roof: updated,
+            ),
+          );
+        });
+      }
+      return;
+    }
+
     if (_duplicateMove != null) {
 
       _previewDuplicateMove(rawModel);
@@ -9407,7 +9469,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_draftCancelPointer == event.pointer) {
 
-      _draftCancelPointer = null;
+      _isDraggingRoofKnuckle = false;
+    _draggingRoofKnuckleId = null;
+    _knuckleDragInitialBreakDist = null;
+    _knuckleDragStartPoint = null;
+
+    _draftCancelPointer = null;
 
       return;
 
@@ -9577,6 +9644,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _cancelActiveDrags() {
 
+    _rotationSource = null;
+    _rotationIds = {};
     _offsetEpoch++;
 
     _offsetOptions = null;
@@ -9608,6 +9677,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _projectionSource = null;
 
     }
+
+    _isDraggingRoofKnuckle = false;
+    _draggingRoofKnuckleId = null;
+    _knuckleDragInitialBreakDist = null;
+    _knuckleDragStartPoint = null;
 
     _draftCancelPointer = null;
 
@@ -9703,6 +9777,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _commitActiveHandleDrag(Offset screenPos) {
+
+    if (_isDraggingRoofKnuckle) {
+      _isDraggingRoofKnuckle = false;
+      _draggingRoofKnuckleId = null;
+      _knuckleDragInitialBreakDist = null;
+      _knuckleDragStartPoint = null;
+      _saveBiMProjectIfAttached();
+      HapticFeedback.selectionClick();
+      return;
+    }
 
     if (_isDraggingZoneTable && _zoneTablePreviewOrigin != null) {
 
@@ -16956,6 +17040,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final items = _buildElementRadialMenuItems(elementId);
 
+    if (_commands.isPlan && ArchitectRotation.supports(_project.activeStorey, _effectiveSelection) &&
+        !items.any((item) => item.action == ArchitectRadialAction.rotate)) {
+      items.add(_radialItem(action: ArchitectRadialAction.rotate, color: const Color(0xFF40C4FF)));
+    }
+
     if (!_is3DView && ArchitectOffset.supports(_project.activeStorey, _effectiveSelection)) {
 
       items.add(_radialItem(action: ArchitectRadialAction.offset, color: const Color(0xFF80CBC4)));
@@ -18819,6 +18908,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
 
     if (id == null) return;
+
+    if (action == ArchitectRadialAction.rotate && _commands.isPlan &&
+        ArchitectRotation.supports(_project.activeStorey, _effectiveSelection)) {
+      _startRotation();
+      return;
+    }
 
     if (action == ArchitectRadialAction.group) { _groupSelection(); return; }
 
@@ -22194,6 +22289,44 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
 
+
+  void _startRotation() {
+    final ids = Set<String>.of(_effectiveSelection);
+    if (!ArchitectRotation.supports(_project.activeStorey, ids)) return;
+    final bounds = [for (final id in ids)
+      if (ArchitectSelection.bounds(_project, id) case final Rect r) r];
+    if (bounds.isEmpty) return;
+    _cancelActiveDrags();
+    setState(() {
+      _rotationSource = _project;
+      _rotationIds = ids;
+      _rotationPivot = bounds.reduce((a, b) => a.expandToInclude(b)).center;
+      _polygonEditId = null;
+      _polygonSelectedEdge = null;
+      _moveSelection = false;
+      _wallParallelMove = false;
+    });
+  }
+
+  void _previewRotation(Offset pivot, double angle) {
+    final source = _rotationSource;
+    if (source == null) return;
+    _elementMovePreview = source.updateActiveStorey(
+      ArchitectRotation.apply(source.activeStorey, _rotationIds, pivot, angle));
+    _repaintPreview();
+  }
+
+  void _applyRotation(Offset pivot, double angle) {
+    _previewRotation(pivot, angle);
+    final next = _elementMovePreview;
+    if (next == null) return;
+    _cancelActiveDrags();
+    _commands.commit(next);
+    _saveBiMProjectIfAttached();
+    setState(() {});
+    HapticFeedback.mediumImpact();
+    _repaintPreview();
+  }
 
   Future<void> _startOffset() async {
 
@@ -26333,6 +26466,62 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           },
 
+                          onToggleMansard: () {
+                            final sel = _selectedRoof;
+                            if (sel == null) return;
+                            final next = sel.copyWith(
+                              isMansard: !sel.isMansard,
+                              slopeDegrees: !sel.isMansard && sel.slopeDegrees <= 30.0
+                                  ? 60.0
+                                  : sel.slopeDegrees,
+                              upperSlopeDegrees: sel.upperSlopeDegrees,
+                            );
+                            setState(() {
+                              _commands.execute(
+                                UpdateArchitectRoofPlane(
+                                  storeyId: _project.activeStoreyId,
+                                  roof: next,
+                                ),
+                              );
+                            });
+                            _saveBiMProjectIfAttached();
+                            HapticFeedback.selectionClick();
+                          },
+
+                          onSelectedRoofUpperSlopeChanged: (upperSlopeDeg) {
+                            final sel = _selectedRoof;
+                            if (sel == null) return;
+                            final next = sel.copyWith(
+                              upperSlopeDegrees: upperSlopeDeg,
+                            );
+                            setState(() {
+                              _commands.execute(
+                                UpdateArchitectRoofPlane(
+                                  storeyId: _project.activeStoreyId,
+                                  roof: next,
+                                ),
+                              );
+                            });
+                            _saveBiMProjectIfAttached();
+                            HapticFeedback.selectionClick();
+                          },
+
+                          onSelectedRoofBreakDistanceChanged: (dist) {
+                            final sel = _selectedRoof;
+                            if (sel == null) return;
+                            final next = sel.copyWith(breakDistance: dist);
+                            setState(() {
+                              _commands.execute(
+                                UpdateArchitectRoofPlane(
+                                  storeyId: _project.activeStoreyId,
+                                  roof: next,
+                                ),
+                              );
+                            });
+                            _saveBiMProjectIfAttached();
+                            HapticFeedback.selectionClick();
+                          },
+
                           onFinishPolygon: _commitRoofDraft,
 
                           onUndoDraftPoint: () =>
@@ -28061,10 +28250,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         Positioned(top: _offsetOptions == null ? 8 : 64, left: 8, right: 8, child: _groupEditBanner()),
 
-      if (_offsetOptions != null)
-
-        Positioned(top: 8, left: 8, right: 8, child: _offsetBanner()),
-
       _buildPolygonDistanceOverlay(),
 
       _buildShapeDimensionOverlay(),
@@ -28928,6 +29113,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         ),
 
+      if (_offsetOptions != null) ...[
+        Positioned.fill(child: IgnorePointer(child: AnimatedBuilder(
+          animation: Listenable.merge([_viewport, _previewRevision]),
+          builder: (_, _) => CustomPaint(
+            key: const ValueKey('architect-offset-direction'),
+            painter: _offsetSide == null ? null : ArchitectOffsetDirectionPainter(
+              start: _viewport.toScreen(ArchitectOffset.directionAnchor(
+                _offsetSource!.activeStorey, _offsetIds, _offsetSide!)),
+              side: _viewport.toScreen(_offsetSide!),
+              color: _offsetValid ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ))),
+        Positioned(top: 8, left: 8, right: 8, child: _offsetBanner()),
+      ],
+      if (_rotationSource != null)
+        Positioned.fill(child: AnimatedBuilder(animation: _viewport,
+          builder: (_, _) => ArchitectRotationOverlay(
+            key: ValueKey(_rotationSource), initialPivot: _rotationPivot,
+            toModel: _screenToModel, toScreen: _viewport.toScreen,
+            snap: (point) => _snapElement(point).point,
+            onPreview: _previewRotation, onApply: _applyRotation,
+            onNavigate: (delta, factor, focal) => _viewport.navigate(
+              previousFocal: focal - delta, focal: focal, scaleFactor: factor),
+            onCancel: () { setState(_cancelActiveDrags); _repaintPreview(); },
+          ),
+        )),
     ],
 
   );

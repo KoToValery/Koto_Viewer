@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../properties/bim_numeric_rule.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import 'bim_numeric_keypad.dart';
 
 class BimElementOffsetOptions {
   final double distance;
@@ -69,10 +70,9 @@ class _ElementOffsetDialogState extends State<_ElementOffsetDialog> {
             TextField(
               key: const ValueKey('architect-offset-distance'),
               controller: controller,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
+              readOnly: true,
+              showCursor: true,
+              keyboardType: TextInputType.none,
               textInputAction: TextInputAction.done,
               decoration: InputDecoration(
                 labelText: l.bimOffsetDistance,
@@ -80,6 +80,17 @@ class _ElementOffsetDialogState extends State<_ElementOffsetDialog> {
               ),
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => submit(),
+            ),
+            BimNumericKeypad(
+              keyPrefix: 'architect-offset-key',
+              decimals: 3,
+              onKey: (key) => setState(() {
+                controller.text = BimNumericKeypad.edit(
+                  controller.text,
+                  key,
+                  decimals: 3,
+                );
+              }),
             ),
             CheckboxListTile(
               key: const ValueKey('architect-offset-copy'),
@@ -161,20 +172,42 @@ class _BimOffsetDialogState extends State<_BimOffsetDialog> {
       contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       actionsPadding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
       constraints: const BoxConstraints(maxWidth: 280),
-      content: TextField(
-        key: widget.inputKey,
-        controller: controller,
-        autofocus: true,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        textInputAction: TextInputAction.done,
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          isDense: true,
-          labelText: context.l10n.offsetAction,
-          suffixText: widget.unitSymbol,
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              key: widget.inputKey,
+              controller: controller,
+              readOnly: true,
+              showCursor: true,
+              keyboardType: TextInputType.none,
+              textInputAction: TextInputAction.done,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                isDense: true,
+                labelText: context.l10n.offsetAction,
+                suffixText: widget.unitSymbol,
+              ),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => submit(),
+            ),
+            Theme(
+              data: ThemeData.dark(),
+              child: BimNumericKeypad(
+                keyPrefix: 'bim-offset-key',
+                decimals: 3,
+                onKey: (key) => setState(() {
+                  controller.text = BimNumericKeypad.edit(
+                    controller.text,
+                    key,
+                    decimals: 3,
+                  );
+                }),
+              ),
+            ),
+          ],
         ),
-        onChanged: (_) => setState(() {}),
-        onSubmitted: (_) => submit(),
       ),
       actions: [
         TextButton(

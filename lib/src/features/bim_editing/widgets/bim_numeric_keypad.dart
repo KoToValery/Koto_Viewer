@@ -52,15 +52,15 @@ class BimNumericKeypad extends StatelessWidget {
                         ? null
                         : () => onKey(key),
                     child: key == '⌫'
-                        ? const Icon(
+                        ? Icon(
                             Icons.backspace_outlined,
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onSurface,
                             size: 20,
                           )
                         : Text(
                             key,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 18,
                             ),
                           ),

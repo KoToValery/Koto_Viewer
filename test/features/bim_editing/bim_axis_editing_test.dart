@@ -115,7 +115,12 @@ void main() {
         tester.widget<AlertDialog>(find.byType(AlertDialog)).title,
         isNull,
       );
-      await tester.enterText(field, '125,5');
+      expect(tester.widget<TextField>(field).readOnly, isTrue);
+      for (final key in '125.5'.split('')) {
+        await tester.tap(find.byKey(ValueKey('bim-offset-key-$key')));
+        await tester.pump();
+      }
+      expect(tester.testTextInput.isVisible, isFalse);
       await tester.pump();
       await tester.tap(find.widgetWithText(TextButton, 'Offset'));
       await tester.pumpAndSettle();

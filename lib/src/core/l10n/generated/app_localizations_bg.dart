@@ -6335,6 +6335,28 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectRoofDrawMultiPitch => 'Многоскатен';
 
   @override
+  String get architectRoofDrawMansard => 'Мансарден';
+
+  @override
+  String get architectRoofIsMansard => 'Мансарден';
+
+  @override
+  String get architectRoofMakeMansard => 'Пречупи скат';
+
+  @override
+  String get architectRoofUpperSlope => 'Горен наклон';
+
+  @override
+  String get architectRoofBreakDistance => 'Пречупване';
+
+  @override
+  String get architectRoofMansardKnuckleTooltip =>
+      'Провлачете за преместване на линията на пречупване';
+
+  @override
+  String get architectRoofKnucklePurlin => 'Междинна столица';
+
+  @override
   String get architectRoofSnap45Degrees => '45° Скат / Било';
 
   @override
@@ -7989,4 +8011,13 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectColorAgriculture => 'Земеделски площи';
+
+  @override
+  String get architectRotationPivot => 'Избери център';
+
+  @override
+  String get architectRotationReference => 'Избери начална посока';
+
+  @override
+  String get architectRotationTarget => 'Избери ъгъл';
 }

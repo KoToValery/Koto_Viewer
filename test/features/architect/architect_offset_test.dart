@@ -85,6 +85,23 @@ OffsetArchitectElements offset(
   editingGroupId: scope,
 );
 
+Future<void> enterOffset(WidgetTester tester, String value) async {
+  final field = tester.widget<TextField>(
+    find.byKey(const ValueKey('architect-offset-distance')),
+  );
+  expect(field.readOnly, isTrue);
+  expect(field.keyboardType, TextInputType.none);
+  while (field.controller!.text.isNotEmpty) {
+    await tester.tap(find.byKey(const ValueKey('architect-offset-key-⌫')));
+    await tester.pump();
+  }
+  for (final key in value.split('')) {
+    await tester.tap(find.byKey(ValueKey('architect-offset-key-$key')));
+    await tester.pump();
+  }
+  expect(tester.testTextInput.isVisible, isFalse);
+}
+
 void main() {
   setUpAll(() async {
     await (FontLoader(
@@ -566,10 +583,7 @@ void main() {
             .value,
         isTrue,
       );
-      await tester.enterText(
-        find.byKey(const ValueKey('architect-offset-distance')),
-        '1',
-      );
+      await enterOffset(tester, '1');
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('architect-offset-start')));
       await tester.pumpAndSettle();
@@ -590,10 +604,7 @@ void main() {
       await mouse.removePointer();
       await editing.contextHold(tester, const Offset(2, 0));
       await groups.action(tester, BimEditAction.offset);
-      await tester.enterText(
-        find.byKey(const ValueKey('architect-offset-distance')),
-        '1',
-      );
+      await enterOffset(tester, '1');
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('architect-offset-start')));
       await tester.pumpAndSettle();
@@ -663,15 +674,11 @@ void main() {
         await groups.action(tester, BimEditAction.editGroup);
         await editing.contextHold(tester, const Offset(2, 0));
         await groups.action(tester, BimEditAction.offset);
-        final input = find.byKey(const ValueKey('architect-offset-distance'));
         final submit = find.byKey(const ValueKey('architect-offset-start'));
-        for (final invalid in ['0', '-2', 'abc']) {
-          await tester.enterText(input, invalid);
-          await tester.pump();
-          expect(tester.widget<TextButton>(submit).onPressed, isNull);
-        }
-        await tester.enterText(input, '250,5');
-        await tester.pump();
+        expect(tester.widget<TextButton>(submit).onPressed, isNull);
+        await enterOffset(tester, '0');
+        expect(tester.widget<TextButton>(submit).onPressed, isNull);
+        await enterOffset(tester, '250.5');
         await capture('dialog');
         await tester.tap(find.byKey(const ValueKey('architect-offset-copy')));
         await tester.pump();

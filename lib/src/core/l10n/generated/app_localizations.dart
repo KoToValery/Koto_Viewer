@@ -11171,6 +11171,48 @@ abstract class AppLocalizations {
   /// **'Multi-pitch'**
   String get architectRoofDrawMultiPitch;
 
+  /// No description provided for @architectRoofDrawMansard.
+  ///
+  /// In en, this message translates to:
+  /// **'Mansard'**
+  String get architectRoofDrawMansard;
+
+  /// No description provided for @architectRoofIsMansard.
+  ///
+  /// In en, this message translates to:
+  /// **'Mansard (Gambrel)'**
+  String get architectRoofIsMansard;
+
+  /// No description provided for @architectRoofMakeMansard.
+  ///
+  /// In en, this message translates to:
+  /// **'Make Mansard'**
+  String get architectRoofMakeMansard;
+
+  /// No description provided for @architectRoofUpperSlope.
+  ///
+  /// In en, this message translates to:
+  /// **'Upper slope'**
+  String get architectRoofUpperSlope;
+
+  /// No description provided for @architectRoofBreakDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Knuckle'**
+  String get architectRoofBreakDistance;
+
+  /// No description provided for @architectRoofMansardKnuckleTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to adjust the Mansard knuckle line'**
+  String get architectRoofMansardKnuckleTooltip;
+
+  /// No description provided for @architectRoofKnucklePurlin.
+  ///
+  /// In en, this message translates to:
+  /// **'Mansard purlin'**
+  String get architectRoofKnucklePurlin;
+
   /// No description provided for @architectRoofSnap45Degrees.
   ///
   /// In en, this message translates to:
@@ -14290,6 +14332,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Agricultural land'**
   String get architectColorAgriculture;
+
+  /// No description provided for @architectRotationPivot.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick centre'**
+  String get architectRotationPivot;
+
+  /// No description provided for @architectRotationReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick start direction'**
+  String get architectRotationReference;
+
+  /// No description provided for @architectRotationTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick angle'**
+  String get architectRotationTarget;
 }
 
 class _AppLocalizationsDelegate

@@ -9,7 +9,7 @@ import 'architect_roof_geometry.dart';
 
 // === SECTION: ROOF DRAW MODE ===
 
-enum RoofDrawMode { rectangle, polygon, multiPitch }
+enum RoofDrawMode { rectangle, polygon, multiPitch, mansard }
 
 // === SECTION: ARCHITECT ROOF TOOL ===
 
@@ -17,6 +17,8 @@ class ArchitectRoofTool extends ChangeNotifier {
   ArchitectRoofDrainage drainage = const ArchitectRoofDrainage();
   RoofDrawMode drawMode = RoofDrawMode.rectangle;
   double slopeDegrees = 22.0;
+  double upperSlopeDegrees = 25.0;
+  double? breakDistance;
   double eavesOverhang = 0.50;
   double? manualSupportDistance;
   ArchitectRoofEavesCut eavesCut = ArchitectRoofEavesCut.plumb;
@@ -34,7 +36,20 @@ class ArchitectRoofTool extends ChangeNotifier {
   void setDrawMode(RoofDrawMode mode) {
     if (drawMode == mode) return;
     drawMode = mode;
+    if (mode == RoofDrawMode.mansard && slopeDegrees <= 30.0) {
+      slopeDegrees = 60.0;
+    }
     clearDraft();
+  }
+
+  void setUpperSlopeDegrees(double value) {
+    upperSlopeDegrees = value.clamp(1.0, 85.0);
+    notifyListeners();
+  }
+
+  void setBreakDistance(double? value) {
+    breakDistance = value;
+    notifyListeners();
   }
 
   void setSlopeDegrees(double value) {
@@ -93,7 +108,8 @@ class ArchitectRoofTool extends ChangeNotifier {
     required ArchitectStorey storey,
     double closeRadius = 0.35,
   }) {
-    if (drawMode == RoofDrawMode.rectangle) {
+    if (drawMode == RoofDrawMode.rectangle ||
+        drawMode == RoofDrawMode.mansard) {
       if (draftPoints.isEmpty) {
         draftPoints.add(point);
         candidatePoint = point;
@@ -197,7 +213,8 @@ class ArchitectRoofTool extends ChangeNotifier {
   /// Preview polygon for the 2D canvas while drafting.
   List<Offset> get previewPolygon {
     if (draftPoints.isEmpty) return const [];
-    if (drawMode == RoofDrawMode.rectangle) {
+    if (drawMode == RoofDrawMode.rectangle ||
+        drawMode == RoofDrawMode.mansard) {
       final p0 = draftPoints.first;
       final p1 = candidatePoint ?? p0;
       final r = Rect.fromPoints(p0, p1);
@@ -227,6 +244,9 @@ class ArchitectRoofTool extends ChangeNotifier {
     eavesCut: eavesCut,
     assembly: activeAssembly.copyWith(),
     drainage: drainage,
+    isMansard: drawMode == RoofDrawMode.mansard,
+    upperSlopeDegrees: upperSlopeDegrees,
+    breakDistance: breakDistance,
   );
 
   /// Finds if [worldPoint] taps near an edge of [roof] (within [tolerance] metres)

@@ -708,6 +708,16 @@ class ArchitectRoofPlane {
   bool isSlopeLocked;
   final ArchitectRoofDrainage drainage;
 
+  /// Whether this plane has a broken Mansard (Gambrel / пречупен) pitch.
+  final bool isMansard;
+
+  /// Slope of the upper roof plane above the knuckle fold line (degrees).
+  final double upperSlopeDegrees;
+
+  /// Horizontal distance from the low eaves edge to the knuckle break line (m).
+  /// If null, defaults to 45% of `maxSlopeRun`.
+  final double? breakDistance;
+
   ArchitectRoofPlane({
     required this.id,
     this.holes = const [],
@@ -726,6 +736,9 @@ class ArchitectRoofPlane {
     this.roofGroupId,
     this.isSlopeLocked = true,
     this.drainage = const ArchitectRoofDrainage(),
+    this.isMansard = false,
+    this.upperSlopeDegrees = 25.0,
+    this.breakDistance,
   }) : assembly =
            assembly ??
            ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles);
@@ -768,6 +781,83 @@ class ArchitectRoofPlane {
   double get slopeRadians => slopeDegrees * math.pi / 180.0;
 
   double get slopePercent => math.tan(slopeRadians) * 100.0;
+
+  double get upperSlopeRadians => upperSlopeDegrees * math.pi / 180.0;
+
+  double get upperSlopePercent => math.tan(upperSlopeRadians) * 100.0;
+
+  /// Horizontal distance from the low eaves line to the knuckle break line along slope direction.
+  double get effectiveBreakDistance {
+    final maxRun = maxSlopeRun;
+    if (breakDistance != null) {
+      if (maxRun > 0.60) {
+        return breakDistance!.clamp(0.25, math.max(0.30, maxRun - 0.25));
+      }
+      return breakDistance!.clamp(0.10, 50.0);
+    }
+    if (maxRun > 1.0) {
+      return (maxRun * 0.45).clamp(0.80, math.max(0.80, maxRun - 0.50));
+    }
+    return 1.80;
+  }
+
+  /// The 2D line segment in model space representing the knuckle fold line across this roof plane.
+  /// Returns null if this is not a Mansard roof or if the knuckle line does not intersect the polygon.
+  (Offset, Offset)? get knuckleSegment {
+    if (!isMansard || points.length < 3) return null;
+    final k = effectiveBreakDistance;
+    final (eavesP0, _) = eavesEdge;
+    final rawDir = _rawEavesInwardNormal;
+    final rawDist = reverseSlope ? (_maxRawRun - k) : k;
+    final centerOnKnuckle = eavesP0 + rawDir * rawDist;
+    final knuckleDir = Offset(-rawDir.dy, rawDir.dx);
+
+    final hits = <Offset>[];
+    for (var i = 0; i < points.length; i++) {
+      final a = points[i];
+      final b = points[(i + 1) % points.length];
+      final hit = _intersectLineWithSegment(centerOnKnuckle, knuckleDir, a, b);
+      if (hit != null) {
+        if (hits.every((h) => (h - hit).distance > 1e-4)) {
+          hits.add(hit);
+        }
+      }
+    }
+    if (hits.length < 2) return null;
+    hits.sort((p1, p2) {
+      final t1 =
+          (p1 - centerOnKnuckle).dx * knuckleDir.dx +
+          (p1 - centerOnKnuckle).dy * knuckleDir.dy;
+      final t2 =
+          (p2 - centerOnKnuckle).dx * knuckleDir.dx +
+          (p2 - centerOnKnuckle).dy * knuckleDir.dy;
+      return t1.compareTo(t2);
+    });
+    return (hits.first, hits.last);
+  }
+
+  /// Midpoint of the knuckle line segment in model space, used as the interactive handle.
+  Offset? get knuckleMidpoint {
+    final seg = knuckleSegment;
+    return seg != null ? (seg.$1 + seg.$2) * 0.5 : null;
+  }
+
+  static Offset? _intersectLineWithSegment(
+    Offset linePt,
+    Offset lineDir,
+    Offset a,
+    Offset b,
+  ) {
+    final ab = b - a;
+    final denom = ab.dx * lineDir.dy - ab.dy * lineDir.dx;
+    if (denom.abs() < 1e-9) return null;
+    final delta = linePt - a;
+    final t = (delta.dx * lineDir.dy - delta.dy * lineDir.dx) / denom;
+    if (t >= -1e-5 && t <= 1.0 + 1e-5) {
+      return a + ab * t.clamp(0.0, 1.0);
+    }
+    return null;
+  }
 
   double get _maxRawRun {
     if (points.isEmpty) return 0.0;
@@ -836,13 +926,28 @@ class ArchitectRoofPlane {
   /// At the wall support line (`d = eavesOverhang`), the rafter underside sits at `baseElevationOffset`.
   /// Towards the eaves (`d < eavesOverhang`), the plane continues downward so the overhang projects below the wall top!
   double undersideElevationAt(Offset worldPt) {
-    final dFromWall = signedDistanceFromEaves(worldPt) - eavesOverhang;
-    return baseElevationOffset + dFromWall * math.tan(slopeRadians);
+    final d = signedDistanceFromEaves(worldPt);
+    final dFromWall = d - eavesOverhang;
+    if (!isMansard) {
+      return baseElevationOffset + dFromWall * math.tan(slopeRadians);
+    }
+    final k = effectiveBreakDistance;
+    final zKnuckle =
+        baseElevationOffset + (k - eavesOverhang) * math.tan(slopeRadians);
+    if (d <= k) {
+      return baseElevationOffset + dFromWall * math.tan(slopeRadians);
+    } else {
+      return zKnuckle + (d - k) * math.tan(upperSlopeRadians);
+    }
   }
 
   /// Top exterior surface elevation at [worldPt], relative to storey floor Z.
   double topElevationAt(Offset worldPt) {
-    final cosA = math.cos(slopeRadians).clamp(0.1, 1.0);
+    final d = signedDistanceFromEaves(worldPt);
+    final k = effectiveBreakDistance;
+    final effectiveSlopeRad =
+        (isMansard && d > k) ? upperSlopeRadians : slopeRadians;
+    final cosA = math.cos(effectiveSlopeRad).clamp(0.1, 1.0);
     final verticalThickness = assembly.totalThickness / cosA;
     return undersideElevationAt(worldPt) + verticalThickness;
   }
@@ -934,6 +1039,10 @@ class ArchitectRoofPlane {
     String? roofGroupId,
     bool? isSlopeLocked,
     ArchitectRoofDrainage? drainage,
+    bool? isMansard,
+    double? upperSlopeDegrees,
+    double? breakDistance,
+    bool clearBreakDistance = false,
   }) => ArchitectRoofPlane(
     id: id ?? this.id,
     holes: holes ?? this.holes,
@@ -954,6 +1063,11 @@ class ArchitectRoofPlane {
     roofGroupId: roofGroupId ?? this.roofGroupId,
     isSlopeLocked: isSlopeLocked ?? this.isSlopeLocked,
     drainage: drainage ?? this.drainage,
+    isMansard: isMansard ?? this.isMansard,
+    upperSlopeDegrees: upperSlopeDegrees ?? this.upperSlopeDegrees,
+    breakDistance: clearBreakDistance
+        ? null
+        : (breakDistance ?? this.breakDistance),
   );
 
   ArchitectRoofPlane clone() => copyWith();
@@ -977,6 +1091,9 @@ class ArchitectRoofPlane {
     'roofGroupId': roofGroupId,
     'isSlopeLocked': isSlopeLocked,
     'drainage': drainage.toJson(),
+    'isMansard': isMansard,
+    'upperSlopeDegrees': upperSlopeDegrees,
+    if (breakDistance != null) 'breakDistance': breakDistance,
   };
 
   factory ArchitectRoofPlane.fromJson(Map<String, dynamic> json) {
@@ -1010,6 +1127,10 @@ class ArchitectRoofPlane {
       roofGroupId: json['roofGroupId'] as String?,
       isSlopeLocked: json['isSlopeLocked'] as bool? ?? true,
       drainage: ArchitectRoofDrainage.fromJson(json['drainage'] as Map? ?? {}),
+      isMansard: json['isMansard'] as bool? ?? false,
+      upperSlopeDegrees:
+          (json['upperSlopeDegrees'] as num?)?.toDouble() ?? 25.0,
+      breakDistance: (json['breakDistance'] as num?)?.toDouble(),
     );
   }
 

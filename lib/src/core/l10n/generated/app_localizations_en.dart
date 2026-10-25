@@ -6307,6 +6307,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectRoofDrawMultiPitch => 'Multi-pitch';
 
   @override
+  String get architectRoofDrawMansard => 'Mansard';
+
+  @override
+  String get architectRoofIsMansard => 'Mansard (Gambrel)';
+
+  @override
+  String get architectRoofMakeMansard => 'Make Mansard';
+
+  @override
+  String get architectRoofUpperSlope => 'Upper slope';
+
+  @override
+  String get architectRoofBreakDistance => 'Knuckle';
+
+  @override
+  String get architectRoofMansardKnuckleTooltip =>
+      'Drag to adjust the Mansard knuckle line';
+
+  @override
+  String get architectRoofKnucklePurlin => 'Mansard purlin';
+
+  @override
   String get architectRoofSnap45Degrees => '45° Hip / Ridge';
 
   @override
@@ -7959,4 +7981,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectColorAgriculture => 'Agricultural land';
+
+  @override
+  String get architectRotationPivot => 'Pick centre';
+
+  @override
+  String get architectRotationReference => 'Pick start direction';
+
+  @override
+  String get architectRotationTarget => 'Pick angle';
 }

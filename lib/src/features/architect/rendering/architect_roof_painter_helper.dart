@@ -149,6 +149,87 @@ class ArchitectRoofPainterHelper {
         canvas.restore();
       }
 
+      // 3b. Mansard Knuckle Line (Пречупване на ската) & Handle
+      if (roof.isMansard && !isGhost) {
+        final knuckle = roof.knuckleSegment;
+        if (knuckle != null) {
+          canvas.save();
+          canvas.clipPath(path);
+          final knuckleColor = isSelected
+              ? const Color(0xFF00E5FF)
+              : baseColor.withValues(alpha: isLowerLevel ? 0.45 : 0.85);
+          _drawDashedLine(
+            canvas,
+            knuckle.$1,
+            knuckle.$2,
+            Paint()
+              ..color = knuckleColor
+              ..strokeWidth = (isSelected ? 1.8 : 1.4) / scale
+              ..strokeCap = StrokeCap.round
+              ..style = PaintingStyle.stroke,
+            dashLength: 0.25,
+            gapLength: 0.15,
+          );
+          canvas.restore();
+
+          // Interactive cyan handle at knuckle midpoint when selected
+          if (isSelected) {
+            final mid = roof.knuckleMidpoint ?? (knuckle.$1 + knuckle.$2) * 0.5;
+            final draftingScale = math.max(scale, 40.0);
+            final handleRadius = 6.0 / draftingScale;
+            final haloRadius = 12.0 / draftingScale;
+
+            // Soft cyan halo
+            canvas.drawCircle(
+              mid,
+              haloRadius,
+              Paint()
+                ..color = const Color(0x3300E5FF)
+                ..style = PaintingStyle.fill,
+            );
+            canvas.drawCircle(
+              mid,
+              haloRadius,
+              Paint()
+                ..color = const Color(0x8800E5FF)
+                ..strokeWidth = 1.0 / draftingScale
+                ..style = PaintingStyle.stroke,
+            );
+
+            // Solid cyan grab disc
+            canvas.drawCircle(
+              mid,
+              handleRadius,
+              Paint()
+                ..color = const Color(0xFF00E5FF)
+                ..style = PaintingStyle.fill,
+            );
+            canvas.drawCircle(
+              mid,
+              handleRadius,
+              Paint()
+                ..color = const Color(0xFF00363A)
+                ..strokeWidth = 1.2 / draftingScale
+                ..style = PaintingStyle.stroke,
+            );
+
+            // Double arrow perpendicular to the knuckle line (along slope direction)
+            final slopeDir = roof.slopeDirection;
+            final arrowHalfLen = 4.0 / draftingScale;
+            final arrowPaint = Paint()
+              ..color = const Color(0xFF00363A)
+              ..strokeWidth = 1.2 / draftingScale
+              ..strokeCap = StrokeCap.round
+              ..style = PaintingStyle.stroke;
+            canvas.drawLine(
+              mid - slopeDir * arrowHalfLen,
+              mid + slopeDir * arrowHalfLen,
+              arrowPaint,
+            );
+          }
+        }
+      }
+
       // 4. Perimeter edges:
       // "Покривите от долните нива да се показват с тънки линии и с кота.
       //  Покривите от ниво Покривни линии да са с дебели линии"
@@ -207,6 +288,19 @@ class ArchitectRoofPainterHelper {
         );
       }
     }
+  }
+
+  /// Returns true if [worldPoint] hits the interactive knuckle handle of a Mansard roof.
+  static bool hitTestKnuckleHandle(
+    ArchitectRoofPlane roof,
+    Offset worldPoint, {
+    required double scale,
+  }) {
+    if (!roof.isMansard) return false;
+    final mid = roof.knuckleMidpoint;
+    if (mid == null) return false;
+    final radius = math.max(0.40, 18.0 / scale);
+    return (worldPoint - mid).distance <= radius;
   }
 
   /// Returns true if [worldPoint] taps on the central slope direction arrow/badge of [roof].
@@ -285,13 +379,19 @@ class ArchitectRoofPainterHelper {
     final degText = roof.slopeDegrees.toStringAsFixed(
       roof.slopeDegrees % 1 == 0 ? 0 : 1,
     );
+    final upperDegText = roof.upperSlopeDegrees.toStringAsFixed(
+      roof.upperSlopeDegrees % 1 == 0 ? 0 : 1,
+    );
     final pctText = roof.slopePercent.round();
+    final slopeText = roof.isMansard
+        ? '$degText° / $upperDegText°'
+        : '$degText° ($pctText%)';
     final ridgeZ = storey.elevation + roof.ridgeTopElevation;
     final sign = ridgeZ >= 0 ? '+' : '';
     final ridgeLabel = scope?.length(ridgeZ) ?? ridgeZ.toStringAsFixed(2);
     final label = isLowerLevel
         ? '${scope?.length(storey.elevation) ?? storey.elevationLabel}  $degText°'
-        : '$degText° ($pctText%)  $sign$ridgeLabel';
+        : '$slopeText  $sign$ridgeLabel';
 
     final fontSize = 11.0 / scale;
     final tp = ArchitectTextPainter(

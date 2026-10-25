@@ -21,6 +21,9 @@ class ArchitectRoofBar extends StatelessWidget {
   final ValueChanged<double>? onSelectedRoofOverhangChanged;
   final VoidCallback? onToggleSlopeLocked;
   final VoidCallback? onMatchRidgeHeight;
+  final VoidCallback? onToggleMansard;
+  final ValueChanged<double>? onSelectedRoofUpperSlopeChanged;
+  final ValueChanged<double>? onSelectedRoofBreakDistanceChanged;
   final VoidCallback? onFinishPolygon;
   final VoidCallback? onUndoDraftPoint;
   final VoidCallback? onCancelDraft;
@@ -39,6 +42,9 @@ class ArchitectRoofBar extends StatelessWidget {
     this.onSelectedRoofOverhangChanged,
     this.onToggleSlopeLocked,
     this.onMatchRidgeHeight,
+    this.onToggleMansard,
+    this.onSelectedRoofUpperSlopeChanged,
+    this.onSelectedRoofBreakDistanceChanged,
     this.onFinishPolygon,
     this.onUndoDraftPoint,
     this.onCancelDraft,
@@ -129,6 +135,17 @@ class ArchitectRoofBar extends StatelessWidget {
                       selected: tool.drawMode == RoofDrawMode.multiPitch,
                       onSelected: (sel) {
                         if (sel) tool.setDrawMode(RoofDrawMode.multiPitch);
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    ChoiceChip(
+                      key: const ValueKey('roof-mode-mansard'),
+                      visualDensity: VisualDensity.compact,
+                      avatar: const Icon(Icons.call_split_rounded, size: 15),
+                      label: Text(l.architectRoofDrawMansard),
+                      selected: tool.drawMode == RoofDrawMode.mansard,
+                      onSelected: (sel) {
+                        if (sel) tool.setDrawMode(RoofDrawMode.mansard);
                       },
                     ),
                     const SizedBox(width: 6),
@@ -261,6 +278,45 @@ class ArchitectRoofBar extends StatelessWidget {
                         onPressed: onFlipSlopeDirection,
                       ),
                     ),
+                    const SizedBox(width: 4),
+                    // Selected roof: Toggle Mansard button
+                    Tooltip(
+                      message: roof.isMansard
+                          ? l.architectRoofIsMansard
+                          : l.architectRoofMakeMansard,
+                      child: ActionChip(
+                        key: const ValueKey('roof-toggle-mansard'),
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor:
+                            roof.isMansard ? const Color(0x3300E5FF) : null,
+                        side: BorderSide(
+                          color: roof.isMansard
+                              ? const Color(0xFF00E5FF)
+                              : Colors.white24,
+                        ),
+                        avatar: Icon(
+                          Icons.call_split_rounded,
+                          size: 15,
+                          color: roof.isMansard
+                              ? const Color(0xFF00E5FF)
+                              : Colors.white70,
+                        ),
+                        label: Text(
+                          roof.isMansard
+                              ? l.architectRoofIsMansard
+                              : l.architectRoofMakeMansard,
+                          style: TextStyle(
+                            color: roof.isMansard
+                                ? const Color(0xFF00E5FF)
+                                : Colors.white,
+                            fontWeight: roof.isMansard
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        onPressed: onToggleMansard,
+                      ),
+                    ),
                     const SizedBox(width: 6),
                   ],
 
@@ -361,7 +417,20 @@ class ArchitectRoofBar extends StatelessWidget {
                       }
                     },
                     itemBuilder: (_) => [
-                      for (final deg in [2.0, 12.0, 18.0, 22.0, 26.0, 30.0, 35.0, 45.0])
+                      for (final deg in [
+                        2.0,
+                        12.0,
+                        18.0,
+                        22.0,
+                        26.0,
+                        30.0,
+                        35.0,
+                        45.0,
+                        55.0,
+                        60.0,
+                        65.0,
+                        70.0,
+                      ])
                         PopupMenuItem(
                           value: deg,
                           child: Text(
@@ -401,6 +470,136 @@ class ArchitectRoofBar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
+
+                  if (roof?.isMansard == true ||
+                      (roof == null && tool.drawMode == RoofDrawMode.mansard)) ...[
+                    // Upper Slope popup selector
+                    PopupMenuButton<double>(
+                      key: const ValueKey('roof-upper-slope-menu'),
+                      tooltip: l.architectRoofUpperSlope,
+                      color: const Color(0xFF262A34),
+                      onSelected: (deg) {
+                        if (roof != null) {
+                          onSelectedRoofUpperSlopeChanged?.call(deg);
+                        } else {
+                          tool.setUpperSlopeDegrees(deg);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        for (final deg in [
+                          12.0,
+                          15.0,
+                          18.0,
+                          22.0,
+                          25.0,
+                          30.0,
+                          35.0,
+                          45.0,
+                        ])
+                          PopupMenuItem(
+                            value: deg,
+                            child: Text(
+                              '${deg.toStringAsFixed(0)}°',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                      ],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF262A34),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF00E5FF)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.trending_flat_rounded,
+                              size: 14,
+                              color: Color(0xFF00E5FF),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${l.architectRoofUpperSlope} ${(roof?.upperSlopeDegrees ?? tool.upperSlopeDegrees).toStringAsFixed(0)}°',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+
+                    // Knuckle break distance popup selector
+                    PopupMenuButton<double>(
+                      key: const ValueKey('roof-break-distance-menu'),
+                      tooltip: l.architectRoofBreakDistance,
+                      color: const Color(0xFF262A34),
+                      onSelected: (dist) {
+                        if (roof != null) {
+                          onSelectedRoofBreakDistanceChanged?.call(dist);
+                        } else {
+                          tool.setBreakDistance(dist);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        for (final dist in [
+                          0.80,
+                          1.00,
+                          1.20,
+                          1.50,
+                          1.80,
+                          2.00,
+                          2.20,
+                          2.50,
+                          3.00,
+                        ])
+                          PopupMenuItem(
+                            value: dist,
+                            child: Text(
+                              '${dist.toStringAsFixed(2)} m',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                      ],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF262A34),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF00E5FF)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.vertical_distribute_rounded,
+                              size: 14,
+                              color: Color(0xFF00E5FF),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${l.architectRoofBreakDistance} ${(roof?.effectiveBreakDistance ?? tool.breakDistance ?? 1.80).toStringAsFixed(2)} m',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
 
                   // Overhang popup selector
                   PopupMenuButton<double>(

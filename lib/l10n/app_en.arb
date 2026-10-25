@@ -4177,6 +4177,13 @@
     }
   },
   "architectRoofDrawMultiPitch": "Multi-pitch",
+  "architectRoofDrawMansard": "Mansard",
+  "architectRoofIsMansard": "Mansard (Gambrel)",
+  "architectRoofMakeMansard": "Make Mansard",
+  "architectRoofUpperSlope": "Upper slope",
+  "architectRoofBreakDistance": "Knuckle",
+  "architectRoofMansardKnuckleTooltip": "Drag to adjust the Mansard knuckle line",
+  "architectRoofKnucklePurlin": "Mansard purlin",
   "architectRoofSnap45Degrees": "45° Hip / Ridge",
   "architectRoofLinkedSlopes": "Linked slopes",
   "architectRoofLinkedSlopesTooltip": "All roof planes in this group share the same slope and eaves height",
@@ -4788,5 +4795,8 @@
   "architectColorMixedUse": "Mixed use",
   "architectColorSpecialUse": "Special building areas",
   "architectColorRailway": "Railway land",
-  "architectColorAgriculture": "Agricultural land"
+  "architectColorAgriculture": "Agricultural land",
+  "architectRotationPivot": "Pick centre",
+  "architectRotationReference": "Pick start direction",
+  "architectRotationTarget": "Pick angle"
 }
