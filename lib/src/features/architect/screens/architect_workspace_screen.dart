@@ -33,6 +33,7 @@ import '../services/architect_line_editing.dart';
 import '../services/architect_offset.dart';
 import '../services/architect_rotation.dart';
 import '../widgets/architect_rotation_overlay.dart';
+import '../widgets/architect_transform_point_input.dart';
 import '../widgets/architect_offset_direction.dart';
 
 import '../../bim_editing/widgets/bim_offset_dialog.dart';
@@ -7479,6 +7480,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  ArchitectSnapResult _snapTransformPoint(Offset raw, bool touch,
+      {bool selectionOnly = false, Offset? anchor}) {
+    final source = _rotationSource ?? _project;
+    final tolerance = (touch ? 12 : 8) / _currentScale;
+    if (selectionOnly) {
+      return ArchitectSnapHelper.snapFree(rawPoint: raw, project: source,
+        tolerance: tolerance, includedIds: _rotationIds,
+        midpointReferences: _midpointTracking.references);
+    }
+    if (anchor != null) {
+      return ArchitectSnapHelper.snapWithAnchor(rawPoint: raw, anchor: anchor,
+        project: source, tolerance: tolerance, magnetic: _magnetEnabled,
+        alignment: true, midpointReferences: _midpointTracking.references,
+        underlay: _currentUnderlayDoc, frame: widget.underlayFrame,
+        visibility: _underlayLayerVisibility);
+    }
+    return ArchitectSnapHelper.snapFree(rawPoint: raw, project: source,
+      tolerance: tolerance, magnetic: _magnetEnabled, alignment: true,
+      midpointReferences: _midpointTracking.references,
+      underlay: _currentUnderlayDoc, frame: widget.underlayFrame,
+      visibility: _underlayLayerVisibility);
+  }
+
   (Offset, double) _snapComponent(Offset rawModel, ArchitectComponentDefinition def) {
 
     if (def.placementMode == ComponentPlacementMode.wallAttached) {
@@ -9081,56 +9105,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     // Mirror aiming and real-time preview
-
     if (_mirrorActive) {
-
-      final snap = _snapElement(rawModel, anchor: _mirrorAnchor);
-
-      _cursorModel = snap.point;
-
-      _activeSnapLabel = snap.snapLabel;
-
-      _activeMagneticGuides = snap.magneticGuides;
-
-      if (_mirrorAnchor != null) {
-
-        _mirrorCurrentPoint = snap.point;
-
-        final delta = snap.point - _mirrorAnchor!;
-
-        if (delta.distanceSquared > 1e-8) {
-
-          try {
-
-            _elementMovePreview = MirrorArchitectElements(
-
-              storeyId: _project.activeStoreyId,
-
-              elementIds: _mirrorSourceIds,
-
-              origin: _mirrorAnchor!,
-
-              direction: delta,
-
-              isDuplicate: _mirrorIsDuplicate,
-
-              idMap: _mirrorIdMap,
-
-            ).apply(_project);
-
-          } catch (_) {}
-
-        }
-
-      }
-
-      _repaintPreview();
-
+      _previewMirrorSnap(_snapElement(rawModel, anchor: _mirrorAnchor));
       return;
-
     }
-
-
 
     // Split aiming and real-time preview
 
@@ -10273,44 +10251,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     if (_mirrorActive) {
-
-      final snap = _snapElement(rawModel, anchor: _mirrorAnchor);
-
-      final pt = snap.point;
-
-      if (_mirrorAnchor == null) {
-
-        setState(() {
-
-          _mirrorAnchor = pt;
-
-          _mirrorCurrentPoint = null;
-
-        });
-
-        HapticFeedback.selectionClick();
-
-      } else {
-
-        final anchor = _mirrorAnchor!;
-
-        final delta = pt - anchor;
-
-        if (delta.distanceSquared > 1e-8) {
-
-          _executeMirror(anchor: anchor, direction: delta);
-
-        }
-
-      }
-
-      _repaintPreview();
-
+      _pickMirrorSnap(_snapElement(rawModel, anchor: _mirrorAnchor));
       return;
-
     }
-
-
 
     if (_splitActive) {
 
@@ -22504,6 +22447,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  void _previewMirrorSnap(ArchitectSnapResult snap) {
+    _cursorModel = snap.point;
+    _activeSnapLabel = snap.snapLabel;
+    _activeMagneticGuides = snap.magneticGuides;
+    _mirrorCurrentPoint = snap.point;
+    final anchor = _mirrorAnchor;
+    if (anchor != null) {
+      final direction = snap.point - anchor;
+      _elementMovePreview = direction.distanceSquared <= 1e-8 ? null :
+        MirrorArchitectElements(storeyId: _project.activeStoreyId,
+          elementIds: _mirrorSourceIds, origin: anchor, direction: direction,
+          isDuplicate: _mirrorIsDuplicate, idMap: _mirrorIdMap,
+          copyGroups: _editingGroupId == null).apply(_project);
+    }
+    _repaintPreview();
+  }
+
+  void _pickMirrorSnap(ArchitectSnapResult snap) {
+    if (_mirrorAnchor == null) {
+      setState(() { _mirrorAnchor = snap.point; _mirrorCurrentPoint = null; });
+      HapticFeedback.selectionClick();
+    } else {
+      _executeMirror(anchor: _mirrorAnchor!, direction: snap.point - _mirrorAnchor!);
+    }
+    _repaintPreview();
+  }
+
   void _startMirrorSession({required bool isDuplicate}) {
 
     if (_selectionHasAutoZones) return;
@@ -22514,6 +22484,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     setState(() {
 
+      _polygonEditId = null;
+      _polygonSelectedEdge = null;
+      _moveSelection = false;
       _mirrorActive = true;
 
       _mirrorIsDuplicate = isDuplicate;
@@ -22582,17 +22555,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (direction.distanceSquared < 1e-12) return;
 
-    final finalIdMap = _mirrorIsDuplicate
-
-        ? {
-
-            for (final id in _mirrorSourceIds)
-
-              id: ArchitectElementId.next('copy'),
-
-          }
-
-        : null;
+    final finalIdMap = _mirrorIsDuplicate ? _mirrorIdMap : null;
 
     try {
 
@@ -22673,195 +22636,37 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   Widget _buildMirrorPromptBanner() {
-
     final l = context.l10n;
-
-    final isAnchorSet = _mirrorAnchor != null;
-
-    return Material(
-
-      key: const ValueKey('architect-mirror-banner'),
-
-      color: const Color(0xE61E1E26),
-
+    final anchor = _mirrorAnchor;
+    return Material(key: const ValueKey('architect-mirror-banner'),
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(8),
-
-      elevation: 4,
-
-      shadowColor: Colors.black54,
-
-      child: Container(
-
-        decoration: BoxDecoration(
-
-          borderRadius: BorderRadius.circular(8),
-
-          border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
-
-        ),
-
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-
-        child: Row(
-
-          mainAxisSize: MainAxisSize.min,
-
-          children: [
-
-            Icon(
-
-              _mirrorIsDuplicate ? Icons.copy_all : Icons.flip,
-
-              size: 18,
-
-              color: const Color(0xFF00E5FF),
-
-            ),
-
+      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [
+            Icon(_mirrorIsDuplicate ? Icons.copy_all : Icons.flip, size: 18),
             const SizedBox(width: 8),
-
-            Flexible(
-
-              child: Text(
-
-                isAnchorSet
-
-                    ? l.architectMirrorPromptPickAxis
-
-                    : l.architectMirrorPromptPickAnchor,
-
-                maxLines: 1,
-
-                overflow: TextOverflow.ellipsis,
-
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-
-              ),
-
-            ),
-
-            if (isAnchorSet) ...[
-
-              const SizedBox(width: 4),
-
-              TextButton(
-
-                key: const ValueKey('architect-mirror-vertical-btn'),
-
-                style: TextButton.styleFrom(
-
-                  padding: const EdgeInsets.symmetric(
-
-                    horizontal: 6,
-
-                    vertical: 2,
-
-                  ),
-
-                  minimumSize: Size.zero,
-
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-
-                ),
-
-                onPressed: () => _executeMirror(
-
-                  anchor: _mirrorAnchor!,
-
-                  direction: const Offset(0, 1),
-
-                ),
-
-                child: Text(
-
-                  l.architectMirrorAxisVertical,
-
-                  style: const TextStyle(
-
-                    color: Color(0xFF00E5FF),
-
-                    fontSize: 11,
-
-                  ),
-
-                ),
-
-              ),
-
-              TextButton(
-
-                key: const ValueKey('architect-mirror-horizontal-btn'),
-
-                style: TextButton.styleFrom(
-
-                  padding: const EdgeInsets.symmetric(
-
-                    horizontal: 6,
-
-                    vertical: 2,
-
-                  ),
-
-                  minimumSize: Size.zero,
-
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-
-                ),
-
-                onPressed: () => _executeMirror(
-
-                  anchor: _mirrorAnchor!,
-
-                  direction: const Offset(1, 0),
-
-                ),
-
-                child: Text(
-
-                  l.architectMirrorAxisHorizontal,
-
-                  style: const TextStyle(
-
-                    color: Color(0xFF00E5FF),
-
-                    fontSize: 11,
-
-                  ),
-
-                ),
-
-              ),
-
-            ],
-
-            const SizedBox(width: 4),
-
-            IconButton(
-
-              key: const ValueKey('architect-mirror-cancel-btn'),
-
-              constraints: const BoxConstraints.tightFor(width: 24, height: 24),
-
-              padding: EdgeInsets.zero,
-
-              icon: const Icon(Icons.close, size: 16, color: Colors.redAccent),
-
-              tooltip: l.cancel,
-
-              onPressed: _cancelMirrorSession,
-
-            ),
-
-          ],
-
-        ),
-
-      ),
-
+            Expanded(child: Text(anchor == null ? l.architectMirrorPromptPickAnchor : l.architectMirrorPromptPickAxis,
+              maxLines: 2, overflow: TextOverflow.ellipsis)),
+            IconButton(key: const ValueKey('architect-mirror-pick-anchor'),
+              tooltip: l.architectMirrorPickAnchor,
+              icon: const Icon(Icons.center_focus_strong),
+              onPressed: () { setState(() { _mirrorAnchor = null; _mirrorCurrentPoint = null;
+                _elementMovePreview = null; }); _repaintPreview(); }),
+            IconButton(key: const ValueKey('architect-mirror-cancel-btn'),
+              tooltip: l.cancel, onPressed: _cancelMirrorSession, icon: const Icon(Icons.close)),
+          ]),
+          if (anchor != null) Row(children: [
+            Expanded(child: TextButton(key: const ValueKey('architect-mirror-vertical-btn'),
+              onPressed: () => _executeMirror(anchor: anchor, direction: const Offset(0, 1)),
+              child: Text(l.architectMirrorAxisVertical))),
+            Expanded(child: TextButton(key: const ValueKey('architect-mirror-horizontal-btn'),
+              onPressed: () => _executeMirror(anchor: anchor, direction: const Offset(1, 0)),
+              child: Text(l.architectMirrorAxisHorizontal))),
+          ]),
+        ])),
     );
-
   }
-
 
 
   void _openSectionOrElevationView(String id) {
@@ -28262,20 +28067,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         Positioned(top: 8, left: 8, right: 8, child: _buildDimensionBar()),
 
-      if (_mirrorActive)
-
-        Positioned(
-
-          top: 8,
-
-          left: 8,
-
-          right: 64,
-
-          child: _buildMirrorPromptBanner(),
-
-        ),
-
       if (_wallCutIds.isNotEmpty && !_wallCutStroke)
 
         Positioned(top: 8, left: 8, right: 64, child: _buildCutPromptBanner()),
@@ -29113,6 +28904,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         ),
 
+      if (_mirrorActive) ...[
+        Positioned.fill(child: AnimatedBuilder(animation: _viewport,
+          builder: (_, _) => ArchitectTransformPointInput(
+            key: const ValueKey('architect-mirror-input'),
+            toModel: _screenToModel, toScreen: _viewport.toScreen,
+            snap: (raw, touch) => _snapTransformPoint(raw, touch, anchor: _mirrorAnchor),
+            localizeSnap: _localizedSnapLabel,
+            onAim: _previewMirrorSnap, onPick: _pickMirrorSnap,
+            onNavigate: (delta, factor, focal) => _viewport.navigate(
+              previousFocal: focal - delta, focal: focal, scaleFactor: factor),
+          ),
+        )),
+        Positioned(top: 8, left: 8, right: 8, child: _buildMirrorPromptBanner()),
+      ],
       if (_offsetOptions != null) ...[
         Positioned.fill(child: IgnorePointer(child: AnimatedBuilder(
           animation: Listenable.merge([_viewport, _previewRevision]),
@@ -29133,7 +28938,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           builder: (_, _) => ArchitectRotationOverlay(
             key: ValueKey(_rotationSource), initialPivot: _rotationPivot,
             toModel: _screenToModel, toScreen: _viewport.toScreen,
-            snap: (point) => _snapElement(point).point,
+            snap: (raw, touch, selectionOnly) => _snapTransformPoint(raw, touch, selectionOnly: selectionOnly),
+            localizeSnap: _localizedSnapLabel,
             onPreview: _previewRotation, onApply: _applyRotation,
             onNavigate: (delta, factor, focal) => _viewport.navigate(
               previousFocal: focal - delta, focal: focal, scaleFactor: factor),

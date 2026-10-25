@@ -4855,10 +4855,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectMirrorCopyTooltip => 'Mirror copy';
 
   @override
-  String get architectMirrorPromptPickAnchor => 'Specify mirror anchor point';
+  String get architectMirrorPromptPickAnchor => 'Pick mirror anchor';
 
   @override
-  String get architectMirrorPromptPickAxis => 'Specify mirror axis direction';
+  String get architectMirrorPromptPickAxis => 'Pick second axis point';
 
   @override
   String get architectMirrorAxisVertical => 'Vertical';
@@ -7986,8 +7986,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectRotationPivot => 'Pick centre';
 
   @override
-  String get architectRotationReference => 'Pick start direction';
+  String get architectRotationReference => 'Pick point on element';
 
   @override
   String get architectRotationTarget => 'Pick angle';
+
+  @override
+  String get architectRotationPickPivot => 'Pick centre again';
+
+  @override
+  String get architectMirrorPickAnchor => 'Pick anchor again';
 }

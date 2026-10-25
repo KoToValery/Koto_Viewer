@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/models/architect_column.dart';
@@ -13,6 +14,11 @@ import 'package:kotoview/src/features/architect/services/architect_command_contr
 import 'package:kotoview/src/features/architect/services/architect_element_tool.dart';
 import 'package:kotoview/src/features/bim_editing/geometry/bim_grid_axis.dart';
 import 'package:kotoview/src/features/bim_projects/controllers/bim_viewport_controller.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_transform_point_input.dart';
+import 'package:kotoview/src/features/bim_editing/widgets/bim_edit_actions.dart';
+import 'architect_editing_test.dart' as editing;
+import 'architect_element_group_test.dart' as groups;
+import 'architect_workspace_interaction_test.dart' as workspace;
 
 ArchitectCommandController seededController({
   List<ArchitectWall> walls = const [],
@@ -62,9 +68,7 @@ Future<void> openWorkspace(
       locale: const Locale('en'),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: ArchitectWorkspaceScreen(
-        commandController: commands,
-      ),
+      home: ArchitectWorkspaceScreen(commandController: commands),
     ),
   );
   await tester.pumpAndSettle();
@@ -83,6 +87,146 @@ Offset screen(WidgetTester tester, Offset point) =>
     camera(tester).toScreen(point);
 
 void main() {
+  test(
+    'Oblique reflection around an external anchor preserves implicit hatch corners and holes',
+    () {
+      const hatch = ArchitectCadPrimitive(
+        id: 'h',
+        type: CadPrimitiveType.hatch,
+        startPoint: Offset(2, 3),
+        endPoint: Offset(6, 5),
+        holes: [
+          [Offset(3, 3.5), Offset(4, 3.5), Offset(4, 4), Offset(3, 4)],
+        ],
+      );
+      final (result, _) = ArchitectElementTool().mirrorElementById(
+        const ArchitectStorey(id: 's', name: '', cadPrimitives: [hatch]),
+        'h',
+        origin: const Offset(1, 1),
+        direction: const Offset(2, 1),
+      );
+      final mirrored = result.cadPrimitives.single;
+      final expected = [
+        const Offset(4.8, -.6),
+        const Offset(7.2, 2.6),
+        const Offset(5.6, 3.8),
+        const Offset(3.2, .6),
+      ];
+      expect(mirrored.polygon, hasLength(4));
+      for (var i = 0; i < 4; i++) {
+        expect((mirrored.polygon![i] - expected[i]).distance, lessThan(1e-8));
+      }
+      expect(
+        (mirrored.holes.single.first - const Offset(4.2, 1.1)).distance,
+        lessThan(1e-8),
+      );
+      expect(mirrored.hatchAngle, closeTo(53.130102354156, 1e-8));
+    },
+  );
+
+  for (final copy in [false, true]) {
+    testWidgets(
+      'Arbitrary mirror anchor and second point snap, preview, ${copy ? 'copy' : 'move'} and undo',
+      (tester) async {
+        final model = editing.seeded(
+          const ArchitectStorey(
+            id: 's',
+            name: '',
+            cadPrimitives: [
+              ArchitectCadPrimitive(
+                id: 'selected',
+                type: CadPrimitiveType.line,
+                startPoint: Offset(2, 3),
+                endPoint: Offset(6, 3),
+              ),
+              ArchitectCadPrimitive(
+                id: 'guide',
+                type: CadPrimitiveType.line,
+                startPoint: Offset(1, 1),
+                endPoint: Offset(3, 2),
+              ),
+            ],
+          ),
+        );
+        addTearDown(model.dispose);
+        await workspace.open(tester, model);
+        workspace.camera(tester).fit(const Rect.fromLTRB(-4, -4, 10, 10));
+        await tester.pumpAndSettle();
+        final before = model.project.activeStorey.toJson();
+        Future<void> start() async {
+          await editing.contextHold(tester, const Offset(4, 3));
+          await groups.action(
+            tester,
+            copy ? BimEditAction.mirrorCopy : BimEditAction.mirrorMove,
+          );
+        }
+
+        await start();
+        await tester.tapAt(workspace.screen(tester, const Offset(3, 2)));
+        await tester.pump();
+        await tester.tap(
+          find.byKey(const ValueKey('architect-mirror-pick-anchor')),
+        );
+        await tester.pump();
+        await tester.tapAt(workspace.screen(tester, const Offset(1.02, 1.01)));
+        await tester.pump();
+        final marker =
+            tester
+                    .widget<CustomPaint>(
+                      find.byKey(const ValueKey('architect-transform-snap')),
+                    )
+                    .painter!
+                as ArchitectTransformSnapPainter;
+        expect(marker.result.isSnapped, isTrue);
+        expect(marker.result.point, const Offset(1, 1));
+        final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+        await mouse.addPointer(
+          location: workspace.screen(tester, const Offset(3.02, 2.01)),
+        );
+        await mouse.moveTo(workspace.screen(tester, const Offset(3.01, 2.02)));
+        await tester.pump();
+        final preview = workspace
+            .overlay(tester)
+            .project
+            .activeStorey
+            .cadPrimitives;
+        final mirrored = copy ? preview.last : preview.first;
+        expect(
+          (mirrored.startPoint - const Offset(3.2, .6)).distance,
+          lessThan(1e-8),
+        );
+        expect(
+          (mirrored.endPoint - const Offset(5.6, 3.8)).distance,
+          lessThan(1e-8),
+        );
+        final previewId = mirrored.id;
+        expect(model.project.activeStorey.toJson(), before);
+        await tester.tap(
+          find.byKey(const ValueKey('architect-mirror-cancel-btn')),
+        );
+        await tester.pumpAndSettle();
+        expect(workspace.overlay(tester).project.activeStorey.toJson(), before);
+        await mouse.removePointer();
+        await start();
+        await tester.tapAt(workspace.screen(tester, const Offset(1, 1)));
+        await tester.pump();
+        await tester.tapAt(workspace.screen(tester, const Offset(3, 2)));
+        await tester.pumpAndSettle();
+        final committed = model.project.activeStorey.cadPrimitives;
+        expect(committed, hasLength(copy ? 3 : 2));
+        final finalMirror = copy ? committed.last : committed.first;
+        expect(
+          (finalMirror.startPoint - const Offset(3.2, .6)).distance,
+          lessThan(1e-8),
+        );
+        if (!copy) expect(finalMirror.id, previewId);
+        model.undo();
+        await tester.pumpAndSettle();
+        expect(model.project.activeStorey.toJson(), before);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
   group('ArchitectElementTool - mirrorElementById', () {
     test('mirrors wall across vertical axis with door and inverted hinge', () {
       final wall = ArchitectWall(
@@ -203,12 +347,7 @@ void main() {
     test('mirrors slab polygon and reverses vertex order', () {
       final slab = ArchitectSlab(
         id: 'sl1',
-        polygon: const [
-          Offset(0, 0),
-          Offset(4, 0),
-          Offset(4, 3),
-          Offset(0, 3),
-        ],
+        polygon: const [Offset(0, 0), Offset(4, 0), Offset(4, 3), Offset(0, 3)],
         thickness: 0.2,
       );
       final storey = ArchitectStorey(id: 's', name: 'Floor', slabs: [slab]);
@@ -239,12 +378,7 @@ void main() {
       final roof = ArchitectRoofPlane(
         id: 'r1',
         storeyId: 's',
-        points: const [
-          Offset(0, 0),
-          Offset(6, 0),
-          Offset(6, 4),
-          Offset(0, 4),
-        ],
+        points: const [Offset(0, 0), Offset(6, 0), Offset(6, 4), Offset(0, 4)],
         eavesEdgeIndex: 0,
       );
       final storey = ArchitectStorey(id: 's', name: 'Floor', roofs: [roof]);
@@ -353,67 +487,83 @@ void main() {
 
       controller.execute(cmd);
       expect(controller.project.gridAxes.length, 2);
-      final newAxis = controller.project.gridAxes.firstWhere((a) => a.id != 'ax1');
+      final newAxis = controller.project.gridAxes.firstWhere(
+        (a) => a.id != 'ax1',
+      );
       expect(newAxis.start.dx, closeTo(-2, 0.001));
       expect(newAxis.end.dx, closeTo(-2, 0.001));
     });
   });
 
   group('Interactive Mirror UI Workflow', () {
-    testWidgets('selection bar triggers mirror copy, anchor pick, vertical axis, and commit', (
-      tester,
-    ) async {
-      final wall = ArchitectWall(
-        id: 'w1',
-        startPoint: const Offset(2, 1),
-        endPoint: const Offset(2, 5),
-        thickness: 0.25,
-      );
-      final controller = seededController(walls: [wall]);
-      addTearDown(controller.dispose);
-      await openWorkspace(tester, controller);
+    testWidgets(
+      'selection bar triggers mirror copy, anchor pick, vertical axis, and commit',
+      (tester) async {
+        final wall = ArchitectWall(
+          id: 'w1',
+          startPoint: const Offset(2, 1),
+          endPoint: const Offset(2, 5),
+          thickness: 0.25,
+        );
+        final controller = seededController(walls: [wall]);
+        addTearDown(controller.dispose);
+        await openWorkspace(tester, controller);
 
-      // 1. Select the wall by tapping near (2, 3)
-      await tester.tapAt(screen(tester, const Offset(2, 3)));
-      await tester.pumpAndSettle();
+        // 1. Select the wall by tapping near (2, 3)
+        await tester.tapAt(screen(tester, const Offset(2, 3)));
+        await tester.pumpAndSettle();
 
-      // Verify selection bar has mirror copy button
-      final mirrorCopyBtn = find.byKey(const ValueKey('architect-selection-mirror-copy'));
-      expect(mirrorCopyBtn, findsOneWidget);
+        // Verify selection bar has mirror copy button
+        final mirrorCopyBtn = find.byKey(
+          const ValueKey('architect-selection-mirror-copy'),
+        );
+        expect(mirrorCopyBtn, findsOneWidget);
 
-      // 2. Tap Mirror Copy button
-      await tester.tap(mirrorCopyBtn);
-      await tester.pumpAndSettle();
+        // 2. Tap Mirror Copy button
+        await tester.tap(mirrorCopyBtn);
+        await tester.pumpAndSettle();
 
-      // Banner should now be visible asking for anchor point
-      final banner = find.byKey(const ValueKey('architect-mirror-banner'));
-      expect(banner, findsOneWidget);
-      expect(
-        find.descendant(of: banner, matching: find.textContaining('anchor')),
-        findsOneWidget,
-      );
+        // Banner should now be visible asking for anchor point
+        final banner = find.byKey(const ValueKey('architect-mirror-banner'));
+        expect(banner, findsOneWidget);
+        expect(
+          find.descendant(of: banner, matching: find.textContaining('anchor')),
+          findsOneWidget,
+        );
 
-      // 3. Pick anchor at (0, 3) in open canvas space
-      await tester.tapAt(screen(tester, const Offset(0, 3)));
-      await tester.pumpAndSettle();
+        // 3. Pick anchor at (0, 3) in open canvas space
+        await tester.tapAt(screen(tester, const Offset(0, 3)));
+        await tester.pumpAndSettle();
 
-      // Banner now asks for axis or quick buttons (Vertical / Horizontal)
-      expect(find.byKey(const ValueKey('architect-mirror-vertical-btn')), findsOneWidget);
-      expect(find.byKey(const ValueKey('architect-mirror-horizontal-btn')), findsOneWidget);
+        // Banner now asks for axis or quick buttons (Vertical / Horizontal)
+        expect(
+          find.byKey(const ValueKey('architect-mirror-vertical-btn')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-mirror-horizontal-btn')),
+          findsOneWidget,
+        );
 
-      // 4. Tap Vertical axis quick button
-      await tester.tap(find.byKey(const ValueKey('architect-mirror-vertical-btn')));
-      await tester.pumpAndSettle();
+        // 4. Tap Vertical axis quick button
+        await tester.tap(
+          find.byKey(const ValueKey('architect-mirror-vertical-btn')),
+        );
+        await tester.pumpAndSettle();
 
-      // Banner dismissed, mirror committed
-      expect(find.byKey(const ValueKey('architect-mirror-banner')), findsNothing);
+        // Banner dismissed, mirror committed
+        expect(
+          find.byKey(const ValueKey('architect-mirror-banner')),
+          findsNothing,
+        );
 
-      // Verify that activeStorey now has 2 walls, one at x = 2, one at x = -2
-      final walls = controller.project.activeStorey.walls;
-      expect(walls.length, 2);
-      final mirrored = walls.firstWhere((w) => w.id != 'w1');
-      expect(mirrored.startPoint.dx, closeTo(-2, 0.01));
-      expect(mirrored.endPoint.dx, closeTo(-2, 0.01));
-    });
+        // Verify that activeStorey now has 2 walls, one at x = 2, one at x = -2
+        final walls = controller.project.activeStorey.walls;
+        expect(walls.length, 2);
+        final mirrored = walls.firstWhere((w) => w.id != 'w1');
+        expect(mirrored.startPoint.dx, closeTo(-2, 0.01));
+        expect(mirrored.endPoint.dx, closeTo(-2, 0.01));
+      },
+    );
   });
 }

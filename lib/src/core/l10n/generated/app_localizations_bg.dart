@@ -4877,12 +4877,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectMirrorCopyTooltip => 'Огледално копиране';
 
   @override
-  String get architectMirrorPromptPickAnchor =>
-      'Посочете опорна точка за огледално отразяване';
+  String get architectMirrorPromptPickAnchor => 'Избери опорна точка';
 
   @override
-  String get architectMirrorPromptPickAxis =>
-      'Посочете второ направление за огледална ос';
+  String get architectMirrorPromptPickAxis => 'Избери втора точка на оста';
 
   @override
   String get architectMirrorAxisVertical => 'Вертикална';
@@ -8016,8 +8014,14 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectRotationPivot => 'Избери център';
 
   @override
-  String get architectRotationReference => 'Избери начална посока';
+  String get architectRotationReference => 'Избери точка от елемента';
 
   @override
   String get architectRotationTarget => 'Избери ъгъл';
+
+  @override
+  String get architectRotationPickPivot => 'Избери друг център';
+
+  @override
+  String get architectMirrorPickAnchor => 'Избери друга опорна точка';
 }

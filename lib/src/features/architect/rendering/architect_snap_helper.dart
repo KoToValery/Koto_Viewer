@@ -74,6 +74,7 @@ class ArchitectSnapHelper {
     bool excludeWallAxes = false,
     bool preferIntersections = false,
     Set<String> excludedIds = const {},
+    Set<String>? includedIds,
     List<ArchitectMidpointReference> midpointReferences = const [],
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
@@ -87,6 +88,7 @@ class ArchitectSnapHelper {
     excludeWallAxes: excludeWallAxes,
     preferIntersections: preferIntersections,
     excludedIds: excludedIds,
+    includedIds: includedIds,
     midpointReferences: midpointReferences,
     underlay: underlay,
     frame: frame,
@@ -171,6 +173,7 @@ class ArchitectSnapHelper {
     bool excludeWallAxes = false,
     bool preferIntersections = false,
     required Set<String> excludedIds,
+    Set<String>? includedIds,
     required List<ArchitectMidpointReference> midpointReferences,
     DxfDocument? underlay,
     required BimCoordinateFrame frame,
@@ -192,7 +195,22 @@ class ArchitectSnapHelper {
         ...wall.windows.map((window) => window.id),
       ],
     };
+    final includedOwners = includedIds == null
+        ? null
+        : {
+            ...includedIds,
+            for (final wall in project.activeStorey.walls.where(
+              (w) => includedIds.contains(w.id),
+            )) ...[
+              ...wall.doors.map((door) => door.id),
+              ...wall.windows.map((window) => window.id),
+            ],
+          };
     bool excluded(String owner) =>
+        (includedOwners != null &&
+            !includedOwners.contains(owner) &&
+            !(owner.startsWith('@wall-axis:') &&
+                includedOwners.contains(owner.substring(11)))) ||
         excludedOwners.contains(owner) ||
         (excludeWallAxes && owner.startsWith('@wall-axis')) ||
         (owner.startsWith('@wall-axis:') &&
@@ -245,7 +263,7 @@ class ArchitectSnapHelper {
       final projection = BimLineGeometry.closest(raw, edge.a, edge.b);
       if ((projection - raw).distance <= radius) nearby.add((edge.a, edge.b));
     }
-    if (underlay != null) {
+    if (underlay != null && includedIds == null) {
       underlay.orBuildSpatialIndex;
       nearby.addAll(
         DxfSegmentSnap.nearby(

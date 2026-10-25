@@ -8534,13 +8534,13 @@ abstract class AppLocalizations {
   /// Prompt for picking mirror reference anchor point
   ///
   /// In en, this message translates to:
-  /// **'Specify mirror anchor point'**
+  /// **'Pick mirror anchor'**
   String get architectMirrorPromptPickAnchor;
 
   /// Prompt for specifying second point or mirror axis direction
   ///
   /// In en, this message translates to:
-  /// **'Specify mirror axis direction'**
+  /// **'Pick second axis point'**
   String get architectMirrorPromptPickAxis;
 
   /// Button to mirror across a vertical axis through anchor
@@ -14342,7 +14342,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectRotationReference.
   ///
   /// In en, this message translates to:
-  /// **'Pick start direction'**
+  /// **'Pick point on element'**
   String get architectRotationReference;
 
   /// No description provided for @architectRotationTarget.
@@ -14350,6 +14350,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pick angle'**
   String get architectRotationTarget;
+
+  /// No description provided for @architectRotationPickPivot.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick centre again'**
+  String get architectRotationPickPivot;
+
+  /// No description provided for @architectMirrorPickAnchor.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick anchor again'**
+  String get architectMirrorPickAnchor;
 }
 
 class _AppLocalizationsDelegate

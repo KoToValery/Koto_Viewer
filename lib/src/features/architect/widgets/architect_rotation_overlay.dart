@@ -3,10 +3,15 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../services/architect_rotation.dart';
 import '../../bim_editing/widgets/bim_numeric_keypad.dart';
+import '../rendering/architect_snap_helper.dart';
+import 'architect_transform_point_input.dart';
 
 class ArchitectRotationOverlay extends StatefulWidget {
   final Offset initialPivot;
-  final Offset Function(Offset) toModel, toScreen, snap;
+  final Offset Function(Offset) toModel, toScreen;
+  final ArchitectSnapResult Function(Offset raw, bool touch, bool selectionOnly)
+  snap;
+  final String? Function(String?) localizeSnap;
   final void Function(Offset pivot, double radians) onPreview, onApply;
   final void Function(Offset delta, double factor, Offset focal) onNavigate;
   final VoidCallback onCancel;
@@ -16,6 +21,7 @@ class ArchitectRotationOverlay extends StatefulWidget {
     required this.toModel,
     required this.toScreen,
     required this.snap,
+    required this.localizeSnap,
     required this.onPreview,
     required this.onApply,
     required this.onNavigate,
@@ -30,12 +36,9 @@ class _RotationState extends State<ArchitectRotationOverlay> {
   Offset? reference, target;
   double angle = 0;
   int stage = 0;
-  bool navigating = false;
-  Offset? focal;
-  double scale = 1;
 
-  void aim(Offset screen) {
-    final point = widget.snap(widget.toModel(screen));
+  void aim(ArchitectSnapResult snap) {
+    final point = snap.point;
     setState(() {
       target = point;
       if (stage == 2 && (point - pivot).distance > 1e-8) {
@@ -48,17 +51,21 @@ class _RotationState extends State<ArchitectRotationOverlay> {
         // on a long reference ray, while remaining usable near the pivot.
         final radius =
             (widget.toScreen(point) - widget.toScreen(pivot)).distance;
-        angle = ArchitectRotation.snapAngle(
-          raw,
-          tolerance: math.atan2(10, radius).clamp(math.pi / 180, math.pi / 30),
-        );
+        angle = snap.isSnapped
+            ? raw
+            : ArchitectRotation.snapAngle(
+                raw,
+                tolerance: math
+                    .atan2(10, radius)
+                    .clamp(math.pi / 180, math.pi / 30),
+              );
       }
     });
     if (stage == 2) widget.onPreview(pivot, angle);
   }
 
-  void accept(Offset screen) {
-    aim(screen);
+  void accept(ArchitectSnapResult snap) {
+    aim(snap);
     if (stage == 0) {
       setState(() {
         pivot = target!;
@@ -66,7 +73,7 @@ class _RotationState extends State<ArchitectRotationOverlay> {
         stage = 1;
       });
     } else if (stage == 1) {
-      if ((target! - pivot).distance < 1e-8) return;
+      if (!snap.isSnapped || (target! - pivot).distance < 1e-8) return;
       setState(() {
         reference = target;
         stage = 2;
@@ -100,48 +107,31 @@ class _RotationState extends State<ArchitectRotationOverlay> {
     return Stack(
       children: [
         Positioned.fill(
-          child: MouseRegion(
-            onHover: (e) => aim(e.localPosition),
-            child: GestureDetector(
-              key: const ValueKey('architect-rotation-input'),
-              behavior: HitTestBehavior.opaque,
-              onTapUp: (e) => accept(e.localPosition),
-              onScaleStart: (e) {
-                focal = e.localFocalPoint;
-                scale = 1;
-                navigating = e.pointerCount > 1;
-              },
-              onScaleUpdate: (e) {
-                if (e.pointerCount > 1) navigating = true;
-                if (navigating) {
-                  widget.onNavigate(
-                    e.localFocalPoint - focal!,
-                    e.scale / scale,
-                    e.localFocalPoint,
-                  );
-                  focal = e.localFocalPoint;
-                  scale = e.scale;
-                  setState(() {});
-                } else {
-                  aim(e.localFocalPoint);
-                }
-              },
-              onScaleEnd: (_) {
-                navigating = false;
-              },
-              child: CustomPaint(
-                painter: _RotationPainter(
-                  pivot: widget.toScreen(pivot),
-                  reference: reference == null
-                      ? null
-                      : widget.toScreen(reference!),
-                  target: target == null ? null : widget.toScreen(target!),
-                  angle: angle,
-                  stage: stage,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+          child: IgnorePointer(
+            child: CustomPaint(
+              painter: _RotationPainter(
+                pivot: widget.toScreen(pivot),
+                reference: reference == null
+                    ? null
+                    : widget.toScreen(reference!),
+                target: target == null ? null : widget.toScreen(target!),
+                angle: angle,
+                stage: stage,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
+          ),
+        ),
+        Positioned.fill(
+          child: ArchitectTransformPointInput(
+            key: const ValueKey('architect-rotation-input'),
+            toModel: widget.toModel,
+            toScreen: widget.toScreen,
+            snap: (raw, touch) => widget.snap(raw, touch, stage == 1),
+            localizeSnap: widget.localizeSnap,
+            onAim: aim,
+            onPick: accept,
+            onNavigate: widget.onNavigate,
           ),
         ),
         Positioned(
@@ -165,6 +155,20 @@ class _RotationState extends State<ArchitectRotationOverlay> {
                           1 => l.architectRotationReference,
                           _ => l.architectRotationTarget,
                         }, maxLines: 2),
+                      ),
+                      IconButton(
+                        key: const ValueKey('architect-rotation-pick-pivot'),
+                        tooltip: l.architectRotationPickPivot,
+                        onPressed: () {
+                          setState(() {
+                            stage = 0;
+                            reference = null;
+                            target = null;
+                            angle = 0;
+                          });
+                          widget.onPreview(pivot, 0);
+                        },
+                        icon: const Icon(Icons.center_focus_strong),
                       ),
                       IconButton(
                         tooltip: l.cancel,
@@ -260,7 +264,13 @@ class _RotationPainter extends CustomPainter {
       pivot + const Offset(0, 10),
       ink,
     );
-    if (reference != null) canvas.drawLine(pivot, reference!, guide);
+    if (reference != null) {
+      canvas.drawLine(pivot, reference!, guide);
+      canvas.drawRect(
+        Rect.fromCenter(center: reference!, width: 8, height: 8),
+        ink,
+      );
+    }
     if (stage == 2) {
       final radius = math.max(50.0, ray.distance);
       final end =

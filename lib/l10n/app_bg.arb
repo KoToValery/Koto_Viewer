@@ -1580,8 +1580,8 @@
   "architectMirrorMoveTooltip": "Огледално преместване",
   "architectMirrorCopy": "Огледало+",
   "architectMirrorCopyTooltip": "Огледално копиране",
-  "architectMirrorPromptPickAnchor": "Посочете опорна точка за огледално отразяване",
-  "architectMirrorPromptPickAxis": "Посочете второ направление за огледална ос",
+  "architectMirrorPromptPickAnchor": "Избери опорна точка",
+  "architectMirrorPromptPickAxis": "Избери втора точка на оста",
   "architectMirrorAxisVertical": "Вертикална",
   "architectMirrorAxisHorizontal": "Хоризонтална",
   "architectEdgeDistance": "Разстояние",
@@ -2613,6 +2613,8 @@
   "architectColorRailway": "Железопътни терени",
   "architectColorAgriculture": "Земеделски площи",
   "architectRotationPivot": "Избери център",
-  "architectRotationReference": "Избери начална посока",
-  "architectRotationTarget": "Избери ъгъл"
+  "architectRotationReference": "Избери точка от елемента",
+  "architectRotationTarget": "Избери ъгъл",
+  "architectRotationPickPivot": "Избери друг център",
+  "architectMirrorPickAnchor": "Избери друга опорна точка"
 }

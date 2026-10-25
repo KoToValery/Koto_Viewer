@@ -103,6 +103,51 @@ Future<void> enterOffset(WidgetTester tester, String value) async {
 }
 
 void main() {
+  testWidgets('Wall offset HUD and direction stay above dynamic dimensions', (
+    tester,
+  ) async {
+    final model = editing.seeded(
+      const ArchitectStorey(
+        id: 's',
+        name: '',
+        walls: [
+          ArchitectWall(
+            id: 'wall',
+            startPoint: Offset.zero,
+            endPoint: Offset(4, 0),
+          ),
+        ],
+      ),
+    );
+    addTearDown(model.dispose);
+    await workspace.open(tester, model);
+    workspace.camera(tester).fit(const Rect.fromLTRB(-4, -4, 9, 8));
+    await tester.pumpAndSettle();
+    await editing.contextHold(tester, const Offset(2, 0));
+    await groups.action(tester, BimEditAction.offset);
+    await enterOffset(tester, '1');
+    await tester.tap(find.byKey(const ValueKey('architect-offset-start')));
+    await tester.pumpAndSettle();
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(
+      location: workspace.screen(tester, const Offset(2, -2)),
+    );
+    await mouse.moveTo(workspace.screen(tester, const Offset(2, -1)));
+    await tester.pumpAndSettle();
+    final arrow = tester.widget<CustomPaint>(
+      find.byKey(const ValueKey('architect-offset-direction')),
+    );
+    expect(arrow.painter, isNotNull);
+    final cancel = find.byKey(const ValueKey('architect-offset-cancel'));
+    expect(cancel.hitTestable(), findsOneWidget);
+    await tester.tap(cancel);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('architect-offset-banner')), findsNothing);
+    expect(model.project.activeStorey.walls, hasLength(1));
+    expect(model.project.activeStorey.walls.single.startPoint, Offset.zero);
+    await mouse.removePointer();
+    expect(tester.takeException(), isNull);
+  });
   setUpAll(() async {
     await (FontLoader(
       'Roboto',

@@ -3547,9 +3547,9 @@
   "@architectMirrorCopy": { "description": "Mirror copy action label" },
   "architectMirrorCopyTooltip": "Mirror copy",
   "@architectMirrorCopyTooltip": { "description": "Mirror copy action tooltip" },
-  "architectMirrorPromptPickAnchor": "Specify mirror anchor point",
+  "architectMirrorPromptPickAnchor": "Pick mirror anchor",
   "@architectMirrorPromptPickAnchor": { "description": "Prompt for picking mirror reference anchor point" },
-  "architectMirrorPromptPickAxis": "Specify mirror axis direction",
+  "architectMirrorPromptPickAxis": "Pick second axis point",
   "@architectMirrorPromptPickAxis": { "description": "Prompt for specifying second point or mirror axis direction" },
   "architectMirrorAxisVertical": "Vertical",
   "@architectMirrorAxisVertical": { "description": "Button to mirror across a vertical axis through anchor" },
@@ -4797,6 +4797,8 @@
   "architectColorRailway": "Railway land",
   "architectColorAgriculture": "Agricultural land",
   "architectRotationPivot": "Pick centre",
-  "architectRotationReference": "Pick start direction",
-  "architectRotationTarget": "Pick angle"
+  "architectRotationReference": "Pick point on element",
+  "architectRotationTarget": "Pick angle",
+  "architectRotationPickPivot": "Pick centre again",
+  "architectMirrorPickAnchor": "Pick anchor again"
 }

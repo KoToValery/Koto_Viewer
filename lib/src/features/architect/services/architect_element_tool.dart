@@ -1365,14 +1365,18 @@ class ArchitectElementTool extends ChangeNotifier {
     final cadIndex = storey.cadPrimitives.indexWhere((c) => c.id == elementId);
     if (cadIndex != -1) {
       final prim = storey.cadPrimitives[cadIndex];
+      final hatchRadians = prim.hatchAngle * math.pi / 180;
+      final hatchDirection = BimTransform2D.mirror(
+        Offset(math.cos(hatchRadians), math.sin(hatchRadians)), Offset.zero, direction);
       final newPrim = prim.copyWith(
         id: targetId,
         holes: ArchitectContour.transform(prim.holes, (p) => BimTransform2D.mirror(p, origin, direction)),
         startPoint: BimTransform2D.mirror(prim.startPoint, origin, direction),
         endPoint: BimTransform2D.mirror(prim.endPoint, origin, direction),
-        polygon: prim.polygon != null
+        hatchAngle: math.atan2(hatchDirection.dy, hatchDirection.dx) * 180 / math.pi,
+        polygon: prim.isPolygon || prim.polygon != null
             ? [
-                for (final p in prim.polygon!)
+                for (final p in prim.isPolygon ? prim.polygonCorners : prim.polygon!)
                   BimTransform2D.mirror(p, origin, direction),
               ].reversed.toList()
             : null,
