@@ -391,30 +391,18 @@ class Architect3dBuilder {
     final timber = roof.assembly.timber;
     final rafterH = timber.rafterHeight / cosSlope;
     const boardingH = 0.022;
-    final counterBattenH =
-        math.max(timber.counterBattenHeight, 0.03) / cosSlope;
-    final battenH = math.max(timber.battenHeight, 0.03) / cosSlope;
-    final coveringH = math.max(
-      (roof.assembly.totalThickness / cosSlope) -
-          (rafterH + boardingH + counterBattenH + battenH),
-      0.035 / cosSlope,
-    );
+    final totalH = roof.assembly.totalThickness / cosSlope;
 
     final hRafterBottom = 0.0;
     final hRafterTop = rafterH;
     final hBoardTop = hRafterTop + boardingH;
-    final hCounterTop = hBoardTop + counterBattenH;
-    final hBattenTop = hCounterTop + battenH;
-    final hCoverTop = hBattenTop + coveringH;
+    final hCoverTop = math.max(hBoardTop + 0.025, totalH);
 
     const rafterTopColor = Color(0xFFD7A86E);
     const rafterSideColor = Color(0xFFC49256);
     const purlinColor = Color(0xFFB8864B);
     const boardColor = Color(0xFFCFA16B);
     const membraneColor = Color(0xFF37474F);
-    const insulationColor = Color(0xFFE6C86E);
-    const counterBattenColor = Color(0xFFDEB887);
-    const battenColor = Color(0xFFE6C28B);
 
     // 1. Wall plate (Mauerlat / Мауерлат) along wall bearing line & Ridge Purlin (Билова столица)
     final wpW = timber.wallPlateWidth.clamp(0.10, 0.24);
@@ -468,10 +456,9 @@ class Architect3dBuilder {
       );
     }
 
-    // 2. Rafters (Ребра) & Counter-battens (Контралетви) along slope direction
+    // 2. Rafters (Ребра) along slope direction (prominently visible at eaves overhang)
     final rafterW = timber.rafterWidth.clamp(0.05, 0.16);
     final rafterStep = math.max(timber.rafterSpacing, 0.35);
-    final cbW = timber.counterBattenWidth.clamp(0.04, rafterW);
 
     final rafterPositions = <double>[];
     for (var s = minS; s <= maxS - rafterW + 1e-4; s += rafterStep) {
@@ -499,62 +486,10 @@ class Architect3dBuilder {
         topColor: rafterTopColor,
         sideColor: rafterSideColor,
       );
-
-      // Counter-batten (Контралетва) directly on top of the rafter line
-      final cbS0 = s0 + (rafterW - cbW) * 0.5;
-      final cbS1 = math.min(cbS0 + cbW, maxS);
-      final cbClip = _clipPolygonToRect(polySD, cbS0, cbS1, minD, maxD);
-      _addExtrudedClippedPrism(
-        tris,
-        cbClip,
-        p0,
-        u,
-        v,
-        storey.elevation,
-        roof,
-        hBoardTop,
-        hCounterTop,
-        planClip: footprint,
-        topColor: counterBattenColor,
-        sideColor: rafterSideColor,
-      );
     }
 
-    // 3. Thermal insulation between rafters (inward of wall bearing line so eaves rafters stay exposed)
-    final hasInsulation = roof.assembly.layers.any(
-      (l) => l.material == ArchitectRoofMaterial.mineralWool,
-    );
-    if (hasInsulation && dWall < maxD - 0.1) {
-      for (var i = 0; i < rafterPositions.length - 1; i++) {
-        final bayS0 = rafterPositions[i] + rafterW + 0.005;
-        final bayS1 = rafterPositions[i + 1] - 0.005;
-        if (bayS1 <= bayS0) continue;
-        final insClip = _clipPolygonToRect(polySD, bayS0, bayS1, dWall, maxD);
-        _addExtrudedClippedPrism(
-          tris,
-          insClip,
-          p0,
-          u,
-          v,
-          storey.elevation,
-          roof,
-          hRafterBottom + rafterH * 0.12,
-          hRafterTop * 0.94,
-          planClip: footprint,
-          topColor: insulationColor,
-          sideColor: insulationColor,
-        );
-      }
-    }
-
-    // A finished roof covers the full footprint. Construction layers remain
-    // visible in sections and below the eaves, without a permanent cutaway.
-    final boardMaxS = maxS;
-    final coverMaxS = maxS;
-    final coverMinD = minD;
-
-    // 4. Sub-roof boarding + waterproofing membrane (Обшивка + Мембрана)
-    final boardClip = _clipPolygonToRect(polySD, minS, boardMaxS, minD, maxD);
+    // 3. Sub-roof boarding (Дъсчена обшивка / стреха над ребрата)
+    final boardClip = _clipPolygonToRect(polySD, minS, maxS, minD, maxD);
     _addExtrudedClippedPrism(
       tris,
       boardClip,
@@ -571,74 +506,35 @@ class Architect3dBuilder {
       sideColor: boardColor,
     );
 
-    // 5. Battens (Летви) perpendicular to slope
-    final battenW = timber.battenWidth.clamp(0.03, 0.08);
-    final battenStep = math.max(timber.battenSpacing, 0.22);
-    final battenPositions = <double>[];
-    for (var d = minD; d <= maxD - battenW + 1e-4; d += battenStep) {
-      battenPositions.add(d);
-    }
-    if (battenPositions.isEmpty ||
-        (maxD - battenW - battenPositions.last).abs() > battenW * 0.6) {
-      battenPositions.add(math.max(minD, maxD - battenW));
-    }
+    // 4. Finished Roof Covering (Покритие - керемиди / ламарина / битум)
+    final coverClip = _clipPolygonToRect(polySD, minS, maxS, minD, maxD);
+    _addExtrudedClippedPrism(
+      tris,
+      coverClip,
+      p0,
+      u,
+      v,
+      storey.elevation,
+      roof,
+      hBoardTop,
+      hCoverTop,
+      planClip: footprint,
+      topColor: topColor,
+      sideColor: fasciaColor,
+    );
 
-    for (final d0 in battenPositions) {
-      final d1 = math.min(d0 + battenW, maxD);
-      final battenClip = _clipPolygonToRect(polySD, minS, maxS, d0, d1);
-      _addExtrudedClippedPrism(
-        tris,
-        battenClip,
-        p0,
-        u,
-        v,
-        storey.elevation,
-        roof,
-        hCounterTop,
-        hBattenTop,
-        planClip: footprint,
-        topColor: battenColor,
-        sideColor: rafterSideColor,
-      );
-    }
-
-    // 6. 3D Profiled Covering: Tiles (Керемиди) or Profiled Metal (Профилирана ламарина)
+    // 5. Standing seams for metal sheet roofs
     if (topMat == ArchitectRoofMaterial.metalSeam) {
-      // Base metal pan sheet
-      final panH = math.max(coveringH * 0.28, 0.010);
-      final sheetClip = _clipPolygonToRect(
-        polySD,
-        minS,
-        coverMaxS,
-        coverMinD,
-        maxD,
-      );
-      _addExtrudedClippedPrism(
-        tris,
-        sheetClip,
-        p0,
-        u,
-        v,
-        storey.elevation,
-        roof,
-        hBattenTop,
-        hBattenTop + panH,
-        planClip: footprint,
-        topColor: topColor,
-        sideColor: const Color(0xFF37474F),
-      );
-
-      // Raised standing seams / corrugated ribs along slope
       const seamSpacing = 0.50;
       const seamWidth = 0.036;
       const seamDark = Color(0xFF37474F);
       const seamLight = Color(0xFF607D8B);
-      for (var s = minS + 0.04; s <= coverMaxS - seamWidth; s += seamSpacing) {
+      for (var s = minS + 0.04; s <= maxS - seamWidth; s += seamSpacing) {
         final seamClip = _clipPolygonToRect(
           polySD,
           s,
           s + seamWidth,
-          coverMinD,
+          minD,
           maxD,
         );
         _addExtrudedClippedPrism(
@@ -649,106 +545,13 @@ class Architect3dBuilder {
           v,
           storey.elevation,
           roof,
-          hBattenTop + panH,
           hCoverTop,
+          hCoverTop + 0.025,
           planClip: footprint,
           topColor: seamLight,
           sideColor: seamDark,
         );
       }
-    } else if (topMat == ArchitectRoofMaterial.clayTiles ||
-        topMat == ArchitectRoofMaterial.concreteTiles ||
-        topMat == ArchitectRoofMaterial.bitumenShingles) {
-      final shadeDark = Color.lerp(topColor, Colors.black, 0.22)!;
-      final shadeLight = Color.lerp(topColor, Colors.white, 0.12)!;
-      final courseCount = battenPositions.length;
-
-      // Stepped overlapping tile courses along each batten row
-      for (var i = 0; i < courseCount; i++) {
-        final dStart = math.max(battenPositions[i], coverMinD);
-        final dEnd = (i + 1 < courseCount)
-            ? math.min(battenPositions[i + 1] + battenW * 0.45, maxD)
-            : maxD;
-        if (dEnd <= dStart + 0.01) continue;
-
-        final courseClip = _clipPolygonToRect(
-          polySD,
-          minS,
-          coverMaxS,
-          dStart,
-          dEnd,
-        );
-        final courseColor = i.isEven ? topColor : shadeLight;
-        _addExtrudedClippedPrism(
-          tris,
-          courseClip,
-          p0,
-          u,
-          v,
-          storey.elevation,
-          roof,
-          hBattenTop,
-          hBattenTop + coveringH * 0.62,
-          planClip: footprint,
-          topColor: courseColor,
-          sideColor: shadeDark,
-        );
-      }
-
-      // 3D longitudinal tile wave crests (профил на керемидите)
-      if (topMat != ArchitectRoofMaterial.bitumenShingles) {
-        const tilePitchS = 0.28;
-        const crestWidth = 0.075;
-        for (
-          var s = minS + 0.05;
-          s <= coverMaxS - crestWidth;
-          s += tilePitchS
-        ) {
-          final crestClip = _clipPolygonToRect(
-            polySD,
-            s,
-            s + crestWidth,
-            coverMinD,
-            maxD,
-          );
-          _addExtrudedClippedPrism(
-            tris,
-            crestClip,
-            p0,
-            u,
-            v,
-            storey.elevation,
-            roof,
-            hBattenTop + coveringH * 0.62,
-            hCoverTop,
-            planClip: footprint,
-            topColor: shadeLight,
-            sideColor: shadeDark,
-          );
-        }
-      }
-    } else {
-      final coverClip = _clipPolygonToRect(
-        polySD,
-        minS,
-        coverMaxS,
-        coverMinD,
-        maxD,
-      );
-      _addExtrudedClippedPrism(
-        tris,
-        coverClip,
-        p0,
-        u,
-        v,
-        storey.elevation,
-        roof,
-        hBattenTop,
-        hCoverTop,
-        planClip: footprint,
-        topColor: topColor,
-        sideColor: fasciaColor,
-      );
     }
 
     return tris;
