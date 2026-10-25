@@ -23,6 +23,8 @@ class Architect3dBuilder {
     ArchitectProject project, {
     bool previewGeometry = true,
     Map<Triangle3D, String>? sources,
+    bool cleanDrainage = false,
+    Map<Triangle3D, String>? silhouetteGroups,
     ArchitectSectionVisibility? sectionVisibility,
     Set<String> suppressedOpeningIds = const {},
     Map<String, FenestrationElevationDetail> openingDetailLevels = const {},
@@ -263,19 +265,32 @@ class Architect3dBuilder {
             project,
             storey,
             roof,
-            includeGutters: sectionVisibility == null ||
-                sectionVisibility.modeFor(ArchitectSectionCategory.gutters)
+            includeGutters:
+                sectionVisibility == null ||
+                sectionVisibility
+                    .modeFor(ArchitectSectionCategory.gutters)
                     .showsProjection,
-            includeDownpipes: sectionVisibility == null ||
-                sectionVisibility.modeFor(ArchitectSectionCategory.downpipes)
+            includeDownpipes:
+                sectionVisibility == null ||
+                sectionVisibility
+                    .modeFor(ArchitectSectionCategory.downpipes)
                     .showsProjection,
+            details: !cleanDrainage,
           ),
         );
         mark(roof.id, first);
+        if (cleanDrainage && silhouetteGroups != null) {
+          for (var i = first; i < allTris.length; i++) {
+            silhouetteGroups[allTris[i]] = '${roof.id}:drainage';
+          }
+        }
       }
 
       // Add 3D architectural components (furniture, sanitary, kitchen, equipment)
-      for (final comp in previewGeometry ? storey.components : const <ArchitectComponentInstance>[]) {
+      for (final comp
+          in previewGeometry
+              ? storey.components
+              : const <ArchitectComponentInstance>[]) {
         if (!comp.isVisible) continue;
         final def = ComponentLibraryService.instance.findDefinition(
           comp.definitionId,
@@ -523,8 +538,13 @@ class Architect3dBuilder {
     for (final s0 in rafterPositions) {
       final s1 = math.min(s0 + rafterW, maxS);
       if (hasKnuckle) {
-        final lowerRafterClip =
-            _clipPolygonToRect(polySD, s0, s1, minD, dKnuckle);
+        final lowerRafterClip = _clipPolygonToRect(
+          polySD,
+          s0,
+          s1,
+          minD,
+          dKnuckle,
+        );
         _addExtrudedClippedPrism(
           tris,
           lowerRafterClip,
@@ -539,8 +559,13 @@ class Architect3dBuilder {
           topColor: rafterTopColor,
           sideColor: rafterSideColor,
         );
-        final upperRafterClip =
-            _clipPolygonToRect(polySD, s0, s1, dKnuckle, maxD);
+        final upperRafterClip = _clipPolygonToRect(
+          polySD,
+          s0,
+          s1,
+          dKnuckle,
+          maxD,
+        );
         _addExtrudedClippedPrism(
           tris,
           upperRafterClip,
@@ -576,8 +601,7 @@ class Architect3dBuilder {
 
     // 3. Sub-roof boarding (Дъсчена обшивка / стреха над ребрата)
     if (hasKnuckle) {
-      final boardLower =
-          _clipPolygonToRect(polySD, minS, maxS, minD, dKnuckle);
+      final boardLower = _clipPolygonToRect(polySD, minS, maxS, minD, dKnuckle);
       _addExtrudedClippedPrism(
         tris,
         boardLower,
@@ -593,8 +617,7 @@ class Architect3dBuilder {
         bottomColor: boardColor,
         sideColor: boardColor,
       );
-      final boardUpper =
-          _clipPolygonToRect(polySD, minS, maxS, dKnuckle, maxD);
+      final boardUpper = _clipPolygonToRect(polySD, minS, maxS, dKnuckle, maxD);
       _addExtrudedClippedPrism(
         tris,
         boardUpper,
@@ -631,8 +654,7 @@ class Architect3dBuilder {
 
     // 4. Finished Roof Covering (Покритие - керемиди / ламарина / битум)
     if (hasKnuckle) {
-      final coverLower =
-          _clipPolygonToRect(polySD, minS, maxS, minD, dKnuckle);
+      final coverLower = _clipPolygonToRect(polySD, minS, maxS, minD, dKnuckle);
       _addExtrudedClippedPrism(
         tris,
         coverLower,
@@ -647,8 +669,7 @@ class Architect3dBuilder {
         topColor: topColor,
         sideColor: fasciaColor,
       );
-      final coverUpper =
-          _clipPolygonToRect(polySD, minS, maxS, dKnuckle, maxD);
+      final coverUpper = _clipPolygonToRect(polySD, minS, maxS, dKnuckle, maxD);
       _addExtrudedClippedPrism(
         tris,
         coverUpper,

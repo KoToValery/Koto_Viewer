@@ -1285,9 +1285,9 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
     final background = drawing.data.background;
     if (background != null) {
       final pen = Paint()
-        ..color = color.withValues(alpha: .7)
+        ..color = color.withValues(alpha: .9)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = .55;
+        ..strokeWidth = .7;
       for (final face in background.faces) {
         architectDrawingSources(
           canvas,

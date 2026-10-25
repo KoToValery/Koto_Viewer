@@ -8168,7 +8168,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roofUiPreviewHelp =>
-      'Schematic section; exact dimensions are in the fields.';
+      'Section follows the current settings. Tap to zoom.';
 
   @override
   String get roofUiNumericInvalid => 'Enter a valid value.';

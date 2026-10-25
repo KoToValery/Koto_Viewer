@@ -8,6 +8,7 @@ import '../services/architect_element_id.dart';
 import 'architect_roof_drainage_editor.dart';
 import 'architect_roof_number_field.dart';
 import 'architect_roof_layer_editor.dart';
+import 'architect_roof_construction_preview.dart';
 
 class ArchitectRoofLayersDialog extends StatefulWidget {
   final ArchitectRoofAssembly initialAssembly;
@@ -442,6 +443,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
               Tab(text: l.roofUiDetails),
             ],
           ),
+          _preview(),
           Expanded(
             child: TabBarView(
               controller: _tabs,
@@ -488,6 +490,91 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       return Dialog.fullscreen(child: SafeArea(child: body));
     }
     return Dialog(child: SizedBox(width: 640, height: 800, child: body));
+  }
+
+  Widget _construction() => ArchitectRoofConstructionPreview(
+    assembly: _assembly,
+    slope: _slopeDegrees,
+    overhang: _eavesOverhang,
+    eavesCut: _eavesCut,
+    support: _manualSupport ? _supportDistance : null,
+    mansard: _mansard,
+    upperSlope: _upperSlope,
+    breakDistance: _breakDistance,
+    project: widget.project,
+    roof: widget.roof,
+    drainage: _drainage,
+  );
+
+  Widget _preview() {
+    final l = context.l10n;
+    final label =
+        '${l.roofUiPreview} · ${roofNumber(_assembly.totalThickness * 1000)} mm';
+    void open() => showDialog<void>(
+      context: context,
+      builder: (context) => Dialog.fullscreen(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  const SizedBox(width: 16),
+                  Expanded(child: Text(l.roofUiPreview)),
+                  IconButton(
+                    key: const ValueKey('roof-preview-close'),
+                    tooltip: l.close,
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: InteractiveViewer(
+                  minScale: .5,
+                  maxScale: 8,
+                  child: _construction(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (MediaQuery.sizeOf(context).height -
+            MediaQuery.viewInsetsOf(context).bottom <
+        440) {
+      return SizedBox(
+        height: 36,
+        child: TextButton.icon(
+          key: const ValueKey('roof-preview'),
+          onPressed: open,
+          icon: const Icon(Icons.zoom_in, size: 18),
+          label: Text(label),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ExpansionTile(
+        key: const ValueKey('roof-preview'),
+        initiallyExpanded: true,
+        tilePadding: EdgeInsets.zero,
+        title: Text(label),
+        children: [
+          Tooltip(
+            message: l.roofUiPreviewHelp,
+            child: InkWell(
+              onTap: open,
+              child: SizedBox(
+                height: MediaQuery.viewInsetsOf(context).bottom > 0 ? 80 : 146,
+                width: double.infinity,
+                child: _construction(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _shape() {
@@ -625,28 +712,6 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
             onChanged: (p) {
               if (p != null) _selectPreset(p);
             },
-          ),
-          ExpansionTile(
-            key: const ValueKey('roof-preview'),
-            tilePadding: EdgeInsets.zero,
-            title: Text(l.roofUiPreview),
-            subtitle: Text('${roofNumber(_assembly.totalThickness * 1000)} mm'),
-            children: [
-              Tooltip(
-                message: l.roofUiPreviewHelp,
-                child: SizedBox(
-                  height: 130,
-                  width: double.infinity,
-                  child: CustomPaint(
-                    painter: _RoofLayersPreviewPainter(
-                      assembly: _assembly,
-                      slopeDegrees: _slopeDegrees,
-                      eavesCut: _eavesCut,
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
           for (var i = 0; i < _assembly.layers.length; i++)
             _buildLayerTile(context, i, _assembly.layers[i]),
@@ -1162,81 +1227,4 @@ class _KeepAliveState extends State<_RoofKeepAlive>
     super.build(context);
     return widget.child;
   }
-}
-
-class _RoofLayersPreviewPainter extends CustomPainter {
-  final ArchitectRoofAssembly assembly;
-  final double slopeDegrees;
-  final ArchitectRoofEavesCut eavesCut;
-  const _RoofLayersPreviewPainter({
-    required this.assembly,
-    required this.slopeDegrees,
-    required this.eavesCut,
-  });
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = Colors.white);
-    final ink = Paint()
-      ..color = const Color(0xFF464646)
-      ..strokeWidth = .7;
-    final weights = [
-      for (final layer in assembly.layers)
-        (assembly.layerDepth(layer) * 1000).clamp(2.0, 10000.0),
-    ];
-    final sum = weights.fold<double>(0, (a, b) => a + b);
-    var y = 8.0;
-    for (var i = 0; i < assembly.layers.length; i++) {
-      final layer = assembly.layers[i],
-          height = (size.height - 16) * weights[i] / sum;
-      final fillHeight = layer.isBetweenRafters
-          ? height * layer.thickness / assembly.layerDepth(layer)
-          : height;
-      final rect = Rect.fromLTWH(4, y, size.width - 8, height);
-      canvas.save();
-      canvas.clipRect(rect);
-      if (layer.role == ArchitectRoofLayerRole.insulation) {
-        for (var x = 8.0; x < size.width; x += 7) {
-          for (var dot = y + 3; dot < y + fillHeight; dot += 7) {
-            canvas.drawCircle(Offset(x, dot), .6, ink);
-          }
-        }
-      } else if (layer.material == ArchitectRoofMaterial.timberBoarding ||
-          layer.material == ArchitectRoofMaterial.osb ||
-          layer.material == ArchitectRoofMaterial.rcSlab) {
-        for (var x = -height; x < size.width; x += 10) {
-          canvas.drawLine(Offset(x, y + height), Offset(x + height, y), ink);
-        }
-      }
-      if (layer.isBetweenRafters && assembly.timber.hasRafters) {
-        for (var x = 20.0; x < size.width - 10; x += 65) {
-          final wood = Rect.fromLTWH(x, y, 12, height);
-          canvas.drawRect(wood, Paint()..color = Colors.white);
-          canvas.drawRect(
-            wood,
-            Paint()
-              ..color = const Color(0xFF333333)
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = .8,
-          );
-          canvas.drawLine(wood.topLeft, wood.bottomRight, ink);
-          canvas.drawLine(wood.topRight, wood.bottomLeft, ink);
-        }
-      }
-      canvas.restore();
-      canvas.drawRect(
-        rect,
-        Paint()
-          ..color = const Color(0xFF464646)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .7,
-      );
-      y += height;
-    }
-  }
-
-  @override
-  bool shouldRepaint(_RoofLayersPreviewPainter old) =>
-      old.assembly != assembly ||
-      old.slopeDegrees != slopeDegrees ||
-      old.eavesCut != eavesCut;
 }

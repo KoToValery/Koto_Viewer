@@ -8197,7 +8197,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get roofUiPreviewHelp =>
-      'Схематично сечение; точните размери са в полетата.';
+      'Сечението следва текущите настройки. Докоснете за мащабиране.';
 
   @override
   String get roofUiNumericInvalid => 'Въведете валидна стойност.';

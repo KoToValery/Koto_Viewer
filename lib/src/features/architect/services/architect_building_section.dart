@@ -672,6 +672,7 @@ class ArchitectBuildingSection {
             includeDownpipes: visibility
                 .modeFor(ArchitectSectionCategory.downpipes)
                 .showsCut,
+            details: false,
           ),
           endpointTolerance: 1e-5,
         );

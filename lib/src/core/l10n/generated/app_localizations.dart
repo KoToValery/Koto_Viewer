@@ -14666,7 +14666,7 @@ abstract class AppLocalizations {
   /// No description provided for @roofUiPreviewHelp.
   ///
   /// In en, this message translates to:
-  /// **'Schematic section; exact dimensions are in the fields.'**
+  /// **'Section follows the current settings. Tap to zoom.'**
   String get roofUiPreviewHelp;
 
   /// No description provided for @roofUiNumericInvalid.

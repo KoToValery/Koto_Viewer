@@ -40,31 +40,35 @@ class ArchitectBuildingElevation {
     final classification = _classifyOpenings(
       project,
       view,
-      cutOpeningIds: {
-        ...cutOpeningIds,
-        ...suppressedOpeningIds,
-      },
+      cutOpeningIds: {...cutOpeningIds, ...suppressedOpeningIds},
       presetDetailLevels: openingDetailLevels,
       occlusionMasks: occlusionMasks,
     );
     final sources = <Triangle3D, String>{};
+    final silhouetteGroups = <Triangle3D, String>{};
     final mesh = Architect3dBuilder.buildProjectMesh(
       project,
       previewGeometry: false,
       sources: sources,
+      cleanDrainage: true,
+      silhouetteGroups: silhouetteGroups,
       sectionVisibility: sectionVisibility,
       suppressedOpeningIds: classification.suppressedOpeningIds,
       openingDetailLevels: classification.openingDetailLevels,
     );
-    return withTerrain(_fromTriangles(
-      mesh.triangles,
+    return withTerrain(
+      _fromTriangles(
+        mesh.triangles,
+        view,
+        sources: sources,
+        silhouetteGroups: silhouetteGroups,
+        project: project,
+        occlusionMasks: occlusionMasks,
+        suppressedOpeningIds: classification.suppressedOpeningIds,
+        openingDetailLevels: classification.openingDetailLevels,
+      ),
       view,
-      sources: sources,
-      project: project,
-      occlusionMasks: occlusionMasks,
-      suppressedOpeningIds: classification.suppressedOpeningIds,
-      openingDetailLevels: classification.openingDetailLevels,
-    ), view);
+    );
   }
 
   static ({
@@ -275,43 +279,92 @@ class ArchitectBuildingElevation {
   }) => withTerrain(_fromTriangles(triangles, view, sources: sources), view);
 
   static void validateTerrain(List<Offset> points) {
-    if (points.isNotEmpty && points.length < 2) throw ArgumentError('Terrain needs two points');
-    for (var i=0;i<points.length;i++) {
-      if (!points[i].dx.isFinite || !points[i].dy.isFinite ||
-          (i>0 && points[i].dx-points[i-1].dx < .001)) {
+    if (points.isNotEmpty && points.length < 2) {
+      throw ArgumentError('Terrain needs two points');
+    }
+    for (var i = 0; i < points.length; i++) {
+      if (!points[i].dx.isFinite ||
+          !points[i].dy.isFinite ||
+          (i > 0 && points[i].dx - points[i - 1].dx < .001)) {
         throw ArgumentError('Terrain must run from left to right');
       }
     }
   }
 
-  static ArchitectBuildingElevation withTerrain(ArchitectBuildingElevation geometry,
-      ArchitectElevation view) {
-    final points=view.terrain;
+  static ArchitectBuildingElevation withTerrain(
+    ArchitectBuildingElevation geometry,
+    ArchitectElevation view,
+  ) {
+    final points = view.terrain;
     if (points.isEmpty) return geometry;
     validateTerrain(points);
-    final left=math.min(-view.length/2,math.min(geometry.bounds.left,points.first.dx))-.5;
-    final right=math.max(view.length/2,math.max(geometry.bounds.right,points.last.dx))+.5;
-    final bottom=math.min(geometry.bounds.top,points.map((p)=>p.dy).reduce(math.min))-10;
-    final ground=[Offset(left,points.first.dy),...points,Offset(right,points.last.dy)];
-    final mask=Path()..addPolygon([...ground,Offset(right,bottom),Offset(left,bottom)],true);
-    Path visible(Path p)=>Path.combine(PathOperation.difference,p,mask);
-    final faces=[for(final p in geometry.faces) visible(p)]
-      .where((p)=>!p.getBounds().isEmpty).toList();
-    final paths={for(final e in geometry.elementPaths.entries) e.key: visible(e.value)};
-    paths.removeWhere((id,p)=>p.getBounds().isEmpty);
-    final bounds=Rect.fromLTRB(left, ground.map((p)=>p.dy).reduce(math.min)-.4,
-      right, math.max(geometry.bounds.bottom,ground.map((p)=>p.dy).reduce(math.max)));
-    return ArchitectBuildingElevation(faces,bounds,elementPaths:paths,
-      operations:[for(final op in geometry.operations) (lines:op.lines,clip:visible(op.clip))],
-      slopes:[for(final slope in geometry.slopes)
-        if(!mask.contains(slope.start) && !mask.contains(slope.end)) slope],
-      terrain:ground);
+    final left =
+        math.min(
+          -view.length / 2,
+          math.min(geometry.bounds.left, points.first.dx),
+        ) -
+        .5;
+    final right =
+        math.max(
+          view.length / 2,
+          math.max(geometry.bounds.right, points.last.dx),
+        ) +
+        .5;
+    final bottom =
+        math.min(
+          geometry.bounds.top,
+          points.map((p) => p.dy).reduce(math.min),
+        ) -
+        10;
+    final ground = [
+      Offset(left, points.first.dy),
+      ...points,
+      Offset(right, points.last.dy),
+    ];
+    final mask = Path()
+      ..addPolygon([
+        ...ground,
+        Offset(right, bottom),
+        Offset(left, bottom),
+      ], true);
+    Path visible(Path p) => Path.combine(PathOperation.difference, p, mask);
+    final faces = [
+      for (final p in geometry.faces) visible(p),
+    ].where((p) => !p.getBounds().isEmpty).toList();
+    final paths = {
+      for (final e in geometry.elementPaths.entries) e.key: visible(e.value),
+    };
+    paths.removeWhere((id, p) => p.getBounds().isEmpty);
+    final bounds = Rect.fromLTRB(
+      left,
+      ground.map((p) => p.dy).reduce(math.min) - .4,
+      right,
+      math.max(
+        geometry.bounds.bottom,
+        ground.map((p) => p.dy).reduce(math.max),
+      ),
+    );
+    return ArchitectBuildingElevation(
+      faces,
+      bounds,
+      elementPaths: paths,
+      operations: [
+        for (final op in geometry.operations)
+          (lines: op.lines, clip: visible(op.clip)),
+      ],
+      slopes: [
+        for (final slope in geometry.slopes)
+          if (!mask.contains(slope.start) && !mask.contains(slope.end)) slope,
+      ],
+      terrain: ground,
+    );
   }
 
   static ArchitectBuildingElevation _fromTriangles(
     List<Triangle3D> triangles,
     ArchitectElevation view, {
     Map<Triangle3D, String> sources = const {},
+    Map<Triangle3D, String> silhouetteGroups = const {},
     ArchitectProject? project,
     List<List<Offset>> occlusionMasks = const [],
     Set<String> suppressedOpeningIds = const {},
@@ -333,6 +386,7 @@ class ArchitectBuildingElevation {
             viewDepth: depth,
           ),
           sources: sources,
+          silhouetteGroups: silhouetteGroups,
           project: project,
           suppressedOpeningIds: suppressedOpeningIds,
           openingDetailLevels: openingDetailLevels,
@@ -424,10 +478,16 @@ class ArchitectBuildingElevation {
       // Keep material boundaries (e.g. a flush window frame) while removing
       // triangle edges and construction seams within one finish.
       final key =
-          '${(u * 1e6).round()}:${(v * 1e6).round()}:${(w * 1e6).round()}:${triangle.color?.toARGB32()}';
+          '${(u * 1e6).round()}:${(v * 1e6).round()}:${(w * 1e6).round()}:${triangle.color?.toARGB32()}:${silhouetteGroups[triangle] ?? ''}';
       final plane = groups[key];
       if (plane == null) {
-        groups[key] = _ElevationPlane(u, v, w, path);
+        groups[key] = _ElevationPlane(
+          u,
+          v,
+          w,
+          path,
+          silhouette: silhouetteGroups[triangle],
+        );
       } else {
         plane.path = Path()
           ..addPath(plane.path, Offset.zero)
@@ -448,12 +508,14 @@ class ArchitectBuildingElevation {
       }
     }
     final faces = <Path>[];
+    final silhouettes = <String, List<List<clip.PointD>>>{};
     Rect? bounds;
     final elementPaths = <String, Path>{};
     Path visiblePart(
       _ElevationPlane face, {
       String? ignoreSource,
       String? onlySource,
+      List<List<clip.PointD>>? contoursOut,
     }) {
       final subjects = [
         for (final p in face.pieces)
@@ -498,6 +560,7 @@ class ArchitectBuildingElevation {
       if (contours == null) {
         throw StateError('Architectural visibility clipping failed');
       }
+      contoursOut?.addAll(contours);
       final path = Path();
       for (final contour in contours) {
         path.addPolygon([for (final p in contour) Offset(p.x, p.y)], true);
@@ -506,9 +569,12 @@ class ArchitectBuildingElevation {
     }
 
     for (final face in groups.values) {
-      final visible = visiblePart(face);
+      final contours = face.silhouette == null
+          ? null
+          : (silhouettes[face.silhouette!] ??= <List<clip.PointD>>[]);
+      final visible = visiblePart(face, contoursOut: contours);
       if (visible.getBounds().isEmpty) continue;
-      faces.add(visible);
+      if (face.silhouette == null) faces.add(visible);
       for (final entry in face.sources.entries) {
         final hit = face.sources.length == 1
             ? visible
@@ -523,15 +589,32 @@ class ArchitectBuildingElevation {
       bounds =
           bounds?.expandToInclude(visible.getBounds()) ?? visible.getBounds();
     }
+    // A drawing needs the visible silhouette, not every longitudinal facet,
+    // socket, or inner wall of the 3D tube. Keep depth clipping/occlusion above,
+    // then unite the visible material before encoding the published contour.
+    for (final contours in silhouettes.values) {
+      if (contours.isEmpty) continue;
+      final engine = clip.ClipperD(roundingDecimalPrecision: 8)
+        ..preserveCollinear = false
+        ..addSubjects(contours);
+      final united = engine.executeClosed(
+        clip.ClipType.union,
+        clip.FillRule.nonZero,
+      );
+      if (united == null) throw StateError('Drainage silhouette union failed');
+      final outline = Path();
+      for (final polygon in united) {
+        outline.addPolygon([for (final p in polygon) Offset(p.x, p.y)], true);
+      }
+      if (!outline.getBounds().isEmpty) faces.add(outline);
+    }
     final operations = <({Path lines, Path clip})>[];
     if (project != null) {
       for (final operation in ArchitectElevationOperation.build(
-
         project,
         view,
         excludedOpeningIds: suppressedOpeningIds,
       )) {
-
         final a = operation.aperture[0], b = operation.aperture[1];
         if ((b.x - a.x).abs() < 1e-6) continue;
         final u = (b.z - a.z) / (b.x - a.x);
@@ -652,9 +735,10 @@ class ArchitectBuildingElevation {
 
 class _ElevationPlane {
   final double u, v, w;
+  final String? silhouette;
   Path path;
   final sources = <String, Path>{};
   final pieces = <({List<Offset> points, String? source})>[];
-  _ElevationPlane(this.u, this.v, this.w, this.path);
+  _ElevationPlane(this.u, this.v, this.w, this.path, {this.silhouette});
   double depth(double x, double z) => u * x + v * z + w;
 }

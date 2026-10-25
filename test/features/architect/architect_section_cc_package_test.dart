@@ -122,8 +122,8 @@ void main() {
     expect(gutters, hasLength(2));
     for (final gutter in gutters) {
       final box = gutter.path.getBounds();
-      expect(box.width, inInclusiveRange(.15, .16));
-      expect(box.height, inInclusiveRange(.09, .10));
+      expect(box.width, closeTo(.15, 1e-5));
+      expect(box.height, closeTo(.09, 1e-5));
       expect(gutter.path.contains(box.center), isFalse);
       expect(ArchitectSectionHatch.slab(gutter.material), isNull);
       final fascia = section.regions

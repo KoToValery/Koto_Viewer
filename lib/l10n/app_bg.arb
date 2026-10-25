@@ -2710,7 +2710,7 @@
   "roofUiScopeHelp": "Променят се само редактираните полета. Местата на тръбите остават към своя скат.",
   "roofUiIndependentHelp": "Промяната на един наклон прави ската независим.",
   "roofUiPreview": "Схема",
-  "roofUiPreviewHelp": "Схематично сечение; точните размери са в полетата.",
+  "roofUiPreviewHelp": "Сечението следва текущите настройки. Докоснете за мащабиране.",
   "roofUiNumericInvalid": "Въведете валидна стойност.",
   "roofUiLayerPosition": "Позиция",
   "roofUiBeforeLayer": "Преди {layer}",

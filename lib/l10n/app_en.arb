@@ -4894,7 +4894,7 @@
   "roofUiScopeHelp": "Only edited fields change. Pipe positions stay with their own plane.",
   "roofUiIndependentHelp": "Changing one pitch makes the plane independent.",
   "roofUiPreview": "Diagram",
-  "roofUiPreviewHelp": "Schematic section; exact dimensions are in the fields.",
+  "roofUiPreviewHelp": "Section follows the current settings. Tap to zoom.",
   "roofUiNumericInvalid": "Enter a valid value.",
   "roofUiLayerPosition": "Position",
   "roofUiBeforeLayer": "Before {layer}",

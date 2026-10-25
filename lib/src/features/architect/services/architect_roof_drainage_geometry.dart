@@ -40,6 +40,8 @@ class ArchitectGutterRun {
 }
 
 class ArchitectRoofDrainageGeometry {
+  static const maximumFittingExtraRadius = .007;
+  static const roofClearance = .01;
   static final _cache =
       Expando<Map<ArchitectRoofPlane, ArchitectRoofDrainageGeometry>>();
   final List<ArchitectGutterRun> gutters;
@@ -405,8 +407,8 @@ class ArchitectRoofDrainageGeometry {
         );
       }
       for (final other in storey.roofs) {
-        // The source outlet is below its lowest roof underside. Inflating that
-        // roof as an obstacle would falsely block shallow gutters.
+        // The source eaves are handled by the physical neck clearance below.
+        // A whole-roof inflated box would also block the open gutter outlet.
         if (other.id == roof.id) continue;
         for (final contour in ArchitectPathSolid.contours(
           ArchitectRoofJunctions.of(storey, project: project).footprint(other),
@@ -460,8 +462,15 @@ class ArchitectRoofDrainageGeometry {
       );
     }
     final neck = math.max(
-      .1,
-      pipe.diameter * math.tan(pipe.bendAngle * math.pi / 360) + .02,
+      math.max(
+        .1,
+        pipe.diameter * math.tan(pipe.bendAngle * math.pi / 360) + .02,
+      ),
+      startZ -
+          (floor.elevation + roof.undersideElevationAt(onEaves)) +
+          pipe.diameter / 2 +
+          maximumFittingExtraRadius +
+          roofClearance,
     );
     if (startZ - pipe.outletElevation <= neck) {
       return failure(ArchitectDownpipeStatus.blocked);

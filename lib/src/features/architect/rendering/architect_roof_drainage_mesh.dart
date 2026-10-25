@@ -21,6 +21,7 @@ class ArchitectRoofDrainageMesh {
     ArchitectRoofPlane roof, {
     bool includeGutters = true,
     bool includeDownpipes = true,
+    bool details = true,
   }) {
     if (!includeGutters && !includeDownpipes) return [];
     final geometry = ArchitectRoofDrainageGeometry.build(project, storey, roof);
@@ -72,7 +73,7 @@ class ArchitectRoofDrainageMesh {
       );
       var channel = Path()..addPolygon(profile, true);
       // Rolled edges stiffen both lips and make the open channel legible in 3D.
-      for (final side in [-1.0, 1.0]) {
+      for (final side in details ? [-1.0, 1.0] : <double>[]) {
         channel = Path.combine(
           PathOperation.union,
           channel,
@@ -217,7 +218,9 @@ class ArchitectRoofDrainageMesh {
                   -d.gutterDepth * math.sin(i * math.pi / 16),
                 ),
             ];
-      final hangerCount = math.max(1, (delta.distance / .6).ceil());
+      final hangerCount = details
+          ? math.max(1, (delta.distance / .6).ceil())
+          : 0;
       for (var i = 0; i < hangerCount; i++) {
         final position = delta.distance * (i + .5) / hangerCount;
         if (ready.any(
@@ -237,7 +240,7 @@ class ArchitectRoofDrainageMesh {
       }
     }
     for (final route in ready) {
-      final rings = _pipeRings(route);
+      final rings = _pipeRings(route, details: details);
       final points = [for (final ring in rings) ring.$1];
       final r = route.pipe.diameter / 2;
       final samples = angles[route.pipe.id]!;
@@ -326,7 +329,12 @@ class ArchitectRoofDrainageMesh {
         triangle(outer.last[j], inner.last[k], inner.last[j]);
       }
       for (var i = 0; i + 1 < rings.length; i++) {
-        if (rings[i].$2 != .007 || rings[i + 1].$2 != .007) continue;
+        if (rings[i].$2 !=
+                ArchitectRoofDrainageGeometry.maximumFittingExtraRadius ||
+            rings[i + 1].$2 !=
+                ArchitectRoofDrainageGeometry.maximumFittingExtraRadius) {
+          continue;
+        }
         final center = (rings[i].$1 + rings[i + 1].$1) / 2;
         final plan = Offset(center.x, center.y);
         Offset? anchor;
@@ -390,7 +398,10 @@ class ArchitectRoofDrainageMesh {
 
   /// Tangential circular elbows and socket/clamp beads share one hollow shell.
   /// No capped cylinders or overlapping sleeves can seal the drainage bore.
-  static List<(Vector3, double)> _pipeRings(ArchitectDownpipeRoute route) {
+  static List<(Vector3, double)> _pipeRings(
+    ArchitectDownpipeRoute route, {
+    bool details = true,
+  }) {
     final source = route.points;
     final diameter = route.pipe.diameter;
     final smooth = <Vector3>[source.first];
@@ -424,6 +435,7 @@ class ArchitectRoofDrainageMesh {
       }
     }
     smooth.add(source.last);
+    if (!details) return [for (final point in smooth) (point, 0)];
     final result = <(Vector3, double)>[(smooth.first, 0)];
     for (var i = 0; i + 1 < smooth.length; i++) {
       final a = smooth[i], b = smooth[i + 1], delta = b - a;
@@ -434,7 +446,10 @@ class ArchitectRoofDrainageMesh {
         if ((b.x - a.x).abs() < 1e-6 && (b.y - a.y).abs() < 1e-6) {
           final count = math.max(1, (delta.length / 1.8).ceil());
           for (var j = 0; j < count; j++) {
-            positions.add((delta.length * (j + .5) / count, .007));
+            positions.add((
+              delta.length * (j + .5) / count,
+              ArchitectRoofDrainageGeometry.maximumFittingExtraRadius,
+            ));
           }
         }
         positions.sort((a, b) => a.$1.compareTo(b.$1));
