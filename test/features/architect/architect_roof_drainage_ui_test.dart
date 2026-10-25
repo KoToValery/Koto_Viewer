@@ -129,6 +129,11 @@ void main() {
         Future<void> open() async {
           await tester.tap(find.text('Open'));
           await tester.pumpAndSettle();
+          await tester.tap(find.text(l.roofUiDetails));
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(
+            find.byKey(const ValueKey('roof-drainage-section')),
+          );
           await tester.tap(find.text(l.architectDrainageTitle));
           await tester.pumpAndSettle();
         }

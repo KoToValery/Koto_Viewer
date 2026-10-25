@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,6 +38,7 @@ void main() {
           Offset.zero,
         ) -
         roof.drainage.gutterDepth;
+    final station = 1 - ArchitectRoofDrainageGeometry.gutterOffset(roof);
     for (final x in [1.0, 3.0, 5.0]) {
       final section = ArchitectBuildingSection.build(
         project,
@@ -47,11 +49,11 @@ void main() {
           .single
           .path;
       expect(
-        path.contains(Offset(.95, z + .0005)),
+        path.contains(Offset(station, z + .0005)),
         isTrue,
         reason: 'Missing channel floor at $x',
       );
-      expect(path.contains(Offset(.95, z + .04)), isFalse);
+      expect(path.contains(Offset(station, z + .04)), isFalse);
     }
   });
 
@@ -142,9 +144,17 @@ void main() {
         roof = floor.roofs.single;
     final geometry = ArchitectRoofDrainageGeometry.build(project, floor, roof);
     final eave = ArchitectRoofDrainageGeometry.eaves(roof).$1;
+    final covering =
+        roof.assembly.layers
+            .firstWhere((l) => l.role == ArchitectRoofLayerRole.covering)
+            .thickness /
+        math.cos(roof.slopeRadians);
     expect(
       geometry.gutters.single.elevation,
-      closeTo(floor.elevation + roof.topElevationAt(eave) - .04, 1e-8),
+      closeTo(
+        floor.elevation + roof.topElevationAt(eave) - covering - .02,
+        1e-8,
+      ),
     );
     expect(
       geometry.routes.single.points.first.z,

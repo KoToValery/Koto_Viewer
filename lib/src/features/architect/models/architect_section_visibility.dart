@@ -23,7 +23,7 @@ class ArchitectSectionVisibility {
   }) =>
       categories[category] ??
       defaults?.modeFor(category) ??
-      ArchitectSectionDisplay.cutOnly;
+      ArchitectSectionDisplay.cutAndProjection;
 
   ArchitectSectionVisibility resolved(ArchitectSectionVisibility defaults) =>
       ArchitectSectionVisibility(

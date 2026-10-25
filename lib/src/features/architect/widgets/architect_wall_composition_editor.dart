@@ -5,6 +5,8 @@ import '../models/architect_wall_type.dart';
 import '../services/architect_element_id.dart';
 import 'architect_material_layer_label.dart';
 import 'architect_wall_type_label.dart';
+import 'architect_wall_type_picker.dart';
+import 'architect_wall_layer_preview.dart';
 
 class _LayerDraft {
   ArchitectMaterialLayer layer;
@@ -16,17 +18,18 @@ class _LayerDraft {
   void dispose() => input.dispose();
 }
 
-String _number(double v) => v
-    .toStringAsFixed(6)
-    .replaceFirst(RegExp(r'0+$'), '')
-    .replaceFirst(RegExp(r'\.$'), '');
+String _number(double value) =>
+    ArchitectUnit.trimZeros(value.toStringAsFixed(6));
+double? _parse(String text) {
+  final value = double.tryParse(text.trim().replaceAll(',', '.'));
+  return value != null && value.isFinite ? value : null;
+}
 
 class ArchitectWallCompositionEditor extends StatefulWidget {
   final ArchitectProject project;
   final ArchitectWallType type;
   final int? typeUseCount;
-  final bool requireName;
-  final bool allowTypeSelection;
+  final bool requireName, allowTypeSelection, isNewType;
   final ArchitectWallPlinth? plinth;
   final List<ArchitectWallPlinth> plinths;
   final bool Function(ArchitectWallType, ArchitectWallPlinthPatch?, bool)
@@ -41,6 +44,7 @@ class ArchitectWallCompositionEditor extends StatefulWidget {
     this.plinths = const [],
     this.requireName = false,
     this.allowTypeSelection = false,
+    this.isNewType = false,
   });
   @override
   State<ArchitectWallCompositionEditor> createState() => _EditorState();
@@ -48,8 +52,9 @@ class ArchitectWallCompositionEditor extends StatefulWidget {
 
 class _EditorState extends State<ArchitectWallCompositionEditor> {
   final form = GlobalKey<FormState>();
+  final retiredInputs = <TextEditingController>[];
   late final name = TextEditingController(
-    text: !widget.type.isFactoryPreset ? widget.type.name : '',
+    text: widget.type.isFactoryPreset ? '' : widget.type.name,
   );
   late final drafts = [
     for (final layer in widget.type.resolvedLayers)
@@ -57,15 +62,24 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
   ];
   late ArchitectWallLocation location = widget.type.resolvedLocation;
   late bool bearing = widget.type.isLoadBearing;
+  late bool saveToCatalog = widget.type.isCatalogType;
+  late ParapetFinish parapetFinish =
+      widget.type.parapetFinish ?? ParapetFinish.cap;
+  late final defaultHeight = TextEditingController(
+    text: _number(
+      widget.project.units.toUnit(widget.type.customHeight ?? 1.05),
+    ),
+  );
+  bool compositionChanged = false, detailsChanged = false;
+  ArchitectWallType? pickedType;
+  String? expandedLayer;
+  String? error;
+  final editedRegionFields = <String>{};
   List<ArchitectWallPlinth> get regions => widget.plinths.isEmpty
       ? [if (widget.plinth != null) widget.plinth!]
       : widget.plinths;
   bool mixed<T>(T Function(ArchitectWallPlinth) field) =>
       regions.map(field).toSet().length > 1;
-  bool compositionChanged = false;
-  bool detailsChanged = false;
-  ArchitectWallType? pickedType;
-  final editedRegionFields = <String>{};
   late bool? plinthEnabled = mixed((p) => p.enabled)
       ? null
       : widget.plinth?.enabled ?? false;
@@ -85,46 +99,79 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
   late ArchitectMaterial? plinthFinish = mixed((p) => p.finish)
       ? null
       : widget.plinth?.finish ?? ArchitectMaterial.render;
-  String? error;
-  double? number(String s) {
-    final v = double.tryParse(s.trim().replaceAll(',', '.'));
-    return v != null && v.isFinite ? v : null;
+  ArchitectWallType get source => pickedType ?? widget.type;
+  double get total => drafts.fold(
+    0,
+    (v, d) => v + widget.project.units.fromUnit(_parse(d.input.text) ?? 0),
+  );
+  bool invalidNumber(_LayerDraft d) =>
+      _parse(d.input.text) == null || _parse(d.input.text)! <= 0;
+  List<ArchitectMaterialLayer> get layers => [
+    for (final d in drafts)
+      d.layer.copyWith(
+        thickness: widget.project.units.fromUnit(_parse(d.input.text) ?? 0),
+      ),
+  ];
+  String? get layerError {
+    if (drafts.any(invalidNumber)) {
+      return context.l10n.architectWallInvalidThickness;
+    }
+    if (drafts.length > 20) return context.l10n.wallLayerLimit;
+    try {
+      ArchitectMaterialLayer.validate(layers);
+      return null;
+    } on ArgumentError {
+      return context.l10n.wallLayerCoreError;
+    }
+  }
+
+  void changed() {
+    compositionChanged = true;
+    detailsChanged = true;
+    error = null;
   }
 
   @override
   void dispose() {
     name.dispose();
+    defaultHeight.dispose();
     plinthHeight.dispose();
     plinthBase.dispose();
     for (final d in drafts) {
       d.dispose();
     }
+    for (final input in retiredInputs) {
+      input.dispose();
+    }
     super.dispose();
   }
 
-  double get total => drafts.fold(
-    0,
-    (v, d) => v + widget.project.units.fromUnit(number(d.input.text) ?? 0),
-  );
   void save() {
-    final l = context.l10n;
     if (!form.currentState!.validate()) return;
+    if (widget.requireName && name.text.trim().isEmpty) {
+      setState(() => error = context.l10n.wallCompositionName);
+      return;
+    }
+    if (source.isParapet &&
+        widget.typeUseCount != null &&
+        (_parse(defaultHeight.text) == null ||
+            _parse(defaultHeight.text)! <= 0)) {
+      setState(() => error = context.l10n.wallInvalidHeight);
+      return;
+    }
+    if (layerError != null) {
+      setState(() => error = layerError);
+      return;
+    }
     try {
-      final layers = [
-        for (final d in drafts)
-          d.layer.copyWith(
-            thickness: widget.project.units.fromUnit(number(d.input.text)!),
-          ),
-      ];
-      ArchitectMaterialLayer.validate(layers);
       final activePlinth =
           plinthEnabled != false && location == ArchitectWallLocation.exterior;
       if (activePlinth &&
           ((editedRegionFields.contains('height') &&
-                  (number(plinthHeight.text) == null ||
-                      number(plinthHeight.text)! <= 0)) ||
+                  (_parse(plinthHeight.text) == null ||
+                      _parse(plinthHeight.text)! <= 0)) ||
               (editedRegionFields.contains('base') &&
-                  number(plinthBase.text) == null))) {
+                  _parse(plinthBase.text) == null))) {
         throw ArgumentError('Invalid plinth field');
       }
       final region = widget.plinth == null
@@ -135,12 +182,12 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                   : null,
               height:
                   editedRegionFields.contains('height') &&
-                      number(plinthHeight.text) != null &&
-                      number(plinthHeight.text)! > 0
-                  ? widget.project.units.fromUnit(number(plinthHeight.text)!)
+                      _parse(plinthHeight.text) != null &&
+                      _parse(plinthHeight.text)! > 0
+                  ? widget.project.units.fromUnit(_parse(plinthHeight.text)!)
                   : null,
               baseElevation: editedRegionFields.contains('base')
-                  ? number(plinthBase.text)
+                  ? _parse(plinthBase.text)
                   : null,
               finish: editedRegionFields.contains('finish')
                   ? plinthFinish
@@ -151,517 +198,749 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
           region.apply(value);
         }
       }
-      final source = pickedType ?? widget.type;
       final type = source.copyWith(
         id: pickedType != null && detailsChanged ? widget.type.id : source.id,
         layers: layers,
         location: location,
         loadBearing: bearing,
+        usage: source.isParapet
+            ? WallUsage.parapet
+            : location == ArchitectWallLocation.exterior
+            ? WallUsage.exterior
+            : WallUsage.interior,
         name: name.text.trim(),
         labelId: source.labelId ?? source.id,
+        isCatalogType: widget.typeUseCount != null || !widget.allowTypeSelection
+            ? source.isCatalogType
+            : pickedType != null && !detailsChanged
+            ? source.isCatalogType
+            : saveToCatalog,
+        parapetFinish: source.isParapet ? parapetFinish : null,
+        customHeight: source.isParapet && widget.typeUseCount != null
+            ? widget.project.units.fromUnit(_parse(defaultHeight.text)!)
+            : null,
       );
       if (widget.onApply(type, region, compositionChanged)) {
         Navigator.pop(context);
       }
     } on ArgumentError {
-      setState(() => error = l.wallLayerInvalid);
+      setState(() => error = context.l10n.wallLayerInvalid);
     }
   }
 
+  Future<void> pickType() async {
+    final types = widget.project.wallTypes
+        .where((t) => t.isCatalogType && t.isParapet == widget.type.isParapet)
+        .toList();
+    if (types.isEmpty) return;
+    final result = await showArchitectWallTypePicker(
+      context,
+      types: types,
+      activeType: source,
+      unit: widget.project.units,
+      projectId: widget.project.id,
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      pickedType = result.type;
+      compositionChanged = true;
+      detailsChanged = false;
+      error = null;
+      for (final d in drafts) {
+        retiredInputs.add(d.input);
+      }
+      drafts
+        ..clear()
+        ..addAll([
+          for (final l in result.type.resolvedLayers)
+            _LayerDraft(l, widget.project.units),
+        ]);
+      name.text = result.type.isFactoryPreset ? '' : result.type.name;
+      location = result.type.resolvedLocation;
+      bearing = result.type.isLoadBearing;
+      parapetFinish = result.type.parapetFinish ?? ParapetFinish.cap;
+      expandedLayer = null;
+    });
+  }
+
+  Future<void> addLayer() async {
+    if (drafts.length >= 20) {
+      setState(() => error = context.l10n.wallLayerLimit);
+      return;
+    }
+    final l = context.l10n,
+        unit = widget.project.units,
+        addForm = GlobalKey<FormState>();
+    var material = ArchitectMaterial.plaster;
+    var position = expandedLayer == null
+        ? drafts.length
+        : drafts.indexWhere((d) => d.layer.id == expandedLayer) + 1;
+    final input = TextEditingController(text: _number(unit.toUnit(.015)));
+    retiredInputs.add(input);
+    final result = await showDialog<(ArchitectMaterialLayer, int)>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, update) => AlertDialog(
+          title: Text(l.wallLayerAdd),
+          content: SingleChildScrollView(
+            child: Form(
+              key: addForm,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<int>(
+                    key: const ValueKey('wall-layer-position'),
+                    initialValue: position,
+                    isExpanded: true,
+                    decoration: InputDecoration(labelText: l.wallLayerPosition),
+                    items: [
+                      for (var i = 0; i <= drafts.length; i++)
+                        DropdownMenuItem(
+                          value: i,
+                          child: Text(
+                            i == drafts.length
+                                ? l.wallLayerAtEnd
+                                : l.wallLayerBefore(
+                                    '${i + 1} · ${drafts[i].layer.material.label(l)}',
+                                  ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (v) => update(() => position = v ?? position),
+                  ),
+                  DropdownButtonFormField<ArchitectMaterial>(
+                    key: const ValueKey('wall-new-layer-material'),
+                    initialValue: material,
+                    isExpanded: true,
+                    decoration: InputDecoration(labelText: l.wallLayerMaterial),
+                    items: [
+                      for (final m in ArchitectMaterial.values)
+                        DropdownMenuItem(value: m, child: Text(m.label(l))),
+                    ],
+                    onChanged: (v) => update(() {
+                      material = v ?? material;
+                      input.text = _number(
+                        unit.toUnit(switch (material.defaultRole) {
+                          ArchitectLayerRole.core => .12,
+                          ArchitectLayerRole.insulation => .12,
+                          ArchitectLayerRole.finish => .015,
+                        }),
+                      );
+                    }),
+                  ),
+                  TextFormField(
+                    key: const ValueKey('wall-new-layer-thickness'),
+                    controller: input,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: l.architectWallQuickThickness,
+                      suffixText: unit.symbol,
+                    ),
+                    validator: (s) =>
+                        _parse(s ?? '') == null || _parse(s ?? '')! <= 0
+                        ? l.architectWallInvalidThickness
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l.cancel),
+            ),
+            FilledButton(
+              key: const ValueKey('wall-layer-insert'),
+              onPressed: () {
+                if (!addForm.currentState!.validate()) return;
+                Navigator.pop(ctx, (
+                  ArchitectMaterialLayer(
+                    id: ArchitectElementId.next('layer'),
+                    material: material,
+                    role: material.defaultRole,
+                    thickness: unit.fromUnit(_parse(input.text)!),
+                  ),
+                  position,
+                ));
+              },
+              child: Text(l.applyAction),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || result == null) return;
+    setState(() {
+      changed();
+      drafts.insert(result.$2, _LayerDraft(result.$1, unit));
+      expandedLayer = result.$1.id;
+    });
+  }
+
+  void addCoatings() => setState(() {
+    if (drafts.length > 18) {
+      error = context.l10n.wallLayerLimit;
+      return;
+    }
+    changed();
+    drafts.insert(
+      0,
+      _LayerDraft(
+        ArchitectMaterialLayer(
+          id: ArchitectElementId.next('layer'),
+          material: location == ArchitectWallLocation.exterior
+              ? ArchitectMaterial.render
+              : ArchitectMaterial.plaster,
+          role: ArchitectLayerRole.finish,
+          thickness: location == ArchitectWallLocation.exterior ? .005 : .015,
+        ),
+        widget.project.units,
+      ),
+    );
+    drafts.add(
+      _LayerDraft(
+        ArchitectMaterialLayer(
+          id: ArchitectElementId.next('layer'),
+          material: ArchitectMaterial.plaster,
+          role: ArchitectLayerRole.finish,
+          thickness: .015,
+        ),
+        widget.project.units,
+      ),
+    );
+  });
+
   @override
   Widget build(BuildContext context) {
-    final l = context.l10n, colors = Theme.of(context).colorScheme;
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 740),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    final l = context.l10n;
+    final body = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      l.wallCompositionAction,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: l.close,
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              Text(
-                widget.typeUseCount == null
-                    ? l.wallSelectedScope
-                    : widget.typeUseCount == 0
-                    ? l.wallTypesTitle
-                    : l.wallTypeApply(widget.typeUseCount!),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 12),
               Expanded(
-                child: Form(
-                  key: form,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (widget.allowTypeSelection) ...[
-                          DropdownButtonFormField<ArchitectWallType>(
-                            key: const ValueKey('wall-composition-type'),
-                            initialValue: pickedType,
-                            isExpanded: true,
-                            hint: Text(widget.type.compactLabel(l)),
-                            decoration: InputDecoration(
-                              labelText: l.architectWallType,
-                            ),
-                            items: [
-                              for (final t in widget.project.wallTypes)
-                                DropdownMenuItem(
-                                  value: t,
-                                  child: Text(
-                                    t.compactLabel(l),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                            ],
-                            onChanged: (t) {
-                              if (t == null) return;
-                              setState(() {
-                                pickedType = t;
-                                compositionChanged = true;
-                                detailsChanged = false;
-                                for (final d in drafts) {
-                                  d.dispose();
-                                }
-                                drafts
-                                  ..clear()
-                                  ..addAll([
-                                    for (final layer in t.resolvedLayers)
-                                      _LayerDraft(layer, widget.project.units),
-                                  ]);
-                                name.text = t.isFactoryPreset ? '' : t.name;
-                                location = t.resolvedLocation;
-                                bearing = t.isLoadBearing;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        if (widget.requireName)
-                          TextFormField(
-                            controller: name,
-                            onChanged: (_) {
-                              compositionChanged = true;
-                              detailsChanged = true;
-                            },
-                            validator: (s) =>
-                                widget.requireName && (s ?? '').trim().isEmpty
-                                ? l.wallCompositionName
-                                : null,
-                            decoration: InputDecoration(
-                              labelText: l.wallCompositionName,
-                              hintText: widget.type.compactLabel(l),
-                            ),
-                          ),
-                        const SizedBox(height: 12),
-                        Text(
-                          location == ArchitectWallLocation.exterior
-                              ? l.wallLayerOutsideInside
-                              : l.wallLayerSides,
-                        ),
-                        const SizedBox(height: 6),
-                        SizedBox(
-                          height: 52,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              for (final d in drafts)
-                                Expanded(
-                                  flex: ((number(d.input.text) ?? 1) * 100)
-                                      .round()
-                                      .clamp(1, 100000),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: d.layer.material.color,
-                                      border: Border.all(
-                                        color:
-                                            d.layer.role ==
-                                                ArchitectLayerRole.core
-                                            ? colors.onSurface
-                                            : colors.outline,
-                                        width:
-                                            d.layer.role ==
-                                                ArchitectLayerRole.core
-                                            ? 2
-                                            : 1,
-                                      ),
-                                    ),
-                                    child: Tooltip(
-                                      message:
-                                          '${d.layer.material.label(l)} · ${d.input.text} ${widget.project.units.symbol}',
-                                      child: const SizedBox.expand(),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        for (var index = 0; index < drafts.length; index++)
-                          _row(index),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            key: const ValueKey('wall-layer-add'),
-                            onPressed: () => setState(() {
-                              compositionChanged = true;
-                              detailsChanged = true;
-                              drafts.add(
-                                _LayerDraft(
-                                  ArchitectMaterialLayer(
-                                    id: ArchitectElementId.next('layer'),
-                                    material: ArchitectMaterial.plaster,
-                                    role: ArchitectLayerRole.finish,
-                                    thickness: .015,
-                                  ),
-                                  widget.project.units,
-                                ),
-                              );
-                            }),
-                            icon: const Icon(Icons.add),
-                            label: Text(l.wallLayerAdd),
-                          ),
-                        ),
-                        Text(
-                          '${l.architectPropertyTotal}: ${_number(widget.project.units.toUnit(total))} ${widget.project.units.symbol}',
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                        ExpansionTile(
-                          tilePadding: EdgeInsets.zero,
-                          title: Text(l.wallAdvanced),
-                          children: [
-                            if (!widget.requireName)
-                              TextFormField(
-                                controller: name,
-                                onChanged: (_) {
-                                  compositionChanged = true;
-                                  detailsChanged = true;
-                                },
-                                validator: (s) =>
-                                    widget.requireName &&
-                                        (s ?? '').trim().isEmpty
-                                    ? l.wallCompositionName
-                                    : null,
-                                decoration: InputDecoration(
-                                  labelText: l.wallCompositionName,
-                                  hintText: widget.type.compactLabel(l),
-                                ),
-                              ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child:
-                                      DropdownButtonFormField<
-                                        ArchitectWallLocation
-                                      >(
-                                        initialValue: location,
-                                        isExpanded: true,
-                                        decoration: InputDecoration(
-                                          labelText: l.wallLocation,
-                                        ),
-                                        items: [
-                                          for (final value
-                                              in ArchitectWallLocation.values)
-                                            DropdownMenuItem(
-                                              value: value,
-                                              child: Text(
-                                                value ==
-                                                        ArchitectWallLocation
-                                                            .exterior
-                                                    ? l.wallExterior
-                                                    : l.wallInterior,
-                                              ),
-                                            ),
-                                        ],
-                                        onChanged: (v) {
-                                          if (v != null) {
-                                            setState(() {
-                                              location = v;
-                                              compositionChanged = true;
-                                              detailsChanged = true;
-                                            });
-                                          }
-                                        },
-                                      ),
-                                ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: CheckboxListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text(l.wallBearing),
-                                    value: bearing,
-                                    onChanged: (v) => setState(() {
-                                      bearing = v ?? false;
-                                      compositionChanged = true;
-                                      detailsChanged = true;
-                                    }),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        if (widget.plinth != null &&
-                            location == ArchitectWallLocation.exterior) ...[
-                          const Divider(height: 24),
-                          CheckboxListTile(
-                            key: const ValueKey('wall-plinth-enabled'),
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(l.wallPlinth),
-                            value: plinthEnabled,
-                            tristate: mixed((p) => p.enabled),
-                            onChanged: (v) => setState(() {
-                              plinthEnabled = v ?? false;
-                              editedRegionFields.add('enabled');
-                            }),
-                          ),
-                          if (plinthEnabled != false) ...[
-                            TextFormField(
-                              key: const ValueKey('wall-plinth-height'),
-                              controller: plinthHeight,
-                              onChanged: (_) =>
-                                  editedRegionFields.add('height'),
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                              decoration: InputDecoration(
-                                labelText:
-                                    'H= (${widget.project.units.symbol})',
-                                hintText: l.wallMixedValue,
-                              ),
-                              validator: (s) {
-                                final v = number(s ?? '');
-                                return mixed((p) => p.height) &&
-                                        !editedRegionFields.contains('height')
-                                    ? null
-                                    : v == null || !v.isFinite || v <= 0
-                                    ? l.architectWallInvalidThickness
-                                    : null;
-                              },
-                            ),
-                            DropdownButtonFormField<ArchitectMaterial>(
-                              initialValue: plinthFinish,
-                              hint: Text(l.wallMixedValue),
-                              decoration: InputDecoration(
-                                labelText: l.wallPlinthFinish,
-                              ),
-                              items: [
-                                for (final m in [
-                                  ArchitectMaterial.render,
-                                  ArchitectMaterial.tile,
-                                  ArchitectMaterial.stone,
-                                ])
-                                  DropdownMenuItem(
-                                    value: m,
-                                    child: Text(m.label(l)),
-                                  ),
-                              ],
-                              onChanged: (v) {
-                                if (v != null) {
-                                  setState(() {
-                                    plinthFinish = v;
-                                    editedRegionFields.add('finish');
-                                  });
-                                }
-                              },
-                            ),
-                            ExpansionTile(
-                              tilePadding: EdgeInsets.zero,
-                              title: Text(l.wallAdvanced),
-                              children: [
-                                TextFormField(
-                                  key: const ValueKey('wall-plinth-base'),
-                                  controller: plinthBase,
-                                  onChanged: (_) =>
-                                      editedRegionFields.add('base'),
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                        signed: true,
-                                      ),
-                                  decoration: InputDecoration(
-                                    labelText: l.wallPlinthBase,
-                                    helperText: l.wallPlinthBaseHelp,
-                                    hintText: l.wallMixedValue,
-                                  ),
-                                  validator: (s) {
-                                    final v = number(s ?? '');
-                                    return mixed((p) => p.baseElevation) &&
-                                            !editedRegionFields.contains('base')
-                                        ? null
-                                        : v == null || !v.isFinite
-                                        ? l.wallLayerInvalid
-                                        : null;
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                        if (error != null)
-                          Text(error!, style: TextStyle(color: colors.error)),
-                      ],
-                    ),
-                  ),
+                child: Text(
+                  widget.isNewType ? l.wallNewVariant : l.wallCompositionAction,
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(l.cancel),
-                  ),
-                  const Spacer(),
-                  Flexible(
-                    child: FilledButton(
-                      key: const ValueKey('wall-composition-save'),
-                      onPressed: save,
-                      child: Text(
-                        (widget.typeUseCount ?? 0) == 0
-                            ? l.save
-                            : l.wallTypeApply(widget.typeUseCount!),
-                      ),
-                    ),
-                  ),
-                ],
+              IconButton(
+                tooltip: l.close,
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close),
               ),
             ],
           ),
-        ),
+          Text(
+            widget.isNewType
+                ? l.wallNewTypeScope
+                : widget.typeUseCount == null
+                ? l.wallSelectedScope
+                : widget.typeUseCount == 0
+                ? l.wallTypesTitle
+                : l.wallTypeApply(widget.typeUseCount!),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              l.architectWallTotalThickness(
+                architectWallLength(total, widget.project.units),
+              ),
+              key: const ValueKey('wall-composition-total'),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          Expanded(
+            child: Form(
+              key: form,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (widget.allowTypeSelection)
+                      OutlinedButton(
+                        key: const ValueKey('wall-composition-type'),
+                        onPressed: pickType,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                source.catalogLabel(l, widget.project.units),
+                              ),
+                            ),
+                            const Icon(Icons.expand_more),
+                          ],
+                        ),
+                      ),
+                    Text(
+                      location == ArchitectWallLocation.exterior
+                          ? l.wallLayerOutsideInside
+                          : l.wallLayerSides,
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 54,
+                      child: ArchitectWallLayerPreview(
+                        layers: [
+                          for (final d in drafts)
+                            d.layer.copyWith(
+                              thickness: widget.project.units.fromUnit(
+                                (_parse(d.input.text) ?? 0).clamp(
+                                  .000001,
+                                  double.infinity,
+                                ),
+                              ),
+                            ),
+                        ],
+                        selectedIndex: drafts.indexWhere(
+                          (d) => d.layer.id == expandedLayer,
+                        ),
+                        onSelected: (index) => setState(
+                          () => expandedLayer = drafts[index].layer.id,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    for (var i = 0; i < drafts.length; i++) _row(i),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        TextButton.icon(
+                          key: const ValueKey('wall-layer-add'),
+                          onPressed: addLayer,
+                          icon: const Icon(Icons.add),
+                          label: Text(l.wallLayerAdd),
+                        ),
+                        if (!drafts.any(
+                          (d) => d.layer.role == ArchitectLayerRole.finish,
+                        ))
+                          TextButton.icon(
+                            key: const ValueKey('wall-layer-coatings'),
+                            onPressed: addCoatings,
+                            icon: const Icon(Icons.add),
+                            label: Text(l.wallLayerCoatings),
+                          ),
+                        if (location == ArchitectWallLocation.interior &&
+                            drafts.first.layer.role ==
+                                ArchitectLayerRole.finish &&
+                            drafts.last.layer.role != ArchitectLayerRole.finish)
+                          TextButton(
+                            key: const ValueKey('wall-copy-finish'),
+                            onPressed: () => setState(() {
+                              final copies = drafts
+                                  .takeWhile(
+                                    (d) =>
+                                        d.layer.role ==
+                                        ArchitectLayerRole.finish,
+                                  )
+                                  .toList()
+                                  .reversed;
+                              if (drafts.length + copies.length > 20) {
+                                error = l.wallLayerLimit;
+                                return;
+                              }
+                              final values = [
+                                for (final d in copies)
+                                  _LayerDraft(
+                                    d.layer.copyWith(
+                                      id: ArchitectElementId.next('layer'),
+                                      thickness: widget.project.units.fromUnit(
+                                        _parse(d.input.text) ?? 0,
+                                      ),
+                                    ),
+                                    widget.project.units,
+                                  ),
+                              ];
+                              changed();
+                              drafts.addAll(values);
+                            }),
+                            child: Tooltip(
+                              message: l.wallCopyFinishHelp,
+                              child: Text(l.wallCopyFinish),
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (layerError != null)
+                      Text(
+                        layerError!,
+                        key: const ValueKey('wall-layer-validation'),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: Text(l.wallTypeDetails),
+                      children: [
+                        TextFormField(
+                          controller: name,
+                          onChanged: (_) => changed(),
+                          validator: (s) =>
+                              widget.requireName && (s ?? '').trim().isEmpty
+                              ? l.wallCompositionName
+                              : null,
+                          decoration: InputDecoration(
+                            labelText: l.wallCompositionName,
+                            hintText: l.wallOptionalName,
+                          ),
+                        ),
+                        if (!source.isParapet) ...[
+                          DropdownButtonFormField<ArchitectWallLocation>(
+                            initialValue: location,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: l.wallLocation,
+                            ),
+                            items: [
+                              for (final v in ArchitectWallLocation.values)
+                                DropdownMenuItem(
+                                  value: v,
+                                  child: Text(
+                                    v == ArchitectWallLocation.exterior
+                                        ? l.wallExterior
+                                        : l.wallInterior,
+                                  ),
+                                ),
+                            ],
+                            onChanged: (v) {
+                              if (v != null) {
+                                setState(() {
+                                  changed();
+                                  location = v;
+                                });
+                              }
+                            },
+                          ),
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(l.wallBearing),
+                            value: bearing,
+                            onChanged: (v) => setState(() {
+                              changed();
+                              bearing = v ?? false;
+                            }),
+                          ),
+                        ],
+                        if (source.isParapet &&
+                            widget.typeUseCount != null) ...[
+                          DropdownButtonFormField<ParapetFinish>(
+                            initialValue: parapetFinish,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: l.wallPlinthFinish,
+                            ),
+                            items: [
+                              for (final f in ParapetFinish.values)
+                                DropdownMenuItem(
+                                  value: f,
+                                  child: Text(
+                                    f == ParapetFinish.cap
+                                        ? l.wallParapetCap
+                                        : l.wallParapetHandrail,
+                                  ),
+                                ),
+                            ],
+                            onChanged: (v) => setState(() {
+                              changed();
+                              parapetFinish = v ?? parapetFinish;
+                            }),
+                          ),
+                          TextFormField(
+                            controller: defaultHeight,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: l.wallParapetDefaultHeight,
+                              suffixText: widget.project.units.symbol,
+                            ),
+                            onChanged: (_) => setState(changed),
+                            validator: (s) =>
+                                _parse(s ?? '') == null || _parse(s ?? '')! <= 0
+                                ? l.wallInvalidHeight
+                                : null,
+                          ),
+                        ],
+                        if (widget.allowTypeSelection)
+                          CheckboxListTile(
+                            key: const ValueKey('wall-save-to-catalog'),
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(l.wallSaveToCatalog),
+                            value: saveToCatalog,
+                            onChanged: (v) => setState(() {
+                              changed();
+                              saveToCatalog = v ?? false;
+                            }),
+                          ),
+                      ],
+                    ),
+                    if (widget.plinth != null &&
+                        location == ArchitectWallLocation.exterior)
+                      _plinth(),
+                    if (error != null)
+                      Text(
+                        error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l.cancel),
+              ),
+              const Spacer(),
+              Flexible(
+                child: FilledButton(
+                  key: const ValueKey('wall-composition-save'),
+                  onPressed: save,
+                  child: Text(
+                    widget.isNewType
+                        ? l.wallCreate
+                        : (widget.typeUseCount ?? 0) == 0
+                        ? l.save
+                        : l.wallTypeApply(widget.typeUseCount!),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (MediaQuery.sizeOf(context).width < 600) {
+      return Dialog.fullscreen(child: SafeArea(child: body));
+    }
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 740),
+        child: body,
       ),
     );
   }
 
   Widget _row(int index) {
-    final d = drafts[index], l = context.l10n;
-    return Padding(
+    final d = drafts[index],
+        l = context.l10n,
+        open = expandedLayer == d.layer.id;
+    return Column(
       key: ValueKey('wall-layer-${d.layer.id}'),
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 3,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(height: 1),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: InkWell(
+                key: ValueKey('wall-layer-details-${d.layer.id}'),
+                onTap: () =>
+                    setState(() => expandedLayer = open ? null : d.layer.id),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        d.layer.role.label(l),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      Text(d.layer.material.label(l)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 88,
+              child: TextFormField(
+                key: ValueKey('wall-layer-thickness-${d.layer.id}'),
+                controller: d.input,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                textAlign: TextAlign.end,
+                decoration: InputDecoration(
+                  suffixText: widget.project.units.symbol,
+                  isDense: true,
+                ),
+                onChanged: (_) => setState(changed),
+                validator: (_) => invalidNumber(d) ? '' : null,
+              ),
+            ),
+            PopupMenuButton<String>(
+              key: ValueKey('wall-layer-menu-${d.layer.id}'),
+              tooltip: l.wallLayerDetails,
+              itemBuilder: (_) => [
+                for (final role in ArchitectLayerRole.values)
+                  CheckedPopupMenuItem(
+                    value: role.name,
+                    checked: d.layer.role == role,
+                    child: Text(role.label(l)),
+                  ),
+                PopupMenuItem(
+                  value: 'up',
+                  enabled: index > 0,
+                  child: Text(l.wallLayerUp),
+                ),
+                PopupMenuItem(
+                  value: 'down',
+                  enabled: index + 1 < drafts.length,
+                  child: Text(l.wallLayerDown),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  enabled: drafts.length > 1,
+                  child: Text(l.delete),
+                ),
+              ],
+              onSelected: (value) => setState(() {
+                changed();
+                if (value == 'delete') {
+                  retiredInputs.add(drafts.removeAt(index).input);
+                } else if (value == 'up' || value == 'down') {
+                  final row = drafts.removeAt(index);
+                  drafts.insert(index + (value == 'up' ? -1 : 1), row);
+                } else {
+                  d.layer = d.layer.copyWith(
+                    role: ArchitectLayerRole.values.byName(value),
+                  );
+                }
+              }),
+            ),
+          ],
+        ),
+        if (open)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
             child: DropdownButtonFormField<ArchitectMaterial>(
               key: ValueKey('wall-layer-material-${d.layer.id}'),
               initialValue: d.layer.material,
               isExpanded: true,
-              decoration: InputDecoration(labelText: d.layer.role.label(l)),
+              decoration: InputDecoration(labelText: l.wallLayerMaterial),
               items: [
-                for (final material in ArchitectMaterial.values)
-                  DropdownMenuItem(
-                    value: material,
-                    child: Text(
-                      material.label(l),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+                for (final m in ArchitectMaterial.values)
+                  DropdownMenuItem(value: m, child: Text(m.label(l))),
               ],
               onChanged: (v) {
                 if (v != null) {
-                  compositionChanged = true;
-                  detailsChanged = true;
-                  setState(
-                    () => d.layer = d.layer.copyWith(
+                  setState(() {
+                    changed();
+                    d.layer = d.layer.copyWith(
                       material: v,
-                      role: v.defaultRole,
-                    ),
-                  );
+                      role: d.layer.role == d.layer.material.defaultRole
+                          ? v.defaultRole
+                          : d.layer.role,
+                    );
+                  });
                 }
               },
             ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 2,
-            child: TextFormField(
-              key: ValueKey('wall-layer-thickness-${d.layer.id}'),
-              controller: d.input,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: InputDecoration(
-                labelText: widget.project.units.symbol,
-              ),
-              onChanged: (_) => setState(() {
-                compositionChanged = true;
-                detailsChanged = true;
-              }),
-              validator: (text) {
-                final v = number(text ?? '');
-                return v == null || !v.isFinite || v <= 0
-                    ? l.architectWallInvalidThickness
-                    : null;
-              },
+      ],
+    );
+  }
+
+  Widget _plinth() {
+    final l = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(),
+        CheckboxListTile(
+          key: const ValueKey('wall-plinth-enabled'),
+          contentPadding: EdgeInsets.zero,
+          title: Text(l.wallPlinth),
+          value: plinthEnabled,
+          tristate: mixed((p) => p.enabled),
+          onChanged: (v) => setState(() {
+            plinthEnabled = v ?? false;
+            editedRegionFields.add('enabled');
+          }),
+        ),
+        if (plinthEnabled != false) ...[
+          TextFormField(
+            key: const ValueKey('wall-plinth-height'),
+            controller: plinthHeight,
+            onChanged: (_) => editedRegionFields.add('height'),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'H (${widget.project.units.symbol})',
+              hintText: l.wallMixedValue,
             ),
+            validator: (s) =>
+                mixed((p) => p.height) && !editedRegionFields.contains('height')
+                ? null
+                : _parse(s ?? '') == null || _parse(s ?? '')! <= 0
+                ? l.wallInvalidHeight
+                : null,
           ),
-          PopupMenuButton<String>(
-            tooltip: l.wallLayerRole,
-            icon: Icon(
-              d.layer.role == ArchitectLayerRole.core
-                  ? Icons.crop_square
-                  : Icons.more_vert,
-            ),
-            itemBuilder: (_) => [
-              for (final role in ArchitectLayerRole.values)
-                CheckedPopupMenuItem(
-                  value: role.name,
-                  checked: d.layer.role == role,
-                  child: Text(role.label(l)),
+          DropdownButtonFormField<ArchitectMaterial>(
+            initialValue: plinthFinish,
+            hint: Text(l.wallMixedValue),
+            decoration: InputDecoration(labelText: l.wallPlinthFinish),
+            items: [
+              for (final m in [
+                ArchitectMaterial.render,
+                ArchitectMaterial.tile,
+                ArchitectMaterial.stone,
+              ])
+                DropdownMenuItem(value: m, child: Text(m.label(l))),
+            ],
+            onChanged: (v) {
+              if (v != null) {
+                setState(() {
+                  plinthFinish = v;
+                  editedRegionFields.add('finish');
+                });
+              }
+            },
+          ),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(l.wallAdvanced),
+            children: [
+              TextFormField(
+                key: const ValueKey('wall-plinth-base'),
+                controller: plinthBase,
+                onChanged: (_) => editedRegionFields.add('base'),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
                 ),
-              PopupMenuItem(
-                value: 'up',
-                enabled: index > 0,
-                child: Text(l.wallLayerUp),
-              ),
-              PopupMenuItem(
-                value: 'down',
-                enabled: index + 1 < drafts.length,
-                child: Text(l.wallLayerDown),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                enabled: drafts.length > 1,
-                child: Text(l.delete),
+                decoration: InputDecoration(
+                  labelText: l.wallPlinthBase,
+                  helperText: l.wallPlinthBaseHelp,
+                  hintText: l.wallMixedValue,
+                ),
+                validator: (s) =>
+                    mixed((p) => p.baseElevation) &&
+                        !editedRegionFields.contains('base')
+                    ? null
+                    : _parse(s ?? '') == null
+                    ? l.wallLayerInvalid
+                    : null,
               ),
             ],
-            onSelected: (value) => setState(() {
-              compositionChanged = true;
-              detailsChanged = true;
-              if (value == 'delete') {
-                drafts.removeAt(index).dispose();
-              } else if (value == 'up' || value == 'down') {
-                final to = index + (value == 'up' ? -1 : 1);
-                final row = drafts.removeAt(index);
-                drafts.insert(to, row);
-              } else {
-                d.layer = d.layer.copyWith(
-                  role: ArchitectLayerRole.values.byName(value),
-                );
-              }
-            }),
           ),
         ],
-      ),
+      ],
     );
   }
 }

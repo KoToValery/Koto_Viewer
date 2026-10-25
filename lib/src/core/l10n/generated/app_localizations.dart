@@ -14380,6 +14380,450 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Viewing direction {side}'**
   String architectViewDirectionSide(int side);
+
+  /// No description provided for @wallPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Walls'**
+  String get wallPickerTitle;
+
+  /// No description provided for @wallCategoryExterior.
+  ///
+  /// In en, this message translates to:
+  /// **'Exterior'**
+  String get wallCategoryExterior;
+
+  /// No description provided for @wallCategoryInterior.
+  ///
+  /// In en, this message translates to:
+  /// **'Interior'**
+  String get wallCategoryInterior;
+
+  /// No description provided for @wallCategoryParapet.
+  ///
+  /// In en, this message translates to:
+  /// **'Parapets'**
+  String get wallCategoryParapet;
+
+  /// No description provided for @wallFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get wallFavorites;
+
+  /// No description provided for @wallFavoriteToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite type'**
+  String get wallFavoriteToggle;
+
+  /// No description provided for @wallPickerSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Type, material, thickness'**
+  String get wallPickerSearch;
+
+  /// No description provided for @wallPickerEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No results'**
+  String get wallPickerEmpty;
+
+  /// No description provided for @wallVariantCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 variant} other{{count} variants}}'**
+  String wallVariantCount(int count);
+
+  /// No description provided for @wallVariant.
+  ///
+  /// In en, this message translates to:
+  /// **'Variant'**
+  String get wallVariant;
+
+  /// No description provided for @wallNewVariant.
+  ///
+  /// In en, this message translates to:
+  /// **'New variant'**
+  String get wallNewVariant;
+
+  /// No description provided for @wallTypesShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Types'**
+  String get wallTypesShort;
+
+  /// No description provided for @wallNoInsulation.
+  ///
+  /// In en, this message translates to:
+  /// **'Uninsulated'**
+  String get wallNoInsulation;
+
+  /// No description provided for @wallParapetCap.
+  ///
+  /// In en, this message translates to:
+  /// **'Coping cap'**
+  String get wallParapetCap;
+
+  /// No description provided for @wallParapetHandrail.
+  ///
+  /// In en, this message translates to:
+  /// **'Handrail'**
+  String get wallParapetHandrail;
+
+  /// No description provided for @wallMaterialThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'{material} {thickness}'**
+  String wallMaterialThickness(String material, String thickness);
+
+  /// No description provided for @wallNewTypeScope.
+  ///
+  /// In en, this message translates to:
+  /// **'New type · existing walls are preserved'**
+  String get wallNewTypeScope;
+
+  /// No description provided for @wallOptionalName.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get wallOptionalName;
+
+  /// No description provided for @wallSaveToCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as type'**
+  String get wallSaveToCatalog;
+
+  /// No description provided for @wallLayerDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Layer details'**
+  String get wallLayerDetails;
+
+  /// No description provided for @wallTypeDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Type details'**
+  String get wallTypeDetails;
+
+  /// No description provided for @wallLayerPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Position'**
+  String get wallLayerPosition;
+
+  /// No description provided for @wallLayerBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'Before {layer}'**
+  String wallLayerBefore(String layer);
+
+  /// No description provided for @wallLayerAtEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'At end'**
+  String get wallLayerAtEnd;
+
+  /// No description provided for @wallLayerMaterial.
+  ///
+  /// In en, this message translates to:
+  /// **'Material'**
+  String get wallLayerMaterial;
+
+  /// No description provided for @wallLayerCoatings.
+  ///
+  /// In en, this message translates to:
+  /// **'Finishes'**
+  String get wallLayerCoatings;
+
+  /// No description provided for @wallCopyFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy A → B'**
+  String get wallCopyFinish;
+
+  /// No description provided for @wallCopyFinishHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy finishes from A to unfinished side B'**
+  String get wallCopyFinishHelp;
+
+  /// No description provided for @wallLayerCoreError.
+  ///
+  /// In en, this message translates to:
+  /// **'The core must be continuous and use base materials.'**
+  String get wallLayerCoreError;
+
+  /// No description provided for @wallDrawingMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Drawing mode'**
+  String get wallDrawingMode;
+
+  /// No description provided for @wallParapetDefaultHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Default height'**
+  String get wallParapetDefaultHeight;
+
+  /// No description provided for @wallCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get wallCreate;
+
+  /// No description provided for @wallLayerLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to 20 layers are supported.'**
+  String get wallLayerLimit;
+
+  /// No description provided for @wallInvalidHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a positive height.'**
+  String get wallInvalidHeight;
+
+  /// No description provided for @wallParapetGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'{finish} · {material}'**
+  String wallParapetGroup(String finish, String material);
+
+  /// No description provided for @roofUiShape.
+  ///
+  /// In en, this message translates to:
+  /// **'Shape'**
+  String get roofUiShape;
+
+  /// No description provided for @roofUiAssembly.
+  ///
+  /// In en, this message translates to:
+  /// **'Build-up'**
+  String get roofUiAssembly;
+
+  /// No description provided for @roofUiDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get roofUiDetails;
+
+  /// No description provided for @roofUiSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get roofUiSettings;
+
+  /// No description provided for @roofUiMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Method'**
+  String get roofUiMethod;
+
+  /// No description provided for @roofUiOnlyPlane.
+  ///
+  /// In en, this message translates to:
+  /// **'This plane'**
+  String get roofUiOnlyPlane;
+
+  /// No description provided for @roofUiWholeRoof.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole roof ({count})'**
+  String roofUiWholeRoof(int count);
+
+  /// No description provided for @roofUiNewScope.
+  ///
+  /// In en, this message translates to:
+  /// **'For new roofs'**
+  String get roofUiNewScope;
+
+  /// No description provided for @roofUiSaveDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Use for future roofs'**
+  String get roofUiSaveDefaults;
+
+  /// No description provided for @roofUiScopeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Only edited fields change. Pipe positions stay with their own plane.'**
+  String get roofUiScopeHelp;
+
+  /// No description provided for @roofUiIndependentHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing one pitch makes the plane independent.'**
+  String get roofUiIndependentHelp;
+
+  /// No description provided for @roofUiPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagram'**
+  String get roofUiPreview;
+
+  /// No description provided for @roofUiPreviewHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Schematic section; exact dimensions are in the fields.'**
+  String get roofUiPreviewHelp;
+
+  /// No description provided for @roofUiNumericInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid value.'**
+  String get roofUiNumericInvalid;
+
+  /// No description provided for @roofUiLayerPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Position'**
+  String get roofUiLayerPosition;
+
+  /// No description provided for @roofUiBeforeLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Before {layer}'**
+  String roofUiBeforeLayer(String layer);
+
+  /// No description provided for @roofUiLayerEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'At end'**
+  String get roofUiLayerEnd;
+
+  /// No description provided for @roofUiAbove.
+  ///
+  /// In en, this message translates to:
+  /// **'Above rafters'**
+  String get roofUiAbove;
+
+  /// No description provided for @roofUiBetween.
+  ///
+  /// In en, this message translates to:
+  /// **'Between rafters'**
+  String get roofUiBetween;
+
+  /// No description provided for @roofUiBelow.
+  ///
+  /// In en, this message translates to:
+  /// **'Below rafters'**
+  String get roofUiBelow;
+
+  /// No description provided for @roofUiLayerActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Layer actions'**
+  String get roofUiLayerActions;
+
+  /// No description provided for @roofUiLayerEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Layer'**
+  String get roofUiLayerEdit;
+
+  /// No description provided for @roofUiStructureZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Structural zone'**
+  String get roofUiStructureZone;
+
+  /// No description provided for @roofUiInsulationFit.
+  ///
+  /// In en, this message translates to:
+  /// **'Between-rafter insulation exceeds the rafter depth.'**
+  String get roofUiInsulationFit;
+
+  /// No description provided for @roofUiParallelZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Use one entry for the shared rafter and between-rafter zone.'**
+  String get roofUiParallelZone;
+
+  /// No description provided for @roofUiAutoBreak.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic break position'**
+  String get roofUiAutoBreak;
+
+  /// No description provided for @roofUiPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 point} other{{count} points}}'**
+  String roofUiPoints(int count);
+
+  /// No description provided for @roofUiAutoPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'New roof'**
+  String get roofUiAutoPreview;
+
+  /// No description provided for @roofUiAddRoof.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get roofUiAddRoof;
+
+  /// No description provided for @roofUiReplaceRoof.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace roof {index} ({count})'**
+  String roofUiReplaceRoof(int index, int count);
+
+  /// No description provided for @roofUiCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get roofUiCreate;
+
+  /// No description provided for @roofUiReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get roofUiReplace;
+
+  /// No description provided for @roofUiTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to'**
+  String get roofUiTarget;
+
+  /// No description provided for @roofUiGeneratedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 plane} other{{count} planes}}'**
+  String roofUiGeneratedCount(int count);
+
+  /// No description provided for @roofUiReviewHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Other roofs are preserved.'**
+  String get roofUiReviewHelp;
+
+  /// No description provided for @roofUiUntouched.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep current'**
+  String get roofUiUntouched;
+
+  /// No description provided for @roofUiReplaceFloor.
+  ///
+  /// In en, this message translates to:
+  /// **'All on storey ({count})'**
+  String roofUiReplaceFloor(int count);
+
+  /// No description provided for @roofUiNewLegend.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get roofUiNewLegend;
+
+  /// No description provided for @roofUiKeptLegend.
+  ///
+  /// In en, this message translates to:
+  /// **'Preserved'**
+  String get roofUiKeptLegend;
 }
 
 class _AppLocalizationsDelegate

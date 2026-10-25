@@ -35,6 +35,8 @@ void main() {
         await tester.pumpAndSettle();
         await editing.selectTool(tester, 'wall');
         if (language == 'bg') {
+          await tester.tap(find.byKey(const ValueKey('wall-drawing-mode')));
+          await tester.pumpAndSettle();
           final arc = find.byKey(const ValueKey('architect-wall-arc-mode'));
           await tester.ensureVisible(arc);
           await tester.tap(arc);

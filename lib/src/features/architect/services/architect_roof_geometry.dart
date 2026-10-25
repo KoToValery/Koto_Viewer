@@ -968,7 +968,7 @@ class ArchitectRoofGeometry {
         if (layer.role == ArchitectRoofLayerRole.rafters ||
             layer.isBetweenRafters) {
           rafterTopPerp ??= cumulativePerp;
-          rafterBotPerp = cumulativePerp + layer.thickness;
+          rafterBotPerp = cumulativePerp + roof.assembly.layerDepth(layer);
         }
 
         final isDiscreteBattenGap =
@@ -995,7 +995,7 @@ class ArchitectRoofGeometry {
           );
         }
 
-        cumulativePerp += layer.thickness;
+        cumulativePerp += roof.assembly.layerDepth(layer);
       }
 
       // 3. Discrete Battens (Летви) along the slope (true orthogonal rectangular profiles)
@@ -1360,9 +1360,12 @@ class ArchitectRoofGeometry {
           (hasFreeLowStart || hasFreeLowEnd)) {
         final fw = timber.hasFasciaBoard ? timber.fasciaThickness : 0.0;
         final covV = coveringThickPerp / cosSlope;
-        final tFlash = 0.008; // Sheet metal thickness in section representation
+        final tFlash = 0.001;
         final apronLen = math.min(0.12, (s1 - s0) * 0.25);
-        final dropLen = math.min(0.065, totalVerticalThick * 0.45);
+        final dropLen = math.min(
+          roof.drainage.showGutter ? 0.005 : 0.065,
+          totalVerticalThick * 0.45,
+        );
         final dripLip = 0.014;
 
         if (hasFreeLowStart) {
@@ -1726,13 +1729,15 @@ class ArchitectRoofGeometry {
       if (tAnchor > 0.10 && tSource > 0.05 && tSource <= maxDistFromSource) {
         final interPt = anchor + activeDir * tAnchor;
         final distAlongRay = (interPt - activeProjPt).distance;
-        candidates.add(_RoofGuideCandidate(
-          point: interPt,
-          label: label,
-          guideLine: (sourcePt, interPt),
-          distanceToCursor: distAlongRay,
-          priority: priority,
-        ));
+        candidates.add(
+          _RoofGuideCandidate(
+            point: interPt,
+            label: label,
+            guideLine: (sourcePt, interPt),
+            distanceToCursor: distAlongRay,
+            priority: priority,
+          ),
+        );
       }
     }
 
@@ -1757,13 +1762,15 @@ class ArchitectRoofGeometry {
       if (tAnchor > 0.10 && tLine.abs() <= maxDistFromSource) {
         final interPt = anchor + activeDir * tAnchor;
         final distAlongRay = (interPt - activeProjPt).distance;
-        candidates.add(_RoofGuideCandidate(
-          point: interPt,
-          label: label,
-          guideLine: (sourcePt, interPt),
-          distanceToCursor: distAlongRay,
-          priority: priority,
-        ));
+        candidates.add(
+          _RoofGuideCandidate(
+            point: interPt,
+            label: label,
+            guideLine: (sourcePt, interPt),
+            distanceToCursor: distAlongRay,
+            priority: priority,
+          ),
+        );
       }
     }
 
@@ -1880,15 +1887,17 @@ class ArchitectRoofGeometry {
 
     // 6. Select closest intersection candidate within snap tolerance
     final maxSnapDist = math.max(snapTolerance * 2.2, 0.40);
-    final validCandidates =
-        candidates.where((c) => c.distanceToCursor <= maxSnapDist).toList();
+    final validCandidates = candidates
+        .where((c) => c.distanceToCursor <= maxSnapDist)
+        .toList();
 
     if (validCandidates.isNotEmpty) {
       // Deduplicate nearby candidates within 12cm, keeping the highest priority
       final clustered = <_RoofGuideCandidate>[];
       for (final c in validCandidates) {
-        final existingIdx = clustered
-            .indexWhere((u) => (u.point - c.point).distance < 0.12);
+        final existingIdx = clustered.indexWhere(
+          (u) => (u.point - c.point).distance < 0.12,
+        );
         if (existingIdx == -1) {
           clustered.add(c);
         } else if (c.priority > clustered[existingIdx].priority) {
@@ -1931,7 +1940,8 @@ class ArchitectRoofGeometry {
 
     // 7. Fallback to continuous ray tracking along anchorDir
     final guideSpan = math.max(activeProjT + 2.0, 10.0);
-    final rayLabel = (activeAngleDeg - 45.0).abs() < 0.5 ||
+    final rayLabel =
+        (activeAngleDeg - 45.0).abs() < 0.5 ||
             (activeAngleDeg - 135.0).abs() < 0.5 ||
             (activeAngleDeg - 225.0).abs() < 0.5 ||
             (activeAngleDeg - 315.0).abs() < 0.5
@@ -1941,9 +1951,7 @@ class ArchitectRoofGeometry {
     return RoofSnapGuideResult(
       point: activeProjPt,
       snapLabel: rayLabel,
-      magneticGuides: [
-        (anchor, anchor + activeDir * guideSpan),
-      ],
+      magneticGuides: [(anchor, anchor + activeDir * guideSpan)],
       isIntersectionSnap: false,
     );
   }

@@ -84,6 +84,9 @@ class ArchitectWall {
   final bool connectEnd;
   final String? wallTypeId;
   final ParapetFinish? parapetFinish;
+
+  /// New walls carry explicit semantics; legacy projects retain their fallback.
+  final bool? parapet;
   final ArchitectCutDisplayMode cutDisplayMode;
   final List<ArchitectDoor> doors;
   final List<ArchitectWindow> windows;
@@ -110,13 +113,16 @@ class ArchitectWall {
     this.connectEnd = true,
     this.wallTypeId,
     this.parapetFinish,
+    this.parapet,
     this.cutDisplayMode = ArchitectCutDisplayMode.auto,
     this.doors = const [],
     this.windows = const [],
   });
 
   bool get isParapet =>
-      height < 1.50 || (wallTypeId != null && wallTypeId!.contains('parapet'));
+      parapet ??
+      (height < 1.50 ||
+          (wallTypeId != null && wallTypeId!.contains('parapet')));
 
   bool isCutAt(double storeyCutPlane) {
     return switch (cutDisplayMode) {
@@ -410,6 +416,7 @@ class ArchitectWall {
     bool? connectEnd,
     String? wallTypeId,
     ParapetFinish? parapetFinish,
+    bool? parapet,
     ArchitectCutDisplayMode? cutDisplayMode,
     List<ArchitectDoor>? doors,
     List<ArchitectWindow>? windows,
@@ -436,6 +443,7 @@ class ArchitectWall {
     connectEnd: connectEnd ?? this.connectEnd,
     wallTypeId: wallTypeId ?? this.wallTypeId,
     parapetFinish: parapetFinish ?? this.parapetFinish,
+    parapet: parapet ?? this.parapet,
     cutDisplayMode: cutDisplayMode ?? this.cutDisplayMode,
     doors: doors ?? this.doors,
     windows: windows ?? this.windows,
@@ -546,6 +554,7 @@ class ArchitectWall {
     'connectEnd': connectEnd,
     'wallTypeId': wallTypeId,
     'parapetFinish': parapetFinish?.name,
+    if (parapet != null) 'parapet': parapet,
     'cutDisplayMode': cutDisplayMode.name,
     'doors': doors.map((d) => d.toJson()).toList(),
     'windows': windows.map((w) => w.toJson()).toList(),
@@ -601,6 +610,7 @@ class ArchitectWall {
     connectStart: json['connectStart'] as bool? ?? true,
     connectEnd: json['connectEnd'] as bool? ?? true,
     wallTypeId: json['wallTypeId'] as String?,
+    parapet: json['parapet'] as bool?,
     parapetFinish: json['parapetFinish'] != null
         ? ParapetFinish.values.firstWhere(
             (p) => p.name == json['parapetFinish'],
@@ -766,7 +776,6 @@ class ArchitectWall {
             storeyElevation: storeyElevation,
             sources: sources,
 
-
             resolveComposition: false,
             includeSolid: false,
             suppressedOpeningIds: suppressedOpeningIds,
@@ -805,7 +814,6 @@ class ArchitectWall {
           ...build3D(
             storeyElevation: storeyElevation,
             sources: sources,
-
 
             resolveComposition: false,
             includeSolid: false,

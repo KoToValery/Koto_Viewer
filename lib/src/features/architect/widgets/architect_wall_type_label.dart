@@ -1,8 +1,79 @@
 import '../../../core/l10n/generated/app_localizations.dart';
 import '../models/architect_wall_type.dart';
 import 'architect_material_layer_label.dart';
+import '../models/architect_project.dart' show ArchitectUnit;
+import '../services/architect_wall_catalog.dart';
+
+String architectWallLength(double value, ArchitectUnit unit) =>
+    '${ArchitectUnit.trimZeros(unit.toUnit(value).toStringAsFixed(6))} ${unit.symbol}';
+
+extension ArchitectWallCategoryLabel on ArchitectWallCategory {
+  String label(AppLocalizations l) => switch (this) {
+    ArchitectWallCategory.exterior => l.wallCategoryExterior,
+    ArchitectWallCategory.interior => l.wallCategoryInterior,
+    ArchitectWallCategory.parapet => l.wallCategoryParapet,
+  };
+}
 
 extension ArchitectWallTypeLabel on ArchitectWallType {
+  String parapetFinishLabel(AppLocalizations l) =>
+      (parapetFinish ?? ParapetFinish.cap) == ParapetFinish.cap
+      ? l.wallParapetCap
+      : l.wallParapetHandrail;
+
+  String catalogGroupLabel(AppLocalizations l, ArchitectUnit unit) {
+    if (isParapet) {
+      final materials = resolvedLayers
+          .where((layer) => layer.role == ArchitectLayerRole.core)
+          .map((layer) => layer.material.label(l))
+          .toSet()
+          .join(' + ');
+      return l.wallParapetGroup(parapetFinishLabel(l), materials);
+    }
+    return resolvedLayers
+        .where((layer) => layer.role == ArchitectLayerRole.core)
+        .map(
+          (layer) => l.wallMaterialThickness(
+            layer.material.label(l),
+            architectWallLength(layer.thickness, unit),
+          ),
+        )
+        .join(' + ');
+  }
+
+  /// Complete physical description keeps equal-total compositions distinguishable.
+  String compositionLabel(
+    AppLocalizations l,
+    ArchitectUnit unit, {
+    bool includeCore = true,
+  }) {
+    final layers = resolvedLayers.where(
+      (layer) => includeCore || layer.role != ArchitectLayerRole.core,
+    );
+    if (layers.isEmpty) return l.wallNoInsulation;
+    return layers
+        .map(
+          (layer) => l.wallMaterialThickness(
+            layer.material.label(l),
+            architectWallLength(layer.thickness, unit),
+          ),
+        )
+        .join(' · ');
+  }
+
+  String catalogLabel(
+    AppLocalizations l,
+    ArchitectUnit unit, {
+    bool grouped = false,
+  }) {
+    if (!isFactoryPreset && name.isNotEmpty) return name;
+    if (isParapet) {
+      final composition = compositionLabel(l, unit);
+      return grouped ? composition : '${parapetFinishLabel(l)} · $composition';
+    }
+    return compositionLabel(l, unit, includeCore: !grouped);
+  }
+
   String get _composition {
     String number(double value) => (value * 100)
         .toStringAsFixed(3)

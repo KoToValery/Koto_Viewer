@@ -139,12 +139,16 @@ class ArchitectSection {
     return segment.start + axis * (station - segment.station);
   }
 
-  /// Looking left of the ordered cut line makes station increase to screen-right.
   /// Endpoint order persists the viewing direction in existing project files.
+  /// Plan +Y points down, so screen-right is opposite the ordered station axis.
   Offset get viewDirection => Offset(-axis.dy, axis.dx);
+  Offset get drawingOrigin => end;
+  Offset get drawingRight => -axis;
+  double drawingStation(double station) => length - station;
   ArchitectSection reversed() => copyWith(
     start: end,
     end: start,
+    drawing: drawing.reflectedHorizontally(length),
     steps: [
       for (final s in segments.reversed)
         if (steps.isNotEmpty &&

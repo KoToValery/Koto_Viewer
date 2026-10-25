@@ -20,9 +20,12 @@ class ArchitectStairSection {
   static ArchitectStairSection build(
     List<StairSolid> solids,
     Offset origin,
-    Offset direction,
-  ) {
-    if (!direction.dx.isFinite ||
+    Offset direction, {
+    double endpointTolerance = 1e-6,
+  }) {
+    if (!endpointTolerance.isFinite ||
+        endpointTolerance <= 0 ||
+        !direction.dx.isFinite ||
         !direction.dy.isFinite ||
         direction.distance < 1e-9) {
       throw ArgumentError('Section direction is missing');
@@ -36,7 +39,30 @@ class ArchitectStairSection {
       ArchitectStairGeometry.dot(Offset(p.x, p.y) - origin, axis),
       p.z,
     );
-    String key(Offset p) => '${(p.dx * 1e6).round()},${(p.dy * 1e6).round()}';
+    // Rounding alone splits coincident endpoints on opposite sides of a bin
+    // boundary. Weld neighbouring bins by distance before stitching contours.
+    final vertices = <(int, int), List<({Offset point, String id})>>{};
+    var vertexCount = 0;
+    String key(Offset p) {
+      final x = (p.dx / endpointTolerance).floor();
+      final y = (p.dy / endpointTolerance).floor();
+      for (var dx = -1; dx <= 1; dx++) {
+        for (var dy = -1; dy <= 1; dy++) {
+          for (final vertex
+              in vertices[(x + dx, y + dy)] ??
+                  <({Offset point, String id})>[]) {
+            if ((p - vertex.point).distanceSquared <=
+                endpointTolerance * endpointTolerance) {
+              return vertex.id;
+            }
+          }
+        }
+      }
+      final id = '${vertexCount++}';
+      (vertices[(x, y)] ??= []).add((point: p, id: id));
+      return id;
+    }
+
     void add(StairSolidMaterial material, List<Offset> polygon) {
       if (polygon.length < 3) return;
       final path = Path()..addPolygon(polygon, true);

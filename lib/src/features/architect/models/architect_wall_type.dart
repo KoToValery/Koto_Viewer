@@ -40,6 +40,9 @@ class ArchitectWallType {
   final bool loadBearing;
   final String name;
   final String? labelId;
+
+  /// Explicit project types survive even when unnamed and not yet placed.
+  final bool isCatalogType;
   final WallUsage usage;
   final double _totalThickness; // in meters (e.g. 0.37 m)
   final double _brickThickness; // in meters (e.g. 0.25 m or 0.12 m)
@@ -52,6 +55,7 @@ class ArchitectWallType {
     required this.id,
     required this.name,
     this.labelId,
+    this.isCatalogType = true,
     required this.usage,
     required double totalThickness,
     double brickThickness = 0.25,
@@ -200,6 +204,7 @@ class ArchitectWallType {
     String? id,
     String? name,
     String? labelId,
+    bool? isCatalogType,
     WallUsage? usage,
     double? totalThickness,
     double? brickThickness,
@@ -217,6 +222,7 @@ class ArchitectWallType {
     loadBearing: loadBearing ?? this.loadBearing,
     name: name ?? this.name,
     labelId: labelId ?? this.labelId,
+    isCatalogType: isCatalogType ?? this.isCatalogType,
     usage: usage ?? this.usage,
     totalThickness: totalThickness ?? this.totalThickness,
     brickThickness: brickThickness ?? this.brickThickness,
@@ -230,6 +236,7 @@ class ArchitectWallType {
     'id': id,
     'name': name,
     if (labelId != null) 'labelId': labelId,
+    'isCatalogType': isCatalogType,
     'usage': usage.name,
     'layers': layers.map((l) => l.toJson()).toList(),
     'location': resolvedLocation.name,
@@ -258,6 +265,7 @@ class ArchitectWallType {
         loadBearing: json['loadBearing'] as bool? ?? json['usage'] == 'bearing',
         name: json['name'] as String,
         labelId: json['labelId'] as String?,
+        isCatalogType: json['isCatalogType'] as bool? ?? true,
         usage: WallUsage.values.firstWhere(
           (u) => u.name == json['usage'],
           orElse: () => WallUsage.exterior,

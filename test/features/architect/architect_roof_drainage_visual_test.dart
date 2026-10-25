@@ -37,7 +37,8 @@ void main() {
           const Offset(2, 0),
         ) -
         roof.drainage.gutterDepth;
-    expect(drainage.contains(Offset(.95, gutterFloor + .0005)), isFalse);
+    final station = 1 - ArchitectRoofDrainageGeometry.gutterOffset(roof);
+    expect(drainage.contains(Offset(station, gutterFloor + .0005)), isFalse);
     if (!const bool.fromEnvironment('ELEVATION_QA_CAPTURE')) return;
     final recorder = ui.PictureRecorder(), canvas = Canvas(recorder);
     canvas.drawColor(Colors.white, BlendMode.src);

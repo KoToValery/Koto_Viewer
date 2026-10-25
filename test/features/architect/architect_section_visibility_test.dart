@@ -10,6 +10,7 @@ import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.d
 import 'package:kotoview/src/features/architect/rendering/architect_vector_scene.dart';
 import 'package:kotoview/src/features/architect/services/architect_building_elevation.dart';
 import 'package:kotoview/src/features/architect/services/architect_building_section.dart';
+import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/services/architect_drawing_publisher.dart';
 import 'architect_roof_drainage_test.dart' as fixture;
 
@@ -44,13 +45,13 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'old files default to cut only; sparse view rules inherit and persist',
+    'unspecified rules show cut and visible projection; explicit rules persist',
     () {
       final legacy = fixture.drainageProject().toJson()
         ..remove('sectionVisibility');
       final old = ArchitectProject.fromJson(legacy);
-      expect(old.sectionVisibility.modeFor(gutters), cutOnly);
-      expect(old.sectionVisibility.modeFor(pipes), cutOnly);
+      expect(old.sectionVisibility.modeFor(gutters), full);
+      expect(old.sectionVisibility.modeFor(pipes), full);
       final p = old.copyWith(
         sectionVisibility: rules(full),
         sections: [
@@ -90,7 +91,7 @@ void main() {
         'futureCategory': 'hidden',
         'downpipes': 'hidden',
       });
-      expect(future.modeFor(gutters), cutOnly);
+      expect(future.modeFor(gutters), full);
       expect(future.modeFor(pipes), hidden);
     },
   );
@@ -98,7 +99,9 @@ void main() {
   test(
     'cut only removes background drainage without leaving wall occlusion holes',
     () {
-      final p = fixture.drainageProject();
+      final p = fixture.drainageProject().copyWith(
+        sectionVisibility: rules(cutOnly),
+      );
       final cut = ArchitectBuildingSection.build(p, front);
       expect(drainage(cut), isEmpty);
       final s = p.activeStorey, roof = s.roofs.single;
@@ -214,8 +217,36 @@ void main() {
     expect(drainage(ArchitectBuildingSection.build(p, throughPipe)), isEmpty);
   });
 
+  test(
+    'pipe-only cut and projection remain valid when the gutter is hidden',
+    () {
+      final model = ArchitectCommandController(
+        fixture.drainageProject().copyWith(
+          sectionVisibility: const ArchitectSectionVisibility(
+            categories: {gutters: hidden},
+          ),
+        ),
+      );
+      addTearDown(model.dispose);
+      final p = model.project;
+      final section = ArchitectBuildingSection.build(
+        p,
+        throughPipe.copyWith(
+          visibility: const ArchitectSectionVisibility(
+            categories: {pipes: full},
+          ),
+        ),
+      );
+      expect(section.elementPaths, contains('roof'));
+      expect(section.drawingRegions, isNotEmpty);
+      expect(drainage(section).single.path.getBounds().height, greaterThan(6));
+    },
+  );
+
   test('stepped sections preserve category rules and far clipping', () {
-    final p = fixture.drainageProject();
+    final p = fixture.drainageProject().copyWith(
+      sectionVisibility: rules(cutOnly),
+    );
     final cut = front.copyWith(steps: const [Offset(4, .1)], viewDepth: 10);
     final normal = ArchitectBuildingSection.build(p, cut);
     final projected = ArchitectBuildingSection.build(

@@ -404,6 +404,8 @@ void main() {
           .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))
           .onToolChanged(ArchitectTool.roof);
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('roof-create-menu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('roof-mode-poly')));
       await tester.pumpAndSettle();
       workspace
@@ -442,7 +444,9 @@ void main() {
             .distance,
         lessThan(1e-8),
       );
-      await tester.ensureVisible(find.byKey(const ValueKey('roof-draft-cancel')));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('roof-draft-cancel')),
+      );
       await tester.tap(find.byKey(const ValueKey('roof-draft-cancel')));
       await tester.pumpAndSettle();
       expect(workspace.overlay(tester).midpointHints, isEmpty);

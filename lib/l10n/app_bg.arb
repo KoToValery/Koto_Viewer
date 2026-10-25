@@ -2621,5 +2621,158 @@
   "architectVisibleInSection": "Видим в разрез",
   "@architectVisibleInSection": {"description": "Toggle whether a component is visible in building sections"},
   "architectViewDirectionSide": "Посока на гледане {side}",
-  "@architectViewDirectionSide": {"description": "Tooltip for one of the two viewing direction arrows", "placeholders": {"side": {"type": "int"}}}
+  "@architectViewDirectionSide": {"description": "Tooltip for one of the two viewing direction arrows", "placeholders": {"side": {"type": "int"}}},
+  "wallPickerTitle": "Стени",
+  "wallCategoryExterior": "Външни",
+  "wallCategoryInterior": "Вътрешни",
+  "wallCategoryParapet": "Парапети",
+  "wallFavorites": "Любими",
+  "wallFavoriteToggle": "Любим тип",
+  "wallPickerSearch": "Тип, материал, дебелина",
+  "wallPickerEmpty": "Няма резултати",
+  "wallVariantCount": "{count, plural, one{1 вариант} other{{count} варианта}}",
+  "@wallVariantCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "wallVariant": "Вариант",
+  "wallNewVariant": "Нов вариант",
+  "wallTypesShort": "Типове",
+  "wallNoInsulation": "Без изолация",
+  "wallParapetCap": "С шапка",
+  "wallParapetHandrail": "С ръкохват",
+  "wallMaterialThickness": "{material} {thickness}",
+  "@wallMaterialThickness": {
+    "placeholders": {
+      "material": {
+        "type": "String"
+      },
+      "thickness": {
+        "type": "String"
+      }
+    }
+  },
+  "wallNewTypeScope": "Нов тип · съществуващите стени се запазват",
+  "wallOptionalName": "Незадължително",
+  "wallSaveToCatalog": "Запази като тип",
+  "wallLayerDetails": "Данни за слоя",
+  "wallTypeDetails": "Данни за типа",
+  "wallLayerPosition": "Позиция",
+  "wallLayerBefore": "Преди {layer}",
+  "@wallLayerBefore": {
+    "placeholders": {
+      "layer": {
+        "type": "String"
+      }
+    }
+  },
+  "wallLayerAtEnd": "Накрая",
+  "wallLayerMaterial": "Материал",
+  "wallLayerCoatings": "Покрития",
+  "wallCopyFinish": "Копирай A → B",
+  "wallCopyFinishHelp": "Копирай покритията от A към непокритата страна B",
+  "wallLayerCoreError": "Ядрото трябва да е непрекъснато и от основни материали.",
+  "wallDrawingMode": "Режим на чертане",
+  "wallParapetDefaultHeight": "Височина по подразбиране",
+  "wallCreate": "Създай",
+  "wallLayerLimit": "Допускат се до 20 слоя.",
+  "wallInvalidHeight": "Въведете положителна височина.",
+  "wallParapetGroup": "{finish} · {material}",
+  "@wallParapetGroup": {
+    "placeholders": {
+      "finish": {
+        "type": "String"
+      },
+      "material": {
+        "type": "String"
+      }
+    }
+  },
+  "roofUiShape": "Форма",
+  "roofUiAssembly": "Състав",
+  "roofUiDetails": "Детайли",
+  "roofUiSettings": "Настройки",
+  "roofUiMethod": "Начин",
+  "roofUiOnlyPlane": "Този скат",
+  "roofUiWholeRoof": "Покривът ({count})",
+  "@roofUiWholeRoof": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "roofUiNewScope": "За нови покриви",
+  "roofUiSaveDefaults": "За следващите покриви",
+  "roofUiScopeHelp": "Променят се само редактираните полета. Местата на тръбите остават към своя скат.",
+  "roofUiIndependentHelp": "Промяната на един наклон прави ската независим.",
+  "roofUiPreview": "Схема",
+  "roofUiPreviewHelp": "Схематично сечение; точните размери са в полетата.",
+  "roofUiNumericInvalid": "Въведете валидна стойност.",
+  "roofUiLayerPosition": "Позиция",
+  "roofUiBeforeLayer": "Преди {layer}",
+  "@roofUiBeforeLayer": {
+    "placeholders": {
+      "layer": {
+        "type": "String"
+      }
+    }
+  },
+  "roofUiLayerEnd": "Накрая",
+  "roofUiAbove": "Над ребрата",
+  "roofUiBetween": "Между ребрата",
+  "roofUiBelow": "Под ребрата",
+  "roofUiLayerActions": "Действия за слоя",
+  "roofUiLayerEdit": "Слой",
+  "roofUiStructureZone": "Конструктивна зона",
+  "roofUiInsulationFit": "Изолацията между ребрата надвишава височината им.",
+  "roofUiParallelZone": "Използвайте един запис за зоната на ребрата и изолацията между тях.",
+  "roofUiAutoBreak": "Автоматично пречупване",
+  "roofUiPoints": "{count, plural, one{1 точка} other{{count} точки}}",
+  "@roofUiPoints": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "roofUiAutoPreview": "Нов покрив",
+  "roofUiAddRoof": "Добави",
+  "roofUiReplaceRoof": "Замени покрив {index} ({count})",
+  "@roofUiReplaceRoof": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "roofUiCreate": "Създай",
+  "roofUiReplace": "Замени",
+  "roofUiTarget": "Прилагане",
+  "roofUiGeneratedCount": "{count, plural, one{1 скат} other{{count} ската}}",
+  "@roofUiGeneratedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "roofUiReviewHelp": "Останалите покриви се запазват.",
+  "roofUiUntouched": "Запази текущото",
+  "roofUiReplaceFloor": "Всички на етажа ({count})",
+  "@roofUiReplaceFloor": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "roofUiNewLegend": "Нов",
+  "roofUiKeptLegend": "Запазени"
 }

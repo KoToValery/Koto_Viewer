@@ -4805,5 +4805,158 @@
   "architectVisibleInSection": "Visible in section",
   "@architectVisibleInSection": {"description": "Toggle whether a component is visible in building sections"},
   "architectViewDirectionSide": "Viewing direction {side}",
-  "@architectViewDirectionSide": {"description": "Tooltip for one of the two viewing direction arrows", "placeholders": {"side": {"type": "int"}}}
+  "@architectViewDirectionSide": {"description": "Tooltip for one of the two viewing direction arrows", "placeholders": {"side": {"type": "int"}}},
+  "wallPickerTitle": "Walls",
+  "wallCategoryExterior": "Exterior",
+  "wallCategoryInterior": "Interior",
+  "wallCategoryParapet": "Parapets",
+  "wallFavorites": "Favorites",
+  "wallFavoriteToggle": "Favorite type",
+  "wallPickerSearch": "Type, material, thickness",
+  "wallPickerEmpty": "No results",
+  "wallVariantCount": "{count, plural, one{1 variant} other{{count} variants}}",
+  "@wallVariantCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "wallVariant": "Variant",
+  "wallNewVariant": "New variant",
+  "wallTypesShort": "Types",
+  "wallNoInsulation": "Uninsulated",
+  "wallParapetCap": "Coping cap",
+  "wallParapetHandrail": "Handrail",
+  "wallMaterialThickness": "{material} {thickness}",
+  "@wallMaterialThickness": {
+    "placeholders": {
+      "material": {
+        "type": "String"
+      },
+      "thickness": {
+        "type": "String"
+      }
+    }
+  },
+  "wallNewTypeScope": "New type · existing walls are preserved",
+  "wallOptionalName": "Optional",
+  "wallSaveToCatalog": "Save as type",
+  "wallLayerDetails": "Layer details",
+  "wallTypeDetails": "Type details",
+  "wallLayerPosition": "Position",
+  "wallLayerBefore": "Before {layer}",
+  "@wallLayerBefore": {
+    "placeholders": {
+      "layer": {
+        "type": "String"
+      }
+    }
+  },
+  "wallLayerAtEnd": "At end",
+  "wallLayerMaterial": "Material",
+  "wallLayerCoatings": "Finishes",
+  "wallCopyFinish": "Copy A → B",
+  "wallCopyFinishHelp": "Copy finishes from A to unfinished side B",
+  "wallLayerCoreError": "The core must be continuous and use base materials.",
+  "wallDrawingMode": "Drawing mode",
+  "wallParapetDefaultHeight": "Default height",
+  "wallCreate": "Create",
+  "wallLayerLimit": "Up to 20 layers are supported.",
+  "wallInvalidHeight": "Enter a positive height.",
+  "wallParapetGroup": "{finish} · {material}",
+  "@wallParapetGroup": {
+    "placeholders": {
+      "finish": {
+        "type": "String"
+      },
+      "material": {
+        "type": "String"
+      }
+    }
+  },
+  "roofUiShape": "Shape",
+  "roofUiAssembly": "Build-up",
+  "roofUiDetails": "Details",
+  "roofUiSettings": "Settings",
+  "roofUiMethod": "Method",
+  "roofUiOnlyPlane": "This plane",
+  "roofUiWholeRoof": "Whole roof ({count})",
+  "@roofUiWholeRoof": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "roofUiNewScope": "For new roofs",
+  "roofUiSaveDefaults": "Use for future roofs",
+  "roofUiScopeHelp": "Only edited fields change. Pipe positions stay with their own plane.",
+  "roofUiIndependentHelp": "Changing one pitch makes the plane independent.",
+  "roofUiPreview": "Diagram",
+  "roofUiPreviewHelp": "Schematic section; exact dimensions are in the fields.",
+  "roofUiNumericInvalid": "Enter a valid value.",
+  "roofUiLayerPosition": "Position",
+  "roofUiBeforeLayer": "Before {layer}",
+  "@roofUiBeforeLayer": {
+    "placeholders": {
+      "layer": {
+        "type": "String"
+      }
+    }
+  },
+  "roofUiLayerEnd": "At end",
+  "roofUiAbove": "Above rafters",
+  "roofUiBetween": "Between rafters",
+  "roofUiBelow": "Below rafters",
+  "roofUiLayerActions": "Layer actions",
+  "roofUiLayerEdit": "Layer",
+  "roofUiStructureZone": "Structural zone",
+  "roofUiInsulationFit": "Between-rafter insulation exceeds the rafter depth.",
+  "roofUiParallelZone": "Use one entry for the shared rafter and between-rafter zone.",
+  "roofUiAutoBreak": "Automatic break position",
+  "roofUiPoints": "{count, plural, one{1 point} other{{count} points}}",
+  "@roofUiPoints": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "roofUiAutoPreview": "New roof",
+  "roofUiAddRoof": "Add",
+  "roofUiReplaceRoof": "Replace roof {index} ({count})",
+  "@roofUiReplaceRoof": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "roofUiCreate": "Create",
+  "roofUiReplace": "Replace",
+  "roofUiTarget": "Apply to",
+  "roofUiGeneratedCount": "{count, plural, one{1 plane} other{{count} planes}}",
+  "@roofUiGeneratedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "roofUiReviewHelp": "Other roofs are preserved.",
+  "roofUiUntouched": "Keep current",
+  "roofUiReplaceFloor": "All on storey ({count})",
+  "@roofUiReplaceFloor": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "roofUiNewLegend": "New",
+  "roofUiKeptLegend": "Preserved"
 }

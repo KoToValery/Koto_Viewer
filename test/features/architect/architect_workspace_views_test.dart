@@ -100,6 +100,26 @@ void main() {
         ),
       );
       expect(source.project.storeys.map((s) => s.toJson()).toList(), floors);
+      expect(
+        view.project.activeStorey.annotations.single.position,
+        const Offset(2, -2),
+      );
+      expect(
+        source.project.sections.single.drawing.annotations.single.position,
+        const Offset(8, -2),
+      );
+      expect(
+        view.project.activeStorey.dimensions.single.lineStart,
+        const Offset(0, -.5),
+      );
+      expect(
+        source.project.sections.single.drawing.dimensions.single.lineStart,
+        const Offset(10, -.5),
+      );
+      expect(
+        source.project.sections.single.reversed().reversed().drawing.toJson(),
+        source.project.sections.single.drawing.toJson(),
+      );
       expect(source.project.elevations.single.drawing.annotations, isEmpty);
       final restored = ArchitectProject.fromJson(
         jsonDecode(jsonEncode(source.project.toJson())),

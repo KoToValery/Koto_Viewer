@@ -9,14 +9,15 @@ import 'package:kotoview/src/features/architect/screens/architect_workspace_scre
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 import 'architect_workspace_interaction_test.dart' as workspace;
+import 'architect_wall_compositions_test.dart' as data;
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  for (final width in [360.0, 1200.0]) {
+  for (final width in [320.0, 360.0, 1200.0]) {
     for (final language in ['bg', 'en']) {
       testWidgets(
-        'One wall picker opens upward and restores selection at $width in $language',
+        'Categorized wall picker selects and restores a type at $width in $language',
         (tester) async {
           tester.view.physicalSize = Size(width, 844);
           tester.view.devicePixelRatio = 1;
@@ -57,23 +58,26 @@ void main() {
                 .id,
             'ext_25_12_eps',
           );
-          expect(find.text(l10n.architectWallSingle), findsOneWidget);
-          expect(find.text(l10n.architectWallChained), findsOneWidget);
-          expect(find.byType(ChoiceChip), findsNWidgets(3));
-          expect(find.byKey(const ValueKey('architect-wall-arc-mode')), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('wall-drawing-mode')),
+            findsOneWidget,
+          );
+          expect(find.byType(ChoiceChip), findsNothing);
           expect(find.text(l10n.architectWallThickness), findsNothing);
 
-          final pickerTop = tester.getTopLeft(picker).dy;
           await tester.tap(picker);
           await tester.pumpAndSettle();
-          for (final type in catalog) {
-            final item = find.byKey(ValueKey('architect-wall-type-${type.id}'));
-            expect(item, findsOneWidget);
-            expect(
-              tester.getBottomLeft(item).dy,
-              lessThanOrEqualTo(pickerTop + 1),
-            );
-          }
+          expect(find.text(l10n.wallCategoryExterior), findsOneWidget);
+          expect(find.text(l10n.wallCategoryInterior), findsOneWidget);
+          expect(find.text(l10n.wallCategoryParapet), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('architect-wall-type-parapet_12')),
+            findsNothing,
+          );
+          await tester.tap(
+            find.byKey(const ValueKey('wall-category-interior')),
+          );
+          await tester.pumpAndSettle();
           await tester.tap(
             find.byKey(
               const ValueKey('architect-wall-type-bearing_25_concrete'),
@@ -93,8 +97,11 @@ void main() {
           );
           // All types remain available, but only the selected one occupies the toolbar.
           expect(find.byType(PopupMenuItem<ArchitectWallType>), findsNothing);
-          expect(find.byType(ChoiceChip), findsNWidgets(3));
-          expect(find.byKey(const ValueKey('architect-wall-arc-mode')), findsOneWidget);
+          expect(find.byType(ChoiceChip), findsNothing);
+          expect(
+            find.byKey(const ValueKey('wall-drawing-mode')),
+            findsOneWidget,
+          );
           expect(commands.canUndo, isFalse);
           await tester.pumpWidget(const SizedBox());
           await tester.pumpAndSettle();
@@ -123,4 +130,63 @@ void main() {
     expect(workspace.overlay(tester).activeWallTypeId, 'ext_25_12_eps');
     expect(workspace.overlay(tester).activeWallInsulation, .12);
   });
+
+  testWidgets(
+    'Draft variant creation is independent, survives later additions and supports Undo',
+    (tester) async {
+      final model = ArchitectCommandController(
+        data
+            .project([data.wall('existing', Offset.zero, const Offset(4, 0))])
+            .copyWith(
+              wallTypes: ArchitectWallType.standardCatalog(),
+              units: ArchitectUnit.centimeters,
+            ),
+      );
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('wall-draft-layers')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('wall-composition-save')));
+      await tester.pumpAndSettle();
+      expect(
+        model.canUndo,
+        isFalse,
+        reason: 'An unchanged variant must not create a duplicate',
+      );
+      await tester.tap(find.byKey(const ValueKey('wall-draft-layers')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('wall-layer-thickness-insulation')),
+        '15',
+      );
+      await tester.tap(find.byKey(const ValueKey('wall-composition-save')));
+      await tester.pumpAndSettle();
+      final first = model.project.wallTypes.last;
+      expect(first.totalThickness, closeTo(.40, 1e-10));
+      expect(first.name, isEmpty);
+      expect(
+        model.project.activeStorey.walls.single.toJson(),
+        data.wall('existing', Offset.zero, const Offset(4, 0)).toJson(),
+      );
+      expect(workspace.overlay(tester).activeWallTypeId, first.id);
+      expect(model.undoCount, 1);
+      await tester.tap(find.byKey(const ValueKey('wall-draft-layers')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('wall-layer-thickness-insulation')),
+        '18',
+      );
+      await tester.tap(find.byKey(const ValueKey('wall-composition-save')));
+      await tester.pumpAndSettle();
+      expect(model.project.wallTypes.any((t) => t.id == first.id), isTrue);
+      expect(model.project.wallTypes.length, 7);
+      model.undo();
+      await tester.pumpAndSettle();
+      expect(model.project.wallTypes.length, 6);
+      expect(model.project.wallTypes.last.id, first.id);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

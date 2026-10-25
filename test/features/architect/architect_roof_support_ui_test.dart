@@ -80,7 +80,10 @@ void main() {
           isFalse,
         );
         await toggle();
-        final field = find.byType(TextFormField);
+        final field = find.descendant(
+          of: find.byKey(const ValueKey('roof-support-distance')),
+          matching: find.byType(TextFormField),
+        );
         expect(field, findsOneWidget);
         await tester.ensureVisible(field);
         await tester.enterText(field, '-5');
@@ -96,7 +99,9 @@ void main() {
         FocusManager.instance.primaryFocus?.unfocus();
         await tester.pumpAndSettle();
         expect(find.text(l.architectRoofSupportDistanceInvalid), findsNothing);
-        await tester.ensureVisible(find.byKey(const ValueKey('roof-manual-support')));
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('roof-manual-support')),
+        );
         await tester.pumpAndSettle();
         await qa.capturePhone(tester, capture, 'roof-manual-support-$language');
         await tester.tap(apply);

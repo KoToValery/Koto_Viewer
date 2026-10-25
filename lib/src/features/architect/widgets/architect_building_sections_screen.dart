@@ -1,4 +1,5 @@
 import '../rendering/architect_hatch_geometry.dart';
+import '../rendering/architect_section_hatch.dart';
 import 'architect_projection_drawing_menu.dart';
 import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 import '../rendering/architect_vector_scene.dart';
@@ -122,7 +123,10 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
 
   ArchitectBuildingSection geometry(ArchitectSection value) {
     if (!identical(cachedProject, project) || !identical(cachedCut, value)) {
-      cachedGeometry = ArchitectBuildingSection.build(project, value);
+      cachedGeometry = ArchitectBuildingSection.build(
+        project,
+        value,
+      ).forView(value);
       cachedProject = project;
       cachedCut = value;
     }
@@ -395,7 +399,12 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
           details: [
             for (final d in value.details)
               d.id == selectedDetail
-                  ? d.copyWith(textOffset: point - layout.anchor)
+                  ? d.copyWith(
+                      textOffset: Offset(
+                        layout.anchor.dx - point.dx,
+                        point.dy - layout.anchor.dy,
+                      ),
+                    )
                   : d,
           ],
         ),
@@ -407,7 +416,8 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
       if (picked == null) {
         final id = data.pickSlab(point, 8 / scale);
         if (id != null) {
-          var station = point.dx.clamp(0, value.length).toDouble();
+          final rawStation = value.drawingStation(point.dx);
+          var station = rawStation.clamp(0, value.length).toDouble();
           for (final floor in project.storeys) {
             for (final slab in floor.slabs.where((s) => s.id == id)) {
               final spans = ArchitectSlabGeometry.intervals(floor, slab, value);
@@ -417,8 +427,9 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                       (s) => station.clamp(s.$1 + 1e-8, s.$2 - 1e-8).toDouble(),
                     )
                     .reduce(
-                      (a, b) =>
-                          (a - point.dx).abs() < (b - point.dx).abs() ? a : b,
+                      (a, b) => (a - rawStation).abs() < (b - rawStation).abs()
+                          ? a
+                          : b,
                     );
               }
             }
@@ -453,13 +464,13 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
             source.slab,
           );
           anchor = Offset(
-            pick.station,
+            value.drawingStation(pick.station),
             surfaces.first.topAt(value.pointAt(pick.station)),
           );
         } else {
           final r = roofSource!;
           anchor = Offset(
-            pick.station,
+            value.drawingStation(pick.station),
             r.storey.elevation +
                 r.roof.topElevationAt(value.pointAt(pick.station)),
           );
@@ -470,7 +481,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
         final next = candidate.copyWith(
           textOffset: reattaching && old != null
               ? old.textOffset
-              : point - anchor,
+              : Offset(anchor.dx - point.dx, point.dy - anchor.dy),
         );
         update(
           value.copyWith(
@@ -580,10 +591,12 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
         title: Text(l.buildingSections),
         actions: [
           if (value != null && widget.onDraftRequested != null)
-            ArchitectProjectionDrawingMenu(onSelected: (tool) {
-              widget.onDraftRequested!(tool);
-              Navigator.pop(context);
-            }),
+            ArchitectProjectionDrawingMenu(
+              onSelected: (tool) {
+                widget.onDraftRequested!(tool);
+                Navigator.pop(context);
+              },
+            ),
           IconButton(
             tooltip: l.architectZoneUndoAction,
             onPressed: widget.controller.canUndo ? historyAction : null,
@@ -1023,8 +1036,8 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                                             controller: widget.controller,
                                             paths: data.elementPaths,
                                             roofProfiles: data.roofProfiles,
-                                            origin: value.start,
-                                            right: value.axis,
+                                            origin: value.drawingOrigin,
+                                            right: value.drawingRight,
                                             elevation: false,
                                             scale:
                                                 scale *
@@ -1113,13 +1126,13 @@ class ArchitectSectionDrawing {
   ArchitectSectionDrawing(
     this.project,
     this.cut,
-    this.data,
+    ArchitectBuildingSection data,
     this.l,
     this.colors,
     this.selected,
     this.fontFamily, [
     this.selectedRoofId,
-  ]);
+  ]) : data = data.forView(cut);
   double get textHeight => project.dimensionScale.textHeight;
   _DetailLayout _detailLayout(ArchitectSlabDetail detail) {
     final source = ArchitectBuildingSection.source(project, cut, detail);
@@ -1144,8 +1157,9 @@ class ArchitectSectionDrawing {
       z = detail.fallbackElevation;
       bottomZ = z;
     }
-    final anchor = Offset(detail.station, z);
-    var text = anchor + detail.textOffset;
+    final anchor = Offset(cut.drawingStation(detail.station), z);
+    final textOffset = Offset(-detail.textOffset.dx, detail.textOffset.dy);
+    var text = anchor + textOffset;
     final rows = <String>[];
     for (final surface in surfaces) {
       final layer = surface.layer;
@@ -1218,7 +1232,7 @@ class ArchitectSectionDrawing {
       )..layout();
       width = math.max(width, painter.width);
     }
-    final left = detail.textOffset.dx >= 0 ? text.dx : text.dx - width;
+    final left = textOffset.dx >= 0 ? text.dx : text.dx - width;
     final bounds = Rect.fromLTRB(
       math.min(left, anchor.dx) - row,
       math.min(bottomZ, text.dy - rows.length * row) - row,
@@ -1292,17 +1306,15 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
       }
     }
     for (final region in drawing.data.drawingRegions) {
-      architectDrawingSources(
-        canvas,
-        drawing.data.regions
-            .where(
-              (r) =>
-                  r.material == region.material &&
-                  r.path.getBounds().overlaps(region.path.getBounds()),
-            )
-            .map((r) => r.sourceId),
-        'sectionRegion',
-      );
+      final sources = drawing.data.regions
+          .where(
+            (r) =>
+                r.material == region.material &&
+                r.path.getBounds().overlaps(region.path.getBounds()),
+          )
+          .map((r) => r.sourceId)
+          .toSet();
+      architectDrawingSources(canvas, sources, 'sectionRegion');
       final path = region.path.transform(matrix.storage);
       final isSelectedRoof =
           drawing.selectedRoofId != null &&
@@ -1319,14 +1331,8 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
                     ? 1.1
                     : .65),
       );
-      if (region.hatchPattern != null) {
-        canvas.save(); canvas.clipPath(path);
-        canvas.drawPath(ArchitectHatchGeometry.path(boundary:path,
-          pattern:region.hatchPattern!,unitsPerMm:ArchitectTextScope.current==null?3:
-            ArchitectTextScope.current!.denominator/1000*scale),
-          Paint()..style=PaintingStyle.stroke..color=color..strokeWidth=.65);
-        canvas.restore();
-      } else if (region.timberCrossSectionPolygon != null &&
+      architectDrawingSources(canvas, sources, 'sectionHatch');
+      if (region.timberCrossSectionPolygon != null &&
           region.timberCrossSectionPolygon!.length == 4) {
         final pts = region.timberCrossSectionPolygon!.map(p).toList();
         final diagPaint = Paint()
@@ -1335,19 +1341,27 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
           ..strokeWidth = 0.65;
         canvas.drawLine(pts[0], pts[2], diagPaint);
         canvas.drawLine(pts[1], pts[3], diagPaint);
-      } else if (region.path.getBounds().height * scale > 4) {
+      } else if (region.hatchPattern != null ||
+          (ArchitectSectionHatch.slab(region.material) != null &&
+              region.path.getBounds().height * scale > 4)) {
+        final pattern =
+            region.hatchPattern ?? ArchitectSectionHatch.slab(region.material)!;
         canvas.save();
         canvas.clipPath(path);
-        final b = path.getBounds();
-        for (var x = b.left - b.height; x < b.right; x += 9) {
-          canvas.drawLine(
-            Offset(x, b.bottom),
-            Offset(x + b.height, b.top),
-            Paint()
-              ..color = color.withValues(alpha: .25)
-              ..strokeWidth = .5,
-          );
-        }
+        canvas.drawPath(
+          ArchitectHatchGeometry.path(
+            boundary: path,
+            pattern: pattern,
+            unitsPerMm: ArchitectTextScope.current == null
+                ? 3
+                : ArchitectTextScope.current!.denominator / 1000 * scale,
+            visibleBounds: Offset.zero & size,
+          ),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..color = color.withValues(alpha: .6)
+            ..strokeWidth = .5,
+        );
         canvas.restore();
       }
     }
@@ -1471,7 +1485,7 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
       for (var i = 0; i < d.rows.length; i++) {
         final y = d.text.dy - i * d.rowHeight;
         final at = p(Offset(d.text.dx, y));
-        final right = detail.textOffset.dx >= 0;
+        final right = detail.textOffset.dx <= 0;
         final tp = ArchitectTextPainter(
           text: TextSpan(
             text: d.rows[i],

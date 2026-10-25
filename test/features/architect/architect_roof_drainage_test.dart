@@ -112,7 +112,9 @@ void main() {
     );
     final geometry = ArchitectRoofDrainageGeometry.build(p, s, roof);
     expect(
-      geometry.planPath(roof.drainage.gutterWidth).contains(const Offset(3, 0)),
+      geometry
+          .planPath(roof.drainage.gutterWidth)
+          .contains(Offset(3, -roof.assembly.timber.fasciaThickness - .014)),
       isTrue,
     );
     final mesh = ArchitectRoofDrainageMesh.build(p, s, roof);

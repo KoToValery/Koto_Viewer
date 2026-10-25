@@ -1,12 +1,8 @@
-// === SECTION: TABLE OF CONTENTS ===
-// 1. ArchitectRoofBar (Compact mobile HUD bar for roof drafting, Auto-Roof, slope, overhang & eaves switching)
-
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../services/architect_roof_tool.dart';
-
-// === SECTION: ARCHITECT ROOF BAR ===
+import 'architect_roof_number_field.dart';
 
 class ArchitectRoofBar extends StatelessWidget {
   final ArchitectRoofTool tool;
@@ -14,20 +10,19 @@ class ArchitectRoofBar extends StatelessWidget {
   final int? selectedEdgeIndex;
   final ValueChanged<AutoRoofType> onAutoRoof;
   final VoidCallback onOpenLayersDialog;
-  final VoidCallback? onSwitchEavesEdge;
-  final VoidCallback? onFlipSlopeDirection;
-  final VoidCallback? onSetSelectedEdgeAsEaves;
-  final ValueChanged<double>? onSelectedRoofSlopeChanged;
-  final ValueChanged<double>? onSelectedRoofOverhangChanged;
-  final VoidCallback? onToggleSlopeLocked;
-  final VoidCallback? onMatchRidgeHeight;
-  final VoidCallback? onToggleMansard;
-  final ValueChanged<double>? onSelectedRoofUpperSlopeChanged;
-  final ValueChanged<double>? onSelectedRoofBreakDistanceChanged;
-  final VoidCallback? onFinishPolygon;
-  final VoidCallback? onUndoDraftPoint;
-  final VoidCallback? onCancelDraft;
-
+  final VoidCallback? onOpenAssemblyDialog,
+      onSwitchEavesEdge,
+      onFlipSlopeDirection,
+      onSetSelectedEdgeAsEaves;
+  final ValueChanged<double>? onSelectedRoofSlopeChanged,
+      onSelectedRoofOverhangChanged;
+  final ValueChanged<ArchitectRoofQuickValue>? onApplySlope, onApplyOverhang;
+  final VoidCallback? onToggleSlopeLocked, onMatchRidgeHeight, onToggleMansard;
+  final ValueChanged<double>? onSelectedRoofUpperSlopeChanged,
+      onSelectedRoofBreakDistanceChanged;
+  final VoidCallback? onFinishPolygon, onUndoDraftPoint, onCancelDraft;
+  final int groupCount;
+  final ArchitectUnit unit;
   const ArchitectRoofBar({
     super.key,
     required this.tool,
@@ -35,11 +30,14 @@ class ArchitectRoofBar extends StatelessWidget {
     this.selectedEdgeIndex,
     required this.onAutoRoof,
     required this.onOpenLayersDialog,
+    this.onOpenAssemblyDialog,
     this.onSwitchEavesEdge,
     this.onFlipSlopeDirection,
     this.onSetSelectedEdgeAsEaves,
     this.onSelectedRoofSlopeChanged,
     this.onSelectedRoofOverhangChanged,
+    this.onApplySlope,
+    this.onApplyOverhang,
     this.onToggleSlopeLocked,
     this.onMatchRidgeHeight,
     this.onToggleMansard,
@@ -48,675 +46,262 @@ class ArchitectRoofBar extends StatelessWidget {
     this.onFinishPolygon,
     this.onUndoDraftPoint,
     this.onCancelDraft,
+    this.groupCount = 1,
+    this.unit = ArchitectUnit.centimeters,
   });
 
+  String _mode(AppLocalizations l) => switch (tool.drawMode) {
+    RoofDrawMode.rectangle => l.architectRoofDrawRect,
+    RoofDrawMode.polygon => l.architectRoofDrawPoly,
+    RoofDrawMode.multiPitch => l.architectRoofDrawMultiPitch,
+    RoofDrawMode.mansard => l.architectRoofDrawMansard,
+  };
   @override
   Widget build(BuildContext context) {
-    final l = context.l10n;
-    final roof = selectedRoof;
-    final currentSlope = roof?.slopeDegrees ?? tool.slopeDegrees;
-    final currentOverhang = roof?.eavesOverhang ?? tool.eavesOverhang;
-
+    final l = context.l10n, roof = selectedRoof;
+    final drafting = roof == null && tool.isDrafting;
+    final canFinish =
+        drafting &&
+        tool.draftPoints.length >= 3 &&
+        (tool.drawMode == RoofDrawMode.polygon ||
+            tool.drawMode == RoofDrawMode.multiPitch);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680),
         child: Material(
           key: const ValueKey('architect-roof-bar'),
-          color: const Color(0xEE1E242C),
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
-          elevation: 4,
-          shadowColor: Colors.black54,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white24),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (roof == null) ...[
-                    // Quick finish button at front when actively drafting with >= 3 points
-                    if (tool.isDrafting &&
-                        (tool.drawMode == RoofDrawMode.polygon ||
-                            tool.drawMode == RoofDrawMode.multiPitch) &&
-                        tool.draftPoints.length >= 3) ...[
-                      ActionChip(
-                        key: const ValueKey('roof-poly-finish-front'),
-                        visualDensity: VisualDensity.compact,
-                        backgroundColor: const Color(0xFF2E7D32),
-                        avatar: const Icon(
-                          Icons.check,
-                          size: 15,
-                          color: Colors.white,
-                        ),
-                        label: Text(
-                          l.architectDimensionFinish,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+          elevation: 3,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Row(
+              children: [
+                if (drafting) ...[
+                  Expanded(
+                    child: canFinish
+                        ? FilledButton.icon(
+                            key: const ValueKey('roof-poly-finish-front'),
+                            onPressed: onFinishPolygon,
+                            icon: const Icon(Icons.check),
+                            label: Text(l.architectDimensionFinish),
+                          )
+                        : Text(
+                            l.roofUiPoints(tool.draftPoints.length),
+                            textAlign: TextAlign.center,
                           ),
-                        ),
-                        onPressed: onFinishPolygon,
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    // Draw mode toggle: Rect vs Poly
-                    ChoiceChip(
-                      key: const ValueKey('roof-mode-rect'),
-                      visualDensity: VisualDensity.compact,
-                      avatar: const Icon(Icons.crop_landscape_rounded, size: 15),
-                      label: Text(l.architectRoofDrawRect),
-                      selected: tool.drawMode == RoofDrawMode.rectangle,
-                      onSelected: (sel) {
-                        if (sel) tool.setDrawMode(RoofDrawMode.rectangle);
+                  ),
+                  IconButton(
+                    key: const ValueKey('roof-draft-undo'),
+                    tooltip: l.undoPoint,
+                    onPressed: onUndoDraftPoint,
+                    icon: const Icon(Icons.undo),
+                  ),
+                  IconButton(
+                    key: const ValueKey('roof-draft-cancel'),
+                    tooltip: l.cancel,
+                    onPressed: onCancelDraft,
+                    icon: const Icon(Icons.close),
+                  ),
+                ] else if (roof == null) ...[
+                  Expanded(
+                    child: PopupMenuButton<String>(
+                      key: const ValueKey('roof-create-menu'),
+                      tooltip: l.roofUiMethod,
+                      onSelected: (v) {
+                        if (v.startsWith('auto:')) {
+                          onAutoRoof(
+                            AutoRoofType.values.byName(v.substring(5)),
+                          );
+                        } else {
+                          tool.setDrawMode(RoofDrawMode.values.byName(v));
+                        }
                       },
-                    ),
-                    const SizedBox(width: 4),
-                    ChoiceChip(
-                      key: const ValueKey('roof-mode-poly'),
-                      visualDensity: VisualDensity.compact,
-                      avatar: const Icon(Icons.pentagon_outlined, size: 15),
-                      label: Text(l.architectRoofDrawPoly),
-                      selected: tool.drawMode == RoofDrawMode.polygon,
-                      onSelected: (sel) {
-                        if (sel) tool.setDrawMode(RoofDrawMode.polygon);
-                      },
-                    ),
-                    const SizedBox(width: 4),
-                    ChoiceChip(
-                      key: const ValueKey('roof-mode-multipitch'),
-                      visualDensity: VisualDensity.compact,
-                      avatar: const Icon(Icons.polyline_rounded, size: 15),
-                      label: Text(l.architectRoofDrawMultiPitch),
-                      selected: tool.drawMode == RoofDrawMode.multiPitch,
-                      onSelected: (sel) {
-                        if (sel) tool.setDrawMode(RoofDrawMode.multiPitch);
-                      },
-                    ),
-                    const SizedBox(width: 4),
-                    ChoiceChip(
-                      key: const ValueKey('roof-mode-mansard'),
-                      visualDensity: VisualDensity.compact,
-                      avatar: const Icon(Icons.call_split_rounded, size: 15),
-                      label: Text(l.architectRoofDrawMansard),
-                      selected: tool.drawMode == RoofDrawMode.mansard,
-                      onSelected: (sel) {
-                        if (sel) tool.setDrawMode(RoofDrawMode.mansard);
-                      },
-                    ),
-                    const SizedBox(width: 6),
-
-                    // Auto-Roof menu button
-                    PopupMenuButton<AutoRoofType>(
-                      key: const ValueKey('roof-auto-menu'),
-                      tooltip: l.architectRoofAuto,
-                      color: const Color(0xFF262A34),
-                      onSelected: onAutoRoof,
                       itemBuilder: (_) => [
-                        for (final type in AutoRoofType.values)
-                          PopupMenuItem(
-                            key: ValueKey('roof-auto-${type.name}'),
-                            value: type,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  switch (type) {
-                                    AutoRoofType.gable => Icons.roofing_rounded,
-                                    AutoRoofType.hip => Icons.change_history_rounded,
-                                    AutoRoofType.shed => Icons.signal_cellular_4_bar_rounded,
-                                    AutoRoofType.flat => Icons.horizontal_rule_rounded,
-                                  },
-                                  size: 18,
-                                  color: const Color(0xFF00E5FF),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  type.label(l),
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ],
+                        for (final m in RoofDrawMode.values)
+                          CheckedPopupMenuItem(
+                            key: ValueKey(
+                              'roof-mode-${switch (m) {
+                                RoofDrawMode.rectangle => 'rect',
+                                RoofDrawMode.polygon => 'poly',
+                                RoofDrawMode.multiPitch => 'multipitch',
+                                RoofDrawMode.mansard => 'mansard',
+                              }}',
                             ),
+                            value: m.name,
+                            checked: tool.drawMode == m,
+                            child: Text(switch (m) {
+                              RoofDrawMode.rectangle => l.architectRoofDrawRect,
+                              RoofDrawMode.polygon => l.architectRoofDrawPoly,
+                              RoofDrawMode.multiPitch =>
+                                l.architectRoofDrawMultiPitch,
+                              RoofDrawMode.mansard =>
+                                l.architectRoofDrawMansard,
+                            }),
+                          ),
+                        const PopupMenuDivider(),
+                        PopupMenuItem<String>(
+                          enabled: false,
+                          child: Text(l.architectRoofAuto),
+                        ),
+                        for (final t in AutoRoofType.values)
+                          PopupMenuItem(
+                            key: ValueKey('roof-auto-${t.name}'),
+                            value: 'auto:${t.name}',
+                            child: Text(t.label(l)),
                           ),
                       ],
-                      child: Container(
+                      child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF00E5FF)),
+                          vertical: 12,
+                          horizontal: 4,
                         ),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.auto_fix_high_rounded,
-                              size: 15,
-                              color: Color(0xFF00E5FF),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              l.architectRoofAuto,
-                              style: const TextStyle(
-                                color: Color(0xFF00E5FF),
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                            const Icon(Icons.draw_outlined, size: 18),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _mode(l),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const Icon(
-                              Icons.arrow_drop_down,
-                              size: 16,
-                              color: Color(0xFF00E5FF),
-                            ),
+                            const Icon(Icons.arrow_drop_down, size: 18),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                  ] else ...[
-                    if (selectedEdgeIndex != null &&
-                        (selectedEdgeIndex != roof.safeEavesEdgeIndex ||
-                            roof.reverseSlope)) ...[
-                      Tooltip(
-                        message: l.architectRoofSetEavesHereTooltip,
-                        child: ActionChip(
-                          key: const ValueKey('roof-set-eaves-edge'),
-                          visualDensity: VisualDensity.compact,
-                          backgroundColor: const Color(0x3300E676),
-                          side: const BorderSide(color: Color(0xFF00E676)),
-                          avatar: const Icon(
-                            Icons.south_rounded,
-                            size: 15,
-                            color: Color(0xFF00E676),
-                          ),
-                          label: Text(
-                            l.architectRoofSetEavesHere,
-                            style: const TextStyle(
-                              color: Color(0xFF00E676),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          onPressed: onSetSelectedEdgeAsEaves,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    // Selected roof: Rotate / Switch Eaves Edge button
-                    Tooltip(
-                      message: l.architectRoofSwitchEavesTooltip,
-                      child: ActionChip(
-                        key: const ValueKey('roof-switch-eaves'),
-                        visualDensity: VisualDensity.compact,
-                        avatar: const Icon(
-                          Icons.rotate_right_rounded,
-                          size: 15,
-                          color: Color(0xFF00E5FF),
-                        ),
-                        label: Text(l.architectRoofRotateSlope),
-                        onPressed: onSwitchEavesEdge,
+                  ),
+                  Expanded(
+                    child: TextButton.icon(
+                      key: const ValueKey('roof-open-assembly'),
+                      onPressed: onOpenAssemblyDialog ?? onOpenLayersDialog,
+                      icon: const Icon(Icons.layers_outlined, size: 18),
+                      label: Text(
+                        l.roofUiAssembly,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    // Selected roof: Flip Slope 180° button
-                    Tooltip(
-                      message: l.architectRoofFlipSlopeTooltip,
-                      child: ActionChip(
-                        key: const ValueKey('roof-flip-slope'),
-                        visualDensity: VisualDensity.compact,
-                        avatar: const Icon(
-                          Icons.swap_vert_rounded,
-                          size: 15,
-                          color: Colors.amberAccent,
-                        ),
-                        label: Text(l.architectRoofFlipSlope),
-                        onPressed: onFlipSlopeDirection,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    // Selected roof: Toggle Mansard button
-                    Tooltip(
-                      message: roof.isMansard
-                          ? l.architectRoofIsMansard
-                          : l.architectRoofMakeMansard,
-                      child: ActionChip(
-                        key: const ValueKey('roof-toggle-mansard'),
-                        visualDensity: VisualDensity.compact,
-                        backgroundColor:
-                            roof.isMansard ? const Color(0x3300E5FF) : null,
-                        side: BorderSide(
-                          color: roof.isMansard
-                              ? const Color(0xFF00E5FF)
-                              : Colors.white24,
-                        ),
-                        avatar: Icon(
-                          Icons.call_split_rounded,
-                          size: 15,
-                          color: roof.isMansard
-                              ? const Color(0xFF00E5FF)
-                              : Colors.white70,
-                        ),
-                        label: Text(
-                          roof.isMansard
-                              ? l.architectRoofIsMansard
-                              : l.architectRoofMakeMansard,
-                          style: TextStyle(
-                            color: roof.isMansard
-                                ? const Color(0xFF00E5FF)
-                                : Colors.white,
-                            fontWeight: roof.isMansard
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                        onPressed: onToggleMansard,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-
-                  if (roof != null && roof.roofGroupId != null) ...[
-                    Tooltip(
-                      message: roof.isSlopeLocked
-                          ? l.architectRoofLinkedSlopesTooltip
-                          : l.architectRoofIndependentSlopeTooltip,
-                      child: InkWell(
-                        key: const ValueKey('roof-toggle-slope-lock'),
-                        onTap: onToggleSlopeLocked,
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: roof.isSlopeLocked
-                                ? const Color(0x3300E5FF)
-                                : const Color(0x33FFD54F),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: roof.isSlopeLocked
-                                  ? const Color(0xFF00E5FF)
-                                  : Colors.amberAccent,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                roof.isSlopeLocked
-                                    ? Icons.link
-                                    : Icons.link_off,
-                                size: 13,
-                                color: roof.isSlopeLocked
-                                    ? const Color(0xFF00E5FF)
-                                    : Colors.amberAccent,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                roof.isSlopeLocked
-                                    ? l.architectRoofLinkedSlopes
-                                    : l.architectRoofIndependentSlope,
-                                style: TextStyle(
-                                  color: roof.isSlopeLocked
-                                      ? const Color(0xFF00E5FF)
-                                      : Colors.amberAccent,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    if (onMatchRidgeHeight != null) ...[
-                      Tooltip(
-                        message: l.architectRoofMatchRidgeTooltip,
-                        child: ActionChip(
-                          key: const ValueKey('roof-match-ridge'),
-                          visualDensity: VisualDensity.compact,
-                          backgroundColor: const Color(0x2269F0AE),
-                          side: const BorderSide(color: Color(0xFF69F0AE)),
-                          avatar: const Icon(
-                            Icons.vertical_align_top_rounded,
-                            size: 14,
-                            color: Color(0xFF69F0AE),
-                          ),
-                          label: Text(
-                            l.architectRoofMatchRidge,
-                            style: const TextStyle(
-                              color: Color(0xFF69F0AE),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          onPressed: onMatchRidgeHeight,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                  ],
-
-                  // Slope popup selector
-                  PopupMenuButton<double>(
-                    key: const ValueKey('roof-slope-menu'),
-                    tooltip: l.architectRoofSlope,
-                    color: const Color(0xFF262A34),
-                    onSelected: (deg) {
-                      if (roof != null) {
-                        onSelectedRoofSlopeChanged?.call(deg);
-                      } else {
-                        tool.setSlopeDegrees(deg);
-                      }
-                    },
-                    itemBuilder: (_) => [
-                      for (final deg in [
-                        2.0,
-                        12.0,
-                        18.0,
-                        22.0,
-                        26.0,
-                        30.0,
-                        35.0,
-                        45.0,
-                        55.0,
-                        60.0,
-                        65.0,
-                        70.0,
-                      ])
-                        PopupMenuItem(
-                          value: deg,
-                          child: Text(
-                            '${deg.toStringAsFixed(0)}°',
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                    ],
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF262A34),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: Row(
+                  ),
+                ] else ...[
+                  Expanded(
+                    child: TextButton(
+                      key: const ValueKey('roof-slope-menu'),
+                      onPressed: () async {
+                        final result = await showArchitectRoofNumber(
+                          context,
+                          label: l.architectRoofSlope,
+                          value: roof.slopeDegrees,
+                          unit: '°',
+                          pitch: true,
+                          max: 80,
+                          groupCount: groupCount,
+                        );
+                        if (result != null) {
+                          if (onApplySlope != null) {
+                            onApplySlope!(result);
+                          } else {
+                            onSelectedRoofSlopeChanged?.call(result.value);
+                          }
+                        }
+                      },
+                      child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.show_chart_rounded,
-                            size: 14,
-                            color: Colors.amberAccent,
-                          ),
-                          const SizedBox(width: 4),
                           Text(
-                            '${l.architectRoofSlope} ${currentSlope.toStringAsFixed(0)}°',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                            ),
+                            l.architectRoofSlope,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          Text(
+                            '${roofNumber(roof.slopeDegrees)}°',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
-
-                  if (roof?.isMansard == true ||
-                      (roof == null && tool.drawMode == RoofDrawMode.mansard)) ...[
-                    // Upper Slope popup selector
-                    PopupMenuButton<double>(
-                      key: const ValueKey('roof-upper-slope-menu'),
-                      tooltip: l.architectRoofUpperSlope,
-                      color: const Color(0xFF262A34),
-                      onSelected: (deg) {
-                        if (roof != null) {
-                          onSelectedRoofUpperSlopeChanged?.call(deg);
-                        } else {
-                          tool.setUpperSlopeDegrees(deg);
-                        }
-                      },
-                      itemBuilder: (_) => [
-                        for (final deg in [
-                          12.0,
-                          15.0,
-                          18.0,
-                          22.0,
-                          25.0,
-                          30.0,
-                          35.0,
-                          45.0,
-                        ])
-                          PopupMenuItem(
-                            value: deg,
-                            child: Text(
-                              '${deg.toStringAsFixed(0)}°',
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                          ),
-                      ],
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF262A34),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF00E5FF)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.trending_flat_rounded,
-                              size: 14,
-                              color: Color(0xFF00E5FF),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${l.architectRoofUpperSlope} ${(roof?.upperSlopeDegrees ?? tool.upperSlopeDegrees).toStringAsFixed(0)}°',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-
-                    // Knuckle break distance popup selector
-                    PopupMenuButton<double>(
-                      key: const ValueKey('roof-break-distance-menu'),
-                      tooltip: l.architectRoofBreakDistance,
-                      color: const Color(0xFF262A34),
-                      onSelected: (dist) {
-                        if (roof != null) {
-                          onSelectedRoofBreakDistanceChanged?.call(dist);
-                        } else {
-                          tool.setBreakDistance(dist);
-                        }
-                      },
-                      itemBuilder: (_) => [
-                        for (final dist in [
-                          0.80,
-                          1.00,
-                          1.20,
-                          1.50,
-                          1.80,
-                          2.00,
-                          2.20,
-                          2.50,
-                          3.00,
-                        ])
-                          PopupMenuItem(
-                            value: dist,
-                            child: Text(
-                              '${dist.toStringAsFixed(2)} m',
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                          ),
-                      ],
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF262A34),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF00E5FF)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.vertical_distribute_rounded,
-                              size: 14,
-                              color: Color(0xFF00E5FF),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${l.architectRoofBreakDistance} ${(roof?.effectiveBreakDistance ?? tool.breakDistance ?? 1.80).toStringAsFixed(2)} m',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-
-                  // Overhang popup selector
-                  PopupMenuButton<double>(
-                    key: const ValueKey('roof-overhang-menu'),
-                    tooltip: l.architectRoofOverhang,
-                    color: const Color(0xFF262A34),
-                    onSelected: (overhang) {
-                      if (roof != null) {
-                        onSelectedRoofOverhangChanged?.call(overhang);
-                      } else {
-                        tool.setEavesOverhang(overhang);
-                      }
-                    },
-                    itemBuilder: (_) => [
-                      for (final ov in [0.0, 0.30, 0.40, 0.50, 0.60, 0.80, 1.00])
-                        PopupMenuItem(
-                          value: ov,
-                          child: Text(
-                            '${(ov * 100).round()} cm',
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                    ],
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF262A34),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.straighten_rounded,
-                            size: 14,
-                            color: Colors.cyanAccent,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${l.architectRoofOverhang} ${(currentOverhang * 100).round()} cm',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
+                  Expanded(
+                    child: TextButton.icon(
+                      key: const ValueKey('roof-open-assembly'),
+                      onPressed: onOpenAssemblyDialog ?? onOpenLayersDialog,
+                      icon: const Icon(Icons.layers_outlined, size: 18),
+                      label: Text(
+                        l.roofUiAssembly,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
-
-                  // Layers & Timber Carpentry dialog button
-                  ActionChip(
-                    key: const ValueKey('roof-open-layers'),
-                    visualDensity: VisualDensity.compact,
-                    avatar: const Icon(
-                      Icons.carpenter_rounded,
-                      size: 15,
-                      color: Color(0xFFFFB74D),
-                    ),
-                    label: Text(l.architectRoofLayersShort),
-                    onPressed: onOpenLayersDialog,
-                  ),
-
-                  // Polygon drafting controls when active
-                  if (roof == null && tool.isDrafting) ...[
-                    const SizedBox(width: 6),
-                    if ((tool.drawMode == RoofDrawMode.polygon ||
-                            tool.drawMode == RoofDrawMode.multiPitch) &&
-                        tool.draftPoints.length >= 3)
-                      ActionChip(
-                        key: const ValueKey('roof-poly-finish'),
-                        visualDensity: VisualDensity.compact,
-                        backgroundColor: const Color(0xFF2E7D32),
-                        avatar: const Icon(
-                          Icons.check,
-                          size: 15,
-                          color: Colors.white,
-                        ),
-                        label: Text(
-                          l.architectDimensionFinish,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        onPressed: onFinishPolygon,
-                      ),
-                    IconButton(
-                      key: const ValueKey('roof-draft-undo'),
-                      visualDensity: VisualDensity.compact,
-                      tooltip: l.architectZoneUndoAction,
-                      icon: const Icon(
-                        Icons.undo,
-                        size: 18,
-                        color: Colors.white70,
-                      ),
-                      onPressed: onUndoDraftPoint,
-                    ),
-                    IconButton(
-                      key: const ValueKey('roof-draft-cancel'),
-                      visualDensity: VisualDensity.compact,
-                      tooltip: l.cancel,
-                      icon: const Icon(
-                        Icons.close,
-                        size: 18,
-                        color: Colors.redAccent,
-                      ),
-                      onPressed: onCancelDraft,
-                    ),
-                  ],
                 ],
-              ),
+                if (roof != null &&
+                    selectedEdgeIndex != null &&
+                    (selectedEdgeIndex != roof.safeEavesEdgeIndex ||
+                        roof.reverseSlope))
+                  IconButton(
+                    key: const ValueKey('roof-set-eaves-edge'),
+                    tooltip: l.architectRoofSetEavesHere,
+                    onPressed: onSetSelectedEdgeAsEaves,
+                    icon: const Icon(Icons.south),
+                  ),
+                IconButton(
+                  key: const ValueKey('roof-open-layers'),
+                  tooltip: l.roofUiSettings,
+                  onPressed: onOpenLayersDialog,
+                  icon: const Icon(Icons.tune),
+                ),
+                if (roof != null)
+                  PopupMenuButton<String>(
+                    key: const ValueKey('roof-actions'),
+                    tooltip: l.roofUiDetails,
+                    onSelected: (v) => switch (v) {
+                      'eaves' => onSetSelectedEdgeAsEaves?.call(),
+                      'rotate' => onSwitchEavesEdge?.call(),
+                      'flip' => onFlipSlopeDirection?.call(),
+                      'mansard' => onToggleMansard?.call(),
+                      'lock' => onToggleSlopeLocked?.call(),
+                      'ridge' => onMatchRidgeHeight?.call(),
+                      _ => null,
+                    },
+                    itemBuilder: (_) => [
+                      if (onSwitchEavesEdge != null)
+                        PopupMenuItem(
+                          key: const ValueKey('roof-rotate-slope'),
+                          value: 'rotate',
+                          child: Text(l.architectRoofRotateSlope),
+                        ),
+                      if (onFlipSlopeDirection != null)
+                        PopupMenuItem(
+                          key: const ValueKey('roof-flip-slope'),
+                          value: 'flip',
+                          child: Text(l.architectRoofFlipSlope),
+                        ),
+                      if (onToggleMansard != null)
+                        CheckedPopupMenuItem(
+                          key: const ValueKey('roof-toggle-mansard'),
+                          value: 'mansard',
+                          checked: roof.isMansard,
+                          child: Text(l.architectRoofIsMansard),
+                        ),
+                      if (roof.roofGroupId != null &&
+                          onToggleSlopeLocked != null)
+                        CheckedPopupMenuItem(
+                          key: const ValueKey('roof-toggle-slope-lock'),
+                          value: 'lock',
+                          checked: roof.isSlopeLocked,
+                          child: Text(l.architectRoofLinkedSlopes),
+                        ),
+                      if (groupCount > 1 && onMatchRidgeHeight != null)
+                        PopupMenuItem(
+                          key: const ValueKey('roof-match-ridge'),
+                          value: 'ridge',
+                          child: Text(l.architectRoofMatchRidge),
+                        ),
+                    ],
+                  ),
+              ],
             ),
           ),
         ),

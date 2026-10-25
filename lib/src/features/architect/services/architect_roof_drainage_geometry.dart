@@ -46,9 +46,14 @@ class ArchitectRoofDrainageGeometry {
   final List<ArchitectDownpipeRoute> routes;
   const ArchitectRoofDrainageGeometry(this.gutters, this.routes);
 
-  /// Place the drip line inside the channel, with its back lip below the eave.
+  /// Keep the rolled back lip outside the fascia, with the drip apron above
+  /// the open channel. The fascia must never pass through the gutter wall.
   static double gutterOffset(ArchitectRoofPlane roof) =>
-      roof.drainage.gutterWidth / 3;
+      roof.drainage.gutterWidth / 2 +
+      (roof.assembly.timber.hasFasciaBoard
+          ? roof.assembly.timber.fasciaThickness
+          : 0) +
+      .005;
 
   /// The channel catches water at the covering, above the rafter/fascia foot.
   /// Keep a small drop below the drip edge, shared by the channel and outlet.
@@ -56,7 +61,20 @@ class ArchitectRoofDrainageGeometry {
     ArchitectStorey floor,
     ArchitectRoofPlane roof,
     Offset onEaves,
-  ) => floor.elevation + roof.topElevationAt(onEaves) - .04;
+  ) {
+    final covering =
+        roof.assembly.layers
+            .where((l) => l.role == ArchitectRoofLayerRole.covering)
+            .firstOrNull
+            ?.thickness ??
+        .04;
+    final verticalCovering =
+        covering / math.cos(roof.slopeRadians).clamp(.1, 1);
+    return floor.elevation +
+        roof.topElevationAt(onEaves) -
+        verticalCovering -
+        .02;
+  }
 
   Path planPath(double gutterWidth, {double tolerance = 0}) {
     var result = Path();

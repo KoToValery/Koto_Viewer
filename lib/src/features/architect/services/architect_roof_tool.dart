@@ -22,6 +22,8 @@ class ArchitectRoofTool extends ChangeNotifier {
   double eavesOverhang = 0.50;
   double? manualSupportDistance;
   ArchitectRoofEavesCut eavesCut = ArchitectRoofEavesCut.plumb;
+  bool attachToWalls = true;
+  double? baseElevationOffset;
   ArchitectRoofAssembly activeAssembly = ArchitectRoofAssembly.fromPreset(
     ArchitectRoofPreset.pitchedTiles,
   );
@@ -43,7 +45,7 @@ class ArchitectRoofTool extends ChangeNotifier {
   }
 
   void setUpperSlopeDegrees(double value) {
-    upperSlopeDegrees = value.clamp(1.0, 85.0);
+    upperSlopeDegrees = value.clamp(0.0, 85.0);
     notifyListeners();
   }
 
@@ -53,12 +55,13 @@ class ArchitectRoofTool extends ChangeNotifier {
   }
 
   void setSlopeDegrees(double value) {
-    slopeDegrees = value.clamp(0.0, 75.0);
+    slopeDegrees = value.clamp(0.0, 80.0);
     notifyListeners();
   }
 
   void setEavesOverhang(double value) {
-    eavesOverhang = value.clamp(0.0, 2.50);
+    if (!value.isFinite || value < 0) throw ArgumentError('Invalid overhang');
+    eavesOverhang = value;
     notifyListeners();
   }
 
@@ -79,13 +82,6 @@ class ArchitectRoofTool extends ChangeNotifier {
 
   void setPreset(ArchitectRoofPreset preset) {
     activeAssembly = ArchitectRoofAssembly.fromPreset(preset);
-    if (preset == ArchitectRoofPreset.flatWarm && slopeDegrees > 5.0) {
-      slopeDegrees = 1.5;
-      eavesOverhang = 0.0;
-    } else if (preset != ArchitectRoofPreset.flatWarm && slopeDegrees < 5.0) {
-      slopeDegrees = 22.0;
-      if (eavesOverhang == 0.0) eavesOverhang = 0.50;
-    }
     notifyListeners();
   }
 
@@ -179,7 +175,7 @@ class ArchitectRoofTool extends ChangeNotifier {
       eavesPolygon: pts,
       storey: storey,
       slopeDegrees: slopeDegrees,
-      baseElevationOffset: storey.height,
+      baseElevationOffset: baseElevationOffset ?? storey.height,
       eavesOverhang: eavesOverhang,
       assembly: activeAssembly,
     );
@@ -188,6 +184,8 @@ class ArchitectRoofTool extends ChangeNotifier {
         ? [
             for (final plane in planes)
               plane.copyWith(
+                attachToWalls: attachToWalls,
+                eavesCut: eavesCut,
                 manualSupportDistance: manualSupportDistance,
                 drainage: drainage,
               ),
@@ -238,7 +236,8 @@ class ArchitectRoofTool extends ChangeNotifier {
     points: points,
     eavesEdgeIndex: eavesEdgeIndex,
     slopeDegrees: slopeDegrees,
-    baseElevationOffset: storey.height,
+    baseElevationOffset: baseElevationOffset ?? storey.height,
+    attachToWalls: attachToWalls,
     eavesOverhang: eavesOverhang,
     manualSupportDistance: manualSupportDistance,
     eavesCut: eavesCut,
@@ -285,8 +284,12 @@ class ArchitectRoofTool extends ChangeNotifier {
           )
           .map(
             (roof) => roof.copyWith(
+              assembly: tool.activeAssembly.copyWith(),
+              attachToWalls: tool.attachToWalls,
+              baseElevationOffset: tool.baseElevationOffset,
+              eavesCut: tool.eavesCut,
               manualSupportDistance: tool.manualSupportDistance,
-              drainage: tool.drainage,
+              drainage: tool.drainage.copyWith(downpipes: const []),
             ),
           )
           .toList();

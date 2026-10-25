@@ -136,7 +136,10 @@ class ArchitectDrawingPublisher {
           final cut = scaled.sections.firstWhere(
             (s) => s.id == drawing.sourceId,
           );
-          final geometry = ArchitectBuildingSection.build(scaled, cut);
+          final geometry = ArchitectBuildingSection.build(
+            scaled,
+            cut,
+          ).forView(cut);
           final data = ArchitectSectionDrawing(
             scaled,
             cut,
@@ -180,6 +183,11 @@ class ArchitectDrawingPublisher {
             ? scaled.sections
                   .firstWhere((s) => s.id == drawing.sourceId)
                   .drawing
+                  .reflectedHorizontally(
+                    scaled.sections
+                        .firstWhere((s) => s.id == drawing.sourceId)
+                        .length,
+                  )
             : scaled.elevations
                   .firstWhere((s) => s.id == drawing.sourceId)
                   .drawing;

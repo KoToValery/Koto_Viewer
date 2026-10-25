@@ -1,6 +1,8 @@
 // === SECTION: ARCHITECTURAL TOOL PALETTE BAR ===
 import 'package:flutter/material.dart';
 import 'architect_wall_type_label.dart';
+import 'architect_wall_type_picker.dart';
+import '../models/architect_project.dart' show ArchitectUnit;
 import 'architect_stair_labels.dart';
 import 'architect_component_labels.dart';
 import 'component_dimensions_dialog.dart';
@@ -51,8 +53,7 @@ enum ArchitectToolCategory {
     ArchitectTool.slab ||
     ArchitectTool.floorDrain ||
     ArchitectTool.roof => structure,
-    ArchitectTool.section ||
-    ArchitectTool.elevation => views,
+    ArchitectTool.section || ArchitectTool.elevation => views,
     ArchitectTool.dimension ||
     ArchitectTool.level ||
     ArchitectTool.text ||
@@ -97,6 +98,10 @@ class ArchitectToolPalette extends StatefulWidget {
   final List<ArchitectWallType>? wallTypes;
   final ArchitectWallType? activeWallType;
   final ValueChanged<ArchitectWallType>? onWallTypeSelected;
+  final ValueChanged<ArchitectWallType>? onCreateWallVariant;
+  final VoidCallback? onManageWallTypes;
+  final String wallProjectId;
+  final ArchitectUnit wallUnit;
 
   // Door options
   final double componentRotation;
@@ -170,6 +175,10 @@ class ArchitectToolPalette extends StatefulWidget {
     this.wallTypes,
     this.activeWallType,
     this.onWallTypeSelected,
+    this.onCreateWallVariant,
+    this.onManageWallTypes,
+    this.wallProjectId = '',
+    this.wallUnit = ArchitectUnit.centimeters,
     this.onCreateFenestration,
     this.activeWindowStyle,
     this.activeDoorStyle,
@@ -350,7 +359,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 _buildComponentSubBar(context)
               else if (activeTool == ArchitectTool.opening)
                 _buildOpeningSubBar(context)
-              else if (activeTool == ArchitectTool.section || activeTool == ArchitectTool.elevation)
+              else if (activeTool == ArchitectTool.section ||
+                  activeTool == ArchitectTool.elevation)
                 _buildViewsSubBar(context),
 
               const SizedBox(height: 6),
@@ -508,7 +518,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     icon: Icons.layers_rounded,
                                     label: l10n.architectToolSlab,
                                   ),
-                                if (category == ArchitectToolCategory.structure ||
+                                if (category ==
+                                        ArchitectToolCategory.structure ||
                                     category == ArchitectToolCategory.build)
                                   _buildToolButton(
                                     tool: ArchitectTool.floorDrain,
@@ -611,14 +622,25 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     icon: Icons.crop_square_rounded,
                                     label: l10n.architectToolCadRect,
                                   ),
-                                if (category == ArchitectToolCategory.drawing && widget.onTerrain != null)
-                                  IconButton(key:const ValueKey('architect-tool-terrain'),
-                                    tooltip:l10n.architectTerrain, onPressed:widget.onTerrain,
-                                    icon:const Icon(Icons.landscape_outlined,color:Colors.white70)),
+                                if (category == ArchitectToolCategory.drawing &&
+                                    widget.onTerrain != null)
+                                  IconButton(
+                                    key: const ValueKey(
+                                      'architect-tool-terrain',
+                                    ),
+                                    tooltip: l10n.architectTerrain,
+                                    onPressed: widget.onTerrain,
+                                    icon: const Icon(
+                                      Icons.landscape_outlined,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
                                 if (category == ArchitectToolCategory.drawing)
-                                  _buildToolButton(tool: ArchitectTool.hatch,
+                                  _buildToolButton(
+                                    tool: ArchitectTool.hatch,
                                     icon: Icons.texture_rounded,
-                                    label: l10n.architectToolHatch),
+                                    label: l10n.architectToolHatch,
+                                  ),
                                 if (category ==
                                     ArchitectToolCategory.of(
                                       ArchitectTool.cadCircle,
@@ -628,7 +650,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     icon: Icons.radio_button_unchecked_rounded,
                                     label: l10n.architectToolCadCircle,
                                   ),
-                                if (category == ArchitectToolCategory.views) ...[
+                                if (category ==
+                                    ArchitectToolCategory.views) ...[
                                   _buildToolButton(
                                     tool: ArchitectTool.section,
                                     icon: Icons.splitscreen_outlined,
@@ -736,149 +759,130 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     );
   }
 
-  Widget _buildWallSubBar(BuildContext context) {
-    final l10n = context.l10n;
-    final curvedWall = widget.curvedWall;
-    final onArcWallSelected = widget.onArcWallSelected;
+  Future<void> _chooseWallType() async {
+    if (wallTypes == null || wallTypes!.isEmpty) return;
+    final result = await showArchitectWallTypePicker(
+      context,
+      types: wallTypes!,
+      activeType: activeWallType ?? wallTypes!.first,
+      projectId: widget.wallProjectId,
+      unit: widget.wallUnit,
+      allowVariant: widget.onCreateWallVariant != null,
+      allowManage: widget.onManageWallTypes != null,
+    );
+    if (!mounted || result == null) return;
+    switch (result.action) {
+      case ArchitectWallPickerAction.select:
+        onWallTypeSelected?.call(result.type);
+        onWallThicknessChanged(result.type.totalThickness);
+      case ArchitectWallPickerAction.variant:
+        widget.onCreateWallVariant?.call(result.type);
+      case ArchitectWallPickerAction.manage:
+        widget.onManageWallTypes?.call();
+    }
+  }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: [
-          if (wallTypes != null && wallTypes!.isNotEmpty)
-            PopupMenuButton<ArchitectWallType>(
-              key: const ValueKey('architect-wall-type-picker'),
-              tooltip: (activeWallType ?? wallTypes!.first).pickerHelp(l10n),
-              position: PopupMenuPosition.over,
-              // The bottom toolbar anchors the list above the selected type.
-              offset: Offset(0, -(wallTypes!.length * 48.0 + 16)),
-              color: const Color(0xFF282B34),
-              onSelected: (type) {
-                onWallTypeSelected?.call(type);
-                onWallThicknessChanged(type.totalThickness);
-              },
-              itemBuilder: (_) => [
-                for (final type in wallTypes!)
-                  PopupMenuItem(
-                    key: ValueKey('architect-wall-type-${type.id}'),
-                    value: type,
-                    child: Row(
-                      children: [
-                        Icon(Icons.circle, size: 8, color: type.color),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Tooltip(
-                            message: type.pickerHelp(l10n),
-                            child: Text(
-                              type.compactLabel(l10n),
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ),
-                        if (type.id == activeWallType?.id) ...[
-                          const SizedBox(width: 12),
-                          const Icon(Icons.check, size: 18, color: Colors.cyan),
-                        ],
-                      ],
-                    ),
-                  ),
-              ],
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
+  Widget _buildWallSubBar(BuildContext context) {
+    final l = context.l10n;
+    final type = activeWallType ?? wallTypes?.firstOrNull;
+    final mode = widget.curvedWall
+        ? l.wallArcMode
+        : wallMode == WallDraftingMode.chained
+        ? l.architectWallChained
+        : l.architectWallSingle;
+    return Row(
+      children: [
+        if (type != null)
+          Expanded(
+            child: Tooltip(
+              message: type.compositionLabel(l, widget.wallUnit),
+              child: OutlinedButton(
+                key: const ValueKey('architect-wall-type-picker'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  minimumSize: const Size(0, 44),
                 ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF282B34),
-                  border: Border.all(color: Colors.white24),
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                onPressed: _chooseWallType,
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.circle,
-                      size: 8,
-                      color: (activeWallType ?? wallTypes!.first).color,
-                    ),
-                    const SizedBox(width: 6),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 130),
+                    Expanded(
                       child: Text(
-                        (activeWallType ?? wallTypes!.first).compactLabel(l10n),
+                        type.catalogLabel(l, widget.wallUnit),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
                       ),
                     ),
-                    const Icon(
-                      Icons.expand_less,
-                      size: 18,
-                      color: Colors.white70,
-                    ),
+                    const Icon(Icons.expand_less, size: 18),
                   ],
                 ),
               ),
             ),
-          const SizedBox(width: 8),
-          ChoiceChip(
-            avatar: const Icon(Icons.show_chart_rounded, size: 14),
-            label: Text(l10n.architectWallSingle),
-            selected: !curvedWall && wallMode == WallDraftingMode.singleLine,
-            onSelected: (sel) {
-              if (sel) onWallModeChanged(WallDraftingMode.singleLine);
-            },
-            visualDensity: VisualDensity.compact,
           ),
-          if (onArcWallSelected != null) ...[
-            const SizedBox(width: 4),
-            ChoiceChip(
-              key: const ValueKey('architect-wall-arc-mode'),
-              avatar: const Icon(Icons.rounded_corner, size: 14),
-              label: Text(l10n.wallArcMode),
-              selected: curvedWall,
-              onSelected: (selected) {
-                if (selected) onArcWallSelected();
-              },
-              visualDensity: VisualDensity.compact,
+        const SizedBox(width: 4),
+        PopupMenuButton<String>(
+          key: const ValueKey('wall-drawing-mode'),
+          tooltip: l.wallDrawingMode,
+          onSelected: (value) {
+            if (value == 'arc') {
+              widget.onArcWallSelected?.call();
+            } else {
+              onWallModeChanged(
+                value == 'chain'
+                    ? WallDraftingMode.chained
+                    : WallDraftingMode.singleLine,
+              );
+            }
+          },
+          itemBuilder: (_) => [
+            CheckedPopupMenuItem(
+              value: 'single',
+              checked:
+                  !widget.curvedWall && wallMode == WallDraftingMode.singleLine,
+              child: Text(l.architectWallSingle),
             ),
-          ],
-          const SizedBox(width: 4),
-          ChoiceChip(
-            avatar: const Icon(Icons.linear_scale_rounded, size: 14),
-            label: Text(l10n.architectWallChained),
-            selected: !curvedWall && wallMode == WallDraftingMode.chained,
-            onSelected: (sel) {
-              if (sel) onWallModeChanged(WallDraftingMode.chained);
-            },
-            visualDensity: VisualDensity.compact,
-          ),
-          if (!curvedWall && isChainingWall && onFinishChainedWall != null) ...[
-            const SizedBox(width: 8),
-            ActionChip(
-              backgroundColor: const Color(0xFF00E5FF),
-              avatar: const Icon(
-                Icons.check_rounded,
-                size: 14,
-                color: Colors.black,
+            CheckedPopupMenuItem(
+              value: 'chain',
+              checked:
+                  !widget.curvedWall && wallMode == WallDraftingMode.chained,
+              child: Text(l.architectWallChained),
+            ),
+            if (widget.onArcWallSelected != null)
+              CheckedPopupMenuItem(
+                key: const ValueKey('architect-wall-arc-mode'),
+                value: 'arc',
+                checked: widget.curvedWall,
+                child: Text(l.wallArcMode),
               ),
-              label: Text(
-                l10n.architectFinishChained,
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
+          ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(mode, style: const TextStyle(color: Colors.white70)),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  size: 18,
+                  color: Colors.white70,
                 ),
-              ),
-              onPressed: onFinishChainedWall,
-              visualDensity: VisualDensity.compact,
+              ],
             ),
-          ],
-        ],
-      ),
+          ),
+        ),
+        if (type != null && widget.onCreateWallVariant != null)
+          IconButton(
+            key: const ValueKey('wall-draft-layers'),
+            tooltip: l.wallNewVariant,
+            onPressed: () => widget.onCreateWallVariant!(type),
+            icon: const Icon(Icons.layers_outlined),
+          ),
+        if (!widget.curvedWall && isChainingWall && onFinishChainedWall != null)
+          IconButton(
+            tooltip: l.architectFinishChained,
+            onPressed: onFinishChainedWall,
+            icon: const Icon(Icons.check),
+          ),
+      ],
     );
   }
 
@@ -1260,10 +1264,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white70,
               side: const BorderSide(color: Colors.white24),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             ),
             icon: const Icon(
               Icons.water_drop_outlined,

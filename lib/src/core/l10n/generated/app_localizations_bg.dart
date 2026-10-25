@@ -8033,4 +8033,271 @@ class AppLocalizationsBg extends AppLocalizations {
   String architectViewDirectionSide(int side) {
     return 'Посока на гледане $side';
   }
+
+  @override
+  String get wallPickerTitle => 'Стени';
+
+  @override
+  String get wallCategoryExterior => 'Външни';
+
+  @override
+  String get wallCategoryInterior => 'Вътрешни';
+
+  @override
+  String get wallCategoryParapet => 'Парапети';
+
+  @override
+  String get wallFavorites => 'Любими';
+
+  @override
+  String get wallFavoriteToggle => 'Любим тип';
+
+  @override
+  String get wallPickerSearch => 'Тип, материал, дебелина';
+
+  @override
+  String get wallPickerEmpty => 'Няма резултати';
+
+  @override
+  String wallVariantCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count варианта',
+      one: '1 вариант',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get wallVariant => 'Вариант';
+
+  @override
+  String get wallNewVariant => 'Нов вариант';
+
+  @override
+  String get wallTypesShort => 'Типове';
+
+  @override
+  String get wallNoInsulation => 'Без изолация';
+
+  @override
+  String get wallParapetCap => 'С шапка';
+
+  @override
+  String get wallParapetHandrail => 'С ръкохват';
+
+  @override
+  String wallMaterialThickness(String material, String thickness) {
+    return '$material $thickness';
+  }
+
+  @override
+  String get wallNewTypeScope => 'Нов тип · съществуващите стени се запазват';
+
+  @override
+  String get wallOptionalName => 'Незадължително';
+
+  @override
+  String get wallSaveToCatalog => 'Запази като тип';
+
+  @override
+  String get wallLayerDetails => 'Данни за слоя';
+
+  @override
+  String get wallTypeDetails => 'Данни за типа';
+
+  @override
+  String get wallLayerPosition => 'Позиция';
+
+  @override
+  String wallLayerBefore(String layer) {
+    return 'Преди $layer';
+  }
+
+  @override
+  String get wallLayerAtEnd => 'Накрая';
+
+  @override
+  String get wallLayerMaterial => 'Материал';
+
+  @override
+  String get wallLayerCoatings => 'Покрития';
+
+  @override
+  String get wallCopyFinish => 'Копирай A → B';
+
+  @override
+  String get wallCopyFinishHelp =>
+      'Копирай покритията от A към непокритата страна B';
+
+  @override
+  String get wallLayerCoreError =>
+      'Ядрото трябва да е непрекъснато и от основни материали.';
+
+  @override
+  String get wallDrawingMode => 'Режим на чертане';
+
+  @override
+  String get wallParapetDefaultHeight => 'Височина по подразбиране';
+
+  @override
+  String get wallCreate => 'Създай';
+
+  @override
+  String get wallLayerLimit => 'Допускат се до 20 слоя.';
+
+  @override
+  String get wallInvalidHeight => 'Въведете положителна височина.';
+
+  @override
+  String wallParapetGroup(String finish, String material) {
+    return '$finish · $material';
+  }
+
+  @override
+  String get roofUiShape => 'Форма';
+
+  @override
+  String get roofUiAssembly => 'Състав';
+
+  @override
+  String get roofUiDetails => 'Детайли';
+
+  @override
+  String get roofUiSettings => 'Настройки';
+
+  @override
+  String get roofUiMethod => 'Начин';
+
+  @override
+  String get roofUiOnlyPlane => 'Този скат';
+
+  @override
+  String roofUiWholeRoof(int count) {
+    return 'Покривът ($count)';
+  }
+
+  @override
+  String get roofUiNewScope => 'За нови покриви';
+
+  @override
+  String get roofUiSaveDefaults => 'За следващите покриви';
+
+  @override
+  String get roofUiScopeHelp =>
+      'Променят се само редактираните полета. Местата на тръбите остават към своя скат.';
+
+  @override
+  String get roofUiIndependentHelp =>
+      'Промяната на един наклон прави ската независим.';
+
+  @override
+  String get roofUiPreview => 'Схема';
+
+  @override
+  String get roofUiPreviewHelp =>
+      'Схематично сечение; точните размери са в полетата.';
+
+  @override
+  String get roofUiNumericInvalid => 'Въведете валидна стойност.';
+
+  @override
+  String get roofUiLayerPosition => 'Позиция';
+
+  @override
+  String roofUiBeforeLayer(String layer) {
+    return 'Преди $layer';
+  }
+
+  @override
+  String get roofUiLayerEnd => 'Накрая';
+
+  @override
+  String get roofUiAbove => 'Над ребрата';
+
+  @override
+  String get roofUiBetween => 'Между ребрата';
+
+  @override
+  String get roofUiBelow => 'Под ребрата';
+
+  @override
+  String get roofUiLayerActions => 'Действия за слоя';
+
+  @override
+  String get roofUiLayerEdit => 'Слой';
+
+  @override
+  String get roofUiStructureZone => 'Конструктивна зона';
+
+  @override
+  String get roofUiInsulationFit =>
+      'Изолацията между ребрата надвишава височината им.';
+
+  @override
+  String get roofUiParallelZone =>
+      'Използвайте един запис за зоната на ребрата и изолацията между тях.';
+
+  @override
+  String get roofUiAutoBreak => 'Автоматично пречупване';
+
+  @override
+  String roofUiPoints(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count точки',
+      one: '1 точка',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get roofUiAutoPreview => 'Нов покрив';
+
+  @override
+  String get roofUiAddRoof => 'Добави';
+
+  @override
+  String roofUiReplaceRoof(int index, int count) {
+    return 'Замени покрив $index ($count)';
+  }
+
+  @override
+  String get roofUiCreate => 'Създай';
+
+  @override
+  String get roofUiReplace => 'Замени';
+
+  @override
+  String get roofUiTarget => 'Прилагане';
+
+  @override
+  String roofUiGeneratedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ската',
+      one: '1 скат',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get roofUiReviewHelp => 'Останалите покриви се запазват.';
+
+  @override
+  String get roofUiUntouched => 'Запази текущото';
+
+  @override
+  String roofUiReplaceFloor(int count) {
+    return 'Всички на етажа ($count)';
+  }
+
+  @override
+  String get roofUiNewLegend => 'Нов';
+
+  @override
+  String get roofUiKeptLegend => 'Запазени';
 }

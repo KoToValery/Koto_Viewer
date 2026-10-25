@@ -80,7 +80,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           controller.project.sectionVisibility.modeFor(geometry.gutters),
-          geometry.cutOnly,
+          geometry.full,
         );
         controller.redo();
         await tester.pumpAndSettle();

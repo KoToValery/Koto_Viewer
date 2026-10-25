@@ -621,7 +621,16 @@ class ArchitectRoofAssembly {
 
   /// Total thickness perpendicular to the roof slope (m).
   double get totalThickness =>
-      layers.fold<double>(0.0, (sum, l) => sum + l.thickness);
+      layers.fold<double>(0.0, (sum, l) => sum + layerDepth(l));
+
+  /// Insulation occupies the rafter zone, with any unfilled depth remaining air.
+  /// It does not reduce the zone below the physical framing depth.
+  double layerDepth(ArchitectRoofLayer layer) =>
+      timber.hasRafters &&
+          (layer.isBetweenRafters ||
+              layer.role == ArchitectRoofLayerRole.rafters)
+      ? math.max(layer.thickness, timber.rafterHeight)
+      : layer.thickness;
 
   /// Thickness of all layers above the top of the rafters (covering + battens + counter-battens + boarding).
   double get thicknessAboveRafters {
@@ -786,14 +795,15 @@ class ArchitectRoofPlane {
 
   double get upperSlopePercent => math.tan(upperSlopeRadians) * 100.0;
 
+  double get minimumBreakDistance => maxSlopeRun > 0.60 ? 0.25 : 0.10;
+  double get maximumBreakDistance =>
+      maxSlopeRun > 0.60 ? math.max(0.30, maxSlopeRun - 0.25) : 50.0;
+
   /// Horizontal distance from the low eaves line to the knuckle break line along slope direction.
   double get effectiveBreakDistance {
     final maxRun = maxSlopeRun;
     if (breakDistance != null) {
-      if (maxRun > 0.60) {
-        return breakDistance!.clamp(0.25, math.max(0.30, maxRun - 0.25));
-      }
-      return breakDistance!.clamp(0.10, 50.0);
+      return breakDistance!.clamp(minimumBreakDistance, maximumBreakDistance);
     }
     if (maxRun > 1.0) {
       return (maxRun * 0.45).clamp(0.80, math.max(0.80, maxRun - 0.50));
@@ -945,8 +955,9 @@ class ArchitectRoofPlane {
   double topElevationAt(Offset worldPt) {
     final d = signedDistanceFromEaves(worldPt);
     final k = effectiveBreakDistance;
-    final effectiveSlopeRad =
-        (isMansard && d > k) ? upperSlopeRadians : slopeRadians;
+    final effectiveSlopeRad = (isMansard && d > k)
+        ? upperSlopeRadians
+        : slopeRadians;
     final cosA = math.cos(effectiveSlopeRad).clamp(0.1, 1.0);
     final verticalThickness = assembly.totalThickness / cosA;
     return undersideElevationAt(worldPt) + verticalThickness;
@@ -1017,7 +1028,8 @@ class ArchitectRoofPlane {
                   xi);
       if (intersect) inside = !inside;
     }
-    return inside && !holes.any((h) => (Path()..addPolygon(h, true)).contains(pt));
+    return inside &&
+        !holes.any((h) => (Path()..addPolygon(h, true)).contains(pt));
   }
 
   ArchitectRoofPlane copyWith({

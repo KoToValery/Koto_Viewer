@@ -26,9 +26,15 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
           .where((e) => e.id == viewId)
           .firstOrNull
           ?.drawing,
-    ArchitectWorkspaceView.section =>
-      source.project.sections.where((e) => e.id == viewId).firstOrNull?.drawing,
+    ArchitectWorkspaceView.section => _sectionDrawing,
   };
+
+  ArchitectViewDrawing? get _sectionDrawing {
+    final cut = source.project.sections
+        .where((e) => e.id == viewId)
+        .firstOrNull;
+    return cut?.drawing.reflectedHorizontally(cut.length);
+  }
 
   void select(ArchitectWorkspaceView type, String? id) {
     view = type;
@@ -90,7 +96,7 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
         sections: [
           for (final e in original.sections)
             if (view == ArchitectWorkspaceView.section && e.id == viewId)
-              e.copyWith(drawing: data)
+              e.copyWith(drawing: data.reflectedHorizontally(e.length))
             else
               e,
         ],
@@ -116,7 +122,8 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
   void redo() => source.redo();
   void restore(ArchitectProject next) => source.restore(next);
   void activateStorey(String id) => source.activateStorey(id);
-  void setDistanceDecimals(int decimals) => source.setDistanceDecimals(decimals);
+  void setDistanceDecimals(int decimals) =>
+      source.setDistanceDecimals(decimals);
   void setUnits(ArchitectUnit units) => source.setUnits(units);
   void setDimensionScale(ArchitectDimensionScale scale) =>
       source.setDimensionScale(scale);

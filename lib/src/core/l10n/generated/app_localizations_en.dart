@@ -8005,4 +8005,270 @@ class AppLocalizationsEn extends AppLocalizations {
   String architectViewDirectionSide(int side) {
     return 'Viewing direction $side';
   }
+
+  @override
+  String get wallPickerTitle => 'Walls';
+
+  @override
+  String get wallCategoryExterior => 'Exterior';
+
+  @override
+  String get wallCategoryInterior => 'Interior';
+
+  @override
+  String get wallCategoryParapet => 'Parapets';
+
+  @override
+  String get wallFavorites => 'Favorites';
+
+  @override
+  String get wallFavoriteToggle => 'Favorite type';
+
+  @override
+  String get wallPickerSearch => 'Type, material, thickness';
+
+  @override
+  String get wallPickerEmpty => 'No results';
+
+  @override
+  String wallVariantCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count variants',
+      one: '1 variant',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get wallVariant => 'Variant';
+
+  @override
+  String get wallNewVariant => 'New variant';
+
+  @override
+  String get wallTypesShort => 'Types';
+
+  @override
+  String get wallNoInsulation => 'Uninsulated';
+
+  @override
+  String get wallParapetCap => 'Coping cap';
+
+  @override
+  String get wallParapetHandrail => 'Handrail';
+
+  @override
+  String wallMaterialThickness(String material, String thickness) {
+    return '$material $thickness';
+  }
+
+  @override
+  String get wallNewTypeScope => 'New type · existing walls are preserved';
+
+  @override
+  String get wallOptionalName => 'Optional';
+
+  @override
+  String get wallSaveToCatalog => 'Save as type';
+
+  @override
+  String get wallLayerDetails => 'Layer details';
+
+  @override
+  String get wallTypeDetails => 'Type details';
+
+  @override
+  String get wallLayerPosition => 'Position';
+
+  @override
+  String wallLayerBefore(String layer) {
+    return 'Before $layer';
+  }
+
+  @override
+  String get wallLayerAtEnd => 'At end';
+
+  @override
+  String get wallLayerMaterial => 'Material';
+
+  @override
+  String get wallLayerCoatings => 'Finishes';
+
+  @override
+  String get wallCopyFinish => 'Copy A → B';
+
+  @override
+  String get wallCopyFinishHelp => 'Copy finishes from A to unfinished side B';
+
+  @override
+  String get wallLayerCoreError =>
+      'The core must be continuous and use base materials.';
+
+  @override
+  String get wallDrawingMode => 'Drawing mode';
+
+  @override
+  String get wallParapetDefaultHeight => 'Default height';
+
+  @override
+  String get wallCreate => 'Create';
+
+  @override
+  String get wallLayerLimit => 'Up to 20 layers are supported.';
+
+  @override
+  String get wallInvalidHeight => 'Enter a positive height.';
+
+  @override
+  String wallParapetGroup(String finish, String material) {
+    return '$finish · $material';
+  }
+
+  @override
+  String get roofUiShape => 'Shape';
+
+  @override
+  String get roofUiAssembly => 'Build-up';
+
+  @override
+  String get roofUiDetails => 'Details';
+
+  @override
+  String get roofUiSettings => 'Settings';
+
+  @override
+  String get roofUiMethod => 'Method';
+
+  @override
+  String get roofUiOnlyPlane => 'This plane';
+
+  @override
+  String roofUiWholeRoof(int count) {
+    return 'Whole roof ($count)';
+  }
+
+  @override
+  String get roofUiNewScope => 'For new roofs';
+
+  @override
+  String get roofUiSaveDefaults => 'Use for future roofs';
+
+  @override
+  String get roofUiScopeHelp =>
+      'Only edited fields change. Pipe positions stay with their own plane.';
+
+  @override
+  String get roofUiIndependentHelp =>
+      'Changing one pitch makes the plane independent.';
+
+  @override
+  String get roofUiPreview => 'Diagram';
+
+  @override
+  String get roofUiPreviewHelp =>
+      'Schematic section; exact dimensions are in the fields.';
+
+  @override
+  String get roofUiNumericInvalid => 'Enter a valid value.';
+
+  @override
+  String get roofUiLayerPosition => 'Position';
+
+  @override
+  String roofUiBeforeLayer(String layer) {
+    return 'Before $layer';
+  }
+
+  @override
+  String get roofUiLayerEnd => 'At end';
+
+  @override
+  String get roofUiAbove => 'Above rafters';
+
+  @override
+  String get roofUiBetween => 'Between rafters';
+
+  @override
+  String get roofUiBelow => 'Below rafters';
+
+  @override
+  String get roofUiLayerActions => 'Layer actions';
+
+  @override
+  String get roofUiLayerEdit => 'Layer';
+
+  @override
+  String get roofUiStructureZone => 'Structural zone';
+
+  @override
+  String get roofUiInsulationFit =>
+      'Between-rafter insulation exceeds the rafter depth.';
+
+  @override
+  String get roofUiParallelZone =>
+      'Use one entry for the shared rafter and between-rafter zone.';
+
+  @override
+  String get roofUiAutoBreak => 'Automatic break position';
+
+  @override
+  String roofUiPoints(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count points',
+      one: '1 point',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get roofUiAutoPreview => 'New roof';
+
+  @override
+  String get roofUiAddRoof => 'Add';
+
+  @override
+  String roofUiReplaceRoof(int index, int count) {
+    return 'Replace roof $index ($count)';
+  }
+
+  @override
+  String get roofUiCreate => 'Create';
+
+  @override
+  String get roofUiReplace => 'Replace';
+
+  @override
+  String get roofUiTarget => 'Apply to';
+
+  @override
+  String roofUiGeneratedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count planes',
+      one: '1 plane',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get roofUiReviewHelp => 'Other roofs are preserved.';
+
+  @override
+  String get roofUiUntouched => 'Keep current';
+
+  @override
+  String roofUiReplaceFloor(int count) {
+    return 'All on storey ($count)';
+  }
+
+  @override
+  String get roofUiNewLegend => 'New';
+
+  @override
+  String get roofUiKeptLegend => 'Preserved';
 }

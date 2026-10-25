@@ -63,6 +63,9 @@ import '../widgets/architect_wall_thickness_dialog.dart';
 import '../widgets/architect_slab_layers_dialog.dart';
 
 import '../widgets/architect_roof_layers_dialog.dart';
+import '../services/architect_roof_settings_commands.dart';
+import '../widgets/architect_roof_number_field.dart';
+import '../widgets/architect_auto_roof_preview_dialog.dart';
 
 import '../widgets/architect_roof_bar.dart';
 
@@ -1205,7 +1208,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (s != null) {
 
-        _sectionGeometry = ArchitectBuildingSection.build(original, s);
+        _sectionGeometry = ArchitectBuildingSection.build(original, s).forView(s);
 
       }
 
@@ -1381,9 +1384,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         elevation: _commands.view == ArchitectWorkspaceView.elevation,
 
-        origin: facade?.centre ?? cut?.start ?? Offset.zero,
+        origin: facade?.centre ?? cut?.drawingOrigin ?? Offset.zero,
 
-        right: facade?.right ?? cut?.axis ?? const Offset(1, 0),
+        right: facade?.right ?? cut?.drawingRight ?? const Offset(1, 0),
 
         scale: _viewport.scale,
 
@@ -3910,11 +3913,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   static const _wallTypePreference = 'architect_wall_type';
 
-  List<ArchitectWallType> get _availableWallTypes => _project.wallTypes.isEmpty
-
-      ? ArchitectWallType.standardCatalog()
-
-      : _project.wallTypes;
+  List<ArchitectWallType> get _availableWallTypes {
+    final types = _project.wallTypes.where((t) => t.isCatalogType).toList();
+    return types.isEmpty ? ArchitectWallType.standardCatalog() : types;
+  }
 
 
 
@@ -13256,6 +13258,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       parapetFinish: _activeWallType?.parapetFinish,
 
+      parapet: _activeWallType?.isParapet,
+
       referenceLine: _wallReference,
 
       exteriorSide: _wallExteriorSide,
@@ -19909,195 +19913,134 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  Future<void> _openRoofLayersDialog({ArchitectRoofPlane? roof}) async {
-
-    var pickDownpipe = false;
-
-    final target =
-
-        roof ??
-
-        _selectedRoof ??
-
-        (_selectedSectionRoofId == null
-
-            ? null
-
-            : ArchitectBuildingSection.findRoofById(
-
-                _modelCommands.project,
-
-                _selectedSectionRoofId!,
-
-              )?.roof);
-
-    final initialAssembly = target?.assembly ?? _roofTool.activeAssembly;
-
-    final initialSlope = target?.slopeDegrees ?? _roofTool.slopeDegrees;
-
-    final initialOverhang = target?.eavesOverhang ?? _roofTool.eavesOverhang;
-
-    final initialEavesCut = target?.eavesCut ?? _roofTool.eavesCut;
-
-    await showDialog<void>(
-
-      context: context,
-
-      builder: (_) => ArchitectRoofLayersDialog(
-
-        initialDrainage: target?.drainage ?? _roofTool.drainage,
-
-        project: _modelCommands.project,
-
-        roof: target,
-
-        canPickDownpipe: target != null,
-
-        initialAssembly: initialAssembly,
-
-        initialSlopeDegrees: initialSlope,
-
-        initialEavesOverhang: initialOverhang,
-
-        initialEavesCut: initialEavesCut,
-
-        initialBaseElevationOffset: target?.baseElevationOffset,
-
-        initialAttachToWalls: target?.attachToWalls ?? true,
-
-        initialManualSupportDistance: target != null
-
-            ? target.manualSupportDistance
-
-            : _roofTool.manualSupportDistance,
-
-        maxSupportDistance: target?.maxSlopeRun,
-
-        onApply: (result) {
-
-          pickDownpipe = result.pickDownpipe;
-
-          setState(() {
-
-            _roofTool.drainage = result.drainage.copyWith(downpipes: const []);
-
-            _roofTool.setAssembly(result.assembly);
-
-            _roofTool.setSlopeDegrees(result.slopeDegrees);
-
-            _roofTool.setEavesOverhang(result.eavesOverhang);
-
-            _roofTool.setEavesCut(result.eavesCut);
-
-            _roofTool.setManualSupportDistance(result.manualSupportDistance);
-
-            if (target != null) {
-
-              final hit = ArchitectBuildingSection.findRoofById(
-
-                _modelCommands.project,
-
-                target.id,
-
-              );
-
-              final storey = hit?.storey ?? _project.activeStorey;
-
-              final currentRoof = hit?.roof ?? target;
-
-              var nextOffset = result.baseElevationOffset;
-
-              if (result.attachToWalls && !currentRoof.attachToWalls) {
-
-                final lower = ArchitectRoofGeometry.supportingWallStorey(
-
-                  _modelCommands.project,
-
-                  storey,
-
-                );
-
-                nextOffset =
-
-                    ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
-
-                      roof: currentRoof.copyWith(
-
-                        assembly: result.assembly,
-
-                        slopeDegrees: result.slopeDegrees,
-
-                        eavesOverhang: result.eavesOverhang,
-
-                        eavesCut: result.eavesCut,
-
-                      ),
-
-                      storey: storey,
-
-                      lowerStorey: lower,
-
-                    );
-
-              }
-
-              _modelCommands.execute(
-
-                UpdateArchitectRoofPlane(
-
-                  storeyId: storey.id,
-
-                  roof: currentRoof.copyWith(
-
-                    drainage: result.drainage,
-
-                    assembly: result.assembly,
-
-                    slopeDegrees: result.slopeDegrees,
-
-                    eavesOverhang: result.eavesOverhang,
-
-                    eavesCut: result.eavesCut,
-
-                    baseElevationOffset: nextOffset,
-
-                    attachToWalls: result.attachToWalls,
-
-                    manualSupportDistance: result.manualSupportDistance,
-
-                    clearManualSupportDistance:
-
-                        result.manualSupportDistance == null,
-
-                  ),
-
-                ),
-
-              );
-
-              _saveBiMProjectIfAttached();
-
-            }
-
-          });
-
-          HapticFeedback.lightImpact();
-
-        },
-
-      ),
-
-    );
-
-    if (mounted && pickDownpipe && target != null) {
-
-      _beginDownpipePlacement(target.id);
-
-    }
-
+  void _setRoofDefaults(ArchitectRoofLayersResult result) {
+    _roofTool.attachToWalls = result.attachToWalls;
+    _roofTool.baseElevationOffset = result.baseElevationOffset;
+    _roofTool.drainage = result.drainage.copyWith(downpipes: const []);
+    _roofTool.setAssembly(result.assembly.copyWith());
+    _roofTool.setSlopeDegrees(result.slopeDegrees);
+    _roofTool.setUpperSlopeDegrees(result.upperSlopeDegrees);
+    _roofTool.setBreakDistance(result.breakDistance);
+    _roofTool.setEavesOverhang(result.eavesOverhang);
+    _roofTool.setEavesCut(result.eavesCut);
+    _roofTool.setManualSupportDistance(result.manualSupportDistance);
   }
 
+  int _roofGroupCount(ArchitectRoofPlane? roof) {
+    if (roof == null || roof.roofGroupId == null || roof.roofGroupId!.isEmpty) {
+      return 1;
+    }
+    return _project.storeys
+        .where((s) => s.id == roof.storeyId)
+        .expand((s) => s.roofs)
+        .where((r) => r.roofGroupId == roof.roofGroupId)
+        .length;
+  }
 
+  void _applyRoofQuickValue(
+    ArchitectRoofPlane roof,
+    ArchitectRoofQuickValue value, {
+    required bool slope,
+  }) {
+    if (!value.applyToGroup &&
+        value.value == (slope ? roof.slopeDegrees : roof.eavesOverhang)) {
+      return;
+    }
+    final result = ArchitectRoofLayersResult(
+      assembly: roof.assembly,
+      slopeDegrees: slope ? value.value : roof.slopeDegrees,
+      eavesOverhang: slope ? roof.eavesOverhang : value.value,
+      eavesCut: roof.eavesCut,
+      applyToGroup: value.applyToGroup,
+      changes: {
+        slope ? ArchitectRoofSetting.slope : ArchitectRoofSetting.overhang,
+      },
+    );
+    try {
+      _modelCommands.execute(
+        ApplyArchitectRoofSettings(
+          storeyId: roof.storeyId,
+          roofId: roof.id,
+          settings: result,
+        ),
+      );
+      _saveBiMProjectIfAttached();
+    } on ArgumentError {
+      _operationError();
+    }
+  }
+
+  Future<void> _openRoofLayersDialog({
+    ArchitectRoofPlane? roof,
+    int initialTab = 0,
+  }) async {
+    var pickDownpipe = false;
+    final original = _project;
+    final target = roof ?? _selectedRoof ??
+        (_selectedSectionRoofId == null
+            ? null
+            : ArchitectBuildingSection.findRoofById(
+                _modelCommands.project,
+                _selectedSectionRoofId!,
+              )?.roof);
+    await showDialog<void>(
+      context: context,
+      builder: (_) => ArchitectRoofLayersDialog(
+        initialTab: initialTab,
+        initialAssembly: target?.assembly ?? _roofTool.activeAssembly,
+        initialSlopeDegrees: target?.slopeDegrees ?? _roofTool.slopeDegrees,
+        initialEavesOverhang: target?.eavesOverhang ?? _roofTool.eavesOverhang,
+        initialEavesCut: target?.eavesCut ?? _roofTool.eavesCut,
+        initialDrainage: target?.drainage ?? _roofTool.drainage,
+        initialBaseElevationOffset: target?.baseElevationOffset ??
+            _roofTool.baseElevationOffset ?? _project.activeStorey.height,
+        initialAttachToWalls: target?.attachToWalls ?? _roofTool.attachToWalls,
+        initialManualSupportDistance: target == null
+            ? _roofTool.manualSupportDistance
+            : target.manualSupportDistance,
+        initialIsMansard: target?.isMansard ??
+            _roofTool.drawMode == RoofDrawMode.mansard,
+        initialUpperSlopeDegrees: target?.upperSlopeDegrees ??
+            _roofTool.upperSlopeDegrees,
+        initialBreakDistance: target == null
+            ? _roofTool.breakDistance
+            : target.breakDistance,
+        maxSupportDistance: target?.maxSlopeRun,
+        project: original,
+        roof: target,
+        canPickDownpipe: target != null,
+        onTryApply: (result) {
+          if (!identical(original, _project)) {
+            _operationError();
+            return false;
+          }
+          try {
+            if (target != null && result.changes.isNotEmpty) {
+              _modelCommands.execute(
+                ApplyArchitectRoofSettings(
+                  storeyId: target.storeyId,
+                  roofId: target.id,
+                  settings: result,
+                ),
+              );
+              _saveBiMProjectIfAttached();
+            }
+            if (target == null || result.saveForNewRoofs) {
+              _setRoofDefaults(result);
+            }
+            pickDownpipe = result.pickDownpipe;
+            return true;
+          } on ArgumentError {
+            _operationError();
+            return false;
+          }
+        },
+      ),
+    );
+    if (mounted && pickDownpipe && target != null) {
+      _beginDownpipePlacement(target.id);
+    }
+  }
 
   void _beginDownpipePlacement([String? roofId]) {
 
@@ -20297,79 +20240,59 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  void _handleAutoRoof(AutoRoofType type) {
-
+  Future<void> _handleAutoRoof(AutoRoofType type) async {
+    final original = _project;
     final generated = ArchitectRoofTool.generateAutoRoof(
-
-      project: _project,
-
+      project: original,
       type: type,
-
       tool: _roofTool,
-
     );
-
     if (generated.isEmpty) {
-
-      HapticFeedback.heavyImpact();
-
       ScaffoldMessenger.of(context).showSnackBar(
-
-        SnackBar(
-
-          content: Text(context.l10n.architectRoofAutoNoWalls),
-
-          duration: const Duration(seconds: 2),
-
-        ),
-
+        SnackBar(content: Text(context.l10n.architectRoofAutoNoWalls)),
       );
-
       return;
-
     }
-
-    setState(() {
-
-      _commands.execute(
-
-        ReplaceStoreyRoofs(storeyId: _project.activeStoreyId, roofs: generated),
-
-      );
-
-      _selectionIds
-
-        ..clear()
-
-        ..add(generated.first.id);
-
-      _selectedElementId = generated.first.id;
-
-      _polygonSelectedEdge = generated.first.safeEavesEdgeIndex;
-
-      _multiSelect = false;
-
-    });
-
-    _saveBiMProjectIfAttached();
-
-    HapticFeedback.mediumImpact();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-
-      SnackBar(
-
-        content: Text(context.l10n.architectRoofAutoCreated(generated.length)),
-
-        duration: const Duration(seconds: 1),
-
+    final replaceIds = await showDialog<Set<String>>(
+      context: context,
+      builder: (_) => ArchitectAutoRoofPreviewDialog(
+        project: original,
+        generated: generated,
+        type: type,
+        selectedRoofId: _selectedRoof?.id,
       ),
-
     );
-
+    if (!mounted || replaceIds == null) return;
+    if (!identical(original, _project)) {
+      _operationError();
+      return;
+    }
+    try {
+      _modelCommands.execute(
+        CreateReviewedArchitectRoofs(
+          storeyId: original.activeStoreyId,
+          roofs: generated,
+          replaceIds: replaceIds,
+        ),
+      );
+      setState(() {
+        _selectionIds
+          ..clear()
+          ..add(generated.first.id);
+        _selectedElementId = generated.first.id;
+        _polygonSelectedEdge = generated.first.safeEavesEdgeIndex;
+        _multiSelect = false;
+      });
+      _saveBiMProjectIfAttached();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectRoofAutoCreated(generated.length)),
+        ),
+      );
+    } on ArgumentError {
+      _operationError();
+    }
   }
-
-
 
   void _showWallTypes() {
 
@@ -20407,6 +20330,43 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     );
 
+  }
+
+  void _createWallVariant(ArchitectWallType source) {
+    final original = _project;
+    showDialog<void>(
+      context: context,
+      builder: (_) => ArchitectWallCompositionEditor(
+        project: original,
+        type: source.copyWith(
+          id: ArchitectElementId.next('wall_type'),
+          name: '',
+          labelId: source.labelId ?? source.id,
+          isCatalogType: true,
+        ),
+        isNewType: true,
+        typeUseCount: 0,
+        onApply: (type, _, changed) {
+          if (!identical(original, _project)) {
+            _operationError();
+            return false;
+          }
+          if (!changed) {
+            _selectWallType(source);
+            return true;
+          }
+          try {
+            _modelCommands.execute(SetArchitectWallComposition(type: type));
+            _selectWallType(type);
+            _saveBiMProjectIfAttached();
+            return true;
+          } on ArgumentError {
+            _operationError();
+            return false;
+          }
+        },
+      ),
+    );
   }
 
 
@@ -20584,6 +20544,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       id: ArchitectElementId.next('wall_type'),
 
       name: previous != null && !previous.isFactoryPreset ? previous.name : '',
+
+      isCatalogType: false,
 
       labelId: previous?.labelId ?? previous?.id,
 
@@ -21221,6 +21183,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             final variant = ArchitectWallType(
 
               id: ArchitectElementId.next('wall_type'),
+
+              isCatalogType: false,
 
               name: previous != null && !previous.isFactoryPreset
 
@@ -25461,6 +25425,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   onWallTypeSelected: _selectWallType,
 
+                  onCreateWallVariant: _createWallVariant,
+                  onManageWallTypes: _showWallTypes,
+                  wallProjectId: _project.id,
+                  wallUnit: _project.units,
+
                   onCreateFenestration: _openFenestrationEditor,
 
                   activeWindowStyle:
@@ -25981,80 +25950,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           },
 
-                          onSelectedRoofSlopeChanged: (slopeDeg) {
-
-                            setState(() {
-
-                              _roofTool.setSlopeDegrees(slopeDeg);
-
-                              final sel = _selectedRoof;
-
-                              if (sel != null) {
-
-                                final grp = sel.roofGroupId;
-
-                                if (grp != null &&
-
-                                    grp.isNotEmpty &&
-
-                                    sel.isSlopeLocked) {
-
-                                  for (final r in _project.activeStorey.roofs) {
-
-                                    if (r.roofGroupId == grp &&
-
-                                        r.isSlopeLocked) {
-
-                                      _commands.execute(
-
-                                        UpdateArchitectRoofPlane(
-
-                                          storeyId: _project.activeStoreyId,
-
-                                          roof: r.copyWith(
-
-                                            slopeDegrees: slopeDeg,
-
-                                          ),
-
-                                        ),
-
-                                      );
-
-                                    }
-
-                                  }
-
-                                } else {
-
-                                  _commands.execute(
-
-                                    UpdateArchitectRoofPlane(
-
-                                      storeyId: _project.activeStoreyId,
-
-                                      roof: sel.copyWith(
-
-                                        slopeDegrees: slopeDeg,
-
-                                      ),
-
-                                    ),
-
-                                  );
-
-                                }
-
-                                _saveBiMProjectIfAttached();
-
-                              }
-
-                            });
-
-                            HapticFeedback.selectionClick();
-
+                          groupCount: _roofGroupCount(_selectedRoof),
+                          unit: _project.units,
+                          onOpenAssemblyDialog: () => _openRoofLayersDialog(roof: _selectedRoof, initialTab: 1),
+                          onApplySlope: (value) {
+                            final roof = _selectedRoof;
+                            if (roof != null) _applyRoofQuickValue(roof, value, slope: true);
                           },
-
+                          onApplyOverhang: (value) {
+                            final roof = _selectedRoof;
+                            if (roof != null) _applyRoofQuickValue(roof, value, slope: false);
+                          },
                           onToggleSlopeLocked: () {
 
                             final sel = _selectedRoof;
@@ -26198,74 +26104,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               ),
 
                             );
-
-                          },
-
-                          onSelectedRoofOverhangChanged: (overhang) {
-
-                            setState(() {
-
-                              _roofTool.setEavesOverhang(overhang);
-
-                              final sel = _selectedRoof;
-
-                              if (sel != null) {
-
-                                final grp = sel.roofGroupId;
-
-                                if (grp != null && grp.isNotEmpty) {
-
-                                  for (final r in _project.activeStorey.roofs) {
-
-                                    if (r.roofGroupId == grp) {
-
-                                      _commands.execute(
-
-                                        UpdateArchitectRoofPlane(
-
-                                          storeyId: _project.activeStoreyId,
-
-                                          roof: r.copyWith(
-
-                                            eavesOverhang: overhang,
-
-                                          ),
-
-                                        ),
-
-                                      );
-
-                                    }
-
-                                  }
-
-                                } else {
-
-                                  _commands.execute(
-
-                                    UpdateArchitectRoofPlane(
-
-                                      storeyId: _project.activeStoreyId,
-
-                                      roof: sel.copyWith(
-
-                                        eavesOverhang: overhang,
-
-                                      ),
-
-                                    ),
-
-                                  );
-
-                                }
-
-                                _saveBiMProjectIfAttached();
-
-                              }
-
-                            });
-
-                            HapticFeedback.selectionClick();
 
                           },
 

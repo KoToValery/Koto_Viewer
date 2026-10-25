@@ -59,6 +59,9 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
     plinth?.validate();
     if (type.id.isEmpty) throw ArgumentError('Empty wall type ID');
     final found = <String>{};
+    final catalog = project.wallTypes.any((t) => t.isCatalogType)
+        ? project.wallTypes
+        : [...ArchitectWallType.standardCatalog(), ...project.wallTypes];
     final storeys = [
       for (final s in project.storeys)
         s.copyWith(
@@ -78,6 +81,10 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
                           wallTypeId: type.id,
                           location: type.resolvedLocation,
                           loadBearing: type.isLoadBearing,
+                          parapet: type.isParapet,
+                          parapetFinish: type.isParapet
+                              ? type.parapetFinish
+                              : null,
                         );
                   composed.validateGeometry();
                   final region =
@@ -101,11 +108,10 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
       wallTypes: preserveComposition
           ? project.wallTypes
           : [
-              for (final t in project.wallTypes)
+              for (final t in catalog)
                 if (t.id != type.id &&
                     t.id != replaceTypeId &&
-                    !(t.id.startsWith('wall_type_') &&
-                        t.name.isEmpty &&
+                    !(!t.isCatalogType &&
                         !storeys.any(
                           (s) => s.walls.any((w) => w.wallTypeId == t.id),
                         )))

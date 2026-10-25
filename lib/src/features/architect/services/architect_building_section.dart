@@ -1,7 +1,9 @@
 import '../models/architect_hatch_pattern.dart';
 import '../rendering/architect_roof_drainage_mesh.dart';
+import '../rendering/architect_section_hatch.dart';
 import 'dart:math' as math;
 import 'dart:ui';
+import 'dart:typed_data';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_material_layer.dart';
@@ -50,6 +52,7 @@ class ArchitectBuildingSection {
   final List<ArchitectSectionRegion> regions;
   final Rect bounds;
   final Map<String, Path> roofProfiles;
+  final bool viewCoordinates;
 
   /// Visible surfaces behind the cut, already masked by cut solids. These are
   /// projection lines only: they must never acquire section hatching.
@@ -59,7 +62,76 @@ class ArchitectBuildingSection {
     this.bounds, {
     this.roofProfiles = const {},
     this.background,
+    this.viewCoordinates = false,
   });
+
+  /// The model keeps legacy station coordinates. Only the view is reflected,
+  /// preserving arrows, saved cut locations and associations in existing files.
+  ArchitectBuildingSection forView(ArchitectSection cut) {
+    if (viewCoordinates) return this;
+    Offset point(Offset p) => Offset(cut.length - p.dx, p.dy);
+    Rect box(Rect b) => Rect.fromLTRB(
+      cut.length - b.right,
+      b.top,
+      cut.length - b.left,
+      b.bottom,
+    );
+    final matrix = Float64List.fromList([
+      -1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      cut.length,
+      0,
+      0,
+      1,
+    ]);
+    Path path(Path p) => p.transform(matrix);
+    final bg = background;
+    return ArchitectBuildingSection(
+      [
+        for (final r in regions)
+          ArchitectSectionRegion(
+            r.sourceId,
+            r.material,
+            path(r.path),
+            slab: r.slab,
+            roof: r.roof,
+            timberCrossSectionPolygon: r.timberCrossSectionPolygon
+                ?.map(point)
+                .toList(),
+            customFillColor: r.customFillColor,
+            hatchPattern: r.hatchPattern,
+          ),
+      ],
+      box(bounds),
+      viewCoordinates: true,
+      roofProfiles: {
+        for (final e in roofProfiles.entries) e.key: path(e.value),
+      },
+      background: bg == null
+          ? null
+          : ArchitectBuildingElevation(
+              bg.faces.map(path).toList(),
+              box(bg.bounds),
+              elementPaths: {
+                for (final e in bg.elementPaths.entries) e.key: path(e.value),
+              },
+              operations: [
+                for (final op in bg.operations)
+                  (lines: path(op.lines), clip: path(op.clip)),
+              ],
+            ),
+    );
+  }
 
   /// Ownership stays in [regions] for picking; equal materials share one
   /// published contour, including across vertical bands and wall junctions.
@@ -129,7 +201,7 @@ class ArchitectBuildingSection {
         ArchitectRoofMaterial.slopeScreed => SlabMaterial.screed,
         ArchitectRoofMaterial.rcSlab => SlabMaterial.concrete,
         ArchitectRoofMaterial.plasterboard => SlabMaterial.plasterboard,
-        null => SlabMaterial.parquet,
+        null => SlabMaterial.custom,
       };
 
   static Color? _roofMemberColor(ArchitectRoofSectionMember member) {
@@ -312,11 +384,12 @@ class ArchitectBuildingSection {
       }
     }
 
-    Path? sliceMesh(List<Triangle3D> tris) {
+    Path? sliceMesh(List<Triangle3D> tris, {double endpointTolerance = 1e-6}) {
       final section = ArchitectStairSection.build(
         [StairSolid(StairSolidMaterial.concrete, tris)],
         cut.start,
         cut.axis,
+        endpointTolerance: endpointTolerance,
       );
       final path = section.regions[StairSolidMaterial.concrete];
       if (path == null) return null;
@@ -484,7 +557,8 @@ class ArchitectBuildingSection {
           } catch (_) {}
         }
 
-        for (final cutOp in wallCutOpeningsByWall[wall.id] ?? const <_CutOpeningSpan>[]) {
+        for (final cutOp
+            in wallCutOpeningsByWall[wall.id] ?? const <_CutOpeningSpan>[]) {
           final apertureRect = Rect.fromLTRB(
             cutOp.sMin,
             cutOp.zBottom,
@@ -569,12 +643,18 @@ class ArchitectBuildingSection {
                   material,
                   region,
                   customFillColor: part.layer.material.color,
+                  hatchPattern: ArchitectSectionHatch.wall(part.layer.material),
                 ),
               );
             }
           } else {
             regions.add(
-              ArchitectSectionRegion(wall.id, SlabMaterial.plaster, wallPath),
+              ArchitectSectionRegion(
+                wall.id,
+                SlabMaterial.plaster,
+                wallPath,
+                hatchPattern: ArchitectSectionHatch.core(wall.coreMaterial),
+              ),
             );
           }
         }
@@ -593,6 +673,7 @@ class ArchitectBuildingSection {
                 .modeFor(ArchitectSectionCategory.downpipes)
                 .showsCut,
           ),
+          endpointTolerance: 1e-5,
         );
         if (path != null) {
           regions.add(
@@ -657,16 +738,22 @@ class ArchitectBuildingSection {
             regions.add(
               ArchitectSectionRegion(
                 stair.id,
-                solid.material == StairSolidMaterial.concrete ? SlabMaterial.concrete
-                    : solid.material == StairSolidMaterial.timber ? SlabMaterial.parquet : SlabMaterial.custom,
+                solid.material == StairSolidMaterial.concrete
+                    ? SlabMaterial.concrete
+                    : solid.material == StairSolidMaterial.timber
+                    ? SlabMaterial.parquet
+                    : SlabMaterial.custom,
                 stairPath,
-                hatchPattern: ArchitectHatchPattern.presets.firstWhere((p)=>p.id ==
-                  switch(solid.material) {
-                    StairSolidMaterial.concrete => 'concrete',
-                    StairSolidMaterial.timber => 'wood',
-                    StairSolidMaterial.metal => 'metal',
-                    StairSolidMaterial.finish => 'diagonal',
-                  }),
+                hatchPattern: ArchitectHatchPattern.presets.firstWhere(
+                  (p) =>
+                      p.id ==
+                      switch (solid.material) {
+                        StairSolidMaterial.concrete => 'concrete',
+                        StairSolidMaterial.timber => 'wood',
+                        StairSolidMaterial.metal => 'metal',
+                        StairSolidMaterial.finish => 'diagonal',
+                      },
+                ),
               ),
             );
           }
@@ -689,13 +776,21 @@ class ArchitectBuildingSection {
                   ? member.polygon
                   : null,
               customFillColor: _roofMemberColor(member),
+              hatchPattern: member.material == ArchitectRoofMaterial.metalSeam
+                  ? ArchitectSectionHatch.preset('metal')
+                  : null,
             ),
           );
         }
       }
 
       // 5. Cut Floor Drains & Components with visibleInSection == true
-      void addDrainDetail(String drainId, double sCenter, double grateW, double zTop) {
+      void addDrainDetail(
+        String drainId,
+        double sCenter,
+        double grateW,
+        double zTop,
+      ) {
         final drainSec = _buildFloorDrainSection(sCenter, grateW, zTop);
         for (var i = 0; i < regions.length; i++) {
           final r = regions[i];
@@ -1191,12 +1286,7 @@ class ArchitectBuildingSection {
       final zLeafTop = zTop - frameFace;
       if (sMax - jambW > sMin + jambW && zLeafTop > zLeafBottom) {
         raw.addRect(
-          Rect.fromLTRB(
-            sMin + jambW,
-            zLeafBottom,
-            sMax - jambW,
-            zLeafTop,
-          ),
+          Rect.fromLTRB(sMin + jambW, zLeafBottom, sMax - jambW, zLeafTop),
         );
       }
     }
