@@ -40,7 +40,11 @@ class _ComponentDimensionsDialogState extends State<ComponentDimensionsDialog> {
   @override
   void initState() {
     super.initState();
-    _values = {...widget.definition.defaultParameters, ...widget.parameters};
+    _values = {
+      'visibleInSection': widget.definition.defaultVisibleInSection,
+      ...widget.definition.defaultParameters,
+      ...widget.parameters,
+    };
     for (final axis in axes) {
       _controllers[axis] = TextEditingController(text: _text(axis));
     }
@@ -142,6 +146,14 @@ class _ComponentDimensionsDialogState extends State<ComponentDimensionsDialog> {
                   value: _locked,
                   onChanged: (value) => setState(() => _locked = value),
                 ),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(l.architectVisibleInSection),
+                value: (_values['visibleInSection'] as bool?) ??
+                    widget.definition.defaultVisibleInSection,
+                onChanged: (value) =>
+                    setState(() => _values['visibleInSection'] = value ?? false),
               ),
               TextButton(
                 onPressed: () => setState(() {

@@ -7999,6 +7999,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectViewChooseArrow => 'Choose an arrow';
 
   @override
+  String get architectVisibleInSection => 'Visible in section';
+
+  @override
   String architectViewDirectionSide(int side) {
     return 'Viewing direction $side';
   }

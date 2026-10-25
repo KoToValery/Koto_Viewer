@@ -14369,6 +14369,12 @@ abstract class AppLocalizations {
   /// **'Choose an arrow'**
   String get architectViewChooseArrow;
 
+  /// Toggle whether a component is visible in building sections
+  ///
+  /// In en, this message translates to:
+  /// **'Visible in section'**
+  String get architectVisibleInSection;
+
   /// Tooltip for one of the two viewing direction arrows
   ///
   /// In en, this message translates to:

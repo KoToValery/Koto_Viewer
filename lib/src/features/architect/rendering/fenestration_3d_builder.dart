@@ -13,6 +13,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_fenestration_style.dart';
+import '../models/architect_elements.dart' show FenestrationElevationDetail;
 
 /// Builds real-time solid 3D mesh triangles for parametric windows and doors.
 class Fenestration3dBuilder {
@@ -44,9 +45,12 @@ class Fenestration3dBuilder {
     required double height,
     required double sillHeight,
     required double storeyElevation,
+    FenestrationElevationDetail detailLevel =
+        FenestrationElevationDetail.full3D,
     bool isHingeLeft = true,
   }) {
     final List<Triangle3D> tris = [];
+    if (detailLevel == FenestrationElevationDetail.hidden) return tris;
     final wallVec = wallEnd - wallStart;
     final wallLen = wallVec.distance;
     if (wallLen < 1e-4) return tris;
@@ -84,6 +88,31 @@ class Fenestration3dBuilder {
     );
 
     // 2. Subdivisions (Transoms, Mullions, Sashes, Double Glazing)
+    final innerBottomZ =
+        zBottom + (style.kind == FenestrationKind.window ? fFace : 0.0);
+    final innerTopZ = zTop - fFace;
+    if (detailLevel == FenestrationElevationDetail.outerContourOnly) {
+      if (halfW > fFace + 0.01 && innerTopZ > innerBottomZ + 0.01) {
+        final halfInfill = (style.glazingThickness / 2.0).clamp(0.010, 0.015);
+        final p1 = frameCenter - u * (halfW - fFace) - n * halfInfill;
+        final p2 = frameCenter + u * (halfW - fFace) - n * halfInfill;
+        final p3 = frameCenter + u * (halfW - fFace) + n * halfInfill;
+        final p4 = frameCenter - u * (halfW - fFace) + n * halfInfill;
+        _addBox3D(
+          tris,
+          p1,
+          p2,
+          p3,
+          p4,
+          innerBottomZ,
+          innerTopZ,
+          style.kind == FenestrationKind.window
+              ? glassColor
+              : const Color(0xFF6D4C41),
+        );
+      }
+      return tris;
+    }
     _buildSubdivisions3D(
       tris: tris,
       node: style.rootSubdivision,
@@ -99,6 +128,7 @@ class Fenestration3dBuilder {
       topZ: zTop - fFace,
       exteriorSign: exteriorSign,
       kind: style.kind,
+      detailLevel: detailLevel,
     );
 
     // 3. Exterior Casing / Trim (Обрамчване)
@@ -136,7 +166,8 @@ class Fenestration3dBuilder {
     }
 
     // 5. Interior-facing 3D Barrel Hinges for doors
-    if (style.kind == FenestrationKind.door) {
+    if (style.kind == FenestrationKind.door &&
+        detailLevel == FenestrationElevationDetail.full3D) {
       _buildDoorHinges3D(
         tris: tris,
         frameCenter: frameCenter,
@@ -210,6 +241,8 @@ class Fenestration3dBuilder {
     required Offset n,
     required double halfFDepth,
     required double glazingThick,
+    FenestrationElevationDetail detailLevel =
+        FenestrationElevationDetail.full3D,
     required double fFace,
     required double left,
     required double right,
@@ -248,6 +281,7 @@ class Fenestration3dBuilder {
             n: n,
             halfFDepth: halfFDepth,
             glazingThick: glazingThick,
+          detailLevel: detailLevel,
             fFace: fFace,
             left: currentX,
             right: childRight,
@@ -293,6 +327,7 @@ class Fenestration3dBuilder {
             n: n,
             halfFDepth: halfFDepth,
             glazingThick: glazingThick,
+          detailLevel: detailLevel,
             fFace: fFace,
             left: left,
             right: right,
@@ -363,6 +398,7 @@ class Fenestration3dBuilder {
           bottomZ: sBottom,
           topZ: sTop,
           glazingThick: glazingThick,
+          detailLevel: detailLevel,
         );
       } else {
         // Solid panel (e.g. door infill)
@@ -380,7 +416,8 @@ class Fenestration3dBuilder {
       }
 
       // Interior-facing window hinges for operable sashes
-      if (kind == FenestrationKind.window) {
+      if (kind == FenestrationKind.window &&
+          detailLevel == FenestrationElevationDetail.full3D) {
         _buildWindowSashHinges3D(
           tris: tris,
           frameCenter: frameCenter,
@@ -409,6 +446,7 @@ class Fenestration3dBuilder {
           bottomZ: bottomZ,
           topZ: topZ,
           glazingThick: glazingThick,
+          detailLevel: detailLevel,
         );
       } else {
         _buildSolidInfillPane(
@@ -441,6 +479,8 @@ class Fenestration3dBuilder {
     required double bottomZ,
     required double topZ,
     required double glazingThick,
+    FenestrationElevationDetail detailLevel =
+        FenestrationElevationDetail.full3D,
   }) {
     if (right <= left + 0.02 || topZ <= bottomZ + 0.02) return;
 
@@ -455,7 +495,9 @@ class Fenestration3dBuilder {
     // Black Rubber Glazing Gasket (черно гумено уплътнение за стъклопакета)
     // Outlines the perimeter of the double glazing unit on both exterior and interior faces.
     const gasketW = 0.008; // 8 mm width of visible rubber seal
-    if (right - left > 2 * gasketW + 0.01 && topZ - bottomZ > 2 * gasketW + 0.01) {
+    if (detailLevel == FenestrationElevationDetail.full3D &&
+        right - left > 2 * gasketW + 0.01 &&
+        topZ - bottomZ > 2 * gasketW + 0.01) {
       final halfGasket = halfGlass + 0.002; // Protrudes 2mm proud of glass on both faces
 
       void addGasketStrip(double x1, double x2, double z1, double z2) {

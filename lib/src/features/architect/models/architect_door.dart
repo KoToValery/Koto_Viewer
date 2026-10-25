@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import 'architect_fenestration_style.dart';
+import 'architect_elements.dart' show FenestrationElevationDetail;
 import '../services/fenestration_library_service.dart';
 import '../rendering/fenestration_3d_builder.dart';
 
@@ -238,6 +239,8 @@ class ArchitectDoor {
     double insulationThickness = 0.0,
     double? coreCenterShift,
     double exteriorSign = 1.0,
+    FenestrationElevationDetail detailLevel =
+        FenestrationElevationDetail.full3D,
   }) {
     architectDrawingSources(canvas, {id}, 'opening');
     final wallVec = wallEnd - wallStart;
@@ -457,7 +460,10 @@ class ArchitectDoor {
     double insulationThickness = 0.0,
     double? coreCenterShift,
     double exteriorSign = 1.0,
+    FenestrationElevationDetail detailLevel =
+        FenestrationElevationDetail.full3D,
   }) {
+    if (detailLevel == FenestrationElevationDetail.hidden) return const [];
     final effectiveStyle = resolvedStyle;
     if (effectiveStyle != null) {
       return Fenestration3dBuilder.buildOpening3D(
@@ -475,6 +481,7 @@ class ArchitectDoor {
         sillHeight: sillHeight,
         storeyElevation: storeyElevation,
         isHingeLeft: isHingeLeft,
+        detailLevel: detailLevel,
       );
     }
 
@@ -542,6 +549,19 @@ class ArchitectDoor {
     // 3. Top Head Jamb / Lintel (4cm)
     addPrism(pLeft + u * frameThickness, pRight - u * frameThickness,
         zTop - frameThickness, zTop, frameColor);
+
+    if (detailLevel != FenestrationElevationDetail.full3D) {
+      if (sillHeight > 0) {
+        addPrism(
+          pLeft,
+          pRight,
+          storeyElevation,
+          zBottom,
+          const Color(0xFF78909C),
+        );
+      }
+      return tris;
+    }
 
     // 4. 3D Door Leaf (4cm thick, swung open)
     final swingSign = openInward ? 1.0 : -1.0;

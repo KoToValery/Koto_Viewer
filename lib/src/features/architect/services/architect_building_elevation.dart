@@ -2,6 +2,7 @@ import 'package:clipper2/clipper2.dart' as clip;
 import 'dart:math' as math;
 import 'dart:ui';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
+import '../models/architect_elements.dart';
 import '../models/architect_elevation.dart';
 import '../models/architect_project.dart';
 import '../models/architect_section_visibility.dart';
@@ -31,14 +32,29 @@ class ArchitectBuildingElevation {
     ArchitectProject project,
     ArchitectElevation view, {
     List<List<Offset>> occlusionMasks = const [],
+    Set<String> suppressedOpeningIds = const {},
+    Map<String, FenestrationElevationDetail> openingDetailLevels = const {},
     ArchitectSectionVisibility? sectionVisibility,
+    Set<String> cutOpeningIds = const {},
   }) {
+    final classification = _classifyOpenings(
+      project,
+      view,
+      cutOpeningIds: {
+        ...cutOpeningIds,
+        ...suppressedOpeningIds,
+      },
+      presetDetailLevels: openingDetailLevels,
+      occlusionMasks: occlusionMasks,
+    );
     final sources = <Triangle3D, String>{};
     final mesh = Architect3dBuilder.buildProjectMesh(
       project,
       previewGeometry: false,
       sources: sources,
       sectionVisibility: sectionVisibility,
+      suppressedOpeningIds: classification.suppressedOpeningIds,
+      openingDetailLevels: classification.openingDetailLevels,
     );
     return withTerrain(_fromTriangles(
       mesh.triangles,
@@ -46,7 +62,210 @@ class ArchitectBuildingElevation {
       sources: sources,
       project: project,
       occlusionMasks: occlusionMasks,
+      suppressedOpeningIds: classification.suppressedOpeningIds,
+      openingDetailLevels: classification.openingDetailLevels,
     ), view);
+  }
+
+  static ({
+    Set<String> suppressedOpeningIds,
+    Map<String, FenestrationElevationDetail> openingDetailLevels,
+  })
+  _classifyOpenings(
+    ArchitectProject project,
+    ArchitectElevation view, {
+    Set<String> cutOpeningIds = const {},
+    Map<String, FenestrationElevationDetail> presetDetailLevels = const {},
+    List<List<Offset>> occlusionMasks = const [],
+  }) {
+    final suppressed = <String>{...cutOpeningIds};
+    final detailLevels = <String, FenestrationElevationDetail>{
+      ...presetDetailLevels,
+      for (final id in cutOpeningIds) id: FenestrationElevationDetail.hidden,
+    };
+
+    final viewSegments = view.steps.isEmpty
+        ? [view]
+        : [
+            for (final s in view.segments)
+              if (view.viewDepth == null || view.viewDepth! - s.offset > 0)
+                view.copyWith(
+                  start: s.start,
+                  end: s.end,
+                  steps: const [],
+                  viewDepth: view.viewDepth == null
+                      ? null
+                      : view.viewDepth! - s.offset,
+                ),
+          ];
+    if (viewSegments.isEmpty) {
+      return (
+        suppressedOpeningIds: suppressed,
+        openingDetailLevels: detailLevels,
+      );
+    }
+
+    for (final storey in project.storeys) {
+      for (final wall in storey.walls) {
+        final allOpenings = [
+          for (final d in wall.doors)
+            (
+              id: d.id,
+              ratio: d.offsetRatio,
+              width: d.width,
+              height: d.height,
+              sill: d.sillHeight,
+            ),
+          for (final w in wall.windows)
+            (
+              id: w.id,
+              ratio: w.offsetRatio,
+              width: w.width,
+              height: w.height,
+              sill: w.sillHeight,
+            ),
+        ];
+        for (final op in allOpenings) {
+          if (suppressed.contains(op.id) || detailLevels.containsKey(op.id)) {
+            if (detailLevels[op.id] == FenestrationElevationDetail.hidden) {
+              suppressed.add(op.id);
+            }
+            continue;
+          }
+          final axis = wall.openingAxis(op.ratio);
+          final wallVec = axis.$2 - axis.$1;
+          final wallLen = wallVec.distance;
+          if (wallLen < 1e-4) continue;
+          final u = wallVec / wallLen;
+          final center2D = axis.$1 + u * (op.ratio * wallLen);
+          final pA = center2D - u * (op.width / 2.0);
+          final pB = center2D + u * (op.width / 2.0);
+          final zBottom = storey.elevation + wall.baseOffset + op.sill;
+          final zTop = zBottom + op.height;
+          final yMid = (zBottom + zTop) / 2.0;
+
+          var maxVisibleWidth = 0.0;
+          var isObliqueOrClipped = false;
+          var inFrontOfView = false;
+
+          for (final segView in viewSegments) {
+            final right = segView.right;
+            final forward = segView.viewDirection;
+            final centre = segView.centre;
+            Vector3 proj(Offset p) {
+              final d = p - centre;
+              return Vector3(
+                d.dx * right.dx + d.dy * right.dy,
+                yMid,
+                d.dx * forward.dx + d.dy * forward.dy,
+              );
+            }
+
+            final vA = proj(pA);
+            final vB = proj(pB);
+            if (math.max(vA.z, vB.z) < -1e-4) continue;
+            inFrontOfView = true;
+
+            final cosAngle = (u.dx * right.dx + u.dy * right.dy).abs();
+            if (cosAngle < 0.999) {
+              isObliqueOrClipped = true;
+            }
+
+            var seg = _clip3([vA, vB], (p) => p.z + 1e-4);
+            if (segView.viewDepth != null) {
+              seg = _clip3(seg, (p) => segView.viewDepth! + 1e-4 - p.z);
+            }
+            seg = _clip3(seg, (p) => p.x + segView.length / 2 + 1e-4);
+            seg = _clip3(seg, (p) => segView.length / 2 + 1e-4 - p.x);
+            if (seg.length < 2) {
+              isObliqueOrClipped = true;
+              continue;
+            }
+            final x0 = math.min(seg.first.x, seg.last.x);
+            final x1 = math.max(seg.first.x, seg.last.x);
+            final zMid = (seg.first.z + seg.last.z) / 2.0;
+            if ((x1 - x0) < op.width - 1e-3) {
+              isObliqueOrClipped = true;
+            }
+
+            var intervals = <(double, double)>[(x0, x1)];
+            void subtractInterval(double cut0, double cut1) {
+              if (cut1 <= cut0 + 1e-6) return;
+              final next = <(double, double)>[];
+              for (final iv in intervals) {
+                if (cut1 <= iv.$1 || cut0 >= iv.$2) {
+                  next.add(iv);
+                } else {
+                  isObliqueOrClipped = true;
+                  if (cut0 > iv.$1 + 1e-6) next.add((iv.$1, cut0));
+                  if (cut1 < iv.$2 - 1e-6) next.add((cut1, iv.$2));
+                }
+              }
+              intervals = next;
+            }
+
+            for (final mask in occlusionMasks) {
+              if (!_hasArea(mask)) continue;
+              final mb = _bounds2(mask);
+              if (yMid > mb.top + 1e-3 && yMid < mb.bottom - 1e-3) {
+                subtractInterval(mb.left, mb.right);
+              }
+            }
+
+            for (final other in storey.walls) {
+              if (other.id == wall.id) continue;
+              final owBottom = storey.elevation + other.baseOffset;
+              final owTop = owBottom + other.effectiveHeight(storey.height);
+              if (yMid <= owBottom + 1e-3 || yMid >= owTop - 1e-3) continue;
+              final corners = [for (final c in other.polygonCorners) proj(c)];
+              final clipped = _clip3(corners, (p) => p.z + 1e-4);
+              if (clipped.length < 2) continue;
+              var oxMin = double.infinity;
+              var oxMax = double.negativeInfinity;
+              var ozMin = double.infinity;
+              for (final cp in clipped) {
+                oxMin = math.min(oxMin, cp.x);
+                oxMax = math.max(oxMax, cp.x);
+                ozMin = math.min(ozMin, cp.z);
+              }
+              if (ozMin < zMid - wall.thickness / 2 - 0.01) {
+                subtractInterval(oxMin, oxMax);
+              }
+            }
+
+            var visW = 0.0;
+            for (final iv in intervals) {
+              visW += (iv.$2 - iv.$1);
+            }
+            maxVisibleWidth = math.max(maxVisibleWidth, visW);
+          }
+
+          if (!inFrontOfView) {
+            detailLevels[op.id] = FenestrationElevationDetail.clean2D;
+            continue;
+          }
+
+          if (isObliqueOrClipped) {
+            if (maxVisibleWidth < 0.10) {
+              suppressed.add(op.id);
+              detailLevels[op.id] = FenestrationElevationDetail.hidden;
+            } else if (maxVisibleWidth < 0.40) {
+              detailLevels[op.id] =
+                  FenestrationElevationDetail.outerContourOnly;
+            } else {
+              detailLevels[op.id] = FenestrationElevationDetail.clean2D;
+            }
+          } else {
+            detailLevels[op.id] = FenestrationElevationDetail.clean2D;
+          }
+        }
+      }
+    }
+
+    return (
+      suppressedOpeningIds: suppressed,
+      openingDetailLevels: detailLevels,
+    );
   }
 
   static ArchitectBuildingElevation fromTriangles(
@@ -95,6 +314,8 @@ class ArchitectBuildingElevation {
     Map<Triangle3D, String> sources = const {},
     ArchitectProject? project,
     List<List<Offset>> occlusionMasks = const [],
+    Set<String> suppressedOpeningIds = const {},
+    Map<String, FenestrationElevationDetail> openingDetailLevels = const {},
   }) {
     if (view.steps.isNotEmpty) {
       final parts = <ArchitectBuildingElevation>[];
@@ -113,6 +334,8 @@ class ArchitectBuildingElevation {
           ),
           sources: sources,
           project: project,
+          suppressedOpeningIds: suppressedOpeningIds,
+          openingDetailLevels: openingDetailLevels,
         );
         final delta = (s.start + s.end) / 2 - view.centre;
         final shift = Offset(
@@ -303,9 +526,12 @@ class ArchitectBuildingElevation {
     final operations = <({Path lines, Path clip})>[];
     if (project != null) {
       for (final operation in ArchitectElevationOperation.build(
+
         project,
         view,
+        excludedOpeningIds: suppressedOpeningIds,
       )) {
+
         final a = operation.aperture[0], b = operation.aperture[1];
         if ((b.x - a.x).abs() < 1e-6) continue;
         final u = (b.z - a.z) / (b.x - a.x);
@@ -328,7 +554,13 @@ class ArchitectBuildingElevation {
         ));
         final visible = visiblePart(plane, ignoreSource: operation.id);
         if (!visible.getBounds().isEmpty) {
-          operations.add((lines: operation.lines, clip: visible));
+          final detailLevel =
+              openingDetailLevels[operation.id] ??
+              FenestrationElevationDetail.clean2D;
+          if (detailLevel != FenestrationElevationDetail.outerContourOnly &&
+              detailLevel != FenestrationElevationDetail.hidden) {
+            operations.add((lines: operation.lines, clip: visible));
+          }
           // Empty apertures of open doors remain selectable, but a foreground
           // solid still masks them just like the operation indication.
           elementPaths[operation.id] = elementPaths.containsKey(operation.id)

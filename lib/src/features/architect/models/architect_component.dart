@@ -126,6 +126,11 @@ class ArchitectComponentInstance {
   final bool isVisible;
   final bool isLocked;
 
+  /// Explicit override for whether this component appears in building sections.
+  /// When null, inherits [ArchitectComponentDefinition.defaultVisibleInSection]
+  /// (which is false for furniture/sanitary and true for floor drains).
+  final bool? visibleInSection;
+
   const ArchitectComponentInstance({
     required this.id,
     required this.definitionId,
@@ -136,7 +141,21 @@ class ArchitectComponentInstance {
     this.label = '',
     this.isVisible = true,
     this.isLocked = false,
+    this.visibleInSection,
   });
+
+  bool get isFloorDrainComponent =>
+      definitionId == 'sanitary_floor_drain' ||
+      definitionId == 'sanitary_linear_drain';
+
+  bool effectiveVisibleInSection({bool defaultFromDefinition = false}) {
+    if (visibleInSection != null) return visibleInSection!;
+    if (parameters['visibleInSection'] is bool) {
+      return parameters['visibleInSection'] as bool;
+    }
+    if (isFloorDrainComponent) return true;
+    return defaultFromDefinition;
+  }
 
   double get width => (parameters['width'] as num?)?.toDouble() ?? 0.60;
   double get depth => (parameters['depth'] as num?)?.toDouble() ?? 0.60;
@@ -207,6 +226,7 @@ class ArchitectComponentInstance {
     String? label,
     bool? isVisible,
     bool? isLocked,
+    bool? visibleInSection,
   }) {
     return ArchitectComponentInstance(
       id: id ?? this.id,
@@ -218,6 +238,7 @@ class ArchitectComponentInstance {
       label: label ?? this.label,
       isVisible: isVisible ?? this.isVisible,
       isLocked: isLocked ?? this.isLocked,
+      visibleInSection: visibleInSection ?? this.visibleInSection,
     );
   }
 
@@ -232,6 +253,7 @@ class ArchitectComponentInstance {
     if (label.isNotEmpty) 'label': label,
     if (!isVisible) 'isVisible': isVisible,
     if (isLocked) 'isLocked': isLocked,
+    if (visibleInSection != null) 'visibleInSection': visibleInSection,
   };
 
   factory ArchitectComponentInstance.fromJson(Map<String, dynamic> json) {
@@ -250,6 +272,7 @@ class ArchitectComponentInstance {
       label: json['label'] as String? ?? '',
       isVisible: json['isVisible'] as bool? ?? true,
       isLocked: json['isLocked'] as bool? ?? false,
+      visibleInSection: json['visibleInSection'] as bool?,
     );
   }
 }

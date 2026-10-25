@@ -4,7 +4,8 @@ import '../../bim_editing/geometry/bim_line_geometry.dart';
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import 'architect_door.dart';
-import 'architect_elements.dart' show ArchitectCutDisplayMode;
+import 'architect_elements.dart'
+    show ArchitectCutDisplayMode, FenestrationElevationDetail;
 import 'architect_wall_type.dart';
 import 'architect_window.dart';
 import 'architect_wall_arc.dart';
@@ -621,11 +622,18 @@ class ArchitectWall {
         const [],
   );
 
-  Path openingCutoutAt(double heightAboveBase) {
+  Path openingCutoutAt(
+    double heightAboveBase, {
+    Set<String> suppressedOpeningIds = const {},
+  }) {
     final path = Path();
     for (final op in [
-      ...doors.map((o) => (o.offsetRatio, o.width, o.sillHeight, o.height)),
-      ...windows.map((o) => (o.offsetRatio, o.width, o.sillHeight, o.height)),
+      ...doors
+          .where((o) => !suppressedOpeningIds.contains(o.id))
+          .map((o) => (o.offsetRatio, o.width, o.sillHeight, o.height)),
+      ...windows
+          .where((o) => !suppressedOpeningIds.contains(o.id))
+          .map((o) => (o.offsetRatio, o.width, o.sillHeight, o.height)),
     ]) {
       if (heightAboveBase <= op.$3 || heightAboveBase >= op.$3 + op.$4) {
         continue;
@@ -646,7 +654,10 @@ class ArchitectWall {
   }
 
   /// Physical material slices, ordered outside to inside and split at the plinth.
-  List<ArchitectWallMaterialSlice> materialSlices(double storeyElevation) {
+  List<ArchitectWallMaterialSlice> materialSlices(
+    double storeyElevation, {
+    Set<String> suppressedOpeningIds = const {},
+  }) {
     final result = <ArchitectWallMaterialSlice>[];
     final composition = resolvedLayers;
     final firstCore = composition.indexWhere(
@@ -699,11 +710,13 @@ class ArchitectWall {
           plinth: const ArchitectWallPlinth(),
           doors: [
             for (final d in doors)
-              d.copyWith(sillHeight: d.sillHeight + z0 - bottom),
+              if (!suppressedOpeningIds.contains(d.id))
+                d.copyWith(sillHeight: d.sillHeight + z0 - bottom),
           ],
           windows: [
             for (final w in windows)
-              w.copyWith(sillHeight: w.sillHeight + z0 - bottom),
+              if (!suppressedOpeningIds.contains(w.id))
+                w.copyWith(sillHeight: w.sillHeight + z0 - bottom),
           ],
         );
         result.add(
@@ -737,18 +750,27 @@ class ArchitectWall {
     bool includeSolid = true,
     bool includeOpeningMeshes = true,
     Color? solidColor,
+    Set<String> suppressedOpeningIds = const {},
+    Map<String, FenestrationElevationDetail> openingDetailLevels = const {},
   }) {
     if (resolveComposition && (layers.isNotEmpty || plinth.enabled)) {
       return [
         if (includeSolid)
-          for (final part in materialSlices(storeyElevation))
+          for (final part in materialSlices(
+            storeyElevation,
+            suppressedOpeningIds: suppressedOpeningIds,
+          ))
             ...part.build3D(storeyElevation),
         if (includeOpeningMeshes)
           ...build3D(
             storeyElevation: storeyElevation,
             sources: sources,
+
+
             resolveComposition: false,
             includeSolid: false,
+            suppressedOpeningIds: suppressedOpeningIds,
+            openingDetailLevels: openingDetailLevels,
           ),
       ];
     }
@@ -770,7 +792,10 @@ class ArchitectWall {
             Path.combine(
               PathOperation.difference,
               Path()..addPolygon(polygonCorners, true),
-              openingCutoutAt((levels[i] + levels[i + 1]) / 2 - bottom),
+              openingCutoutAt(
+                (levels[i] + levels[i + 1]) / 2 - bottom,
+                suppressedOpeningIds: suppressedOpeningIds,
+              ),
             ),
             levels[i],
             levels[i + 1],
@@ -780,8 +805,12 @@ class ArchitectWall {
           ...build3D(
             storeyElevation: storeyElevation,
             sources: sources,
+
+
             resolveComposition: false,
             includeSolid: false,
+            suppressedOpeningIds: suppressedOpeningIds,
+            openingDetailLevels: openingDetailLevels,
           ),
       ];
     }
@@ -866,6 +895,7 @@ class ArchitectWall {
         >[];
 
     for (final d in doors) {
+      if (suppressedOpeningIds.contains(d.id)) continue;
       openings.add((
         id: d.id,
         offsetRatio: d.offsetRatio,
@@ -875,6 +905,8 @@ class ArchitectWall {
         build3DTris: () => d.build3D(
           wallStart: openingAxis(d.offsetRatio).$1,
           wallEnd: openingAxis(d.offsetRatio).$2,
+          detailLevel:
+              openingDetailLevels[d.id] ?? FenestrationElevationDetail.full3D,
           wallThickness: thickness,
           storeyElevation: storeyElevation + baseOffset,
           coreThickness: coreThickness,
@@ -886,6 +918,7 @@ class ArchitectWall {
     }
 
     for (final w in windows) {
+      if (suppressedOpeningIds.contains(w.id)) continue;
       openings.add((
         id: w.id,
         offsetRatio: w.offsetRatio,
@@ -895,6 +928,8 @@ class ArchitectWall {
         build3DTris: () => w.build3D(
           wallStart: openingAxis(w.offsetRatio).$1,
           wallEnd: openingAxis(w.offsetRatio).$2,
+          detailLevel:
+              openingDetailLevels[w.id] ?? FenestrationElevationDetail.full3D,
           wallThickness: thickness,
           storeyElevation: storeyElevation + baseOffset,
           coreThickness: coreThickness,

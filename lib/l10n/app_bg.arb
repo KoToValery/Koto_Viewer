@@ -2618,6 +2618,8 @@
   "architectRotationPickPivot": "Избери друг център",
   "architectMirrorPickAnchor": "Избери друга опорна точка",
   "architectViewChooseArrow": "Избери стрелка",
+  "architectVisibleInSection": "Видим в разрез",
+  "@architectVisibleInSection": {"description": "Toggle whether a component is visible in building sections"},
   "architectViewDirectionSide": "Посока на гледане {side}",
   "@architectViewDirectionSide": {"description": "Tooltip for one of the two viewing direction arrows", "placeholders": {"side": {"type": "int"}}}
 }

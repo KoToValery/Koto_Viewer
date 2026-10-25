@@ -12,6 +12,33 @@ export 'architect_stair_design.dart';
 // 0. CUT DISPLAY MODE (PLAN CUT PLANE / СРЯЗВАЩА РАВНИНА)
 // ===========================================================================
 
+/// Three canonical representation states for every visual architectural element.
+enum ArchitectVisualState {
+  /// 2D Floor Plan representation (orthographic top-down symbolic CAD view).
+  plan,
+
+  /// 2D Detailed Section & Elevation representation (print-ready cut + projection without 3D clutter).
+  section,
+
+  /// Full 3D solid mesh representation for interactive 3D viewport.
+  model3D,
+}
+
+/// Level of detail for fenestration (windows and doors) in 3D and 2D section/elevation views.
+enum FenestrationElevationDetail {
+  /// Full 3D model with 5-chamber depth, rubber gaskets, and 3D hardware hinges/handles.
+  full3D,
+
+  /// Clean print-ready 2D elevation/section projection (frame, sash, mullions, glass, casing) without 3D hinges or gaskets.
+  clean2D,
+
+  /// Simplified outer frame contour only (for oblique/foreshortened views with visible width 10..40 cm).
+  outerContourOnly,
+
+  /// Completely suppressed (for cut openings in background view or extreme oblique slivers < 10 cm).
+  hidden,
+}
+
 /// Defines how an architectural element is displayed relative to the floor plan cut plane.
 enum ArchitectCutDisplayMode {
   /// Automatically determined by whether the floor cut plane intersects the element's height range.

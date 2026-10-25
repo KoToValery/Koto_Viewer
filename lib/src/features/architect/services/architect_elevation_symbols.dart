@@ -16,8 +16,9 @@ class ArchitectElevationOperation {
 
   static List<ArchitectElevationOperation> build(
     ArchitectProject project,
-    ArchitectElevation view,
-  ) {
+    ArchitectElevation view, {
+    Set<String> excludedOpeningIds = const {},
+  }) {
     final result = <ArchitectElevationOperation>[];
     for (final storey in project.storeys) {
       for (final wall in storey.walls) {
@@ -153,6 +154,7 @@ class ArchitectElevationOperation {
         }
 
         for (final w in wall.windows) {
+          if (excludedOpeningIds.contains(w.id)) continue;
           opening(
             w.id,
             w.offsetRatio,
@@ -165,6 +167,7 @@ class ArchitectElevationOperation {
           );
         }
         for (final d in wall.doors) {
+          if (excludedOpeningIds.contains(d.id)) continue;
           opening(
             d.id,
             d.offsetRatio,

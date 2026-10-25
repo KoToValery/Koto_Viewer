@@ -439,6 +439,9 @@ class SanitaryLinearDrain extends ArchitectComponentDefinition {
   String get id => 'sanitary_linear_drain';
 
   @override
+  bool get defaultVisibleInSection => true;
+
+  @override
   String get defaultName => 'Linear Shower Drain';
 
   @override
@@ -562,6 +565,9 @@ class SanitaryLinearDrain extends ArchitectComponentDefinition {
 class SanitaryFloorDrain extends ArchitectComponentDefinition {
   @override
   String get id => 'sanitary_floor_drain';
+
+  @override
+  bool get defaultVisibleInSection => true;
 
   @override
   String get defaultName => 'Floor Drain';

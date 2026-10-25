@@ -36,8 +36,12 @@ class ArchitectWallSolids {
     ArchitectStorey storey,
     List<ArchitectWallType> types, {
     ArchitectProject? project,
+    Set<String> suppressedOpeningIds = const {},
   }) {
-    final cacheable = project != null && identical(types, project.wallTypes);
+    final cacheable =
+        suppressedOpeningIds.isEmpty &&
+        project != null &&
+        identical(types, project.wallTypes);
     if (cacheable) {
       final cached = _cache[project]?[storey];
       if (cached != null) return cached;
@@ -125,8 +129,12 @@ class ArchitectWallSolids {
         }
       }
       for (final op in [
-        ...wall.doors.map((o) => (o.sillHeight, o.height)),
-        ...wall.windows.map((o) => (o.sillHeight, o.height)),
+        ...wall.doors
+            .where((o) => !suppressedOpeningIds.contains(o.id))
+            .map((o) => (o.sillHeight, o.height)),
+        ...wall.windows
+            .where((o) => !suppressedOpeningIds.contains(o.id))
+            .map((o) => (o.sillHeight, o.height)),
       ]) {
         for (final z in [bottom + op.$1, bottom + op.$1 + op.$2]) {
           if (z > bottom && z < top) breaks.add(z);
@@ -151,7 +159,10 @@ class ArchitectWallSolids {
       );
       final holes = <String, Path>{};
       for (final w in active) {
-        final path = w.openingCutoutAt(mid - storey.elevation - w.baseOffset);
+        final path = w.openingCutoutAt(
+          mid - storey.elevation - w.baseOffset,
+          suppressedOpeningIds: suppressedOpeningIds,
+        );
         holes[w.id] = path;
       }
       for (final region in layers.materials) {

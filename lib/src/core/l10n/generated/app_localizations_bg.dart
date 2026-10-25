@@ -8027,6 +8027,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectViewChooseArrow => 'Избери стрелка';
 
   @override
+  String get architectVisibleInSection => 'Видим в разрез';
+
+  @override
   String architectViewDirectionSide(int side) {
     return 'Посока на гледане $side';
   }

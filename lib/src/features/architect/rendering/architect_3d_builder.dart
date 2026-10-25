@@ -7,6 +7,7 @@ import 'architect_path_solid.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
+import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import '../models/architect_section_visibility.dart';
 import 'architect_wall_network.dart';
@@ -23,6 +24,8 @@ class Architect3dBuilder {
     bool previewGeometry = true,
     Map<Triangle3D, String>? sources,
     ArchitectSectionVisibility? sectionVisibility,
+    Set<String> suppressedOpeningIds = const {},
+    Map<String, FenestrationElevationDetail> openingDetailLevels = const {},
   }) {
     final List<Triangle3D> allTris = [];
     final roofSolids = <(String, List<Triangle3D>)>[];
@@ -48,6 +51,7 @@ class Architect3dBuilder {
             storey,
             project.wallTypes,
             project: project,
+            suppressedOpeningIds: suppressedOpeningIds,
           ))
             (solid.wall.id, solid.triangles)
         else
@@ -57,6 +61,7 @@ class Architect3dBuilder {
               wall.build3D(
                 storeyElevation: storey.elevation,
                 includeOpeningMeshes: false,
+                suppressedOpeningIds: suppressedOpeningIds,
               ),
             ),
       ];
@@ -76,6 +81,19 @@ class Architect3dBuilder {
             sources: sources,
             includeSolid: false,
             resolveComposition: false,
+            suppressedOpeningIds: suppressedOpeningIds,
+            openingDetailLevels: {
+              if (!previewGeometry)
+                for (final opId in [
+                  for (final d in wall.doors) d.id,
+                  for (final w in wall.windows) w.id,
+                ])
+                  opId:
+                      openingDetailLevels[opId] ??
+                      FenestrationElevationDetail.clean2D
+              else
+                ...openingDetailLevels,
+            },
           ),
         );
         mark(wall.id, first);
@@ -213,10 +231,12 @@ class Architect3dBuilder {
         mark(slab.id, first);
       }
 
-      for (final drain in storey.floorDrains) {
-        final first = allTris.length;
-        allTris.addAll(ArchitectFloorDrainMesh.build(project, storey, drain));
-        mark(drain.id, first);
+      if (previewGeometry) {
+        for (final drain in storey.floorDrains) {
+          final first = allTris.length;
+          allTris.addAll(ArchitectFloorDrainMesh.build(project, storey, drain));
+          mark(drain.id, first);
+        }
       }
 
       final roofJunctions = ArchitectRoofJunctions.of(storey, project: project);
@@ -255,7 +275,7 @@ class Architect3dBuilder {
       }
 
       // Add 3D architectural components (furniture, sanitary, kitchen, equipment)
-      for (final comp in storey.components) {
+      for (final comp in previewGeometry ? storey.components : const <ArchitectComponentInstance>[]) {
         if (!comp.isVisible) continue;
         final def = ComponentLibraryService.instance.findDefinition(
           comp.definitionId,

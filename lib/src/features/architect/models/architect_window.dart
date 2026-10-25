@@ -5,6 +5,7 @@ import '../rendering/architect_canvas_palette.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
+import 'architect_elements.dart';
 import 'architect_fenestration_style.dart';
 import '../rendering/fenestration_3d_builder.dart';
 import '../services/fenestration_library_service.dart';
@@ -373,7 +374,11 @@ class ArchitectWindow {
     double insulationThickness = 0.0,
     double? coreCenterShift,
     double exteriorSign = 1.0,
+    FenestrationElevationDetail detailLevel = FenestrationElevationDetail.full3D,
   }) {
+    if (detailLevel == FenestrationElevationDetail.hidden) {
+      return const [];
+    }
     final effectiveExtSign = (isFlipped ? -1.0 : 1.0) * exteriorSign;
     final effectiveStyle = resolvedStyle;
     if (effectiveStyle != null) {
@@ -391,6 +396,7 @@ class ArchitectWindow {
         height: height,
         sillHeight: sillHeight,
         storeyElevation: storeyElevation,
+        detailLevel: detailLevel,
       );
     }
 
@@ -431,19 +437,21 @@ class ArchitectWindow {
     // Complete the legacy frame in elevation, including its pane divisions.
     _addBox3D(tris, lp2, rp1, rp4, lp3, zBottom, zBottom + jWidth, frameColor);
     _addBox3D(tris, lp2, rp1, rp4, lp3, zTop - jWidth, zTop, frameColor);
-    for (var i = 1; i < panesCount; i++) {
-      final centre = centerPos + u * (width * (i / panesCount - .5));
-      final left = centre - u * (jWidth / 2), right = centre + u * (jWidth / 2);
-      _addBox3D(
-        tris,
-        left - n * halfThick,
-        right - n * halfThick,
-        right + n * halfThick,
-        left + n * halfThick,
-        zBottom + jWidth,
-        zTop - jWidth,
-        frameColor,
-      );
+    if (detailLevel != FenestrationElevationDetail.outerContourOnly) {
+      for (var i = 1; i < panesCount; i++) {
+        final centre = centerPos + u * (width * (i / panesCount - .5));
+        final left = centre - u * (jWidth / 2), right = centre + u * (jWidth / 2);
+        _addBox3D(
+          tris,
+          left - n * halfThick,
+          right - n * halfThick,
+          right + n * halfThick,
+          left + n * halfThick,
+          zBottom + jWidth,
+          zTop - jWidth,
+          frameColor,
+        );
+      }
     }
 
     // Glass pane in the center
@@ -461,6 +469,10 @@ class ArchitectWindow {
       zTop - jWidth,
       glassColor,
     );
+
+    if (detailLevel != FenestrationElevationDetail.full3D) {
+      return tris;
+    }
 
     // Black Rubber Glazing Gasket (черно гумено уплътнение за стъклопакета)
     const gasketColor = Color(0xFF1B1B1B);

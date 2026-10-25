@@ -4802,6 +4802,8 @@
   "architectRotationPickPivot": "Pick centre again",
   "architectMirrorPickAnchor": "Pick anchor again",
   "architectViewChooseArrow": "Choose an arrow",
+  "architectVisibleInSection": "Visible in section",
+  "@architectVisibleInSection": {"description": "Toggle whether a component is visible in building sections"},
   "architectViewDirectionSide": "Viewing direction {side}",
   "@architectViewDirectionSide": {"description": "Tooltip for one of the two viewing direction arrows", "placeholders": {"side": {"type": "int"}}}
 }

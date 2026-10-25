@@ -428,6 +428,10 @@ abstract class ArchitectComponentDefinition {
   /// Attachment rule.
   ComponentPlacementMode get placementMode;
 
+  /// Whether instances of this component are visible in building sections by default.
+  /// Furniture and general sanitary items default to false; floor drains default to true.
+  bool get defaultVisibleInSection => false;
+
   /// Schema of configurable dimensions and properties.
   List<ParametricFieldSchema> get schema;
 

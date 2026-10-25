@@ -16,7 +16,10 @@ import '../rendering/architect_wall_solids.dart';
 import 'architect_roof_geometry.dart';
 import 'architect_slab_geometry.dart';
 import 'architect_stair_section.dart';
+import '../models/architect_wall.dart';
 import 'architect_building_elevation.dart';
+import 'component_geometry_cache.dart';
+import 'component_library_service.dart';
 
 class ArchitectSectionRegion {
   final String sourceId;
@@ -234,6 +237,9 @@ class ArchitectBuildingSection {
     final regions = <ArchitectSectionRegion>[];
     final highPriorityCutouts = <Path>[];
     final roofProfiles = <String, Path>{};
+    final cutOpeningIds = <String>{};
+    final cutOpeningAperturePaths = <String, Path>{};
+    final extraCutMaskPaths = <Path>[];
 
     // 1. Pre-build roof section slices per storey
     final storeyRoofSlices = <String, List<ArchitectRoofSectionSlice>>{};
@@ -344,6 +350,19 @@ class ArchitectBuildingSection {
         }
       }
 
+      final wallCutOpeningsByWall = <String, List<_CutOpeningSpan>>{};
+      final floorCutOpeningIds = <String>{};
+      for (final wall in floor.walls) {
+        final cutOps = _findCutOpeningsOnWall(wall, floor.elevation, cut);
+        if (cutOps.isNotEmpty) {
+          wallCutOpeningsByWall[wall.id] = cutOps;
+          for (final op in cutOps) {
+            floorCutOpeningIds.add(op.id);
+            cutOpeningIds.add(op.id);
+          }
+        }
+      }
+
       final useCompositions = floor.walls.any(
         (w) => w.layers.isNotEmpty || w.plinth.enabled || w.isCurved,
       );
@@ -352,6 +371,7 @@ class ArchitectBuildingSection {
               floor,
               project.wallTypes,
               project: project,
+              suppressedOpeningIds: floorCutOpeningIds,
             )
           : const <ArchitectWallSolid>[];
       for (final wall in floor.walls) {
@@ -369,6 +389,7 @@ class ArchitectBuildingSection {
               sources: sources,
               includeSolid: !useCompositions,
               resolveComposition: !useCompositions,
+              suppressedOpeningIds: floorCutOpeningIds,
             );
         // Each material/height band is a closed solid. Slicing their joined
         // triangle soup makes shared cap edges branch, so contour tracing can
@@ -461,6 +482,41 @@ class ArchitectBuildingSection {
               cutout,
             );
           } catch (_) {}
+        }
+
+        for (final cutOp in wallCutOpeningsByWall[wall.id] ?? const <_CutOpeningSpan>[]) {
+          final apertureRect = Rect.fromLTRB(
+            cutOp.sMin,
+            cutOp.zBottom,
+            cutOp.sMax,
+            cutOp.zTop,
+          );
+          final clippedAperture = Path.combine(
+            PathOperation.intersect,
+            Path()..addRect(apertureRect),
+            wallPath!,
+          );
+          if (clippedAperture.getBounds().isEmpty) continue;
+          wallPath = Path.combine(
+            PathOperation.difference,
+            wallPath,
+            clippedAperture,
+          );
+          extraCutMaskPaths.add(clippedAperture);
+          cutOpeningAperturePaths[cutOp.id] = clippedAperture;
+          final cleanOpeningSection = _buildCleanOpeningSectionProfile(
+            cutOp,
+            clippedAperture,
+          );
+          if (!cleanOpeningSection.getBounds().isEmpty) {
+            regions.add(
+              ArchitectSectionRegion(
+                cutOp.id,
+                SlabMaterial.tile,
+                cleanOpeningSection,
+              ),
+            );
+          }
         }
 
         for (final id in sources.values.toSet()) {
@@ -637,6 +693,133 @@ class ArchitectBuildingSection {
           );
         }
       }
+
+      // 5. Cut Floor Drains & Components with visibleInSection == true
+      void addDrainDetail(String drainId, double sCenter, double grateW, double zTop) {
+        final drainSec = _buildFloorDrainSection(sCenter, grateW, zTop);
+        for (var i = 0; i < regions.length; i++) {
+          final r = regions[i];
+          if (!r.slab || r.roof) continue;
+          try {
+            final trimmed = Path.combine(
+              PathOperation.difference,
+              r.path,
+              drainSec.envelope,
+            );
+            regions[i] = ArchitectSectionRegion(
+              r.sourceId,
+              r.material,
+              trimmed,
+              slab: r.slab,
+              roof: r.roof,
+              timberCrossSectionPolygon: r.timberCrossSectionPolygon,
+              customFillColor: r.customFillColor,
+              hatchPattern: r.hatchPattern,
+            );
+          } catch (_) {}
+        }
+        regions.add(
+          ArchitectSectionRegion(
+            drainId,
+            SlabMaterial.tile,
+            drainSec.detailPath,
+            customFillColor: const Color(0xFFB0BEC5),
+          ),
+        );
+      }
+
+      for (final drain in floor.floorDrains) {
+        final sProj =
+            (drain.position - cut.start).dx * cut.axis.dx +
+            (drain.position - cut.start).dy * cut.axis.dy;
+        final sClamped = sProj.clamp(0.0, cut.length);
+        final ptOnCut = cut.pointAt(sClamped);
+        final distToAxis = _distToSegment2D(
+          ptOnCut,
+          drain.axis.$1,
+          drain.axis.$2,
+        );
+        if (sProj >= -drain.halfWidth &&
+            sProj <= cut.length + drain.halfWidth &&
+            (distToAxis <= drain.halfWidth + 0.08 ||
+                drain.containsPoint(ptOnCut))) {
+          final grateW = (drain.halfWidth * 2.0).clamp(0.08, 0.30);
+          final sDrain = sProj
+              .clamp(grateW / 2, math.max(grateW / 2, cut.length - grateW / 2))
+              .toDouble();
+          addDrainDetail(
+            drain.id,
+            sDrain,
+            grateW,
+            floor.elevation + floor.floorFinishThickness,
+          );
+        }
+      }
+
+      for (final comp in floor.components) {
+        if (!comp.isVisible) continue;
+        final def = ComponentLibraryService.instance.findDefinition(
+          comp.definitionId,
+        );
+        final showInSec = comp.effectiveVisibleInSection(
+          defaultFromDefinition: def?.defaultVisibleInSection ?? false,
+        );
+        if (!showInSec) continue;
+        if (comp.isFloorDrainComponent) {
+          final sProj =
+              (comp.position - cut.start).dx * cut.axis.dx +
+              (comp.position - cut.start).dy * cut.axis.dy;
+          if (sProj < 0 || sProj > cut.length) continue;
+          final ptOnCut = cut.pointAt(sProj);
+          final wM =
+              (comp.parameters['width'] as num?)?.toDouble() ??
+              (comp.parameters['diameter'] as num?)?.toDouble() ??
+              0.15;
+          final dM =
+              (comp.parameters['depth'] as num?)?.toDouble() ??
+              (comp.parameters['diameter'] as num?)?.toDouble() ??
+              0.15;
+          final grateW = wM.clamp(0.08, 0.30);
+          final reach = math.max(wM, dM) / 2.0 + 0.08;
+          if ((ptOnCut - comp.position).distance <= reach) {
+            addDrainDetail(
+              comp.id,
+              sProj,
+              grateW,
+              floor.elevation +
+                  floor.floorFinishThickness +
+                  comp.elevationOffset,
+            );
+          }
+        } else if (def != null) {
+          final geo = ComponentGeometryCache.instance.getOrCompute(
+            def,
+            comp.parameters,
+          );
+          final cosR = math.cos(comp.rotation);
+          final sinR = math.sin(comp.rotation);
+          final zBase = floor.elevation + comp.elevationOffset;
+          Vector3 tr(Vector3 p) => Vector3(
+            comp.position.dx + p.x * cosR - p.y * sinR,
+            comp.position.dy + p.x * sinR + p.y * cosR,
+            zBase + p.z,
+          );
+          final compPath = sliceMesh([
+            for (final t in geo.mesh3d.triangles)
+              Triangle3D(v0: tr(t.v0), v1: tr(t.v1), v2: tr(t.v2)),
+          ]);
+          if (compPath != null) {
+            regions.add(
+              ArchitectSectionRegion(
+                comp.id,
+                SlabMaterial.custom,
+                compPath,
+                customFillColor: const Color(0xFFCFD8DC),
+              ),
+            );
+          }
+        }
+      }
     }
 
     // Project the same 3D solids as facades, with real hidden-surface removal.
@@ -645,9 +828,12 @@ class ArchitectBuildingSection {
     // Keep disconnected members separate while triangulating: decomposing one
     // large union creates artificial strips at every other member's X station.
     final cutMasks = [
-      for (final region in regions)
+      for (final maskPath in [
+        for (final region in regions) region.path,
+        ...extraCutMaskPaths,
+      ])
         for (final t in ArchitectPathSolid.extrude(
-          region.path,
+          maskPath,
           0,
           1,
           const Color(0xff000000),
@@ -668,6 +854,7 @@ class ArchitectBuildingSection {
       ),
       occlusionMasks: cutMasks,
       sectionVisibility: visibility,
+      cutOpeningIds: cutOpeningIds,
     );
     // Cut fills participate in the same double-precision visibility pass;
     // never subtract them again from an already encoded float32 contour.
@@ -681,6 +868,13 @@ class ArchitectBuildingSection {
       bounds =
           bounds?.expandToInclude(visible.getBounds()) ?? visible.getBounds();
     }
+    for (final aperturePath in cutOpeningAperturePaths.values) {
+      if (aperturePath.getBounds().isEmpty) continue;
+      backgroundFaces.add(aperturePath);
+      bounds =
+          bounds?.expandToInclude(aperturePath.getBounds()) ??
+          aperturePath.getBounds();
+    }
     final background = ArchitectBuildingElevation(
       backgroundFaces,
       bounds ?? Rect.zero,
@@ -688,6 +882,8 @@ class ArchitectBuildingSection {
         for (final entry in projected.elementPaths.entries)
           if (!exposed(entry.value).getBounds().isEmpty)
             entry.key: exposed(entry.value),
+        for (final entry in cutOpeningAperturePaths.entries)
+          if (!entry.value.getBounds().isEmpty) entry.key: entry.value,
       },
       operations: [
         for (final op in projected.operations)
@@ -801,4 +997,288 @@ class ArchitectBuildingSection {
     }
     return null;
   }
+
+  static List<_CutOpeningSpan> _findCutOpeningsOnWall(
+    ArchitectWall wall,
+    double storeyElevation,
+    ArchitectSection cut,
+  ) {
+    final result = <_CutOpeningSpan>[];
+    final zBase = storeyElevation + wall.baseOffset;
+    final openings = [
+      for (final d in wall.doors)
+        (
+          id: d.id,
+          ratio: d.offsetRatio,
+          width: d.width,
+          height: d.height,
+          sill: d.sillHeight,
+          frame: d.frameThickness,
+          isWindow: false,
+        ),
+      for (final w in wall.windows)
+        (
+          id: w.id,
+          ratio: w.offsetRatio,
+          width: w.width,
+          height: w.height,
+          sill: w.sillHeight,
+          frame: w.frameThickness,
+          isWindow: true,
+        ),
+    ];
+
+    (double, double)? clipLinearInterval(
+      double s0,
+      double s1,
+      double valAt0,
+      double deriv,
+      double minVal,
+      double maxVal,
+    ) {
+      if (deriv.abs() < 1e-9) {
+        if (valAt0 < minVal || valAt0 > maxVal) return null;
+        return (s0, s1);
+      }
+      final tA = (minVal - valAt0) / deriv;
+      final tB = (maxVal - valAt0) / deriv;
+      final lo = math.max(s0, math.min(tA, tB));
+      final hi = math.min(s1, math.max(tA, tB));
+      return hi > lo ? (lo, hi) : null;
+    }
+
+    for (final op in openings) {
+      final axis = wall.openingAxis(op.ratio);
+      final wallVec = axis.$2 - axis.$1;
+      final wallLen = wallVec.distance;
+      if (wallLen < 1e-4) continue;
+      final u = wallVec / wallLen;
+      final n = Offset(-u.dy, u.dx);
+      final center = axis.$1 + u * (op.ratio * wallLen);
+      final halfW = op.width / 2.0;
+      final halfT = wall.thickness / 2.0;
+
+      final d0 = cut.start - center;
+      final u0 = d0.dx * u.dx + d0.dy * u.dy;
+      final du = cut.axis.dx * u.dx + cut.axis.dy * u.dy;
+      final n0 = d0.dx * n.dx + d0.dy * n.dy;
+      final dn = cut.axis.dx * n.dx + cut.axis.dy * n.dy;
+
+      final spanU = clipLinearInterval(
+        0.0,
+        cut.length,
+        u0,
+        du,
+        -halfW - 1e-5,
+        halfW + 1e-5,
+      );
+      if (spanU == null) continue;
+      final spanOp = clipLinearInterval(
+        spanU.$1,
+        spanU.$2,
+        n0,
+        dn,
+        -halfT - 1e-5,
+        halfT + 1e-5,
+      );
+      if (spanOp == null || spanOp.$2 - spanOp.$1 <= 1e-4) continue;
+
+      var sMin = spanOp.$1;
+      var sMax = spanOp.$2;
+      final isCrossWallCut = dn.abs() > 0.15;
+      if (isCrossWallCut) {
+        // Normalize the station span to the full cut wall thickness across the two wall faces
+        // so diagonal cuts grazing a jamb never leave stepped wall notches.
+        final wallU = clipLinearInterval(
+          0.0,
+          cut.length,
+          (cut.start - axis.$1).dx * u.dx + (cut.start - axis.$1).dy * u.dy,
+          du,
+          0.0,
+          wallLen,
+        );
+        final wallN = clipLinearInterval(
+          wallU?.$1 ?? 0.0,
+          wallU?.$2 ?? cut.length,
+          n0,
+          dn,
+          -halfT,
+          halfT,
+        );
+        if (wallN != null && wallN.$2 - wallN.$1 > 1e-4) {
+          sMin = wallN.$1;
+          sMax = wallN.$2;
+        }
+      }
+
+      result.add(
+        _CutOpeningSpan(
+          id: op.id,
+          sMin: sMin,
+          sMax: sMax,
+          zBottom: zBase + op.sill,
+          zTop: zBase + op.sill + op.height,
+          frameThickness: op.frame.clamp(0.03, 0.08),
+          isWindow: op.isWindow,
+          isCrossWallCut: isCrossWallCut,
+        ),
+      );
+    }
+    return result;
+  }
+
+  static Path _buildCleanOpeningSectionProfile(
+    _CutOpeningSpan op,
+    Path clippedAperture,
+  ) {
+    final sMin = op.sMin;
+    final sMax = op.sMax;
+    final zBottom = op.zBottom;
+    final zTop = op.zTop;
+    final spanW = sMax - sMin;
+    final spanH = zTop - zBottom;
+    if (spanW <= 1e-4 || spanH <= 1e-4) return Path();
+
+    final frameFace = math.min(op.frameThickness, spanH * 0.25);
+    final raw = Path();
+    if (op.isCrossWallCut) {
+      final sMid = (sMin + sMax) / 2.0;
+      final frameDepth = math.min(0.07, spanW * 0.65);
+      // Top head frame
+      raw.addRect(
+        Rect.fromLTRB(
+          sMid - frameDepth / 2.0,
+          zTop - frameFace,
+          sMid + frameDepth / 2.0,
+          zTop,
+        ),
+      );
+      // Bottom sill frame for windows
+      if (op.isWindow) {
+        raw.addRect(
+          Rect.fromLTRB(
+            sMid - frameDepth / 2.0,
+            zBottom,
+            sMid + frameDepth / 2.0,
+            zBottom + frameFace,
+          ),
+        );
+      }
+      // Central glazing or door leaf strip
+      final leafHalf = math.min(op.isWindow ? 0.012 : 0.020, frameDepth * 0.35);
+      final zLeafBottom = op.isWindow ? zBottom + frameFace : zBottom;
+      final zLeafTop = zTop - frameFace;
+      if (zLeafTop > zLeafBottom + 1e-4) {
+        raw.addRect(
+          Rect.fromLTRB(
+            sMid - leafHalf,
+            zLeafBottom,
+            sMid + leafHalf,
+            zLeafTop,
+          ),
+        );
+      }
+    } else {
+      // Longitudinal cut along the wall
+      final jambW = math.min(frameFace, spanW * 0.25);
+      raw.addRect(Rect.fromLTRB(sMin, zBottom, sMin + jambW, zTop));
+      raw.addRect(Rect.fromLTRB(sMax - jambW, zBottom, sMax, zTop));
+      raw.addRect(Rect.fromLTRB(sMin, zTop - frameFace, sMax, zTop));
+      if (op.isWindow) {
+        raw.addRect(Rect.fromLTRB(sMin, zBottom, sMax, zBottom + frameFace));
+      }
+      final zLeafBottom = op.isWindow ? zBottom + frameFace : zBottom;
+      final zLeafTop = zTop - frameFace;
+      if (sMax - jambW > sMin + jambW && zLeafTop > zLeafBottom) {
+        raw.addRect(
+          Rect.fromLTRB(
+            sMin + jambW,
+            zLeafBottom,
+            sMax - jambW,
+            zLeafTop,
+          ),
+        );
+      }
+    }
+    try {
+      return Path.combine(PathOperation.intersect, raw, clippedAperture);
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  static ({Path detailPath, Path envelope}) _buildFloorDrainSection(
+    double sCenter,
+    double grateWidth,
+    double zFinishedFloor,
+  ) {
+    final gHalf = grateWidth / 2.0;
+    final bHalf = (grateWidth * 0.65).clamp(0.06, 0.14) / 2.0;
+    const pHalf = 0.020; // DN40/50 outlet stub
+
+    final grateRect = Rect.fromLTRB(
+      sCenter - gHalf,
+      zFinishedFloor - 0.012,
+      sCenter + gHalf,
+      zFinishedFloor,
+    );
+    final bodyRect = Rect.fromLTRB(
+      sCenter - bHalf,
+      zFinishedFloor - 0.075,
+      sCenter + bHalf,
+      zFinishedFloor - 0.012,
+    );
+    final pipeRect = Rect.fromLTRB(
+      sCenter - pHalf,
+      zFinishedFloor - 0.115,
+      sCenter + pHalf,
+      zFinishedFloor - 0.075,
+    );
+
+    var detail = Path()..addRect(grateRect);
+    detail = Path.combine(
+      PathOperation.union,
+      detail,
+      Path()..addRect(bodyRect),
+    );
+    detail = Path.combine(
+      PathOperation.union,
+      detail,
+      Path()..addRect(pipeRect),
+    );
+    return (detailPath: detail, envelope: detail);
+  }
+
+  static double _distToSegment2D(Offset p, Offset a, Offset b) {
+    final ab = b - a;
+    final len2 = ab.dx * ab.dx + ab.dy * ab.dy;
+    if (len2 < 1e-8) return (p - a).distance;
+    final t = (((p.dx - a.dx) * ab.dx + (p.dy - a.dy) * ab.dy) / len2).clamp(
+      0.0,
+      1.0,
+    );
+    return (p - (a + ab * t)).distance;
+  }
+}
+
+class _CutOpeningSpan {
+  final String id;
+  final double sMin;
+  final double sMax;
+  final double zBottom;
+  final double zTop;
+  final double frameThickness;
+  final bool isWindow;
+  final bool isCrossWallCut;
+
+  const _CutOpeningSpan({
+    required this.id,
+    required this.sMin,
+    required this.sMax,
+    required this.zBottom,
+    required this.zTop,
+    required this.frameThickness,
+    required this.isWindow,
+    required this.isCrossWallCut,
+  });
 }
