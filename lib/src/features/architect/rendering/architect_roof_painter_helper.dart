@@ -10,6 +10,7 @@ import '../models/architect_project.dart';
 import '../services/architect_roof_geometry.dart';
 import '../services/architect_roof_tool.dart';
 import '../services/architect_roof_junctions.dart';
+import 'architect_panel_roof_geometry.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_path_solid.dart';
 import 'architect_wall_network.dart';
@@ -74,7 +75,8 @@ class ArchitectRoofPainterHelper {
       if (roof.points.length < 3) continue;
       final isSelected =
           !isGhost && !isLowerLevel && selectedIds.contains(roof.id);
-      final path = junctions.footprint(roof);
+      final path = roof.assembly.panels!=null?
+        ArchitectPanelRoofGeometry.panelFootprint(storey,roof,project:project):junctions.footprint(roof);
       if (path.getBounds().isEmpty) continue;
 
       if (project != null) {
@@ -90,7 +92,7 @@ class ArchitectRoofPainterHelper {
       final baseColor = switch (topMat) {
         ArchitectRoofMaterial.clayTiles => const Color(0xFFC85A32),
         ArchitectRoofMaterial.concreteTiles => const Color(0xFF78909C),
-        ArchitectRoofMaterial.metalSeam => const Color(0xFF546E7A),
+        ArchitectRoofMaterial.metalSeam || ArchitectRoofMaterial.steel => const Color(0xFF546E7A),
         ArchitectRoofMaterial.bitumenShingles => const Color(0xFF6D4C41),
         ArchitectRoofMaterial.waterproofing => const Color(0xFF455A64),
         _ => const Color(0xFFC85A32),
@@ -104,12 +106,12 @@ class ArchitectRoofPainterHelper {
         final diag = bounds.size.longestSide + 1.0;
         final center = bounds.center;
         final slopeDir = roof.slopeDirection;
-        final isStandingSeam = topMat == ArchitectRoofMaterial.metalSeam;
+        final isStandingSeam = topMat == ArchitectRoofMaterial.metalSeam || roof.assembly.panels!=null;
         final stepDir = isStandingSeam
             ? Offset(-slopeDir.dy, slopeDir.dx)
             : slopeDir;
         final lineDir = Offset(-stepDir.dy, stepDir.dx);
-        final step = isStandingSeam ? 0.60 : 0.35;
+        final step = roof.assembly.panels?.module ?? (isStandingSeam ? 0.60 : 0.35);
 
         final hatchAlpha = isLowerLevel ? 0.12 : (isSelected ? 0.35 : 0.22);
         final hatchW = isLowerLevel ? 0.5 / scale : 0.8 / scale;
@@ -120,7 +122,7 @@ class ArchitectRoofPainterHelper {
 
         final count = (diag / step).ceil();
         for (var i = -count; i <= count; i++) {
-          final origin = center + stepDir * (i * step);
+          final origin = (roof.assembly.panels!=null?roof.eavesEdge.$1:center) + stepDir * (i * step);
           canvas.drawLine(
             origin - lineDir * diag,
             origin + lineDir * diag,

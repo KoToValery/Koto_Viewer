@@ -40,6 +40,7 @@ class ApplyArchitectRoofSettings extends ArchitectModelCommand {
   ) {
     final s = settings, c = s.changes, old = roof.drainage;
     final drainage = old.copyWith(
+      position:c.contains(ArchitectRoofSetting.gutterPosition)?s.drainage.position:null,
       showGutter: c.contains(ArchitectRoofSetting.gutterVisible)
           ? s.drainage.showGutter
           : null,
@@ -132,15 +133,21 @@ class ApplyArchitectRoofSettings extends ArchitectModelCommand {
                 next.manualSupportDistance! > next.maxSlopeRun))) {
       throw ArgumentError('Invalid roof settings');
     }
+    next.assembly.panels?.validate(slope:next.slopeDegrees,mansard:next.isMansard);
+    if(next.drainage.position==ArchitectGutterPosition.internal && next.assembly.panels==null) {
+      throw ArgumentError('Internal box gutter requires the panel roof construction');
+    }
     if (c.contains(ArchitectRoofSetting.attachment) &&
         next.attachToWalls &&
         !roof.attachToWalls) {
       next = next.copyWith(
         baseElevationOffset:
             ArchitectRoofGeometry.resolveAttachedBaseElevationOffset(
+              project:project,
               roof: next,
               storey: floor,
-              lowerStorey: ArchitectRoofGeometry.supportingWallStorey(
+              lowerStorey: next.assembly.panels!=null?
+                ArchitectRoofGeometry.supportingSteelStorey(project,floor):ArchitectRoofGeometry.supportingWallStorey(
                 project,
                 floor,
               ),
@@ -177,6 +184,7 @@ class CreateReviewedArchitectRoofs extends ArchitectModelCommand {
         throw ArgumentError('Invalid new roofs');
       }
       roof.drainage.validate();
+      roof.assembly.panels?.validate(slope:roof.slopeDegrees,mansard:roof.isMansard);
     }
     return ArchitectModelCommand.replace(
       project,

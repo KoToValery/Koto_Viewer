@@ -9,6 +9,7 @@ import 'architect_roof_drainage_editor.dart';
 import 'architect_roof_number_field.dart';
 import 'architect_roof_layer_editor.dart';
 import 'architect_roof_construction_preview.dart';
+import 'architect_roof_panel_fields.dart';
 
 class ArchitectRoofLayersDialog extends StatefulWidget {
   final ArchitectRoofAssembly initialAssembly;
@@ -107,10 +108,32 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
 
   void _selectPreset(ArchitectRoofPreset preset) {
     if (preset == ArchitectRoofPreset.custom) return;
-    setState(() => _assembly = ArchitectRoofAssembly.fromPreset(preset));
+    setState(() {
+      _assembly = ArchitectRoofAssembly.fromPreset(preset);
+      if(_assembly.panels!=null) {
+        var spec=_assembly.panels!;
+        final columns=[for(final floor in widget.project?.storeys??<ArchitectStorey>[])
+          for(final c in floor.columns)
+            if(widget.roof==null||widget.roof!.bounds.inflate(.3).contains(c.position))c.id];
+        spec=spec.copyWith(columnIds:columns);
+        _assembly=ArchitectRoofAssembly.panelRoof(spec);
+        if(spec.membrane) {
+          _slopeDegrees=2;
+        } else if(_slopeDegrees<spec.minimumSlope) {
+          _slopeDegrees=6;
+        }
+      } else if(_drainage.position==ArchitectGutterPosition.internal) {
+        _drainage=_drainage.copyWith(position:ArchitectGutterPosition.external);
+      }
+    });
   }
 
   String? get _assemblyError {
+    if(_assembly.panels!=null) {
+      final spec=_assembly.panels!;
+      if(_slopeDegrees<spec.minimumSlope)return context.l10n.roofPanelSlopeInvalid;
+      try {spec.validate(slope:_slopeDegrees,mansard:_mansard);}on ArgumentError{return context.l10n.roofPanelInvalid;}
+    }
     final zone = _assembly.layers
         .where(
           (l) => l.role == ArchitectRoofLayerRole.rafters || l.isBetweenRafters,
@@ -300,6 +323,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       _drainage.showDownpipes,
     );
     check(ArchitectRoofSetting.gutterProfile, d.profile, _drainage.profile);
+    check(ArchitectRoofSetting.gutterPosition,d.position,_drainage.position);
     check(ArchitectRoofSetting.gutterMaterial, d.material, _drainage.material);
     check(
       ArchitectRoofSetting.gutterWidth,
@@ -713,8 +737,11 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
               if (p != null) _selectPreset(p);
             },
           ),
-          for (var i = 0; i < _assembly.layers.length; i++)
+          if(_assembly.panels!=null) ArchitectRoofPanelFields(value:_assembly.panels!,project:widget.project,
+            onChanged:(p)=>setState(()=>_assembly=ArchitectRoofAssembly.panelRoof(p)))
+          else for (var i = 0; i < _assembly.layers.length; i++)
             _buildLayerTile(context, i, _assembly.layers[i]),
+          if(_assembly.panels==null)
           TextButton.icon(
             key: const ValueKey('roof-add-layer'),
             onPressed: () => _editLayer(),
@@ -799,7 +826,8 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          _buildTimberTab(context),
+          if(_assembly.panels==null) _buildTimberTab(context),
+          if(_assembly.panels==null)
           ExpansionTile(
             controller: _detailControllers.putIfAbsent(
               'eaves',
@@ -834,6 +862,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
               _RoofDetailScope(
                 controller: _detailControllers['drainage']!,
                 child: ArchitectRoofDrainageEditor(
+                  allowInternal:_assembly.panels!=null,
                   value: _drainage,
                   project: widget.project,
                   roof: widget.roof,

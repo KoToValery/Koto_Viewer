@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 enum ArchitectGutterProfile { halfRound, box }
+enum ArchitectGutterPosition { external, internal }
 
 enum ArchitectDrainageMaterial { galvanizedSteel, aluminium, pvc, copper }
 
@@ -94,12 +95,14 @@ class ArchitectDownpipe {
 }
 
 class ArchitectRoofDrainage {
+  final ArchitectGutterPosition position;
   final bool showGutter, showDownpipes;
   final ArchitectGutterProfile profile;
   final ArchitectDrainageMaterial material;
   final double gutterWidth, gutterDepth;
   final List<ArchitectDownpipe> downpipes;
   const ArchitectRoofDrainage({
+    this.position=ArchitectGutterPosition.external,
     this.showGutter = false,
     this.showDownpipes = true,
     this.profile = ArchitectGutterProfile.halfRound,
@@ -109,6 +112,7 @@ class ArchitectRoofDrainage {
     this.downpipes = const [],
   });
   ArchitectRoofDrainage copyWith({
+    ArchitectGutterPosition? position,
     bool? showGutter,
     bool? showDownpipes,
     ArchitectGutterProfile? profile,
@@ -117,6 +121,7 @@ class ArchitectRoofDrainage {
     double? gutterDepth,
     List<ArchitectDownpipe>? downpipes,
   }) => ArchitectRoofDrainage(
+    position:position??this.position,
     showGutter: showGutter ?? this.showGutter,
     showDownpipes: showDownpipes ?? this.showDownpipes,
     profile: profile ?? this.profile,
@@ -141,6 +146,7 @@ class ArchitectRoofDrainage {
   }
 
   Map<String, dynamic> toJson() => {
+    if(position!=ArchitectGutterPosition.external) 'position':position.name,
     'showGutter': showGutter,
     'showDownpipes': showDownpipes,
     'profile': profile.name,
@@ -150,6 +156,7 @@ class ArchitectRoofDrainage {
     'downpipes': [for (final p in downpipes) p.toJson()],
   };
   factory ArchitectRoofDrainage.fromJson(Map json) => ArchitectRoofDrainage(
+    position:ArchitectGutterPosition.values.where((p)=>p.name==json['position']).firstOrNull??ArchitectGutterPosition.external,
     showGutter: json['showGutter'] == true,
     showDownpipes: json['showDownpipes'] != false,
     profile:

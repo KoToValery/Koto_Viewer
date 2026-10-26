@@ -7,6 +7,8 @@ import '../models/architect_column.dart';
 import 'architect_roof_junctions.dart';
 import 'architect_slab_geometry.dart';
 import '../rendering/architect_path_solid.dart';
+import '../rendering/architect_panel_roof_geometry.dart';
+import 'architect_panel_supports.dart';
 
 enum ArchitectDownpipeStatus { ready, noFacade, blocked, outsideEaves }
 
@@ -51,6 +53,9 @@ class ArchitectRoofDrainageGeometry {
   /// Keep the rolled back lip outside the fascia, with the drip apron above
   /// the open channel. The fascia must never pass through the gutter wall.
   static double gutterOffset(ArchitectRoofPlane roof) =>
+      roof.drainage.position==ArchitectGutterPosition.internal
+      ? -(roof.drainage.gutterWidth/2+ArchitectPanelRoofGeometry.internalInset)
+      :
       roof.drainage.gutterWidth / 2 +
       (roof.assembly.timber.hasFasciaBoard
           ? roof.assembly.timber.fasciaThickness
@@ -64,6 +69,14 @@ class ArchitectRoofDrainageGeometry {
     ArchitectRoofPlane roof,
     Offset onEaves,
   ) {
+    if(roof.assembly.panels!=null) {
+      final panel=roof.assembly.panels!;
+      final point=roof.drainage.position==ArchitectGutterPosition.internal
+        ?onEaves+roof.slopeDirection*(ArchitectPanelRoofGeometry.channelEnd(roof)-roof.signedDistanceFromEaves(onEaves))
+        :onEaves;
+      return floor.elevation+ArchitectPanelRoofGeometry.panelUnderside(roof,point)+
+        (panel.thickness+panel.membraneThickness)/math.cos(roof.slopeRadians)-.02;
+    }
     final covering =
         roof.assembly.layers
             .where((l) => l.role == ArchitectRoofLayerRole.covering)
@@ -142,6 +155,7 @@ class ArchitectRoofDrainageGeometry {
                     .signedDistanceFromEaves(contour[(i + 1) % contour.length])
                     .abs() <
                 1e-5)
+          if(roof.assembly.panels==null || !ArchitectPanelRoofGeometry.isSharedEdge(floor,roof,contour[i],contour[(i+1)%contour.length]))
           (contour[i], contour[(i + 1) % contour.length]),
   ];
 
@@ -182,6 +196,9 @@ class ArchitectRoofDrainageGeometry {
     ArchitectRoofPlane roof,
     ArchitectDownpipe pipe,
   ) {
+    if(roof.drainage.position==ArchitectGutterPosition.internal) {
+      return _internalRoute(project,floor,roof,pipe);
+    }
     final direct = _route(project, floor, roof, pipe);
     if (direct.status == ArchitectDownpipeStatus.ready ||
         direct.status == ArchitectDownpipeStatus.outsideEaves ||
@@ -244,6 +261,76 @@ class ArchitectRoofDrainageGeometry {
       }
     }
     return direct;
+  }
+
+  static ArchitectDownpipeRoute _internalRoute(ArchitectProject project,ArchitectStorey floor,
+    ArchitectRoofPlane roof,ArchitectDownpipe pipe) {
+    final n=roof.slopeDirection;
+    final (a,b)=eaves(roof);
+    final length=(b-a).distance;
+    ArchitectDownpipeRoute fail(ArchitectDownpipeStatus status)=>ArchitectDownpipeRoute(pipe,status,[],n);
+    try {pipe.validate();}on ArgumentError{return fail(ArchitectDownpipeStatus.blocked);}
+    if(length<1e-6||pipe.offset<0||pipe.offset>length)return fail(ArchitectDownpipeStatus.outsideEaves);
+    final edge=a+(b-a)*(pipe.offset/length),origin=edge-n*gutterOffset(roof),r=pipe.diameter/2+.006;
+    if(!visibleEaves(project,floor,roof).any((e)=>(BimLineGeometry.closest(edge,e.$1,e.$2)-edge).distance<1e-5)) {
+      return fail(ArchitectDownpipeStatus.outsideEaves);
+    }
+    final top=gutterElevation(floor,roof,edge)-roof.drainage.gutterDepth;
+    if(roof.assembly.panels==null||pipe.waypoints.isNotEmpty||pipe.diameter>roof.drainage.gutterWidth-.01||
+      pipe.offset<r||pipe.offset>length-r||top<=pipe.outletElevation+.1||
+      roof.drainage.downpipes.any((p)=>p.id!=pipe.id&&p.visible&&(p.offset-pipe.offset).abs()<(p.diameter+pipe.diameter)/2+.02)) {
+      return fail(ArchitectDownpipeStatus.blocked);
+    }
+    bool intersects(Path path,double bottom,double upper) {
+      if(upper<pipe.outletElevation||bottom>top)return false;
+      if(path.contains(origin))return true;
+      return ArchitectPathSolid.contours(path).any((loop)=>List.generate(loop.length,(i)=>i)
+        .any((i)=>(BimLineGeometry.closest(origin,loop[i],loop[(i+1)%loop.length])-origin).distance<r));
+    }
+    for(final f in project.storeys) {
+      for(final w in f.walls) {
+        if(intersects(Path()..addPolygon(w.polygonCorners,true),f.elevation+w.baseOffset,
+          f.elevation+w.baseOffset+w.effectiveHeight(f.height))) {
+          return fail(ArchitectDownpipeStatus.blocked);
+        }
+      }
+      for(final c in f.columns) {
+        if(intersects(Path()..addPolygon(ArchitectPanelSupports.corners(c),true),f.elevation+c.baseOffset,
+          f.elevation+c.baseOffset+(c.height??f.height))) {
+          return fail(ArchitectDownpipeStatus.blocked);
+        }
+      }
+      for(final beam in f.beams) {
+        if(intersects(Path()..addPolygon(beam.polygonCorners,true),f.elevation+beam.baseOffset,
+          f.elevation+beam.baseOffset+beam.depth)) {
+          return fail(ArchitectDownpipeStatus.blocked);
+        }
+      }
+      for(final slab in f.slabs) {
+        var plan=Path()..addPolygon(slab.polygon,true);
+        for(final hole in f.openings) {plan=Path.combine(PathOperation.difference,plan,Path()..addPolygon(hole.boundary,true));}
+        for(final layer in ArchitectSlabGeometry.surfaces(project,f,slab)) {
+          if(intersects(plan,layer.bottomAt(origin),layer.topAt(origin)))return fail(ArchitectDownpipeStatus.blocked);
+        }
+      }
+      for(final other in f.roofs) {
+        if(other.id!=roof.id&&intersects(ArchitectRoofJunctions.of(f,project:project).footprint(other),
+          f.elevation+other.undersideElevationAt(origin),f.elevation+other.topElevationAt(origin))) {
+          return fail(ArchitectDownpipeStatus.blocked);
+        }
+      }
+    }
+    for(final member in ArchitectPanelRoofGeometry.build(floor,roof,project:project).where((m)=>m.structural)) {
+      for(final t in member.triangles) {
+        final points=[t.v0,t.v1,t.v2];
+        if(intersects(Path()..addPolygon([for(final v in points)Offset(v.x,v.y)],true),
+          points.map((p)=>p.z).reduce(math.min),points.map((p)=>p.z).reduce(math.max))) {
+          return fail(ArchitectDownpipeStatus.blocked);
+        }
+      }
+    }
+    return ArchitectDownpipeRoute(pipe,ArchitectDownpipeStatus.ready,[Vector3(origin.dx,origin.dy,top),
+      Vector3(origin.dx,origin.dy,pipe.outletElevation)],n);
   }
 
   static ArchitectDownpipeRoute _route(

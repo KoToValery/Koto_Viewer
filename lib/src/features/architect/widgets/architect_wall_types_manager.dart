@@ -147,7 +147,7 @@ class _TypesState extends State<ArchitectWallTypesManager> {
   }
 
   Future<void> newType() async {
-    final templates = ArchitectWallType.standardCatalog();
+    final templates = ArchitectWallType.standardCatalog(includeSpecial: true);
     final result = await showArchitectWallTypePicker(
       context,
       types: templates,

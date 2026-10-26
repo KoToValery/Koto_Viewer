@@ -1,4 +1,5 @@
 import '../models/architect_contour.dart';
+import '../rendering/architect_special_wall_geometry.dart';
 import 'architect_roof_drainage_geometry.dart';
 import 'architect_roof_junctions.dart';
 import '../models/architect_line_style.dart';
@@ -675,7 +676,10 @@ class ArchitectElementTool extends ChangeNotifier {
 
     // Check Walls
     for (final wall in storey.walls) {
-      if (wall.containsPoint(point)) {
+      if (ArchitectSpecialWallGeometry.containsPlanPoint(
+        wall,
+        storey.walls,
+        point)) {
         yield wall.id;
       }
     }

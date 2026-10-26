@@ -8304,4 +8304,195 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectHatchTransformHelp =>
       'Плъзнете за посока и мащаб на щриховката. Мащабът се захваща през 10%, а посоката — през 45°.';
+
+  @override
+  String get wallSystem => 'Система';
+
+  @override
+  String get wallSystemLayered => 'Слоеста';
+
+  @override
+  String get wallSystemLogs => 'Трупи';
+
+  @override
+  String get wallSystemFrame => 'Гипсокартон';
+
+  @override
+  String get wallSystemPanels => 'Термопанели';
+
+  @override
+  String get wallMaterialSteel => 'Стомана';
+
+  @override
+  String get wallMaterialPir => 'PIR';
+
+  @override
+  String get wallLogOverlap => 'Застъпване (%)';
+
+  @override
+  String get wallLogTail => 'Издаване (× диаметър)';
+
+  @override
+  String get wallLogPitch => 'Височина на реда';
+
+  @override
+  String get wallStudSpacing => 'Стъпка на профилите';
+
+  @override
+  String get wallStudWidth => 'Ширина на профила';
+
+  @override
+  String get wallMetalThickness => 'Дебелина на метала';
+
+  @override
+  String get wallCavityInsulation => 'Вата в кухината';
+
+  @override
+  String get wallSupportDepth => 'Подконструкция';
+
+  @override
+  String get wallPanelModule => 'Ширина на панела';
+
+  @override
+  String get wallPanelMount => 'Монтаж';
+
+  @override
+  String get wallPanelInFront => 'Пред колоните';
+
+  @override
+  String get wallPanelBetween => 'Между колоните';
+
+  @override
+  String get wallPanelsHorizontal => 'Хоризонтални панели';
+
+  @override
+  String get wallSystemInvalid => 'Проверете размерите на системата.';
+
+  @override
+  String get wallSystemStraightOnly => 'Тази система използва прави стени.';
+
+  @override
+  String get wallLogHelp =>
+      'Диаметърът запазва кръглата форма. Застъпването променя височината на реда; ъглите се разминават с половин ред.';
+
+  @override
+  String get wallFrameHelp =>
+      'Плоскостите, профилите и ватата имат отделни размери.';
+
+  @override
+  String get wallPanelHelp =>
+      'Панелът и подконструкцията имат отделни дебелини. Опорите се закрепват към избраните лица на колоните.';
+
+  @override
+  String get wallColumnSupports => 'Опори към колони';
+
+  @override
+  String get wallMountingOffset => 'Монтажен отстъп';
+
+  @override
+  String get wallMissingSupports =>
+      'Липсва опорна колона. Изберете заместител.';
+
+  @override
+  String get wallLogCasing => 'Обсада на отвори';
+
+  @override
+  String get wallLogCasingWidth => 'Ширина на обсадата';
+
+  @override
+  String get wallLogSettlement => 'Място за слягане';
+
+  @override
+  String get architectRoofPresetLogTimber => 'Дървен · трупи';
+
+  @override
+  String get wallLogDiameter => 'Диаметър';
+
+  @override
+  String get wallRemoveMissingSupports => 'Премахни липсващите';
+
+  @override
+  String get roofPanelPitched => 'Термопанели · скатен';
+
+  @override
+  String get roofPanelMembrane => 'Термопанели · мембрана';
+
+  @override
+  String get roofPanelThickness => 'Панел';
+
+  @override
+  String get roofPanelSkin => 'Обшивка';
+
+  @override
+  String get roofPanelModule => 'Модул';
+
+  @override
+  String get roofPanelRib => 'Височина на профила';
+
+  @override
+  String get roofPanelMinSlope => 'Мин. наклон';
+
+  @override
+  String get roofPanelFrame => 'Метална конструкция';
+
+  @override
+  String get roofPanelBeamDepth => 'Височина на гредата';
+
+  @override
+  String get roofPanelBeamWidth => 'Ширина на гредата';
+
+  @override
+  String get roofPanelWeb => 'Стебло';
+
+  @override
+  String get roofPanelFlange => 'Пояс';
+
+  @override
+  String get roofPanelFramesSpacing => 'Стъпка на рамките';
+
+  @override
+  String get roofPanelPurlinDepth => 'Височина на столицата';
+
+  @override
+  String get roofPanelPurlinWidth => 'Пояс на столицата';
+
+  @override
+  String get roofPanelPurlinMetal => 'Метал на столицата';
+
+  @override
+  String get roofPanelPurlinSpacing => 'Стъпка на столиците';
+
+  @override
+  String get roofPanelCutback => 'Отдръпване на ядрото';
+
+  @override
+  String get roofPanelUpstand => 'Борд';
+
+  @override
+  String get roofPanelInvalid =>
+      'Проверете размерите на панела и конструкцията.';
+
+  @override
+  String get roofPanelSlopeInvalid =>
+      'Наклонът е под минимума за избраната система.';
+
+  @override
+  String get roofPanelHelp =>
+      'Цели панели по ската върху Z-столици и I-греди. Размерите и минималният наклон се задават за избраната система.';
+
+  @override
+  String get roofPanelColumns => 'Опорни колони';
+
+  @override
+  String get roofGutterPosition => 'Разположение';
+
+  @override
+  String get roofGutterExternal => 'Външен';
+
+  @override
+  String get roofGutterInternal => 'Вътрешен';
+
+  @override
+  String get roofGutterInternalHelp =>
+      'Открито кутиеобразно корито в края на покрива. Тръбата се спуска вертикално; при пресичане с конструкцията е нужен друг изход или отвор.';
 }

@@ -41,9 +41,11 @@ class ArchitectSectionHatch {
         ArchitectMaterial.concrete => preset('concrete'),
         ArchitectMaterial.timber => preset('wood'),
         ArchitectMaterial.panel ||
-        ArchitectMaterial.xps => preset('diagonalCross'),
+        ArchitectMaterial.xps ||
+        ArchitectMaterial.pir => preset('diagonalCross'),
         ArchitectMaterial.eps || ArchitectMaterial.stoneWool => preset('dots'),
         ArchitectMaterial.tile || ArchitectMaterial.stone => preset('diagonal'),
+        ArchitectMaterial.steel => preset('metal'),
         ArchitectMaterial.plaster ||
         ArchitectMaterial.render ||
         ArchitectMaterial.plasterboard => preset('reverseDiagonal'),

@@ -7,6 +7,8 @@ extension ArchitectLayerMaterialLabel on ArchitectMaterial {
     ArchitectMaterial.concrete => l.architectMaterialConcrete,
     ArchitectMaterial.timber => l.architectMaterialTimber,
     ArchitectMaterial.panel => l.architectMaterialPanel,
+    ArchitectMaterial.steel => l.wallMaterialSteel,
+    ArchitectMaterial.pir => l.wallMaterialPir,
     ArchitectMaterial.eps => l.architectInsulationEps,
     ArchitectMaterial.xps => l.architectInsulationXps,
     ArchitectMaterial.stoneWool => l.architectInsulationStoneWool,

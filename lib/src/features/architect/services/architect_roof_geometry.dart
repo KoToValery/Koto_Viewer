@@ -12,9 +12,12 @@ import '../models/architect_project.dart';
 import '../models/architect_section.dart';
 import '../rendering/architect_path_solid.dart';
 import '../rendering/architect_wall_network.dart';
+import '../rendering/architect_panel_roof_geometry.dart';
+import '../rendering/architect_mesh_section.dart';
 import 'architect_element_id.dart';
 import 'architect_polygon_geometry.dart';
 import 'architect_roof_junctions.dart';
+import 'architect_panel_supports.dart';
 
 // === SECTION: DATA STRUCTURES ===
 
@@ -83,6 +86,12 @@ class ArchitectRoofSectionSlice {
 // === SECTION: AUTO-ROOF GENERATOR ===
 
 class ArchitectRoofGeometry {
+  static ArchitectStorey? supportingSteelStorey(ArchitectProject project,ArchitectStorey floor) {
+    if(floor.columns.isNotEmpty)return floor;
+    final candidates=project.storeys.where((f)=>f.elevation<=floor.elevation&&f.columns.isNotEmpty).toList()
+      ..sort((a,b)=>b.elevation.compareTo(a.elevation));
+    return candidates.firstOrNull;
+  }
   /// Resolve by physical elevation, independent of plan/menu ordering. Empty
   /// intermediate levels must not hide the walls carrying a dedicated roof plan.
   static ArchitectStorey? supportingWallStorey(
@@ -128,6 +137,11 @@ class ArchitectRoofGeometry {
         hullPoints.addAll(w.polygonCorners);
       }
     }
+    if(preset==ArchitectRoofPreset.sandwichPitched||preset==ArchitectRoofPreset.sandwichMembrane) {
+      for(final column in supportingSteelStorey(project,storey)?.columns??[]) {
+        hullPoints.addAll(ArchitectPanelSupports.corners(column));
+      }
+    }
     if (hullPoints.isEmpty) {
       for (final w in walls) {
         hullPoints.addAll(w.polygonCorners);
@@ -162,7 +176,7 @@ class ArchitectRoofGeometry {
     final depth = bottom - top;
 
     final effectivePreset =
-        preset ??
+        (type==AutoRoofType.flat && preset==ArchitectRoofPreset.sandwichPitched?ArchitectRoofPreset.sandwichMembrane:preset) ??
         (type == AutoRoofType.flat
             ? ArchitectRoofPreset.flatWarm
             : ArchitectRoofPreset.pitchedTiles);
@@ -212,7 +226,7 @@ class ArchitectRoofGeometry {
       storeyId: storey.id,
       points: pts,
       eavesEdgeIndex: eavesEdge,
-      slopeDegrees: slopeOverride ?? slopeDegrees,
+      slopeDegrees: assembly.panels!=null?math.max(slopeOverride??slopeDegrees,assembly.panels!.minimumSlope):slopeOverride ?? slopeDegrees,
       baseElevationOffset: baseZ,
       eavesOverhang: overhang,
       assembly: assembly.copyWith(),
@@ -721,11 +735,39 @@ class ArchitectRoofGeometry {
   /// aligning the roof bearing plane with the highest supporting non-parapet wall on [storey]
   /// (or [lowerStorey] if [storey] has no walls).
   static double resolveAttachedBaseElevationOffset({
+    ArchitectProject? project,
     required ArchitectRoofPlane roof,
     required ArchitectStorey storey,
     ArchitectStorey? lowerStorey,
   }) {
     if (!roof.attachToWalls) return roof.baseElevationOffset;
+    if(roof.assembly.panels!=null) {
+      final selected=roof.assembly.panels!.columnIds;
+      if(project!=null&&selected.isNotEmpty) {
+        final heights=[for(final f in project.storeys)for(final c in f.columns)
+          if(selected.contains(c.id))f.elevation-storey.elevation+c.baseOffset+(c.height??f.height)-
+            (roof.signedDistanceFromEaves(c.position)-roof.eavesOverhang)*math.tan(roof.slopeRadians)];
+        return heights.length==selected.length?heights.reduce(math.max):roof.baseElevationOffset;
+      }
+      final source=storey.columns.isNotEmpty?storey:lowerStorey;
+      if(source==null&&roof.assembly.panels!.columnIds.isNotEmpty)return roof.baseElevationOffset;
+      if(source!=null) {
+        final ids=roof.assembly.panels!.columnIds;
+        final columns=source.columns.where((c)=>ids.isEmpty||ids.contains(c.id)).toList();
+        if(ids.isNotEmpty && columns.length!=ids.length)return roof.baseElevationOffset;
+        if(columns.isNotEmpty) {
+          columns.sort((a,b)=>(roof.signedDistanceFromEaves(a.position)-roof.eavesOverhang).abs()
+            .compareTo((roof.signedDistanceFromEaves(b.position)-roof.eavesOverhang).abs()));
+          return columns.map((c)=>source.elevation-storey.elevation+c.baseOffset+(c.height??source.height)-
+            (roof.signedDistanceFromEaves(c.position)-roof.eavesOverhang)*math.tan(roof.slopeRadians)).reduce(math.max);
+        }
+      }
+    }
+    final bearingDepth =
+        roof.assembly.preset == ArchitectRoofPreset.logTimber &&
+            roof.assembly.timber.hasWallPlate
+        ? roof.assembly.timber.wallPlateHeight
+        : 0.0;
     final candidateWalls = storey.walls.where((w) => !w.isParapet).toList();
     if (candidateWalls.isNotEmpty) {
       var maxH = 0.0;
@@ -733,7 +775,7 @@ class ArchitectRoofGeometry {
         final h = w.baseOffset + w.effectiveHeight(storey.height);
         if (h > maxH) maxH = h;
       }
-      if (maxH > 0.0) return maxH;
+      if (maxH > 0.0) return maxH + bearingDepth;
     }
     if (storey.walls.isEmpty && lowerStorey != null) {
       final lowerWalls = lowerStorey.walls.where((w) => !w.isParapet).toList();
@@ -746,7 +788,7 @@ class ArchitectRoofGeometry {
               w.effectiveHeight(lowerStorey.height);
           if (topZ > maxTopZ) maxTopZ = topZ;
         }
-        return maxTopZ - storey.elevation;
+        return maxTopZ - storey.elevation + bearingDepth;
       }
     }
     return roof.baseElevationOffset;
@@ -769,6 +811,26 @@ class ArchitectRoofGeometry {
     final lineLen = lineVec.distance;
     if (lineLen < 1e-6) return const [];
     final lineDir = lineVec / lineLen;
+    final panelSlices=<ArchitectRoofSectionSlice>[];
+    for(final roof in storey.roofs.where((r)=>r.assembly.panels!=null)) {
+      final members=<ArchitectRoofSectionMember>[];
+      var envelope=Path();Rect? bounds;
+      for(final component in ArchitectPanelRoofGeometry.build(storey,roof,project:project)) {
+        var path=component.section(sectionLine.start,lineDir);
+        path=ArchitectMeshSection.combine(PathOperation.intersect,path,Path()..addRect(Rect.fromLTRB(0,-1e6,lineLen,1e6)));
+        if(path.getBounds().isEmpty)continue;
+        bounds=bounds?.expandToInclude(path.getBounds())??path.getBounds();
+        envelope=ArchitectMeshSection.combine(PathOperation.union,envelope,path);
+        members.add(ArchitectRoofSectionMember(roofId:roof.id,kind:component.structural?
+          ArchitectRoofMemberKind.rafter:ArchitectRoofMemberKind.layer,material:component.material,
+          path:path,polygon:const []));
+      }
+      if(bounds!=null) {
+        panelSlices.add(ArchitectRoofSectionSlice(roofId:roof.id,fromS:bounds.left,toS:bounds.right,
+        members:members,envelopePath:envelope,bottomProfile:[for(final x in [bounds.left,bounds.right])
+          Offset(x,storey.elevation+ArchitectPanelRoofGeometry.panelUnderside(roof,sectionLine.start+lineDir*x))]));
+      }
+    }
 
     // 0. Intersect supporting walls with sectionLine to find transverse wall intervals [wMin, wMax]
     final supportingWalls = storey.walls.any((w) => !w.isParapet)
@@ -828,6 +890,7 @@ class ArchitectRoofGeometry {
         <({ArchitectRoofPlane roof, double fromS, double toS})>[];
     final roofJunctions = ArchitectRoofJunctions.of(storey, project: project);
     for (final roof in storey.roofs) {
+      if(roof.assembly.panels!=null)continue;
       if (roof.points.length < 3) continue;
       final footprint = roofJunctions.footprint(roof);
       final hits = <double>[];
@@ -888,7 +951,7 @@ class ArchitectRoofGeometry {
       }
     }
 
-    if (rawIntervals.isEmpty) return const [];
+    if (rawIntervals.isEmpty) return panelSlices;
     rawIntervals.sort((a, b) => a.fromS.compareTo(b.fromS));
 
     final draftSlices =
@@ -1528,7 +1591,7 @@ class ArchitectRoofGeometry {
       );
     }
 
-    return result;
+    return [...result,...panelSlices];
   }
 
   /// Evaluates the roof underside elevation (world Z in metres) at [worldPt] on [storey].

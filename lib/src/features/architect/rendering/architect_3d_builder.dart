@@ -1,6 +1,8 @@
 import 'architect_roof_drainage_mesh.dart';
 import 'architect_floor_drain_mesh.dart';
 import 'architect_solid_shell.dart';
+import 'architect_mesh_boolean.dart';
+import 'architect_panel_roof_geometry.dart';
 import '../services/architect_slab_geometry.dart';
 import '../services/architect_roof_junctions.dart';
 import 'architect_path_solid.dart';
@@ -30,7 +32,7 @@ class Architect3dBuilder {
     Map<String, FenestrationElevationDetail> openingDetailLevels = const {},
   }) {
     final List<Triangle3D> allTris = [];
-    final roofSolids = <(String, List<Triangle3D>)>[];
+    final roofSolids = <(String, List<Triangle3D>,String?)>[];
     var joinedRoofs = false;
     void mark(String id, int start) {
       if (sources == null) return;
@@ -45,9 +47,10 @@ class Architect3dBuilder {
           wall.copyWith(height: wall.effectiveHeight(storey.height)),
       ];
       final composed = walls.any(
-        (w) => w.layers.isNotEmpty || w.plinth.enabled || w.isCurved,
+        (w) => w.system.isSpecial ||
+            w.layers.isNotEmpty || w.plinth.enabled || w.isCurved,
       );
-      final wallSolids = <(String, List<Triangle3D>)>[
+      final wallSolids = <(String, List<Triangle3D>, String?)>[
         if (composed)
           for (final solid in ArchitectWallSolids.build(
             storey,
@@ -55,7 +58,7 @@ class Architect3dBuilder {
             project: project,
             suppressedOpeningIds: suppressedOpeningIds,
           ))
-            (solid.wall.id, solid.triangles)
+            (solid.wall.id, solid.triangles, solid.componentId)
         else
           for (final wall in walls)
             (
@@ -65,15 +68,37 @@ class Architect3dBuilder {
                 includeOpeningMeshes: false,
                 suppressedOpeningIds: suppressedOpeningIds,
               ),
+              null,
             ),
       ];
-      final shell = ArchitectSolidShell.build([
-        for (final solid in wallSolids) solid.$2,
+      // Special contact planes contain curved-profile fragments. Unite their
+      // planar masks before removing internal faces; the ordinary triangle
+      // splitter grows quadratically on these fine construction components.
+      final ordinaryShell = ArchitectSolidShell.build([
+        for (final solid in wallSolids)
+          if (solid.$3 == null) solid.$2,
       ]);
+      final constructionShell = ArchitectMeshBoolean.exposedSurfaces([
+        for (final solid in wallSolids)
+          if (solid.$3 != null) solid.$2,
+      ]);
+      var ordinaryIndex = 0, constructionIndex = 0;
+      final shell = [
+        for (final solid in wallSolids)
+          solid.$3 == null
+              ? ordinaryShell[ordinaryIndex++]
+              : constructionShell[constructionIndex++],
+      ];
       for (var i = 0; i < wallSolids.length; i++) {
         final first = allTris.length;
         allTris.addAll(shell[i]);
         mark(wallSolids[i].$1, first);
+        final group = wallSolids[i].$3;
+        if (group != null && silhouetteGroups != null) {
+          for (final triangle in shell[i]) {
+            silhouetteGroups[triangle] = group;
+          }
+        }
       }
       for (final wall in walls) {
         final first = allTris.length;
@@ -244,6 +269,7 @@ class Architect3dBuilder {
       final roofJunctions = ArchitectRoofJunctions.of(storey, project: project);
       final roofMeshes = [
         for (final roof in storey.roofs)
+          if(roof.assembly.panels==null)
           _buildRoofMesh(
             storey,
             roof,
@@ -255,7 +281,21 @@ class Architect3dBuilder {
       ];
       joinedRoofs = joinedRoofs || roofJunctions.trimmed.isNotEmpty;
       for (var i = 0; i < storey.roofs.length; i++) {
-        roofSolids.add((storey.roofs[i].id, roofMeshes[i]));
+        final roof=storey.roofs[i];
+        if(roof.assembly.panels!=null) {
+          for(final component in ArchitectPanelRoofGeometry.build(storey,roof,project:project)) {
+            final cladding=!component.structural &&
+              (component.material==ArchitectRoofMaterial.steel || component.material==ArchitectRoofMaterial.waterproofing) &&
+              !(roof.assembly.panels!.membrane&&component.id.startsWith('weather_'));
+            final display=cladding?[for(final t in component.triangles)
+              Triangle3D(v0:t.v0,v1:t.v1,v2:t.v2,color:t.color,depthBias:1)]:component.triangles;
+            roofSolids.add((roof.id,display,'construction:roof:${roof.id}:${component.id}'));
+          }
+        }
+      }
+      var ordinaryRoofIndex=0;
+      for(final roof in storey.roofs.where((r)=>r.assembly.panels==null)) {
+        roofSolids.add((roof.id,roofMeshes[ordinaryRoofIndex++],null));
       }
 
       for (final roof in storey.roofs) {
@@ -344,13 +384,25 @@ class Architect3dBuilder {
 
     // For simple envelope prisms (!previewGeometry), remove shared internal interfaces.
     // Detailed carpentry (previewGeometry) is already cleanly clipped to plan footprints.
-    final roofShell = (joinedRoofs && !previewGeometry)
+    final hasPanelRoofs=roofSolids.any((s)=>s.$3!=null);
+    // Keep thin panel skins closed. A coplanar face mask can erase outward
+    // weather faces when adjacent, sub-millimetre layers are triangulated.
+    // Their volumes already meet without overlap; facade HLR unites each
+    // construction component independently after depth clipping.
+    final roofShell = hasPanelRoofs
+        ? [for(final solid in roofSolids)solid.$2]
+        : (joinedRoofs && !previewGeometry)
         ? ArchitectSolidShell.build([for (final solid in roofSolids) solid.$2])
         : [for (final solid in roofSolids) solid.$2];
     for (var i = 0; i < roofSolids.length; i++) {
       final first = allTris.length;
       allTris.addAll(roofShell[i]);
       mark(roofSolids[i].$1, first);
+      if(roofSolids[i].$3!=null&&silhouetteGroups!=null) {
+        for(final triangle in roofShell[i]) {
+          silhouetteGroups[triangle]=roofSolids[i].$3!;
+        }
+      }
     }
     return Mesh3D(name: project.name, triangles: allTris);
   }
@@ -446,16 +498,19 @@ class Architect3dBuilder {
         minD +
         (roof.manualSupportDistance ??
             math.min(roof.eavesOverhang, spanD * 0.45));
+    final centeredSupport =
+        roof.manualSupportDistance != null ||
+        roof.assembly.preset == ArchitectRoofPreset.logTimber;
     if (timber.hasWallPlate &&
-        (roof.manualSupportDistance != null
+        (centeredSupport
             ? dWall - wpW * .5 < maxD && dWall + wpW * .5 > minD
             : dWall + wpW < maxD)) {
       final wpClipped = _clipPolygonToRect(
         polySD,
         minS,
         maxS,
-        roof.manualSupportDistance != null ? dWall - wpW * .5 : dWall,
-        roof.manualSupportDistance != null ? dWall + wpW * .5 : dWall + wpW,
+        centeredSupport ? dWall - wpW * .5 : dWall,
+        centeredSupport ? dWall + wpW * .5 : dWall + wpW,
       );
       _addExtrudedClippedPrism(
         tris,

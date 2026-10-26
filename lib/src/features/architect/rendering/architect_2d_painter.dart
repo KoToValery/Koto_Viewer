@@ -1108,7 +1108,10 @@ class Architect2dPainter extends CustomPainter {
 
       if (isSelected) {
         canvas.drawPath(
-          ArchitectWallNetwork.polygon(wall.polygonCorners),
+          wall.system.isSpecial
+              ? layers.coreRegions[wall.id] ??
+                    ArchitectWallNetwork.polygon(wall.polygonCorners)
+              : ArchitectWallNetwork.polygon(wall.polygonCorners),
           borderPaint,
         );
         for (final point in [wall.startPoint, wall.endPoint]) {
@@ -1149,7 +1152,7 @@ class Architect2dPainter extends CustomPainter {
         door.paint2D(
           palette: palette,
           canvas: canvas,
-          wallGeometryProvided:wall.isCurved,
+          wallGeometryProvided:wall.isCurved || wall.system.isSpecial,
           wallStart: wall.openingAxis(door.offsetRatio).$1,
           wallEnd: wall.openingAxis(door.offsetRatio).$2,
           wallThickness: wall.thickness,
@@ -1165,7 +1168,7 @@ class Architect2dPainter extends CustomPainter {
         window.paint2D(
           palette: palette,
           canvas: canvas,
-          wallGeometryProvided:wall.isCurved,
+          wallGeometryProvided:wall.isCurved || wall.system.isSpecial,
           wallStart: wall.openingAxis(window.offsetRatio).$1,
           wallEnd: wall.openingAxis(window.offsetRatio).$2,
           wallThickness: wall.thickness,

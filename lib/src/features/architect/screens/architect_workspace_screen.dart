@@ -4040,6 +4040,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         exteriorSide: _wallExteriorSide,
 
+        system: _activeWallType?.system ?? const ArchitectWallSystem(),
         layers: _activeWallType?.layers ?? const [],
 
         insulationThicknessOverride: _activeWallType?.insulationThickness,
@@ -13250,6 +13251,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       thickness: _wallThickness,
 
+      system: _activeWallType?.system ?? const ArchitectWallSystem(),
       layers: _activeWallType?.resolvedLayers ?? const [],
 
       location: _activeWallType?.resolvedLocation,
@@ -20567,6 +20569,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       totalThickness: wall.thickness,
 
+      system: wall.system,
       layers: wall.resolvedLayers,
 
       location: wall.isExterior
@@ -21208,6 +21211,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
               totalThickness: next.thickness,
 
+              system: next.system,
               layers: next.resolvedLayers,
 
               location: next.isExterior

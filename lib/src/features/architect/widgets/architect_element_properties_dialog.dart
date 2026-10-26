@@ -47,6 +47,14 @@ class _ArchitectElementPropertiesDialogState
     extends State<ArchitectElementPropertiesDialog> {
   final values = <String, double>{};
   final texts = <String, String>{};
+  Map<String, dynamic> get panelPlacement => Map<String, dynamic>.from(
+    texts.containsKey('wallPanelPlacement')
+        ? jsonDecode(texts['wallPanelPlacement']!) as Map
+        : records.first['systemPlacement'] as Map? ?? {},
+  );
+  void updatePanelPlacement(Map<String, dynamic> patch) => setState(() {
+    texts['wallPanelPlacement'] = jsonEncode({...panelPlacement, ...patch});
+  });
   ArchitectLineStyle? _lineStyle;
   ArchitectHatchPattern? _hatchPattern;
   ArchitectDrawingColor? _hatchColor;
@@ -918,6 +926,81 @@ class _ArchitectElementPropertiesDialogState
                   ),
                 if(fields.containsKey('arcRadius'))numberField('arcRadius',false),
                 numberField('baseOffset', false),
+                if (records.length == 1 &&
+                    (records.first['system'] as Map?)?['kind'] ==
+                        'sandwichPanels')
+                  ExpansionTile(
+                    key: const ValueKey('wall-panel-supports'),
+                    tilePadding: EdgeInsets.zero,
+                    title: Text(l.wallColumnSupports),
+                    children: [
+                      TextFormField(
+                        key: const ValueKey('wall-panel-offset'),
+                        initialValue: widget.project.units
+                            .toUnit(
+                              (panelPlacement['mountingOffset'] as num?)
+                                      ?.toDouble() ??
+                                  0,
+                            )
+                            .toString(),
+                        decoration: InputDecoration(
+                          labelText: l.wallMountingOffset,
+                          suffixText: widget.project.units.symbol,
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                          signed: true,
+                        ),
+                        onChanged: (text) {
+                          final value = double.tryParse(
+                            text.replaceAll(',', '.'),
+                          );
+                          if (value != null && value.isFinite) {
+                            updatePanelPlacement({
+                              'mountingOffset': widget.project.units.fromUnit(
+                                value,
+                              ),
+                            });
+                          }
+                        },
+                      ),
+                      for (final column in widget.project.activeStorey.columns)
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(column.label),
+                          value: (panelPlacement['columnIds'] as List? ?? [])
+                              .contains(column.id),
+                          onChanged: (value) {
+                            final ids = Set<String>.from(
+                              panelPlacement['columnIds'] as List? ?? [],
+                            );
+                            if (value == true) {
+                              ids.add(column.id);
+                            } else {
+                              ids.remove(column.id);
+                            }
+                            updatePanelPlacement({'columnIds': ids.toList()});
+                          },
+                        ),
+                      if ((panelPlacement['columnIds'] as List? ?? []).any(
+                        (id) => !widget.project.activeStorey.columns.any(
+                          (c) => c.id == id,
+                        ),
+                      )) ...[
+                        Text(l.wallMissingSupports),
+                        TextButton(
+                          key: const ValueKey('wall-panel-remove-missing'),
+                          onPressed: () => updatePanelPlacement({
+                            'columnIds': [
+                              for (final id in panelPlacement['columnIds'] as List? ?? [])
+                                if (widget.project.activeStorey.columns.any((c) => c.id == id)) id,
+                            ],
+                          }),
+                          child: Text(l.wallRemoveMissingSupports),
+                        ),
+                      ],
+                    ],
+                  ),
                 numberField('height', true),
                 if (normalWalls)
                   CheckboxListTile(

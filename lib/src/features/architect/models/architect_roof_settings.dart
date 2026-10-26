@@ -13,6 +13,7 @@ enum ArchitectRoofSetting {
   gutterVisible,
   pipesVisible,
   gutterProfile,
+  gutterPosition,
   gutterMaterial,
   gutterWidth,
   gutterDepth,

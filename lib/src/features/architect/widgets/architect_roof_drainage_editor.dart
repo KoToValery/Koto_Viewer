@@ -13,6 +13,7 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
   final ArchitectRoofPlane? roof;
   final VoidCallback? onPlace;
   final bool embedded;
+  final bool allowInternal;
   const ArchitectRoofDrainageEditor({
     super.key,
     required this.value,
@@ -21,6 +22,7 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
     this.roof,
     this.onPlace,
     this.embedded = false,
+    this.allowInternal=false,
   });
 
   String _status(BuildContext context, ArchitectDownpipe pipe) {
@@ -70,6 +72,12 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
       physics: embedded ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.all(12),
       children: [
+        if(allowInternal)Tooltip(message:l.roofGutterInternalHelp,child:DropdownButtonFormField<ArchitectGutterPosition>(
+          key:ValueKey('roof-gutter-position-${value.position.name}'),initialValue:value.position,isExpanded:true,
+          decoration:InputDecoration(labelText:l.roofGutterPosition),items:[
+            DropdownMenuItem(value:ArchitectGutterPosition.external,child:Text(l.roofGutterExternal)),
+            DropdownMenuItem(value:ArchitectGutterPosition.internal,child:Text(l.roofGutterInternal))],
+          onChanged:(v){if(v!=null)onChanged(value.copyWith(position:v,profile:v==ArchitectGutterPosition.internal?ArchitectGutterProfile.box:null));})),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           title: Text(l.architectDrainageGutter),
@@ -82,7 +90,7 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
           value: value.showDownpipes,
           onChanged: (v) => onChanged(value.copyWith(showDownpipes: v)),
         ),
-        DropdownButtonFormField<ArchitectGutterProfile>(
+        if(value.position!=ArchitectGutterPosition.internal) DropdownButtonFormField<ArchitectGutterProfile>(
           initialValue: value.profile,
           decoration: InputDecoration(labelText: l.architectDrainageProfile),
           items: [

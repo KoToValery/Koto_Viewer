@@ -528,6 +528,11 @@ class ArchitectBuildingElevation {
         if (identical(face, other) || !box.overlaps(other.path.getBounds())) {
           continue;
         }
+        // A closed component's projected union already is its silhouette.
+        // Masking its own coplanar BSP fragments only creates numerical seams.
+        if (face.silhouette != null && face.silhouette == other.silhouette) {
+          continue;
+        }
         for (final piece in other.pieces) {
           if (ignoreSource != null && piece.source == ignoreSource) continue;
           final mask = _clip2(
@@ -592,16 +597,35 @@ class ArchitectBuildingElevation {
     // A drawing needs the visible silhouette, not every longitudinal facet,
     // socket, or inner wall of the 3D tube. Keep depth clipping/occlusion above,
     // then unite the visible material before encoding the published contour.
-    for (final contours in silhouettes.values) {
+    for (final entry in silhouettes.entries) {
+      final contours = entry.value;
       if (contours.isEmpty) continue;
       final engine = clip.ClipperD(roundingDecimalPrecision: 8)
         ..preserveCollinear = false
         ..addSubjects(contours);
-      final united = engine.executeClosed(
+      var united = engine.executeClosed(
         clip.ClipType.union,
         clip.FillRule.nonZero,
       );
       if (united == null) throw StateError('Drainage silhouette union failed');
+      if (entry.key.startsWith('construction:')) {
+        // Weld projection seams below 0.01 mm. This is far below drawing
+        // precision and preserves the explicit courses and opening contours.
+        united = clip.Clipper.inflatePathsD(
+          paths: united,
+          delta: .00001,
+          joinType: clip.JoinType.miter,
+          endType: clip.EndType.polygon,
+          precision: 7,
+        );
+        united = clip.Clipper.inflatePathsD(
+          paths: united,
+          delta: -.00001,
+          joinType: clip.JoinType.miter,
+          endType: clip.EndType.polygon,
+          precision: 7,
+        );
+      }
       final outline = Path();
       for (final polygon in united) {
         outline.addPolygon([for (final p in polygon) Offset(p.x, p.y)], true);

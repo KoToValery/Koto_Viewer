@@ -12,6 +12,8 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import 'architect_roof_drainage.dart';
 export 'architect_roof_drainage.dart';
+import 'architect_roof_panel.dart';
+export 'architect_roof_panel.dart';
 
 // === SECTION: ENUMS ===
 
@@ -20,7 +22,10 @@ enum ArchitectRoofPreset {
   warmPitched,
   standingSeam,
   flatWarm,
-  custom;
+  custom,
+  logTimber,
+  sandwichPitched,
+  sandwichMembrane;
 
   String label(AppLocalizations l10n) => switch (this) {
     ArchitectRoofPreset.pitchedTiles => l10n.architectRoofPresetPitchedTiles,
@@ -28,6 +33,9 @@ enum ArchitectRoofPreset {
     ArchitectRoofPreset.standingSeam => l10n.architectRoofPresetStandingSeam,
     ArchitectRoofPreset.flatWarm => l10n.architectRoofPresetFlatWarm,
     ArchitectRoofPreset.custom => l10n.architectRoofPresetCustom,
+    ArchitectRoofPreset.logTimber => l10n.architectRoofPresetLogTimber,
+    ArchitectRoofPreset.sandwichPitched => l10n.roofPanelPitched,
+    ArchitectRoofPreset.sandwichMembrane => l10n.roofPanelMembrane,
   };
 }
 
@@ -72,7 +80,9 @@ enum ArchitectRoofMaterial {
   waterproofing,
   slopeScreed,
   rcSlab,
-  plasterboard;
+  plasterboard,
+  steel,
+  pir;
 
   String label(AppLocalizations l10n) => switch (this) {
     ArchitectRoofMaterial.clayTiles => l10n.architectRoofMatClayTiles,
@@ -91,6 +101,8 @@ enum ArchitectRoofMaterial {
     ArchitectRoofMaterial.slopeScreed => l10n.architectRoofMatSlopeScreed,
     ArchitectRoofMaterial.rcSlab => l10n.architectRoofMatRcSlab,
     ArchitectRoofMaterial.plasterboard => l10n.architectRoofMatPlasterboard,
+    ArchitectRoofMaterial.steel => l10n.wallMaterialSteel,
+    ArchitectRoofMaterial.pir => l10n.wallMaterialPir,
   };
 }
 
@@ -354,11 +366,13 @@ class ArchitectRoofTimberSpec {
 // === SECTION: ROOF ASSEMBLY & PRESETS ===
 
 class ArchitectRoofAssembly {
+  final ArchitectRoofPanelSpec? panels;
   final ArchitectRoofPreset preset;
   final List<ArchitectRoofLayer> layers;
   final ArchitectRoofTimberSpec timber;
 
   const ArchitectRoofAssembly({
+    this.panels,
     required this.preset,
     required this.layers,
     required this.timber,
@@ -366,6 +380,19 @@ class ArchitectRoofAssembly {
 
   factory ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset preset) {
     switch (preset) {
+      case ArchitectRoofPreset.sandwichPitched:
+      case ArchitectRoofPreset.sandwichMembrane:
+        return ArchitectRoofAssembly.panelRoof(
+          ArchitectRoofPanelSpec(membrane:preset==ArchitectRoofPreset.sandwichMembrane,
+            minimumSlope:preset==ArchitectRoofPreset.sandwichMembrane?1.2:4),preset:preset);
+      case ArchitectRoofPreset.logTimber:
+        final base = ArchitectRoofAssembly.fromPreset(
+          ArchitectRoofPreset.warmPitched,
+        );
+        return base.copyWith(
+          preset: preset,
+          timber: base.timber.copyWith(hasRingBeam: false),
+        );
       case ArchitectRoofPreset.pitchedTiles:
       case ArchitectRoofPreset.custom:
         return const ArchitectRoofAssembly(
@@ -620,8 +647,19 @@ class ArchitectRoofAssembly {
   }
 
   /// Total thickness perpendicular to the roof slope (m).
-  double get totalThickness =>
+  double get totalThickness => panels?.totalDepth ??
       layers.fold<double>(0.0, (sum, l) => sum + layerDepth(l));
+
+  factory ArchitectRoofAssembly.panelRoof(ArchitectRoofPanelSpec spec,{ArchitectRoofPreset? preset}) =>
+    ArchitectRoofAssembly(preset:preset??(spec.membrane?ArchitectRoofPreset.sandwichMembrane:ArchitectRoofPreset.sandwichPitched),
+      panels:spec,timber:ArchitectRoofTimberSpec.none,layers:[
+        if(spec.membrane) ArchitectRoofLayer(id:'membrane',role:ArchitectRoofLayerRole.covering,
+          material:ArchitectRoofMaterial.waterproofing,thickness:spec.membraneThickness),
+        ArchitectRoofLayer(id:'outer_skin',role:ArchitectRoofLayerRole.covering,material:ArchitectRoofMaterial.steel,thickness:spec.skin),
+        ArchitectRoofLayer(id:'panel_core',role:ArchitectRoofLayerRole.insulation,material:ArchitectRoofMaterial.pir,thickness:spec.thickness-2*spec.skin),
+        ArchitectRoofLayer(id:'inner_skin',role:ArchitectRoofLayerRole.interior,material:ArchitectRoofMaterial.steel,thickness:spec.skin),
+        ArchitectRoofLayer(id:'steel_frame',role:ArchitectRoofLayerRole.structure,material:ArchitectRoofMaterial.steel,thickness:spec.structureDepth),
+      ]);
 
   /// Insulation occupies the rafter zone, with any unfilled depth remaining air.
   /// It does not reduce the zone below the physical framing depth.
@@ -647,16 +685,20 @@ class ArchitectRoofAssembly {
   }
 
   ArchitectRoofAssembly copyWith({
+    ArchitectRoofPanelSpec? panels,
+    bool clearPanels=false,
     ArchitectRoofPreset? preset,
     List<ArchitectRoofLayer>? layers,
     ArchitectRoofTimberSpec? timber,
   }) => ArchitectRoofAssembly(
+    panels:clearPanels?null:panels??this.panels,
     preset: preset ?? this.preset,
     layers: layers ?? this.layers.map((l) => l.copyWith()).toList(),
     timber: timber ?? this.timber.copyWith(),
   );
 
   Map<String, dynamic> toJson() => {
+    if(panels!=null) 'panels':panels!.toJson(),
     'preset': preset.name,
     'layers': layers.map((l) => l.toJson()).toList(),
     'timber': timber.toJson(),
@@ -669,6 +711,10 @@ class ArchitectRoofAssembly {
     final rawLayers = json['layers'] as List<dynamic>?;
     final rawTimber = json['timber'] as Map<String, dynamic>?;
     return ArchitectRoofAssembly(
+      panels:json['panels'] is Map?ArchitectRoofPanelSpec.fromJson(json['panels'] as Map):
+        (preset==ArchitectRoofPreset.sandwichPitched||preset==ArchitectRoofPreset.sandwichMembrane
+          ?ArchitectRoofPanelSpec(membrane:preset==ArchitectRoofPreset.sandwichMembrane,
+            minimumSlope:preset==ArchitectRoofPreset.sandwichMembrane?1.2:4):null),
       preset: preset,
       layers: rawLayers != null
           ? rawLayers

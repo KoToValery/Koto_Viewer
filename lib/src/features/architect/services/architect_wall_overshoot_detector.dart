@@ -1,6 +1,7 @@
 // === SECTION: ARCHITECT WALL OVERSHOOT DETECTOR ===
 
 import 'dart:math' as math;
+import 'architect_wall_connection_policy.dart';
 import 'dart:ui';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
@@ -201,7 +202,13 @@ class ArchitectWallOvershootDetector {
               ? deltaEnd
               : (deltaEnd - tMaxOther);
 
-          if (overshootDist >= minOvershootMeters) {
+          if (overshootDist >= minOvershootMeters &&
+              !ArchitectWallConnectionPolicy.protectsLogTail(
+                wall,
+                other,
+                false,
+                pInt,
+              )) {
             final overshoot = ArchitectWallOvershoot(
               wall: wall,
               atStart: false,
@@ -238,7 +245,13 @@ class ArchitectWallOvershootDetector {
               ? deltaStart
               : (deltaStart - faceDist);
 
-          if (overshootDist >= minOvershootMeters) {
+          if (overshootDist >= minOvershootMeters &&
+              !ArchitectWallConnectionPolicy.protectsLogTail(
+                wall,
+                other,
+                true,
+                pInt,
+              )) {
             final overshoot = ArchitectWallOvershoot(
               wall: wall,
               atStart: true,
@@ -265,6 +278,14 @@ class ArchitectWallOvershootDetector {
     required ArchitectWallOvershoot overshoot,
   }) {
     final commands = <ArchitectModelCommand>[];
+    if (ArchitectWallConnectionPolicy.protectsLogTail(
+      overshoot.wall,
+      overshoot.otherWall,
+      overshoot.atStart,
+      overshoot.intersectionPoint,
+    )) {
+      return commands;
+    }
 
     // Primary wall trim
     final wall = overshoot.wall;
@@ -281,7 +302,13 @@ class ArchitectWallOvershootDetector {
     );
 
     // If other wall also overshoots at this corner (X-crossing), trim it as well
-    if (overshoot.otherAlsoOvershoots && overshoot.otherAtStart != null) {
+    if (overshoot.otherAlsoOvershoots && overshoot.otherAtStart != null &&
+        !ArchitectWallConnectionPolicy.protectsLogTail(
+          overshoot.otherWall,
+          wall,
+          overshoot.otherAtStart!,
+          overshoot.intersectionPoint,
+        )) {
       final other = overshoot.otherWall;
       final trimmedOther = overshoot.otherAtStart!
           ? other.copyWith(startPoint: overshoot.intersectionPoint)

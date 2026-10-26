@@ -18,6 +18,8 @@ import '../models/architect_zone.dart';
 import '../rendering/architect_scene_geometry.dart';
 import 'architect_command_controller.dart';
 import 'architect_stair_rules.dart';
+import 'architect_panel_supports.dart';
+import '../rendering/architect_special_wall_geometry.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 
 /// A shared property schema for all persisted architectural element kinds.
@@ -122,7 +124,11 @@ class ArchitectSelection {
       if (stair.id == id) return stair.plan.bounds;
     }
     for (final w in s.walls) {
-      if (w.id == id) return ArchitectSceneGeometry.boundsOf(w.polygonCorners);
+      if (w.id == id) {
+        return ArchitectSceneGeometry.boundsOf(
+          ArchitectSpecialWallGeometry.physicalPlanCorners(w, s.walls),
+        );
+      }
       for (final o in [
         ...w.doors.map((d) => (d.id, d.offsetRatio, d.width)),
         ...w.windows.map((e) => (e.id, e.offsetRatio, e.width)),
@@ -425,6 +431,23 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         }
       }
       for (final value in textValues.entries) {
+        if (value.key == 'wallPanelPlacement') {
+          final wall = ArchitectWall.fromJson(e);
+          if (!wall.system.isPanel) {
+            throw ArgumentError('Panel supports require a panel wall');
+          }
+          final placement = ArchitectWallSystemPlacement.fromJson(
+            Map<String, dynamic>.from(jsonDecode(value.value) as Map),
+          );
+          placement.validate();
+          if (placement.columnIds.any(
+            (id) => !project.activeStorey.columns.any((c) => c.id == id),
+          )) {
+            throw ArgumentError('Unknown facade column');
+          }
+          e['systemPlacement'] = placement.toJson();
+          continue;
+        }
         if (value.key == 'drawingColor') {
           if (!project.activeStorey.cadPrimitives.any((p) => p.id == e['id'] && p.type == CadPrimitiveType.hatch)) {
             throw ArgumentError('Drawing fill colors require hatch elements');
@@ -594,7 +617,10 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         e.remove('coreThickness');
       }
     }
-    final next = ArchitectProject.fromJson(json);
+    final next = ArchitectPanelSupports.resolve(
+      ArchitectProject.fromJson(json),
+      previous: project,
+    );
     for (final stair in next.activeStorey.stairs.where((s) => elementIds.contains(s.id))) {
       if (stair.design != null && !stair.design!.isDraft &&
           ArchitectStairRules.check(stair).any((c) => c.state == StairCheckState.error)) {

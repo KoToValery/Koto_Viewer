@@ -8275,4 +8275,194 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectHatchTransformHelp =>
       'Drag to rotate the hatch and change its scale. Scale snaps in 10% steps; direction snaps every 45°.';
+
+  @override
+  String get wallSystem => 'Construction';
+
+  @override
+  String get wallSystemLayered => 'Layers';
+
+  @override
+  String get wallSystemLogs => 'Round logs';
+
+  @override
+  String get wallSystemFrame => 'Stud partition';
+
+  @override
+  String get wallSystemPanels => 'Sandwich panels';
+
+  @override
+  String get wallMaterialSteel => 'Steel';
+
+  @override
+  String get wallMaterialPir => 'PIR';
+
+  @override
+  String get wallLogOverlap => 'Overlap (%)';
+
+  @override
+  String get wallLogTail => 'End extension (× diameter)';
+
+  @override
+  String get wallLogPitch => 'Course height';
+
+  @override
+  String get wallStudSpacing => 'Profile spacing';
+
+  @override
+  String get wallStudWidth => 'Profile width';
+
+  @override
+  String get wallMetalThickness => 'Metal thickness';
+
+  @override
+  String get wallCavityInsulation => 'Cavity insulation';
+
+  @override
+  String get wallSupportDepth => 'Support depth';
+
+  @override
+  String get wallPanelModule => 'Panel width';
+
+  @override
+  String get wallPanelMount => 'Mounting';
+
+  @override
+  String get wallPanelInFront => 'In front of columns';
+
+  @override
+  String get wallPanelBetween => 'Between columns';
+
+  @override
+  String get wallPanelsHorizontal => 'Horizontal panels';
+
+  @override
+  String get wallSystemInvalid => 'Check the construction dimensions.';
+
+  @override
+  String get wallSystemStraightOnly => 'This system uses straight walls.';
+
+  @override
+  String get wallLogHelp =>
+      'Diameter stays circular. Overlap changes course height; corners alternate by half a course.';
+
+  @override
+  String get wallFrameHelp =>
+      'Boards, profiles and cavity insulation have independent dimensions.';
+
+  @override
+  String get wallPanelHelp =>
+      'Panel and support depth are separate. Supports attach to the selected column faces.';
+
+  @override
+  String get wallColumnSupports => 'Column supports';
+
+  @override
+  String get wallMountingOffset => 'Mounting offset';
+
+  @override
+  String get wallMissingSupports =>
+      'A support column is missing. Select its replacement.';
+
+  @override
+  String get wallLogCasing => 'Opening casing';
+
+  @override
+  String get wallLogCasingWidth => 'Casing width';
+
+  @override
+  String get wallLogSettlement => 'Settlement allowance';
+
+  @override
+  String get architectRoofPresetLogTimber => 'Timber · logs';
+
+  @override
+  String get wallLogDiameter => 'Diameter';
+
+  @override
+  String get wallRemoveMissingSupports => 'Remove missing';
+
+  @override
+  String get roofPanelPitched => 'Panels · pitched';
+
+  @override
+  String get roofPanelMembrane => 'Panels · membrane';
+
+  @override
+  String get roofPanelThickness => 'Panel';
+
+  @override
+  String get roofPanelSkin => 'Skin';
+
+  @override
+  String get roofPanelModule => 'Module';
+
+  @override
+  String get roofPanelRib => 'Rib height';
+
+  @override
+  String get roofPanelMinSlope => 'Min. pitch';
+
+  @override
+  String get roofPanelFrame => 'Steel frame';
+
+  @override
+  String get roofPanelBeamDepth => 'Beam depth';
+
+  @override
+  String get roofPanelBeamWidth => 'Beam width';
+
+  @override
+  String get roofPanelWeb => 'Web';
+
+  @override
+  String get roofPanelFlange => 'Flange';
+
+  @override
+  String get roofPanelFramesSpacing => 'Frame spacing';
+
+  @override
+  String get roofPanelPurlinDepth => 'Purlin depth';
+
+  @override
+  String get roofPanelPurlinWidth => 'Purlin flange';
+
+  @override
+  String get roofPanelPurlinMetal => 'Purlin gauge';
+
+  @override
+  String get roofPanelPurlinSpacing => 'Purlin spacing';
+
+  @override
+  String get roofPanelCutback => 'Core cutback';
+
+  @override
+  String get roofPanelUpstand => 'Upstand';
+
+  @override
+  String get roofPanelInvalid => 'Check the panel and frame dimensions.';
+
+  @override
+  String get roofPanelSlopeInvalid =>
+      'Pitch is below the minimum for this system.';
+
+  @override
+  String get roofPanelHelp =>
+      'Continuous panels on Z purlins and I beams. Set dimensions and minimum pitch for the selected system.';
+
+  @override
+  String get roofPanelColumns => 'Supporting columns';
+
+  @override
+  String get roofGutterPosition => 'Position';
+
+  @override
+  String get roofGutterExternal => 'External';
+
+  @override
+  String get roofGutterInternal => 'Internal';
+
+  @override
+  String get roofGutterInternalHelp =>
+      'Open box channel at the roof edge. The pipe drops vertically; a structural collision requires another outlet or an opening.';
 }

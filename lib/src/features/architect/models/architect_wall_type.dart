@@ -1,5 +1,7 @@
 import 'architect_material_layer.dart';
 export 'architect_material_layer.dart';
+import 'architect_wall_system.dart';
+export 'architect_wall_system.dart';
 // === SECTION: ARCHITECTURAL WALL TYPE MODELS ===
 import 'dart:ui';
 import '../../../core/l10n/generated/app_localizations.dart';
@@ -34,6 +36,7 @@ enum ParapetFinish {
 
 /// Parametric definition of an architectural wall type.
 class ArchitectWallType {
+  final ArchitectWallSystem system;
   final String id;
   final List<ArchitectMaterialLayer> layers;
   final ArchitectWallLocation? location;
@@ -52,6 +55,7 @@ class ArchitectWallType {
   final int colorValue;
 
   const ArchitectWallType({
+    this.system = const ArchitectWallSystem(),
     required this.id,
     required this.name,
     this.labelId,
@@ -70,9 +74,11 @@ class ArchitectWallType {
        _brickThickness = brickThickness,
        _insulationThickness = insulationThickness;
 
-  double get totalThickness => layers.isEmpty
+  double get totalThickness =>
+      system.additionalDepth +
+      (layers.isEmpty
       ? _totalThickness
-      : layers.fold(0, (v, l) => v + l.thickness);
+      : layers.fold<double>(0, (v, l) => v + l.thickness));
   double get brickThickness => layers.isEmpty
       ? _brickThickness
       : layers
@@ -145,6 +151,7 @@ class ArchitectWallType {
 
   /// Default starter catalog of standard architectural wall types.
   static List<ArchitectWallType> standardCatalog({
+    bool includeSpecial = false,
     double parapetHeight = 1.05,
     ParapetFinish parapetFinish = ParapetFinish.cap,
     AppLocalizations? l10n,
@@ -197,10 +204,90 @@ class ArchitectWallType {
         parapetFinish: parapetFinish,
         colorValue: 0xFF26A69A,
       ),
+      if (includeSpecial)
+        const ArchitectWallType(
+          id: 'round_logs_240',
+          name: '',
+          usage: WallUsage.exterior,
+          totalThickness: .24,
+          location: ArchitectWallLocation.exterior,
+          loadBearing: true,
+          system: ArchitectWallSystem(kind: ArchitectWallSystemKind.roundLogs),
+          layers: [
+            ArchitectMaterialLayer(
+              id: 'log',
+              material: ArchitectMaterial.timber,
+              role: ArchitectLayerRole.core,
+              thickness: .24,
+            ),
+          ],
+        ),
+      if (includeSpecial)
+        const ArchitectWallType(
+          id: 'stud_partition_100',
+          name: '',
+          usage: WallUsage.interior,
+          totalThickness: .1,
+          location: ArchitectWallLocation.interior,
+          system: ArchitectWallSystem(kind: ArchitectWallSystemKind.studFrame),
+          layers: [
+            ArchitectMaterialLayer(
+              id: 'board_a',
+              material: ArchitectMaterial.plasterboard,
+              role: ArchitectLayerRole.finish,
+              thickness: .0125,
+            ),
+            ArchitectMaterialLayer(
+              id: 'frame',
+              material: ArchitectMaterial.panel,
+              role: ArchitectLayerRole.core,
+              thickness: .075,
+            ),
+            ArchitectMaterialLayer(
+              id: 'board_b',
+              material: ArchitectMaterial.plasterboard,
+              role: ArchitectLayerRole.finish,
+              thickness: .0125,
+            ),
+          ],
+        ),
+      if (includeSpecial)
+        const ArchitectWallType(
+          id: 'sandwich_100_100',
+          name: '',
+          usage: WallUsage.exterior,
+          totalThickness: .1,
+          location: ArchitectWallLocation.exterior,
+          system: ArchitectWallSystem(
+            kind: ArchitectWallSystemKind.sandwichPanels,
+            metalThickness: .003,
+          ),
+          layers: [
+            ArchitectMaterialLayer(
+              id: 'skin_a',
+              material: ArchitectMaterial.steel,
+              role: ArchitectLayerRole.finish,
+              thickness: .0005,
+            ),
+            ArchitectMaterialLayer(
+              id: 'panel',
+              material: ArchitectMaterial.pir,
+              role: ArchitectLayerRole.core,
+              thickness: .099,
+            ),
+            ArchitectMaterialLayer(
+              id: 'skin_b',
+              material: ArchitectMaterial.steel,
+              role: ArchitectLayerRole.finish,
+              thickness: .0005,
+            ),
+          ],
+        ),
     ];
   }
 
   ArchitectWallType copyWith({
+    ArchitectWallSystem? system,
     String? id,
     String? name,
     String? labelId,
@@ -216,6 +303,7 @@ class ArchitectWallType {
     ArchitectWallLocation? location,
     bool? loadBearing,
   }) => ArchitectWallType(
+    system: system ?? this.system,
     id: id ?? this.id,
     layers: layers ?? this.layers,
     location: location ?? this.location,
@@ -233,6 +321,7 @@ class ArchitectWallType {
   );
 
   Map<String, dynamic> toJson() => {
+    if (system.isSpecial) 'system': system.toJson(),
     'id': id,
     'name': name,
     if (labelId != null) 'labelId': labelId,
@@ -251,6 +340,11 @@ class ArchitectWallType {
 
   factory ArchitectWallType.fromJson(Map<String, dynamic> json) =>
       ArchitectWallType(
+        system: ArchitectWallSystem.fromJson(
+          json['system'] == null
+              ? null
+              : Map<String, dynamic>.from(json['system'] as Map),
+        ),
         id: json['id'] as String,
         layers: (json['layers'] as List? ?? [])
             .map(

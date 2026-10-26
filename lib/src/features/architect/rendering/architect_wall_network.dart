@@ -101,6 +101,7 @@ class ArchitectWallNetwork {
     for (var i = 0; i < walls.length; i++) {
       final a = walls[i];
       for (final b in walls.skip(i + 1)) {
+        if (a.system.isSpecial || b.system.isSpecial) continue;
         if (a.isCurved || b.isCurved) {
           final nodes = a.intersections(b);
           // An endpoint on a face still joins even if the saved references differ.

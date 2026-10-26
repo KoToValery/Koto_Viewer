@@ -3,6 +3,7 @@ import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_wall_type.dart';
 import 'architect_wall_network.dart';
+import 'architect_special_wall_geometry.dart';
 
 /// Insulation follows the explicit exterior side. All layers retain the
 /// original reference nodes, so their faces share the same mitred junctions.
@@ -45,6 +46,8 @@ class ArchitectWallLayers {
         project.wallTypes,
         cutPlaneHeight: project.activeStorey.cutPlaneHeight,
         storeyElevation: project.activeStorey.elevation,
+        storey: project.activeStorey,
+        project: project,
       );
 
   static ArchitectWallLayers build(
@@ -52,7 +55,83 @@ class ArchitectWallLayers {
     List<ArchitectWallType> types, {
     double cutPlaneHeight = 1.20,
     double storeyElevation = 0,
+    ArchitectStorey? storey,
+    ArchitectProject? project,
   }) {
+    if (walls.any((w) => w.system.isSpecial)) {
+      final ordinary = build(
+        walls.where((w) => !w.system.isSpecial).toList(),
+        types,
+        cutPlaneHeight: cutPlaneHeight,
+        storeyElevation: storeyElevation,
+      );
+      var body = ordinary.body,
+          core = ordinary.core,
+          uncut = ordinary.uncutBody;
+      final materials = [...ordinary.materials],
+          owners = {...ordinary.coreRegions};
+      final floor =
+          storey ??
+          ArchitectStorey(
+            id: 'wall-preview',
+            name: '',
+            elevation: storeyElevation,
+            walls: walls,
+          );
+      for (final component in ArchitectSpecialWallGeometry.build(
+        floor,
+        project: project,
+      )) {
+        if (!walls.any((w) => w.id == component.wall.id)) continue;
+        final wall = component.wall;
+        if (wall.isCutAt(cutPlaneHeight)) {
+          var path = component.at(storeyElevation + cutPlaneHeight);
+          // Existing masonry owns its region at a mixed contact; never paint
+          // two hatches over the same material section.
+          path = Path.combine(PathOperation.difference, path, ordinary.body);
+          body = Path.combine(PathOperation.union, body, path);
+          if (component.layer.role == ArchitectLayerRole.core) {
+            core = Path.combine(PathOperation.union, core, path);
+          }
+          owners[wall.id] = Path.combine(
+            PathOperation.union,
+            owners[wall.id] ?? Path(),
+            path,
+          );
+          materials.add(
+            ArchitectWallMaterialRegion(wall, component.layer, path),
+          );
+        } else {
+          final projection = Path();
+          for (final t in component.triangles) {
+            final points = [
+              Offset(t.v0.x, t.v0.y),
+              Offset(t.v1.x, t.v1.y),
+              Offset(t.v2.x, t.v2.y),
+            ];
+            final a = points[1] - points[0], b = points[2] - points[0];
+            if ((a.dx * b.dy - a.dy * b.dx).abs() > 1e-12) {
+              projection.addPolygon(
+                a.dx * b.dy - a.dy * b.dx > 0
+                    ? points
+                    : points.reversed.toList(),
+                true,
+              );
+            }
+          }
+          uncut = Path.combine(PathOperation.union, uncut, projection);
+        }
+      }
+      return ArchitectWallLayers(
+        body,
+        core,
+        ordinary.insulation,
+        uncutBody: Path.combine(PathOperation.difference, uncut, body),
+        walls: walls.where((w) => w.isCutAt(cutPlaneHeight)).toList(),
+        coreRegions: owners,
+        materials: materials,
+      );
+    }
     final catalog = {..._defaults, for (final type in types) type.id: type};
     final cutWalls = walls.where((w) => w.isCutAt(cutPlaneHeight)).toList();
     final uncutWalls = walls.where((w) => !w.isCutAt(cutPlaneHeight)).toList();

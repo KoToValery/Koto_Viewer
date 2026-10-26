@@ -1,6 +1,7 @@
 import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
 import 'architect_command_controller.dart';
+import 'architect_wall_connection_policy.dart';
 
 class SetArchitectWallPlinth extends ArchitectModelCommand {
   final String storeyId;
@@ -56,6 +57,7 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
   @override
   ArchitectProject apply(ArchitectProject project) {
     ArchitectMaterialLayer.validate(type.resolvedLayers);
+    type.system.validate(type.totalThickness);
     plinth?.validate();
     if (type.id.isEmpty) throw ArgumentError('Empty wall type ID');
     final found = <String>{};
@@ -75,6 +77,7 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
                   final composed = preserveComposition
                       ? wall
                       : wall.copyWith(
+                          system: type.system,
                           layers: List.unmodifiable(type.resolvedLayers),
                           thickness: type.totalThickness,
                           insulationThicknessOverride: type.insulationThickness,
@@ -90,7 +93,7 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
                   final region =
                       plinthPatch?.apply(wall.plinth) ?? plinth ?? wall.plinth;
                   return composed.copyWith(
-                    plinth: composed.isExterior
+                    plinth: composed.isExterior && !composed.system.isLog
                         ? region
                         : region.copyWith(enabled: false),
                   );
@@ -102,6 +105,9 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
     ];
     if (replaceTypeId == null && found.length != wallIds.length) {
       throw ArgumentError('Unknown walls');
+    }
+    for (final floor in storeys) {
+      ArchitectWallConnectionPolicy.validateStorey(floor);
     }
     return project.copyWith(
       storeys: storeys,

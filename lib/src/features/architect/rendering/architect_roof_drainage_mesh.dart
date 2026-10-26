@@ -26,6 +26,7 @@ class ArchitectRoofDrainageMesh {
     if (!includeGutters && !includeDownpipes) return [];
     final geometry = ArchitectRoofDrainageGeometry.build(project, storey, roof);
     final d = roof.drainage, ink = color(d.material);
+    final box=d.position==ArchitectGutterPosition.internal||d.profile==ArchitectGutterProfile.box;
     final result = <Triangle3D>[];
     final ready = geometry.routes
         .where((r) => r.status == ArchitectDownpipeStatus.ready)
@@ -40,7 +41,7 @@ class ArchitectRoofDrainageMesh {
       final delta = gutter.end - gutter.start;
       if (delta.distance < 1e-5) continue;
       final axis = delta / delta.distance;
-      final profile = d.profile == ArchitectGutterProfile.box
+      final profile = box
           ? [
               Offset(-d.gutterWidth / 2, 0),
               Offset(-d.gutterWidth / 2, -d.gutterDepth),
@@ -174,7 +175,7 @@ class ArchitectRoofDrainageMesh {
       }
 
       // Close only the channel ends; the mouth and punched outlets stay open.
-      final cavity = d.profile == ArchitectGutterProfile.box
+      final cavity = box
           ? [
               Offset(-d.gutterWidth / 2 + thickness, 0),
               Offset(
@@ -195,7 +196,7 @@ class ArchitectRoofDrainageMesh {
       fitting(cap, 0, thickness);
       fitting(cap, delta.distance - thickness, delta.distance);
       // Strap hangers sit on the outside of the sheet at regular centres.
-      final strap = d.profile == ArchitectGutterProfile.box
+      final strap = box
           ? [
               Offset(-d.gutterWidth / 2 - .003, -.015),
               Offset(-d.gutterWidth / 2 - .003, -d.gutterDepth - .003),

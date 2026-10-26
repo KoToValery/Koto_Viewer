@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/architect_project.dart';
+import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_section.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_slab_assembly.dart';
@@ -38,6 +39,11 @@ class ArchitectRoofConstructionPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if(assembly.panels!=null) {
+      try {assembly.panels!.validate(slope:slope,mansard:mansard);}
+      on ArgumentError {return Center(child:Text(slope<assembly.panels!.minimumSlope?
+        context.l10n.roofPanelSlopeInvalid:context.l10n.roofPanelInvalid));}
+    }
     final source = roof;
     final template =
         source ??
@@ -201,12 +207,14 @@ class ArchitectRoofConstructionPainter extends CustomPainter {
         ArchitectRoofMaterial.rcSlab => SlabMaterial.concrete,
         ArchitectRoofMaterial.mineralWool => SlabMaterial.mineralWool,
         ArchitectRoofMaterial.xps => SlabMaterial.xps,
+        ArchitectRoofMaterial.pir => SlabMaterial.roofInsulation,
         ArchitectRoofMaterial.clayTiles ||
         ArchitectRoofMaterial.concreteTiles ||
         ArchitectRoofMaterial.bitumenShingles => SlabMaterial.tile,
         _ => SlabMaterial.custom,
       };
-      final pattern = ArchitectSectionHatch.slab(material);
+      final pattern = member.material==ArchitectRoofMaterial.steel
+        ?ArchitectSectionHatch.preset('metal'):ArchitectSectionHatch.slab(material);
       if (pattern == null || path.getBounds().height < 3) continue;
       canvas.save();
       canvas.clipPath(path);

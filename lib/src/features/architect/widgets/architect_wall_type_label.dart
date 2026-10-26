@@ -4,6 +4,15 @@ import 'architect_material_layer_label.dart';
 import '../models/architect_project.dart' show ArchitectUnit;
 import '../services/architect_wall_catalog.dart';
 
+extension ArchitectWallSystemLabel on ArchitectWallSystemKind {
+  String label(AppLocalizations l) => switch (this) {
+    ArchitectWallSystemKind.layered => l.wallSystemLayered,
+    ArchitectWallSystemKind.roundLogs => l.wallSystemLogs,
+    ArchitectWallSystemKind.studFrame => l.wallSystemFrame,
+    ArchitectWallSystemKind.sandwichPanels => l.wallSystemPanels,
+  };
+}
+
 String architectWallLength(double value, ArchitectUnit unit) =>
     '${ArchitectUnit.trimZeros(unit.toUnit(value).toStringAsFixed(6))} ${unit.symbol}';
 
@@ -22,6 +31,12 @@ extension ArchitectWallTypeLabel on ArchitectWallType {
       : l.wallParapetHandrail;
 
   String catalogGroupLabel(AppLocalizations l, ArchitectUnit unit) {
+    if (system.isSpecial) {
+      return l.wallMaterialThickness(
+        system.kind.label(l),
+        architectWallLength(totalThickness, unit),
+      );
+    }
     if (isParapet) {
       final materials = resolvedLayers
           .where((layer) => layer.role == ArchitectLayerRole.core)
@@ -47,6 +62,10 @@ extension ArchitectWallTypeLabel on ArchitectWallType {
     ArchitectUnit unit, {
     bool includeCore = true,
   }) {
+    if (system.isSpecial) {
+      return '${system.kind.label(l)} · ${resolvedLayers.map((layer) => l.wallMaterialThickness(layer.material.label(l), architectWallLength(layer.thickness, unit))).join(' + ')}'
+          '${system.isPanel ? ' + ${l.wallMaterialThickness(l.wallSupportDepth, architectWallLength(system.supportDepth, unit))}' : ''}';
+    }
     final layers = resolvedLayers.where(
       (layer) => includeCore || layer.role != ArchitectLayerRole.core,
     );
@@ -88,6 +107,7 @@ extension ArchitectWallTypeLabel on ArchitectWallType {
 
   String compactLabel(AppLocalizations l10n) {
     if (!isFactoryPreset && name.isNotEmpty) return name;
+    if (system.isSpecial) return '${system.kind.label(l10n)} $_composition';
     if (layers.isNotEmpty) {
       if (isParapet) return l10n.architectWallParapetCode(_composition);
       if (layers
@@ -106,6 +126,13 @@ extension ArchitectWallTypeLabel on ArchitectWallType {
   }
 
   String pickerHelp(AppLocalizations l10n) {
+    if (system.isSpecial) {
+      return switch (system.kind) {
+        ArchitectWallSystemKind.roundLogs => l10n.wallLogHelp,
+        ArchitectWallSystemKind.studFrame => l10n.wallFrameHelp,
+        _ => l10n.wallPanelHelp,
+      };
+    }
     final title = layers.isNotEmpty
         ? layers
               .firstWhere((l) => l.role == ArchitectLayerRole.core)

@@ -14,6 +14,8 @@ enum ArchitectMaterial {
   plasterboard,
   tile,
   stone,
+  steel,
+  pir,
 }
 
 enum ArchitectLayerRole { core, insulation, finish }
@@ -78,6 +80,7 @@ class ArchitectMaterialLayer {
             ArchitectMaterial.concrete,
             ArchitectMaterial.timber,
             ArchitectMaterial.panel,
+            ArchitectMaterial.pir,
           }.contains(l.material),
         )) {
       throw ArgumentError('Invalid core material');
@@ -91,6 +94,8 @@ extension ArchitectMaterialAppearance on ArchitectMaterial {
     ArchitectMaterial.concrete => const Color(0xFF9FAEB5),
     ArchitectMaterial.timber => const Color(0xFFD7A86E),
     ArchitectMaterial.panel => const Color(0xFFC4C9CF),
+    ArchitectMaterial.steel => const Color(0xFFAAB2B8),
+    ArchitectMaterial.pir => const Color(0xFFF0E8CE),
     ArchitectMaterial.eps => const Color(0xFFF3E8BF),
     ArchitectMaterial.xps => const Color(0xFF80CBC4),
     ArchitectMaterial.stoneWool => const Color(0xFFB8C880),
@@ -104,6 +109,7 @@ extension ArchitectMaterialAppearance on ArchitectMaterial {
     ArchitectMaterial.brick ||
     ArchitectMaterial.concrete ||
     ArchitectMaterial.timber ||
+    ArchitectMaterial.pir ||
     ArchitectMaterial.panel => ArchitectLayerRole.core,
     ArchitectMaterial.eps ||
     ArchitectMaterial.xps ||

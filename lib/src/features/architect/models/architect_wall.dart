@@ -62,6 +62,8 @@ class ArchitectWallAttachment {
 
 /// Represents an architectural parametric wall with hosted openings (doors/windows).
 class ArchitectWall {
+  final ArchitectWallSystem system;
+  final ArchitectWallSystemPlacement systemPlacement;
   final String id;
   final double arcBulge;
   final List<ArchitectMaterialLayer> layers;
@@ -92,6 +94,8 @@ class ArchitectWall {
   final List<ArchitectWindow> windows;
 
   const ArchitectWall({
+    this.system = const ArchitectWallSystem(),
+    this.systemPlacement = const ArchitectWallSystemPlacement(),
     required this.id,
     this.arcBulge = 0,
     this.layers = const [],
@@ -121,8 +125,9 @@ class ArchitectWall {
 
   bool get isParapet =>
       parapet ??
-      (height < 1.50 ||
-          (wallTypeId != null && wallTypeId!.contains('parapet')));
+      (!system.isSpecial &&
+          (height < 1.50 ||
+          (wallTypeId != null && wallTypeId!.contains('parapet'))));
 
   bool isCutAt(double storeyCutPlane) {
     return switch (cutDisplayMode) {
@@ -148,8 +153,11 @@ class ArchitectWall {
 
   double effectiveHeight(double storeyHeight) =>
       followStoreyHeight && !isParapet ? storeyHeight : height;
-  WallCoreMaterial get coreMaterial =>
-      (layers.isNotEmpty
+  WallCoreMaterial get coreMaterial => system.isLog
+      ? WallCoreMaterial.timber
+      : system.isSpecial
+      ? WallCoreMaterial.panel
+      : (layers.isNotEmpty
           ? WallCoreMaterial.values
                 .where(
                   (m) =>
@@ -208,6 +216,33 @@ class ArchitectWall {
         referencePointAt(from) + normalVector * high,
       ];
   void validateGeometry() {
+    system.validate(thickness);
+    systemPlacement.validate();
+    if (system.isSpecial && isCurved) {
+      throw ArgumentError('This wall system requires a straight mounting line');
+    }
+    if (system.isLog &&
+        (layers.length != 1 ||
+            layers.first.material != ArchitectMaterial.timber ||
+            (layers.first.thickness - thickness).abs() > 1e-7)) {
+      throw ArgumentError('Log diameter and wall thickness must agree');
+    }
+    if (system.isFrame &&
+        (coreThickness <= 2 * system.metalThickness ||
+            system.insulationDepth > coreThickness)) {
+      throw ArgumentError('Profiles and insulation must fit the frame cavity');
+    }
+    if (system.isLog && system.openingCasing) {
+      for (final op in [
+        ...doors.map((o) => (o.offsetRatio, o.width)),
+        ...windows.map((o) => (o.offsetRatio, o.width)),
+      ]) {
+        if (op.$1 * length - op.$2 / 2 - system.casingWidth < 0 ||
+            op.$1 * length + op.$2 / 2 + system.casingWidth > length) {
+          throw ArgumentError('Opening casing does not fit the log wall');
+        }
+      }
+    }
     if (!arcBulge.isFinite ||
         arcBulge.abs() > 100 ||
         (isCurved &&
@@ -337,6 +372,7 @@ class ArchitectWall {
           ),
         ];
   double get exteriorBuildUp {
+    if (system.isPanel) return 0;
     if (layers.isEmpty) return insulationThickness;
     return layers
         .takeWhile((l) => l.role != ArchitectLayerRole.core)
@@ -344,6 +380,7 @@ class ArchitectWall {
   }
 
   double get interiorBuildUp {
+    if (system.isPanel) return 0;
     if (layers.isEmpty) return 0;
     return layers.reversed
         .takeWhile((l) => l.role != ArchitectLayerRole.core)
@@ -351,7 +388,9 @@ class ArchitectWall {
   }
 
   double get coreAsymmetry => exteriorBuildUp - interiorBuildUp;
-  double get coreThickness => layers.isEmpty
+  double get coreThickness => system.isPanel
+      ? thickness
+      : layers.isEmpty
       ? thickness - insulationThickness
       : layers
             .where((l) => l.role == ArchitectLayerRole.core)
@@ -395,6 +434,8 @@ class ArchitectWall {
   }
 
   ArchitectWall copyWith({
+    ArchitectWallSystem? system,
+    ArchitectWallSystemPlacement? systemPlacement,
     String? id,
     double? arcBulge,
     List<ArchitectMaterialLayer>? layers,
@@ -421,9 +462,11 @@ class ArchitectWall {
     List<ArchitectDoor>? doors,
     List<ArchitectWindow>? windows,
   }) => ArchitectWall(
+    system: system ?? this.system,
+    systemPlacement: systemPlacement ?? this.systemPlacement,
     id: id ?? this.id,
     arcBulge: arcBulge ?? this.arcBulge,
-    layers: layers ?? this.layers,
+    layers: layers ?? _layersForThickness(thickness),
     location: location ?? this.location,
     loadBearing: loadBearing ?? this.loadBearing,
     plinth: plinth ?? this.plinth,
@@ -450,6 +493,20 @@ class ArchitectWall {
   );
 
   bool get isDetached => !connectStart && !connectEnd;
+
+  List<ArchitectMaterialLayer> _layersForThickness(double? next) {
+    if (!system.isSpecial || next == null || layers.isEmpty) return layers;
+    final index = layers.indexWhere((l) => l.role == ArchitectLayerRole.core);
+    if (index < 0) return layers;
+    return [
+      for (var i = 0; i < layers.length; i++)
+        i == index
+            ? layers[i].copyWith(
+                thickness: layers[i].thickness + next - thickness,
+              )
+            : layers[i],
+    ];
+  }
 
   bool connectsAt(Offset point) {
     if (isDetached) return false;
@@ -533,6 +590,8 @@ class ArchitectWall {
   }
 
   Map<String, dynamic> toJson() => {
+    if (system.isSpecial) 'system': system.toJson(),
+    if (system.isSpecial) 'systemPlacement': systemPlacement.toJson(),
     'id': id,
     if (isCurved) 'arcBulge': arcBulge,
     'layers': layers.map((l) => l.toJson()).toList(),
@@ -561,6 +620,16 @@ class ArchitectWall {
   };
 
   factory ArchitectWall.fromJson(Map<String, dynamic> json) => ArchitectWall(
+    system: ArchitectWallSystem.fromJson(
+      json['system'] == null
+          ? null
+          : Map<String, dynamic>.from(json['system'] as Map),
+    ),
+    systemPlacement: ArchitectWallSystemPlacement.fromJson(
+      json['systemPlacement'] == null
+          ? null
+          : Map<String, dynamic>.from(json['systemPlacement'] as Map),
+    ),
     id: json['id'] as String,
     arcBulge: (json['arcBulge'] as num?)?.toDouble() ?? 0,
     layers: (json['layers'] as List? ?? [])

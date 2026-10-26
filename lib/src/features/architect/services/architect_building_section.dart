@@ -3,6 +3,7 @@ import '../rendering/architect_roof_drainage_mesh.dart';
 import '../rendering/architect_section_hatch.dart';
 import 'dart:math' as math;
 import 'dart:ui';
+import '../rendering/architect_mesh_section.dart';
 import 'dart:typed_data';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_elements.dart';
@@ -201,6 +202,8 @@ class ArchitectBuildingSection {
         ArchitectRoofMaterial.slopeScreed => SlabMaterial.screed,
         ArchitectRoofMaterial.rcSlab => SlabMaterial.concrete,
         ArchitectRoofMaterial.plasterboard => SlabMaterial.plasterboard,
+        ArchitectRoofMaterial.steel => SlabMaterial.custom,
+        ArchitectRoofMaterial.pir => SlabMaterial.roofInsulation,
         null => SlabMaterial.custom,
       };
 
@@ -226,6 +229,8 @@ class ArchitectBuildingSection {
       ArchitectRoofMaterial.slopeScreed => const Color(0xFFB0BEC5),
       ArchitectRoofMaterial.rcSlab => null,
       ArchitectRoofMaterial.plasterboard => const Color(0xFFECEFF1),
+      ArchitectRoofMaterial.steel => const Color(0xffeeeeee),
+      ArchitectRoofMaterial.pir => const Color(0xfffafafa),
       null => null,
     };
   }
@@ -384,7 +389,19 @@ class ArchitectBuildingSection {
       }
     }
 
-    Path? sliceMesh(List<Triangle3D> tris, {double endpointTolerance = 1e-6}) {
+    Path? sliceMesh(List<Triangle3D> tris, {double endpointTolerance = 1e-6,
+      bool exact = false,
+    }) {
+      if (exact) {
+        final path = ArchitectMeshSection.vertical(tris, cut.start, cut.axis);
+        return path.getBounds().isEmpty
+            ? null
+            : ArchitectMeshSection.combine(
+                PathOperation.intersect,
+                path,
+                Path()..addRect(Rect.fromLTRB(0, -1e6, cut.length, 1e6)),
+              );
+      }
       final section = ArchitectStairSection.build(
         [StairSolid(StairSolidMaterial.concrete, tris)],
         cut.start,
@@ -437,7 +454,8 @@ class ArchitectBuildingSection {
       }
 
       final useCompositions = floor.walls.any(
-        (w) => w.layers.isNotEmpty || w.plinth.enabled || w.isCurved,
+        (w) => w.system.isSpecial ||
+            w.layers.isNotEmpty || w.plinth.enabled || w.isCurved,
       );
       final sharedSolids = useCompositions
           ? ArchitectWallSolids.build(
@@ -445,6 +463,7 @@ class ArchitectBuildingSection {
               project.wallTypes,
               project: project,
               suppressedOpeningIds: floorCutOpeningIds,
+              specialSuppressedOpeningIds: const {},
             )
           : const <ArchitectWallSolid>[];
       for (final wall in floor.walls) {
@@ -474,12 +493,20 @@ class ArchitectBuildingSection {
           if (path == null) return;
           accumulated = accumulated == null
               ? path
-              : Path.combine(PathOperation.union, accumulated!, path);
+              : (wall.system.isSpecial
+                    ? ArchitectMeshSection.combine(
+                        PathOperation.union,
+                        accumulated!,
+                        path,
+                      )
+                    : Path.combine(PathOperation.union, accumulated!, path));
         }
 
         if (useCompositions) {
           for (final solid in sharedSolids.where((s) => s.wall.id == wall.id)) {
-            final path = sliceMesh(solid.triangles);
+            final path = sliceMesh(solid.triangles,
+              exact: wall.system.isSpecial,
+            );
             if (path == null) continue;
             materialSections[solid] = path;
             addWallSection(path);
@@ -565,7 +592,9 @@ class ArchitectBuildingSection {
             cutOp.sMax,
             cutOp.zTop,
           );
-          final clippedAperture = Path.combine(
+          final clippedAperture = wall.system.isSpecial
+              ? (Path()..addRect(apertureRect))
+              : Path.combine(
             PathOperation.intersect,
             Path()..addRect(apertureRect),
             wallPath!,
@@ -573,7 +602,7 @@ class ArchitectBuildingSection {
           if (clippedAperture.getBounds().isEmpty) continue;
           wallPath = Path.combine(
             PathOperation.difference,
-            wallPath,
+            wallPath!,
             clippedAperture,
           );
           extraCutMaskPaths.add(clippedAperture);
@@ -616,12 +645,16 @@ class ArchitectBuildingSection {
             )) {
               final raw = materialSections[part];
               if (raw == null) continue;
-              final region = Path.combine(
+              final region = (wall.system.isSpecial
+                  ? ArchitectMeshSection.combine
+                  : Path.combine)(
                 PathOperation.intersect,
                 remaining,
                 raw,
               );
-              remaining = Path.combine(
+              remaining = (wall.system.isSpecial
+                  ? ArchitectMeshSection.combine
+                  : Path.combine)(
                 PathOperation.difference,
                 remaining,
                 region,
@@ -777,7 +810,7 @@ class ArchitectBuildingSection {
                   ? member.polygon
                   : null,
               customFillColor: _roofMemberColor(member),
-              hatchPattern: member.material == ArchitectRoofMaterial.metalSeam
+              hatchPattern: member.material == ArchitectRoofMaterial.metalSeam || member.material==ArchitectRoofMaterial.steel
                   ? ArchitectSectionHatch.preset('metal')
                   : null,
             ),

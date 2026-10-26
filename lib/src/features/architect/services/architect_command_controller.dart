@@ -24,6 +24,8 @@ import 'architect_element_id.dart';
 import 'architect_wall_relations.dart';
 import 'architect_dimension_chain.dart';
 import 'architect_stair_rules.dart';
+import 'architect_panel_supports.dart';
+import 'architect_wall_connection_policy.dart';
 export 'architect_element_id.dart';
 
 /// Commands accept model metres, never screen coordinates or a camera scale.
@@ -51,7 +53,14 @@ abstract class ArchitectModelCommand {
     ArchitectProject project,
     ArchitectStorey next,
   ) => project.copyWith(
-    storeys: [for (final s in project.storeys) s.id == next.id ? next : s],
+    storeys: [
+      for (final s in project.storeys)
+        s.id == next.id
+            ? ArchitectWallConnectionPolicy.validateStorey(
+                ArchitectPanelSupports.synchronize(next, previous: s),
+              )
+            : s,
+    ],
   );
 
   static void newId(ArchitectProject project, String id) {
@@ -193,7 +202,8 @@ class CreateArchitectWall extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     if(wall.layers.isNotEmpty) {
       ArchitectMaterialLayer.validate(wall.layers);
-      final total=wall.layers.fold(0.0,(v,l)=>v+l.thickness);
+      final total=wall.system.additionalDepth +
+          wall.layers.fold(0.0,(v,l)=>v+l.thickness);
       if((wall.thickness-total).abs()>1e-8)throw ArgumentError('Wall thickness differs from composition');
     }
     wall.plinth.validate();
@@ -232,7 +242,9 @@ class UpdateArchitectWall extends ArchitectModelCommand {
     final previous = s.walls.firstWhere((w) => w.id == wall.id);
     if(wall.layers.isNotEmpty) {
       ArchitectMaterialLayer.validate(wall.layers);
-      final total=wall.layers.fold(0.0,(v,l)=>v+l.thickness);
+      final total=
+          wall.system.additionalDepth +
+          wall.layers.fold(0.0,(v,l)=>v+l.thickness);
       if((wall.thickness-total).abs()>1e-8)throw ArgumentError('Wall thickness differs from composition');
     }
     wall.plinth.validate();
@@ -1751,6 +1763,7 @@ class CreateArchitectRoofPlane extends ArchitectModelCommand {
   @override
   ArchitectProject apply(ArchitectProject project) {
     roof.drainage.validate();
+    roof.assembly.panels?.validate(slope:roof.slopeDegrees,mansard:roof.isMansard);
     if (!ArchitectContour.valid(roof.points, roof.holes)) {
       throw ArgumentError('Invalid roof contour');
     }
@@ -1770,6 +1783,7 @@ class UpdateArchitectRoofPlane extends ArchitectModelCommand {
   @override
   ArchitectProject apply(ArchitectProject project) {
     roof.drainage.validate();
+    roof.assembly.panels?.validate(slope:roof.slopeDegrees,mansard:roof.isMansard);
     if (!ArchitectContour.valid(roof.points, roof.holes)) {
       throw ArgumentError('Invalid roof contour');
     }
@@ -1791,6 +1805,7 @@ class ReplaceStoreyRoofs extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     for (final roof in roofs) {
       roof.drainage.validate();
+      roof.assembly.panels?.validate(slope:roof.slopeDegrees,mansard:roof.isMansard);
     }
     final floor = ArchitectModelCommand.storey(project, storeyId);
     return ArchitectModelCommand.replace(project, floor.copyWith(roofs: roofs));
@@ -2081,7 +2096,9 @@ class ArchitectCommandController
   ArchitectCommandController(ArchitectProject project)
     : super(
         ArchitectRoofPlacement.resolve(
-          ArchitectSlabAssemblies.resolve(ArchitectStairRules.resolve(project)),
+          ArchitectPanelSupports.resolve(
+            ArchitectSlabAssemblies.resolve(ArchitectStairRules.resolve(project)),
+          ),
         ),
         historyLimit: historyLimit,
         equivalent: _sameModel,
@@ -2098,7 +2115,12 @@ class ArchitectCommandController
   void commit(ArchitectProject next) => super.commit(
     ArchitectRoofPlacement.resolve(
       ArchitectSlabAssemblies.resolve(
-        ArchitectDimensionChain.resolve(ArchitectStairRules.resolve(next)),
+        ArchitectWallConnectionPolicy.validateProject(
+          ArchitectPanelSupports.resolve(
+            ArchitectDimensionChain.resolve(ArchitectStairRules.resolve(next)),
+            previous: project,
+          ),
+        ),
       ),
       previous: project,
     ),

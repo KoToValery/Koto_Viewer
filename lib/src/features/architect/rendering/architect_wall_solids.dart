@@ -10,6 +10,7 @@ import '../models/architect_wall.dart';
 import '../models/architect_wall_type.dart';
 import 'architect_path_solid.dart';
 import 'architect_wall_layers.dart';
+import 'architect_special_wall_geometry.dart';
 
 class ArchitectWallSolid {
   final ArchitectWall wall;
@@ -17,14 +18,16 @@ class ArchitectWallSolid {
   final Path path;
   final double bottom, top;
   final List<Triangle3D> triangles;
+  final String? componentId;
   const ArchitectWallSolid(
     this.wall,
     this.layer,
     this.path,
     this.bottom,
     this.top,
-    this.triangles,
-  );
+    this.triangles, {
+    this.componentId,
+  });
 }
 
 /// The plan's material ownership is extruded between actual vertical events.
@@ -37,9 +40,12 @@ class ArchitectWallSolids {
     List<ArchitectWallType> types, {
     ArchitectProject? project,
     Set<String> suppressedOpeningIds = const {},
+    Set<String>? specialSuppressedOpeningIds,
   }) {
     final cacheable =
         suppressedOpeningIds.isEmpty &&
+        (specialSuppressedOpeningIds == null ||
+            specialSuppressedOpeningIds.isEmpty) &&
         project != null &&
         identical(types, project.wallTypes);
     if (cacheable) {
@@ -67,6 +73,7 @@ class ArchitectWallSolids {
     };
     final walls = [
       for (final w in storey.walls)
+        if (!w.system.isSpecial)
         () {
           var height = w.effectiveHeight(storey.height);
           if (w.followStoreyHeight && !w.isParapet) {
@@ -269,6 +276,24 @@ class ArchitectWallSolids {
           );
         }
       }
+    }
+    for (final component in ArchitectSpecialWallGeometry.build(
+      storey,
+      project: project,
+      suppressedOpeningIds: specialSuppressedOpeningIds ?? suppressedOpeningIds,
+    )) {
+      final bounds = component.bounds;
+      result.add(
+        ArchitectWallSolid(
+          component.wall,
+          component.layer,
+          component.at((bounds.min.z + bounds.max.z) / 2),
+          bounds.min.z,
+          bounds.max.z,
+          component.triangles,
+          componentId: 'construction:${component.wall.id}:${component.id}',
+        ),
+      );
     }
     if (cacheable) {
       (_cache[project] ??=

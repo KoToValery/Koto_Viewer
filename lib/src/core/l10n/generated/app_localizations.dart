@@ -14830,6 +14830,372 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Drag to rotate the hatch and change its scale. Scale snaps in 10% steps; direction snaps every 45°.'**
   String get architectHatchTransformHelp;
+
+  /// No description provided for @wallSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Construction'**
+  String get wallSystem;
+
+  /// No description provided for @wallSystemLayered.
+  ///
+  /// In en, this message translates to:
+  /// **'Layers'**
+  String get wallSystemLayered;
+
+  /// No description provided for @wallSystemLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Round logs'**
+  String get wallSystemLogs;
+
+  /// No description provided for @wallSystemFrame.
+  ///
+  /// In en, this message translates to:
+  /// **'Stud partition'**
+  String get wallSystemFrame;
+
+  /// No description provided for @wallSystemPanels.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandwich panels'**
+  String get wallSystemPanels;
+
+  /// No description provided for @wallMaterialSteel.
+  ///
+  /// In en, this message translates to:
+  /// **'Steel'**
+  String get wallMaterialSteel;
+
+  /// No description provided for @wallMaterialPir.
+  ///
+  /// In en, this message translates to:
+  /// **'PIR'**
+  String get wallMaterialPir;
+
+  /// No description provided for @wallLogOverlap.
+  ///
+  /// In en, this message translates to:
+  /// **'Overlap (%)'**
+  String get wallLogOverlap;
+
+  /// No description provided for @wallLogTail.
+  ///
+  /// In en, this message translates to:
+  /// **'End extension (× diameter)'**
+  String get wallLogTail;
+
+  /// No description provided for @wallLogPitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Course height'**
+  String get wallLogPitch;
+
+  /// No description provided for @wallStudSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile spacing'**
+  String get wallStudSpacing;
+
+  /// No description provided for @wallStudWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile width'**
+  String get wallStudWidth;
+
+  /// No description provided for @wallMetalThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Metal thickness'**
+  String get wallMetalThickness;
+
+  /// No description provided for @wallCavityInsulation.
+  ///
+  /// In en, this message translates to:
+  /// **'Cavity insulation'**
+  String get wallCavityInsulation;
+
+  /// No description provided for @wallSupportDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Support depth'**
+  String get wallSupportDepth;
+
+  /// No description provided for @wallPanelModule.
+  ///
+  /// In en, this message translates to:
+  /// **'Panel width'**
+  String get wallPanelModule;
+
+  /// No description provided for @wallPanelMount.
+  ///
+  /// In en, this message translates to:
+  /// **'Mounting'**
+  String get wallPanelMount;
+
+  /// No description provided for @wallPanelInFront.
+  ///
+  /// In en, this message translates to:
+  /// **'In front of columns'**
+  String get wallPanelInFront;
+
+  /// No description provided for @wallPanelBetween.
+  ///
+  /// In en, this message translates to:
+  /// **'Between columns'**
+  String get wallPanelBetween;
+
+  /// No description provided for @wallPanelsHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal panels'**
+  String get wallPanelsHorizontal;
+
+  /// No description provided for @wallSystemInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the construction dimensions.'**
+  String get wallSystemInvalid;
+
+  /// No description provided for @wallSystemStraightOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'This system uses straight walls.'**
+  String get wallSystemStraightOnly;
+
+  /// No description provided for @wallLogHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Diameter stays circular. Overlap changes course height; corners alternate by half a course.'**
+  String get wallLogHelp;
+
+  /// No description provided for @wallFrameHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Boards, profiles and cavity insulation have independent dimensions.'**
+  String get wallFrameHelp;
+
+  /// No description provided for @wallPanelHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Panel and support depth are separate. Supports attach to the selected column faces.'**
+  String get wallPanelHelp;
+
+  /// No description provided for @wallColumnSupports.
+  ///
+  /// In en, this message translates to:
+  /// **'Column supports'**
+  String get wallColumnSupports;
+
+  /// No description provided for @wallMountingOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Mounting offset'**
+  String get wallMountingOffset;
+
+  /// No description provided for @wallMissingSupports.
+  ///
+  /// In en, this message translates to:
+  /// **'A support column is missing. Select its replacement.'**
+  String get wallMissingSupports;
+
+  /// No description provided for @wallLogCasing.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening casing'**
+  String get wallLogCasing;
+
+  /// No description provided for @wallLogCasingWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Casing width'**
+  String get wallLogCasingWidth;
+
+  /// No description provided for @wallLogSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement allowance'**
+  String get wallLogSettlement;
+
+  /// No description provided for @architectRoofPresetLogTimber.
+  ///
+  /// In en, this message translates to:
+  /// **'Timber · logs'**
+  String get architectRoofPresetLogTimber;
+
+  /// No description provided for @wallLogDiameter.
+  ///
+  /// In en, this message translates to:
+  /// **'Diameter'**
+  String get wallLogDiameter;
+
+  /// No description provided for @wallRemoveMissingSupports.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove missing'**
+  String get wallRemoveMissingSupports;
+
+  /// No description provided for @roofPanelPitched.
+  ///
+  /// In en, this message translates to:
+  /// **'Panels · pitched'**
+  String get roofPanelPitched;
+
+  /// No description provided for @roofPanelMembrane.
+  ///
+  /// In en, this message translates to:
+  /// **'Panels · membrane'**
+  String get roofPanelMembrane;
+
+  /// No description provided for @roofPanelThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Panel'**
+  String get roofPanelThickness;
+
+  /// No description provided for @roofPanelSkin.
+  ///
+  /// In en, this message translates to:
+  /// **'Skin'**
+  String get roofPanelSkin;
+
+  /// No description provided for @roofPanelModule.
+  ///
+  /// In en, this message translates to:
+  /// **'Module'**
+  String get roofPanelModule;
+
+  /// No description provided for @roofPanelRib.
+  ///
+  /// In en, this message translates to:
+  /// **'Rib height'**
+  String get roofPanelRib;
+
+  /// No description provided for @roofPanelMinSlope.
+  ///
+  /// In en, this message translates to:
+  /// **'Min. pitch'**
+  String get roofPanelMinSlope;
+
+  /// No description provided for @roofPanelFrame.
+  ///
+  /// In en, this message translates to:
+  /// **'Steel frame'**
+  String get roofPanelFrame;
+
+  /// No description provided for @roofPanelBeamDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Beam depth'**
+  String get roofPanelBeamDepth;
+
+  /// No description provided for @roofPanelBeamWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Beam width'**
+  String get roofPanelBeamWidth;
+
+  /// No description provided for @roofPanelWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'Web'**
+  String get roofPanelWeb;
+
+  /// No description provided for @roofPanelFlange.
+  ///
+  /// In en, this message translates to:
+  /// **'Flange'**
+  String get roofPanelFlange;
+
+  /// No description provided for @roofPanelFramesSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame spacing'**
+  String get roofPanelFramesSpacing;
+
+  /// No description provided for @roofPanelPurlinDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Purlin depth'**
+  String get roofPanelPurlinDepth;
+
+  /// No description provided for @roofPanelPurlinWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Purlin flange'**
+  String get roofPanelPurlinWidth;
+
+  /// No description provided for @roofPanelPurlinMetal.
+  ///
+  /// In en, this message translates to:
+  /// **'Purlin gauge'**
+  String get roofPanelPurlinMetal;
+
+  /// No description provided for @roofPanelPurlinSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Purlin spacing'**
+  String get roofPanelPurlinSpacing;
+
+  /// No description provided for @roofPanelCutback.
+  ///
+  /// In en, this message translates to:
+  /// **'Core cutback'**
+  String get roofPanelCutback;
+
+  /// No description provided for @roofPanelUpstand.
+  ///
+  /// In en, this message translates to:
+  /// **'Upstand'**
+  String get roofPanelUpstand;
+
+  /// No description provided for @roofPanelInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the panel and frame dimensions.'**
+  String get roofPanelInvalid;
+
+  /// No description provided for @roofPanelSlopeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Pitch is below the minimum for this system.'**
+  String get roofPanelSlopeInvalid;
+
+  /// No description provided for @roofPanelHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Continuous panels on Z purlins and I beams. Set dimensions and minimum pitch for the selected system.'**
+  String get roofPanelHelp;
+
+  /// No description provided for @roofPanelColumns.
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting columns'**
+  String get roofPanelColumns;
+
+  /// No description provided for @roofGutterPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Position'**
+  String get roofGutterPosition;
+
+  /// No description provided for @roofGutterExternal.
+  ///
+  /// In en, this message translates to:
+  /// **'External'**
+  String get roofGutterExternal;
+
+  /// No description provided for @roofGutterInternal.
+  ///
+  /// In en, this message translates to:
+  /// **'Internal'**
+  String get roofGutterInternal;
+
+  /// No description provided for @roofGutterInternalHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Open box channel at the roof edge. The pipe drops vertically; a structural collision requires another outlet or an opening.'**
+  String get roofGutterInternalHelp;
 }
 
 class _AppLocalizationsDelegate
