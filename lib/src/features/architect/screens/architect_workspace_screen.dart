@@ -33,6 +33,7 @@ import '../services/architect_line_editing.dart';
 import '../services/architect_offset.dart';
 import '../services/architect_rotation.dart';
 import '../widgets/architect_rotation_overlay.dart';
+import '../widgets/architect_hatch_transform_handle.dart';
 import '../widgets/architect_transform_point_input.dart';
 import '../widgets/architect_offset_direction.dart';
 
@@ -3462,6 +3463,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (!mounted) return;
 
     if ((_offsetOptions != null && !identical(_offsetSource, _project)) ||
+        (_hatchTransformSource != null && !identical(_hatchTransformSource, _project)) ||
         (_rotationSource != null && !identical(_rotationSource, _project)) ||
         (_viewDirectionDraft != null && !identical(_viewDirectionDraft!.source, _project))) {
 
@@ -4364,6 +4366,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   ArchitectProject? _rotationSource;
   Set<String> _rotationIds = {};
   Offset _rotationPivot = Offset.zero;
+  ArchitectProject? _hatchTransformSource;
+  int _hatchTransformEpoch = 0;
 
   BimElementOffsetOptions? _offsetOptions;
 
@@ -9636,6 +9640,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _cancelActiveDrags() {
+    _hatchTransformSource = null;
+    _hatchTransformEpoch++;
 
     _viewDirectionDraft = null;
     _rotationSource = null;
@@ -22213,6 +22219,67 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
   }
 
+  Widget _buildHatchTransformHandle() => Positioned.fill(
+    child: AnimatedBuilder(
+      animation: Listenable.merge([_viewport, _previewRevision]),
+      builder: (_, _) {
+        final ids = _effectiveSelection;
+        if (_is3DView || _printPreview || ids.length != 1 ||
+            _multiSelect || _moveSelection || _mirrorActive || _splitActive ||
+            _offsetOptions != null || _rotationSource != null ||
+            _duplicateMove != null || _newPointTargetId != null ||
+            _radialMenuScreenPosition != null || _polygonEditor.active ||
+            _isDraggingVertexOrHandle) {
+          return const SizedBox.shrink();
+        }
+        final hatch = _project.activeStorey.cadPrimitives.where((p) =>
+          p.id == ids.single && p.type == CadPrimitiveType.hatch &&
+          !p.hatchPattern.isSolid && p.hatchPattern.layers.isNotEmpty).firstOrNull;
+        if (hatch == null) return const SizedBox.shrink();
+        return ArchitectHatchTransformHandle(
+          key: ValueKey((_project.activeStoreyId, hatch.id, _hatchTransformEpoch)),
+          hatch: hatch,
+          toScreen: _viewport.toScreen,
+          toModel: _screenToModel,
+          onStart: () => _hatchTransformSource = _project,
+          onPreview: (angle, scale) => _previewHatchTransform(hatch.id, angle, scale),
+          onApply: (angle, scale) {
+            final source = _hatchTransformSource;
+            if (source == null || !identical(source, _project)) return;
+            _previewHatchTransform(hatch.id, angle, scale);
+            final next = _elementMovePreview;
+            _hatchTransformSource = null;
+            _elementMovePreview = null;
+            if (next != null &&
+                ((angle - hatch.hatchAngle).abs() > 1e-8 ||
+                 (scale - hatch.hatchScale).abs() > 1e-8)) {
+              _commands.commit(next);
+              _saveBiMProjectIfAttached();
+            }
+            _repaintPreview();
+          },
+          onCancel: () {
+            _hatchTransformSource = null;
+            _elementMovePreview = null;
+            _repaintPreview();
+          },
+        );
+      },
+    ),
+  );
+
+  void _previewHatchTransform(String id, double angle, double scale) {
+    final source = _hatchTransformSource;
+    if (source == null || !identical(source, _project)) return;
+    _elementMovePreview = source.updateActiveStorey(
+      source.activeStorey.copyWith(cadPrimitives: [
+        for (final p in source.activeStorey.cadPrimitives)
+          p.id == id ? p.copyWith(hatchAngle: angle, hatchScale: scale) : p,
+      ]),
+    );
+    _repaintPreview();
+  }
+
   void _previewRotation(Offset pivot, double angle) {
     final source = _rotationSource;
     if (source == null) return;
@@ -27892,6 +27959,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         Positioned(top: _offsetOptions == null ? 8 : 64, left: 8, right: 8, child: _groupEditBanner()),
 
       _buildPolygonDistanceOverlay(),
+
+      _buildHatchTransformHandle(),
 
       _buildShapeDimensionOverlay(),
 

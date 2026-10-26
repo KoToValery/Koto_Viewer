@@ -4,6 +4,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../services/architect_rotation.dart';
 import '../../bim_editing/widgets/bim_numeric_keypad.dart';
 import '../rendering/architect_snap_helper.dart';
+import '../rendering/architect_angular_guides.dart';
 import 'architect_transform_point_input.dart';
 
 class ArchitectRotationOverlay extends StatefulWidget {
@@ -240,14 +241,13 @@ class _RotationPainter extends CustomPainter {
     final ray = reference == null ? const Offset(1, 0) : reference! - pivot;
     final start = math.atan2(ray.dy, ray.dx);
     if (stage > 0) {
-      final reach = size.longestSide * 2;
-      for (var i = 0; i < 8; i++) {
-        final a = start + i * math.pi / 4;
-        final u = Offset(math.cos(a), math.sin(a));
-        for (var t = 0.0; t < reach; t += 12) {
-          canvas.drawLine(pivot + u * t, pivot + u * (t + 5), guide);
-        }
-      }
+      ArchitectAngularGuides.paint(
+        canvas,
+        size,
+        pivot: pivot,
+        color: color,
+        referenceAngle: start,
+      );
     }
     final ink = Paint()
       ..color = color

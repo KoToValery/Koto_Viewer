@@ -14824,6 +14824,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Preserved'**
   String get roofUiKeptLegend;
+
+  /// No description provided for @architectHatchTransformHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to rotate the hatch and change its scale. Scale snaps in 10% steps; direction snaps every 45°.'**
+  String get architectHatchTransformHelp;
 }
 
 class _AppLocalizationsDelegate

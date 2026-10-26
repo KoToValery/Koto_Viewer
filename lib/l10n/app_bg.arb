@@ -2774,5 +2774,6 @@
     }
   },
   "roofUiNewLegend": "Нов",
-  "roofUiKeptLegend": "Запазени"
+  "roofUiKeptLegend": "Запазени",
+  "architectHatchTransformHelp": "Плъзнете за посока и мащаб на щриховката. Мащабът се захваща през 10%, а посоката — през 45°."
 }

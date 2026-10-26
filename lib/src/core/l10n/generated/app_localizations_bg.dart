@@ -8300,4 +8300,8 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get roofUiKeptLegend => 'Запазени';
+
+  @override
+  String get architectHatchTransformHelp =>
+      'Плъзнете за посока и мащаб на щриховката. Мащабът се захваща през 10%, а посоката — през 45°.';
 }
