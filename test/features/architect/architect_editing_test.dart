@@ -79,6 +79,7 @@ Future<void> ensureSelectionTool(WidgetTester tester) async {
   // Selection is explicitly chosen; drawing tools no longer acquire elements.
   final palette = tester.widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette));
   if (palette.activeTool != ArchitectTool.select) {
+    await tool_ui.prepare(tester, Icons.near_me_outlined);
     await tester.tap(find.byKey(const ValueKey('architect-tool-select')));
     await tester.pumpAndSettle();
   }

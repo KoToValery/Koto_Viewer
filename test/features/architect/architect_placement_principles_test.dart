@@ -174,7 +174,7 @@ void main() {
   );
 
   testWidgets(
-    'Selection tool chooses overlaps; drafting tools prioritize their own type',
+    'Selection chooses overlaps; drafting tools never select existing elements',
     (tester) async {
       final model = editing.seeded(
         ArchitectStorey(
@@ -187,13 +187,13 @@ void main() {
       addTearDown(model.dispose);
       await workspace.open(tester, model);
       final old = model.project;
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tester.tap(find.byIcon(Icons.near_me_outlined));
       await tester.pumpAndSettle();
       await editing.hold(tester, Offset.zero);
       expect(workspace.overlay(tester).selectedElementId, 'c');
       await editing.selectTool(tester, 'wall');
-      await editing.hold(tester, Offset.zero);
-      expect(workspace.overlay(tester).selectedElementId, 'w');
+      await workspace.wallTap(tester, Offset.zero);
+      expect(workspace.overlay(tester).selectedElementId, isNull);
       expect(
         tester
             .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))
@@ -201,8 +201,8 @@ void main() {
         ArchitectTool.wall,
       );
       await editing.selectTool(tester, 'column');
-      await editing.hold(tester, Offset.zero);
-      expect(workspace.overlay(tester).selectedElementId, 'c');
+      await workspace.wallTap(tester, Offset.zero);
+      expect(workspace.overlay(tester).selectedElementId, isNull);
       expect(identical(model.project, old), isTrue);
       expect(tester.takeException(), isNull);
     },
@@ -293,7 +293,7 @@ void main() {
     );
   });
 
-  testWidgets('Hold on empty space resumes placement after a selection', (
+  testWidgets('Explicit drawing tool resumes placement after a selection', (
     tester,
   ) async {
     final model = editing.seeded(
@@ -310,6 +310,7 @@ void main() {
     await editing.selectTool(tester, 'column');
     await editing.hold(tester, Offset.zero);
     expect(workspace.overlay(tester).selectedElementId, 'c');
+    await editing.selectTool(tester, 'column');
     final g = await tester.startGesture(
       workspace.screen(tester, Offset.zero) + const Offset(120, 80),
     );

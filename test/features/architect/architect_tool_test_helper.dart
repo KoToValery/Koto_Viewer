@@ -4,7 +4,8 @@ import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.d
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 
 final toolsByIcon = {
-  Icons.pan_tool_rounded: ArchitectTool.select,
+  Icons.pan_tool_rounded: ArchitectTool.pan,
+  Icons.near_me_outlined: ArchitectTool.select,
   Icons.line_weight_rounded: ArchitectTool.wall,
   Icons.meeting_room_rounded: ArchitectTool.door,
   Icons.window_rounded: ArchitectTool.window,

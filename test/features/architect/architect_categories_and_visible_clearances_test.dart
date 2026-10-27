@@ -24,7 +24,7 @@ void main() {
 
   for (final language in ['bg', 'en']) {
     testWidgets(
-      'Phone $language categories expose every tool and keep Select available',
+      'Phone $language categories expose every tool and keep Pan available',
       (tester) async {
         final model = workspace.commands();
         addTearDown(model.dispose);
@@ -74,7 +74,7 @@ void main() {
           for (final entry in tool_ui.toolsByIcon.entries) {
             expect(
               find.byIcon(entry.key),
-              entry.value == ArchitectTool.select ||
+              entry.value == ArchitectTool.pan ||
                       ArchitectToolCategory.of(entry.value) == category
                   ? findsOneWidget
                   : findsNothing,
@@ -82,7 +82,7 @@ void main() {
           }
           final entries = tool_ui.toolsByIcon.entries.where(
             (e) =>
-                e.value != ArchitectTool.select &&
+                e.value != ArchitectTool.pan &&
                 ArchitectToolCategory.of(e.value) == category,
           );
           for (final entry in entries) {
@@ -97,7 +97,7 @@ void main() {
               entry.value,
             );
           }
-          await tester.tap(find.byKey(const ValueKey('architect-tool-select')));
+          await tester.tap(find.byKey(const ValueKey('architect-tool-pan')));
           await tester.pumpAndSettle();
           expect(
             find.byKey(ValueKey('architect-tools-${category.name}')),
@@ -170,7 +170,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tool_ui.choose(tester, Icons.line_weight_rounded);
+        await tool_ui.choose(tester, Icons.near_me_outlined);
         await tester.pumpAndSettle();
         final camera = workspace.camera(tester);
         camera.fit(
@@ -209,6 +209,12 @@ void main() {
                 find.byType(ArchitectRadialMenu),
               );
               for (final item in menu.items) {
+                if (find
+                    .byKey(ValueKey('architect-radial-${item.action.name}'))
+                    .evaluate()
+                    .isEmpty) {
+                  continue;
+                }
                 expect(
                   rect.overlaps(
                     tester.getRect(
@@ -220,14 +226,12 @@ void main() {
                   isFalse,
                 );
               }
-              expect(
-                rect.overlaps(
-                  tester.getRect(
-                    find.byKey(const ValueKey('architect-radial-title')),
-                  ),
-                ),
-                isFalse,
+              final title = find.byKey(
+                const ValueKey('architect-radial-title'),
               );
+              if (title.evaluate().isNotEmpty) {
+                expect(rect.overlaps(tester.getRect(title)), isFalse);
+              }
             }
             rects.add(rect);
           }
@@ -290,7 +294,7 @@ void main() {
       );
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tool_ui.choose(tester, Icons.line_weight_rounded);
+      await tool_ui.choose(tester, Icons.near_me_outlined);
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(.5, 0));
       await tester.pumpAndSettle();

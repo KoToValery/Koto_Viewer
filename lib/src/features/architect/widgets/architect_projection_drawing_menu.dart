@@ -15,6 +15,7 @@ class ArchitectProjectionDrawingMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = context.l10n;
     final tools = {
+      ArchitectTool.select: (Icons.near_me_outlined, l.architectToolSelect),
       ArchitectTool.cadLine: (Icons.show_chart, l.architectToolCadLine),
       ArchitectTool.cadRect: (Icons.crop_square, l.architectToolCadRect),
       ArchitectTool.hatch: (Icons.texture, l.architectToolHatch),

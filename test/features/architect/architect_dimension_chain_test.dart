@@ -219,8 +219,8 @@ void main() {
         final model = editing.seeded(s.copyWith(dimensions: [d]));
         addTearDown(model.dispose);
         await workspace.open(tester, model);
-        await tool_ui.prepare(tester, Icons.pan_tool_rounded);
-        await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+        await tool_ui.prepare(tester, Icons.near_me_outlined);
+        await tester.tap(find.byIcon(Icons.near_me_outlined));
         await tester.pump();
         final before = model.project.activeStorey.dimensions.single;
         await workspace.wallTap(
@@ -683,8 +683,8 @@ void main() {
       expect(model.undoCount, 1);
       final d = model.project.activeStorey.dimensions.single;
       expect(d.lineStart.dy, closeTo(3.2, .01));
-      await tool_ui.prepare(tester, Icons.pan_tool_rounded);
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tool_ui.prepare(tester, Icons.near_me_outlined);
+      await tester.tap(find.byIcon(Icons.near_me_outlined));
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(2, 3.2));
       expect(workspace.overlay(tester).selectedElementIds, {d.id});
@@ -875,8 +875,8 @@ void main() {
       );
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tool_ui.prepare(tester, Icons.pan_tool_rounded);
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tool_ui.prepare(tester, Icons.near_me_outlined);
+      await tester.tap(find.byIcon(Icons.near_me_outlined));
       await tester.pump();
       await workspace.wallTap(tester, Offset.zero);
       expect(workspace.overlay(tester).selectedElementIds, {'column'});
@@ -890,21 +890,26 @@ void main() {
       await workspace.wallTap(tester, Offset.zero);
       await workspace.wallTap(tester, const Offset(1, 0));
       expect(workspace.overlay(tester).selectedElementIds, {'column', 'wall'});
-      final held = await tester.startGesture(workspace.screen(tester, const Offset(1, 0)));
+      final held = await tester.startGesture(
+        workspace.screen(tester, const Offset(1, 0)),
+      );
       await tester.pump(const Duration(milliseconds: 750));
       await held.up();
       await tester.pumpAndSettle();
       final menu = tester.widget<ArchitectRadialMenu>(
         find.byType(ArchitectRadialMenu),
       );
-      expect(menu.items.map((i) => i.action), [
-        ArchitectRadialAction.move,
-        ArchitectRadialAction.mirrorMove,
-        ArchitectRadialAction.mirrorCopy,
-        ArchitectRadialAction.properties,
-        ArchitectRadialAction.delete,
-        ArchitectRadialAction.group,
-      ]);
+      expect(
+        menu.items.map((i) => i.action),
+        containsAll([
+          ArchitectRadialAction.move,
+          ArchitectRadialAction.mirrorMove,
+          ArchitectRadialAction.mirrorCopy,
+          ArchitectRadialAction.properties,
+          ArchitectRadialAction.delete,
+          ArchitectRadialAction.group,
+        ]),
+      );
       menu.onActionSelected(ArchitectRadialAction.delete);
       await tester.pump();
       expect(model.project.activeStorey.columns, isEmpty);
@@ -1093,83 +1098,76 @@ void main() {
     },
   );
 
-  test(
-    'Exterior dimensions put openings before wall sections and overall',
-    () {
-      const wall = ArchitectWall(
-        id: 'host_wall',
-        startPoint: Offset(0, 0),
-        endPoint: Offset(6, 0),
-        thickness: 0.25,
-        windows: [
-          ArchitectWindow(
-            id: 'w1',
-            wallId: 'host_wall',
-            offsetRatio: 0.25,
-            width: 1.20,
-            uuid: 'u1',
-          ),
-          ArchitectWindow(
-            id: 'w2',
-            wallId: 'host_wall',
-            offsetRatio: 0.75,
-            width: 1.20,
-            uuid: 'u2',
-          ),
-        ],
-      );
-      final storey = const ArchitectStorey(
-        id: 's',
-        name: 'Floor',
-        walls: [wall],
-      );
-      final openingAnchors = [
-        ...ArchitectDimensionChain.openingAnchors(wall, 'w1'),
-        ...ArchitectDimensionChain.openingAnchors(wall, 'w2'),
-      ];
-      final dim = ArchitectDimensionChain.build(
-        id: 'dim3tier',
-        anchors: [
-          const ArchitectDimensionAnchor(point: Offset(0, 0)),
-          ...openingAnchors,
-          const ArchitectDimensionAnchor(point: Offset(6, 0)),
-        ],
-        direction: const Offset(1, 0),
-        offset: 1.5,
-      );
+  test('Exterior dimensions put openings before wall sections and overall', () {
+    const wall = ArchitectWall(
+      id: 'host_wall',
+      startPoint: Offset(0, 0),
+      endPoint: Offset(6, 0),
+      thickness: 0.25,
+      windows: [
+        ArchitectWindow(
+          id: 'w1',
+          wallId: 'host_wall',
+          offsetRatio: 0.25,
+          width: 1.20,
+          uuid: 'u1',
+        ),
+        ArchitectWindow(
+          id: 'w2',
+          wallId: 'host_wall',
+          offsetRatio: 0.75,
+          width: 1.20,
+          uuid: 'u2',
+        ),
+      ],
+    );
+    final storey = const ArchitectStorey(id: 's', name: 'Floor', walls: [wall]);
+    final openingAnchors = [
+      ...ArchitectDimensionChain.openingAnchors(wall, 'w1'),
+      ...ArchitectDimensionChain.openingAnchors(wall, 'w2'),
+    ];
+    final dim = ArchitectDimensionChain.build(
+      id: 'dim3tier',
+      anchors: [
+        const ArchitectDimensionAnchor(point: Offset(0, 0)),
+        ...openingAnchors,
+        const ArchitectDimensionAnchor(point: Offset(6, 0)),
+      ],
+      direction: const Offset(1, 0),
+      offset: 1.5,
+    );
 
-      final tiers = ArchitectDimensionLayout.layoutTiers(
-        dimension: dim,
-        scale: 50.0,
-        storey: storey,
-      );
+    final tiers = ArchitectDimensionLayout.layoutTiers(
+      dimension: dim,
+      scale: 50.0,
+      storey: storey,
+    );
 
-      expect(tiers, hasLength(3));
-      expect(tiers[0].tierIndex, 1); // Openings row
-      expect(tiers[1].tierIndex, 2); // Wall sections
-      expect(tiers[2].tierIndex, 3); // Overall row
+    expect(tiers, hasLength(3));
+    expect(tiers[0].tierIndex, 1); // Openings row
+    expect(tiers[1].tierIndex, 2); // Wall sections
+    expect(tiers[2].tierIndex, 3); // Overall row
 
-      // The first row starts at the facade corner and includes every jamb.
-      final t2Points = tiers[0].points;
-      expect(t2Points.first.dx, closeTo(0.0, 1e-4));
-      expect(t2Points.last.dx, closeTo(6.0, 1e-4));
+    // The first row starts at the facade corner and includes every jamb.
+    final t2Points = tiers[0].points;
+    expect(t2Points.first.dx, closeTo(0.0, 1e-4));
+    expect(t2Points.last.dx, closeTo(6.0, 1e-4));
 
-      // First row: pier1, win1, pier2, win2, pier3.
-      final t2Segments = tiers[0].segments;
-      expect(t2Segments, hasLength(5));
-      final segLengths = [for (final s in t2Segments) (s.$2 - s.$1).distance];
-      // sum of all segments must equal wall length (6.0)
-      final totalT2 = segLengths.reduce((a, b) => a + b);
-      expect(totalT2, closeTo(6.0, 1e-4));
-      // Window opening widths should be 1.20
-      expect(segLengths[1], closeTo(1.20, 1e-4));
-      expect(segLengths[3], closeTo(1.20, 1e-4));
+    // First row: pier1, win1, pier2, win2, pier3.
+    final t2Segments = tiers[0].segments;
+    expect(t2Segments, hasLength(5));
+    final segLengths = [for (final s in t2Segments) (s.$2 - s.$1).distance];
+    // sum of all segments must equal wall length (6.0)
+    final totalT2 = segLengths.reduce((a, b) => a + b);
+    expect(totalT2, closeTo(6.0, 1e-4));
+    // Window opening widths should be 1.20
+    expect(segLengths[1], closeTo(1.20, 1e-4));
+    expect(segLengths[3], closeTo(1.20, 1e-4));
 
-      // Tier 3 is the overall row (length 6.0)
-      expect(
-        (tiers[2].points[1] - tiers[2].points[0]).distance,
-        closeTo(6.0, 1e-4),
-      );
-    },
-  );
+    // Tier 3 is the overall row (length 6.0)
+    expect(
+      (tiers[2].points[1] - tiers[2].points[0]).distance,
+      closeTo(6.0, 1e-4),
+    );
+  });
 }

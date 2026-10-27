@@ -319,7 +319,7 @@ void main() {
       await openWorkspace(tester, commands);
 
       // Switch to Select tool
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tester.tap(find.byIcon(Icons.near_me_outlined));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
       await tester.pumpAndSettle();
@@ -355,7 +355,7 @@ void main() {
       await openWorkspace(tester, commands);
 
       // Select w1
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tester.tap(find.byIcon(Icons.near_me_outlined));
       await tester.pumpAndSettle();
 
       await tester.tapAt(screen(tester, const Offset(2, 0)));
@@ -377,7 +377,7 @@ void main() {
       await openWorkspace(tester, commands);
 
       // Select w1
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tester.tap(find.byIcon(Icons.near_me_outlined));
       await tester.pumpAndSettle();
 
       await tester.tapAt(screen(tester, const Offset(2, 0)));

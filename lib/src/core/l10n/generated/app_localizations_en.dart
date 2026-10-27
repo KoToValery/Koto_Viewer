@@ -7799,18 +7799,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectElevationHint => 'Two points → direction';
 
   @override
-  String get architectSelectModeRect => 'Rectangle';
+  String get architectSelectModeRect => 'Box';
 
   @override
-  String get architectSelectModePolygon => 'Point by point';
+  String get architectSelectModePolygon => 'Polygon';
 
   @override
   String get architectSelectMarqueeHint =>
       'Click or drag opposite corners to select';
-
-  @override
-  String get architectSelectPolygonHint =>
-      'Click points to outline selection area';
 
   @override
   String get architectSelectFinish => 'Select';
@@ -8475,4 +8471,49 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectOffsetContourHint =>
       'Offset every edge of the selected contour. Positive values expand it; negative values shrink it.';
+
+  @override
+  String get architectToolPan => 'Pan view';
+
+  @override
+  String get architectSelectionClear => 'Clear';
+
+  @override
+  String get architectSelectRectangleHint =>
+      'Pick two opposite corners or drag a box. Use two fingers to pan.';
+
+  @override
+  String get architectSelectPolygonHint =>
+      'Place vertices and close the polygon at its first point or with the check button.';
+
+  @override
+  String get architectCategoryEdit => 'Edit';
+
+  @override
+  String get architectSelectReplace => 'Replace';
+
+  @override
+  String get architectSelectAdd => 'Add';
+
+  @override
+  String get architectSelectRemove => 'Remove';
+
+  @override
+  String get architectSelectCrossing => 'Crossing';
+
+  @override
+  String get architectSelectContained => 'Inside';
+
+  @override
+  String get architectSelectCrossingHelp =>
+      'Select elements inside or crossing the selection boundary.';
+
+  @override
+  String get architectSelectContainedHelp =>
+      'Select only elements entirely inside the selection boundary.';
+
+  @override
+  String architectSelectPreviewCount(int count) {
+    return 'After selection: $count';
+  }
 }

@@ -13982,13 +13982,13 @@ abstract class AppLocalizations {
   /// Rectangular marquee selection mode
   ///
   /// In en, this message translates to:
-  /// **'Rectangle'**
+  /// **'Box'**
   String get architectSelectModeRect;
 
   /// Polygonal marquee selection mode
   ///
   /// In en, this message translates to:
-  /// **'Point by point'**
+  /// **'Polygon'**
   String get architectSelectModePolygon;
 
   /// Hint for rectangular marquee selection
@@ -13996,12 +13996,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Click or drag opposite corners to select'**
   String get architectSelectMarqueeHint;
-
-  /// Hint for polygon marquee selection
-  ///
-  /// In en, this message translates to:
-  /// **'Click points to outline selection area'**
-  String get architectSelectPolygonHint;
 
   /// Confirm button for polygon marquee selection
   ///
@@ -15214,6 +15208,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Offset every edge of the selected contour. Positive values expand it; negative values shrink it.'**
   String get architectOffsetContourHint;
+
+  /// No description provided for @architectToolPan.
+  ///
+  /// In en, this message translates to:
+  /// **'Pan view'**
+  String get architectToolPan;
+
+  /// No description provided for @architectSelectionClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get architectSelectionClear;
+
+  /// No description provided for @architectSelectRectangleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick two opposite corners or drag a box. Use two fingers to pan.'**
+  String get architectSelectRectangleHint;
+
+  /// Hint for polygon marquee selection
+  ///
+  /// In en, this message translates to:
+  /// **'Place vertices and close the polygon at its first point or with the check button.'**
+  String get architectSelectPolygonHint;
+
+  /// No description provided for @architectCategoryEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get architectCategoryEdit;
+
+  /// No description provided for @architectSelectReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get architectSelectReplace;
+
+  /// No description provided for @architectSelectAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get architectSelectAdd;
+
+  /// No description provided for @architectSelectRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get architectSelectRemove;
+
+  /// No description provided for @architectSelectCrossing.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossing'**
+  String get architectSelectCrossing;
+
+  /// No description provided for @architectSelectContained.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside'**
+  String get architectSelectContained;
+
+  /// No description provided for @architectSelectCrossingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Select elements inside or crossing the selection boundary.'**
+  String get architectSelectCrossingHelp;
+
+  /// No description provided for @architectSelectContainedHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Select only elements entirely inside the selection boundary.'**
+  String get architectSelectContainedHelp;
+
+  /// No description provided for @architectSelectPreviewCount.
+  ///
+  /// In en, this message translates to:
+  /// **'After selection: {count}'**
+  String architectSelectPreviewCount(int count);
 }
 
 class _AppLocalizationsDelegate

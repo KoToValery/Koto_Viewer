@@ -25,9 +25,11 @@ enum ArchitectToolCategory {
   furnishing,
   views,
   annotations,
-  drawing;
+  drawing,
+  selection;
 
   String label(AppLocalizations l) => switch (this) {
+    selection => l.architectCategoryEdit,
     plan => l.architectCategoryPlan,
     build => l.architectCategoryBuild,
     structure => l.architectCategoryStructure,
@@ -38,10 +40,9 @@ enum ArchitectToolCategory {
   };
 
   static ArchitectToolCategory of(ArchitectTool tool) => switch (tool) {
-    ArchitectTool.select ||
-    ArchitectTool.zone ||
-    ArchitectTool.zoneTable ||
-    ArchitectTool.axis => plan,
+    ArchitectTool.select => selection,
+    ArchitectTool.pan => plan,
+    ArchitectTool.zone || ArchitectTool.zoneTable || ArchitectTool.axis => plan,
     ArchitectTool.wall ||
     ArchitectTool.door ||
     ArchitectTool.window ||
@@ -236,12 +237,13 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   void didUpdateWidget(ArchitectToolPalette oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.drawingOnly &&
+        category != ArchitectToolCategory.selection &&
         category != ArchitectToolCategory.annotations &&
         category != ArchitectToolCategory.drawing) {
       category = ArchitectToolCategory.drawing;
     }
     if (widget.activeTool != oldWidget.activeTool &&
-        widget.activeTool != ArchitectTool.select) {
+        widget.activeTool != ArchitectTool.pan) {
       category = ArchitectToolCategory.of(widget.activeTool);
     }
   }
@@ -368,12 +370,21 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               Row(
                 children: [
                   IconButton(
-                    key: const ValueKey('architect-tool-select'),
-                    tooltip: l10n.architectToolSelect,
-                    onPressed: () => onToolChanged(ArchitectTool.select),
+                    key: const ValueKey('architect-tool-pan'),
+                    tooltip: l10n.architectToolPan,
+                    isSelected: activeTool == ArchitectTool.pan,
+                    style: IconButton.styleFrom(
+                      backgroundColor: activeTool == ArchitectTool.pan
+                          ? const Color(0xFF164E63)
+                          : Colors.transparent,
+                      side: activeTool == ArchitectTool.pan
+                          ? const BorderSide(color: Colors.cyanAccent)
+                          : BorderSide.none,
+                    ),
+                    onPressed: () => onToolChanged(ArchitectTool.pan),
                     icon: Icon(
                       Icons.pan_tool_rounded,
-                      color: activeTool == ArchitectTool.select
+                      color: activeTool == ArchitectTool.pan
                           ? Colors.cyanAccent
                           : Colors.white70,
                     ),
@@ -403,12 +414,19 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                       }
                     },
                     itemBuilder: (_) => [
-                      for (final value in ArchitectToolCategory.values.where(
-                        (c) =>
-                            !widget.drawingOnly ||
-                            c == ArchitectToolCategory.annotations ||
-                            c == ArchitectToolCategory.drawing,
-                      ))
+                      for (final value
+                          in [
+                            ArchitectToolCategory.selection,
+                            ...ArchitectToolCategory.values.where(
+                              (c) => c != ArchitectToolCategory.selection,
+                            ),
+                          ].where(
+                            (c) =>
+                                !widget.drawingOnly ||
+                                c == ArchitectToolCategory.selection ||
+                                c == ArchitectToolCategory.annotations ||
+                                c == ArchitectToolCategory.drawing,
+                          ))
                         PopupMenuItem(
                           value: value,
                           key: ValueKey('architect-category-${value.name}'),
@@ -464,6 +482,12 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                             physics: const BouncingScrollPhysics(),
                             child: Row(
                               children: [
+                                if (category == ArchitectToolCategory.selection)
+                                  _buildToolButton(
+                                    tool: ArchitectTool.select,
+                                    icon: Icons.near_me_outlined,
+                                    label: l10n.architectToolSelect,
+                                  ),
                                 if (category ==
                                     ArchitectToolCategory.of(
                                       ArchitectTool.wall,
@@ -722,6 +746,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           },
           borderRadius: BorderRadius.circular(10),
           child: Container(
+            constraints: const BoxConstraints(minHeight: 44),
             padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),

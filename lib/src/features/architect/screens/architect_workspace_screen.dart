@@ -1,3 +1,4 @@
+import '../widgets/architect_selection_control.dart';
 import '../../../core/services/ui_settings_service.dart';
 
 import '../models/architect_floor_drain.dart';
@@ -1735,6 +1736,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _interactionEpoch++;
 
       _multiSelect = enable;
+      _explicitSelectionOperation = false;
 
       _selectionIds.clear();
 
@@ -3654,6 +3656,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _wallJoinPointer = null;
 
     _multiSelect = false;
+      _explicitSelectionOperation = false;
+      _selectionOperation = ArchitectSelectionOperation.replace;
 
     _moveSelection = false;
 
@@ -3729,6 +3733,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _changeTool(ArchitectTool tool, {bool toggle = true}) => setState(() {
+    if (_activeTool == tool && (tool == ArchitectTool.select || tool == ArchitectTool.pan)) return;
+    _marqueeTool.cancel();
 
     _finishDraftGroup();
 
@@ -3744,7 +3750,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final nextTool =
 
-        (toggle && _activeTool == tool && tool != ArchitectTool.select)
+        (toggle && _activeTool == tool && tool != ArchitectTool.select && tool != ArchitectTool.pan)
 
         ? ArchitectTool.select
 
@@ -3783,6 +3789,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _wallEndpointClearanceId = null;
 
     _multiSelect = false;
+      _explicitSelectionOperation = false;
+      _selectionOperation = ArchitectSelectionOperation.replace;
 
     _moveSelection = false;
 
@@ -3849,6 +3857,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _zoneTool.cancelEditingZone();
 
       _multiSelect = false;
+      _explicitSelectionOperation = false;
+      _selectionOperation = ArchitectSelectionOperation.replace;
 
       _moveSelection = false;
 
@@ -4240,6 +4250,114 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   final Set<String> _selectionIds = {};
   final _marqueeTool = ArchitectMarqueeTool();
+  ArchitectSelectionOperation _selectionOperation =
+      ArchitectSelectionOperation.replace;
+  ArchitectSelectionRelation _selectionRelation =
+      ArchitectSelectionRelation.crossing;
+  bool _explicitSelectionOperation = false;
+  ArchitectSelectionOperation get _activeSelectionOperation =>
+      _explicitSelectionOperation
+      ? _selectionOperation
+      : (_multiSelect
+            ? ArchitectSelectionOperation.add
+            : ArchitectSelectionOperation.replace);
+  (int, ArchitectProject)? _selectionPreviewKey;
+  ({bool active, Set<String> result, Set<String> added, Set<String> removed})
+  _selectionPreviewValue = (
+    active: false,
+    result: <String>{},
+    added: <String>{},
+    removed: <String>{},
+  );
+  List<Offset> get _marqueeEvaluationPolygon =>
+      _marqueeTool.mode == ArchitectSelectMode.polygon
+      ? _marqueeTool.finish()
+      : _marqueeTool.previewPolygon;
+
+  Set<String> _marqueeHits(List<Offset> polygon) {
+    final hits = ArchitectMarqueeTool.evaluateSelection(
+      storey: _project.activeStorey,
+      project: _project,
+      polygon: polygon,
+      includeComponents: _showFurnitureLayer,
+      relation: _selectionRelation,
+    );
+    final editingGroup = _editingGroup;
+    if (editingGroup != null) return hits.intersection(editingGroup.elementIds);
+    if (_selectionRelation == ArchitectSelectionRelation.contained) {
+      for (final group in _project.activeStorey.groups) {
+        if (!hits.containsAll(group.elementIds)) {
+          hits.removeAll(group.elementIds);
+        }
+      }
+    }
+    return _project.activeStorey.expandGroups(hits);
+  }
+
+  ({bool active, Set<String> result, Set<String> added, Set<String> removed})
+  get _selectionPreview {
+    if (!_marqueeTool.isDrafting ||
+        !ArchitectPolygonGeometry.valid(_marqueeEvaluationPolygon)) {
+      return (
+        active: false,
+        result: _effectiveSelection,
+        added: <String>{},
+        removed: <String>{},
+      );
+    }
+    final key = (_previewRevision.value, _project);
+    if (_selectionPreviewKey != key) {
+      final current = Set<String>.of(_effectiveSelection);
+      final result = ArchitectMarqueeTool.combine(
+        current,
+        _marqueeHits(_marqueeEvaluationPolygon),
+        _activeSelectionOperation,
+      );
+      _selectionPreviewValue = (
+        active: true,
+        result: result,
+        added: result.difference(current),
+        removed: current.difference(result),
+      );
+      _selectionPreviewKey = key;
+    }
+    return _selectionPreviewValue;
+  }
+
+  void _setSelectionOperation(ArchitectSelectionOperation operation) {
+    setState(() {
+      _cancelActiveDrags();
+      _marqueeTool.cancel();
+      _moveSelection = false;
+      _selectionOperation = operation;
+      _explicitSelectionOperation = true;
+      _multiSelect = operation != ArchitectSelectionOperation.replace;
+      _selectionCyclePoint = null;
+      _lastTapTime = null;
+      _interactionEpoch++;
+    });
+    _repaintPreview();
+  }
+
+  void _setSelectionRelation(ArchitectSelectionRelation relation) {
+    setState(() {
+      _cancelActiveDrags();
+      _marqueeTool.cancel();
+      _selectionRelation = relation;
+      _interactionEpoch++;
+    });
+    _repaintPreview();
+  }
+  Offset? _selectionBoxDown;
+  Offset? _selectionBoxDownScreen;
+  bool _selectionBoxDragging = false;
+  bool get _showSelectionActions => (_effectiveSelection.isNotEmpty || (_multiSelect && !_explicitSelectionOperation)) &&
+      !_marqueeTool.isDrafting && !_is3DView && _radialMenuScreenPosition == null && _newPointTargetId == null;
+  bool get _showSelectionControl => _activeTool == ArchitectTool.select &&
+      _radialMenuScreenPosition == null && !_moveSelection && _newPointTargetId == null && _offsetOptions == null &&
+      _duplicateMove == null && _rotationSource == null && !_mirrorActive &&
+      !_splitActive && _wallCutIds.isEmpty && _wallExtendId == null &&
+      _cutOpeningTargetId == null && !_terrainDrafting;
 
   Set<String> _groupDragIds = {};
 
@@ -6087,6 +6205,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onPointerDown(PointerDownEvent event) {
+    if (_activeTool == ArchitectTool.pan) return;
 
     if (_draftOverlayContains(event.localPosition)) {
 
@@ -6130,6 +6249,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       return;
 
+    }
+
+    if (_showSelectionControl && _marqueeTool.isDrafting) {
+      _selectionBoxDown = rawModel;
+      _selectionBoxDownScreen = event.localPosition;
+      return;
+    }
+
+    if (_showSelectionControl && _multiSelect && !_moveSelection) {
+      if(_marqueeTool.mode==ArchitectSelectMode.rectangle) {
+        _selectionBoxDown=rawModel;_selectionBoxDownScreen=event.localPosition;
+      }
+      return;
     }
 
     if (_commands.view == ArchitectWorkspaceView.section &&
@@ -7021,6 +7153,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+    if (_showSelectionControl && !_moveSelection &&
+        _marqueeTool.mode == ArchitectSelectMode.rectangle) {
+      _selectionBoxDown = rawModel;
+      _selectionBoxDownScreen = event.localPosition;
+    }
+
     // No handle engaged on pointer-down: free pan/zoom candidate
 
     ArchitectLogger.log(
@@ -7036,6 +7174,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onPointerMove(PointerMoveEvent event) {
+    if (_activeTool == ArchitectTool.pan) return;
+    if (_selectionBoxDown != null && _selectionBoxDownScreen != null &&
+        _marqueeTool.mode == ArchitectSelectMode.rectangle) {
+      if (_selectionBoxDragging || (event.localPosition - _selectionBoxDownScreen!).distance > 8) {
+        if (!_marqueeTool.isDrafting) {
+          setState(() => _marqueeTool.addPoint(_selectionBoxDown!));
+        }
+        _selectionBoxDragging = true;
+        _marqueeTool.updateCandidate(_screenToModel(event.localPosition));
+        _repaintPreview();
+      }
+      return;
+    }
 
     if (_draftCancelPointer == event.pointer) return;
 
@@ -7122,7 +7273,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool get _canPlaceWithMarker =>
 
-      ((_activeTool != ArchitectTool.select && !_selectionContextActive) ||
+      ((_activeTool != ArchitectTool.select && _activeTool != ArchitectTool.pan && !_selectionContextActive) ||
 
           _mirrorActive ||
 
@@ -9441,6 +9592,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onPointerHover(PointerHoverEvent event) {
+    if (_activeTool == ArchitectTool.pan) return;
 
     if (_draftOverlayContains(event.localPosition)) return;
 
@@ -9453,6 +9605,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onPointerUp(PointerUpEvent event) {
+    if (_activeTool == ArchitectTool.pan) return;
+    if (_selectionBoxDragging) {
+      _commitMarquee(rectangleEnd: _screenToModel(event.localPosition));
+      return;
+    }
+    _selectionBoxDown = null;
+    _selectionBoxDownScreen = null;
 
     if (_draftCancelPointer == event.pointer) {
 
@@ -9630,6 +9789,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _cancelActiveDrags() {
+    if (_selectionBoxDragging) _marqueeTool.cancel();
+    _selectionBoxDown = null;
+    _selectionBoxDownScreen = null;
+    _selectionBoxDragging = false;
     _hatchTransformSource = null;
     _hatchTransformEpoch++;
 
@@ -10171,6 +10334,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _handleTap(Offset rawModel) {
+    if (_activeTool == ArchitectTool.pan) return;
+    if (_activeTool == ArchitectTool.select && _marqueeTool.isDrafting) {
+      if (_marqueeTool.mode == ArchitectSelectMode.rectangle) {
+        _commitMarquee(rectangleEnd: rawModel);
+      } else if (_marqueeTool.points.length >= 3 &&
+          (rawModel - _marqueeTool.points.first).distance * _currentScale <= 20) {
+        _commitMarquee();
+      } else {
+        setState(() => _marqueeTool.addPoint(rawModel));
+        _repaintPreview();
+      }
+      return;
+    }
 
     if (_offsetOptions != null) {
 
@@ -10948,79 +11124,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (_activeTool == ArchitectTool.select) {
-      if (_marqueeTool.isDrafting) {
-        if (_marqueeTool.mode == ArchitectSelectMode.rectangle) {
-          _marqueeTool.addPoint(rawModel);
-          final poly = _marqueeTool.previewPolygon;
-          final hits = ArchitectMarqueeTool.evaluateSelection(
-            storey: _project.activeStorey,
-            project: _project,
-            polygon: poly,
-          );
-          setState(() {
-            if (_multiSelect) {
-              _selectionIds.addAll(hits);
-            } else {
-              _selectionIds
-                ..clear()
-                ..addAll(hits);
-            }
-            if (_selectionIds.isNotEmpty) _selectionContextActive = true;
-            _marqueeTool.cancel();
-          });
-          HapticFeedback.selectionClick();
-          return;
-        } else {
-          // Polygon mode
-          if (_marqueeTool.points.length >= 3 &&
-              (rawModel - _marqueeTool.points.first).distance <=
-                  math.min(20.0 / _currentScale, 0.40)) {
-            final poly = _marqueeTool.previewPolygon;
-            final hits = ArchitectMarqueeTool.evaluateSelection(
-              storey: _project.activeStorey,
-              project: _project,
-              polygon: poly,
-            );
-            setState(() {
-              if (_multiSelect) {
-                _selectionIds.addAll(hits);
-              } else {
-                _selectionIds
-                  ..clear()
-                  ..addAll(hits);
-              }
-              if (_selectionIds.isNotEmpty) _selectionContextActive = true;
-              _marqueeTool.cancel();
-            });
-            HapticFeedback.selectionClick();
-            return;
-          } else {
-            setState(() {
-              _marqueeTool.addPoint(rawModel);
-            });
-            HapticFeedback.lightImpact();
-            return;
-          }
-        }
-      }
-
-      if (_selectionContextActive) {
-        _handleSelectionTap(rawModel);
-        return;
-      }
-
-      if (_selectAt(rawModel, toggle: _multiSelect)) {
-        return;
-      }
-
-      setState(() {
-        _marqueeTool.addPoint(rawModel);
-      });
-      HapticFeedback.selectionClick();
+      if (_selectAt(rawModel, toggle: _multiSelect)) return;
+      setState(() => _marqueeTool.addPoint(rawModel));
+      _repaintPreview();
+      HapticFeedback.lightImpact();
       return;
     }
-
-
 
     // A tap selects at the finger/cursor. Only an intentional hold places a
 
@@ -14869,7 +14978,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     child: IgnorePointer(
 
-                      ignoring: _radialMenuScreenPosition != null || _multiSelect,
+                      ignoring: _radialMenuScreenPosition != null || _multiSelect || _marqueeTool.isDrafting,
 
                       child: Tooltip(
 
@@ -14961,7 +15070,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 child: IgnorePointer(
 
-                  ignoring: _radialMenuScreenPosition != null || _multiSelect,
+                  ignoring: _radialMenuScreenPosition != null || _multiSelect || _marqueeTool.isDrafting,
 
                   child: Tooltip(
 
@@ -15185,7 +15294,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             targetId == null ||
 
-            _radialMenuScreenPosition != null || _newPointTargetId != null) {
+            _radialMenuScreenPosition != null || _newPointTargetId != null || _marqueeTool.isDrafting) {
 
           return const SizedBox.shrink();
 
@@ -16496,6 +16605,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool _onSelectionHold(Offset screenPoint) {
+    if (_marqueeTool.isDrafting) return false;
     if (_activeTool != ArchitectTool.select) return false;
 
     if (_wallCutIds.isNotEmpty ||
@@ -16595,6 +16705,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool _onContextHold(Offset screenPoint) {
+    if (_marqueeTool.isDrafting) return false;
     if (_activeTool != ArchitectTool.select) return false;
 
     if (!_selectionContextActive &&
@@ -17926,6 +18037,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _startNewPointSession(String id, {Offset? initialPick}) {
+    _marqueeTool.cancel();
 
     if (initialPick != null) _selectPolygonContour(initialPick);
     final holeIndex = _selectedPolygonHoleIndex;
@@ -19711,7 +19823,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _draftEnd = null;
 
-      if (shouldMulti) {
+      if (_explicitSelectionOperation) {
+        final current=Set<String>.of(_effectiveSelection);
+        final members=_commands.isPlan && _editingGroupId==null
+            ? _project.activeStorey.expandGroups({id}) : {id};
+        _selectionIds..clear()..addAll(ArchitectMarqueeTool.combine(current,members,_selectionOperation));
+      } else if (shouldMulti) {
 
         if (_selectionIds.isEmpty && _selectedElementId != null) {
 
@@ -19764,7 +19881,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       }
 
-      final grouped = _editingGroupId == null && _commands.isPlan && _project.activeStorey.groupFor(id) != null;
+      final grouped = _selectionIds.isNotEmpty && _editingGroupId == null && _commands.isPlan && _project.activeStorey.groupFor(id) != null;
 
       _selectedElementId = grouped ? null : primary;
 
@@ -19776,7 +19893,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _selectionContextActive = true;
 
-        _moveSelection = true;
+        _moveSelection = !_multiSelect;
 
       }
 
@@ -20340,6 +20457,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _selectedElementId = generated.first.id;
         _polygonSelectedEdge = generated.first.safeEavesEdgeIndex;
         _multiSelect = false;
+      _explicitSelectionOperation = false;
+      _selectionOperation = ArchitectSelectionOperation.replace;
       });
       _saveBiMProjectIfAttached();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -21315,115 +21434,69 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  Widget _buildSelectControl() {
-    final l10n = context.l10n;
-    final isPoly = _marqueeTool.mode == ArchitectSelectMode.polygon;
-    final drafting = _marqueeTool.isDrafting;
-
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: const Color(0xE61E293B),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white24),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black38,
-              blurRadius: 6,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SegmentedButton<ArchitectSelectMode>(
-              style: const ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              segments: [
-                ButtonSegment<ArchitectSelectMode>(
-                  value: ArchitectSelectMode.rectangle,
-                  icon: const Icon(Icons.crop_square_rounded, size: 18),
-                  label: Text(
-                    l10n.architectSelectModeRect,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
-                ButtonSegment<ArchitectSelectMode>(
-                  value: ArchitectSelectMode.polygon,
-                  icon: const Icon(Icons.polyline_rounded, size: 18),
-                  label: Text(
-                    l10n.architectSelectModePolygon,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
-              ],
-              selected: {_marqueeTool.mode},
-              onSelectionChanged: (set) {
-                setState(() {
-                  _marqueeTool.setMode(set.first);
-                });
-              },
-            ),
-            if (drafting) ...[
-              const SizedBox(width: 8),
-              if (isPoly && _marqueeTool.points.length >= 3)
-                IconButton(
-                  tooltip: l10n.architectSelectFinish,
-                  icon: const Icon(Icons.check_circle_rounded,
-                      color: Color(0xFF00E676), size: 22),
-                  onPressed: () {
-                    final poly = _marqueeTool.previewPolygon;
-                    final hits = ArchitectMarqueeTool.evaluateSelection(
-                      storey: _project.activeStorey,
-                      project: _project,
-                      polygon: poly,
-                    );
-                    setState(() {
-                      if (_multiSelect) {
-                        _selectionIds.addAll(hits);
-                      } else {
-                        _selectionIds
-                          ..clear()
-                          ..addAll(hits);
-                      }
-                      if (_selectionIds.isNotEmpty) _selectionContextActive = true;
-                      _marqueeTool.cancel();
-                    });
-                    HapticFeedback.selectionClick();
-                  },
-                ),
-              if (isPoly && _marqueeTool.points.isNotEmpty)
-                IconButton(
-                  tooltip: l10n.undoPoint,
-                  icon: const Icon(Icons.undo_rounded,
-                      color: Colors.white70, size: 20),
-                  onPressed: () {
-                    setState(() {
-                      _marqueeTool.removeLastPoint();
-                    });
-                  },
-                ),
-              IconButton(
-                tooltip: l10n.cancel,
-                icon: const Icon(Icons.close_rounded,
-                    color: Colors.redAccent, size: 20),
-                onPressed: () {
-                  setState(() {
-                    _marqueeTool.cancel();
-                  });
-                },
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
+  void _commitMarquee({Offset? rectangleEnd}) {
+    final polygon = _marqueeTool.finish(rectangleEnd: rectangleEnd);
+    if (polygon.isEmpty) {
+      if (_selectionBoxDragging) {
+        setState(() { _selectionBoxDragging = false; _selectionBoxDown = null;
+          _selectionBoxDownScreen = null; _marqueeTool.cancel(); });
+        _repaintPreview();
+      }
+      return;
+    }
+    final result=ArchitectMarqueeTool.combine(Set<String>.of(_effectiveSelection),_marqueeHits(polygon),_activeSelectionOperation);
+    setState(() {
+      _selectionIds..clear()..addAll(result);
+      _selectionBoxDown = null;
+      _selectionBoxDownScreen = null;
+      _selectionBoxDragging = false;
+      _marqueeTool.cancel();
+      _selectedElementId = null;
+      _selectedZoneId = null;
+      _polygonEditId = null;
+      _polygonSelectedEdge = null;
+      _polygonContourElementId = null;
+      _polygonContourIndex = 0;
+      _zoneTool.cancelAll();
+      _axisTool.cancelAll();
+      _axisTool.deselect();
+      final ids = _effectiveSelection;
+      if (ids.length == 1) {
+        _selectedElementId = ids.single;
+        final zone = _project.activeStorey.zones.where((z) => z.id == ids.single).firstOrNull;
+        if (zone != null) {
+          _selectedZoneId = zone.id;
+          _zoneTool.startEditingZone(zone);
+        }
+        if (_selectedHatch != null) _polygonEditId = ids.single;
+      }
+      _selectionContextActive = ids.isNotEmpty;
+      _selectionCyclePoint = null;
+      _lastTapTime = null;
+      _lastTapPos = null;
+    });
+    _repaintPreview();
+    HapticFeedback.selectionClick();
   }
+
+  Widget _buildSelectControl() => ValueListenableBuilder<int>(
+    valueListenable:_previewRevision,
+    builder:(context,revision,child) {
+      final preview=_selectionPreview;
+      return ArchitectSelectionControl(
+        mode:_marqueeTool.mode,drafting:_marqueeTool.isDrafting,
+        canFinish:_marqueeTool.finish().isNotEmpty,canUndo:_marqueeTool.points.isNotEmpty,
+        count:_effectiveSelection.length,previewCount:preview.active?preview.result.length:null,
+        operation:_explicitSelectionOperation?_selectionOperation:(_multiSelect?null:ArchitectSelectionOperation.replace),
+        relation:_selectionRelation,onOperation:_setSelectionOperation,onRelation:_setSelectionRelation,
+        onMode:(mode)=>setState(() { _cancelActiveDrags();_marqueeTool.setMode(mode); }),
+        onFinish:()=>_commitMarquee(),
+        onUndo:() { setState(()=>_marqueeTool.removeLastPoint());_repaintPreview(); },
+        onCancel:() { setState(() { _cancelActiveDrags();_marqueeTool.cancel(); });_repaintPreview(); },
+        onClear:() { _marqueeTool.cancel();_clearSelection(); },
+      );
+    },
+  );
 
   Widget _buildWallSelectionActions(Set<String> wallIds) {
 
@@ -22282,7 +22355,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _multiSelect || _moveSelection || _mirrorActive || _splitActive ||
             _offsetOptions != null || _rotationSource != null ||
             _duplicateMove != null || _newPointTargetId != null ||
-            _radialMenuScreenPosition != null || _polygonEditor.active ||
+            _radialMenuScreenPosition != null || _marqueeTool.isDrafting || _polygonEditor.active ||
             _isDraggingVertexOrHandle) {
           return const SizedBox.shrink();
         }
@@ -26462,6 +26535,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ),
 
+                    if (_showSelectionActions)
+                      Positioned(bottom: 0, left: 0, right: 0, child: _buildSelectionBar()),
                   ],
 
                 ),
@@ -26474,6 +26549,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+              if (_activeTool == ArchitectTool.select && !_is3DView)
+                SizedBox(height:60,child:_showSelectionControl
+                  ? Padding(padding:const EdgeInsets.fromLTRB(8,4,8,4),child:_buildSelectControl())
+                  : const SizedBox.shrink()),
               // Floating Axis Property Inspector Card if an axis is selected
 
               if (!_multiSelect &&
@@ -26512,15 +26591,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-              if ((_effectiveSelection.isNotEmpty || _multiSelect) &&
 
-                  !_is3DView &&
-
-                  _radialMenuScreenPosition == null &&
-
-                  _newPointTargetId == null)
-
-                _buildSelectionBar(),
 
             ],
 
@@ -27226,7 +27297,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         ),
 
-        singlePointerPan: true,
+        singlePointerPan: _activeTool != ArchitectTool.select,
 
         holdToEdit:
 
@@ -27272,7 +27343,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             : (position) => _selectPolygonEdge(_screenToModel(position)),
 
-        isDraggingHandle: () => _newPointTargetId != null || _isActivelyDraggingHandle,
+        isDraggingHandle: () => _selectionBoxDown != null || _newPointTargetId != null || _isActivelyDraggingHandle,
 
         onToolDown: _onPointerDown,
 
@@ -27620,13 +27691,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             Positioned.fill(child: _buildDraftCancel()),
 
-            Positioned(
+            if (!_showSelectionControl) Positioned(
 
               left: 12,
 
               right: 12,
 
-              bottom: 12,
+              bottom: _showSelectionActions ? 60 : 12,
 
               child: IgnorePointer(
 
@@ -28078,8 +28149,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         ),
 
-      if (_activeTool == ArchitectTool.select && _effectiveSelection.isEmpty)
-        Positioned(top: 8, left: 8, child: _buildSelectControl()),
+
 
       if (_activeTool == ArchitectTool.hatch && _effectiveSelection.isEmpty)
 
@@ -29579,6 +29649,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     selectedElementId: _selectedElementId,
 
     selectedElementIds: _effectiveSelection,
+    selectionPreviewActive: layer == ArchitectPaintLayer.interaction && _selectionPreview.active,
+    selectionPreviewIds: layer == ArchitectPaintLayer.interaction ? _selectionPreview.result : const {},
+    selectionPreviewAddedIds: layer == ArchitectPaintLayer.interaction ? _selectionPreview.added : const {},
+    selectionPreviewRemovedIds: layer == ArchitectPaintLayer.interaction ? _selectionPreview.removed : const {},
 
     selectedZoneId: _selectedZoneId,
 
@@ -29660,7 +29734,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     slabCandidatePoint: _elementTool.slabCandidatePoint,
     marqueePoints: _marqueeTool.points,
-    marqueePolygon: _marqueeTool.previewPolygon,
+    marqueePolygon: _marqueeTool.mode==ArchitectSelectMode.polygon && _marqueeTool.points.length>=3
+        ? List<Offset>.of(_marqueeTool.points) : _marqueeTool.previewPolygon,
+    marqueeCandidate: _marqueeTool.mode==ArchitectSelectMode.polygon ? _marqueeTool.candidatePoint : null,
+    marqueeContained: _selectionRelation==ArchitectSelectionRelation.contained,
 
     roofTool: _roofTool,
 

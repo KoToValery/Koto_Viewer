@@ -1,10 +1,12 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
-import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../../bim_editing/geometry/bim_polygon_geometry.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
+import '../models/architect_contour.dart';
+import 'architect_selection.dart';
 
 /// Geometry mode for the architectural selection marquee tool.
 enum ArchitectSelectMode {
@@ -14,6 +16,10 @@ enum ArchitectSelectMode {
   /// Point-by-point arbitrary polygonal marquee contour.
   polygon,
 }
+
+enum ArchitectSelectionOperation { replace, add, remove }
+
+enum ArchitectSelectionRelation { crossing, contained }
 
 /// Controller and geometric evaluator for Archicad-style marquee area selection.
 class ArchitectMarqueeTool {
@@ -35,8 +41,12 @@ class ArchitectMarqueeTool {
   }
 
   void addPoint(Offset pt) {
-    if (points.isNotEmpty && (pt - points.last).distance < 0.05) return;
+    if (points.isNotEmpty &&
+        (pt - points.last).distance < BimPolygonGeometry.epsilon) {
+      return;
+    }
     points.add(pt);
+    candidatePoint = null;
   }
 
   void updateCandidate(Offset pt) {
@@ -60,7 +70,7 @@ class ArchitectMarqueeTool {
     if (points.isEmpty) return const [];
     if (mode == ArchitectSelectMode.rectangle) {
       final p1 = points.first;
-      final p2 = candidatePoint ?? (points.length >= 2 ? points[1] : p1);
+      final p2 = points.length >= 2 ? points[1] : (candidatePoint ?? p1);
       final minX = math.min(p1.dx, p2.dx);
       final maxX = math.max(p1.dx, p2.dx);
       final minY = math.min(p1.dy, p2.dy);
@@ -74,187 +84,236 @@ class ArchitectMarqueeTool {
     } else {
       final res = List<Offset>.from(points);
       if (candidatePoint != null &&
-          (candidatePoint! - points.last).distance > 0.05) {
+          (candidatePoint! - points.last).distance >
+              BimPolygonGeometry.epsilon) {
         res.add(candidatePoint!);
       }
       return res;
     }
   }
 
-  /// Evaluates which elements on [storey] and [project] lie inside or intersect [polygon].
+  /// Commit from the actual final pick, never from a stale hover candidate.
+  List<Offset> finish({Offset? rectangleEnd}) {
+    if (points.isEmpty) return const [];
+    final List<Offset> polygon;
+    if (mode == ArchitectSelectMode.rectangle) {
+      final end =
+          rectangleEnd ?? (points.length > 1 ? points[1] : candidatePoint);
+      if (end == null) return const [];
+      final rect = Rect.fromPoints(points.first, end);
+      polygon = [
+        rect.topLeft,
+        rect.topRight,
+        rect.bottomRight,
+        rect.bottomLeft,
+      ];
+    } else {
+      polygon = List.of(points);
+    }
+    return BimPolygonGeometry.valid(polygon) ? polygon : const [];
+  }
+
+  static Set<String> combine(
+    Set<String> current,
+    Set<String> hits,
+    ArchitectSelectionOperation operation,
+  ) => switch (operation) {
+    ArchitectSelectionOperation.replace => Set.of(hits),
+    ArchitectSelectionOperation.add => {...current, ...hits},
+    ArchitectSelectionOperation.remove => Set.of(current)..removeAll(hits),
+  };
+
   static Set<String> evaluateSelection({
     required ArchitectStorey storey,
     required ArchitectProject project,
     required List<Offset> polygon,
+    bool includeComponents = true,
+    ArchitectSelectionRelation relation = ArchitectSelectionRelation.crossing,
   }) {
-    if (polygon.length < 3) return const {};
-    final selectedIds = <String>{};
-
-    bool ptInside(Offset pt) => BimPolygonGeometry.contains(polygon, pt);
-
-    bool segmentIntersects(Offset a, Offset b) {
-      if (ptInside(a) || ptInside(b)) return true;
-      for (int i = 0; i < polygon.length; i++) {
-        final e1 = polygon[i];
-        final e2 = polygon[(i + 1) % polygon.length];
-        if (BimLineGeometry.intersection(a, b, e1, e2,
-                firstFinite: true, secondFinite: true) !=
-            null) {
+    if (!BimPolygonGeometry.valid(polygon)) return const {};
+    final selected = <String>{};
+    final marquee = Path()..addPolygon(polygon, true);
+    final bounds = marquee.getBounds();
+    bool inside(Offset p) =>
+        marquee.contains(p) ||
+        List.generate(
+          polygon.length,
+          (i) =>
+              (p -
+                      BimLineGeometry.closest(
+                        p,
+                        polygon[i],
+                        polygon[(i + 1) % polygon.length],
+                      ))
+                  .distance <=
+              1e-7,
+        ).any((hit) => hit);
+    bool segment(Offset a, Offset b) {
+      if (relation == ArchitectSelectionRelation.contained) {
+        if (!inside(a) || !inside(b)) return false;
+        final cuts = <double>[0, 1];
+        for (var i = 0; i < polygon.length; i++) {
+          final hit = BimLineGeometry.intersection(
+            a,
+            b,
+            polygon[i],
+            polygon[(i + 1) % polygon.length],
+            firstFinite: true,
+            secondFinite: true,
+          );
+          if (hit != null) cuts.add(BimLineGeometry.parameter(hit, a, b));
+          if ((polygon[i] - BimLineGeometry.closest(polygon[i], a, b))
+                  .distance <=
+              1e-7) {
+            cuts.add(BimLineGeometry.parameter(polygon[i], a, b));
+          }
+        }
+        cuts.sort();
+        for (var i = 1; i < cuts.length; i++) {
+          if (!inside(a + (b - a) * ((cuts[i - 1] + cuts[i]) / 2))) {
+            return false;
+          }
+        }
+        return true;
+      }
+      if (inside(a) || inside(b)) return true;
+      for (var i = 0; i < polygon.length; i++) {
+        if (BimPolygonGeometry.segmentsIntersect(
+          a,
+          b,
+          polygon[i],
+          polygon[(i + 1) % polygon.length],
+        )) {
           return true;
         }
       }
       return false;
     }
 
-    bool polyIntersects(List<Offset> poly) {
-      if (poly.isEmpty) return false;
-      for (final pt in poly) {
-        if (ptInside(pt)) return true;
+    bool region(Path path) {
+      final shapeBounds = path.getBounds();
+      if (!bounds.overlaps(shapeBounds) ||
+          !path.computeMetrics().any(
+            (m) => m.length > BimPolygonGeometry.epsilon,
+          )) {
+        return false;
       }
-      for (int i = 0; i < poly.length; i++) {
-        final a = poly[i];
-        final b = poly[(i + 1) % poly.length];
-        for (int j = 0; j < polygon.length; j++) {
-          final e1 = polygon[j];
-          final e2 = polygon[(j + 1) % polygon.length];
-          if (BimLineGeometry.intersection(a, b, e1, e2,
-                  firstFinite: true, secondFinite: true) !=
-              null) {
-            return true;
-          }
-        }
-      }
-      // Marquee is completely inside the element's polygon
-      if (BimPolygonGeometry.contains(poly, polygon.first)) return true;
-      return false;
+      final operation = relation == ArchitectSelectionRelation.contained
+          ? PathOperation.difference
+          : PathOperation.intersect;
+      final hasRegion = Path.combine(
+        operation,
+        relation == ArchitectSelectionRelation.contained ? path : marquee,
+        relation == ArchitectSelectionRelation.contained ? marquee : path,
+      ).computeMetrics().any((m) => m.length > 1e-7);
+      return relation == ArchitectSelectionRelation.contained
+          ? !hasRegion
+          : hasRegion;
     }
 
-    // 1. Walls
+    bool contour(List<Offset> outer, [List<List<Offset>> holes = const []]) =>
+        region(ArchitectContour.path(outer, holes));
+
     for (final wall in storey.walls) {
-      if (segmentIntersects(wall.startPoint, wall.endPoint) ||
-          polyIntersects(wall.polygonCorners)) {
-        selectedIds.add(wall.id);
-        for (final d in wall.doors) {
-          selectedIds.add(d.id);
+      if (contour(wall.polygonCorners)) selected.add(wall.id);
+      // Hosted openings are picked by their own footprint, not by their host.
+      for (final door in wall.doors) {
+        if (region(
+          ArchitectSelection.openingOutline(wall, door.offsetRatio, door.width),
+        )) {
+          selected.add(door.id);
         }
-        for (final w in wall.windows) {
-          selectedIds.add(w.id);
+      }
+      for (final window in wall.windows) {
+        if (region(
+          ArchitectSelection.openingOutline(
+            wall,
+            window.offsetRatio,
+            window.width,
+          ),
+        )) {
+          selected.add(window.id);
         }
       }
     }
-
-    // 2. Columns
-    for (final col in storey.columns) {
-      final rect = Rect.fromCenter(
-        center: col.position,
-        width: col.width,
-        height: col.depth,
-      );
-      if (ptInside(col.position) ||
-          polyIntersects([
-            rect.topLeft,
-            rect.topRight,
-            rect.bottomRight,
-            rect.bottomLeft,
-          ])) {
-        selectedIds.add(col.id);
+    for (final column in storey.columns) {
+      if (region(ArchitectSelection.columnOutline(column))) {
+        selected.add(column.id);
       }
     }
-
-    // 3. Beams
     for (final beam in storey.beams) {
-      if (segmentIntersects(beam.startPoint, beam.endPoint)) {
-        selectedIds.add(beam.id);
-      }
+      if (contour(beam.polygonCorners)) selected.add(beam.id);
     }
-
-    // 4. Slabs
     for (final slab in storey.slabs) {
-      if (polyIntersects(slab.polygon)) {
-        selectedIds.add(slab.id);
-      }
+      if (contour(slab.polygon, slab.holes)) selected.add(slab.id);
     }
-
-    // 5. Roofs
     for (final roof in storey.roofs) {
-      if (polyIntersects(roof.points)) {
-        selectedIds.add(roof.id);
-      }
+      if (contour(roof.points, roof.holes)) selected.add(roof.id);
     }
-
-    // 6. Zones
     for (final zone in storey.zones) {
-      if (polyIntersects(zone.polygon) || ptInside(zone.centroid)) {
-        selectedIds.add(zone.id);
+      if (contour(zone.polygon)) selected.add(zone.id);
+    }
+    for (final primitive in storey.cadPrimitives) {
+      if (primitive.type == CadPrimitiveType.line) {
+        if (segment(primitive.startPoint, primitive.endPoint)) {
+          selected.add(primitive.id);
+        }
+      } else if (primitive.isPolygon) {
+        if (contour(primitive.polygonCorners, primitive.holes)) {
+          selected.add(primitive.id);
+        }
+      } else if (primitive.type == CadPrimitiveType.circle) {
+        if (region(
+          Path()..addOval(
+            Rect.fromCircle(
+              center: primitive.startPoint,
+              radius: (primitive.endPoint - primitive.startPoint).distance,
+            ),
+          ),
+        )) {
+          selected.add(primitive.id);
+        }
       }
     }
-
-    // 7. CAD Primitives (lines, rectangles, circles, hatches, text)
-    for (final prim in storey.cadPrimitives) {
-      if (prim.type == CadPrimitiveType.line) {
-        if (segmentIntersects(prim.startPoint, prim.endPoint)) {
-          selectedIds.add(prim.id);
-        }
-      } else if (prim.isPolygon) {
-        if (polyIntersects(prim.polygonCorners)) {
-          selectedIds.add(prim.id);
-        }
-      } else {
-        if (ptInside(prim.startPoint) || ptInside(prim.endPoint)) {
-          selectedIds.add(prim.id);
-        }
-      }
+    for (final opening in storey.openings) {
+      if (contour(opening.boundary)) selected.add(opening.id);
     }
-
-    // 8. Dimensions
-    for (final dim in storey.dimensions) {
-      if (dim.anchors.any((a) => ptInside(a.point)) ||
-          segmentIntersects(dim.startPoint, dim.endPoint) ||
-          segmentIntersects(dim.lineStart, dim.lineEnd)) {
-        selectedIds.add(dim.id);
-      }
+    for (final dimension in storey.dimensions) {
+      final hit = relation == ArchitectSelectionRelation.contained
+          ? dimension.anchors.every((a) => inside(a.point)) &&
+                segment(dimension.lineStart, dimension.lineEnd)
+          : dimension.anchors.any((a) => inside(a.point)) ||
+                segment(dimension.lineStart, dimension.lineEnd);
+      if (hit) selected.add(dimension.id);
     }
-
-    // 9. Grid axes
     for (final axis in project.gridAxes) {
-      if (segmentIntersects(axis.start, axis.end)) {
-        selectedIds.add(axis.id);
+      if (segment(axis.start, axis.end)) selected.add(axis.id);
+    }
+    for (final section in project.sections) {
+      if (relation == ArchitectSelectionRelation.contained
+          ? section.segments.every((s) => segment(s.start, s.end))
+          : section.segments.any((s) => segment(s.start, s.end))) {
+        selected.add(section.id);
       }
     }
-
-    // 10. Sections & Elevations
-    for (final s in project.sections) {
-      if (segmentIntersects(s.start, s.end)) {
-        selectedIds.add(s.id);
+    for (final elevation in project.elevations) {
+      if (relation == ArchitectSelectionRelation.contained
+          ? elevation.segments.every((s) => segment(s.start, s.end))
+          : elevation.segments.any((s) => segment(s.start, s.end))) {
+        selected.add(elevation.id);
       }
     }
-    for (final e in project.elevations) {
-      if (segmentIntersects(e.start, e.end)) {
-        selectedIds.add(e.id);
+    for (final drain in storey.floorDrains) {
+      if (contour(drain.polygon, drain.holes)) selected.add(drain.id);
+    }
+    if (includeComponents) {
+      for (final component in storey.components.where((c) => c.isVisible)) {
+        if (contour(component.worldPolygonCorners)) selected.add(component.id);
       }
     }
-
-    // 11. Floor drains
-    for (final d in storey.floorDrains) {
-      if (ptInside(d.position) || polyIntersects(d.polygon)) {
-        selectedIds.add(d.id);
-      }
+    for (final stair in storey.stairs) {
+      if (region(stair.plan.path)) selected.add(stair.id);
     }
-
-    // 12. Components / furniture
-    for (final c in storey.components) {
-      if (ptInside(c.position)) {
-        selectedIds.add(c.id);
-      }
-    }
-
-    // 13. Stairs
-    for (final st in storey.stairs) {
-      if (segmentIntersects(st.startPoint, st.endPoint)) {
-        selectedIds.add(st.id);
-      }
-    }
-
-    return selectedIds;
+    return selected;
   }
 }

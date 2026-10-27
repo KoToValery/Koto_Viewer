@@ -1,3 +1,4 @@
+import 'architect_selection_painter.dart';
 import '../models/architect_line_style.dart';
 import '../models/architect_hatch_pattern.dart';
 import 'architect_clearance_badge_layout.dart';
@@ -65,6 +66,7 @@ enum ArchitectTool {
   floorDrain,
   section,
   elevation,
+  pan,
 }
 
 enum WallDraftingMode { singleLine, chained }
@@ -109,6 +111,10 @@ class Architect2dPainter extends CustomPainter {
   final ArchitectDoor? doorPreview;
   final ArchitectWindow? windowPreview;
   final Set<String> selectedElementIds;
+  final bool selectionPreviewActive;
+  final Set<String> selectionPreviewIds, selectionPreviewAddedIds, selectionPreviewRemovedIds;
+  final bool marqueeContained;
+  final Offset? marqueeCandidate;
   final Path? dimensionWallObstacles;
   final String? activeSnapLabel;
   final String? selectedElementId;
@@ -237,6 +243,9 @@ class Architect2dPainter extends CustomPainter {
     this.doorPreview,
     this.windowPreview,
     this.selectedElementIds = const {},
+    this.selectionPreviewActive=false,
+    this.selectionPreviewIds=const {},this.selectionPreviewAddedIds=const {},this.selectionPreviewRemovedIds=const {},
+    this.marqueeContained=false,this.marqueeCandidate,
     this.dimensionWallObstacles,
     this.activeSnapLabel,
     this.selectedElementId,
@@ -462,18 +471,22 @@ class Architect2dPainter extends CustomPainter {
         _drawZoneSchedule(canvas);
         _drawSelectedElement(canvas);
       }
-      _drawPolygonEditing(canvas);
+      if(marqueePoints.isEmpty) _drawPolygonEditing(canvas);
       _drawWallEndpointLeaderLine(canvas);
       _drawNewPointPreview(canvas);
       _drawActiveDrafting(canvas);
-      for (final id in selectedElementIds) {
-        canvas.drawPath(
-          ArchitectSelection.outline(project, id),
-          Paint()
-            ..color = Colors.cyan
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2 / zoomScale,
-        );
+      for(final id in selectionPreviewActive?selectionPreviewIds:selectedElementIds) {
+        final outline=ArchitectSelection.outline(project,id);
+        if(selectionPreviewActive && selectionPreviewAddedIds.contains(id)) {
+          ArchitectSelectionPainter.preview(canvas,outline,zoomScale,palette);
+        } else {
+          ArchitectSelectionPainter.outline(canvas,outline,zoomScale,palette);
+        }
+      }
+      if(selectionPreviewActive) {
+        for(final id in selectionPreviewRemovedIds) {
+          ArchitectSelectionPainter.preview(canvas,ArchitectSelection.outline(project,id),zoomScale,palette,removed:true);
+        }
       }
       ArchitectElementsPainterHelper.drawActiveElementsDrafting(
         canvas: canvas,
@@ -723,6 +736,7 @@ class Architect2dPainter extends CustomPainter {
   }
 
   void _drawSelectedWallHandles(Canvas canvas, ArchitectWall wall) {
+    if(marqueePoints.isNotEmpty) return;
     final draftingScale = math.max(zoomScale, 80.0);
     const vertexColor = Color(0xFF00BCD4);
 
@@ -1645,54 +1659,9 @@ class Architect2dPainter extends CustomPainter {
       }
     }
 
-    // --- MARQUEE SELECTION PREVIEW (Archicad-style dashed frame) ---
     if (marqueePoints.isNotEmpty) {
-      final poly = marqueePolygon;
-      if (poly.length >= 3) {
-        final fillPath = Path()..addPolygon(poly, true);
-        canvas.drawPath(
-          fillPath,
-          Paint()
-            ..color = const Color(0xFF00E5FF).withValues(alpha: 0.14)
-            ..style = PaintingStyle.fill,
-        );
-
-        final darkUnderlay = Paint()
-          ..color = const Color(0xCC000000)
-          ..strokeWidth = 2.4 / draftingScale
-          ..style = PaintingStyle.stroke;
-        final cyanDash = Paint()
-          ..color = const Color(0xFF00E5FF)
-          ..strokeWidth = 1.6 / draftingScale
-          ..style = PaintingStyle.stroke;
-
-        for (int i = 0; i < poly.length; i++) {
-          final p1 = poly[i];
-          final p2 = poly[(i + 1) % poly.length];
-          _drawDashedLine(canvas, p1, p2, darkUnderlay, draftingScale);
-          _drawDashedLine(canvas, p1, p2, cyanDash, draftingScale);
-        }
-      } else if (poly.length == 2) {
-        final p1 = poly[0];
-        final p2 = poly[1];
-        final darkUnderlay = Paint()
-          ..color = const Color(0xCC000000)
-          ..strokeWidth = 2.4 / draftingScale;
-        final cyanDash = Paint()
-          ..color = const Color(0xFF00E5FF)
-          ..strokeWidth = 1.6 / draftingScale;
-        _drawDashedLine(canvas, p1, p2, darkUnderlay, draftingScale);
-        _drawDashedLine(canvas, p1, p2, cyanDash, draftingScale);
-      }
-
-      for (int i = 0; i < marqueePoints.length; i++) {
-        _drawDraftMarker(
-          canvas,
-          marqueePoints[i],
-          draftingScale: draftingScale,
-          isStart: i == 0,
-        );
-      }
+      ArchitectSelectionPainter.marquee(canvas, marqueePolygon, marqueePoints, zoomScale, palette,
+        contained:marqueeContained,candidate:marqueeCandidate);
     }
     if (activeTool == ArchitectTool.wall &&
         cursorPosition != null &&

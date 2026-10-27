@@ -237,7 +237,7 @@ void main() {
         addTearDown(model.dispose);
         model.replaceView(model.project.copyWith(gridAxes: scene.axes));
         await workspace.open(tester, model);
-        await tool_ui.choose(tester, Icons.pan_tool_rounded);
+        await tool_ui.choose(tester, Icons.near_me_outlined);
         await tester.pumpAndSettle();
         await workspace.wallTap(
           tester,

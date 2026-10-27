@@ -21,8 +21,8 @@ Future<void> selectDimension(
   WidgetTester tester,
   ArchitectDimension dimension,
 ) async {
-  await tool_ui.prepare(tester, Icons.pan_tool_rounded);
-  await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+  await tool_ui.prepare(tester, Icons.near_me_outlined);
+  await tester.tap(find.byIcon(Icons.near_me_outlined));
   await tester.pumpAndSettle();
   await workspace.wallTap(
     tester,

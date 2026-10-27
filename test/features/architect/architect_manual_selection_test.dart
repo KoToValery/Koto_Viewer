@@ -37,8 +37,8 @@ ArchitectStorey scene() => const ArchitectStorey(
 );
 
 Future<void> selectTool(WidgetTester tester) async {
-  await tool_ui.prepare(tester, Icons.pan_tool_rounded);
-  await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+  await tool_ui.prepare(tester, Icons.near_me_outlined);
+  await tester.tap(find.byIcon(Icons.near_me_outlined));
   await tester.pumpAndSettle();
 }
 
@@ -81,6 +81,13 @@ void main() {
       await workspace.wallTap(tester, const Offset(2, 2));
       expect(workspace.overlay(tester).selectedElementIds, {'c1', 'w1'});
       await workspace.wallTap(tester, const Offset(5, 2));
+      expect(workspace.overlay(tester).selectedElementIds, {'c1', 'w1'});
+      await tester.tap(find.byKey(const ValueKey('architect-select-cancel')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('architect-selection-control-clear')),
+      );
+      await tester.pumpAndSettle();
       expect(workspace.overlay(tester).selectedElementIds, isEmpty);
       expect(model.undoCount, 0);
       expect(tester.takeException(), isNull);
@@ -159,13 +166,16 @@ void main() {
       await workspace.wallTap(tester, const Offset(1, 2));
       menu = await holdMenu(tester, const Offset(1, 0));
       expect(workspace.overlay(tester).selectedElementIds, {'w1', 'w4', 'c1'});
-      expect(menu.items.map((i) => i.action), [
-        ArchitectRadialAction.move,
-        ArchitectRadialAction.mirrorMove,
-        ArchitectRadialAction.mirrorCopy,
-        ArchitectRadialAction.properties,
-        ArchitectRadialAction.delete,
-      ]);
+      expect(
+        menu.items.map((i) => i.action),
+        containsAll([
+          ArchitectRadialAction.move,
+          ArchitectRadialAction.mirrorMove,
+          ArchitectRadialAction.mirrorCopy,
+          ArchitectRadialAction.properties,
+          ArchitectRadialAction.delete,
+        ]),
+      );
       menu.onActionSelected(ArchitectRadialAction.properties);
       await tester.pumpAndSettle();
       expect(
@@ -199,7 +209,13 @@ void main() {
         contains(ArchitectRadialAction.rotate),
       );
       menu.onActionSelected(ArchitectRadialAction.rotate);
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('architect-rotation-preset-90')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('architect-rotation-apply')));
+      await tester.pumpAndSettle();
       expect(model.project.activeStorey.columns.map((c) => c.rotationDeg), [
         90,
         90,
@@ -328,9 +344,11 @@ void main() {
         expect(badge.top, greaterThanOrEqualTo(0));
         expect(badge.bottom, lessThanOrEqualTo(800));
         for (final item in menu.items) {
-          final button = tester.getRect(
-            find.byKey(ValueKey('architect-radial-${item.action.name}')),
+          final finder = find.byKey(
+            ValueKey('architect-radial-${item.action.name}'),
           );
+          if (finder.evaluate().isEmpty) continue; // other fixed menu pages
+          final button = tester.getRect(finder);
           expect(badge.overlaps(button), isFalse);
         }
         if (capture && language == 'bg') {

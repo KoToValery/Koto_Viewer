@@ -290,9 +290,11 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.cadPrimitives.single.hatchScale, 1.3);
+      await tester.tap(find.byKey(const ValueKey('architect-tool-pan')));
+      await tester.pumpAndSettle();
       final camera = workspace.camera(tester);
       final before = camera.translation;
-      // The guide painter has no input surface; ordinary blank-space drags pan.
+      // The hand owns one-pointer navigation.
       final pan = await tester.startGesture(
         tester.getTopLeft(
               find.byKey(const ValueKey('architect-viewport-input')),

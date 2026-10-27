@@ -184,6 +184,26 @@ class ArchitectSelection {
     return null;
   }
 
+  static Path openingOutline(ArchitectWall wall, double ratio, double width) {
+    final p = wall.centerPointAt(ratio);
+    final u = wall.tangentAt(ratio) * width / 2;
+    final n = wall.normalAt(ratio) * wall.thickness / 2;
+    return Path()..addPolygon([p-u-n,p+u-n,p+u+n,p-u+n],true);
+  }
+
+  static Path columnOutline(ArchitectColumn column) {
+    if (column.shape == ColumnShape.circular) {
+      return Path()..addOval(Rect.fromCircle(center:column.position,radius:column.width/2));
+    }
+    final angle=column.rotationDeg*math.pi/180;
+    Offset rotate(Offset p)=>column.position+Offset(
+      p.dx*math.cos(angle)-p.dy*math.sin(angle),p.dx*math.sin(angle)+p.dy*math.cos(angle));
+    return Path()..addPolygon([
+      Offset(-column.width/2,-column.depth/2),Offset(column.width/2,-column.depth/2),
+      Offset(column.width/2,column.depth/2),Offset(-column.width/2,column.depth/2),
+    ].map(rotate).toList(),true);
+  }
+
   static Path outline(ArchitectProject project, String id) {
     final s = project.activeStorey;
     final path = Path();
@@ -206,34 +226,12 @@ class ArchitectSelection {
         ...w.windows.map((e) => (e.id, e.offsetRatio, e.width)),
       ]) {
         if (o.$1 != id) continue;
-        final p = w.centerPointAt(o.$2);
-        final u = w.tangentAt(o.$2) * o.$3 / 2, n = w.normalAt(o.$2) * w.thickness / 2;
-        return path
-          ..addPolygon([p - u - n, p + u - n, p + u + n, p - u + n], true);
+        return openingOutline(w, o.$2, o.$3);
       }
     }
     for (final c in s.columns) {
       if (c.id != id) continue;
-      if (c.shape == ColumnShape.circular) {
-        return path
-          ..addOval(Rect.fromCircle(center: c.position, radius: c.width / 2));
-      }
-      final a = c.rotationDeg * math.pi / 180;
-      Offset rotate(Offset p) =>
-          c.position +
-          Offset(
-            p.dx * math.cos(a) - p.dy * math.sin(a),
-            p.dx * math.sin(a) + p.dy * math.cos(a),
-          );
-      return path..addPolygon(
-        [
-          Offset(-c.width / 2, -c.depth / 2),
-          Offset(c.width / 2, -c.depth / 2),
-          Offset(c.width / 2, c.depth / 2),
-          Offset(-c.width / 2, c.depth / 2),
-        ].map(rotate).toList(),
-        true,
-      );
+      return columnOutline(c);
     }
     for (final b in s.beams) {
       if (b.id == id) return path..addPolygon(b.polygonCorners, true);

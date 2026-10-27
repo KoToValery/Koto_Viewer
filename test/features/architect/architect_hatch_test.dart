@@ -663,6 +663,7 @@ void main() {
         CadPrimitiveType.hatch,
       );
       expect(model.project.activeStorey.slabs, isEmpty);
+      await tools.prepare(tester, Icons.near_me_outlined);
       await tester.tap(find.byKey(const ValueKey('architect-tool-select')));
       await tester.pumpAndSettle();
       await editing.hold(tester, const Offset(3, 2));
@@ -712,7 +713,7 @@ void main() {
       );
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tools.choose(tester, Icons.pan_tool_rounded);
+      await tools.choose(tester, Icons.near_me_outlined);
       await tester.pumpAndSettle();
       await editing.hold(tester, const Offset(3, 2));
       expect(

@@ -203,10 +203,12 @@ void main() {
         ),
       ]);
       await open(tester, model);
-      await tool_ui.choose(tester, Icons.view_column_rounded);
+      await tool_ui.choose(tester, Icons.near_me_outlined);
       await tester.pumpAndSettle();
       await tester.longPressAt(screen(tester, original));
       await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('architect-selection-move')));
+      await tester.pumpAndSettle();
       var commits = 0;
       model.addListener(() => commits++);
       final grab = original + const Offset(.05, .04);

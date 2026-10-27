@@ -274,61 +274,64 @@ void main() {
     );
     expect(identical(model.project, old), isTrue);
   });
-  testWidgets(
-    'Quick touch selects without moving; swipe pans; hold enables editing',
-    (tester) async {
-      final a = editing.wall('a', Offset.zero, const Offset(4, 0));
-      final model = editing.seeded(
-        ArchitectStorey(id: 's', name: 's', walls: [a]),
-      );
-      addTearDown(model.dispose);
-      await workspace.open(tester, model);
-      await tool_ui.prepare(tester, Icons.pan_tool_rounded);
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
-      await tester.pumpAndSettle();
-      final old = model.project;
-      await workspace.wallTap(tester, const Offset(2, 0));
-      expect(workspace.overlay(tester).selectedElementId, 'a');
-      final translation = workspace.camera(tester).translation;
-      final swipe = await tester.startGesture(
-        workspace.screen(tester, const Offset(2, 0)),
-      );
-      await tester.pump(const Duration(milliseconds: 100));
-      await swipe.moveBy(const Offset(40, 0));
-      await swipe.up();
-      await tester.pump();
-      expect(workspace.camera(tester).translation, isNot(translation));
-      expect(identical(model.project, old), isTrue);
-      await editing.selectTool(tester, 'wall');
-      await editing.hold(tester, const Offset(2, 0));
-      final jitter = await tester.startGesture(
-        workspace.screen(tester, const Offset(2, 0)),
-      );
-      await tester.pump(const Duration(milliseconds: 281));
-      await jitter.moveBy(const Offset(1, 1));
-      await jitter.up();
-      await tester.pump();
-      expect(identical(model.project, old), isTrue);
-      final hold = await tester.startGesture(
-        workspace.screen(tester, const Offset(2, 0)),
-      );
-      await tester.pump(const Duration(milliseconds: 281));
-      await hold.moveTo(workspace.screen(tester, const Offset(2, 1)));
-      await tester.pump();
-      expect(identical(model.project, old), isTrue);
-      expect(
-        workspace.overlay(tester).project.activeStorey.walls.single.startPoint,
-        const Offset(0, 1),
-      );
-      await hold.up();
-      await tester.pump();
-      expect(
-        model.project.activeStorey.walls.single.startPoint,
-        const Offset(0, 1),
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('Quick touch selects; Hand pans; explicit Move enables editing', (
+    tester,
+  ) async {
+    final a = editing.wall('a', Offset.zero, const Offset(4, 0));
+    final model = editing.seeded(
+      ArchitectStorey(id: 's', name: 's', walls: [a]),
+    );
+    addTearDown(model.dispose);
+    await workspace.open(tester, model);
+    await tool_ui.prepare(tester, Icons.near_me_outlined);
+    await tool_ui.choose(tester, Icons.near_me_outlined);
+    await tester.pumpAndSettle();
+    final old = model.project;
+    await workspace.wallTap(tester, const Offset(2, 0));
+    expect(workspace.overlay(tester).selectedElementId, 'a');
+    await tester.tap(find.byKey(const ValueKey('architect-tool-pan')));
+    await tester.pumpAndSettle();
+    final translation = workspace.camera(tester).translation;
+    final swipe = await tester.startGesture(
+      workspace.screen(tester, const Offset(2, 0)),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    await swipe.moveBy(const Offset(40, 0));
+    await swipe.up();
+    await tester.pump();
+    expect(workspace.camera(tester).translation, isNot(translation));
+    expect(identical(model.project, old), isTrue);
+    await editing.selectTool(tester, 'wall');
+    await editing.hold(tester, const Offset(2, 0));
+    await tester.tap(find.byKey(const ValueKey('architect-selection-move')));
+    await tester.pumpAndSettle();
+    final jitter = await tester.startGesture(
+      workspace.screen(tester, const Offset(2, 0)),
+    );
+    await tester.pump(const Duration(milliseconds: 281));
+    await jitter.moveBy(const Offset(1, 1));
+    await jitter.up();
+    await tester.pump();
+    expect(identical(model.project, old), isTrue);
+    final hold = await tester.startGesture(
+      workspace.screen(tester, const Offset(2, 0)),
+    );
+    await tester.pump(const Duration(milliseconds: 281));
+    await hold.moveTo(workspace.screen(tester, const Offset(2, 1)));
+    await tester.pump();
+    expect(identical(model.project, old), isTrue);
+    expect(
+      workspace.overlay(tester).project.activeStorey.walls.single.startPoint,
+      const Offset(0, 1),
+    );
+    await hold.up();
+    await tester.pump();
+    expect(
+      model.project.activeStorey.walls.single.startPoint,
+      const Offset(0, 1),
+    );
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
     'Draft inherits an inner face; click clearance opens local keypad and repositions',
     (tester) async {
@@ -362,7 +365,7 @@ void main() {
         WallReferenceLine.inner,
       );
       // Cancel the draft before selecting the original wall.
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tool_ui.choose(tester, Icons.near_me_outlined);
       await tester.pumpAndSettle();
       await editing.selectTool(tester, 'wall');
       await editing.hold(tester, const Offset(1, 0));

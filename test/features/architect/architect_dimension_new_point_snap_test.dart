@@ -48,8 +48,8 @@ void main() {
         addTearDown(model.dispose);
 
         await workspace.open(tester, model);
-        await tool_ui.prepare(tester, Icons.pan_tool_rounded);
-        await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+        await tool_ui.prepare(tester, Icons.near_me_outlined);
+        await tester.tap(find.byIcon(Icons.near_me_outlined));
         await tester.pumpAndSettle();
 
         // Select the dimension by tapping on it
@@ -115,8 +115,8 @@ void main() {
         addTearDown(model.dispose);
 
         await workspace.open(tester, model);
-        await tool_ui.prepare(tester, Icons.pan_tool_rounded);
-        await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+        await tool_ui.prepare(tester, Icons.near_me_outlined);
+        await tester.tap(find.byIcon(Icons.near_me_outlined));
         await tester.pumpAndSettle();
 
         // Select the dimension

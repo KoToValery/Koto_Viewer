@@ -7827,18 +7827,14 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectElevationHint => 'Две точки → посока';
 
   @override
-  String get architectSelectModeRect => 'Правоъгълно';
+  String get architectSelectModeRect => 'Рамка';
 
   @override
-  String get architectSelectModePolygon => 'Точка по точка';
+  String get architectSelectModePolygon => 'Полигон';
 
   @override
   String get architectSelectMarqueeHint =>
       'Посочи срещуположни ъгли за селекция';
-
-  @override
-  String get architectSelectPolygonHint =>
-      'Посочи точки за ограждане на селекцията';
 
   @override
   String get architectSelectFinish => 'Селектирай';
@@ -8505,4 +8501,49 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectOffsetContourHint =>
       'Офсет на всички отсечки на избрания контур. Положителните стойности го разширяват, отрицателните го свиват.';
+
+  @override
+  String get architectToolPan => 'Преместване на изгледа';
+
+  @override
+  String get architectSelectionClear => 'Изчисти';
+
+  @override
+  String get architectSelectRectangleHint =>
+      'Посочи два срещуположни ъгъла или издърпай рамка. Два пръста преместват изгледа.';
+
+  @override
+  String get architectSelectPolygonHint =>
+      'Постави точки и затвори полигона с първата точка или с отметката.';
+
+  @override
+  String get architectCategoryEdit => 'Редакция';
+
+  @override
+  String get architectSelectReplace => 'Замени';
+
+  @override
+  String get architectSelectAdd => 'Добави';
+
+  @override
+  String get architectSelectRemove => 'Премахни';
+
+  @override
+  String get architectSelectCrossing => 'Пресича';
+
+  @override
+  String get architectSelectContained => 'Вътре';
+
+  @override
+  String get architectSelectCrossingHelp =>
+      'Избира елементите вътре или пресичащи границата на селекцията.';
+
+  @override
+  String get architectSelectContainedHelp =>
+      'Избира само елементите изцяло вътре в границата на селекцията.';
+
+  @override
+  String architectSelectPreviewCount(int count) {
+    return 'След избора: $count';
+  }
 }

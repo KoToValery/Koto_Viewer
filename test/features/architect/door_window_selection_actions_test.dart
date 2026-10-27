@@ -324,7 +324,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       // Select tool
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tester.tap(find.byIcon(Icons.near_me_outlined));
       await tester.pump();
 
       // Tap on door at (3.0, 0.0)
@@ -410,7 +410,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       // Select tool
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tester.tap(find.byIcon(Icons.near_me_outlined));
       await tester.pump();
 
       // Tap on window at (3.0, 0.0)
