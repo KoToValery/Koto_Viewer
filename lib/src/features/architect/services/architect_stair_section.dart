@@ -1,18 +1,24 @@
 import 'dart:ui';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../rendering/architect_stair_mesh.dart';
+import '../models/architect_elevation.dart';
+import 'architect_building_elevation.dart';
 import 'architect_stair_geometry.dart';
 
 class ArchitectStairSection {
   final Offset origin, axis;
   final Map<StairSolidMaterial, Path> regions;
   final Rect bounds;
+
+  /// Visible faces behind the plane; drawn as thin, unhatched outlines.
+  final List<Path> projection;
   const ArchitectStairSection(
     this.origin,
     this.axis,
     this.regions,
-    this.bounds,
-  );
+    this.bounds, {
+    this.projection = const [],
+  });
   bool get isEmpty => regions.values.every((p) => p.getBounds().isEmpty);
 
   /// Intersect closed material solids with a vertical plane, not a flattened
@@ -22,6 +28,7 @@ class ArchitectStairSection {
     Offset origin,
     Offset direction, {
     double endpointTolerance = 1e-6,
+    bool includeProjection = false,
   }) {
     if (!endpointTolerance.isFinite ||
         endpointTolerance <= 0 ||
@@ -125,14 +132,23 @@ class ArchitectStairSection {
         if (key(points.first) == key(points.last)) add(solid.material, points);
       }
     }
-    final concrete = regions[StairSolidMaterial.concrete],
-        finish = regions[StairSolidMaterial.finish];
-    if (concrete != null && finish != null) {
-      regions[StairSolidMaterial.concrete] = Path.combine(
+    // Finish and treads own the visible face. A railing or support meeting
+    // another material must not leave overlapping hatches in the cut.
+    var occupied = Path();
+    for (final material in [
+      StairSolidMaterial.finish,
+      StairSolidMaterial.timber,
+      StairSolidMaterial.metal,
+      StairSolidMaterial.concrete,
+    ]) {
+      final region = regions[material];
+      if (region == null) continue;
+      regions[material] = Path.combine(
         PathOperation.difference,
-        concrete,
-        finish,
+        region,
+        occupied,
       );
+      occupied = Path.combine(PathOperation.union, occupied, region);
     }
     Rect? bounds;
     for (final path in regions.values) {
@@ -141,6 +157,40 @@ class ArchitectStairSection {
           ? path.getBounds()
           : bounds.expandToInclude(path.getBounds());
     }
-    return ArchitectStairSection(origin, axis, regions, bounds ?? Rect.zero);
+    final projection = <Path>[];
+    if (includeProjection && bounds != null) {
+      var left = bounds.left, right = bounds.right;
+      final triangles = [for (final solid in solids) ...solid.triangles];
+      for (final t in triangles) {
+        for (final p in [t.v0, t.v1, t.v2]) {
+          final x = project(p).dx;
+          if (x < left) left = x;
+          if (x > right) right = x;
+        }
+      }
+      final middle = (left + right) / 2;
+      // Reuse the building elevation's hidden-surface removal. Projecting all
+      // triangle edges would expose tessellation and the far side's guard.
+      final visible = ArchitectBuildingElevation.fromTriangles(
+        triangles,
+        ArchitectElevation(
+          id: 'stair-section',
+          start: origin + axis * (left - .01),
+          end: origin + axis * (right + .01),
+        ),
+      );
+      for (final face in visible.faces) {
+        final path = face.shift(Offset(middle, 0));
+        projection.add(path);
+        bounds = bounds!.expandToInclude(path.getBounds());
+      }
+    }
+    return ArchitectStairSection(
+      origin,
+      axis,
+      regions,
+      bounds ?? Rect.zero,
+      projection: projection,
+    );
   }
 }

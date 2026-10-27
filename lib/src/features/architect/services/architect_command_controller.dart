@@ -1842,6 +1842,10 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
+    // Use one canonical contour for the fill, border, handles and persistence.
+    // A pull may overtake an old corner: remove that backtracking spur before
+    // validating, exactly as the shared slab/contour editor does.
+    final polygon = ArchitectPolygonGeometry.clean(this.polygon);
     if (!ArchitectPolygonGeometry.valid(polygon)) {
       throw ArgumentError('Invalid contour');
     }

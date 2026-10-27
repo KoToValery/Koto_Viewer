@@ -38,6 +38,7 @@ import '../widgets/architect_transform_point_input.dart';
 import '../widgets/architect_offset_direction.dart';
 
 import '../../bim_editing/widgets/bim_offset_dialog.dart';
+import '../../bim_editing/geometry/bim_offset_geometry.dart';
 
 import '../services/architect_apartment_zones.dart';
 
@@ -1707,16 +1708,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  ArchitectTool _toolForElement(String id) => ArchitectTool.values.firstWhere(
-
-    (tool) => tool != ArchitectTool.select && _isElementAllowedForTool(id, tool),
-
-    orElse: () => ArchitectTool.select,
-
-  );
-
-
-
   void _toggleMultiSelection() {
 
     final ids = _effectiveSelection;
@@ -1767,11 +1758,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             : null;
 
-        _activeTool = primary == null
-
-            ? ArchitectTool.select
-
-            : _toolForElement(primary);
+        _activeTool = ArchitectTool.select;
 
         _selectionContextActive = primary != null;
 
@@ -6137,10 +6124,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_newPointTargetId != null) {
 
-      _touchPosition = event.localPosition;
-
-      _placingWithHold = true;
-
+      _touchPosition = null;
+      _placingWithHold = false;
       _updateNewPointCandidate(rawModel, isTouch: _touchInput);
 
       return;
@@ -7104,8 +7089,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _offsetOptions == null &&
 
-        !_splitActive) {
-
+        !_splitActive && _newPointTargetId == null) {
       // A hold on empty space resumes placement with the same active tool.
 
       setState(() {
@@ -8074,6 +8058,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
 
+
+  ArchitectCadPrimitive? get _selectedHatch => _effectiveSelection.length == 1
+      ? _project.activeStorey.cadPrimitives.where((p) =>
+          p.id == _selectedElementId && p.type == CadPrimitiveType.hatch).firstOrNull
+      : null;
 
   List<Offset>? get _selectedPolygon {
 
@@ -15196,7 +15185,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             targetId == null ||
 
-            _radialMenuScreenPosition != null) {
+            _radialMenuScreenPosition != null || _newPointTargetId != null) {
 
           return const SizedBox.shrink();
 
@@ -15262,11 +15251,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 left: 8,
 
-                right: 64,
+                right: _selectedHatch != null ? 8 : 64,
 
                 child: Material(
 
-                  color: const Color(0xEE1E242C),
+                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
 
                   elevation: 4,
 
@@ -15276,7 +15265,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     borderRadius: BorderRadius.circular(8),
 
-                    side: const BorderSide(color: Colors.white24),
+                    side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
 
                   ),
 
@@ -15320,9 +15309,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                             color: _polygonEdgeMode == mode
 
-                                ? Colors.cyanAccent
+                                ? Theme.of(context).colorScheme.primary
 
-                                : Colors.white70,
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
 
                           ),
 
@@ -15338,7 +15327,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       Expanded(
 
-                        child: !selected
+                        child: !selected && _selectedHatch == null
 
                             ? Padding(
 
@@ -15356,9 +15345,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                   overflow: TextOverflow.ellipsis,
 
-                                  style: const TextStyle(
+                                  style: TextStyle(
 
-                                    color: Colors.white70,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
 
                                     fontSize: 12,
 
@@ -15374,7 +15363,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                 style: TextButton.styleFrom(
 
-                                  foregroundColor: Colors.cyanAccent,
+                                  foregroundColor: Theme.of(context).colorScheme.primary,
 
                                 ),
 
@@ -15384,7 +15373,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                     : () => _editPolygonDistance(null),
 
-                                icon: const Icon(Icons.swap_vert, size: 18),
+                                icon: Tooltip(
+                                  message: _selectedHatch == null
+                                      ? context.l10n.architectZoneOffset
+                                      : context.l10n.architectOffsetContourHint,
+                                  child: const Icon(Icons.swap_vert, size: 18),
+                                ),
 
                                 label: Text(
 
@@ -15400,6 +15394,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ),
 
+                      if (_selectedHatch != null) ...[
+                        IconButton(
+                          constraints: const BoxConstraints.tightFor(width: 36, height: 44),
+                          padding: EdgeInsets.zero,
+                          key: const ValueKey('hatch-edit-new-point'),
+                          tooltip: context.l10n.bimNewPoint,
+                          icon: const Icon(Icons.add_location_alt_outlined, size: 20),
+                          onPressed: _polygonDistanceOpen ? null
+                              : () => _startNewPointSession(_selectedHatch!.id),
+                        ),
+                        IconButton(
+                          constraints: const BoxConstraints.tightFor(width: 36, height: 44),
+                          padding: EdgeInsets.zero,
+                          key: const ValueKey('hatch-edit-properties'),
+                          tooltip: context.l10n.architectProperties,
+                          icon: const Icon(Icons.tune, size: 20),
+                          onPressed: _polygonDistanceOpen ? null : _showProperties,
+                        ),
+                      ],
                       IconButton(
 
                         key: const ValueKey('polygon-edit-close'),
@@ -15428,13 +15441,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                               }),
 
-                        icon: const Icon(
+                        icon: Icon(
 
                           Icons.check,
 
                           size: 20,
 
-                          color: Colors.cyanAccent,
+                          color: Theme.of(context).colorScheme.primary,
 
                         ),
 
@@ -15460,11 +15473,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  List<Offset>? _offsetHatchRing(List<Offset> points, double meters) {
+    try {
+      return BimOffsetGeometry.ring(points, meters);
+    } on ArgumentError {
+      return null;
+    }
+  }
+
   Future<void> _editPolygonDistance(ArchitectPolygonDistance? dimension) async {
 
     if (_polygonDistanceOpen) return;
 
-    final polygon = _editablePolygon, edge = _polygonSelectedEdge;
+    final polygon = _editablePolygon;
+    final wholeRing = dimension == null && _selectedHatch != null;
+    final edge = _polygonSelectedEdge ?? (wholeRing ? 0 : null);
 
     final id = _activePolygonDistanceElementId;
     final holeIndex = _selectedPolygonHoleIndex;
@@ -15529,8 +15552,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   dimension == null
 
-                      ? context.l10n.architectZoneOffset
-
+                      ? wholeRing
+                          ? holeIndex == null
+                              ? context.l10n.architectOffsetOuterContour
+                              : context.l10n.architectOffsetInnerContour
+                          : context.l10n.architectZoneOffset
                       : context.l10n.architectEdgeDistance,
 
                 ],
@@ -15561,8 +15587,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       : dimension.side * (dimension.distance - meters);
 
-                  candidate = dimension == null
-
+                  candidate = wholeRing
+                      ? _offsetHatchRing(original, meters)
+                      : dimension == null
                       ? ArchitectPolygonGeometry.offsetEdge(
 
                           original,
@@ -15577,6 +15604,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       : dimension.setDistance(original, meters, mode: mode);
 
+                  _elementMovePreview = null;
                   if (candidate != null) {
                     try {
                       _elementMovePreview = UpdateArchitectPolygon(
@@ -16468,6 +16496,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool _onSelectionHold(Offset screenPoint) {
+    if (_activeTool != ArchitectTool.select) return false;
 
     if (_wallCutIds.isNotEmpty ||
 
@@ -16566,6 +16595,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool _onContextHold(Offset screenPoint) {
+    if (_activeTool != ArchitectTool.select) return false;
 
     if (!_selectionContextActive &&
 
@@ -17910,6 +17940,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _newPointTargetId = id;
       _newPointHoleIndex = holeIndex;
+      _lastTapTime = null;
+      _lastTapPos = null;
 
       _newPointCandidate = null;
 
@@ -18631,7 +18663,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     setState(() {
 
       _newPointTargetId = null;
-
+      _newPointHoleIndex = null;
+      _placingWithHold = false;
+      _touchPosition = null;
+      _lastTapTime = null;
+      _lastTapPos = null;
+      _selectionIds..clear()..add(targetId);
+      _selectedElementId = targetId;
+      _selectedZoneId = _project.activeStorey.zones.any((z) => z.id == targetId)
+          ? targetId : null;
+      _selectionContextActive = true;
+      _activeTool = ArchitectTool.select;
       _newPointCandidate = null;
 
       _newPointLeaderLine = null;
@@ -18874,8 +18916,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (action == ArchitectRadialAction.editGroup) { _enterGroup(); return; }
 
+    if (action == ArchitectRadialAction.offset && _selectedHatch != null) {
+      if (pick != null) _selectPolygonContour(pick);
+      setState(() => _polygonEditId = id);
+      _editPolygonDistance(null);
+      return;
+    }
     if (action == ArchitectRadialAction.offset &&
-
         ArchitectOffset.supports(_project.activeStorey, _effectiveSelection)) {
 
       _startOffset();
@@ -19595,6 +19642,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   }) {
 
+    if (_activeTool != ArchitectTool.select) return false;
     final id = _nextSelection(point, advance: invalidateGesture);
 
     if (id == null) return false;
@@ -19734,8 +19782,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (!grouped && adoptTool && primary != null) {
 
-        _activeTool = _toolForElement(primary);
-
+        _activeTool = ArchitectTool.select;
         _selectionContextActive = true;
 
       }
@@ -19791,12 +19838,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     HapticFeedback.selectionClick();
 
     _selectPolygonContour(point);
+    if (_selectedHatch != null && !_multiSelect) {
+      setState(() {
+        _polygonEditId = id;
+        _polygonSelectedEdge = ArchitectPolygonDimensions.hitEdge(
+          _selectedPolygon!, point, 18 / _currentScale);
+      });
+    }
     return true;
-
   }
-
-
-
   void _operationError() => ScaffoldMessenger.of(context).showSnackBar(
 
     SnackBar(content: Text(context.l10n.architectOperationRejected)),
@@ -27222,7 +27272,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             : (position) => _selectPolygonEdge(_screenToModel(position)),
 
-        isDraggingHandle: () => _isActivelyDraggingHandle,
+        isDraggingHandle: () => _newPointTargetId != null || _isActivelyDraggingHandle,
 
         onToolDown: _onPointerDown,
 

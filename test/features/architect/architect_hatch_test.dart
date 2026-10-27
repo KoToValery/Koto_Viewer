@@ -663,6 +663,8 @@ void main() {
         CadPrimitiveType.hatch,
       );
       expect(model.project.activeStorey.slabs, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('architect-tool-select')));
+      await tester.pumpAndSettle();
       await editing.hold(tester, const Offset(3, 2));
       expect(workspace.overlay(tester).selectedElementId, isNotNull);
       final before = model.project;
@@ -688,7 +690,7 @@ void main() {
     },
   );
   testWidgets(
-    'General selection activates hatch tools and Select similar keeps only hatches',
+    'General selection retains Select and Select similar keeps only hatches',
     (tester) async {
       final model = ArchitectCommandController(
         fixture([
@@ -717,7 +719,7 @@ void main() {
         tester
             .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))
             .activeTool,
-        ArchitectTool.hatch,
+        ArchitectTool.select,
       );
       final before = model.project.toJson();
       await tester.tap(find.byKey(const ValueKey('architect-select-similar')));

@@ -8495,4 +8495,14 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get roofGutterInternalHelp =>
       'Открито кутиеобразно корито в края на покрива. Тръбата се спуска вертикално; при пресичане с конструкцията е нужен друг изход или отвор.';
+
+  @override
+  String get architectOffsetOuterContour => 'Външен контур';
+
+  @override
+  String get architectOffsetInnerContour => 'Контур на отвор';
+
+  @override
+  String get architectOffsetContourHint =>
+      'Офсет на всички отсечки на избрания контур. Положителните стойности го разширяват, отрицателните го свиват.';
 }

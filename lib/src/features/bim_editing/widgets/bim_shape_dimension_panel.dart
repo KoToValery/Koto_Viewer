@@ -54,7 +54,7 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
   });
   @override
   Widget build(BuildContext context) => Material(
-    color: const Color(0xF51E242C),
+    color: Theme.of(context).colorScheme.surfaceContainerHigh,
     elevation: 8,
     borderRadius: BorderRadius.circular(12),
     child: Padding(
@@ -77,10 +77,10 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
                             color: !valid(i)
-                                ? Colors.redAccent
+                                ? Theme.of(context).colorScheme.error
                                 : active == i
-                                ? Colors.cyanAccent
-                                : Colors.white38,
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.outline,
                           ),
                         ),
                         child: Column(
@@ -88,8 +88,10 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
                           children: [
                             Text(
                               widget.labels[i],
-                              style: const TextStyle(
-                                color: Colors.white70,
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                                 fontSize: 11,
                               ),
                             ),
@@ -98,8 +100,10 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
                               alignment: Alignment.centerLeft,
                               child: Text(
                                 '${input[i] ?? widget.values[i].toStringAsFixed(widget.decimals)} ${widget.unit}',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                   fontSize: 16,
                                 ),
                               ),
@@ -113,7 +117,13 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
             ],
           ),
           if (widget.signed)
-            TextButton(onPressed: () => key('±'), child: const Text('±')),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
+              ),
+              onPressed: () => key('±'),
+              child: const Text('±'),
+            ),
           BimNumericKeypad(
             decimals: widget.decimals,
             keyPrefix: 'shape-key',
@@ -122,13 +132,19 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
           if (!widget.canSave)
             Text(
               context.l10n.architectOperationRejected,
-              style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 11,
+              ),
             ),
           Row(
             children: [
               Expanded(
                 child: TextButton(
                   key: const ValueKey('shape-cancel'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.onSurface,
+                  ),
                   onPressed: widget.onCancel,
                   child: Text(context.l10n.cancel),
                 ),
@@ -136,6 +152,22 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
               Expanded(
                 child: FilledButton(
                   key: const ValueKey('shape-save'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor:
+                        ThemeData.estimateBrightnessForColor(
+                              Theme.of(context).colorScheme.primary,
+                            ) ==
+                            Brightness.dark
+                        ? Colors.white
+                        : Colors.black,
+                    disabledForegroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: .6),
+                    disabledBackgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: .12),
+                  ),
                   onPressed:
                       widget.canSave &&
                           List.generate(input.length, valid).every((v) => v)

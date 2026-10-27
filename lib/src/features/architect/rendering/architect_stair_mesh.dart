@@ -289,85 +289,254 @@ class ArchitectStairMesh {
     ];
   }
 
-  /// Open risers on two side stringers. The same solids drive 3D and cuts.
+  /// Open risers on timber cut stringers or continuous steel stringers with
+  /// discrete tread seats. These are drawing details, not sized connections.
+  /// The same solids drive 3D, elevations and cuts.
   static List<StairSolid> _framed(ArchitectStair stair) {
     final d = stair.design!;
     final material = d.construction == StairConstruction.steel
-        ? StairSolidMaterial.metal : StairSolidMaterial.timber;
+        ? StairSolidMaterial.metal
+        : StairSolidMaterial.timber;
     final result = <StairSolid>[];
     final geometry = ArchitectStairGeometry.of(stair);
     for (final surface in stair.plan.surfaces) {
-      result.add(verticalPrism(surface.polygon,
-        surface.elevation + d.startOffset - d.treadThickness,
-        surface.elevation + d.startOffset, material));
-    }
-    void stringer(Offset a, Offset b, double za, double zb) {
-      final v = b - a;
-      if (v.distance < 1e-8) return;
-      final n = Offset(-v.dy, v.dx) / v.distance * d.stringerWidth / 2;
-      final lower = [
-        Vector3(a.dx-n.dx,a.dy-n.dy,za-d.stringerDepth),
-        Vector3(b.dx-n.dx,b.dy-n.dy,zb-d.stringerDepth),
-        Vector3(b.dx+n.dx,b.dy+n.dy,zb-d.stringerDepth),
-        Vector3(a.dx+n.dx,a.dy+n.dy,za-d.stringerDepth),
+      final polygon = List<Offset>.of(surface.polygon);
+      final step = (surface.elevation / d.riser).round() - 1;
+      final (a, b) = stair.plan.nosings[step];
+      // Only the leading patch of a curved tread gets a nosing. Landings use
+      // their actual incoming edge, rather than the next flight's direction.
+      final front = <int>[
+        for (var i = 0; i < polygon.length; i++)
+          if ((polygon[i] - a).distance < 1e-7 ||
+              (polygon[i] - b).distance < 1e-7)
+            i,
       ];
-      result.add(hexahedron(lower, [for(final p in lower)
-        Vector3(p.x,p.y,p.z+d.stringerDepth)], material));
+      if (front.length == 2 && d.nosingProjection > 0) {
+        final edge = b - a;
+        var inward = Offset(-edge.dy, edge.dx) / edge.distance;
+        final centre =
+            polygon.reduce((p, q) => p + q) / polygon.length.toDouble();
+        if (ArchitectStairGeometry.dot(centre - (a + b) / 2, inward) < 0) {
+          inward = -inward;
+        }
+        for (final i in front) {
+          polygon[i] -= inward * d.nosingProjection;
+        }
+      }
+      result.add(
+        verticalPrism(
+          polygon,
+          surface.elevation + d.startOffset - d.treadThickness,
+          surface.elevation + d.startOffset,
+          material,
+        ),
+      );
     }
     if (geometry.flights.isNotEmpty) {
       for (final flight in geometry.flights) {
         for (final side in [-1.0, 1.0]) {
-          final across = side * (flight.width-d.stringerWidth)/2;
+          final across = side * (flight.width - d.stringerWidth) / 2;
+          final z = flight.base + d.startOffset - d.treadThickness;
+          final support = StairFlightGeometry(
+            flight.point(0, across),
+            flight.axis,
+            d.stringerWidth,
+            d.going,
+            d.riser,
+            flight.count,
+            flight.firstRiser,
+          );
+          if (d.construction == StairConstruction.steel) {
+            // The inclined beam stays below every tread. Thin vertical seats
+            // bridge to the tread underside without a solid sawtooth web.
+            result.add(
+              profilePrism(
+                [
+                  Offset(0, z),
+                  Offset(flight.run, z + (flight.count - 1) * d.riser),
+                  Offset(
+                    flight.run,
+                    z + (flight.count - 1) * d.riser - d.stringerDepth,
+                  ),
+                  Offset(0, z - d.stringerDepth),
+                ],
+                support,
+                material,
+              ),
+            );
+            for (var i = 0; i < flight.count - 1; i++) {
+              final x = i * d.going, bottom = z + i * d.riser;
+              final length = d.going * .65;
+              result.add(
+                profilePrism(
+                  [
+                    Offset(x, bottom),
+                    Offset(x, bottom + d.riser),
+                    Offset(x + length, bottom + d.riser),
+                    Offset(x + length, bottom + d.riser * .65),
+                  ],
+                  StairFlightGeometry(
+                    support.origin,
+                    support.axis,
+                    math.min(.012, d.stringerWidth / 3),
+                    d.going,
+                    d.riser,
+                    flight.count,
+                    flight.firstRiser,
+                  ),
+                  material,
+                ),
+              );
+            }
+            continue;
+          }
           // Notched upper edge bears directly under each tread. A straight
           // rising top would otherwise project through the next tread surface.
-          final profile=<Offset>[];
-          for(var i=0;i<flight.count-1;i++) {
-            final z=flight.base+d.startOffset+(i+1)*d.riser-d.treadThickness;
-            profile.addAll([Offset(i*d.going,z),Offset((i+1)*d.going,z)]);
+          final profile = <Offset>[];
+          for (var i = 0; i < flight.count - 1; i++) {
+            final z =
+                flight.base +
+                d.startOffset +
+                (i + 1) * d.riser -
+                d.treadThickness;
+            profile.addAll([
+              Offset(i * d.going, z),
+              Offset((i + 1) * d.going, z),
+            ]);
           }
           profile.addAll([
-            Offset(flight.run,flight.top+d.startOffset-d.riser-d.treadThickness-d.stringerDepth),
-            Offset(0,flight.base+d.startOffset+d.riser-d.treadThickness-d.stringerDepth),
+            Offset(
+              flight.run,
+              flight.top +
+                  d.startOffset -
+                  d.riser -
+                  d.treadThickness -
+                  d.stringerDepth,
+            ),
+            Offset(
+              0,
+              flight.base +
+                  d.startOffset +
+                  d.riser -
+                  d.treadThickness -
+                  d.stringerDepth,
+            ),
           ]);
-          result.add(profilePrism(profile,StairFlightGeometry(
-            flight.point(0,across),flight.axis,d.stringerWidth,
-            d.going,d.riser,flight.count,flight.firstRiser),material));
+          result.add(profilePrism(profile, support, material));
         }
       }
       for (final landing in geometry.landings) {
-        final p=landing.polygon;
-        for(var i=0;i<p.length;i++) {
-          stringer(p[i],p[(i+1)%p.length],
-            landing.elevation+d.startOffset-d.treadThickness,
-            landing.elevation+d.startOffset-d.treadThickness);
+        final p = landing.polygon;
+        final centre = p.reduce((a, b) => a + b) / p.length.toDouble();
+        for (var i = 0; i < p.length; i++) {
+          final a = p[i], b = p[(i + 1) % p.length], edge = b - a;
+          var inward = Offset(-edge.dy, edge.dx) / edge.distance;
+          if (ArchitectStairGeometry.dot(centre - (a + b) / 2, inward) < 0) {
+            inward = -inward;
+          }
+          // Perimeter beams remain inside the landing footprint.
+          final inset = inward * d.stringerWidth;
+          final top = landing.elevation + d.startOffset - d.treadThickness;
+          result.add(
+            verticalPrism(
+              [a, b, b + inset, a + inset],
+              top - d.stringerDepth,
+              top,
+              material,
+            ),
+          );
         }
       }
     } else {
       // Side strips follow the actual curved/winding tread patches. Their
       // flat tops touch tread undersides and stay inside the stair footprint.
-      final surfaces=stair.plan.surfaces;
-      for(var i=0;i<surfaces.length;i++) {
-        final surface=surfaces[i], p=surface.polygon;
-        if(p.length!=4) continue;
-        final near=p[1]-p[0],far=p[2]-p[3];
-        final a=near/near.distance*d.stringerWidth;
-        final b=far/far.distance*d.stringerWidth;
-        final sliced=d.isSpiral && !d.hasWinders;
-        final lowA=surface.slopeBase?.first ?? (sliced ?
-          (i~/ArchitectStairDesign.spiralSlicesPerGoing+
-            (i%ArchitectStairDesign.spiralSlicesPerGoing)/ArchitectStairDesign.spiralSlicesPerGoing)*d.riser
-          : surface.elevation-d.riser);
-        final lowB=surface.slopeBase?.last ??
-          (sliced?lowA+d.riser/ArchitectStairDesign.spiralSlicesPerGoing:surface.elevation);
-        final top=surface.elevation+d.startOffset-d.treadThickness;
-        for(final polygon in [
-          [p[0],p[0]+a,p[3]+b,p[3]],
-          [p[1]-a,p[1],p[2],p[2]-b],
+      final surfaces = stair.plan.surfaces;
+      for (var i = 0; i < surfaces.length; i++) {
+        final surface = surfaces[i], p = surface.polygon;
+        if (p.length != 4) continue;
+        final near = p[1] - p[0], far = p[2] - p[3];
+        final a = near / near.distance * d.stringerWidth;
+        final b = far / far.distance * d.stringerWidth;
+        final sliced = d.isSpiral && !d.hasWinders;
+        final lowA =
+            surface.slopeBase?.first ??
+            (sliced
+                ? (i ~/ ArchitectStairDesign.spiralSlicesPerGoing +
+                          (i % ArchitectStairDesign.spiralSlicesPerGoing) /
+                              ArchitectStairDesign.spiralSlicesPerGoing) *
+                      d.riser
+                : surface.elevation - d.riser);
+        final lowB =
+            surface.slopeBase?.last ??
+            (sliced
+                ? lowA + d.riser / ArchitectStairDesign.spiralSlicesPerGoing
+                : surface.elevation);
+        final top = surface.elevation + d.startOffset - d.treadThickness;
+        for (final polygon in [
+          [p[0], p[0] + a, p[3] + b, p[3]],
+          [p[1] - a, p[1], p[2], p[2] - b],
         ]) {
-          result.add(hexahedron([
-            for(var j=0;j<4;j++) Vector3(polygon[j].dx,polygon[j].dy,
-              (j<2?lowA:lowB)+d.startOffset-d.treadThickness-d.stringerDepth),
-          ],[for(final q in polygon) Vector3(q.dx,q.dy,top)],material));
+          final bottom = [
+            for (var j = 0; j < 4; j++)
+              Vector3(
+                polygon[j].dx,
+                polygon[j].dy,
+                (j < 2 ? lowA : lowB) +
+                    d.startOffset -
+                    d.treadThickness -
+                    d.stringerDepth,
+              ),
+          ];
+          final steel = d.construction == StairConstruction.steel;
+          result.add(
+            hexahedron(bottom, [
+              for (var j = 0; j < 4; j++)
+                Vector3(
+                  polygon[j].dx,
+                  polygon[j].dy,
+                  steel ? bottom[j].z + d.stringerDepth : top,
+                ),
+            ], material),
+          );
+          if (steel) {
+            // Seats occupy the leading portion of each tread, including its
+            // straight lead/tail patches and either mirrored winder layout.
+            final fraction = (lowA - (surface.elevation - d.riser)) / d.riser;
+            if (fraction < .65 - 1e-8) {
+              final span = (lowB - lowA) / d.riser;
+              final t = span > 1e-8
+                  ? ((.65 - fraction) / span).clamp(0.0, 1.0)
+                  : 1.0;
+              final ratio =
+                  math.min(.012, d.stringerWidth / 3) / d.stringerWidth;
+              final nearMid = (polygon[0] + polygon[1]) / 2;
+              final farMid = (polygon[2] + polygon[3]) / 2;
+              final seat = [
+                nearMid + (polygon[0] - nearMid) * ratio,
+                nearMid + (polygon[1] - nearMid) * ratio,
+                farMid + (polygon[2] - farMid) * ratio,
+                farMid + (polygon[3] - farMid) * ratio,
+              ];
+              seat[2] = seat[1] + (seat[2] - seat[1]) * t;
+              seat[3] = seat[0] + (seat[3] - seat[0]) * t;
+              result.add(
+                hexahedron(
+                  [
+                    for (var j = 0; j < 4; j++)
+                      Vector3(
+                        seat[j].dx,
+                        seat[j].dy,
+                        (j < 2 ? lowA : lowA + (lowB - lowA) * t) +
+                            d.startOffset -
+                            d.treadThickness,
+                      ),
+                  ],
+                  [for (final q in seat) Vector3(q.dx, q.dy, top)],
+                  material,
+                ),
+              );
+            }
+          }
         }
       }
     }
@@ -382,6 +551,58 @@ class ArchitectStairMesh {
     final d = stair.design;
     if (d == null || !d.showRailing) return [];
     final result = <StairSolid>[];
+    final sweep = d.sweepDegrees * math.pi / 180;
+    final guardChordDeviation = d.isSpiral
+        ? [d.innerRadius, d.innerRadius + stair.width]
+              .map((radius) {
+                final segments = math.max(8, (sweep * radius / .12).ceil());
+                return radius * (1 - math.cos(sweep / (2 * segments)));
+              })
+              .reduce(math.max)
+        : 0.0;
+    // The guard follows the dense plan outline; curved treads use coarser
+    // chords. Admit only their maximum arc/chord deviation when finding a foot.
+    final footTolerance = d.isSpiral
+        ? (d.innerRadius + stair.width) *
+                  (1 -
+                      math.cos(
+                        d.anglePerGoing /
+                            (2 * ArchitectStairDesign.spiralSlicesPerGoing),
+                      )) +
+              guardChordDeviation +
+              1e-6
+        : d.hasWinders
+        ? (d.winderLayout(stair.width).radius + stair.width) *
+                  (1 - math.cos(d.winderLayout(stair.width).angle / 16)) +
+              1e-6
+        : 1e-6;
+    Vector3 postFoot(Vector3 p) {
+      final point = Offset(p.x, p.y);
+      final last = stair.plan.nosings.last;
+      // The terminal post bears on the upper floor, which is not an extra
+      // generated stair tread. Intermediate posts bear on actual level treads.
+      if ((p.z - d.startOffset - d.rise).abs() < 1e-7 &&
+          ArchitectStairGeometry.pointSegmentDistance(point, last.$1, last.$2) <
+              1e-6) {
+        return p;
+      }
+      double? level;
+      for (final surface in stair.plan.surfaces) {
+        final z = surface.elevation + d.startOffset;
+        // A landing corner can interpolate just below the next tread. Choose
+        // the nearest actual bearing level, also distinguishing stacked turns.
+        if ((level == null || (z - p.z).abs() < (level - p.z).abs()) &&
+            ArchitectStairGeometry.inside(
+              point,
+              surface.polygon,
+              tolerance: footTolerance,
+            )) {
+          level = z;
+        }
+      }
+      return Vector3(p.x, p.y, level ?? p.z);
+    }
+
     for (final path in ArchitectStairRailings.build(
       stair,
       storey: storey,
@@ -421,7 +642,7 @@ class ArchitectStairMesh {
           final t = ((nextPost - distance) / length).clamp(0.0, 1.0);
           final p = a + (b - a) * t;
           if (!path.wallMounted) {
-            result.add(cylinder(p, at(p, d.guardHeight), .012));
+            result.add(cylinder(postFoot(p), at(p, d.guardHeight), .012));
           } else {
             var nearest = Offset.zero, nearestDistance = double.infinity;
             for (final (a, b) in stair.plan.nosings) {
@@ -456,9 +677,15 @@ class ArchitectStairMesh {
       }
       if (!path.wallMounted) {
         result.add(
-          cylinder(points.first, at(points.first, d.guardHeight), .02),
+          cylinder(
+            postFoot(points.first),
+            at(points.first, d.guardHeight),
+            .02,
+          ),
         );
-        result.add(cylinder(points.last, at(points.last, d.guardHeight), .02));
+        result.add(
+          cylinder(postFoot(points.last), at(points.last, d.guardHeight), .02),
+        );
       }
     }
     return result;

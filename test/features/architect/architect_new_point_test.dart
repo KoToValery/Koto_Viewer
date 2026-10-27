@@ -1,3 +1,4 @@
+import 'package:kotoview/src/features/architect/widgets/architect_radial_menu.dart';
 import 'package:kotoview/src/features/bim_editing/widgets/bim_edit_actions.dart';
 import 'architect_tool_test_helper.dart' as tool_ui;
 import 'package:flutter/material.dart';
@@ -77,6 +78,7 @@ ArchitectStorey fixture(String kind) => ArchitectStorey(
             category: ArchitectZoneCategory.office,
             polygon: polygon,
             targetArea: 60,
+            isAutoBoundary: false,
           ),
         ]
       : [],
@@ -337,7 +339,7 @@ void main() {
         await tester.pump();
         expect(identical(model.project, original), isTrue);
         if (kind == 'zone') {
-          expect(workspace.overlay(tester).zoneEditingPolygon, polygon);
+          expect(model.project.activeStorey.zones.single.polygon, polygon);
         }
         expect(tester.takeException(), isNull);
       },
@@ -372,21 +374,21 @@ void main() {
       await editing.selectTool(tester, 'wall');
       await editing.contextHold(tester, const Offset(3, 0));
       expect(find.text('Нова точка'), findsOneWidget);
-      expect(find.text('Срежи'), findsOneWidget);
-      expect(find.text('Раздели'), findsOneWidget);
+      final menu = tester.widget<ArchitectRadialMenu>(find.byType(ArchitectRadialMenu));
+      expect(menu.items.map((item) => item.action), containsAll([BimEditAction.cut, BimEditAction.split]));
       final buttons = find.byWidgetPredicate(
         (w) =>
             w is InkWell &&
             w.key is ValueKey<String> &&
             (w.key as ValueKey<String>).value.startsWith('architect-radial-'),
       );
-      expect(buttons, findsNWidgets(11));
+      expect(buttons, findsNWidgets(9));
       final rects = tester.getRect(buttons.at(0));
       expect(rects.left, greaterThanOrEqualTo(0));
-      for (var i = 0; i < 11; i++) {
+      for (var i = 0; i < 9; i++) {
         final a = tester.getRect(buttons.at(i));
         expect(a.right, lessThanOrEqualTo(360));
-        for (var j = i + 1; j < 11; j++) {
+        for (var j = i + 1; j < 9; j++) {
           expect(
             (a.center - tester.getRect(buttons.at(j)).center).distance,
             greaterThanOrEqualTo(50 - 1e-8),

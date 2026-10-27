@@ -1,3 +1,5 @@
+import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
 import 'architect_tool_test_helper.dart' as tool_ui;
 import 'dart:math' as math;
 import 'dart:io';
@@ -73,7 +75,17 @@ Future<void> selectTool(WidgetTester tester, String name) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> ensureSelectionTool(WidgetTester tester) async {
+  // Selection is explicitly chosen; drawing tools no longer acquire elements.
+  final palette = tester.widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette));
+  if (palette.activeTool != ArchitectTool.select) {
+    await tester.tap(find.byKey(const ValueKey('architect-tool-select')));
+    await tester.pumpAndSettle();
+  }
+}
+
 Future<void> hold(WidgetTester tester, Offset point) async {
+  await ensureSelectionTool(tester);
   final g = await tester.startGesture(workspace.screen(tester, point));
   await tester.pump(const Duration(milliseconds: 451));
   await g.up();
@@ -81,6 +93,7 @@ Future<void> hold(WidgetTester tester, Offset point) async {
 }
 
 Future<void> contextHold(WidgetTester tester, Offset point) async {
+  await ensureSelectionTool(tester);
   final gesture = await tester.startGesture(workspace.screen(tester, point));
   await tester.pump(const Duration(milliseconds: 701));
   await gesture.up();

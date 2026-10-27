@@ -105,11 +105,17 @@ class _ElementOffsetDialogState extends State<_ElementOffsetDialog> {
       ),
       actions: [
         TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.onSurface,
+          ),
           onPressed: () => Navigator.of(context).pop(),
           child: Text(l.cancel),
         ),
         TextButton(
           key: const ValueKey('architect-offset-start'),
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.onSurface,
+          ),
           onPressed: valid ? submit : null,
           child: Text(l.offsetAction),
         ),
@@ -167,7 +173,6 @@ class _BimOffsetDialogState extends State<_BimOffsetDialog> {
     }
 
     return AlertDialog(
-      backgroundColor: const Color(0xFF1E1E24),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       actionsPadding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
@@ -183,7 +188,6 @@ class _BimOffsetDialogState extends State<_BimOffsetDialog> {
               showCursor: true,
               keyboardType: TextInputType.none,
               textInputAction: TextInputAction.done,
-              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 isDense: true,
                 labelText: context.l10n.offsetAction,
@@ -192,31 +196,34 @@ class _BimOffsetDialogState extends State<_BimOffsetDialog> {
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => submit(),
             ),
-            Theme(
-              data: ThemeData.dark(),
-              child: BimNumericKeypad(
-                keyPrefix: 'bim-offset-key',
-                decimals: 3,
-                onKey: (key) => setState(() {
-                  controller.text = BimNumericKeypad.edit(
-                    controller.text,
-                    key,
-                    decimals: 3,
-                  );
-                }),
-              ),
+            BimNumericKeypad(
+              keyPrefix: 'bim-offset-key',
+              decimals: 3,
+              onKey: (key) => setState(() {
+                controller.text = BimNumericKeypad.edit(
+                  controller.text,
+                  key,
+                  decimals: 3,
+                );
+              }),
             ),
           ],
         ),
       ),
       actions: [
         TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.onSurface,
+          ),
           onPressed: () => Navigator.of(context).pop(),
           child: Text(context.l10n.cancel),
         ),
         Tooltip(
           message: context.l10n.specifyDirectionByDrag,
           child: TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.onSurface,
+            ),
             onPressed: valid ? submit : null,
             child: Text(context.l10n.offsetAction),
           ),

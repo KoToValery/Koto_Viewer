@@ -46,7 +46,12 @@ class _StairSectionState extends State<ArchitectStairSectionScreen> {
     origin = widget.stair.startPoint;
     axis = widget.stair.unitVector;
     firstPoint = null;
-    section = ArchitectStairSection.build(solids, origin, axis);
+    section = ArchitectStairSection.build(
+      solids,
+      origin,
+      axis,
+      includeProjection: true,
+    );
   }
 
   @override
@@ -107,6 +112,7 @@ class _StairSectionState extends State<ArchitectStairSectionScreen> {
                             solids,
                             origin,
                             axis,
+                            includeProjection: true,
                           );
                         }
                       });

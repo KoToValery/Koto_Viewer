@@ -8465,4 +8465,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get roofGutterInternalHelp =>
       'Open box channel at the roof edge. The pipe drops vertically; a structural collision requires another outlet or an opening.';
+
+  @override
+  String get architectOffsetOuterContour => 'Outer contour';
+
+  @override
+  String get architectOffsetInnerContour => 'Opening contour';
+
+  @override
+  String get architectOffsetContourHint =>
+      'Offset every edge of the selected contour. Positive values expand it; negative values shrink it.';
 }

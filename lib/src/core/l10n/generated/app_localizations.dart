@@ -15196,6 +15196,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open box channel at the roof edge. The pipe drops vertically; a structural collision requires another outlet or an opening.'**
   String get roofGutterInternalHelp;
+
+  /// No description provided for @architectOffsetOuterContour.
+  ///
+  /// In en, this message translates to:
+  /// **'Outer contour'**
+  String get architectOffsetOuterContour;
+
+  /// No description provided for @architectOffsetInnerContour.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening contour'**
+  String get architectOffsetInnerContour;
+
+  /// No description provided for @architectOffsetContourHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Offset every edge of the selected contour. Positive values expand it; negative values shrink it.'**
+  String get architectOffsetContourHint;
 }
 
 class _AppLocalizationsDelegate

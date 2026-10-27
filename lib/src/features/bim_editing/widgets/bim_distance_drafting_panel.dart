@@ -53,7 +53,11 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
 
   void _key(String key) {
     setState(() {
-      final value = BimNumericKeypad.edit(_input, key, decimals: widget.decimals);
+      final value = BimNumericKeypad.edit(
+        _input,
+        key,
+        decimals: widget.decimals,
+      );
       _input = value;
       final number = const BimNumericRule().parse(value);
       if (number != null && number.isFinite && number >= widget.minimumLength) {
@@ -65,13 +69,14 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final colors = Theme.of(context).colorScheme;
     return Material(
-      color: const Color(0xF51E242C),
+      color: colors.surfaceContainerHigh,
       elevation: 8,
       shadowColor: Colors.black54,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Colors.white24),
+        side: BorderSide(color: colors.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -86,8 +91,8 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                   widget.title!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white70,
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -101,9 +106,9 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
-                  color: Colors.black26,
+                  color: colors.surfaceContainerHighest,
                   border: Border.all(
-                    color: _valid ? Colors.cyanAccent : Colors.redAccent,
+                    color: _valid ? colors.primary : colors.error,
                     width: 1.2,
                   ),
                   borderRadius: BorderRadius.circular(6),
@@ -113,8 +118,8 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                     Expanded(
                       child: Text(
                         '${_input ?? widget.length.toStringAsFixed(widget.decimals)} ${widget.unit}',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: colors.onSurface,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
@@ -123,7 +128,7 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                     Icon(
                       Icons.dialpad,
                       size: 16,
-                      color: _keypad ? Colors.amberAccent : Colors.cyanAccent,
+                      color: _keypad ? colors.tertiary : colors.primary,
                     ),
                   ],
                 ),
@@ -137,6 +142,7 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
               TextButton(
                 onPressed: () => _key('±'),
                 style: TextButton.styleFrom(
+                  foregroundColor: colors.onSurface,
                   minimumSize: const Size(0, 28),
                   padding: EdgeInsets.zero,
                 ),
@@ -157,18 +163,18 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                         height: 32,
                       ),
                       style: IconButton.styleFrom(
-                        foregroundColor: Colors.cyanAccent,
-                        backgroundColor: Colors.cyanAccent.withValues(alpha: 0.12),
+                        foregroundColor: colors.primary,
+                        backgroundColor: colors.primary.withValues(alpha: 0.12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(6),
-                          side: const BorderSide(color: Colors.cyanAccent, width: 1.0),
+                          side: BorderSide(color: colors.primary, width: 1.0),
                         ),
                       ),
                       onPressed: widget.onUnlock,
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.explore_outlined,
                         size: 18,
-                        color: Colors.cyanAccent,
+                        color: colors.primary,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -177,8 +183,8 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                     child: OutlinedButton(
                       key: const ValueKey('wall-end'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.cyanAccent,
-                        side: const BorderSide(color: Colors.cyanAccent, width: 1.0),
+                        foregroundColor: colors.primary,
+                        side: BorderSide(color: colors.primary, width: 1.0),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         visualDensity: VisualDensity.compact,
                         shape: RoundedRectangleBorder(
@@ -205,8 +211,14 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                       child: FilledButton(
                         key: const ValueKey('wall-continue'),
                         style: FilledButton.styleFrom(
-                          backgroundColor: Colors.cyanAccent,
-                          foregroundColor: const Color(0xFF1E242C),
+                          backgroundColor: colors.primary,
+                          foregroundColor:
+                              ThemeData.estimateBrightnessForColor(
+                                    colors.primary,
+                                  ) ==
+                                  Brightness.dark
+                              ? Colors.white
+                              : Colors.black,
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           visualDensity: VisualDensity.compact,
                           shape: RoundedRectangleBorder(
@@ -238,17 +250,17 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                       height: 32,
                     ),
                     style: IconButton.styleFrom(
-                      foregroundColor: Colors.redAccent,
-                      backgroundColor: Colors.redAccent.withValues(alpha: 0.12),
+                      foregroundColor: colors.error,
+                      backgroundColor: colors.error.withValues(alpha: 0.12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(6),
-                        side: const BorderSide(color: Colors.redAccent, width: 1.5),
+                        side: BorderSide(color: colors.error, width: 1.5),
                       ),
                     ),
                     onPressed: widget.onCancel,
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.close_rounded,
-                      color: Colors.redAccent,
+                      color: colors.error,
                       size: 19,
                       weight: 700,
                     ),

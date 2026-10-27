@@ -304,7 +304,10 @@ void main() {
           model.project.activeStorey,
           id,
         )!;
-        expect(host.$2.first, const [
+        expect(host.$2.first, id == 'hatch' ? const [
+          Offset(1.75, 1.75), Offset(5.25, 1.75),
+          Offset(5.25, 4.25), Offset(1.75, 4.25),
+        ] : const [
           Offset(2, 2),
           Offset(5.25, 2),
           Offset(5.25, 4),

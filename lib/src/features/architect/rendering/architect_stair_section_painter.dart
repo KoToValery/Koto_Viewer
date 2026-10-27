@@ -29,9 +29,30 @@ class ArchitectStairSectionPainter extends CustomPainter {
     canvas.scale(scale, -scale);
     canvas.translate(-b.center.dx, -b.center.dy);
     final ink = palette.foreground(const Color(0xFF263238));
+    canvas.save();
+    // Clip the pen, not the faces: subtracting areas and then stroking them
+    // would invent lines along the cut masks.
+    var projectionClip = Path()..addRect(b);
+    for (final region in section.regions.values) {
+      projectionClip = Path.combine(
+        PathOperation.difference,
+        projectionClip,
+        region,
+      );
+    }
+    canvas.clipPath(projectionClip);
+    for (final face in section.projection) {
+      canvas.drawPath(
+        face,
+        Paint()
+          ..color = ink.withValues(alpha: .8)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = .65 / scale,
+      );
+    }
+    canvas.restore();
     final concrete = section.regions[StairSolidMaterial.concrete];
     if (concrete != null) {
-
       ArchitectWallHatch.paint(
         canvas,
         const ArchitectWall(
@@ -63,14 +84,32 @@ class ArchitectStairSectionPainter extends CustomPainter {
       );
     }
     final metal = section.regions[StairSolidMaterial.metal];
-    for(final (region,id) in [(metal,'metal'),(section.regions[StairSolidMaterial.timber],'wood')]) {
-      if(region==null) continue;
-      canvas.save();canvas.clipPath(region);
-      canvas.drawPath(ArchitectHatchGeometry.path(boundary:region,
-        pattern:ArchitectHatchPattern.presets.firstWhere((p)=>p.id==id),unitsPerMm:3/scale),
-        Paint()..color=ink..style=PaintingStyle.stroke..strokeWidth=.7/scale);
+    for (final (region, id) in [
+      (metal, 'metal'),
+      (section.regions[StairSolidMaterial.timber], 'wood'),
+    ]) {
+      if (region == null) continue;
+      canvas.save();
+      canvas.clipPath(region);
+      canvas.drawPath(
+        ArchitectHatchGeometry.path(
+          boundary: region,
+          pattern: ArchitectHatchPattern.presets.firstWhere((p) => p.id == id),
+          unitsPerMm: 3 / scale,
+        ),
+        Paint()
+          ..color = ink
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = .7 / scale,
+      );
       canvas.restore();
-      canvas.drawPath(region,Paint()..color=ink..style=PaintingStyle.stroke..strokeWidth=1.3/scale);
+      canvas.drawPath(
+        region,
+        Paint()
+          ..color = ink
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.3 / scale,
+      );
     }
     final guide = Paint()
       ..color = const Color(0xFFCC5555)

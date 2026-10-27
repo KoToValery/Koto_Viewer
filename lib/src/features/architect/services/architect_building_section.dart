@@ -752,36 +752,49 @@ class ArchitectBuildingSection {
       }
 
       for (final stair in floor.stairs) {
-        for (final solid in [
+        final solids = [
           ...ArchitectStairMesh.body(stair),
           ...ArchitectStairMesh.railings(
             stair,
             storey: floor,
             project: project,
           ),
-        ]) {
-          final stairPath = sliceMesh([
-            for (final t in solid.triangles)
-              Triangle3D(
-                v0: t.v0 + Vector3(0, 0, floor.elevation),
-                v1: t.v1 + Vector3(0, 0, floor.elevation),
-                v2: t.v2 + Vector3(0, 0, floor.elevation),
-              ),
-          ]);
-          if (stairPath != null) {
+        ];
+        final section = ArchitectStairSection.build(
+          [
+            for (final solid in solids)
+              StairSolid(solid.material, [
+                for (final t in solid.triangles)
+                  Triangle3D(
+                    v0: t.v0 + Vector3(0, 0, floor.elevation),
+                    v1: t.v1 + Vector3(0, 0, floor.elevation),
+                    v2: t.v2 + Vector3(0, 0, floor.elevation),
+                  ),
+              ]),
+          ],
+          cut.start,
+          cut.axis,
+        );
+        for (final entry in section.regions.entries) {
+          final stairPath = Path.combine(
+            PathOperation.intersect,
+            entry.value,
+            Path()..addRect(Rect.fromLTRB(0, -1e6, cut.length, 1e6)),
+          );
+          if (!stairPath.getBounds().isEmpty) {
             regions.add(
               ArchitectSectionRegion(
                 stair.id,
-                solid.material == StairSolidMaterial.concrete
+                entry.key == StairSolidMaterial.concrete
                     ? SlabMaterial.concrete
-                    : solid.material == StairSolidMaterial.timber
+                    : entry.key == StairSolidMaterial.timber
                     ? SlabMaterial.parquet
                     : SlabMaterial.custom,
                 stairPath,
                 hatchPattern: ArchitectHatchPattern.presets.firstWhere(
                   (p) =>
                       p.id ==
-                      switch (solid.material) {
+                      switch (entry.key) {
                         StairSolidMaterial.concrete => 'concrete',
                         StairSolidMaterial.timber => 'wood',
                         StairSolidMaterial.metal => 'metal',
