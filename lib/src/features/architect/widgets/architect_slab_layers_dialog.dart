@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../services/architect_section_junctions.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_elements.dart';
@@ -43,7 +44,22 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
         original ??
         ArchitectSlabAssembly(
           id: ArchitectElementId.next('assembly'),
-          usage: SlabUsage.intermediate,
+          usage: ArchitectSectionJunctions.defaultUsageForStorey(
+            widget.project,
+            storey,
+          ),
+          above: ArchitectSlabCatalog.preset(
+            ArchitectSectionJunctions.defaultUsageForStorey(
+              widget.project,
+              storey,
+            ),
+          ).above,
+          below: ArchitectSlabCatalog.preset(
+            ArchitectSectionJunctions.defaultUsageForStorey(
+              widget.project,
+              storey,
+            ),
+          ).below,
         );
     onlyThis = original == null;
     direction = widget.slab.slopeDirection;

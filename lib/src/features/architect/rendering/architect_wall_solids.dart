@@ -1,4 +1,5 @@
 import '../services/architect_roof_junctions.dart';
+import '../services/architect_section_junctions.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../services/architect_slab_geometry.dart';
@@ -74,23 +75,23 @@ class ArchitectWallSolids {
     final walls = [
       for (final w in storey.walls)
         if (!w.system.isSpecial)
-        () {
-          var height = w.effectiveHeight(storey.height);
-          if (w.followStoreyHeight && !w.isParapet) {
-            for (final (floor, roof) in roofEnvelopes) {
-              for (final point in roof.points) {
-                height = math.max(
-                  height,
-                  floor.elevation +
-                      roof.undersideElevationAt(point) -
-                      storey.elevation -
-                      w.baseOffset,
-                );
+          () {
+            var height = w.effectiveHeight(storey.height);
+            if (w.followStoreyHeight && !w.isParapet) {
+              for (final (floor, roof) in roofEnvelopes) {
+                for (final point in roof.points) {
+                  height = math.max(
+                    height,
+                    floor.elevation +
+                        roof.undersideElevationAt(point) -
+                        storey.elevation -
+                        w.baseOffset,
+                  );
+                }
               }
             }
-          }
-          return w.copyWith(height: height, followStoreyHeight: false);
-        }(),
+            return w.copyWith(height: height, followStoreyHeight: false);
+          }(),
     ];
     var roofFootprint = Path();
     for (final (floor, roof) in roofEnvelopes) {
@@ -112,10 +113,17 @@ class ArchitectWallSolids {
               Path()..addPolygon(opening.boundary, true),
             );
           }
+          final effectiveAssembly =
+              ArchitectSectionJunctions.resolveEffectiveSlabAssembly(
+                project,
+                floor,
+                slab,
+              );
           for (final surface in ArchitectSlabGeometry.surfaces(
             project,
             floor,
             slab,
+            assemblyOverride: effectiveAssembly,
           )) {
             slabs.add((path, surface));
           }
@@ -188,10 +196,37 @@ class ArchitectWallSolids {
             roofFootprint,
           );
         }
+
+        final resolvedLayers = wall.resolvedLayers;
+        final firstCoreIdx = resolvedLayers.indexWhere(
+          (l) => l.role == ArchitectLayerRole.core,
+        );
+        final layerIdx = resolvedLayers.indexWhere(
+          (l) => l.id == region.layer.id,
+        );
+        final isCoreLayer = region.layer.role == ArchitectLayerRole.core;
+        final isExteriorLayer =
+            wall.isExterior &&
+            ((firstCoreIdx > 0 && layerIdx >= 0 && layerIdx < firstCoreIdx) ||
+                region.layer.role == ArchitectLayerRole.insulation);
+
         var parts = [
           ArchitectVerticalPart(footprint, (_) => bottom, (_) => top),
         ];
         for (final (outline, surface) in slabs) {
+          if (surface.layer.id != 'core' && (isCoreLayer || isExteriorLayer)) {
+            continue;
+          }
+          if (surface.layer.id == 'core' && isExteriorLayer) {
+            final cantileversOutside = [0.25, 0.5, 0.75].any(
+              (t) => outline.contains(
+                wall.centerPointAt(t) +
+                    wall.normalAt(t) *
+                        (wall.exteriorSign * (wall.thickness / 2 + 0.08)),
+              ),
+            );
+            if (!cantileversOutside) continue;
+          }
           parts = ArchitectVerticalClip.subtract(
             parts,
             outline,
@@ -208,7 +243,7 @@ class ArchitectWallSolids {
             removeAbove: true,
           );
         }
-        final color = wall.layers.isEmpty && !plinth.enabled
+        final color = wall.layers.isEmpty && !wall.hasInsulation && !plinth.enabled
             ? const Color(0xFFECEFF1)
             : region.layer.material.color;
         // Each clipped part is a closed solid. Keep it separate so vertical

@@ -1,4 +1,6 @@
 import '../models/architect_hatch_pattern.dart';
+import '../models/architect_wall_type.dart';
+import 'architect_section_junctions.dart';
 import '../rendering/architect_roof_drainage_mesh.dart';
 import '../rendering/architect_section_hatch.dart';
 import 'dart:math' as math;
@@ -7,7 +9,7 @@ import '../rendering/architect_mesh_section.dart';
 import 'dart:typed_data';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_elements.dart';
-import '../models/architect_material_layer.dart';
+
 import '../models/architect_project.dart';
 import '../models/architect_section.dart';
 import '../models/architect_section_visibility.dart';
@@ -146,11 +148,16 @@ class ArchitectBuildingSection {
         result.add(region);
         continue;
       }
+      final isMonolithicShared =
+          region.material == SlabMaterial.concrete ||
+          region.material == SlabMaterial.xps;
+      final effectiveHatch =
+          region.hatchPattern ?? ArchitectSectionHatch.slab(region.material);
       final key = (
             region.material,
-            region.customFillColor?.toARGB32(),
-            region.slab,
-            region.hatchPattern,
+            isMonolithicShared ? null : region.customFillColor?.toARGB32(),
+            isMonolithicShared ? true : region.slab,
+            effectiveHatch,
           ),
           index = indices[key];
       if (index == null) {
@@ -163,9 +170,9 @@ class ArchitectBuildingSection {
         previous.sourceId,
         previous.material,
         Path.combine(PathOperation.union, previous.path, region.path),
-        slab: previous.slab,
+        slab: previous.slab || region.slab,
         customFillColor: previous.customFillColor,
-        hatchPattern: previous.hatchPattern,
+        hatchPattern: previous.hatchPattern ?? effectiveHatch,
       );
     }
     return result;
@@ -355,7 +362,17 @@ class ArchitectBuildingSection {
       }
     }
 
-    // 2. Build Slab regions first and register their envelopes as high-priority cutouts for walls
+    // 2. Analyze Cut Walls & Build Symbiotic Slab + Foundation + Wall-Base Junctions
+    final cutWalls = ArchitectSectionJunctions.analyzeCutWalls(project, cut);
+    final junctionPlan =
+        ArchitectSectionJunctions.buildSlabAndFoundationJunctions(
+          project: project,
+          cut: cut,
+          cutWalls: cutWalls,
+        );
+    regions.addAll(junctionPlan.slabAndFoundationRegions);
+    regions.addAll(junctionPlan.wallDetailRegions);
+    /*
     for (final floor in project.storeys) {
       for (final slab in floor.slabs) {
         final spans = ArchitectSlabGeometry.intervals(floor, slab, cut);
@@ -389,6 +406,7 @@ class ArchitectBuildingSection {
       }
     }
 
+    */
     Path? sliceMesh(List<Triangle3D> tris, {double endpointTolerance = 1e-6,
       bool exact = false,
     }) {
@@ -455,7 +473,7 @@ class ArchitectBuildingSection {
 
       final useCompositions = floor.walls.any(
         (w) => w.system.isSpecial ||
-            w.layers.isNotEmpty || w.plinth.enabled || w.isCurved,
+            w.layers.isNotEmpty || w.hasInsulation || w.plinth.enabled || w.isCurved,
       );
       final sharedSolids = useCompositions
           ? ArchitectWallSolids.build(
@@ -574,7 +592,13 @@ class ArchitectBuildingSection {
 
         // Boolean-subtract overlapping roof envelopes (including Mauerlat & Ridge Purlin) and slabs
         // so zero redundant lines appear at wall-to-roof and wall-to-slab junctions!
-        for (final cutout in highPriorityCutouts) {
+        for (final cutout in [
+          ...highPriorityCutouts,
+          if (!useCompositions || wall.system.isSpecial) ...[
+            ...junctionPlan.wallCoreCutouts,
+            ...?junctionPlan.wallBaseDetailCutouts[wall.id],
+          ],
+        ]) {
           try {
             wallPath = Path.combine(
               PathOperation.difference,
@@ -645,7 +669,7 @@ class ArchitectBuildingSection {
             )) {
               final raw = materialSections[part];
               if (raw == null) continue;
-              final region = (wall.system.isSpecial
+              var region = (wall.system.isSpecial
                   ? ArchitectMeshSection.combine
                   : Path.combine)(
                 PathOperation.intersect,
@@ -659,6 +683,57 @@ class ArchitectBuildingSection {
                 remaining,
                 region,
               );
+              if (!wall.system.isSpecial) {
+                final resolved = wall.resolvedLayers;
+                final firstCoreIdx = resolved.indexWhere(
+                  (l) => l.role == ArchitectLayerRole.core,
+                );
+                final layerIdx = resolved.indexWhere(
+                  (l) => l.id == part.layer.id,
+                );
+                final isCore = part.layer.role == ArchitectLayerRole.core;
+                final isInteriorFinish =
+                    part.layer.role == ArchitectLayerRole.finish &&
+                    (!wall.isExterior ||
+                        (firstCoreIdx >= 0 && layerIdx > firstCoreIdx));
+                if (isCore) {
+                  for (final cutout in [
+                    ...junctionPlan.wallCoreCutouts,
+                    ...?junctionPlan.wallBaseDetailCutouts[wall.id],
+                  ]) {
+                    try {
+                      region = Path.combine(
+                        PathOperation.difference,
+                        region,
+                        cutout,
+                      );
+                    } catch (_) {}
+                  }
+                } else if (isInteriorFinish) {
+                  for (final cutout in junctionPlan.interiorFinishCutouts) {
+                    try {
+                      region = Path.combine(
+                        PathOperation.difference,
+                        region,
+                        cutout,
+                      );
+                    } catch (_) {}
+                  }
+                }
+              } else {
+                for (final cutout in [
+                  ...junctionPlan.wallCoreCutouts,
+                  ...?junctionPlan.wallBaseDetailCutouts[wall.id],
+                ]) {
+                  try {
+                    region = ArchitectMeshSection.combine(
+                      PathOperation.difference,
+                      region,
+                      cutout,
+                    );
+                  } catch (_) {}
+                }
+              }
               if (region.getBounds().isEmpty) continue;
               final material = switch (part.layer.material) {
                 ArchitectMaterial.concrete => SlabMaterial.concrete,
@@ -684,7 +759,9 @@ class ArchitectBuildingSection {
             regions.add(
               ArchitectSectionRegion(
                 wall.id,
-                SlabMaterial.plaster,
+                wall.coreMaterial == WallCoreMaterial.concrete
+                    ? SlabMaterial.concrete
+                    : SlabMaterial.plaster,
                 wallPath,
                 hatchPattern: ArchitectSectionHatch.core(wall.coreMaterial),
               ),

@@ -21,9 +21,11 @@ class ArchitectSlabGeometry {
   static List<SlabLayerSurface> surfaces(
     ArchitectProject project,
     ArchitectStorey storey,
-    ArchitectSlab slab,
-  ) {
-    final assembly = ArchitectSlabAssemblies.of(project, slab);
+    ArchitectSlab slab, {
+    ArchitectSlabAssembly? assemblyOverride,
+  }) {
+    final assembly =
+        assemblyOverride ?? ArchitectSlabAssemblies.of(project, slab);
     final coreTop = storey.elevation + slab.coreTopOffset;
     final down = Offset(
       math.cos(slab.slopeDirection ?? 0),
@@ -127,15 +129,12 @@ class ArchitectSlabGeometry {
       for (final (a, b, c) in ArchitectStairMesh.triangulate(slab.polygon))
         [slab.polygon[a], slab.polygon[b], slab.polygon[c]],
     ];
-    for (final boundary in [...slab.holes, ...storey.openings.map((o) => o.boundary)]) {
-      for (final (a, b, c) in ArchitectStairMesh.triangulate(
-        boundary,
-      )) {
-        final clip = [
-          boundary[a],
-          boundary[b],
-          boundary[c],
-        ];
+    for (final boundary in [
+      ...slab.holes,
+      ...storey.openings.map((o) => o.boundary),
+    ]) {
+      for (final (a, b, c) in ArchitectStairMesh.triangulate(boundary)) {
+        final clip = [boundary[a], boundary[b], boundary[c]];
         if (_cross(clip[1] - clip[0], clip[2] - clip[0]) < 0) {
           final temp = clip[1];
           clip[1] = clip[2];

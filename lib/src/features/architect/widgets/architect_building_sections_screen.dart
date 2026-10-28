@@ -1,4 +1,5 @@
 import '../rendering/architect_hatch_geometry.dart';
+import '../services/architect_section_junctions.dart';
 import '../rendering/architect_section_hatch.dart';
 import 'architect_projection_drawing_menu.dart';
 import '../rendering/architect_2d_painter.dart' show ArchitectTool;
@@ -1142,7 +1143,17 @@ class ArchitectSectionDrawing {
     final point = cut.pointAt(detail.station);
     final surfaces = source == null
         ? <SlabLayerSurface>[]
-        : ArchitectSlabGeometry.surfaces(project, source.storey, source.slab);
+        : ArchitectSlabGeometry.surfaces(
+            project,
+            source.storey,
+            source.slab,
+            assemblyOverride:
+                ArchitectSectionJunctions.resolveEffectiveSlabAssembly(
+                  project,
+                  source.storey,
+                  source.slab,
+                ),
+          );
     final double z;
     final double bottomZ;
     if (surfaces.isNotEmpty) {
