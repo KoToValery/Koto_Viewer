@@ -17,6 +17,7 @@ class ArchitectRoofPitchEditor extends StatefulWidget {
   final bool snapEnabled;
   final ValueChanged<bool>? onSnapEnabled;
   static const handleHitRadius = 24.0;
+  static const leaderOffset = Offset(40, -40);
   const ArchitectRoofPitchEditor({
     super.key,
     required this.roof,
@@ -126,7 +127,8 @@ class _PitchState extends State<ArchitectRoofPitchEditor> {
   Widget build(BuildContext context) {
     final l = context.l10n;
     final a = widget.toScreen(projected(pivot, preview));
-    final b = widget.toScreen(projected(control, preview));
+    final contact = widget.toScreen(projected(control, preview));
+    final b = contact + ArchitectRoofPitchEditor.leaderOffset;
     return Stack(
       children: [
         Positioned.fill(
@@ -186,6 +188,10 @@ class _PitchState extends State<ArchitectRoofPitchEditor> {
               key: const ValueKey('roof-pitch-input'),
               behavior: HitTestBehavior.opaque,
               onTapUp: (d) {
+                if ((d.localPosition - b).distance <=
+                    ArchitectRoofPitchEditor.handleHitRadius) {
+                  return;
+                }
                 final x = widget.toView(d.localPosition).dx;
                 final eave =
                     (widget.roof.eavesEdge.$1 + widget.roof.eavesEdge.$2) / 2;
@@ -259,6 +265,7 @@ class _PitchState extends State<ArchitectRoofPitchEditor> {
                       .map((p) => widget.toScreen(projected(p, preview)))
                       .toList(),
                   invalid,
+                  surfaceControl: contact,
                   snapContact: snapContact == null
                       ? null
                       : widget.toScreen(snapContact!),
@@ -362,6 +369,7 @@ class ArchitectRoofPitchPainter extends CustomPainter {
   final List<Offset> points;
   final bool invalid;
   final Offset? snapContact;
+  final Offset? surfaceControl;
   final (Offset, Offset)? snapGuide;
   static const pivotRadius = 3.5, controlRadius = 4.0;
   ArchitectRoofPitchPainter(
@@ -369,6 +377,7 @@ class ArchitectRoofPitchPainter extends CustomPainter {
     this.control,
     this.points,
     this.invalid, {
+    this.surfaceControl,
     this.snapContact,
     this.snapGuide,
   });
@@ -391,6 +400,10 @@ class ArchitectRoofPitchPainter extends CustomPainter {
       pivot + const Offset(8, 0),
       axisPen,
     );
+    if (surfaceControl != null) {
+      canvas.drawLine(surfaceControl!, control, pen);
+      canvas.drawCircle(surfaceControl!, 2, Paint()..color = pen.color);
+    }
     canvas.drawCircle(control, controlRadius, pen);
     canvas.drawCircle(control, 1, Paint()..color = pen.color);
     if (snapContact != null) {

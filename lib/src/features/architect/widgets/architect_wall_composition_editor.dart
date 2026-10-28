@@ -20,6 +20,26 @@ class _LayerDraft {
   void dispose() => input.dispose();
 }
 
+/// Keep each construction's inputs when trying another system in this dialog.
+class _SystemDraft {
+  final ArchitectWallType source;
+  final ArchitectWallSystem system;
+  final List<ArchitectMaterialLayer> layers;
+  final List<String> dimensions;
+  final String name;
+  final ArchitectWallLocation location;
+  final bool bearing;
+  _SystemDraft(
+    this.source,
+    this.system,
+    this.layers,
+    this.dimensions,
+    this.name,
+    this.location,
+    this.bearing,
+  );
+}
+
 String _number(double value) =>
     ArchitectUnit.trimZeros(value.toStringAsFixed(6));
 double? _parse(String text) {
@@ -75,6 +95,7 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
   );
   bool compositionChanged = false, detailsChanged = false;
   ArchitectWallType? pickedType;
+  final systemDrafts = <ArchitectWallSystemKind, _SystemDraft>{};
   String? expandedLayer;
   String? error;
   final editedRegionFields = <String>{};
@@ -103,12 +124,59 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
       ? null
       : widget.plinth?.finish ?? ArchitectMaterial.render;
   ArchitectWallType get source => pickedType ?? widget.type;
+  ArchitectWallType get currentType => source.copyWith(
+    system: system,
+    layers: layers,
+    name: name.text.trim(),
+    location: location,
+    loadBearing: bearing,
+  );
+
+  void switchSystem(ArchitectWallSystemKind kind) {
+    systemDrafts[system.kind] = _SystemDraft(
+      source,
+      system,
+      [for (final d in drafts) d.layer],
+      [for (final d in drafts) d.input.text],
+      name.text,
+      location,
+      bearing,
+    );
+    final previous = systemDrafts[kind];
+    final template =
+        previous?.source ??
+        ArchitectWallType.standardCatalog(
+          includeSpecial: true,
+        ).firstWhere((t) => t.system.kind == kind);
+    for (final d in drafts) {
+      retiredInputs.add(d.input);
+    }
+    pickedType = template;
+    system = previous?.system ?? template.system;
+    drafts
+      ..clear()
+      ..addAll([
+        for (final layer in previous?.layers ?? template.resolvedLayers)
+          _LayerDraft(layer, widget.project.units),
+      ]);
+    if (previous != null) {
+      for (var i = 0; i < drafts.length; i++) {
+        drafts[i].input.text = previous.dimensions[i];
+      }
+    }
+    name.text = previous?.name ?? '';
+    location = previous?.location ?? template.resolvedLocation;
+    bearing = previous?.bearing ?? template.isLoadBearing;
+    expandedLayer = null;
+    changed();
+  }
+
   double get total =>
       system.additionalDepth +
       drafts.fold<double>(
-    0,
-    (v, d) => v + widget.project.units.fromUnit(_parse(d.input.text) ?? 0),
-  );
+        0,
+        (v, d) => v + widget.project.units.fromUnit(_parse(d.input.text) ?? 0),
+      );
   bool invalidNumber(_LayerDraft d) =>
       _parse(d.input.text) == null || _parse(d.input.text)! <= 0;
   List<ArchitectMaterialLayer> get layers => [
@@ -250,9 +318,16 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
   }
 
   Future<void> pickType() async {
-    final types = widget.project.wallTypes
-        .where((t) => t.isCatalogType && t.isParapet == widget.type.isParapet)
-        .toList();
+    final types = {
+      for (final t in ArchitectWallType.standardCatalog(includeSpecial: true))
+        if (t.system.kind == system.kind && t.isParapet == source.isParapet)
+          t.id: t,
+      for (final t in widget.project.wallTypes)
+        if (t.isCatalogType &&
+            t.system.kind == system.kind &&
+            t.isParapet == source.isParapet)
+          t.id: t,
+    }.values.toList();
     if (types.isEmpty) return;
     final result = await showArchitectWallTypePicker(
       context,
@@ -469,16 +544,17 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                 : l.wallTypeApply(widget.typeUseCount!),
             style: Theme.of(context).textTheme.bodySmall,
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Text(
-              l.architectWallTotalThickness(
-                architectWallLength(total, widget.project.units),
+          if (!system.isLog)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                l.architectWallTotalThickness(
+                  architectWallLength(total, widget.project.units),
+                ),
+                key: const ValueKey('wall-composition-total'),
+                style: Theme.of(context).textTheme.titleSmall,
               ),
-              key: const ValueKey('wall-composition-total'),
-              style: Theme.of(context).textTheme.titleSmall,
             ),
-          ),
           Expanded(
             child: Form(
               key: form,
@@ -501,40 +577,10 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                         ],
                         onChanged: (kind) {
                           if (kind == null || kind == system.kind) return;
-                          final template = ArchitectWallType.standardCatalog(
-                            includeSpecial: true,
-                          ).firstWhere((t) => t.system.kind == kind);
-                          setState(() {
-                            system = template.system;
-                            for (final d in drafts) {
-                              retiredInputs.add(d.input);
-                            }
-                            drafts
-                              ..clear()
-                              ..addAll([
-                                for (final layer in template.resolvedLayers)
-                                  _LayerDraft(layer, widget.project.units),
-                              ]);
-                            location = template.resolvedLocation;
-                            bearing = template.isLoadBearing;
-                            changed();
-                          });
+                          setState(() => switchSystem(kind));
                         },
                       ),
                       const SizedBox(height: 12),
-                      if (system.isSpecial)
-                        ArchitectWallSystemFields(
-                          key: ValueKey(
-                            'wall-system-fields-${source.id}-${system.kind.name}',
-                          ),
-                          system: system,
-                          unit: widget.project.units,
-                          thickness: total,
-                          onChanged: (value) => setState(() {
-                            system = value;
-                            changed();
-                          }),
-                        ),
                     ],
                     if (widget.allowTypeSelection)
                       OutlinedButton(
@@ -542,20 +588,23 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                         onPressed: pickType,
                         child: Row(
                           children: [
-                            Expanded(
-                              child: Text(
-                                source.catalogLabel(l, widget.project.units),
-                              ),
-                            ),
+                            Expanded(child: Text(l.wallChooseType)),
                             const Icon(Icons.expand_more),
                           ],
                         ),
                       ),
                     Text(
-                      location == ArchitectWallLocation.exterior
-                          ? l.wallLayerOutsideInside
-                          : l.wallLayerSides,
+                      currentType.compositionLabel(l, widget.project.units),
+                      key: const ValueKey('wall-active-composition'),
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
+                    const SizedBox(height: 8),
+                    if (!system.isLog)
+                      Text(
+                        location == ArchitectWallLocation.exterior
+                            ? l.wallLayerOutsideInside
+                            : l.wallLayerSides,
+                      ),
                     const SizedBox(height: 6),
                     SizedBox(
                       height: 54,
@@ -565,41 +614,60 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                               layers: layers,
                             )
                           : ArchitectWallLayerPreview(
-                        layers: [
-                          for (final d in drafts)
-                            d.layer.copyWith(
-                              thickness: widget.project.units.fromUnit(
-                                (_parse(d.input.text) ?? 0).clamp(
-                                  .000001,
-                                  double.infinity,
-                                ),
+                              layers: [
+                                for (final d in drafts)
+                                  d.layer.copyWith(
+                                    thickness: widget.project.units.fromUnit(
+                                      (_parse(d.input.text) ?? 0).clamp(
+                                        .000001,
+                                        double.infinity,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                              selectedIndex: drafts.indexWhere(
+                                (d) => d.layer.id == expandedLayer,
+                              ),
+                              onSelected: (index) => setState(
+                                () => expandedLayer = drafts[index].layer.id,
                               ),
                             ),
-                        ],
-                        selectedIndex: drafts.indexWhere(
-                          (d) => d.layer.id == expandedLayer,
-                        ),
-                        onSelected: (index) => setState(
-                          () => expandedLayer = drafts[index].layer.id,
-                        ),
-                      ),
                     ),
                     const SizedBox(height: 12),
-                    for (var i = 0; i < drafts.length; i++) _row(i),
+                    if (system.isLog)
+                      TextFormField(
+                        key: ValueKey(
+                          'wall-layer-thickness-${drafts.first.layer.id}',
+                        ),
+                        controller: drafts.first.input,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: l.wallLogDiameter,
+                          suffixText: widget.project.units.symbol,
+                        ),
+                        onChanged: (_) => setState(changed),
+                        validator: (_) => invalidNumber(drafts.first)
+                            ? l.architectWallInvalidThickness
+                            : null,
+                      )
+                    else
+                      for (var i = 0; i < drafts.length; i++) _row(i),
                     Wrap(
                       spacing: 8,
                       children: [
                         if (!system.isLog)
                           TextButton.icon(
-                          key: const ValueKey('wall-layer-add'),
-                          onPressed: addLayer,
-                          icon: const Icon(Icons.add),
-                          label: Text(l.wallLayerAdd),
-                        ),
+                            key: const ValueKey('wall-layer-add'),
+                            onPressed: addLayer,
+                            icon: const Icon(Icons.add),
+                            label: Text(l.wallLayerAdd),
+                          ),
                         if (!system.isLog &&
                             !drafts.any(
-                          (d) => d.layer.role == ArchitectLayerRole.finish,
-                        ))
+                              (d) => d.layer.role == ArchitectLayerRole.finish,
+                            ))
                           TextButton.icon(
                             key: const ValueKey('wall-layer-coatings'),
                             onPressed: addCoatings,
@@ -655,6 +723,28 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                           color: Theme.of(context).colorScheme.error,
                         ),
                       ),
+                    if (system.isSpecial)
+                      ExpansionTile(
+                        key: ValueKey(
+                          'wall-system-options-${system.kind.name}',
+                        ),
+                        tilePadding: EdgeInsets.zero,
+                        title: Text(l.wallSystemOptions),
+                        children: [
+                          ArchitectWallSystemFields(
+                            key: ValueKey(
+                              'wall-system-fields-${source.id}-${system.kind.name}',
+                            ),
+                            system: system,
+                            unit: widget.project.units,
+                            thickness: total,
+                            onChanged: (value) => setState(() {
+                              system = value;
+                              changed();
+                            }),
+                          ),
+                        ],
+                      ),
                     ExpansionTile(
                       tilePadding: EdgeInsets.zero,
                       title: Text(l.wallTypeDetails),
@@ -673,6 +763,9 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                         ),
                         if (!source.isParapet) ...[
                           DropdownButtonFormField<ArchitectWallLocation>(
+                            key: ValueKey(
+                              'wall-location-${system.kind.name}-${source.id}',
+                            ),
                             initialValue: location,
                             isExpanded: true,
                             decoration: InputDecoration(
@@ -868,45 +961,45 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
             ),
             if (!system.isLog)
               PopupMenuButton<String>(
-              key: ValueKey('wall-layer-menu-${d.layer.id}'),
-              tooltip: l.wallLayerDetails,
-              itemBuilder: (_) => [
-                for (final role in ArchitectLayerRole.values)
-                  CheckedPopupMenuItem(
-                    value: role.name,
-                    checked: d.layer.role == role,
-                    child: Text(role.label(l)),
+                key: ValueKey('wall-layer-menu-${d.layer.id}'),
+                tooltip: l.wallLayerDetails,
+                itemBuilder: (_) => [
+                  for (final role in ArchitectLayerRole.values)
+                    CheckedPopupMenuItem(
+                      value: role.name,
+                      checked: d.layer.role == role,
+                      child: Text(role.label(l)),
+                    ),
+                  PopupMenuItem(
+                    value: 'up',
+                    enabled: index > 0,
+                    child: Text(l.wallLayerUp),
                   ),
-                PopupMenuItem(
-                  value: 'up',
-                  enabled: index > 0,
-                  child: Text(l.wallLayerUp),
-                ),
-                PopupMenuItem(
-                  value: 'down',
-                  enabled: index + 1 < drafts.length,
-                  child: Text(l.wallLayerDown),
-                ),
-                PopupMenuItem(
-                  value: 'delete',
-                  enabled: drafts.length > 1,
-                  child: Text(l.delete),
-                ),
-              ],
-              onSelected: (value) => setState(() {
-                changed();
-                if (value == 'delete') {
-                  retiredInputs.add(drafts.removeAt(index).input);
-                } else if (value == 'up' || value == 'down') {
-                  final row = drafts.removeAt(index);
-                  drafts.insert(index + (value == 'up' ? -1 : 1), row);
-                } else {
-                  d.layer = d.layer.copyWith(
-                    role: ArchitectLayerRole.values.byName(value),
-                  );
-                }
-              }),
-            ),
+                  PopupMenuItem(
+                    value: 'down',
+                    enabled: index + 1 < drafts.length,
+                    child: Text(l.wallLayerDown),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    enabled: drafts.length > 1,
+                    child: Text(l.delete),
+                  ),
+                ],
+                onSelected: (value) => setState(() {
+                  changed();
+                  if (value == 'delete') {
+                    retiredInputs.add(drafts.removeAt(index).input);
+                  } else if (value == 'up' || value == 'down') {
+                    final row = drafts.removeAt(index);
+                    drafts.insert(index + (value == 'up' ? -1 : 1), row);
+                  } else {
+                    d.layer = d.layer.copyWith(
+                      role: ArchitectLayerRole.values.byName(value),
+                    );
+                  }
+                }),
+              ),
           ],
         ),
         if (open)

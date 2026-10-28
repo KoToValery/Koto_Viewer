@@ -1869,7 +1869,8 @@ class ArchitectRoofGeometry {
       }
     }
 
-    // Candidate Types B, C, D: Wall corners, Slabs, and other Roof Vertices
+    // Guides belong to supporting walls and the current eaves. Existing roof
+    // vertices remain object snaps, never guide origins for another slope.
     final refCorners = <Offset>[];
     void addCorner(Offset pt) {
       if ((pt - anchor).distance < 0.15) return;
@@ -1880,21 +1881,16 @@ class ArchitectRoofGeometry {
       refCorners.add(pt);
     }
 
-    for (final w in activeStorey.walls) {
-      addCorner(w.startPoint);
-      addCorner(w.endPoint);
+    final wallCorners = [for (final w in activeStorey.walls) ...[w.startPoint, w.endPoint]];
+    double fromEaves(Offset p) => eavesUnit == null || p0 == null ? 0 :
+        ((p - p0).dx * eavesUnit.dy - (p - p0).dy * eavesUnit.dx).abs();
+    final nearestWall = wallCorners.isEmpty ? 0.0 : wallCorners.map(fromEaves).reduce(math.min);
+    for (final corner in wallCorners) {
+      // Corners on the far facade belong to the opposite slope. Account for
+      // the overhang by measuring from the nearest supporting wall line.
+      if (fromEaves(corner) <= nearestWall + math.max(.05, snapTolerance)) addCorner(corner);
     }
-    for (final s in activeStorey.slabs) {
-      for (final c in s.polygon) {
-        addCorner(c);
-      }
-    }
-    for (final r in activeStorey.roofs) {
-      for (final c in r.points) {
-        addCorner(c);
-      }
-    }
-    for (final dp in draftPoints) {
+    for (final dp in draftPoints.take(2)) {
       addCorner(dp);
     }
 
@@ -1949,7 +1945,7 @@ class ArchitectRoofGeometry {
     }
 
     // 6. Select closest intersection candidate within snap tolerance
-    final maxSnapDist = math.max(snapTolerance * 2.2, 0.40);
+    final maxSnapDist = snapTolerance;
     final validCandidates = candidates
         .where((c) => c.distanceToCursor <= maxSnapDist)
         .toList();

@@ -7,6 +7,7 @@ import '../services/architect_roof_drainage_geometry.dart';
 import 'architect_path_solid.dart';
 
 class ArchitectRoofDrainageMesh {
+  static final _cache = Expando<Map<(ArchitectRoofPlane, bool, bool, bool), List<Triangle3D>>>();
   static const thickness = .0015;
   static Color color(ArchitectDrainageMaterial material) => switch (material) {
     ArchitectDrainageMaterial.galvanizedSteel => const Color(0xff87969d),
@@ -22,6 +23,17 @@ class ArchitectRoofDrainageMesh {
     bool includeGutters = true,
     bool includeDownpipes = true,
     bool details = true,
+  }) => (_cache[project] ??= {}).putIfAbsent((roof, includeGutters, includeDownpipes, details),
+    () => List.unmodifiable(_build(project, storey, roof,
+      includeGutters: includeGutters, includeDownpipes: includeDownpipes, details: details)));
+
+  static List<Triangle3D> _build(
+    ArchitectProject project,
+    ArchitectStorey storey,
+    ArchitectRoofPlane roof, {
+    required bool includeGutters,
+    required bool includeDownpipes,
+    required bool details,
   }) {
     if (!includeGutters && !includeDownpipes) return [];
     final geometry = ArchitectRoofDrainageGeometry.build(project, storey, roof);

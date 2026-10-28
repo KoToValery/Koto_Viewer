@@ -11708,7 +11708,7 @@ abstract class AppLocalizations {
   /// No description provided for @wallCompositionAction.
   ///
   /// In en, this message translates to:
-  /// **'Layers'**
+  /// **'Construction'**
   String get wallCompositionAction;
 
   /// No description provided for @wallManageTypes.
@@ -14828,7 +14828,7 @@ abstract class AppLocalizations {
   /// No description provided for @wallSystem.
   ///
   /// In en, this message translates to:
-  /// **'Construction'**
+  /// **'System'**
   String get wallSystem;
 
   /// No description provided for @wallSystemLayered.
@@ -14960,7 +14960,7 @@ abstract class AppLocalizations {
   /// No description provided for @wallLogHelp.
   ///
   /// In en, this message translates to:
-  /// **'Diameter stays circular. Overlap changes course height; corners alternate by half a course.'**
+  /// **'Plans show the nominal diameter. Sections and 3D retain round logs, overlap and alternating corner courses.'**
   String get wallLogHelp;
 
   /// No description provided for @wallFrameHelp.
@@ -15286,6 +15286,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'After selection: {count}'**
   String architectSelectPreviewCount(int count);
+
+  /// No description provided for @wallLogSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Diameter {size}'**
+  String wallLogSize(String size);
+
+  /// No description provided for @wallChooseType.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose type'**
+  String get wallChooseType;
+
+  /// No description provided for @wallSystemOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Construction details'**
+  String get wallSystemOptions;
 }
 
 class _AppLocalizationsDelegate

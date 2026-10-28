@@ -101,6 +101,7 @@ import '../../bim_editing/geometry/bim_contour_drafting_geometry.dart';
 import 'dart:math' as math;
 
 import 'dart:async';
+import '../widgets/architect_downpipe_handle.dart';
 
 import 'dart:convert';
 
@@ -3914,7 +3915,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   List<ArchitectWallType> get _availableWallTypes {
     final types = _project.wallTypes.where((t) => t.isCatalogType).toList();
-    return types.isEmpty ? ArchitectWallType.standardCatalog() : types;
+    if (types.isEmpty) return ArchitectWallType.standardCatalog(includeSpecial: true);
+    return [
+      ...types,
+      for (final preset in ArchitectWallType.standardCatalog(includeSpecial: true))
+        if (preset.system.isSpecial &&
+            !types.any((t) => t.system.kind == preset.system.kind)) preset,
+    ];
   }
 
 
@@ -7541,7 +7548,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  ArchitectSnapResult _snapElement(Offset raw, {Offset? anchor}) {
+  ArchitectSnapResult _snapElement(Offset raw, {Offset? anchor, double? tolerancePixels}) {
 
     if (_splitActive && _splitGuidePerpendicular != null) {
 
@@ -7587,7 +7594,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             project: _project,
 
-            tolerance: (_touchInput ? 12 : 8) / _currentScale,
+            tolerance: (tolerancePixels ?? (_touchInput ? 12 : 8)) / _currentScale,
 
             magnetic: _magnetEnabled,
 
@@ -7611,7 +7618,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             project: _project,
 
-            tolerance: (_touchInput ? 12 : 8) / _currentScale,
+            tolerance: (tolerancePixels ?? (_touchInput ? 12 : 8)) / _currentScale,
 
             magnetic: _magnetEnabled,
 
@@ -9382,11 +9389,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final anchor = isPolyMode ? points.lastOrNull : null;
 
-    final snap = _snapElement(raw, anchor: anchor);
+    final snap = _snapElement(raw, anchor: anchor, tolerancePixels: _touchInput ? 18 : 12);
 
     final midpointSnap = snap.snapLabel == 'Midpoint' ||
 
         snap.snapLabel == 'Midpoint alignment';
+
+    final objectSnap = snap.isSnapped && const {
+      'Endpoint', 'Vertex', 'Intersection', 'Axis endpoint',
+      'Axis intersection', 'Center', 'Midpoint',
+    }.contains(snap.snapLabel);
+    final closesDraft = isPolyMode && points.length >= 3 &&
+        (raw - points.first).distance <= math.min(18 / _currentScale, 0.35);
+    if (objectSnap && !closesDraft) {
+      _activeSnapLabel = snap.snapLabel;
+      _activeMagneticGuides = snap.magneticGuides;
+      return snap.point;
+    }
 
     if (isPolyMode && points.length >= 3) {
 
@@ -9440,7 +9459,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         raw: raw,
         anchor: anchor,
         draftPoints: points,
-        activeStorey: _project.activeStorey,
+        activeStorey: _project.activeStorey.walls.isEmpty
+            ? (ArchitectRoofGeometry.supportingWallStorey(_project, _project.activeStorey) ?? _project.activeStorey)
+                .copyWith(roofs: _project.activeStorey.roofs)
+            : _project.activeStorey,
         currentSlopeDegrees: _roofTool.slopeDegrees,
         snapTolerance: snapTol,
         hip45Label: () => l10n.architectRoofSnap45Degrees,
@@ -27889,6 +27911,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ),
 
+      if (_commands.isPlan && _activeTool == ArchitectTool.select && !_placingDownpipe)
+        Positioned.fill(child: AnimatedBuilder(
+          animation: Listenable.merge([_viewport, _modelCommands]),
+          builder: (_, _) => ArchitectDownpipeHandle(
+            controller: _modelCommands,
+            onNavigate: (delta, factor, focal) => _viewport.navigate(
+              previousFocal: focal - delta, focal: focal, scaleFactor: factor),
+            roofIds: _project.activeStorey.roofs.map((r) => r.id).toSet(),
+            toScreen: (p, z) => _viewport.toScreen(p),
+          ),
+        )),
       if (_radialMenuScreenPosition != null && _radialMenuItems.isNotEmpty)
 
         Positioned.fill(

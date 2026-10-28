@@ -42,6 +42,37 @@ class ArchitectGutterRun {
 }
 
 class ArchitectRoofDrainageGeometry {
+  /// Start a newly added outlet at the centre of an exposed run, rather than
+  /// the model's legacy 30 cm offset beside a wall corner.
+  static double initialOffset(ArchitectProject project, ArchitectRoofPlane roof) {
+    final floor = project.storeys.where((s) => s.roofs.any((r) => r.id == roof.id)).firstOrNull;
+    final (a, b) = eaves(roof);
+    final length = (b - a).distance;
+    if (length < 1e-6) return 0;
+    final runs = floor == null ? [(a, b)] : visibleEaves(project, floor, roof);
+    if (runs.isEmpty) return length / 2;
+    final ordered = [...runs]..sort((a, b) => (b.$2 - b.$1).distance.compareTo((a.$2 - a.$1).distance));
+    final midpoint = (ordered.first.$1 + ordered.first.$2) / 2;
+    final axis = (b - a) / length;
+    final facadeCentres = <(double, double, Offset)>[];
+    for (final storey in project.storeys) {
+      for (final wall in storey.walls) {
+        if ((wall.unitVector.dx * axis.dx + wall.unitVector.dy * axis.dy).abs() < .95) continue;
+        final centre = (wall.startPoint + wall.endPoint) / 2;
+        final delta = centre - a;
+        final along = delta.dx * axis.dx + delta.dy * axis.dy;
+        final projected = a + axis * along;
+        if ((BimLineGeometry.closest(projected, ordered.first.$1, ordered.first.$2) - projected).distance > 1e-5) continue;
+        final inward = delta.dx * roof.slopeDirection.dx + delta.dy * roof.slopeDirection.dy;
+        if (inward < -.05) continue;
+        facadeCentres.add((inward.abs(), (projected - midpoint).distance, projected));
+      }
+    }
+    facadeCentres.sort((a, b) => (a.$1 - b.$1).abs() > .05 ? a.$1.compareTo(b.$1) : a.$2.compareTo(b.$2));
+    final target = facadeCentres.firstOrNull?.$3 ?? midpoint;
+    return (((target - a).dx * (b - a).dx + (target - a).dy * (b - a).dy) / length).clamp(0, length);
+  }
+
   static const maximumFittingExtraRadius = .007;
   static const roofClearance = .01;
   static final _cache =

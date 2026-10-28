@@ -707,7 +707,7 @@ class ArchitectBuildingSection {
                 .showsCut,
             details: false,
           ),
-          endpointTolerance: 1e-5,
+          exact: true,
         );
         if (path != null) {
           regions.add(

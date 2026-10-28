@@ -55,10 +55,11 @@ void main() {
     await views.select(tester, 'section', 'cut');
     final roof = source.project.activeStorey.roofs.last;
     final z = roof.undersideElevationAt(const Offset(6, 2)) + .1;
-    await workspace.wallTap(tester, Offset(7, -z));
+    // Section views reflect legacy station coordinates: 10 - 7 = 3.
+    await workspace.wallTap(tester, Offset(3, -z));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('projection-roof-snap')), findsOneWidget);
-    final start = workspace.screen(tester, Offset(7, -z));
+    final start = workspace.screen(tester, Offset(3, -z));
     final scale = workspace.camera(tester).scale;
     final gesture = await tester.startGesture(start);
     await gesture.moveTo(start + Offset(0, .1 * scale));
@@ -166,14 +167,14 @@ void main() {
       addTearDown(source.dispose);
       await workspace.open(tester, source);
       await views.select(tester, 'section', 'cut');
-      await workspace.wallTap(tester, const Offset(2.6, -1.6));
+      await workspace.wallTap(tester, const Offset(7.4, -1.6));
       await tester.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('projection-properties')),
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('projection-move-x')), findsNothing);
-      final start = workspace.screen(tester, const Offset(2.6, -1.6));
+      final start = workspace.screen(tester, const Offset(7.4, -1.6));
       final scale = workspace.camera(tester).scale;
       final gesture = await tester.startGesture(start);
       await gesture.moveTo(start + Offset(0, -.15 * scale));
@@ -220,7 +221,7 @@ void main() {
         );
         final roof = source.project.activeStorey.roofs.last;
         final point = Offset(
-          7,
+          3,
           roof.undersideElevationAt(const Offset(6, 2)) + .1,
         );
         final viewer = tester.widget<InteractiveViewer>(
@@ -396,7 +397,7 @@ void main() {
         );
         final rect = tester.getRect(find.byType(ArchitectProjectionEditor));
         await tester.tapAt(
-          rect.topLeft + editor.toScreen(const Offset(2.6, 1.6)),
+          rect.topLeft + editor.toScreen(const Offset(7.4, 1.6)),
         );
         await tester.pumpAndSettle();
         expect(

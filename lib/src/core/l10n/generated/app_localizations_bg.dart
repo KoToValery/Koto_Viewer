@@ -6622,7 +6622,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get wallTypeInUse => 'Изберете заместител за стените с този тип.';
 
   @override
-  String get wallCompositionAction => 'Слоеве';
+  String get wallCompositionAction => 'Конструкция';
 
   @override
   String get wallManageTypes => 'Редактирай типовете';
@@ -8369,7 +8369,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get wallLogHelp =>
-      'Диаметърът запазва кръглата форма. Застъпването променя височината на реда; ъглите се разминават с половин ред.';
+      'В план се показва номиналният диаметър. Разрезите и 3D запазват кръглите трупи, застъпването и разминатите редове в ъглите.';
 
   @override
   String get wallFrameHelp =>
@@ -8546,4 +8546,15 @@ class AppLocalizationsBg extends AppLocalizations {
   String architectSelectPreviewCount(int count) {
     return 'След избора: $count';
   }
+
+  @override
+  String wallLogSize(String size) {
+    return 'Диаметър $size';
+  }
+
+  @override
+  String get wallChooseType => 'Избор на тип';
+
+  @override
+  String get wallSystemOptions => 'Детайли на конструкцията';
 }

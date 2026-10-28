@@ -425,6 +425,10 @@ class Architect2dPainter extends CustomPainter {
           );
         }
       }
+      if (!_project.activeStorey.isRoof) {
+        ArchitectRoofPainterHelper.paintOverhead(canvas: canvas, project: _project,
+          scale: zoomScale, color: palette.foreground(Colors.black));
+      }
       ArchitectRoofPainterHelper.paintRoofs(
         canvas: canvas,
         storey: _elementLayerStorey,

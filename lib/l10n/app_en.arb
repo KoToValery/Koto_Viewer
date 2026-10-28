@@ -4320,7 +4320,7 @@
   "@wallTypeApply": {"placeholders": {"count": {"type": "int"}}},
   "wallTypeReplacement": "Replace with",
   "wallTypeInUse": "Select a replacement for the walls using this type.",
-  "wallCompositionAction": "Layers",
+  "wallCompositionAction": "Construction",
   "wallManageTypes": "Manage types",
   "wallMaterialPlaster": "Plaster",
   "wallMaterialRender": "Facade render",
@@ -4959,7 +4959,7 @@
   "roofUiNewLegend": "New",
   "roofUiKeptLegend": "Preserved",
   "architectHatchTransformHelp": "Drag to rotate the hatch and change its scale. Scale snaps in 10% steps; direction snaps every 45°.",
-  "wallSystem": "Construction",
+  "wallSystem": "System",
   "wallSystemLayered": "Layers",
   "wallSystemLogs": "Round logs",
   "wallSystemFrame": "Stud partition",
@@ -4981,7 +4981,7 @@
   "wallPanelsHorizontal": "Horizontal panels",
   "wallSystemInvalid": "Check the construction dimensions.",
   "wallSystemStraightOnly": "This system uses straight walls.",
-  "wallLogHelp": "Diameter stays circular. Overlap changes course height; corners alternate by half a course.",
+  "wallLogHelp": "Plans show the nominal diameter. Sections and 3D retain round logs, overlap and alternating corner courses.",
   "wallFrameHelp": "Boards, profiles and cavity insulation have independent dimensions.",
   "wallPanelHelp": "Panel and support depth are separate. Supports attach to the selected column faces.",
   "wallColumnSupports": "Column supports",
@@ -5036,5 +5036,9 @@
   "architectSelectCrossingHelp": "Select elements inside or crossing the selection boundary.",
   "architectSelectContainedHelp": "Select only elements entirely inside the selection boundary.",
   "architectSelectPreviewCount": "After selection: {count}",
-  "@architectSelectPreviewCount": {"placeholders":{"count":{"type":"int"}}}
+  "@architectSelectPreviewCount": {"placeholders":{"count":{"type":"int"}}},
+  "wallLogSize": "Diameter {size}",
+  "@wallLogSize": {"placeholders": {"size": {"type": "String"}}},
+  "wallChooseType": "Choose type",
+  "wallSystemOptions": "Construction details"
 }

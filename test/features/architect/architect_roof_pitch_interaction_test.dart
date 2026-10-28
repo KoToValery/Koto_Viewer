@@ -273,7 +273,10 @@ void main() {
         final finger = await tester.startGesture(initial.control);
         await finger.moveBy(const Offset(0, -30));
         await tester.pump();
-        await finger.moveTo(camera.toScreen(Offset(5, -(target + .04))));
+        await finger.moveTo(
+          camera.toScreen(Offset(5, -(target + .04))) +
+              ArchitectRoofPitchEditor.leaderOffset,
+        );
         await tester.pump();
         expect(pitchPainter(tester).snapContact != null, snapEnabled);
         await finger.up();

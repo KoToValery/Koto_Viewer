@@ -1352,9 +1352,8 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
           ArchitectHatchGeometry.path(
             boundary: path,
             pattern: pattern,
-            unitsPerMm: ArchitectTextScope.current == null
-                ? 3
-                : ArchitectTextScope.current!.denominator / 1000 * scale,
+            unitsPerMm: (ArchitectTextScope.current?.denominator ?? drawing.project.dimensionScale.denominator) / 1000 * scale,
+            origin: p(Offset.zero),
             visibleBounds: Offset.zero & size,
           ),
           Paint()

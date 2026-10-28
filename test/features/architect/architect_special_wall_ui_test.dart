@@ -192,6 +192,9 @@ void main() {
             await tester.pumpAndSettle();
             expect(tester.takeException(), isNull);
             if (kind == ArchitectWallSystemKind.roundLogs) {
+              await tester.tap(find.byKey(const ValueKey('wall-system-options-roundLogs')));
+              await tester.pumpAndSettle();
+              await tester.ensureVisible(find.byKey(const ValueKey('wall-system-overlap')));
               await tester.enterText(
                 find.byKey(const ValueKey('wall-system-overlap')),
                 '15',

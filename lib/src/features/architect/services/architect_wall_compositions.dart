@@ -78,6 +78,9 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
                       ? wall
                       : wall.copyWith(
                           system: type.system,
+                          systemPlacement: wall.system.kind == type.system.kind
+                              ? wall.systemPlacement
+                              : const ArchitectWallSystemPlacement(),
                           layers: List.unmodifiable(type.resolvedLayers),
                           thickness: type.totalThickness,
                           insulationThicknessOverride: type.insulationThickness,

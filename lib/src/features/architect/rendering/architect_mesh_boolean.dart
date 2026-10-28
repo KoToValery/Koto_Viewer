@@ -231,9 +231,14 @@ class _FaceMesh {
       clip.FillRule.nonZero,
     );
     if (contours == null) throw StateError('Construction face union failed');
+    // Flutter paths store float32 coordinates. Rebuilding a cap in world
+    // coordinates opens micron-wide cracks between it and the double-precision
+    // sides (already at 14 m), so a subsequent section cannot close its loops.
+    // Triangulate near the origin and restore the world position afterwards.
+    final origin = project(triangles.first.v0);
     final path = Path();
     for (final loop in contours) {
-      path.addPolygon([for (final p in loop) Offset(p.x, p.y)], true);
+      path.addPolygon([for (final p in loop) Offset(p.x, p.y) - origin], true);
     }
     final color = triangles.first.color;
     final result = <Triangle3D>[];
@@ -246,9 +251,9 @@ class _FaceMesh {
       if (triangle.v0.z < .5 || triangle.v1.z < .5 || triangle.v2.z < .5) {
         continue;
       }
-      final a = lift(Offset(triangle.v0.x, triangle.v0.y)),
-          b = lift(Offset(triangle.v1.x, triangle.v1.y)),
-          c = lift(Offset(triangle.v2.x, triangle.v2.y));
+      final a = lift(Offset(triangle.v0.x, triangle.v0.y) + origin),
+          b = lift(Offset(triangle.v1.x, triangle.v1.y) + origin),
+          c = lift(Offset(triangle.v2.x, triangle.v2.y) + origin);
       final flip = (b - a).cross(c - a).dot(normal) < 0;
       result.add(
         Triangle3D(v0: a, v1: flip ? c : b, v2: flip ? b : c, color: color),

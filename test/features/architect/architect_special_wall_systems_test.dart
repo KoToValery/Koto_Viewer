@@ -603,7 +603,7 @@ void main() {
     },
   );
   test(
-    'real log sections are available to the plan at different cut heights',
+    'log plans keep nominal diameter while physical sections keep round chords',
     () {
       final wall = special(
         'a',
@@ -619,8 +619,18 @@ void main() {
       expect(layers.body.contains(const Offset(1, 0)), isTrue);
       expect(layers.body.getBounds().height, closeTo(.24, .002));
       final narrow = ArchitectWallLayers.build([wall], [], cutPlaneHeight: .31);
-      expect(narrow.body.getBounds().height, lessThan(.24));
-      expect(narrow.body.getBounds().height, greaterThan(.1));
+      expect(narrow.body.getBounds().height, closeTo(.24, .00001));
+      final components = ArchitectSpecialWallGeometry.build(
+        project([wall]).activeStorey,
+      );
+      final physical = components
+          .map((c) => c.at(.31))
+          .fold<Path>(
+            Path(),
+            (a, b) => Path.combine(PathOperation.union, a, b),
+          );
+      expect(physical.getBounds().height, lessThan(.24));
+      expect(physical.getBounds().height, greaterThan(.1));
     },
   );
   test('split is a montage edit and does not create physical tails', () {

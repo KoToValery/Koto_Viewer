@@ -4,6 +4,11 @@ import '../models/architect_wall.dart';
 import '../models/architect_wall_type.dart';
 import 'architect_wall_network.dart';
 import 'architect_special_wall_geometry.dart';
+import 'architect_mesh_section.dart';
+import 'architect_path_solid.dart';
+import '../services/architect_slab_geometry.dart';
+import '../services/architect_roof_geometry.dart';
+import '../services/architect_roof_junctions.dart';
 
 /// Insulation follows the explicit exterior side. All layers retain the
 /// original reference nodes, so their faces share the same mitred junctions.
@@ -78,17 +83,145 @@ class ArchitectWallLayers {
             elevation: storeyElevation,
             walls: walls,
           );
-      for (final component in ArchitectSpecialWallGeometry.build(
-        floor,
-        project: project,
-      )) {
+      var claimedLogs = Path(), logObstacles = ordinary.body;
+      final cutZ = storeyElevation + cutPlaneHeight;
+      if (walls.any((w) => w.system.isLog)) {
+        for (final column in floor.columns) {
+          if (cutPlaneHeight <= column.baseOffset ||
+              cutPlaneHeight >=
+                  column.baseOffset + (column.height ?? floor.height)) {
+            continue;
+          }
+          logObstacles = Path.combine(
+            PathOperation.union,
+            logObstacles,
+            ArchitectMeshSection.horizontal(
+              column.build3D(
+                storeyElevation: floor.elevation,
+                storeyHeight: floor.height,
+              ),
+              cutZ,
+            ),
+          );
+        }
+        if (project != null) {
+          for (final level in project.storeys) {
+            for (final slab in level.slabs) {
+              var footprint = Path()..addPolygon(slab.polygon, true);
+              for (final opening in level.openings) {
+                footprint = Path.combine(
+                  PathOperation.difference,
+                  footprint,
+                  Path()..addPolygon(opening.boundary, true),
+                );
+              }
+              for (final hole in slab.holes) {
+                footprint = Path.combine(
+                  PathOperation.difference,
+                  footprint,
+                  Path()..addPolygon(hole, true),
+                );
+              }
+              for (final surface in ArchitectSlabGeometry.surfaces(
+                project,
+                level,
+                slab,
+              )) {
+                if (!slab.polygon.any((p) => surface.bottomAt(p) < cutZ) ||
+                    !slab.polygon.any((p) => surface.topAt(p) > cutZ)) {
+                  continue;
+                }
+                logObstacles = Path.combine(
+                  PathOperation.union,
+                  logObstacles,
+                  ArchitectMeshSection.horizontal(
+                    ArchitectPathSolid.between(
+                      footprint,
+                      surface.bottomAt,
+                      surface.topAt,
+                      ArchitectMaterial.timber.color,
+                    ),
+                    cutZ,
+                  ),
+                );
+              }
+            }
+            if (level.id != floor.id &&
+                ArchitectRoofGeometry.supportingWallStorey(
+                      project,
+                      level,
+                    )?.id !=
+                    floor.id) {
+              continue;
+            }
+            for (final roof in level.roofs) {
+              double underside(Offset p) =>
+                  level.elevation + roof.undersideElevationAt(p);
+              if (!roof.points.any((p) => underside(p) < cutZ)) continue;
+              var top = cutZ + 10;
+              for (final p in roof.points) {
+                if (underside(p) + 10 > top) top = underside(p) + 10;
+              }
+              logObstacles = Path.combine(
+                PathOperation.union,
+                logObstacles,
+                ArchitectMeshSection.horizontal(
+                  ArchitectPathSolid.between(
+                    ArchitectRoofJunctions.of(
+                      level,
+                      project: project,
+                    ).footprint(roof),
+                    underside,
+                    (_) => top,
+                    ArchitectMaterial.timber.color,
+                  ),
+                  cutZ,
+                ),
+              );
+            }
+          }
+        }
+      }
+      // A plan describes the nominal log diameter. Slicing alternating round
+      // courses gives different chord widths and can hit a tangency exactly;
+      // reserve that physical cut for sections and use a clean envelope here.
+      for (final wall in walls.where((w) => w.system.isLog)) {
+        final outline = Path()
+          ..addPolygon(
+            ArchitectSpecialWallGeometry.physicalPlanCorners(wall, walls),
+            true,
+          );
+        if (!wall.isCutAt(cutPlaneHeight)) {
+          uncut = Path.combine(PathOperation.union, uncut, outline);
+          continue;
+        }
+        var path = Path.combine(
+          PathOperation.difference,
+          outline,
+          wall.openingCutoutAt(cutPlaneHeight - wall.baseOffset),
+        );
+        path = Path.combine(PathOperation.difference, path, logObstacles);
+        path = Path.combine(PathOperation.difference, path, claimedLogs);
+        claimedLogs = Path.combine(PathOperation.union, claimedLogs, path);
+        body = Path.combine(PathOperation.union, body, path);
+        core = Path.combine(PathOperation.union, core, path);
+        owners[wall.id] = path;
+        materials.add(
+          ArchitectWallMaterialRegion(wall, wall.resolvedLayers.first, path),
+        );
+      }
+      for (final component
+          in floor.walls.any((w) => w.system.isFrame || w.system.isPanel)
+              ? ArchitectSpecialWallGeometry.build(floor, project: project)
+              : <ArchitectWallComponent>[]) {
         if (!walls.any((w) => w.id == component.wall.id)) continue;
         final wall = component.wall;
+        if (wall.system.isLog) continue;
         if (wall.isCutAt(cutPlaneHeight)) {
           var path = component.at(storeyElevation + cutPlaneHeight);
           // Existing masonry owns its region at a mixed contact; never paint
           // two hatches over the same material section.
-          path = Path.combine(PathOperation.difference, path, ordinary.body);
+          path = Path.combine(PathOperation.difference, path, body);
           body = Path.combine(PathOperation.union, body, path);
           if (component.layer.role == ArchitectLayerRole.core) {
             core = Path.combine(PathOperation.union, core, path);

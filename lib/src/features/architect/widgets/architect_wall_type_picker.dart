@@ -7,6 +7,7 @@ import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
 import '../services/architect_wall_catalog.dart';
 import 'architect_wall_layer_preview.dart';
+import 'architect_wall_system_preview.dart';
 import 'architect_wall_type_label.dart';
 
 enum ArchitectWallPickerAction { select, variant, manage }
@@ -105,6 +106,7 @@ class ArchitectWallCatalogBrowser extends StatefulWidget {
 }
 
 class _BrowserState extends State<ArchitectWallCatalogBrowser> {
+  late ArchitectWallSystemKind systemKind = widget.activeType.system.kind;
   late ArchitectWallCategory category = ArchitectWallCategory.of(
     widget.activeType,
   );
@@ -133,6 +135,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
             ArchitectWallCatalogGroup.keyOf(oldWidget.activeType) !=
                 ArchitectWallCatalogGroup.keyOf(widget.activeType))) {
       category = ArchitectWallCategory.of(widget.activeType);
+      systemKind = widget.activeType.system.kind;
       expanded[category] = ArchitectWallCatalogGroup.keyOf(widget.activeType);
     }
   }
@@ -188,6 +191,9 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
         .where(
           (t) =>
               (q.isNotEmpty || ArchitectWallCategory.of(t) == category) &&
+              (q.isNotEmpty ||
+                  t.system.kind == systemKind ||
+                  category == ArchitectWallCategory.parapet) &&
               (!favoritesOnly || favorites.contains(t.id)) &&
               (!bearingOnly || t.isLoadBearing) &&
               (q.isEmpty ||
@@ -213,11 +219,16 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
             .where(
               (t) =>
                   t.id == widget.activeType.id &&
+                  t.system.kind == systemKind &&
                   ArchitectWallCategory.of(t) == category,
             )
             .firstOrNull ??
         widget.types
-            .where((t) => ArchitectWallCategory.of(t) == category)
+            .where(
+              (t) =>
+                  ArchitectWallCategory.of(t) == category &&
+                  t.system.kind == systemKind,
+            )
             .firstOrNull ??
         widget.activeType;
     final rows = <Widget>[];
@@ -233,7 +244,12 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
             leading: SizedBox(
               width: 28,
               height: 32,
-              child: ArchitectWallLayerPreview(layers: first.resolvedLayers),
+              child: first.system.isSpecial
+                  ? ArchitectWallSystemPreview(
+                      system: first.system,
+                      layers: first.resolvedLayers,
+                    )
+                  : ArchitectWallLayerPreview(layers: first.resolvedLayers),
             ),
             title: Text(first.catalogGroupLabel(l, widget.unit)),
             subtitle: Text(
@@ -294,6 +310,42 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
               onChanged: (_) => setState(() {}),
             ),
           ),
+        if (category != ArchitectWallCategory.parapet &&
+            widget.types.map((t) => t.system.kind).toSet().length > 1)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: DropdownButtonFormField<ArchitectWallSystemKind>(
+              key: ValueKey('wall-catalog-system-${systemKind.name}'),
+              initialValue: systemKind,
+              isExpanded: true,
+              decoration: InputDecoration(labelText: l.wallSystem),
+              items: [
+                for (final kind in ArchitectWallSystemKind.values)
+                  if (widget.types.any((t) => t.system.kind == kind))
+                    DropdownMenuItem(value: kind, child: Text(kind.label(l))),
+              ],
+              onChanged: (kind) {
+                if (kind == null) return;
+                setState(() {
+                  systemKind = kind;
+                  final matching = widget.types
+                      .where((t) => t.system.kind == kind)
+                      .first;
+                  if (!widget.types.any(
+                    (t) =>
+                        t.system.kind == kind &&
+                        ArchitectWallCategory.of(t) == category,
+                  )) {
+                    category = ArchitectWallCategory.of(matching);
+                  }
+                  expanded[category] = ArchitectWallCatalogGroup.keyOf(
+                    matching,
+                  );
+                  bearingOnly = false;
+                });
+              },
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.all(8),
           child: Row(
@@ -313,6 +365,15 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                       onPressed: () => setState(() {
                         category = c;
                         bearingOnly = false;
+                        final available = widget.types.where(
+                          (t) => ArchitectWallCategory.of(t) == c,
+                        );
+                        if (!available.any(
+                              (t) => t.system.kind == systemKind,
+                            ) &&
+                            available.isNotEmpty) {
+                          systemKind = available.first.system.kind;
+                        }
                         expanded.putIfAbsent(
                           c,
                           () =>
@@ -457,9 +518,14 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                         SizedBox(
                           width: 24,
                           height: 30,
-                          child: ArchitectWallLayerPreview(
-                            layers: type.resolvedLayers,
-                          ),
+                          child: type.system.isSpecial
+                              ? ArchitectWallSystemPreview(
+                                  system: type.system,
+                                  layers: type.resolvedLayers,
+                                )
+                              : ArchitectWallLayerPreview(
+                                  layers: type.resolvedLayers,
+                                ),
                         ),
                         const SizedBox(width: 8),
                       ],
@@ -474,6 +540,11 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                                 grouped: grouped,
                               ),
                             ),
+                            if (type.system.isSpecial && type.name.isNotEmpty)
+                              Text(
+                                type.compositionLabel(l, widget.unit),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
                             if (query.text.isNotEmpty)
                               Text(
                                 ArchitectWallCategory.of(type).label(l),

@@ -507,6 +507,9 @@ class ArchitectBuildingElevation {
             : path;
       }
     }
+    // Curved drainage creates many small surface planes. Query projected
+    // neighbours instead of comparing every tube facet with the whole model.
+    final occluders = _ElevationOcclusionIndex(groups.values.toList());
     final faces = <Path>[];
     final silhouettes = <String, List<List<clip.PointD>>>{};
     Rect? bounds;
@@ -524,7 +527,7 @@ class ArchitectBuildingElevation {
       if (subjects.isEmpty) return Path();
       final box = face.path.getBounds();
       final masks = <List<Offset>>[];
-      for (final other in groups.values) {
+      for (final other in occluders.overlapping(box)) {
         if (identical(face, other) || !box.overlaps(other.path.getBounds())) {
           continue;
         }
@@ -765,4 +768,33 @@ class _ElevationPlane {
   final pieces = <({List<Offset> points, String? source})>[];
   _ElevationPlane(this.u, this.v, this.w, this.path, {this.silhouette});
   double depth(double x, double z) => u * x + v * z + w;
+}
+
+class _ElevationOcclusionIndex {
+  late final Rect bounds;
+  late final List<_ElevationPlane> leaves;
+  _ElevationOcclusionIndex? left, right;
+  _ElevationOcclusionIndex(List<_ElevationPlane> faces) {
+    final boxes = {for (final face in faces) face: face.path.getBounds()};
+    bounds = boxes.values.fold<Rect?>(null, (a, b) => a?.expandToInclude(b) ?? b) ?? Rect.zero;
+    if (faces.length <= 8) {
+      leaves = faces;
+      return;
+    }
+    leaves = const [];
+    final horizontal = bounds.width >= bounds.height;
+    faces.sort((a, b) => (horizontal ? boxes[a]!.center.dx : boxes[a]!.center.dy)
+      .compareTo(horizontal ? boxes[b]!.center.dx : boxes[b]!.center.dy));
+    final mid = faces.length ~/ 2;
+    left = _ElevationOcclusionIndex(faces.sublist(0, mid));
+    right = _ElevationOcclusionIndex(faces.sublist(mid));
+  }
+  Iterable<_ElevationPlane> overlapping(Rect box) sync* {
+    if (!bounds.overlaps(box)) return;
+    for (final face in leaves) {
+      if (face.path.getBounds().overlaps(box)) yield face;
+    }
+    if (left != null) yield* left!.overlapping(box);
+    if (right != null) yield* right!.overlapping(box);
+  }
 }

@@ -2168,7 +2168,7 @@
   "@wallTypeApply": {"placeholders": {"count": {"type": "int"}}},
   "wallTypeReplacement": "Замени с",
   "wallTypeInUse": "Изберете заместител за стените с този тип.",
-  "wallCompositionAction": "Слоеве",
+  "wallCompositionAction": "Конструкция",
   "wallManageTypes": "Редактирай типовете",
   "wallMaterialPlaster": "Мазилка",
   "wallMaterialRender": "Фасадна мазилка",
@@ -2797,7 +2797,7 @@
   "wallPanelsHorizontal": "Хоризонтални панели",
   "wallSystemInvalid": "Проверете размерите на системата.",
   "wallSystemStraightOnly": "Тази система използва прави стени.",
-  "wallLogHelp": "Диаметърът запазва кръглата форма. Застъпването променя височината на реда; ъглите се разминават с половин ред.",
+  "wallLogHelp": "В план се показва номиналният диаметър. Разрезите и 3D запазват кръглите трупи, застъпването и разминатите редове в ъглите.",
   "wallFrameHelp": "Плоскостите, профилите и ватата имат отделни размери.",
   "wallPanelHelp": "Панелът и подконструкцията имат отделни дебелини. Опорите се закрепват към избраните лица на колоните.",
   "wallColumnSupports": "Опори към колони",
@@ -2852,5 +2852,9 @@
   "architectSelectCrossingHelp": "Избира елементите вътре или пресичащи границата на селекцията.",
   "architectSelectContainedHelp": "Избира само елементите изцяло вътре в границата на селекцията.",
   "architectSelectPreviewCount": "След избора: {count}",
-  "@architectSelectPreviewCount": {"placeholders":{"count":{"type":"int"}}}
+  "@architectSelectPreviewCount": {"placeholders":{"count":{"type":"int"}}},
+  "wallLogSize": "Диаметър {size}",
+  "@wallLogSize": {"placeholders": {"size": {"type": "String"}}},
+  "wallChooseType": "Избор на тип",
+  "wallSystemOptions": "Детайли на конструкцията"
 }

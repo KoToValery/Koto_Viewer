@@ -72,7 +72,11 @@ class _ThicknessState extends State<ArchitectWallThicknessDialog> {
       },
     );
     return AlertDialog(
-      title: Text(l.architectWallQuickThickness),
+      title: Text(
+        widget.wall.system.isLog
+            ? l.wallLogDiameter
+            : l.architectWallQuickThickness,
+      ),
       content: SizedBox(
         width: 300,
         child: Form(
@@ -84,7 +88,9 @@ class _ThicknessState extends State<ArchitectWallThicknessDialog> {
               children: [
                 field(
                   core,
-                  widget.wall.hasInsulation
+                  widget.wall.system.isLog
+                      ? l.wallLogDiameter
+                      : widget.wall.hasInsulation
                       ? l.architectWallQuickCore
                       : l.architectWallQuickThickness,
                   'architect-wall-core-input',

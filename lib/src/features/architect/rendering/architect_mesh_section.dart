@@ -14,8 +14,11 @@ class ArchitectMeshSection {
   ) {
     const tolerance = 1e-6;
     final bins = <(int, int), List<(String, Offset)>>{};
+    // Once welded, an endpoint must keep its node. A later nearby anchor in a
+    // neighbouring bin must not change its identity while assembling links.
+    final pointKeys = <Offset, String>{};
     var serial = 0;
-    String key(Offset p) {
+    String key(Offset p) => pointKeys.putIfAbsent(p, () {
       final x = (p.dx / tolerance).floor(), y = (p.dy / tolerance).floor();
       for (var dx = -1; dx <= 1; dx++) {
         for (var dy = -1; dy <= 1; dy++) {
@@ -27,7 +30,7 @@ class ArchitectMeshSection {
       final id = '${serial++}';
       (bins[(x, y)] ??= []).add((id, p));
       return id;
-    }
+    });
 
     final segments = <(Offset, Offset)>[], seen = <String>{};
     for (final face in mesh) {
@@ -53,6 +56,7 @@ class ArchitectMeshSection {
       final a = project(points[0]), b = project(points[1]);
       if ((a - b).distance < 1e-8) continue;
       final names = [key(a), key(b)]..sort();
+      if (names.first == names.last) continue;
       if (seen.add(names.join(':'))) segments.add((a, b));
     }
     final links = <String, List<int>>{};

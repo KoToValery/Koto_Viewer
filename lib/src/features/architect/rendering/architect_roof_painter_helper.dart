@@ -18,6 +18,39 @@ import 'architect_wall_network.dart';
 // === SECTION: COMMITTED ROOF PLANES 2D PAINTER ===
 
 class ArchitectRoofPainterHelper {
+  /// Dashed overhead edges on the next floor below the roof, using the same
+  /// cleaned footprints as its own plan and drawing shared ridges only once.
+  static void paintOverhead({
+    required Canvas canvas,
+    required ArchitectProject project,
+    required double scale,
+    required Color color,
+  }) {
+    final elevations = project.storeys
+        .where((s) => s.elevation > project.activeStorey.elevation && s.roofs.isNotEmpty)
+        .map((s) => s.elevation).toList()..sort();
+    if (elevations.isEmpty) return;
+    final seen = <String>{};
+    final pen = Paint()..color = color.withValues(alpha: .65)
+      ..style = PaintingStyle.stroke..strokeWidth = 1 / scale;
+    for (final floor in project.storeys.where((s) => s.elevation == elevations.first)) {
+      final junctions = ArchitectRoofJunctions.of(floor, project: project);
+      for (final roof in floor.roofs) {
+        architectDrawingSources(canvas, {roof.id}, 'roofOverhead');
+        final footprint = roof.assembly.panels == null ? junctions.footprint(roof)
+            : ArchitectPanelRoofGeometry.panelFootprint(floor, roof, project: project);
+        for (final contour in ArchitectPathSolid.contours(footprint)) {
+          for (var i = 0; i < contour.length; i++) {
+            final a = contour[i], b = contour[(i + 1) % contour.length];
+            final keys = [for (final p in [a, b]) '${(p.dx * 1e5).round()},${(p.dy * 1e5).round()}']..sort();
+            if (!seen.add(keys.join(':'))) continue;
+            _drawDashedLine(canvas, a, b, pen, dashLength: 6 / scale, gapLength: 4 / scale);
+          }
+        }
+      }
+    }
+  }
+
   /// Draws the dashed perimeter contour of the enclosing walls from the highest
   /// supporting storey below that has walls and distribution.
   static void drawSupportingWallUnderlay({

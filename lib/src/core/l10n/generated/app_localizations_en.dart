@@ -6598,7 +6598,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Select a replacement for the walls using this type.';
 
   @override
-  String get wallCompositionAction => 'Layers';
+  String get wallCompositionAction => 'Construction';
 
   @override
   String get wallManageTypes => 'Manage types';
@@ -8273,7 +8273,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Drag to rotate the hatch and change its scale. Scale snaps in 10% steps; direction snaps every 45°.';
 
   @override
-  String get wallSystem => 'Construction';
+  String get wallSystem => 'System';
 
   @override
   String get wallSystemLayered => 'Layers';
@@ -8340,7 +8340,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wallLogHelp =>
-      'Diameter stays circular. Overlap changes course height; corners alternate by half a course.';
+      'Plans show the nominal diameter. Sections and 3D retain round logs, overlap and alternating corner courses.';
 
   @override
   String get wallFrameHelp =>
@@ -8516,4 +8516,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String architectSelectPreviewCount(int count) {
     return 'After selection: $count';
   }
+
+  @override
+  String wallLogSize(String size) {
+    return 'Diameter $size';
+  }
+
+  @override
+  String get wallChooseType => 'Choose type';
+
+  @override
+  String get wallSystemOptions => 'Construction details';
 }

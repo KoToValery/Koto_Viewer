@@ -177,7 +177,11 @@ class ArchitectPathSolid {
             ..sort((a, b) => y(a, mid).compareTo(y(b, mid)));
       for (var j = 0; j + 1 < crossing.length; j++) {
         final low = crossing[j], high = crossing[j + 1];
-        if (!path.contains(Offset(mid, (y(low, mid) + y(high, mid)) / 2))) {
+        if (!_contains(
+          loops,
+          Offset(mid, (y(low, mid) + y(high, mid)) / 2),
+          path.fillType,
+        )) {
           continue;
         }
         final a = Offset(x0, y(low, x0)),

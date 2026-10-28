@@ -62,6 +62,9 @@ extension ArchitectWallTypeLabel on ArchitectWallType {
     ArchitectUnit unit, {
     bool includeCore = true,
   }) {
+    if (system.isLog) {
+      return '${system.kind.label(l)} · ${l.wallLogSize(architectWallLength(totalThickness, unit))}';
+    }
     if (system.isSpecial) {
       return '${system.kind.label(l)} · ${resolvedLayers.map((layer) => l.wallMaterialThickness(layer.material.label(l), architectWallLength(layer.thickness, unit))).join(' + ')}'
           '${system.isPanel ? ' + ${l.wallMaterialThickness(l.wallSupportDepth, architectWallLength(system.supportDepth, unit))}' : ''}';
@@ -106,8 +109,9 @@ extension ArchitectWallTypeLabel on ArchitectWallType {
   }
 
   String compactLabel(AppLocalizations l10n) {
-    if (!isFactoryPreset && name.isNotEmpty) return name;
+    if (system.isLog) return '${system.kind.label(l10n)} Ø$_composition';
     if (system.isSpecial) return '${system.kind.label(l10n)} $_composition';
+    if (!isFactoryPreset && name.isNotEmpty) return name;
     if (layers.isNotEmpty) {
       if (isParapet) return l10n.architectWallParapetCode(_composition);
       if (layers

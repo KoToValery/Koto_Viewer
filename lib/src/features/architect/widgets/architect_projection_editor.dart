@@ -1,4 +1,5 @@
 import 'architect_roof_pitch_editor.dart';
+import 'architect_downpipe_handle.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart';
@@ -75,6 +76,9 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   String? _pointerDownHit;
   String? error;
   Timer? _errorTimer;
+  Timer? _contextHold;
+  Offset? _contextDown;
+  int _pipeSelectionRevision = 0;
   final measureRects = <ArchitectOpeningMeasure, Rect>{};
   void updateDrag(Offset point) {
     final raw = point - dragStart!;
@@ -118,6 +122,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   @override
   void dispose() {
     _errorTimer?.cancel();
+    _contextHold?.cancel();
     super.dispose();
   }
 
@@ -321,28 +326,108 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
     );
   }
 
+  void startPitch() {
+    final ref = selected;
+    if (ref?.kind != ArchitectProjectionKind.roof) return;
+    setState(() {
+      pitchSnap = ArchitectProjectionSnap(
+        project,
+        widget.paths,
+        ref!.id,
+        roofProfiles: widget.roofProfiles,
+        sectionOrigin: widget.elevation ? null : widget.origin,
+        sectionRight: widget.elevation ? null : widget.right,
+      );
+      pitchEditing = true;
+    });
+  }
+
+  Future<void> contextMenu(Offset local, Offset global) async {
+    final hit = ArchitectProjectionEditing.pick(
+      project,
+      widget.paths,
+      widget.toView(local),
+      14 / widget.scale,
+    );
+    if (hit == null) return;
+    setState(() {
+      id = hit;
+      error = null;
+    });
+    final ref = selected;
+    final l = context.l10n;
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final position = overlay.globalToLocal(global);
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(position.dx, position.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(value: 'properties', child: Text(l.architectProperties)),
+        PopupMenuItem(
+          value: 'move',
+          child: Text(l.architectRoofMoveVerticalAction),
+        ),
+        if (ref?.kind == ArchitectProjectionKind.roof)
+          PopupMenuItem(value: 'pitch', child: Text(l.architectRoofPitchEdit)),
+      ],
+    );
+    if (!mounted || id != hit) return;
+    switch (action) {
+      case 'properties':
+        await properties();
+      case 'move':
+        await moveNumber(false);
+      case 'pitch':
+        startPitch();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ref = selected, l = context.l10n;
     if (pitchEditing && ref?.kind == ArchitectProjectionKind.roof) {
-      final roof=ref!.storey.roofs.firstWhere((r)=>r.id==ref.id);
-      return ArchitectRoofPitchEditor(roof:roof,elevation:ref.storey.elevation,
-        origin:widget.origin,right:widget.right,toView:widget.toView,toScreen:widget.toScreen,
-        onNavigate:widget.onNavigate, snap:pitchSnap, snapEnabled:roofSnapEnabled,
-        onSnapEnabled:(value)=>setState(()=>roofSnapEnabled=value),
-        onCancel:()=>setState(()=>pitchEditing=false),
-        onApply:(next) {
-          if(apply(()=>UpdateArchitectRoofPlane(storeyId:ref.storey.id,roof:next).apply(project))) {
-            setState(()=>pitchEditing=false);
+      final roof = ref!.storey.roofs.firstWhere((r) => r.id == ref.id);
+      return ArchitectRoofPitchEditor(
+        roof: roof,
+        elevation: ref.storey.elevation,
+        origin: widget.origin,
+        right: widget.right,
+        toView: widget.toView,
+        toScreen: widget.toScreen,
+        onNavigate: widget.onNavigate,
+        snap: pitchSnap,
+        snapEnabled: roofSnapEnabled,
+        onSnapEnabled: (value) => setState(() => roofSnapEnabled = value),
+        onCancel: () => setState(() => pitchEditing = false),
+        onApply: (next) {
+          if (apply(
+            () => UpdateArchitectRoofPlane(
+              storeyId: ref.storey.id,
+              roof: next,
+            ).apply(project),
+          )) {
+            setState(() => pitchEditing = false);
           }
-        });
+        },
+      );
     }
     return Stack(
       fit: StackFit.expand,
       children: [
         Listener(
           onPointerDown: (event) {
+            _contextHold?.cancel();
             if (_pointers.isEmpty) {
+              _contextDown = event.localPosition;
+              _contextHold = Timer(const Duration(milliseconds: 600), () {
+                if (mounted && dragStart == null && _pointers.length == 1) {
+                  contextMenu(event.localPosition, event.position);
+                }
+              });
               _pointerDownView = widget.toView(event.localPosition);
               _pointerDownHit = ArchitectProjectionEditing.pick(
                 project,
@@ -353,8 +438,18 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
             }
             _pointers.add(event.pointer);
           },
-          onPointerUp: (event) => _pointers.remove(event.pointer),
+          onPointerMove: (event) {
+            if (_contextDown == null ||
+                (event.localPosition - _contextDown!).distance > 6) {
+              _contextHold?.cancel();
+            }
+          },
+          onPointerUp: (event) {
+            _contextHold?.cancel();
+            _pointers.remove(event.pointer);
+          },
           onPointerCancel: (event) => setState(() {
+            _contextHold?.cancel();
             _pointers.remove(event.pointer);
             dragStart = null;
             delta = Offset.zero;
@@ -375,6 +470,8 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                 },
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
+            onSecondaryTapUp: (d) =>
+                contextMenu(d.localPosition, d.globalPosition),
             onTapUp: (details) {
               for (final entry in measureRects.entries) {
                 if (entry.value.inflate(6).contains(details.localPosition)) {
@@ -389,6 +486,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                 10 / widget.scale,
               );
               setState(() {
+                _pipeSelectionRevision++;
                 id = hit;
                 error = null;
               });
@@ -398,6 +496,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
             onScaleStart: ref == null && widget.onNavigate == null
                 ? null
                 : (d) {
+                    _contextHold?.cancel();
                     lastScale = 1;
                     // Gesture recognition can begin outside a thin roof after
                     // touch slop. Keep the element and point from pointer-down.
@@ -504,6 +603,29 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
             ),
           ),
         ),
+        ArchitectDownpipeHandle(
+          controller: widget.controller,
+          onNavigate: widget.onNavigate,
+          selectionRevision: _pipeSelectionRevision,
+          onSelected: () => setState(() => id = null),
+          roofIds: widget.paths.keys.toSet(),
+          visibleAt: (id, p, z) =>
+              widget.paths[id]?.contains(
+                Offset(
+                  (p - widget.origin).dx * widget.right.dx +
+                      (p - widget.origin).dy * widget.right.dy,
+                  z,
+                ),
+              ) ??
+              false,
+          toScreen: (p, z) => widget.toScreen(
+            Offset(
+              (p - widget.origin).dx * widget.right.dx +
+                  (p - widget.origin).dy * widget.right.dy,
+              z,
+            ),
+          ),
+        ),
         if (ref != null)
           Positioned(
             left: 8,
@@ -543,15 +665,12 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                             icon: const Icon(Icons.swap_vert),
                           ),
                           if (ref.kind == ArchitectProjectionKind.roof)
-                            IconButton(key:const ValueKey('projection-roof-pitch'),
-                              tooltip:l.architectRoofPitchEdit,icon:const Icon(Icons.rotate_right),
-                              onPressed:()=>setState(() {
-                                pitchSnap = ArchitectProjectionSnap(project, widget.paths, ref.id,
-                                  roofProfiles: widget.roofProfiles,
-                                  sectionOrigin: widget.elevation ? null : widget.origin,
-                                  sectionRight: widget.elevation ? null : widget.right);
-                                pitchEditing = true;
-                              })),
+                            IconButton(
+                              key: const ValueKey('projection-roof-pitch'),
+                              tooltip: l.architectRoofPitchEdit,
+                              icon: const Icon(Icons.rotate_right),
+                              onPressed: startPitch,
+                            ),
                           if (ref.kind == ArchitectProjectionKind.roof)
                             IconButton(
                               key: const ValueKey('projection-roof-snap'),

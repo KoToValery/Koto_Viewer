@@ -1,0 +1,1140 @@
+{
+  "id": "bim_1793114409017_69a80a",
+  "name": "Log wall regression",
+  "createdAt": "2026-10-27T17:20:09.017790",
+  "updatedAt": "2026-10-27T22:34:19.099303",
+  "units": "centimeters",
+  "storeys": [
+    {
+      "id": "storey_0",
+      "name": "±0.00",
+      "elevation": 0.0,
+      "height": 3.0,
+      "cutPlaneHeight": 1.2,
+      "floorFinishThickness": 0.05,
+      "walls": [
+        {
+          "system": {
+            "kind": "roundLogs",
+            "overlapPercent": 10.0,
+            "tailFactor": 1.0,
+            "studSpacing": 0.6,
+            "studWidth": 0.05,
+            "metalThickness": 0.0006,
+            "insulationDepth": 0.05,
+            "supportDepth": 0.1,
+            "panelModule": 1.0,
+            "panelMount": "inFront",
+            "horizontalPanels": false,
+            "openingCasing": true,
+            "casingWidth": 0.05,
+            "settlementAllowance": 0.0
+          },
+          "systemPlacement": {
+            "columnIds": [],
+            "mountingOffset": 0.0
+          },
+          "id": "wall_element_3e559249_1793116007740479_0",
+          "layers": [
+            {
+              "id": "log",
+              "material": "timber",
+              "role": "core",
+              "thickness": 0.24
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": true,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.2,
+            "y": 6.6
+          },
+          "endPoint": {
+            "x": 14.4,
+            "y": 6.6000000000000005
+          },
+          "thickness": 0.24,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "timber",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "left",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "wall_type_227a6bdb_1793134913830822_0",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "system": {
+            "kind": "roundLogs",
+            "overlapPercent": 10.0,
+            "tailFactor": 1.0,
+            "studSpacing": 0.6,
+            "studWidth": 0.05,
+            "metalThickness": 0.0006,
+            "insulationDepth": 0.05,
+            "supportDepth": 0.1,
+            "panelModule": 1.0,
+            "panelMount": "inFront",
+            "horizontalPanels": false,
+            "openingCasing": true,
+            "casingWidth": 0.05,
+            "settlementAllowance": 0.0
+          },
+          "systemPlacement": {
+            "columnIds": [],
+            "mountingOffset": 0.0
+          },
+          "id": "wall_element_3e559249_1793133156458160_1",
+          "layers": [
+            {
+              "id": "log",
+              "material": "timber",
+              "role": "core",
+              "thickness": 0.24
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": true,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.2,
+            "y": 6.6
+          },
+          "endPoint": {
+            "x": 7.2,
+            "y": 2.220446049250313e-16
+          },
+          "thickness": 0.24,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "timber",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "wall_type_5e6679a7_1793134631995149_6",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "system": {
+            "kind": "roundLogs",
+            "overlapPercent": 10.0,
+            "tailFactor": 1.0,
+            "studSpacing": 0.6,
+            "studWidth": 0.05,
+            "metalThickness": 0.0006,
+            "insulationDepth": 0.05,
+            "supportDepth": 0.1,
+            "panelModule": 1.0,
+            "panelMount": "inFront",
+            "horizontalPanels": false,
+            "openingCasing": true,
+            "casingWidth": 0.05,
+            "settlementAllowance": 0.0
+          },
+          "systemPlacement": {
+            "columnIds": [],
+            "mountingOffset": 0.0
+          },
+          "id": "wall_element_3e559249_1793133160304172_2",
+          "layers": [
+            {
+              "id": "log",
+              "material": "timber",
+              "role": "core",
+              "thickness": 0.24
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": true,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.2,
+            "y": 2.220446049250313e-16
+          },
+          "endPoint": {
+            "x": 14.4,
+            "y": 2.220446049250313e-16
+          },
+          "thickness": 0.24,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "timber",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "wall_type_5e6679a7_1793134547548721_4",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "system": {
+            "kind": "roundLogs",
+            "overlapPercent": 10.0,
+            "tailFactor": 1.0,
+            "studSpacing": 0.6,
+            "studWidth": 0.05,
+            "metalThickness": 0.0006,
+            "insulationDepth": 0.05,
+            "supportDepth": 0.1,
+            "panelModule": 1.0,
+            "panelMount": "inFront",
+            "horizontalPanels": false,
+            "openingCasing": true,
+            "casingWidth": 0.05,
+            "settlementAllowance": 0.0
+          },
+          "systemPlacement": {
+            "columnIds": [],
+            "mountingOffset": 0.0
+          },
+          "id": "wall_element_3e559249_1793133166530735_3",
+          "layers": [
+            {
+              "id": "log",
+              "material": "timber",
+              "role": "core",
+              "thickness": 0.24
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": true,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 14.4,
+            "y": 2.220446049250313e-16
+          },
+          "endPoint": {
+            "x": 14.4,
+            "y": 6.6000000000000005
+          },
+          "thickness": 0.24,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "timber",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "wall_type_5e6679a7_1793134447525643_3",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        }
+      ],
+      "zones": [],
+      "columns": [],
+      "beams": [],
+      "slabs": [
+        {
+          "id": "slab_element_3e559249_1793133259089435_7",
+          "polygon": [
+            {
+              "x": 6.955,
+              "y": 6.845
+            },
+            {
+              "x": 14.525,
+              "y": 6.7250000000000005
+            },
+            {
+              "x": 14.645,
+              "y": -0.24499999999999977
+            },
+            {
+              "x": 6.955,
+              "y": -0.24499999999999977
+            }
+          ],
+          "thickness": 0.16,
+          "label": "Slab 1",
+          "assemblyId": "assembly_5e6679a7_1793134344708649_2",
+          "coreTopOffset": 0.0,
+          "slopeDirection": null
+        }
+      ],
+      "roofs": [],
+      "openings": [],
+      "stairs": [],
+      "dimensions": [],
+      "elevationMarkers": [],
+      "annotations": [],
+      "cadPrimitives": [],
+      "components": []
+    },
+    {
+      "id": "storey_roof",
+      "name": "Покривни линии",
+      "elevation": 3.0,
+      "height": 2.8,
+      "cutPlaneHeight": 1.2,
+      "floorFinishThickness": 0.05,
+      "isRoof": true,
+      "walls": [],
+      "zones": [],
+      "columns": [],
+      "beams": [],
+      "slabs": [],
+      "roofs": [
+        {
+          "id": "roof_3e559249_1793133325821130_8",
+          "storeyId": "storey_roof",
+          "points": [
+            {
+              "x": 6.254999999999997,
+              "y": 7.545000000000002
+            },
+            {
+              "x": 10.784970718556252,
+              "y": 3.0150292814437454
+            },
+            {
+              "x": 15.314941437112507,
+              "y": 7.545
+            }
+          ],
+          "eavesEdgeIndex": 2,
+          "reverseSlope": false,
+          "slopeDegrees": 22.0,
+          "baseElevationOffset": 0.0,
+          "attachToWalls": true,
+          "placementResolved": true,
+          "eavesOverhang": 0.7000000000000001,
+          "eavesCut": "plumb",
+          "assembly": {
+            "preset": "pitchedTiles",
+            "layers": [
+              {
+                "id": "covering",
+                "role": "covering",
+                "material": "clayTiles",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "battens",
+                "role": "battens",
+                "material": "timberBoarding",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "counter_battens",
+                "role": "counterBattens",
+                "material": "timberBoarding",
+                "thickness": 0.05,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "membrane",
+                "role": "underlayment",
+                "material": "breathableMembrane",
+                "thickness": 0.003,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "boarding",
+                "role": "boarding",
+                "material": "timberBoarding",
+                "thickness": 0.025,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "rafters",
+                "role": "rafters",
+                "material": "timberBoarding",
+                "thickness": 0.16,
+                "isBetweenRafters": false
+              }
+            ],
+            "timber": {
+              "hasBattens": true,
+              "battenWidth": 0.05,
+              "battenHeight": 0.04,
+              "battenSpacing": 0.33,
+              "hasCounterBattens": true,
+              "counterBattenWidth": 0.05,
+              "counterBattenHeight": 0.05,
+              "hasRafters": true,
+              "rafterWidth": 0.08,
+              "rafterHeight": 0.16,
+              "rafterSpacing": 0.6,
+              "hasWallPlate": true,
+              "wallPlateWidth": 0.14,
+              "wallPlateHeight": 0.14,
+              "hasRingBeam": true,
+              "ringBeamHeight": 0.1,
+              "hasRidgePurlin": true,
+              "ridgePurlinWidth": 0.16,
+              "ridgePurlinHeight": 0.2,
+              "hasFasciaBoard": true,
+              "fasciaThickness": 0.025,
+              "hasMetalFlashing": true
+            }
+          },
+          "roofGroupId": null,
+          "isSlopeLocked": true,
+          "drainage": {
+            "showGutter": false,
+            "showDownpipes": true,
+            "profile": "halfRound",
+            "material": "galvanizedSteel",
+            "gutterWidth": 0.15,
+            "gutterDepth": 0.09,
+            "downpipes": []
+          },
+          "isMansard": false,
+          "upperSlopeDegrees": 25.0
+        },
+        {
+          "id": "roof_3e559249_1793133369335102_9",
+          "storeyId": "storey_roof",
+          "points": [
+            {
+              "x": 6.242101171775207,
+              "y": -0.8518117918332124
+            },
+            {
+              "x": 15.379232795424183,
+              "y": -0.851811791833212
+            },
+            {
+              "x": 10.784970132221638,
+              "y": 3.0150292588337138
+            }
+          ],
+          "eavesEdgeIndex": 0,
+          "reverseSlope": false,
+          "slopeDegrees": 25.40227392488967,
+          "baseElevationOffset": 0.040538782405771856,
+          "attachToWalls": false,
+          "placementResolved": true,
+          "eavesOverhang": 0.7000000000000001,
+          "eavesCut": "plumb",
+          "assembly": {
+            "preset": "pitchedTiles",
+            "layers": [
+              {
+                "id": "covering",
+                "role": "covering",
+                "material": "clayTiles",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "battens",
+                "role": "battens",
+                "material": "timberBoarding",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "counter_battens",
+                "role": "counterBattens",
+                "material": "timberBoarding",
+                "thickness": 0.05,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "membrane",
+                "role": "underlayment",
+                "material": "breathableMembrane",
+                "thickness": 0.003,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "boarding",
+                "role": "boarding",
+                "material": "timberBoarding",
+                "thickness": 0.025,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "rafters",
+                "role": "rafters",
+                "material": "timberBoarding",
+                "thickness": 0.16,
+                "isBetweenRafters": false
+              }
+            ],
+            "timber": {
+              "hasBattens": true,
+              "battenWidth": 0.05,
+              "battenHeight": 0.04,
+              "battenSpacing": 0.33,
+              "hasCounterBattens": true,
+              "counterBattenWidth": 0.05,
+              "counterBattenHeight": 0.05,
+              "hasRafters": true,
+              "rafterWidth": 0.08,
+              "rafterHeight": 0.16,
+              "rafterSpacing": 0.6,
+              "hasWallPlate": true,
+              "wallPlateWidth": 0.14,
+              "wallPlateHeight": 0.14,
+              "hasRingBeam": true,
+              "ringBeamHeight": 0.1,
+              "hasRidgePurlin": true,
+              "ridgePurlinWidth": 0.16,
+              "ridgePurlinHeight": 0.2,
+              "hasFasciaBoard": true,
+              "fasciaThickness": 0.025,
+              "hasMetalFlashing": true
+            }
+          },
+          "roofGroupId": null,
+          "isSlopeLocked": true,
+          "drainage": {
+            "showGutter": false,
+            "showDownpipes": false,
+            "profile": "halfRound",
+            "material": "galvanizedSteel",
+            "gutterWidth": 0.15,
+            "gutterDepth": 0.09,
+            "downpipes": [
+              {
+                "id": "downpipe_3e559249_1793133796312853_13",
+                "offset": 0.3,
+                "diameter": 0.1,
+                "wallClearance": 0.05,
+                "bendAngle": 45.0,
+                "outletElevation": 0.15,
+                "facadeWallId": null,
+                "visible": true,
+                "waypoints": []
+              },
+              {
+                "id": "downpipe_3e559249_1793133844680742_14",
+                "offset": 7.441429486020773,
+                "diameter": 0.1,
+                "wallClearance": 0.05,
+                "bendAngle": 45.0,
+                "outletElevation": 0.15,
+                "facadeWallId": null,
+                "visible": true,
+                "waypoints": []
+              }
+            ]
+          },
+          "isMansard": false,
+          "upperSlopeDegrees": 25.0
+        },
+        {
+          "id": "roof_3e559249_1793133411378325_10",
+          "storeyId": "storey_roof",
+          "points": [
+            {
+              "x": 15.345000000000002,
+              "y": 7.539548905228925
+            },
+            {
+              "x": 15.344999999999999,
+              "y": -0.828396614346504
+            },
+            {
+              "x": 10.784970132221638,
+              "y": 3.0150292588337138
+            }
+          ],
+          "eavesEdgeIndex": 0,
+          "reverseSlope": false,
+          "slopeDegrees": 22.0,
+          "baseElevationOffset": 0.0,
+          "attachToWalls": true,
+          "placementResolved": true,
+          "eavesOverhang": 0.7000000000000001,
+          "eavesCut": "plumb",
+          "assembly": {
+            "preset": "pitchedTiles",
+            "layers": [
+              {
+                "id": "covering",
+                "role": "covering",
+                "material": "clayTiles",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "battens",
+                "role": "battens",
+                "material": "timberBoarding",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "counter_battens",
+                "role": "counterBattens",
+                "material": "timberBoarding",
+                "thickness": 0.05,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "membrane",
+                "role": "underlayment",
+                "material": "breathableMembrane",
+                "thickness": 0.003,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "boarding",
+                "role": "boarding",
+                "material": "timberBoarding",
+                "thickness": 0.025,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "rafters",
+                "role": "rafters",
+                "material": "timberBoarding",
+                "thickness": 0.16,
+                "isBetweenRafters": false
+              }
+            ],
+            "timber": {
+              "hasBattens": true,
+              "battenWidth": 0.05,
+              "battenHeight": 0.04,
+              "battenSpacing": 0.33,
+              "hasCounterBattens": true,
+              "counterBattenWidth": 0.05,
+              "counterBattenHeight": 0.05,
+              "hasRafters": true,
+              "rafterWidth": 0.08,
+              "rafterHeight": 0.16,
+              "rafterSpacing": 0.6,
+              "hasWallPlate": true,
+              "wallPlateWidth": 0.14,
+              "wallPlateHeight": 0.14,
+              "hasRingBeam": true,
+              "ringBeamHeight": 0.1,
+              "hasRidgePurlin": true,
+              "ridgePurlinWidth": 0.16,
+              "ridgePurlinHeight": 0.2,
+              "hasFasciaBoard": true,
+              "fasciaThickness": 0.025,
+              "hasMetalFlashing": true
+            }
+          },
+          "roofGroupId": null,
+          "isSlopeLocked": true,
+          "drainage": {
+            "showGutter": false,
+            "showDownpipes": true,
+            "profile": "halfRound",
+            "material": "galvanizedSteel",
+            "gutterWidth": 0.15,
+            "gutterDepth": 0.09,
+            "downpipes": []
+          },
+          "isMansard": false,
+          "upperSlopeDegrees": 25.0
+        },
+        {
+          "id": "roof_3e559249_1793133424647226_11",
+          "storeyId": "storey_roof",
+          "points": [
+            {
+              "x": 6.255,
+              "y": -0.840832361316552
+            },
+            {
+              "x": 6.255,
+              "y": 7.544999999999996
+            },
+            {
+              "x": 10.784970718556252,
+              "y": 3.015029281443745
+            }
+          ],
+          "eavesEdgeIndex": 0,
+          "reverseSlope": false,
+          "slopeDegrees": 22.0,
+          "baseElevationOffset": 0.0,
+          "attachToWalls": true,
+          "placementResolved": true,
+          "eavesOverhang": 0.7000000000000001,
+          "eavesCut": "plumb",
+          "assembly": {
+            "preset": "pitchedTiles",
+            "layers": [
+              {
+                "id": "covering",
+                "role": "covering",
+                "material": "clayTiles",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "battens",
+                "role": "battens",
+                "material": "timberBoarding",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "counter_battens",
+                "role": "counterBattens",
+                "material": "timberBoarding",
+                "thickness": 0.05,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "membrane",
+                "role": "underlayment",
+                "material": "breathableMembrane",
+                "thickness": 0.003,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "boarding",
+                "role": "boarding",
+                "material": "timberBoarding",
+                "thickness": 0.025,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "rafters",
+                "role": "rafters",
+                "material": "timberBoarding",
+                "thickness": 0.16,
+                "isBetweenRafters": false
+              }
+            ],
+            "timber": {
+              "hasBattens": true,
+              "battenWidth": 0.05,
+              "battenHeight": 0.04,
+              "battenSpacing": 0.33,
+              "hasCounterBattens": true,
+              "counterBattenWidth": 0.05,
+              "counterBattenHeight": 0.05,
+              "hasRafters": true,
+              "rafterWidth": 0.08,
+              "rafterHeight": 0.16,
+              "rafterSpacing": 0.6,
+              "hasWallPlate": true,
+              "wallPlateWidth": 0.14,
+              "wallPlateHeight": 0.14,
+              "hasRingBeam": true,
+              "ringBeamHeight": 0.1,
+              "hasRidgePurlin": true,
+              "ridgePurlinWidth": 0.16,
+              "ridgePurlinHeight": 0.2,
+              "hasFasciaBoard": true,
+              "fasciaThickness": 0.025,
+              "hasMetalFlashing": true
+            }
+          },
+          "roofGroupId": null,
+          "isSlopeLocked": true,
+          "drainage": {
+            "showGutter": false,
+            "showDownpipes": true,
+            "profile": "halfRound",
+            "material": "galvanizedSteel",
+            "gutterWidth": 0.15,
+            "gutterDepth": 0.09,
+            "downpipes": []
+          },
+          "isMansard": false,
+          "upperSlopeDegrees": 25.0
+        }
+      ],
+      "openings": [],
+      "stairs": [],
+      "dimensions": [],
+      "elevationMarkers": [],
+      "annotations": [],
+      "cadPrimitives": [],
+      "components": []
+    }
+  ],
+  "activeStoreyId": "storey_0",
+  "wallTypes": [
+    {
+      "id": "int_12_partition",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "interior",
+      "layers": [],
+      "location": "interior",
+      "loadBearing": false,
+      "totalThickness": 0.12,
+      "brickThickness": 0.12,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4294944550
+    },
+    {
+      "id": "ext_25_brick",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "exterior",
+      "layers": [],
+      "location": "exterior",
+      "loadBearing": false,
+      "totalThickness": 0.25,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4294930499
+    },
+    {
+      "id": "bearing_25_concrete",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "bearing",
+      "layers": [],
+      "location": "interior",
+      "loadBearing": true,
+      "totalThickness": 0.25,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4286091420
+    },
+    {
+      "id": "parapet_12",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "parapet",
+      "layers": [],
+      "location": "exterior",
+      "loadBearing": false,
+      "totalThickness": 0.12,
+      "brickThickness": 0.12,
+      "insulationThickness": 0.0,
+      "customHeight": 1.05,
+      "parapetFinish": "cap",
+      "colorValue": 4280723098
+    },
+    {
+      "id": "ext_25_12_eps",
+      "name": "",
+      "labelId": "ext_25_12_eps",
+      "isCatalogType": true,
+      "usage": "exterior",
+      "layers": [
+        {
+          "id": "insulation",
+          "material": "eps",
+          "role": "insulation",
+          "thickness": 0.12
+        },
+        {
+          "id": "core",
+          "material": "brick",
+          "role": "core",
+          "thickness": 0.25
+        }
+      ],
+      "location": "exterior",
+      "loadBearing": false,
+      "totalThickness": 0.37,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.12,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4293874512
+    },
+    {
+      "system": {
+        "kind": "roundLogs",
+        "overlapPercent": 10.0,
+        "tailFactor": 1.0,
+        "studSpacing": 0.6,
+        "studWidth": 0.05,
+        "metalThickness": 0.0006,
+        "insulationDepth": 0.05,
+        "supportDepth": 0.1,
+        "panelModule": 1.0,
+        "panelMount": "inFront",
+        "horizontalPanels": false,
+        "openingCasing": true,
+        "casingWidth": 0.05,
+        "settlementAllowance": 0.0
+      },
+      "id": "wall_type_5e6679a7_1793134447525643_3",
+      "name": "",
+      "labelId": "ext_25_12_eps",
+      "isCatalogType": false,
+      "usage": "exterior",
+      "layers": [
+        {
+          "id": "log",
+          "material": "timber",
+          "role": "core",
+          "thickness": 0.24
+        }
+      ],
+      "location": "exterior",
+      "loadBearing": true,
+      "totalThickness": 0.24,
+      "brickThickness": 0.24,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4286091420
+    },
+    {
+      "system": {
+        "kind": "roundLogs",
+        "overlapPercent": 10.0,
+        "tailFactor": 1.0,
+        "studSpacing": 0.6,
+        "studWidth": 0.05,
+        "metalThickness": 0.0006,
+        "insulationDepth": 0.05,
+        "supportDepth": 0.1,
+        "panelModule": 1.0,
+        "panelMount": "inFront",
+        "horizontalPanels": false,
+        "openingCasing": true,
+        "casingWidth": 0.05,
+        "settlementAllowance": 0.0
+      },
+      "id": "wall_type_5e6679a7_1793134547548721_4",
+      "name": "",
+      "labelId": "ext_25_12_eps",
+      "isCatalogType": false,
+      "usage": "exterior",
+      "layers": [
+        {
+          "id": "log",
+          "material": "timber",
+          "role": "core",
+          "thickness": 0.24
+        }
+      ],
+      "location": "exterior",
+      "loadBearing": true,
+      "totalThickness": 0.24,
+      "brickThickness": 0.24,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4286091420
+    },
+    {
+      "system": {
+        "kind": "roundLogs",
+        "overlapPercent": 10.0,
+        "tailFactor": 1.0,
+        "studSpacing": 0.6,
+        "studWidth": 0.05,
+        "metalThickness": 0.0006,
+        "insulationDepth": 0.05,
+        "supportDepth": 0.1,
+        "panelModule": 1.0,
+        "panelMount": "inFront",
+        "horizontalPanels": false,
+        "openingCasing": true,
+        "casingWidth": 0.05,
+        "settlementAllowance": 0.0
+      },
+      "id": "wall_type_5e6679a7_1793134631995149_6",
+      "name": "",
+      "labelId": "ext_25_12_eps",
+      "isCatalogType": false,
+      "usage": "exterior",
+      "layers": [
+        {
+          "id": "log",
+          "material": "timber",
+          "role": "core",
+          "thickness": 0.24
+        }
+      ],
+      "location": "exterior",
+      "loadBearing": true,
+      "totalThickness": 0.24,
+      "brickThickness": 0.24,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4286091420
+    },
+    {
+      "system": {
+        "kind": "roundLogs",
+        "overlapPercent": 10.0,
+        "tailFactor": 1.0,
+        "studSpacing": 0.6,
+        "studWidth": 0.05,
+        "metalThickness": 0.0006,
+        "insulationDepth": 0.05,
+        "supportDepth": 0.1,
+        "panelModule": 1.0,
+        "panelMount": "inFront",
+        "horizontalPanels": false,
+        "openingCasing": true,
+        "casingWidth": 0.05,
+        "settlementAllowance": 0.0
+      },
+      "id": "wall_type_227a6bdb_1793134913830822_0",
+      "name": "",
+      "labelId": "ext_25_brick",
+      "isCatalogType": false,
+      "usage": "exterior",
+      "layers": [
+        {
+          "id": "log",
+          "material": "timber",
+          "role": "core",
+          "thickness": 0.24
+        }
+      ],
+      "location": "exterior",
+      "loadBearing": true,
+      "totalThickness": 0.24,
+      "brickThickness": 0.24,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4294930499
+    }
+  ],
+  "slabAssemblies": [
+    {
+      "id": "assembly_5e6679a7_1793134344708649_2",
+      "customName": "",
+      "usage": "ground",
+      "above": [
+        {
+          "id": "finish",
+          "material": "tile",
+          "role": "finish",
+          "thickness": 0.01,
+          "slopePercent": 0.0,
+          "customName": "",
+          "finishPackage": true
+        },
+        {
+          "id": "finish-bed",
+          "material": "tileAdhesive",
+          "role": "adhesive",
+          "thickness": 0.005,
+          "slopePercent": 0.0,
+          "customName": "",
+          "finishPackage": true
+        },
+        {
+          "id": "screed",
+          "material": "screed",
+          "role": "screed",
+          "thickness": 0.05,
+          "slopePercent": 0.0,
+          "customName": "",
+          "finishPackage": false
+        },
+        {
+          "id": "foil",
+          "material": "peFoil",
+          "role": "separation",
+          "thickness": 0.0002,
+          "slopePercent": 0.0,
+          "customName": "",
+          "finishPackage": false
+        },
+        {
+          "id": "thermal",
+          "material": "floorInsulation",
+          "role": "insulation",
+          "thickness": 0.1,
+          "slopePercent": 0.0,
+          "customName": "",
+          "finishPackage": false
+        },
+        {
+          "id": "waterproof",
+          "material": "waterproofing",
+          "role": "waterproofing",
+          "thickness": 0.008,
+          "slopePercent": 0.0,
+          "customName": "",
+          "finishPackage": false
+        }
+      ],
+      "below": [
+        {
+          "id": "base-foil",
+          "material": "peFoil",
+          "role": "separation",
+          "thickness": 0.0002,
+          "slopePercent": 0.0,
+          "customName": "",
+          "finishPackage": false
+        },
+        {
+          "id": "ballast",
+          "material": "ballast",
+          "role": "base",
+          "thickness": 0.2,
+          "slopePercent": 0.0,
+          "customName": "",
+          "finishPackage": false
+        },
+        {
+          "id": "fill",
+          "material": "compactedFill",
+          "role": "fill",
+          "thickness": 0.2,
+          "slopePercent": 0.0,
+          "customName": "",
+          "finishPackage": false
+        }
+      ]
+    }
+  ]
+}

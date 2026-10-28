@@ -48,7 +48,10 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
 
   Future<void> _edit(BuildContext context, [int? index]) async {
     final pipe = index == null
-        ? ArchitectDownpipe(id: ArchitectElementId.next('downpipe'))
+        ? ArchitectDownpipe(id: ArchitectElementId.next('downpipe'),
+            offset: roof == null ? .3 : project == null
+                ? (ArchitectRoofDrainageGeometry.eaves(roof!).$2 - ArchitectRoofDrainageGeometry.eaves(roof!).$1).distance / 2
+                : ArchitectRoofDrainageGeometry.initialOffset(project!, roof!))
         : value.downpipes[index];
     final next = await showDialog<ArchitectDownpipe>(
       context: context,
