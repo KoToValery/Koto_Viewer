@@ -2040,6 +2040,8 @@
   "architectRoofRotateSlope": "Посока скат",
   "architectRoofAttachToWalls": "Прикрепи към стените",
   "architectRoofAttachToWallsSubtitle": "Автоматично прикрепя покрива към най-високата точка на стените с конструктивен детайл",
+  "architectRoofAlignOnce": "По стените",
+  "architectRoofAlignOnceHelp": "Задава еднократно височината по носещите стени. Ръчните премествания запазват зададената височина.",
   "architectRoofRingBeamLabel": "10 см стоманобетонен пояс",
   "architectRoofMetalFlashingLabel": "Метална обшивка (капелник)",
   "architectRoofMoveVerticalAction": "Премести нагоре / надолу",

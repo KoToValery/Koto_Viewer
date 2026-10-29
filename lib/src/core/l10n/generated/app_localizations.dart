@@ -11105,6 +11105,18 @@ abstract class AppLocalizations {
   /// **'Auto-align roof structure to highest supporting walls with constructive eaves detail'**
   String get architectRoofAttachToWallsSubtitle;
 
+  /// No description provided for @architectRoofAlignOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Align to walls'**
+  String get architectRoofAlignOnce;
+
+  /// No description provided for @architectRoofAlignOnceHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the roof height once from the supporting walls. Manual moves keep their saved height.'**
+  String get architectRoofAlignOnceHelp;
+
   /// No description provided for @architectRoofRingBeamLabel.
   ///
   /// In en, this message translates to:

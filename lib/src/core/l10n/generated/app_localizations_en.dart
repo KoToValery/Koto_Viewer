@@ -6271,6 +6271,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Auto-align roof structure to highest supporting walls with constructive eaves detail';
 
   @override
+  String get architectRoofAlignOnce => 'Align to walls';
+
+  @override
+  String get architectRoofAlignOnceHelp =>
+      'Set the roof height once from the supporting walls. Manual moves keep their saved height.';
+
+  @override
   String get architectRoofRingBeamLabel => '10 cm concrete ring beam';
 
   @override

@@ -1367,6 +1367,7 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
                     : .65),
       );
       architectDrawingSources(canvas, sources, 'sectionHatch');
+      if (!region.drawHatch) continue;
       if (region.timberCrossSectionPolygon != null &&
           region.timberCrossSectionPolygon!.length == 4) {
         final pts = region.timberCrossSectionPolygon!.map(p).toList();

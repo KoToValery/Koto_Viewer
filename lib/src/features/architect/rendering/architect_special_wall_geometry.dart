@@ -6,6 +6,7 @@ import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_wall_type.dart';
 import '../services/architect_roof_geometry.dart';
+import '../services/architect_roof_wall_plates.dart';
 import '../services/architect_roof_junctions.dart';
 import '../services/architect_slab_geometry.dart';
 import '../services/architect_wall_connection_policy.dart';
@@ -319,6 +320,7 @@ class ArchitectSpecialWallGeometry {
         result = <ArchitectWallComponent>[];
     final openingCutters = <ArchitectWallComponent, List<List<Triangle3D>>>{};
     final sharedCutters = <Object, List<Triangle3D>>{};
+    final sharedPlates = <ArchitectStorey, List<ArchitectRoofWallPlate>>{};
     List<Triangle3D> shared(Object key, List<Triangle3D> Function() create) =>
         sharedCutters.putIfAbsent(key, create);
     final roofs = [
@@ -874,39 +876,13 @@ class ArchitectSpecialWallGeometry {
             if (c.wall.system.isLog &&
                 roof.assembly.preset == ArchitectRoofPreset.logTimber &&
                 roof.assembly.timber.hasWallPlate) {
-              final line = ArchitectRoofGeometry.wallBearingLine(roof);
-              if (line != null && (line.$2 - line.$1).distance > 1e-6) {
-                final u = (line.$2 - line.$1) / (line.$2 - line.$1).distance;
-                final n =
-                    Offset(-u.dy, u.dx) *
-                    roof.assembly.timber.wallPlateWidth /
-                    2;
-                final outline = Path.combine(
-                  PathOperation.intersect,
-                  Path()..addPolygon([
-                    line.$1 - n,
-                    line.$2 - n,
-                    line.$2 + n,
-                    line.$1 + n,
-                  ], true),
-                  ArchitectRoofJunctions.of(
-                    floor,
-                    project: project,
-                  ).footprint(roof),
-                );
+              final plates = sharedPlates.putIfAbsent(
+                floor,
+                () => ArchitectRoofWallPlate.build(floor, project: project),
+              );
+              for (final plate in plates.where((p) => p.roofId == roof.id)) {
                 cutters.add(
-                  shared(
-                    (floor, roof, 'wallPlate'),
-                    () => ArchitectPathSolid.between(
-                      outline,
-                      (p) =>
-                          floor.elevation +
-                          roof.undersideElevationAt(p) -
-                          roof.assembly.timber.wallPlateHeight,
-                      (p) => floor.elevation + roof.undersideElevationAt(p),
-                      c.layer.material.color,
-                    ),
-                  ),
+                  shared((floor, plate, 'wallPlate'), () => plate.mesh()),
                 );
               }
             }

@@ -100,6 +100,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
   testWidgets(
+    'phone roof accepts a two millimetre move and retains it after reopening',
+    (tester) async {
+      await qa.phone(tester);
+      final source = ArchitectCommandController(
+        roof_fixture.roofSnapProject().copyWith(
+          units: ArchitectUnit.centimeters,
+          sections: const [roof_fixture.roofSnapCut],
+        ),
+      );
+      addTearDown(source.dispose);
+      await workspace.open(tester, source);
+      await views.select(tester, 'section', 'cut');
+      final roof = source.project.activeStorey.roofs.last;
+      final z = roof.undersideElevationAt(const Offset(6, 2)) + .1;
+      await workspace.wallTap(tester, Offset(3, -z));
+      await projection.settleProjection(tester);
+      await tester.tap(find.byKey(const ValueKey('projection-move-z')));
+      await enterNumber(tester, '0.2'); // Project units are centimetres.
+      expect(source.undoCount, 1);
+      expect(
+        source.project.activeStorey.roofs.last.baseElevationOffset,
+        closeTo(roof.baseElevationOffset + .002, 1e-8),
+      );
+      final reopened = ArchitectCommandController(
+        ArchitectProject.fromJson(source.project.toJson()),
+      );
+      addTearDown(reopened.dispose);
+      expect(
+        reopened.project.activeStorey.roofs.last.baseElevationOffset,
+        closeTo(roof.baseElevationOffset + .002, 1e-8),
+      );
+      expect(reopened.project.activeStorey.roofs.last.attachToWalls, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
     'main facade edits actual opening and rejects a move through its neighbour',
     (tester) async {
       final source = ArchitectCommandController(fixture.elevationProject());

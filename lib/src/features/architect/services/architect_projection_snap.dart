@@ -77,15 +77,17 @@ class ArchitectProjectionSnap {
     }
     for (final entry in paths.entries) {
       final edges = movingIds.contains(entry.key) ? _moving : _targets;
+      final ref = ArchitectProjectionEditing.find(project, entry.key);
       // Tile profiles, battens and flashing must not attract a ridge away
       // from the matching main roof surfaces.
-      if (movingIds.contains(entry.key) ||
-          !roofProfiles.containsKey(entry.key)) {
+      if (movingIds.contains(entry.key)) {
+        addEdges(roofProfiles[entry.key] ?? entry.value, edges);
+      } else if (!roofProfiles.containsKey(entry.key) &&
+          ref?.kind != ArchitectProjectionKind.wall) {
         addEdges(entry.value, edges);
       }
       // A supporting wall can already extend to the selected roof. Retain its
       // nominal cap as a stable reference when manually lowering that roof.
-      final ref = ArchitectProjectionEditing.find(project, entry.key);
       if (ref?.kind == ArchitectProjectionKind.wall && edges == _targets) {
         final wall = ref!.storey.walls.firstWhere((w) => w.id == ref.id);
         final z =

@@ -37,6 +37,8 @@ class ArchitectSectionRegion {
   final List<Offset>? timberCrossSectionPolygon;
   final Color? customFillColor;
   final ArchitectHatchPattern? hatchPattern;
+  final bool drawHatch;
+  final bool mergeOutline;
 
   const ArchitectSectionRegion(
     this.sourceId,
@@ -47,6 +49,8 @@ class ArchitectSectionRegion {
     this.timberCrossSectionPolygon,
     this.customFillColor,
     this.hatchPattern,
+    this.drawHatch = true,
+    this.mergeOutline = true,
   });
 }
 
@@ -122,6 +126,8 @@ class ArchitectBuildingSection {
                 .toList(),
             customFillColor: r.customFillColor,
             hatchPattern: r.hatchPattern,
+            drawHatch: r.drawHatch,
+            mergeOutline: r.mergeOutline,
           ),
       ],
       box(bounds),
@@ -151,9 +157,12 @@ class ArchitectBuildingSection {
       _drawingCache[this] ??= _mergeDrawingRegions();
   List<ArchitectSectionRegion> _mergeDrawingRegions() {
     final result = <ArchitectSectionRegion>[],
-        indices = <(SlabMaterial, int?, bool, ArchitectHatchPattern?), int>{};
+        indices =
+            <(SlabMaterial, int?, bool, ArchitectHatchPattern?, bool), int>{};
     for (final region in regions) {
-      if (region.roof || region.timberCrossSectionPolygon != null) {
+      if (region.roof ||
+          region.timberCrossSectionPolygon != null ||
+          !region.mergeOutline) {
         result.add(region);
         continue;
       }
@@ -167,6 +176,7 @@ class ArchitectBuildingSection {
             isMonolithicShared ? null : region.customFillColor?.toARGB32(),
             isMonolithicShared ? true : region.slab,
             effectiveHatch,
+            region.drawHatch,
           ),
           index = indices[key];
       if (index == null) {
@@ -182,6 +192,7 @@ class ArchitectBuildingSection {
         slab: previous.slab || region.slab,
         customFillColor: previous.customFillColor,
         hatchPattern: previous.hatchPattern ?? effectiveHatch,
+        drawHatch: previous.drawHatch,
       );
     }
     return result;
@@ -291,6 +302,8 @@ class ArchitectBuildingSection {
               roof: r.roof,
               customFillColor: r.customFillColor,
               hatchPattern: r.hatchPattern,
+              drawHatch: r.drawHatch,
+              mergeOutline: r.mergeOutline,
               timberCrossSectionPolygon: r.timberCrossSectionPolygon
                   ?.map((p) => p + shift)
                   .toList(),
@@ -784,6 +797,10 @@ class ArchitectBuildingSection {
                   region,
                   customFillColor: part.layer.material.color,
                   hatchPattern: ArchitectSectionHatch.wall(part.layer.material),
+                  // Each course keeps its seated profile. Uniting tangent log
+                  // contours erases shared arcs and leaves numerical slivers.
+                  drawHatch: !wall.system.isLog,
+                  mergeOutline: !wall.system.isLog,
                 ),
               );
             }
@@ -968,6 +985,8 @@ class ArchitectBuildingSection {
               timberCrossSectionPolygon: r.timberCrossSectionPolygon,
               customFillColor: r.customFillColor,
               hatchPattern: r.hatchPattern,
+              drawHatch: r.drawHatch,
+              mergeOutline: r.mergeOutline,
             );
           } catch (_) {}
         }
@@ -1171,6 +1190,8 @@ class ArchitectBuildingSection {
               roof: r.roof,
               customFillColor: r.customFillColor,
               hatchPattern: r.hatchPattern,
+              drawHatch: r.drawHatch,
+              mergeOutline: r.mergeOutline,
               timberCrossSectionPolygon: r.timberCrossSectionPolygon
                   ?.map((p) => p + shift)
                   .toList(),

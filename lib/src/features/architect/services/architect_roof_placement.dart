@@ -81,6 +81,18 @@ class ArchitectRoofPlacement {
                     old.containsKey(roof.id) &&
                     !old[roof.id]!.attachToWalls &&
                     roof.attachToWalls;
+                // Wall alignment is a one-time placement action. Retain saved
+                // heights and turn off the legacy flag once that action has
+                // completed. Steel panel roofs keep their explicit column link.
+                if (roof.assembly.panels == null &&
+                    roof.placementResolved &&
+                    !reattach) {
+                  if (roof.attachToWalls) {
+                    changed = true;
+                    return roof.copyWith(attachToWalls: false);
+                  }
+                  return roof;
+                }
                 if (!roof.attachToWalls ||
                     (!reattach &&
                         !panelSupportChanged &&
@@ -106,6 +118,7 @@ class ArchitectRoofPlacement {
                 return roof.copyWith(
                   baseElevationOffset: height,
                   placementResolved: true,
+                  attachToWalls: roof.assembly.panels != null,
                 );
               })(),
           ],

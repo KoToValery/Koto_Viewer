@@ -7,8 +7,10 @@ import 'architect_panel_roof_geometry.dart';
 import '../services/architect_slab_geometry.dart';
 import '../services/architect_roof_junctions.dart';
 import '../services/architect_roof_ridge_beams.dart';
+import '../services/architect_roof_wall_plates.dart';
 import '../services/architect_roof_geometry.dart';
 import 'architect_path_solid.dart';
+import 'architect_mesh_boolean.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
@@ -311,6 +313,7 @@ class Architect3dBuilder {
       final ridgeBeams = previewGeometry
           ? ArchitectRoofRidgeBeam.build(storey, project: project)
           : <ArchitectRoofRidgeBeam>[];
+      final wallPlates = ArchitectRoofWallPlate.build(storey, project: project);
       final roofMeshes = [
         for (final roof in storey.roofs)
           if (roof.assembly.panels == null)
@@ -319,6 +322,7 @@ class Architect3dBuilder {
               roof,
               detailed: previewGeometry,
               ridgeSeats: ridgeBeams,
+              wallPlates: wallPlates.where((p) => p.roofId == roof.id).toList(),
               footprint: roofJunctions.trimmed.contains(roof.id)
                   ? roofJunctions.footprint(roof)
                   : null,
@@ -518,6 +522,7 @@ class Architect3dBuilder {
     ArchitectRoofPlane roof, {
     bool detailed = true,
     List<ArchitectRoofRidgeBeam> ridgeSeats = const [],
+    List<ArchitectRoofWallPlate> wallPlates = const [],
     Path? footprint,
   }) {
     final pts = roof.points;
@@ -537,13 +542,20 @@ class Architect3dBuilder {
     if (!detailed ||
         !roof.assembly.timber.hasRafters ||
         roof.slopeDegrees < 1.0) {
-      return _buildSimpleRoofPrism(
+      final mesh = _buildSimpleRoofPrism(
         storey,
         roof,
         topColor,
         fasciaColor,
         footprint: footprint,
+        wallPlates: wallPlates,
       );
+      if (wallPlates.isEmpty) return mesh;
+      // Vertical clipping partitions the roof around its seats. Remove the
+      // internal cap faces so they cannot become projection lines in batten gaps.
+      return ArchitectMeshBoolean.exposedSurfaces([
+        [...mesh, for (final plate in wallPlates) ...plate.mesh()],
+      ]).single;
     }
 
     final tris = <Triangle3D>[];
@@ -587,8 +599,12 @@ class Architect3dBuilder {
     const boardingH = 0.022;
     final totalH = roof.assembly.totalThickness / cosSlope;
 
-    final hRafterBottom = 0.0;
-    final hRafterTop = rafterH;
+    final hRafterBottom = roof.assembly.preset == ArchitectRoofPreset.logTimber
+        ? (roof.assembly.totalThickness -
+                  ArchitectRoofWallPlate.rafterBottomDepth(roof)) /
+              cosSlope
+        : 0.0;
+    final hRafterTop = hRafterBottom + rafterH;
     final hBoardTop = hRafterTop + boardingH;
     final hCoverTop = math.max(hBoardTop + 0.025, totalH);
 
@@ -608,7 +624,11 @@ class Architect3dBuilder {
     final centeredSupport =
         roof.manualSupportDistance != null ||
         roof.assembly.preset == ArchitectRoofPreset.logTimber;
+    for (final plate in wallPlates) {
+      tris.addAll(plate.mesh());
+    }
     if (timber.hasWallPlate &&
+        roof.assembly.preset != ArchitectRoofPreset.logTimber &&
         (centeredSupport
             ? dWall - wpW * .5 < maxD && dWall + wpW * .5 > minD
             : dWall + wpW < maxD)) {
@@ -702,7 +722,7 @@ class Architect3dBuilder {
           planClip: footprint,
           topColor: rafterTopColor,
           sideColor: rafterSideColor,
-          seats: ridgeSeats,
+          seats: [...ridgeSeats, ...wallPlates],
         );
         final upperRafterClip = _clipPolygonToRect(
           polySD,
@@ -724,7 +744,7 @@ class Architect3dBuilder {
           planClip: footprint,
           topColor: rafterTopColor,
           sideColor: rafterSideColor,
-          seats: ridgeSeats,
+          seats: [...ridgeSeats, ...wallPlates],
         );
       } else {
         final rafterClip = _clipPolygonToRect(polySD, s0, s1, minD, maxD);
@@ -741,7 +761,7 @@ class Architect3dBuilder {
           planClip: footprint,
           topColor: rafterTopColor,
           sideColor: rafterSideColor,
-          seats: ridgeSeats,
+          seats: [...ridgeSeats, ...wallPlates],
         );
       }
     }
@@ -934,7 +954,37 @@ class Architect3dBuilder {
     Color topColor,
     Color fasciaColor, {
     Path? footprint,
+    List<ArchitectRoofWallPlate> wallPlates = const [],
   }) {
+    if (wallPlates.isNotEmpty) {
+      final outline = footprint ?? (Path()..addPolygon(roof.points, true));
+      var parts = [
+        ArchitectVerticalPart(
+          outline,
+          (p) => storey.elevation + roof.undersideElevationAt(p),
+          (p) => storey.elevation + roof.topElevationAt(p),
+        ),
+      ];
+      for (final plate in wallPlates) {
+        parts = ArchitectVerticalClip.subtract(
+          parts,
+          plate.footprint,
+          (_) => plate.bottom,
+          (_) => plate.top,
+        );
+      }
+      return [
+        for (final part in parts)
+          ..._roofPrism(
+            part.path,
+            part.bottom,
+            part.top,
+            topColor,
+            fasciaColor,
+            fasciaColor,
+          ),
+      ];
+    }
     if (footprint != null) {
       return _roofPrism(
         footprint,

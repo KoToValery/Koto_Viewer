@@ -60,6 +60,34 @@ class CutWallJunctionSpan {
           wall.coreMaterial == WallCoreMaterial.concrete ||
           wall.system.isLog ||
           wall.system.isPanel);
+
+  /// At a slab perimeter its footprint identifies the outside of the junction,
+  /// even in older projects whose wall-side flag points into the building.
+  CutWallJunctionSpan atSlab(List<(double, double)> spans) {
+    if (!wall.isExterior || !isTransverseCut) return this;
+    for (final (a, b) in spans) {
+      for (final (w0, w1) in fullIntervals) {
+        final atStart = (w0 - a).abs() <= .08;
+        final atEnd = (w1 - b).abs() <= .08;
+        if (atStart == atEnd) continue;
+        return CutWallJunctionSpan(
+          storey: storey,
+          wall: wall,
+          transverse: transverse,
+          isTransverseCut: isTransverseCut,
+          exteriorDirectionS: atStart ? -1 : 1,
+          zWallBot: zWallBot,
+          zWallTop: zWallTop,
+          fullIntervals: fullIntervals,
+          coreIntervals: coreIntervals,
+          coreOpeningsFreeIntervals: coreOpeningsFreeIntervals,
+          exteriorIntervals: exteriorIntervals,
+          interiorIntervals: interiorIntervals,
+        );
+      }
+    }
+    return this;
+  }
 }
 
 class SlabWallJunctionPlan {
@@ -103,20 +131,19 @@ class ArchitectSectionJunctions {
     ArchitectProject project,
     ArchitectStorey storey,
   ) {
-    final lowerStoreys = project.storeys
-        .where(
-          (s) =>
-              s.id != storey.id &&
-              !s.isRoof &&
-              s.elevation < storey.elevation - 1e-4,
-        )
-        .toList()
-      ..sort((a, b) => a.elevation.compareTo(b.elevation));
+    final lowerStoreys =
+        project.storeys
+            .where(
+              (s) =>
+                  s.id != storey.id &&
+                  !s.isRoof &&
+                  s.elevation < storey.elevation - 1e-4,
+            )
+            .toList()
+          ..sort((a, b) => a.elevation.compareTo(b.elevation));
 
     if (lowerStoreys.isEmpty) {
-      return storey.elevation < -0.50
-          ? SlabUsage.foundation
-          : SlabUsage.ground;
+      return storey.elevation < -0.50 ? SlabUsage.foundation : SlabUsage.ground;
     }
 
     final immediatelyBelow = lowerStoreys.last;
@@ -199,10 +226,11 @@ class ArchitectSectionJunctions {
     for (final storey in project.storeys) {
       for (final wall in storey.walls) {
         final type = catalog[wall.wallTypeId];
-        final insulation = (wall.insulationThicknessOverride ??
-                type?.insulationThickness ??
-                wall.insulationThickness)
-            .clamp(0.0, math.max(0.0, wall.thickness - 0.001));
+        final insulation =
+            (wall.insulationThicknessOverride ??
+                    type?.insulationThickness ??
+                    wall.insulationThickness)
+                .clamp(0.0, math.max(0.0, wall.thickness - 0.001));
         final offset = wall.centerLineOffset;
         final outside = wall.layers.isEmpty ? insulation : wall.exteriorBuildUp;
         final inside = wall.layers.isEmpty ? 0.0 : wall.interiorBuildUp;
@@ -241,10 +269,12 @@ class ArchitectSectionJunctions {
         final doorSpans = _baseDoorwayIntervals(wall, cut);
         final coreOpeningsFree = _subtractIntervals(coreIntervals, doorSpans);
 
-        final transverse = (wall.normalVector.dx * cut.axis.dx +
-                wall.normalVector.dy * cut.axis.dy)
-            .abs();
-        final extDot = wall.exteriorNormal.dx * cut.axis.dx +
+        final transverse =
+            (wall.normalVector.dx * cut.axis.dx +
+                    wall.normalVector.dy * cut.axis.dy)
+                .abs();
+        final extDot =
+            wall.exteriorNormal.dx * cut.axis.dx +
             wall.exteriorNormal.dy * cut.axis.dy;
 
         final zBot = storey.elevation + wall.baseOffset;
@@ -338,10 +368,10 @@ class ArchitectSectionJunctions {
 
           if ((cw.zWallBot - zCoreTop).abs() <= 0.12 ||
               (cw.zWallBot >= zCoreBot - 0.02 && cw.zWallBot <= zTop + 0.05)) {
-            wallsAbove.add(cw);
+            wallsAbove.add(cw.atSlab(spans));
           } else if ((cw.zWallTop - zCoreTop).abs() <= 0.12 ||
               (cw.zWallTop >= zBot - 0.05 && cw.zWallTop <= zTop + 0.05)) {
-            wallsBelow.add(cw);
+            wallsBelow.add(cw.atSlab(spans));
           }
         }
 
@@ -461,8 +491,9 @@ class ArchitectSectionJunctions {
               var stemLeft = c0;
               var stemRight = c1;
               if (cw.wall.system.isPanel && (c1 - c0) < 0.24) {
-                final scale =
-                    cw.wall.isCurved ? 1.0 : 1.0 / math.max(0.25, cw.transverse);
+                final scale = cw.wall.isCurved
+                    ? 1.0
+                    : 1.0 / math.max(0.25, cw.transverse);
                 final targetW = math.max(0.25, cw.wall.thickness) * scale;
                 if (cw.exteriorDirectionS < 0) {
                   stemRight = stemLeft + targetW;
@@ -500,8 +531,9 @@ class ArchitectSectionJunctions {
               var fndOuterLeft = stemLeft;
               var fndOuterRight = stemRight;
               if (cw.wall.isExterior) {
-                final scale =
-                    cw.wall.isCurved ? 1.0 : 1.0 / math.max(0.25, cw.transverse);
+                final scale = cw.wall.isCurved
+                    ? 1.0
+                    : 1.0 / math.max(0.25, cw.transverse);
                 double insSpanW = 0.0;
                 if (cw.exteriorIntervals.isNotEmpty) {
                   final extSpan = k < cw.exteriorIntervals.length
@@ -512,7 +544,8 @@ class ArchitectSectionJunctions {
                     cw.wall.plinth.enabled ||
                     cw.wall.system.isLog ||
                     cw.wall.system.isPanel) {
-                  insSpanW = math.max(0.08, cw.wall.insulationThickness) * scale;
+                  insSpanW =
+                      math.max(0.08, cw.wall.insulationThickness) * scale;
                 }
 
                 if (insSpanW > 1e-3) {
@@ -573,7 +606,7 @@ class ArchitectSectionJunctions {
                   if (isLeftExt) {
                     groundSubBaseCutout.addRect(
                       Rect.fromLTRB(
-                        fndOuterLeft - 2.0,
+                        math.min(fndOuterLeft, spans.first.$1) - .05,
                         zFoundationBot - 1.0,
                         stemRight,
                         zCoreTop + 0.5,
@@ -584,7 +617,7 @@ class ArchitectSectionJunctions {
                       Rect.fromLTRB(
                         stemLeft,
                         zFoundationBot - 1.0,
-                        fndOuterRight + 2.0,
+                        math.max(fndOuterRight, spans.last.$2) + .05,
                         zCoreTop + 0.5,
                       ),
                     );
@@ -785,7 +818,9 @@ class ArchitectSectionJunctions {
           ),
         );
         onAddWallCutout(
-          Path()..addRect(Rect.fromLTRB(f0 - 0.01, zBase - 0.05, f1 + 0.01, zBase + flashH)),
+          Path()..addRect(
+            Rect.fromLTRB(f0 - 0.01, zBase - 0.05, f1 + 0.01, zBase + flashH),
+          ),
         );
       }
       return;
@@ -866,10 +901,9 @@ class ArchitectSectionJunctions {
 
         // Trim bottom log course cleanly at top of the timber sill plate
         onAddWallCutout(
-          Path()
-            ..addRect(
-              Rect.fromLTRB(c0 - 0.02, zBase - 0.20, c1 + 0.02, zSillTop),
-            ),
+          Path()..addRect(
+            Rect.fromLTRB(c0 - 0.02, zBase - 0.20, c1 + 0.02, zSillTop),
+          ),
         );
       } else if (isStudFrame) {
         // Stud-Frame Wall: optional ground waterproofing + Bottom Sole Plate (долен праг с диагонали)
@@ -943,11 +977,18 @@ class ArchitectSectionJunctions {
 
     final wall = cw.wall;
     final layers = wall.resolvedLayers;
-    final coreIndex = layers.indexWhere((l) => l.role == ArchitectLayerRole.core);
-    final extLayers = coreIndex > 0 ? layers.sublist(0, coreIndex) : const <ArchitectMaterialLayer>[];
+    final coreIndex = layers.indexWhere(
+      (l) => l.role == ArchitectLayerRole.core,
+    );
+    final extLayers = coreIndex > 0
+        ? layers.sublist(0, coreIndex)
+        : const <ArchitectMaterialLayer>[];
     if (extLayers.isEmpty) return;
 
-    final totalExtThick = extLayers.fold<double>(0.0, (v, l) => v + l.thickness);
+    final totalExtThick = extLayers.fold<double>(
+      0.0,
+      (v, l) => v + l.thickness,
+    );
     if (totalExtThick <= 1e-4) return;
 
     final spanW = sB - sA;
@@ -1002,10 +1043,7 @@ class ArchitectSectionJunctions {
       if (d.abs() < 1e-10) continue;
       final t = cross(a - section.start, v) / d;
       final q = cross(a - section.start, u) / d;
-      if (t >= 0.0 &&
-          t <= section.length &&
-          q >= -1e-7 &&
-          q <= 1.0 + 1e-7) {
+      if (t >= 0.0 && t <= section.length && q >= -1e-7 && q <= 1.0 + 1e-7) {
         breaks.add(t);
       }
     }
@@ -1035,8 +1073,8 @@ class ArchitectSectionJunctions {
     for (final d in wall.doors) {
       if (d.sillHeight > 0.03) continue;
       final ratio = d.offsetRatio;
-      final halfRatio = (wall.openingArcSpan(d.width) / 2.0) /
-          math.max(0.01, wall.length);
+      final halfRatio =
+          (wall.openingArcSpan(d.width) / 2.0) / math.max(0.01, wall.length);
       final from = (ratio - halfRatio).clamp(0.0, 1.0);
       final to = (ratio + halfRatio).clamp(0.0, 1.0);
       if (to <= from + 1e-5) continue;

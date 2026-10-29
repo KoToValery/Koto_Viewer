@@ -317,6 +317,7 @@ class ArchitectProjectionEditing {
                 points: [for (final pt in r.points) pt + horizontal],
                 baseElevationOffset: r.baseElevationOffset + dz,
                 attachToWalls: false,
+                placementResolved: true,
               )
             else
               r,
@@ -469,8 +470,12 @@ class ArchitectProjectionEditing {
       }
     }
     final distLeft = (left - leftX).abs() < 1e-4 ? 0.0 : left - leftX;
-    final distRight = (rightX - rightEdge).abs() < 1e-4 ? 0.0 : rightX - rightEdge;
-    final distSill = (bottom - ref.storey.elevation).abs() < 1e-4 ? 0.0 : bottom - ref.storey.elevation;
+    final distRight = (rightX - rightEdge).abs() < 1e-4
+        ? 0.0
+        : rightX - rightEdge;
+    final distSill = (bottom - ref.storey.elevation).abs() < 1e-4
+        ? 0.0
+        : bottom - ref.storey.elevation;
     return [
       ArchitectOpeningMeasure(
         ArchitectOpeningDistance.left,

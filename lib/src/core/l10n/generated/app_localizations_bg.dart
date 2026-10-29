@@ -6298,6 +6298,13 @@ class AppLocalizationsBg extends AppLocalizations {
       'Автоматично прикрепя покрива към най-високата точка на стените с конструктивен детайл';
 
   @override
+  String get architectRoofAlignOnce => 'По стените';
+
+  @override
+  String get architectRoofAlignOnceHelp =>
+      'Задава еднократно височината по носещите стени. Ръчните премествания запазват зададената височина.';
+
+  @override
   String get architectRoofRingBeamLabel => '10 см стоманобетонен пояс';
 
   @override

@@ -4159,6 +4159,8 @@
   "architectRoofRotateSlope": "Slope dir",
   "architectRoofAttachToWalls": "Attach to wall top",
   "architectRoofAttachToWallsSubtitle": "Auto-align roof structure to highest supporting walls with constructive eaves detail",
+  "architectRoofAlignOnce": "Align to walls",
+  "architectRoofAlignOnceHelp": "Set the roof height once from the supporting walls. Manual moves keep their saved height.",
   "architectRoofRingBeamLabel": "10 cm concrete ring beam",
   "architectRoofMetalFlashingLabel": "Metal flashing (drip edge)",
   "architectRoofMoveVerticalAction": "Move up / down",

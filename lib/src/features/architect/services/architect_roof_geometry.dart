@@ -18,6 +18,7 @@ import 'architect_element_id.dart';
 import 'architect_polygon_geometry.dart';
 import 'architect_roof_junctions.dart';
 import 'architect_roof_ridge_beams.dart';
+import 'architect_roof_wall_plates.dart';
 import 'architect_panel_supports.dart';
 
 // === SECTION: DATA STRUCTURES ===
@@ -818,6 +819,40 @@ class ArchitectRoofGeometry {
         }
       }
     }
+    if (roof.assembly.preset == ArchitectRoofPreset.logTimber &&
+        roof.assembly.timber.hasWallPlate &&
+        roof.manualSupportDistance == null) {
+      final support = storey.walls.any((w) => !w.isParapet)
+          ? storey
+          : lowerStorey;
+      if (support != null) {
+        final plates = ArchitectRoofWallPlate.build(
+          storey.copyWith(roofs: [roof]),
+          lowerStorey: support,
+        );
+        final shifts = <double>[];
+        for (final plate in plates) {
+          final wall = support.walls
+              .where(
+                (w) =>
+                    (w.coreCenterStart - plate.start).distance < 1e-5 &&
+                    (w.coreCenterEnd - plate.end).distance < 1e-5,
+              )
+              .firstOrNull;
+          if (wall != null) {
+            shifts.add(
+              support.elevation +
+                  wall.baseOffset +
+                  wall.effectiveHeight(support.height) -
+                  plate.bottom,
+            );
+          }
+        }
+        if (shifts.isNotEmpty) {
+          return roof.baseElevationOffset + shifts.reduce(math.max);
+        }
+      }
+    }
     final bearingDepth =
         roof.assembly.preset == ArchitectRoofPreset.logTimber &&
             roof.assembly.timber.hasWallPlate
@@ -1101,6 +1136,21 @@ class ArchitectRoofGeometry {
         ),
     ]..removeWhere((entry) => entry.$2.getBounds().isEmpty);
     final emittedRidges = <ArchitectRoofRidgeBeam>{};
+    final plateSections = [
+      for (final plate in ArchitectRoofWallPlate.build(
+        storey,
+        project: project,
+        lowerStorey: lowerStorey,
+      ))
+        (
+          plate,
+          ArchitectMeshSection.vertical(
+            plate.mesh(),
+            sectionLine.start,
+            lineDir,
+          ),
+        ),
+    ]..removeWhere((p) => p.$2.getBounds().isEmpty);
     final ridgeBearingSections = <(ArchitectRoofRidgeBearing, Path)>[
       for (final beam in ridgeBeams)
         for (final bearing in beam.bearings(
@@ -1428,10 +1478,26 @@ class ArchitectRoofGeometry {
             final sb = sWallCenter + halfWp;
             // A horizontal seat cuts a shallow birdsmouth in the rafter;
             // choosing its higher underside avoids a gap above half the plate.
-            final zWpTop = math.max(
-              zTop0 + dzDs * (sa - s0) - dRafterBotV,
-              zTop0 + dzDs * (sb - s0) - dRafterBotV,
-            );
+            final plate = plateSections
+                .where(
+                  (p) =>
+                      p.$1.roofId == roof.id &&
+                      p.$2
+                          .getBounds()
+                          .inflate(.001)
+                          .contains(Offset(sWallCenter, p.$1.top - .001)),
+                )
+                .firstOrNull;
+            final zWpTop =
+                plate?.$1.top ??
+                math.max(
+                  zTop0 + dzDs * (sa - s0) - dRafterBotV,
+                  zTop0 + dzDs * (sb - s0) - dRafterBotV,
+                );
+            if (roof.assembly.preset == ArchitectRoofPreset.logTimber &&
+                plate == null) {
+              continue;
+            }
             final zWpBot = zWpTop - timber.wallPlateHeight;
             final wpPoly = <Offset>[
               Offset(sa, zWpTop),
@@ -1439,16 +1505,18 @@ class ArchitectRoofGeometry {
               Offset(sb, zWpBot),
               Offset(sa, zWpBot),
             ];
-            discreteMembers.add(
-              ArchitectRoofSectionMember(
-                roofId: roof.id,
-                kind: ArchitectRoofMemberKind.wallPlate,
-                material: ArchitectRoofMaterial.timberBoarding,
-                polygon: wpPoly,
-                path: Path()..addPolygon(wpPoly, true),
-                drawTimberDiagonals: true,
-              ),
-            );
+            if (roof.assembly.preset != ArchitectRoofPreset.logTimber) {
+              discreteMembers.add(
+                ArchitectRoofSectionMember(
+                  roofId: roof.id,
+                  kind: ArchitectRoofMemberKind.wallPlate,
+                  material: ArchitectRoofMaterial.timberBoarding,
+                  polygon: wpPoly,
+                  path: plate?.$2 ?? (Path()..addPolygon(wpPoly, true)),
+                  drawTimberDiagonals: true,
+                ),
+              );
+            }
             zCurrentBot = zWpBot;
           }
 
@@ -1480,6 +1548,33 @@ class ArchitectRoofGeometry {
             maxWallZ: zCurrentBot,
           ));
         }
+      }
+
+      // Physical log-wall plates also appear in longitudinal sections. Their
+      // extent and seat must not depend on the cut's angle to the roof slope.
+      for (final (plate, profile) in plateSections.where(
+        (p) => p.$1.roofId == roof.id,
+      )) {
+        final path = ArchitectMeshSection.combine(
+          PathOperation.intersect,
+          profile,
+          Path()..addRect(Rect.fromLTRB(s0, -1e6, s1, 1e6)),
+        );
+        if (path.getBounds().isEmpty) continue;
+        final loops = ArchitectPathSolid.contours(path);
+        discreteMembers.add(
+          ArchitectRoofSectionMember(
+            roofId: roof.id,
+            kind: ArchitectRoofMemberKind.wallPlate,
+            material: ArchitectRoofMaterial.timberBoarding,
+            path: path,
+            polygon: loops.length == 1 ? loops.single : const [],
+            drawTimberDiagonals:
+                (plate.axis.dx * lineDir.dx + plate.axis.dy * lineDir.dy)
+                    .abs() <
+                .25,
+          ),
+        );
       }
 
       // 6. Slice the physical ridge beam, including longitudinal/oblique cuts.
