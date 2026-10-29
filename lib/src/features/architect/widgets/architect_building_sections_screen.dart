@@ -1,5 +1,7 @@
 import '../rendering/architect_hatch_geometry.dart';
 import '../services/architect_section_junctions.dart';
+import '../services/architect_projection_loader.dart';
+import 'architect_projection_status.dart';
 import '../rendering/architect_section_hatch.dart';
 import 'architect_projection_drawing_menu.dart';
 import '../rendering/architect_2d_painter.dart' show ArchitectTool;
@@ -64,9 +66,10 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
   ArchitectProject get project => widget.controller.project;
   ArchitectSection? get cut =>
       project.sections.where((s) => s.id == sectionId).firstOrNull;
-  ArchitectBuildingSection? cachedGeometry;
-  ArchitectProject? cachedProject;
-  ArchitectSection? cachedCut;
+  late final _geometryLoader =
+      ArchitectProjectionLoader<ArchitectBuildingSection>(() {
+        if (mounted) setState(() {});
+      });
 
   @override
   void initState() {
@@ -105,6 +108,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
 
   @override
   void dispose() {
+    _geometryLoader.dispose();
     widget.controller.removeListener(changed);
     transform.dispose();
     super.dispose();
@@ -122,16 +126,17 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
     );
   }
 
-  ArchitectBuildingSection geometry(ArchitectSection value) {
-    if (!identical(cachedProject, project) || !identical(cachedCut, value)) {
-      cachedGeometry = ArchitectBuildingSection.build(
-        project,
+  ArchitectBuildingSection? geometry(ArchitectSection value) {
+    final source = project;
+    _geometryLoader.ensure(
+      source,
+      value.id,
+      () async => (await ArchitectBuildingSection.buildAsync(
+        source,
         value,
-      ).forView(value);
-      cachedProject = project;
-      cachedCut = value;
-    }
-    return cachedGeometry!;
+      )).forView(value),
+    );
+    return _geometryLoader.data;
   }
 
   void resetModes() {
@@ -392,6 +397,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
     final value = cut;
     if (value == null) return;
     final data = geometry(value);
+    if (data == null || _geometryLoader.loading) return;
     if (movingDetail && selectedDetail != null) {
       final detail = value.details.firstWhere((d) => d.id == selectedDetail);
       final layout = drawing._detailLayout(detail);
@@ -889,6 +895,13 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                     : LayoutBuilder(
                         builder: (_, c) {
                           final data = geometry(value);
+                          if (data == null || _geometryLoader.failed) {
+                            return ArchitectProjectionStatus(
+                              failed: _geometryLoader.failed,
+                              onRetry: () =>
+                                  setState(_geometryLoader.invalidate),
+                            );
+                          }
                           final drawing = ArchitectSectionDrawing(
                             project,
                             value,
@@ -1080,6 +1093,17 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                                               drawing,
                                             ),
                                           ),
+                                    ),
+                                  ),
+                                if (_geometryLoader.loading)
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    width: 24,
+                                    height: 24,
+                                    child: ArchitectProjectionStatus(
+                                      failed: false,
+                                      onRetry: () {},
                                     ),
                                   ),
                               ],
@@ -1350,8 +1374,11 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
           ..color = (isSelectedRoof ? drawing.colors.primary : color)
               .withValues(alpha: 0.65)
           ..strokeWidth = 0.65;
+        canvas.save();
+        canvas.clipPath(path);
         canvas.drawLine(pts[0], pts[2], diagPaint);
         canvas.drawLine(pts[1], pts[3], diagPaint);
+        canvas.restore();
       } else if (region.hatchPattern != null ||
           (ArchitectSectionHatch.slab(region.material) != null &&
               region.path.getBounds().height * scale > 4)) {
@@ -1363,7 +1390,11 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
           ArchitectHatchGeometry.path(
             boundary: path,
             pattern: pattern,
-            unitsPerMm: (ArchitectTextScope.current?.denominator ?? drawing.project.dimensionScale.denominator) / 1000 * scale,
+            unitsPerMm:
+                (ArchitectTextScope.current?.denominator ??
+                    drawing.project.dimensionScale.denominator) /
+                1000 *
+                scale,
             origin: p(Offset.zero),
             visibleBounds: Offset.zero & size,
           ),

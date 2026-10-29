@@ -1,9 +1,11 @@
 import '../services/architect_roof_junctions.dart';
 import '../services/architect_section_junctions.dart';
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show compute;
 import 'dart:math' as math;
 import '../services/architect_slab_geometry.dart';
 import '../services/architect_roof_geometry.dart';
+import '../services/architect_roof_ridge_beams.dart';
 import 'architect_vertical_clip.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_project.dart';
@@ -12,6 +14,7 @@ import '../models/architect_wall_type.dart';
 import 'architect_path_solid.dart';
 import 'architect_wall_layers.dart';
 import 'architect_special_wall_geometry.dart';
+import 'architect_mesh_boolean.dart';
 
 class ArchitectWallSolid {
   final ArchitectWall wall;
@@ -35,7 +38,55 @@ class ArchitectWallSolid {
 /// Shared material volumes never overlap at L/T/X junctions.
 class ArchitectWallSolids {
   static final _cache =
-      Expando<Map<ArchitectStorey, List<ArchitectWallSolid>>>();
+      Expando<
+        Map<(ArchitectStorey, String, String), List<ArchitectWallSolid>>
+      >();
+  static final _shells = Expando<List<List<Triangle3D>>>();
+
+  static String _openingKey(Set<String> ids) =>
+      (ids.toList()..sort()).join('\u0000');
+
+  static Future<List<ArchitectWallSolid>> buildAsync(
+    ArchitectStorey storey,
+    ArchitectProject project, {
+    Set<String> suppressedOpeningIds = const {},
+    Set<String>? specialSuppressedOpeningIds,
+    bool prepareShell = false,
+  }) async {
+    await ArchitectSpecialWallGeometry.buildAsync(
+      storey,
+      project: project,
+      suppressedOpeningIds: specialSuppressedOpeningIds ?? suppressedOpeningIds,
+    );
+    final solids = build(
+      storey,
+      project.wallTypes,
+      project: project,
+      suppressedOpeningIds: suppressedOpeningIds,
+      specialSuppressedOpeningIds: specialSuppressedOpeningIds,
+    );
+    if (prepareShell && _shells[solids] == null) {
+      final components = [
+        for (final solid in solids)
+          if (solid.componentId != null) solid.triangles,
+      ];
+      if (components.isNotEmpty) {
+        _shells[solids] = await compute(
+          ArchitectMeshBoolean.exposedSurfaces,
+          components,
+          debugLabel: 'architectural-wall-surfaces',
+        );
+      }
+    }
+    return solids;
+  }
+
+  static List<List<Triangle3D>> constructionShell(
+    List<ArchitectWallSolid> solids,
+  ) => _shells[solids] ??= ArchitectMeshBoolean.exposedSurfaces([
+    for (final solid in solids)
+      if (solid.componentId != null) solid.triangles,
+  ]);
   static List<ArchitectWallSolid> build(
     ArchitectStorey storey,
     List<ArchitectWallType> types, {
@@ -43,14 +94,14 @@ class ArchitectWallSolids {
     Set<String> suppressedOpeningIds = const {},
     Set<String>? specialSuppressedOpeningIds,
   }) {
-    final cacheable =
-        suppressedOpeningIds.isEmpty &&
-        (specialSuppressedOpeningIds == null ||
-            specialSuppressedOpeningIds.isEmpty) &&
-        project != null &&
-        identical(types, project.wallTypes);
+    final cacheable = project != null && identical(types, project.wallTypes);
+    final key = (
+      storey,
+      _openingKey(suppressedOpeningIds),
+      _openingKey(specialSuppressedOpeningIds ?? suppressedOpeningIds),
+    );
     if (cacheable) {
-      final cached = _cache[project]?[storey];
+      final cached = _cache[project]?[key];
       if (cached != null) return cached;
     }
     final roofFloors = [
@@ -66,6 +117,14 @@ class ArchitectWallSolids {
     final roofEnvelopes = [
       for (final floor in roofFloors)
         for (final roof in floor.roofs) (floor, roof),
+    ];
+    final ridgeBearings = [
+      for (final floor in roofFloors)
+        for (final beam in ArchitectRoofRidgeBeam.build(
+          floor,
+          project: project,
+        ))
+          ...beam.bearings(floor, storey),
     ];
     final nominalTops = {
       for (final w in storey.walls)
@@ -243,7 +302,19 @@ class ArchitectWallSolids {
             removeAbove: true,
           );
         }
-        final color = wall.layers.isEmpty && !wall.hasInsulation && !plinth.enabled
+        for (final bearing in ridgeBearings.where(
+          (b) => b.wall.id == wall.id,
+        )) {
+          parts = ArchitectVerticalClip.subtract(
+            parts,
+            bearing.footprint,
+            (_) => bearing.bottom,
+            (_) => bearing.beam.top,
+            removeAbove: true,
+          );
+        }
+        final color =
+            wall.layers.isEmpty && !wall.hasInsulation && !plinth.enabled
             ? const Color(0xFFECEFF1)
             : region.layer.material.color;
         // Each clipped part is a closed solid. Keep it separate so vertical
@@ -331,9 +402,7 @@ class ArchitectWallSolids {
       );
     }
     if (cacheable) {
-      (_cache[project] ??=
-              <ArchitectStorey, List<ArchitectWallSolid>>{})[storey] =
-          result;
+      (_cache[project] ??= {})[key] = result;
     }
     return result;
   }

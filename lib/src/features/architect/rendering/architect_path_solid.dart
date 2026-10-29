@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:clipper2/clipper2.dart' as clip;
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 
 /// Extrudes boolean-clean paths, including holes and disconnected contours.
@@ -87,6 +88,7 @@ class ArchitectPathSolid {
     double top,
     Color color, {
     double contourTolerance = .000001,
+    bool compactCaps = false,
   }) {
     if (top - bottom < 1e-8) return const [];
     return between(
@@ -95,6 +97,7 @@ class ArchitectPathSolid {
       (_) => top,
       color,
       contourTolerance: contourTolerance,
+      compactCaps: compactCaps,
     );
   }
 
@@ -104,10 +107,10 @@ class ArchitectPathSolid {
     double Function(Offset) top,
     Color color, {
     double contourTolerance = .000001,
+    bool compactCaps = false,
   }) {
     final loops = contours(path, tolerance: contourTolerance),
         tris = <Triangle3D>[];
-    final edges = <(Offset, Offset)>[];
     Vector3 v(Offset p, double z) => Vector3(p.dx, p.dy, z);
     void triangle(
       Offset a,
@@ -140,7 +143,6 @@ class ArchitectPathSolid {
       final insideLeft = _contains(loops, probe, path.fillType);
       for (var i = 0; i < loop.length; i++) {
         final a = loop[i], b = loop[(i + 1) % loop.length];
-        edges.add((a, b));
         final p = insideLeft ? a : b, q = insideLeft ? b : a;
         tris.add(
           Triangle3D(
@@ -160,6 +162,88 @@ class ArchitectPathSolid {
         );
       }
     }
+    // A simple end face needs n-2 triangles. Vertical decomposition inserts a
+    // strip at every X coordinate and multiplies the caps of notched logs.
+    // Keep the existing hole-aware decomposition for compound contours.
+    for (final (a, b, c) in triangulateContours(
+      loops,
+      fillType: path.fillType,
+      compact: compactCaps,
+    )) {
+      triangle(a, b, c, bottom, reverse: true);
+      triangle(a, b, c, top);
+    }
+    return tris;
+  }
+
+  /// Pure double-precision cap triangulation, also safe in a worker isolate.
+  /// Unlike a temporary Flutter Path, this preserves coplanar mesh seams.
+  static List<(Offset, Offset, Offset)> triangulateContours(
+    List<List<Offset>> loops, {
+    PathFillType fillType = PathFillType.nonZero,
+    bool compact = true,
+  }) {
+    // Clipper can retain repeated or almost collinear seam vertices. Remove
+    // those in double precision before ear clipping, as Path contours do.
+    if (compact) {
+      loops = [
+        for (final loop in loops) _cleanContour(loop),
+      ].where((loop) => loop.length >= 3).toList();
+    }
+    // Canonical winding distinguishes holes from disconnected outer contours,
+    // including even-odd holes whose input winding matches their parent.
+    if (compact && loops.length > 1) {
+      final engine = clip.ClipperD(roundingDecimalPrecision: 7)
+        ..preserveCollinear = false
+        ..addSubjects([
+          for (final loop in loops)
+            [for (final p in loop) clip.PointD(p.dx, p.dy)],
+        ]);
+      final normalized = engine.executeClosed(
+        clip.ClipType.union,
+        fillType == PathFillType.evenOdd
+            ? clip.FillRule.evenOdd
+            : clip.FillRule.nonZero,
+      );
+      if (normalized == null) throw StateError('Construction cap union failed');
+      loops = [
+        for (final loop in normalized)
+          _cleanContour([for (final p in loop) Offset(p.x, p.y)]),
+      ].where((loop) => loop.length >= 3).toList();
+      fillType = PathFillType.nonZero;
+    }
+    double area(List<Offset> loop) {
+      var value = 0.0;
+      for (var i = 1; i + 1 < loop.length; i++) {
+        final a = loop[i] - loop.first, b = loop[i + 1] - loop.first;
+        value += a.dx * b.dy - a.dy * b.dx;
+      }
+      return value;
+    }
+
+    // Disconnected contours do not need strips through every other member.
+    if (compact &&
+        loops.isNotEmpty &&
+        loops.every((loop) => area(loop).sign == area(loops.first).sign)) {
+      final caps = [for (final loop in loops) _triangulate(loop)];
+      if (caps.every((cap) => cap != null)) {
+        return [for (final cap in caps) ...cap!];
+      }
+    }
+    final edges = <(Offset, Offset)>[
+      for (final loop in loops)
+        for (var i = 0; i < loop.length; i++)
+          (loop[i], loop[(i + 1) % loop.length]),
+    ];
+    final result = <(Offset, Offset, Offset)>[];
+    void triangle(Offset a, Offset b, Offset c) {
+      final ab = b - a, ac = c - a;
+      final cross = ab.dx * ac.dy - ab.dy * ac.dx;
+      if (cross.abs() >= 1e-12) {
+        result.add(cross > 0 ? (a, b, c) : (a, c, b));
+      }
+    }
+
     final xs = edges.expand((e) => [e.$1.dx, e.$2.dx]).toSet().toList()..sort();
     for (var i = 0; i + 1 < xs.length; i++) {
       final x0 = xs[i], x1 = xs[i + 1], mid = (x0 + x1) / 2;
@@ -180,7 +264,7 @@ class ArchitectPathSolid {
         if (!_contains(
           loops,
           Offset(mid, (y(low, mid) + y(high, mid)) / 2),
-          path.fillType,
+          fillType,
         )) {
           continue;
         }
@@ -188,13 +272,89 @@ class ArchitectPathSolid {
             b = Offset(x1, y(low, x1)),
             c = Offset(x1, y(high, x1)),
             d = Offset(x0, y(high, x0));
-        triangle(a, b, c, bottom, reverse: true);
-        triangle(a, c, d, bottom, reverse: true);
-        triangle(a, b, c, top);
-        triangle(a, c, d, top);
+        triangle(a, b, c);
+        triangle(a, c, d);
       }
     }
-    return tris;
+    return result;
+  }
+
+  static List<Offset> _cleanContour(List<Offset> loop) {
+    const tolerance = 1e-7;
+    final clean = <Offset>[];
+    for (final p in loop) {
+      if (clean.isEmpty || (p - clean.last).distance > tolerance) clean.add(p);
+    }
+    if (clean.length > 1 && (clean.first - clean.last).distance < tolerance) {
+      clean.removeLast();
+    }
+    var changed = true;
+    while (changed && clean.length > 3) {
+      changed = false;
+      for (var i = 0; i < clean.length; i++) {
+        final a = clean[(i + clean.length - 1) % clean.length],
+            b = clean[i],
+            c = clean[(i + 1) % clean.length];
+        final ab = b - a, bc = c - b;
+        if ((ab.dx * bc.dy - ab.dy * bc.dx).abs() <=
+                tolerance * math.max(ab.distance, bc.distance) &&
+            ab.dx * bc.dx + ab.dy * bc.dy >= 0) {
+          clean.removeAt(i);
+          changed = true;
+          break;
+        }
+      }
+    }
+    return clean;
+  }
+
+  static List<(Offset, Offset, Offset)>? _triangulate(List<Offset> polygon) {
+    if (polygon.length < 3 || polygon.length > 1024) return null;
+    double cross(Offset a, Offset b, Offset c) =>
+        (b - a).dx * (c - a).dy - (b - a).dy * (c - a).dx;
+    var area = 0.0;
+    for (var i = 1; i + 1 < polygon.length; i++) {
+      area += cross(polygon.first, polygon[i], polygon[i + 1]);
+    }
+    if (area.abs() < 1e-12) return null;
+    final ids = List<int>.generate(polygon.length, (i) => i);
+    if (area < 0) ids.setAll(0, ids.reversed.toList());
+    final result = <(Offset, Offset, Offset)>[];
+    while (ids.length > 3) {
+      var found = false;
+      for (var i = 0; i < ids.length; i++) {
+        final ia = ids[(i + ids.length - 1) % ids.length],
+            ib = ids[i],
+            ic = ids[(i + 1) % ids.length];
+        final a = polygon[ia], b = polygon[ib], c = polygon[ic];
+        if (cross(a, b, c) <= 1e-12) continue;
+        if (ids.any(
+          (id) =>
+              id != ia &&
+              id != ib &&
+              id != ic &&
+              cross(a, b, polygon[id]) >= -1e-12 &&
+              cross(b, c, polygon[id]) >= -1e-12 &&
+              cross(c, a, polygon[id]) >= -1e-12,
+        )) {
+          continue;
+        }
+        result.add((a, b, c));
+        ids.removeAt(i);
+        found = true;
+        break;
+      }
+      if (!found) return null;
+    }
+    result.add((polygon[ids[0]], polygon[ids[1]], polygon[ids[2]]));
+    final covered = result.fold<double>(
+      0,
+      (sum, t) => sum + cross(t.$1, t.$2, t.$3).abs(),
+    );
+    if ((covered - area.abs()).abs() > math.max(1e-10, area.abs() * 1e-7)) {
+      return null;
+    }
+    return result;
   }
 
   static bool _contains(

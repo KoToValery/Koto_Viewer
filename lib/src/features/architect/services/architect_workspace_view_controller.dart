@@ -9,6 +9,10 @@ enum ArchitectWorkspaceView { plan, elevation, section }
 /// through the original project controller, history and autosave.
 class ArchitectWorkspaceViewController extends ChangeNotifier {
   final ArchitectCommandController source;
+
+  /// Applies session drafting defaults to newly created elements in this view.
+  ArchitectProject Function(ArchitectProject previous, ArchitectProject next)?
+  prepareCreation;
   ArchitectWorkspaceView view = ArchitectWorkspaceView.plan;
   String? viewId;
   ArchitectProject? _cachedSource, _cachedProjection;
@@ -69,6 +73,7 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
   }
 
   void commit(ArchitectProject next) {
+    next = prepareCreation?.call(project, next) ?? next;
     if (isPlan) {
       source.commit(next);
       return;

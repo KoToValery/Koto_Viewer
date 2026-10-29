@@ -1,3 +1,4 @@
+import 'architect_projection_test_helper.dart' as projection;
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -47,7 +48,7 @@ void main() {
       addTearDown(source.dispose);
       await workspace.open(tester, source);
       await tester.tap(find.byKey(const ValueKey('architect-view-section')));
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       await tester.tap(
         find.byWidgetPredicate(
           (w) =>
@@ -55,7 +56,7 @@ void main() {
               w.value == source.project.sections.single.id,
         ),
       );
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(tester.takeException(), isNull);
       final roof = source.project.storeys.expand((s) => s.roofs).first;
       source.commit(
@@ -67,7 +68,7 @@ void main() {
           elevation: false,
         ),
       );
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(tester.takeException(), isNull);
       final project = source.project;
       source.commit(
@@ -75,7 +76,7 @@ void main() {
           sections: [project.sections.single.copyWith(viewDepth: 2)],
         ),
       );
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(tester.takeException(), isNull);
     },
   );

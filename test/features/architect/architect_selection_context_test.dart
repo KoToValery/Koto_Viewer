@@ -337,26 +337,20 @@ void main() {
         addTearDown(c.dispose);
         final original = c.project;
         await open(tester, c);
-        expect(palette(tester).activeTool, ArchitectTool.select);
+        expect(palette(tester).activeTool, ArchitectTool.pan);
         await tap(tester, point);
         expect(palette(tester).activeTool, tool);
         expect(workspace.overlay(tester).selectedElementIds, {id});
         expect(c.project, same(original));
         expect(c.canUndo, isFalse);
-        final button = find.byKey(ValueKey('architect-tool-${tool.name}'));
-        if (tool == ArchitectTool.component) {
-          palette(tester).onToolChanged(tool);
-        } else {
-          await tester.ensureVisible(button);
-          await tester.tap(button);
-        }
+        await tester.tap(find.byKey(const ValueKey('architect-tool-pan')));
         await tester.pumpAndSettle();
-        expect(palette(tester).activeTool, ArchitectTool.select);
+        expect(palette(tester).activeTool, ArchitectTool.pan);
         expect(workspace.overlay(tester).selectedElementIds, isEmpty);
         await tap(tester, point);
         expect(palette(tester).activeTool, tool);
         await tap(tester, const Offset(3, 2));
-        expect(palette(tester).activeTool, ArchitectTool.select);
+        expect(palette(tester).activeTool, ArchitectTool.pan);
         expect(workspace.overlay(tester).selectedElementIds, isEmpty);
         await tap(tester, const Offset(3, 2));
         expect(c.project, same(original));
@@ -419,17 +413,17 @@ void main() {
       await tap(tester, const Offset(0, 2));
       expect(palette(tester).activeTool, ArchitectTool.column);
       expect(workspace.overlay(tester).selectedElementIds, {'column'});
-      final button = find.byKey(const ValueKey('architect-tool-column'));
+      final button = find.byKey(const ValueKey('architect-tool-pan'));
       await tester.ensureVisible(button);
       await tester.tap(button);
       await tester.pumpAndSettle();
-      expect(palette(tester).activeTool, ArchitectTool.select);
+      expect(palette(tester).activeTool, ArchitectTool.pan);
       expect(workspace.overlay(tester).selectedElementIds, isEmpty);
       expect(c.canUndo, isFalse);
     },
   );
   testWidgets(
-    'mixed selection requires its explicit button and leaving it keeps one context',
+    'mixed selection requires its explicit button and leaving clears selection',
     (tester) async {
       final c = ArchitectCommandController(project(mixed));
       addTearDown(c.dispose);
@@ -446,8 +440,8 @@ void main() {
       await tester.tap(button);
       await tester.pumpAndSettle();
       expect(palette(tester).multiSelect, isFalse);
-      expect(palette(tester).activeTool, ArchitectTool.column);
-      expect(workspace.overlay(tester).selectedElementIds, {'column'});
+      expect(palette(tester).activeTool, ArchitectTool.pan);
+      expect(workspace.overlay(tester).selectedElementIds, isEmpty);
       expect(c.canUndo, isFalse);
     },
   );

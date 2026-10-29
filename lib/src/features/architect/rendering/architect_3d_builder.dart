@@ -1,10 +1,13 @@
 import 'architect_roof_drainage_mesh.dart';
 import 'architect_floor_drain_mesh.dart';
 import 'architect_solid_shell.dart';
-import 'architect_mesh_boolean.dart';
+import 'architect_mesh_section.dart';
+import 'architect_vertical_clip.dart';
 import 'architect_panel_roof_geometry.dart';
 import '../services/architect_slab_geometry.dart';
 import '../services/architect_roof_junctions.dart';
+import '../services/architect_roof_ridge_beams.dart';
+import '../services/architect_roof_geometry.dart';
 import 'architect_path_solid.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -20,6 +23,39 @@ import '../services/component_library_service.dart';
 
 /// Real-time 3D solid mesh builder for architectural projects.
 class Architect3dBuilder {
+  /// Warm special wall volumes and contact surfaces off the UI isolate before
+  /// assembling the scene. Section and elevation use these same cached solids.
+  static Future<Mesh3D> buildProjectMeshAsync(
+    ArchitectProject project, {
+    bool previewGeometry = true,
+    Map<Triangle3D, String>? sources,
+    bool cleanDrainage = false,
+    Map<Triangle3D, String>? silhouetteGroups,
+    ArchitectSectionVisibility? sectionVisibility,
+    Set<String> suppressedOpeningIds = const {},
+    Map<String, FenestrationElevationDetail> openingDetailLevels = const {},
+  }) async {
+    for (final storey in project.storeys) {
+      if (!storey.walls.any((w) => w.system.isSpecial)) continue;
+      await ArchitectWallSolids.buildAsync(
+        storey,
+        project,
+        suppressedOpeningIds: suppressedOpeningIds,
+        prepareShell: true,
+      );
+    }
+    return buildProjectMesh(
+      project,
+      previewGeometry: previewGeometry,
+      sources: sources,
+      cleanDrainage: cleanDrainage,
+      silhouetteGroups: silhouetteGroups,
+      sectionVisibility: sectionVisibility,
+      suppressedOpeningIds: suppressedOpeningIds,
+      openingDetailLevels: openingDetailLevels,
+    );
+  }
+
   /// Builds a complete [Mesh3D] from an [ArchitectProject].
   static Mesh3D buildProjectMesh(
     ArchitectProject project, {
@@ -32,7 +68,7 @@ class Architect3dBuilder {
     Map<String, FenestrationElevationDetail> openingDetailLevels = const {},
   }) {
     final List<Triangle3D> allTris = [];
-    final roofSolids = <(String, List<Triangle3D>,String?)>[];
+    final roofSolids = <(String, List<Triangle3D>, String?)>[];
     var joinedRoofs = false;
     void mark(String id, int start) {
       if (sources == null) return;
@@ -47,17 +83,23 @@ class Architect3dBuilder {
           wall.copyWith(height: wall.effectiveHeight(storey.height)),
       ];
       final composed = walls.any(
-        (w) => w.system.isSpecial ||
-            w.layers.isNotEmpty || w.plinth.enabled || w.isCurved,
+        (w) =>
+            w.system.isSpecial ||
+            w.layers.isNotEmpty ||
+            w.plinth.enabled ||
+            w.isCurved,
       );
+      final compositions = composed
+          ? ArchitectWallSolids.build(
+              storey,
+              project.wallTypes,
+              project: project,
+              suppressedOpeningIds: suppressedOpeningIds,
+            )
+          : const <ArchitectWallSolid>[];
       final wallSolids = <(String, List<Triangle3D>, String?)>[
         if (composed)
-          for (final solid in ArchitectWallSolids.build(
-            storey,
-            project.wallTypes,
-            project: project,
-            suppressedOpeningIds: suppressedOpeningIds,
-          ))
+          for (final solid in compositions)
             (solid.wall.id, solid.triangles, solid.componentId)
         else
           for (final wall in walls)
@@ -78,10 +120,9 @@ class Architect3dBuilder {
         for (final solid in wallSolids)
           if (solid.$3 == null) solid.$2,
       ]);
-      final constructionShell = ArchitectMeshBoolean.exposedSurfaces([
-        for (final solid in wallSolids)
-          if (solid.$3 != null) solid.$2,
-      ]);
+      final constructionShell = ArchitectWallSolids.constructionShell(
+        compositions,
+      );
       var ordinaryIndex = 0, constructionIndex = 0;
       final shell = [
         for (final solid in wallSolids)
@@ -267,35 +308,100 @@ class Architect3dBuilder {
       }
 
       final roofJunctions = ArchitectRoofJunctions.of(storey, project: project);
+      final ridgeBeams = previewGeometry
+          ? ArchitectRoofRidgeBeam.build(storey, project: project)
+          : <ArchitectRoofRidgeBeam>[];
       final roofMeshes = [
         for (final roof in storey.roofs)
-          if(roof.assembly.panels==null)
-          _buildRoofMesh(
-            storey,
-            roof,
-            detailed: previewGeometry,
-            footprint: roofJunctions.trimmed.contains(roof.id)
-                ? roofJunctions.footprint(roof)
-                : null,
-          ),
+          if (roof.assembly.panels == null)
+            _buildRoofMesh(
+              storey,
+              roof,
+              detailed: previewGeometry,
+              ridgeSeats: ridgeBeams,
+              footprint: roofJunctions.trimmed.contains(roof.id)
+                  ? roofJunctions.footprint(roof)
+                  : null,
+            ),
       ];
       joinedRoofs = joinedRoofs || roofJunctions.trimmed.isNotEmpty;
       for (var i = 0; i < storey.roofs.length; i++) {
-        final roof=storey.roofs[i];
-        if(roof.assembly.panels!=null) {
-          for(final component in ArchitectPanelRoofGeometry.build(storey,roof,project:project)) {
-            final cladding=!component.structural &&
-              (component.material==ArchitectRoofMaterial.steel || component.material==ArchitectRoofMaterial.waterproofing) &&
-              !(roof.assembly.panels!.membrane&&component.id.startsWith('weather_'));
-            final display=cladding?[for(final t in component.triangles)
-              Triangle3D(v0:t.v0,v1:t.v1,v2:t.v2,color:t.color,depthBias:1)]:component.triangles;
-            roofSolids.add((roof.id,display,'construction:roof:${roof.id}:${component.id}'));
+        final roof = storey.roofs[i];
+        if (roof.assembly.panels != null) {
+          for (final component in ArchitectPanelRoofGeometry.build(
+            storey,
+            roof,
+            project: project,
+          )) {
+            final cladding =
+                !component.structural &&
+                (component.material == ArchitectRoofMaterial.steel ||
+                    component.material ==
+                        ArchitectRoofMaterial.waterproofing) &&
+                !(roof.assembly.panels!.membrane &&
+                    component.id.startsWith('weather_'));
+            final display = cladding
+                ? [
+                    for (final t in component.triangles)
+                      Triangle3D(
+                        v0: t.v0,
+                        v1: t.v1,
+                        v2: t.v2,
+                        color: t.color,
+                        depthBias: 1,
+                      ),
+                  ]
+                : component.triangles;
+            roofSolids.add((
+              roof.id,
+              display,
+              'construction:roof:${roof.id}:${component.id}',
+            ));
           }
         }
       }
-      var ordinaryRoofIndex=0;
-      for(final roof in storey.roofs.where((r)=>r.assembly.panels==null)) {
-        roofSolids.add((roof.id,roofMeshes[ordinaryRoofIndex++],null));
+      var ordinaryRoofIndex = 0;
+      for (final roof in storey.roofs.where((r) => r.assembly.panels == null)) {
+        roofSolids.add((roof.id, roofMeshes[ordinaryRoofIndex++], null));
+      }
+
+      for (final beam in ridgeBeams) {
+        for (final roof in storey.roofs.where(
+          (r) => beam.roofIds.contains(r.id),
+        )) {
+          final first = allTris.length;
+          final mesh = beam.mesh(planClip: roofJunctions.footprint(roof));
+          allTris.addAll(mesh);
+          mark(roof.id, first);
+          if (silhouetteGroups != null) {
+            for (final t in mesh) {
+              silhouetteGroups[t] = 'construction:ridge:${beam.roofId}';
+            }
+          }
+        }
+        for (final bearing in beam.bearings(
+          storey,
+          ArchitectRoofGeometry.supportingWallStorey(project, storey),
+        )) {
+          for (final roof in storey.roofs.where(
+            (r) => beam.roofIds.contains(r.id),
+          )) {
+            final path = ArchitectMeshSection.combine(
+              PathOperation.intersect,
+              bearing.footprint,
+              roofJunctions.footprint(roof),
+            );
+            final first = allTris.length;
+            final mesh = ArchitectPathSolid.extrude(
+              path,
+              bearing.bottom,
+              bearing.top,
+              const Color(0xffb0bec5),
+            );
+            allTris.addAll(mesh);
+            mark(roof.id, first);
+          }
+        }
       }
 
       for (final roof in storey.roofs) {
@@ -384,13 +490,13 @@ class Architect3dBuilder {
 
     // For simple envelope prisms (!previewGeometry), remove shared internal interfaces.
     // Detailed carpentry (previewGeometry) is already cleanly clipped to plan footprints.
-    final hasPanelRoofs=roofSolids.any((s)=>s.$3!=null);
+    final hasPanelRoofs = roofSolids.any((s) => s.$3 != null);
     // Keep thin panel skins closed. A coplanar face mask can erase outward
     // weather faces when adjacent, sub-millimetre layers are triangulated.
     // Their volumes already meet without overlap; facade HLR unites each
     // construction component independently after depth clipping.
     final roofShell = hasPanelRoofs
-        ? [for(final solid in roofSolids)solid.$2]
+        ? [for (final solid in roofSolids) solid.$2]
         : (joinedRoofs && !previewGeometry)
         ? ArchitectSolidShell.build([for (final solid in roofSolids) solid.$2])
         : [for (final solid in roofSolids) solid.$2];
@@ -398,9 +504,9 @@ class Architect3dBuilder {
       final first = allTris.length;
       allTris.addAll(roofShell[i]);
       mark(roofSolids[i].$1, first);
-      if(roofSolids[i].$3!=null&&silhouetteGroups!=null) {
-        for(final triangle in roofShell[i]) {
-          silhouetteGroups[triangle]=roofSolids[i].$3!;
+      if (roofSolids[i].$3 != null && silhouetteGroups != null) {
+        for (final triangle in roofShell[i]) {
+          silhouetteGroups[triangle] = roofSolids[i].$3!;
         }
       }
     }
@@ -411,6 +517,7 @@ class Architect3dBuilder {
     ArchitectStorey storey,
     ArchitectRoofPlane roof, {
     bool detailed = true,
+    List<ArchitectRoofRidgeBeam> ridgeSeats = const [],
     Path? footprint,
   }) {
     final pts = roof.points;
@@ -527,24 +634,6 @@ class Architect3dBuilder {
         sideColor: purlinColor,
       );
     }
-    if (spanD > wpW * 2.5) {
-      final dRidge = maxD - wpW;
-      final ridgeClipped = _clipPolygonToRect(polySD, minS, maxS, dRidge, maxD);
-      _addExtrudedClippedPrism(
-        tris,
-        ridgeClipped,
-        p0,
-        u,
-        v,
-        storey.elevation,
-        roof,
-        -wpH,
-        hRafterBottom,
-        planClip: footprint,
-        topColor: purlinColor,
-        sideColor: purlinColor,
-      );
-    }
 
     final dKnuckle = minD + roof.effectiveBreakDistance;
     final hasKnuckle =
@@ -613,6 +702,7 @@ class Architect3dBuilder {
           planClip: footprint,
           topColor: rafterTopColor,
           sideColor: rafterSideColor,
+          seats: ridgeSeats,
         );
         final upperRafterClip = _clipPolygonToRect(
           polySD,
@@ -634,6 +724,7 @@ class Architect3dBuilder {
           planClip: footprint,
           topColor: rafterTopColor,
           sideColor: rafterSideColor,
+          seats: ridgeSeats,
         );
       } else {
         final rafterClip = _clipPolygonToRect(polySD, s0, s1, minD, maxD);
@@ -650,6 +741,7 @@ class Architect3dBuilder {
           planClip: footprint,
           topColor: rafterTopColor,
           sideColor: rafterSideColor,
+          seats: ridgeSeats,
         );
       }
     }
@@ -996,6 +1088,7 @@ class Architect3dBuilder {
     required Color sideColor,
     Color? bottomColor,
     Path? planClip,
+    List<ArchitectRoofRidgeBeam> seats = const [],
   }) {
     final cleanSD = _cleanPolygon(clippedSD);
     if (cleanSD.length < 3 || hTop <= hBottom) return;
@@ -1004,6 +1097,46 @@ class Architect3dBuilder {
       p0.dx + u.dx * sd.dx + v.dx * sd.dy,
       p0.dy + u.dy * sd.dx + v.dy * sd.dy,
     );
+
+    if (seats.isNotEmpty) {
+      var outline = Path()..addPolygon(cleanSD.map(toWorld2D).toList(), true);
+      if (planClip != null) {
+        outline = ArchitectMeshSection.combine(
+          PathOperation.intersect,
+          outline,
+          planClip,
+        );
+      }
+      var parts = [
+        ArchitectVerticalPart(
+          outline,
+          (p) => storeyElevation + roof.undersideElevationAt(p) + hBottom,
+          (p) => storeyElevation + roof.undersideElevationAt(p) + hTop,
+        ),
+      ];
+      for (final seat in seats) {
+        if (!outline.getBounds().overlaps(seat.footprint.getBounds())) continue;
+        parts = ArchitectVerticalClip.subtract(
+          parts,
+          seat.footprint,
+          (_) => seat.bottom,
+          (_) => seat.top,
+        );
+      }
+      for (final part in parts) {
+        tris.addAll(
+          _roofPrism(
+            part.path,
+            part.bottom,
+            part.top,
+            topColor,
+            sideColor,
+            botClr,
+          ),
+        );
+      }
+      return;
+    }
 
     if (planClip != null) {
       final footprint = Path.combine(

@@ -1,4 +1,3 @@
-import 'architect_tool_test_helper.dart' as tool_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -146,12 +145,10 @@ void main() {
 
       await openWorkspace(tester, model);
 
-      // Select wall tool
-      await tool_ui.choose(tester, Icons.line_weight_rounded);
-      await tester.pumpAndSettle();
 
       // Hold on wall to select it
-      await hold(tester, const Offset(2, 0));
+      await tester.tapAt(screen(tester, const Offset(2, 0)));
+      await tester.pumpAndSettle();
 
       // Selection bar is visible
       expect(find.byKey(const ValueKey('architect-clear-selection')), findsOneWidget);
@@ -165,7 +162,8 @@ void main() {
       expect(find.byKey(const ValueKey('architect-clear-selection')), findsNothing);
 
       // Select wall again with hold
-      await hold(tester, const Offset(2, 0));
+      await tester.tapAt(screen(tester, const Offset(2, 0)));
+      await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('architect-clear-selection')), findsOneWidget);
 
       // Tap in empty space (e.g. at (2, -0.5))
@@ -189,12 +187,10 @@ void main() {
 
       await openWorkspace(tester, model);
 
-      // Select wall tool
-      await tool_ui.choose(tester, Icons.line_weight_rounded);
-      await tester.pumpAndSettle();
 
       // Select wall w1 with hold
-      await hold(tester, const Offset(2, 0));
+      await tester.tapAt(screen(tester, const Offset(2, 0)));
+      await tester.pumpAndSettle();
 
       // Open wall actions popup menu and select Split tool
       await tester.tap(find.byKey(const ValueKey('architect-wall-actions')));

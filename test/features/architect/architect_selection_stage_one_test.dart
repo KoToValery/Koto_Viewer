@@ -220,6 +220,7 @@ void main() {
       final model = editing.seeded(scene);
       addTearDown(model.dispose);
       await workspace.open(tester, model);
+      await tools.chooseMulti(tester, operation: ArchitectSelectionOperation.replace);
       workspace.camera(tester).fit(const Rect.fromLTWH(-5, -5, 15, 12));
       await tester.pumpAndSettle();
       await tester.tapAt(workspace.screen(tester, const Offset(-1, -1)));
@@ -252,6 +253,7 @@ void main() {
       final model = editing.seeded(scene);
       addTearDown(model.dispose);
       await workspace.open(tester, model);
+      await tools.chooseMulti(tester, operation: ArchitectSelectionOperation.replace);
       workspace.camera(tester).fit(const Rect.fromLTWH(-5, -5, 15, 12));
       await tester.pumpAndSettle();
       final before = workspace.camera(tester).translation;
@@ -280,12 +282,13 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-  testWidgets('Hand pans the canvas and never selects or starts a box', (
+  testWidgets('Hand pans the canvas without selecting on a drag or starting a box', (
     tester,
   ) async {
     final model = editing.seeded(scene);
     addTearDown(model.dispose);
     await workspace.open(tester, model);
+      await tools.chooseMulti(tester, operation: ArchitectSelectionOperation.replace);
     workspace.camera(tester).fit(const Rect.fromLTWH(-5, -5, 15, 12));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('architect-tool-pan')));
@@ -304,7 +307,7 @@ void main() {
       find.byKey(const ValueKey('architect-selection-controls')),
       findsNothing,
     );
-    await tools.choose(tester, Icons.near_me_outlined);
+    await tools.chooseMulti(tester, operation: ArchitectSelectionOperation.replace);
     await tester.pumpAndSettle();
     expect(
       tester
@@ -325,6 +328,7 @@ void main() {
     final model = editing.seeded(scene);
     addTearDown(model.dispose);
     await workspace.open(tester, model);
+      await tools.chooseMulti(tester, operation: ArchitectSelectionOperation.replace);
     workspace.camera(tester).fit(const Rect.fromLTWH(-5, -5, 15, 12));
     await tester.pumpAndSettle();
     final first = await tester.startGesture(
@@ -401,6 +405,7 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
+          await tools.chooseMulti(tester, operation: ArchitectSelectionOperation.replace);
           workspace.camera(tester).fit(const Rect.fromLTWH(-1, -1, 10, 8));
           await tester.pumpAndSettle();
           await tester.tapAt(workspace.screen(tester, const Offset(2, 1)));

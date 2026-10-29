@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:clipper2/clipper2.dart' as clip;
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import 'architect_path_solid.dart';
@@ -6,7 +7,57 @@ import 'architect_path_solid.dart';
 /// Closed mesh sections retain nested contours (notably hollow steel profiles).
 /// Contours are cleaned in double precision before entering Flutter's paths.
 class ArchitectMeshSection {
+  static final _vertical = Expando<Map<(Offset, Offset, double), Path>>();
+
+  /// Slice closed components in one worker request; keep native Paths local.
+  static Future<void> prepareVertical(
+    Iterable<List<Triangle3D>> meshes,
+    Offset origin,
+    Offset axis,
+    double length,
+  ) async {
+    final key = (origin, axis, length);
+    final pending = meshes
+        .where((mesh) => _vertical[mesh]?[key] == null)
+        .toList();
+    if (pending.isEmpty) return;
+    final contours = await compute(_sliceVerticalComponents, (
+      pending,
+      origin,
+      axis,
+      length,
+    ), debugLabel: 'architectural-wall-sections');
+    for (var i = 0; i < pending.length; i++) {
+      (_vertical[pending[i]] ??= {})[key] = _offsetPath(contours[i]);
+    }
+  }
+
+  static Path verticalClipped(
+    List<Triangle3D> mesh,
+    Offset origin,
+    Offset axis,
+    double length,
+  ) => (_vertical[mesh] ??= {})[(origin, axis, length)] ??= _offsetPath(
+    _sliceVerticalComponents(([mesh], origin, axis, length)).single,
+  );
+
+  static Path _offsetPath(List<List<Offset>> contours) {
+    final path = Path()..fillType = PathFillType.evenOdd;
+    for (final contour in contours) {
+      path.addPolygon(contour, true);
+    }
+    return path;
+  }
+
   static Path slice(
+    List<Triangle3D> mesh,
+    Vector3 origin,
+    Vector3 normal,
+    Offset Function(Vector3) project,
+  ) => _offsetPath(sliceContours(mesh, origin, normal, project));
+
+  /// Numerical mesh intersection and contour welding, independent of Path.
+  static List<List<Offset>> sliceContours(
     List<Triangle3D> mesh,
     Vector3 origin,
     Vector3 normal,
@@ -93,9 +144,9 @@ class ArchitectMeshSection {
       clip.FillRule.evenOdd,
     );
     if (contours == null) throw StateError('Construction section failed');
-    return Path()
-      ..fillType = PathFillType.evenOdd
-      ..addPath(_path(contours), Offset.zero);
+    return [
+      for (final loop in contours) [for (final p in loop) Offset(p.x, p.y)],
+    ];
   }
 
   static Path vertical(List<Triangle3D> mesh, Offset origin, Offset axis) =>
@@ -121,6 +172,41 @@ class ArchitectMeshSection {
       result.addPolygon([for (final p in loop) Offset(p.x, p.y)], true);
     }
     return result;
+  }
+
+  /// Union operands as independently filled regions. A reflected polygon may
+  /// have the opposite winding to its neighbour; normalize each operand before
+  /// batching so it cannot cancel material or fill another operand's holes.
+  static Path unionPaths(Iterable<Path> paths) {
+    final contours = <List<clip.PointD>>[];
+    for (final path in paths) {
+      if (path.getBounds().isEmpty) continue;
+      final engine = clip.ClipperD(roundingDecimalPrecision: 7)
+        ..preserveCollinear = false
+        ..addSubjects([
+          for (final loop in ArchitectPathSolid.contours(path))
+            [for (final p in loop) clip.PointD(p.dx, p.dy)],
+        ]);
+      final normalized = engine.executeClosed(
+        clip.ClipType.union,
+        path.fillType == PathFillType.evenOdd
+            ? clip.FillRule.evenOdd
+            : clip.FillRule.nonZero,
+      );
+      if (normalized == null) {
+        throw StateError('Construction contour normalization failed');
+      }
+      contours.addAll(normalized);
+    }
+    final engine = clip.ClipperD(roundingDecimalPrecision: 7)
+      ..preserveCollinear = false
+      ..addSubjects(contours);
+    final united = engine.executeClosed(
+      clip.ClipType.union,
+      clip.FillRule.nonZero,
+    );
+    if (united == null) throw StateError('Construction contour union failed');
+    return _path(united);
   }
 
   static Path combine(PathOperation operation, Path a, Path b) {
@@ -161,4 +247,48 @@ class ArchitectMeshSection {
     if (result == null) throw StateError('Construction path operation failed');
     return _path(result);
   }
+}
+
+List<List<List<Offset>>> _sliceVerticalComponents(
+  (List<List<Triangle3D>>, Offset, Offset, double) request,
+) {
+  final (meshes, start, axis, length) = request;
+  return [
+    for (final mesh in meshes)
+      (() {
+        final contours = ArchitectMeshSection.sliceContours(
+          mesh,
+          Vector3(start.dx, start.dy, 0),
+          Vector3(-axis.dy, axis.dx, 0),
+          (v) => Offset(
+            (v.x - start.dx) * axis.dx + (v.y - start.dy) * axis.dy,
+            v.z,
+          ),
+        );
+        final engine = clip.ClipperD(roundingDecimalPrecision: 7)
+          ..preserveCollinear = false
+          ..addSubjects([
+            for (final loop in contours)
+              [for (final p in loop) clip.PointD(p.dx, p.dy)],
+          ])
+          ..addClips([
+            [
+              clip.PointD(0, -1e6),
+              clip.PointD(length, -1e6),
+              clip.PointD(length, 1e6),
+              clip.PointD(0, 1e6),
+            ],
+          ]);
+        final clipped = engine.executeClosed(
+          clip.ClipType.intersection,
+          clip.FillRule.evenOdd,
+        );
+        if (clipped == null) {
+          throw StateError('Construction section clipping failed');
+        }
+        return [
+          for (final loop in clipped) [for (final p in loop) Offset(p.x, p.y)],
+        ];
+      })(),
+  ];
 }

@@ -5945,7 +5945,7 @@ abstract class AppLocalizations {
   /// **'Categories'**
   String get architectToolCategories;
 
-  /// Selection and navigation tool
+  /// Explicit single-element selection tool
   ///
   /// In en, this message translates to:
   /// **'Select'**
@@ -7520,7 +7520,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectNavigationHint.
   ///
   /// In en, this message translates to:
-  /// **'Pan / zoom'**
+  /// **'Drag to pan; tap an object to edit.'**
   String get architectNavigationHint;
 
   /// No description provided for @architectWallEditRejected.
@@ -8942,7 +8942,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectSelectionCycleHelp.
   ///
   /// In en, this message translates to:
-  /// **'Tap to add or remove; repeated taps cycle overlaps. Hold for actions.'**
+  /// **'Tap to select; repeated taps cycle overlaps. Hold for actions.'**
   String get architectSelectionCycleHelp;
 
   /// No description provided for @architectDimensionOverall.
@@ -15212,7 +15212,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectToolPan.
   ///
   /// In en, this message translates to:
-  /// **'Pan view'**
+  /// **'Navigate'**
   String get architectToolPan;
 
   /// No description provided for @architectSelectionClear.
@@ -15304,6 +15304,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Construction details'**
   String get wallSystemOptions;
+
+  /// Tooltip for drawing another element of the selected type
+  ///
+  /// In en, this message translates to:
+  /// **'Start drawing: {tool}'**
+  String architectDrawSelectedType(String tool);
+
+  /// No description provided for @architectToolComponent.
+  ///
+  /// In en, this message translates to:
+  /// **'Object'**
+  String get architectToolComponent;
+
+  /// No description provided for @architectProjectionLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating view…'**
+  String get architectProjectionLoading;
+
+  /// No description provided for @architectProjectionLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not calculate the view.'**
+  String get architectProjectionLoadFailed;
 }
 
 class _AppLocalizationsDelegate

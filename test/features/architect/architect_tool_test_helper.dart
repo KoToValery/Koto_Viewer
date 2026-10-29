@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_selection_control.dart';
+import 'package:kotoview/src/features/architect/services/architect_marquee_tool.dart';
 
 final toolsByIcon = {
   Icons.pan_tool_rounded: ArchitectTool.pan,
@@ -44,6 +46,30 @@ Future<void> prepare(WidgetTester tester, IconData icon) async {
 Future<void> choose(WidgetTester tester, IconData icon) async {
   await prepare(tester, icon);
   await tester.tap(find.byIcon(icon));
+}
+
+Future<void> chooseMulti(
+  WidgetTester tester, {
+  ArchitectSelectionOperation? operation,
+}) async {
+  await prepare(tester, Icons.near_me_outlined);
+  final palette = tester.widget<ArchitectToolPalette>(
+    find.byType(ArchitectToolPalette),
+  );
+  if (!palette.multiSelect) {
+    final button = find.byKey(const ValueKey('architect-multi-select'));
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+  }
+  if (operation != null) {
+    tester
+        .widget<ArchitectSelectionControl>(
+          find.byType(ArchitectSelectionControl),
+        )
+        .onOperation!(operation);
+    await tester.pumpAndSettle();
+  }
 }
 
 Future<void> setMagnetic(WidgetTester tester, bool enabled) async {

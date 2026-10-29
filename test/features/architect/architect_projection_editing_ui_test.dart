@@ -1,3 +1,4 @@
+import 'architect_projection_test_helper.dart' as projection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,7 +16,7 @@ import 'architect_workspace_views_test.dart' as views;
 import 'architect_projection_snap_test.dart' as roof_fixture;
 
 Future<void> enterNumber(WidgetTester tester, String value) async {
-  await tester.pumpAndSettle();
+  await projection.settleProjection(tester);
   final dialog = find.byType(Dialog).last;
   for (final key in value.replaceFirst('-', '').split('')) {
     await tester.tap(
@@ -36,7 +37,7 @@ Future<void> enterNumber(WidgetTester tester, String value) async {
       matching: find.byKey(const ValueKey('wall-end')),
     ),
   );
-  await tester.pumpAndSettle();
+  await projection.settleProjection(tester);
 }
 
 void main() {
@@ -57,7 +58,7 @@ void main() {
     final z = roof.undersideElevationAt(const Offset(6, 2)) + .1;
     // Section views reflect legacy station coordinates: 10 - 7 = 3.
     await workspace.wallTap(tester, Offset(3, -z));
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     expect(find.byKey(const ValueKey('projection-roof-snap')), findsOneWidget);
     final start = workspace.screen(tester, Offset(3, -z));
     final scale = workspace.camera(tester).scale;
@@ -68,18 +69,18 @@ void main() {
     await tester.pump();
     expect(source.canUndo, isFalse);
     await gesture.up();
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     expect(source.undoCount, 1);
     expect(
       source.project.activeStorey.roofs.last.baseElevationOffset,
       closeTo(3, 1e-5),
     );
     source.undo();
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     expect(source.project.activeStorey.roofs.last.baseElevationOffset, 3.25);
     // The toggle is local UI state and never creates model history.
     await tester.tap(find.byKey(const ValueKey('projection-roof-snap')));
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     expect(source.canUndo, isFalse);
     expect(
       tester
@@ -93,7 +94,7 @@ void main() {
     await canceled.moveTo(start + Offset(0, .3 * scale));
     await tester.pump();
     await canceled.cancel();
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     expect(source.canUndo, isFalse);
     expect(source.project.activeStorey.roofs.last.baseElevationOffset, 3.25);
     expect(tester.takeException(), isNull);
@@ -106,7 +107,7 @@ void main() {
       await workspace.open(tester, source);
       await views.select(tester, 'elevation', fixture.facade.id);
       await workspace.wallTap(tester, const Offset(-2.4, -1.6));
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(
         find.byKey(const ValueKey('projection-properties')),
         findsOneWidget,
@@ -132,16 +133,16 @@ void main() {
         .2,
       );
       await tester.tap(find.byKey(const ValueKey('projection-properties')));
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(find.byType(ArchitectElementPropertiesDialog), findsOneWidget);
       expect(
         find.byKey(const ValueKey('architect-property-width')),
         findsOneWidget,
       );
       await tester.tap(find.byKey(const ValueKey('architect-properties-save')));
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       source.undo();
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(
         source.project.storeys.first.walls.first.windows.first.sillHeight,
         .9,
@@ -168,7 +169,7 @@ void main() {
       await workspace.open(tester, source);
       await views.select(tester, 'section', 'cut');
       await workspace.wallTap(tester, const Offset(7.4, -1.6));
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(
         find.byKey(const ValueKey('projection-properties')),
         findsOneWidget,
@@ -183,7 +184,7 @@ void main() {
       await gesture.moveTo(start + Offset(0, -.25 * scale));
       await tester.pump();
       await gesture.up();
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(source.undoCount, 1);
       expect(
         source.project.storeys.first.walls.first.windows.first.sillHeight,
@@ -215,7 +216,7 @@ void main() {
             capture,
           ),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         var editor = tester.widget<ArchitectProjectionEditor>(
           find.byType(ArchitectProjectionEditor),
         );
@@ -236,7 +237,7 @@ void main() {
           3,
           editor.toScreen(point),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         editor = tester.widget<ArchitectProjectionEditor>(
           find.byType(ArchitectProjectionEditor),
         );
@@ -244,7 +245,7 @@ void main() {
           find.byType(ArchitectProjectionEditor),
         );
         await tester.tapAt(origin + editor.toScreen(point));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         final snapButton = find.byKey(const ValueKey('projection-roof-snap'));
         expect(tester.widget<IconButton>(snapButton).isSelected, isTrue);
         expect(
@@ -254,7 +255,7 @@ void main() {
         for (final snapEnabled in [true, false]) {
           if (!snapEnabled) {
             await tester.tap(snapButton);
-            await tester.pumpAndSettle();
+            await projection.settleProjection(tester);
           }
           editor = tester.widget<ArchitectProjectionEditor>(
             find.byType(ArchitectProjectionEditor),
@@ -270,14 +271,14 @@ void main() {
             await qa.capturePhone(tester, capture, 'roof-edge-snap-$locale');
           }
           await gesture.up();
-          await tester.pumpAndSettle();
+          await projection.settleProjection(tester);
           expect(source.undoCount, 1);
           expect(
             source.project.activeStorey.roofs.last.baseElevationOffset,
             closeTo(snapEnabled ? 3 : 3.03, 1e-5),
           );
           source.undo();
-          await tester.pumpAndSettle();
+          await projection.settleProjection(tester);
         }
         expect(tester.takeException(), isNull);
       },
@@ -333,11 +334,11 @@ void main() {
             capture,
           ),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.tap(
           find.byKey(const ValueKey('architect-facade-plan-toggle')),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await qa.capturePhone(
           tester,
           capture,
@@ -350,7 +351,7 @@ void main() {
         await tester.tapAt(
           rect.topLeft + editor.toScreen(const Offset(-2.4, 1.6)),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           find.byKey(const ValueKey('projection-distance-sill')),
           findsOneWidget,
@@ -391,7 +392,7 @@ void main() {
             capture,
           ),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         final editor = tester.widget<ArchitectProjectionEditor>(
           find.byType(ArchitectProjectionEditor),
         );
@@ -399,7 +400,7 @@ void main() {
         await tester.tapAt(
           rect.topLeft + editor.toScreen(const Offset(7.4, 1.6)),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           find.byKey(const ValueKey('projection-properties')),
           findsOneWidget,

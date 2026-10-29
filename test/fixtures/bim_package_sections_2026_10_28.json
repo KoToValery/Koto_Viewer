@@ -1,0 +1,1336 @@
+{
+  "id": "bim_1793200276740_2415e9",
+  "name": "Architectural Project",
+  "createdAt": "2026-10-28T17:11:16.740500",
+  "updatedAt": "2026-10-28T22:09:09.973793",
+  "units": "centimeters",
+  "distanceDecimals": 1,
+  "dimensionScale": 100,
+  "document": {
+    "version": 1,
+    "viewScales": {},
+    "profileMm": {},
+    "overrideMm": {},
+    "drawings": [],
+    "sheets": [],
+    "templates": [
+      {
+        "id": "standard",
+        "name": "",
+        "items": [
+          {
+            "id": "project",
+            "rect": [
+              0.0,
+              0.0,
+              180.0,
+              10.0
+            ],
+            "field": "project",
+            "text": "",
+            "textMm": 3.3,
+            "border": true
+          },
+          {
+            "id": "drawing",
+            "rect": [
+              0.0,
+              10.0,
+              180.0,
+              10.0
+            ],
+            "field": "drawing",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "number",
+            "rect": [
+              0.0,
+              20.0,
+              40.0,
+              10.0
+            ],
+            "field": "number",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "scale",
+            "rect": [
+              40.0,
+              20.0,
+              40.0,
+              10.0
+            ],
+            "field": "scale",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "author",
+            "rect": [
+              80.0,
+              20.0,
+              60.0,
+              10.0
+            ],
+            "field": "author",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "date",
+            "rect": [
+              140.0,
+              20.0,
+              40.0,
+              10.0
+            ],
+            "field": "date",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          }
+        ]
+      }
+    ]
+  },
+  "storeys": [
+    {
+      "id": "storey_0",
+      "name": "±0.00",
+      "elevation": 0.0,
+      "height": 3.0,
+      "cutPlaneHeight": 1.2,
+      "floorFinishThickness": 0.05,
+      "walls": [
+        {
+          "id": "wall_element_298564cc_1793200315386304_0",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.2,
+            "y": 13.2
+          },
+          "endPoint": {
+            "x": 7.2,
+            "y": 6.6
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "id": "wall_element_298564cc_1793200317961540_1",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.2,
+            "y": 6.6
+          },
+          "endPoint": {
+            "x": 14.4,
+            "y": 6.6
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "id": "wall_element_298564cc_1793200320831089_2",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 14.4,
+            "y": 6.6
+          },
+          "endPoint": {
+            "x": 14.4,
+            "y": 13.2
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "id": "wall_element_298564cc_1793200326586981_3",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 14.4,
+            "y": 13.2
+          },
+          "endPoint": {
+            "x": 7.2,
+            "y": 13.2
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "id": "wall_element_298564cc_1793205488556956_14",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "loadBearing": false,
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 7.325,
+            "y": 9.9
+          },
+          "endPoint": {
+            "x": 14.4,
+            "y": 9.9
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        }
+      ],
+      "zones": [],
+      "columns": [],
+      "beams": [],
+      "slabs": [
+        {
+          "id": "slab_element_298564cc_1793200391752775_4",
+          "polygon": [
+            {
+              "x": 7.075,
+              "y": 13.325
+            },
+            {
+              "x": 7.075,
+              "y": 6.474999999999999
+            },
+            {
+              "x": 14.525,
+              "y": 6.475
+            },
+            {
+              "x": 14.525,
+              "y": 13.325
+            }
+          ],
+          "thickness": 0.16,
+          "label": "Slab 1",
+          "assemblyId": null,
+          "coreTopOffset": 0.0,
+          "slopeDirection": null
+        },
+        {
+          "id": "offset_298564cc_1793200572213621_10",
+          "polygon": [
+            {
+              "x": 6.955,
+              "y": 13.444999999999999
+            },
+            {
+              "x": 6.955,
+              "y": 6.354999999999999
+            },
+            {
+              "x": 14.645,
+              "y": 6.3549999999999995
+            },
+            {
+              "x": 14.645,
+              "y": 13.444999999999999
+            }
+          ],
+          "thickness": 0.16,
+          "label": "Slab 1",
+          "assemblyId": null,
+          "coreTopOffset": 0.0,
+          "slopeDirection": null
+        },
+        {
+          "id": "slab_element_366bb3f7_1793218149972677_16",
+          "polygon": [
+            {
+              "x": 6.955,
+              "y": 13.444999999999999
+            },
+            {
+              "x": 6.955,
+              "y": 6.354999999999999
+            },
+            {
+              "x": 14.645,
+              "y": 6.3549999999999995
+            },
+            {
+              "x": 14.645,
+              "y": 13.444999999999999
+            }
+          ],
+          "thickness": 0.16,
+          "label": "Slab 3",
+          "assemblyId": null,
+          "coreTopOffset": 0.0,
+          "slopeDirection": null
+        }
+      ],
+      "roofs": [],
+      "openings": [],
+      "stairs": [],
+      "dimensions": [],
+      "elevationMarkers": [],
+      "annotations": [],
+      "cadPrimitives": [],
+      "components": []
+    },
+    {
+      "id": "storey_roof",
+      "name": "Покривни линии",
+      "elevation": 3.0,
+      "height": 2.8,
+      "cutPlaneHeight": 1.2,
+      "floorFinishThickness": 0.05,
+      "isRoof": true,
+      "walls": [],
+      "zones": [],
+      "columns": [],
+      "beams": [],
+      "slabs": [],
+      "roofs": [
+        {
+          "id": "roof_366bb3f7_1793217634689829_9",
+          "storeyId": "storey_roof",
+          "points": [
+            {
+              "x": 6.255000000000003,
+              "y": 14.144999999999996
+            },
+            {
+              "x": 10.5,
+              "y": 9.899999999999999
+            },
+            {
+              "x": 11.099999999999998,
+              "y": 9.899999999999999
+            },
+            {
+              "x": 15.344999999999999,
+              "y": 14.145
+            }
+          ],
+          "eavesEdgeIndex": 3,
+          "reverseSlope": false,
+          "slopeDegrees": 22.0,
+          "baseElevationOffset": 0.0,
+          "attachToWalls": true,
+          "placementResolved": true,
+          "eavesOverhang": 0.7000000000000001,
+          "eavesCut": "plumb",
+          "assembly": {
+            "preset": "pitchedTiles",
+            "layers": [
+              {
+                "id": "covering",
+                "role": "covering",
+                "material": "clayTiles",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "battens",
+                "role": "battens",
+                "material": "timberBoarding",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "counter_battens",
+                "role": "counterBattens",
+                "material": "timberBoarding",
+                "thickness": 0.05,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "membrane",
+                "role": "underlayment",
+                "material": "breathableMembrane",
+                "thickness": 0.003,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "boarding",
+                "role": "boarding",
+                "material": "timberBoarding",
+                "thickness": 0.025,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "rafters",
+                "role": "rafters",
+                "material": "timberBoarding",
+                "thickness": 0.16,
+                "isBetweenRafters": false
+              }
+            ],
+            "timber": {
+              "hasBattens": true,
+              "battenWidth": 0.05,
+              "battenHeight": 0.04,
+              "battenSpacing": 0.33,
+              "hasCounterBattens": true,
+              "counterBattenWidth": 0.05,
+              "counterBattenHeight": 0.05,
+              "hasRafters": true,
+              "rafterWidth": 0.08,
+              "rafterHeight": 0.16,
+              "rafterSpacing": 0.6,
+              "hasWallPlate": true,
+              "wallPlateWidth": 0.14,
+              "wallPlateHeight": 0.14,
+              "hasRingBeam": true,
+              "ringBeamHeight": 0.1,
+              "hasRidgePurlin": true,
+              "ridgePurlinWidth": 0.16,
+              "ridgePurlinHeight": 0.2,
+              "hasFasciaBoard": true,
+              "fasciaThickness": 0.025,
+              "hasMetalFlashing": true
+            }
+          },
+          "roofGroupId": null,
+          "isSlopeLocked": true,
+          "drainage": {
+            "showGutter": true,
+            "showDownpipes": true,
+            "profile": "halfRound",
+            "material": "galvanizedSteel",
+            "gutterWidth": 0.15,
+            "gutterDepth": 0.09,
+            "downpipes": [
+              {
+                "id": "downpipe_366bb3f7_1793218374787933_18",
+                "offset": 1.6116707629411233,
+                "diameter": 0.1,
+                "wallClearance": 0.05,
+                "bendAngle": 45.0,
+                "outletElevation": 0.15,
+                "facadeWallId": null,
+                "visible": true,
+                "waypoints": []
+              }
+            ]
+          },
+          "isMansard": false,
+          "upperSlopeDegrees": 25.0
+        },
+        {
+          "id": "roof_366bb3f7_1793217653843173_10",
+          "storeyId": "storey_roof",
+          "points": [
+            {
+              "x": 15.344999999999999,
+              "y": 14.145000150650967
+            },
+            {
+              "x": 15.344999999999999,
+              "y": 5.654999999999998
+            },
+            {
+              "x": 11.100000381469727,
+              "y": 9.899999618530273
+            }
+          ],
+          "eavesEdgeIndex": 0,
+          "reverseSlope": false,
+          "slopeDegrees": 22.0,
+          "baseElevationOffset": 0.0,
+          "attachToWalls": true,
+          "placementResolved": true,
+          "eavesOverhang": 0.7000000000000001,
+          "eavesCut": "plumb",
+          "assembly": {
+            "preset": "pitchedTiles",
+            "layers": [
+              {
+                "id": "covering",
+                "role": "covering",
+                "material": "clayTiles",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "battens",
+                "role": "battens",
+                "material": "timberBoarding",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "counter_battens",
+                "role": "counterBattens",
+                "material": "timberBoarding",
+                "thickness": 0.05,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "membrane",
+                "role": "underlayment",
+                "material": "breathableMembrane",
+                "thickness": 0.003,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "boarding",
+                "role": "boarding",
+                "material": "timberBoarding",
+                "thickness": 0.025,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "rafters",
+                "role": "rafters",
+                "material": "timberBoarding",
+                "thickness": 0.16,
+                "isBetweenRafters": false
+              }
+            ],
+            "timber": {
+              "hasBattens": true,
+              "battenWidth": 0.05,
+              "battenHeight": 0.04,
+              "battenSpacing": 0.33,
+              "hasCounterBattens": true,
+              "counterBattenWidth": 0.05,
+              "counterBattenHeight": 0.05,
+              "hasRafters": true,
+              "rafterWidth": 0.08,
+              "rafterHeight": 0.16,
+              "rafterSpacing": 0.6,
+              "hasWallPlate": true,
+              "wallPlateWidth": 0.14,
+              "wallPlateHeight": 0.14,
+              "hasRingBeam": true,
+              "ringBeamHeight": 0.1,
+              "hasRidgePurlin": true,
+              "ridgePurlinWidth": 0.16,
+              "ridgePurlinHeight": 0.2,
+              "hasFasciaBoard": true,
+              "fasciaThickness": 0.025,
+              "hasMetalFlashing": true
+            }
+          },
+          "roofGroupId": null,
+          "isSlopeLocked": true,
+          "drainage": {
+            "showGutter": false,
+            "showDownpipes": true,
+            "profile": "halfRound",
+            "material": "galvanizedSteel",
+            "gutterWidth": 0.15,
+            "gutterDepth": 0.09,
+            "downpipes": []
+          },
+          "isMansard": false,
+          "upperSlopeDegrees": 25.0
+        },
+        {
+          "id": "roof_366bb3f7_1793217671909363_11",
+          "storeyId": "storey_roof",
+          "points": [
+            {
+              "x": 6.255000034742348,
+              "y": 5.655000034742347
+            },
+            {
+              "x": 15.34500050905617,
+              "y": 5.654999700554019
+            },
+            {
+              "x": 11.100000381469727,
+              "y": 9.899999618530273
+            },
+            {
+              "x": 10.5,
+              "y": 9.899999999999999
+            }
+          ],
+          "eavesEdgeIndex": 0,
+          "reverseSlope": false,
+          "slopeDegrees": 22.0,
+          "baseElevationOffset": 0.0,
+          "attachToWalls": true,
+          "placementResolved": true,
+          "eavesOverhang": 0.7000000000000001,
+          "eavesCut": "plumb",
+          "assembly": {
+            "preset": "pitchedTiles",
+            "layers": [
+              {
+                "id": "covering",
+                "role": "covering",
+                "material": "clayTiles",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "battens",
+                "role": "battens",
+                "material": "timberBoarding",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "counter_battens",
+                "role": "counterBattens",
+                "material": "timberBoarding",
+                "thickness": 0.05,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "membrane",
+                "role": "underlayment",
+                "material": "breathableMembrane",
+                "thickness": 0.003,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "boarding",
+                "role": "boarding",
+                "material": "timberBoarding",
+                "thickness": 0.025,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "rafters",
+                "role": "rafters",
+                "material": "timberBoarding",
+                "thickness": 0.16,
+                "isBetweenRafters": false
+              }
+            ],
+            "timber": {
+              "hasBattens": true,
+              "battenWidth": 0.05,
+              "battenHeight": 0.04,
+              "battenSpacing": 0.33,
+              "hasCounterBattens": true,
+              "counterBattenWidth": 0.05,
+              "counterBattenHeight": 0.05,
+              "hasRafters": true,
+              "rafterWidth": 0.08,
+              "rafterHeight": 0.16,
+              "rafterSpacing": 0.6,
+              "hasWallPlate": true,
+              "wallPlateWidth": 0.14,
+              "wallPlateHeight": 0.14,
+              "hasRingBeam": true,
+              "ringBeamHeight": 0.1,
+              "hasRidgePurlin": true,
+              "ridgePurlinWidth": 0.16,
+              "ridgePurlinHeight": 0.2,
+              "hasFasciaBoard": true,
+              "fasciaThickness": 0.025,
+              "hasMetalFlashing": true
+            }
+          },
+          "roofGroupId": null,
+          "isSlopeLocked": true,
+          "drainage": {
+            "showGutter": true,
+            "showDownpipes": true,
+            "profile": "halfRound",
+            "material": "galvanizedSteel",
+            "gutterWidth": 0.15,
+            "gutterDepth": 0.09,
+            "downpipes": [
+              {
+                "id": "downpipe_366bb3f7_1793218301240947_17",
+                "offset": 7.060741784215442,
+                "diameter": 0.1,
+                "wallClearance": 0.05,
+                "bendAngle": 45.0,
+                "outletElevation": 0.15,
+                "facadeWallId": null,
+                "visible": true,
+                "waypoints": []
+              }
+            ]
+          },
+          "isMansard": false,
+          "upperSlopeDegrees": 25.0
+        },
+        {
+          "id": "roof_366bb3f7_1793217711053458_12",
+          "storeyId": "storey_roof",
+          "points": [
+            {
+              "x": 6.255000010168941,
+              "y": 14.14500005493596
+            },
+            {
+              "x": 6.2549999188099,
+              "y": 5.655000118554746
+            },
+            {
+              "x": 10.5000000517599,
+              "y": 9.899999618530273
+            }
+          ],
+          "eavesEdgeIndex": 0,
+          "reverseSlope": false,
+          "slopeDegrees": 22.0,
+          "baseElevationOffset": 0.0,
+          "attachToWalls": true,
+          "placementResolved": true,
+          "eavesOverhang": 0.7000000000000001,
+          "eavesCut": "plumb",
+          "assembly": {
+            "preset": "pitchedTiles",
+            "layers": [
+              {
+                "id": "covering",
+                "role": "covering",
+                "material": "clayTiles",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "battens",
+                "role": "battens",
+                "material": "timberBoarding",
+                "thickness": 0.04,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "counter_battens",
+                "role": "counterBattens",
+                "material": "timberBoarding",
+                "thickness": 0.05,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "membrane",
+                "role": "underlayment",
+                "material": "breathableMembrane",
+                "thickness": 0.003,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "boarding",
+                "role": "boarding",
+                "material": "timberBoarding",
+                "thickness": 0.025,
+                "isBetweenRafters": false
+              },
+              {
+                "id": "rafters",
+                "role": "rafters",
+                "material": "timberBoarding",
+                "thickness": 0.16,
+                "isBetweenRafters": false
+              }
+            ],
+            "timber": {
+              "hasBattens": true,
+              "battenWidth": 0.05,
+              "battenHeight": 0.04,
+              "battenSpacing": 0.33,
+              "hasCounterBattens": true,
+              "counterBattenWidth": 0.05,
+              "counterBattenHeight": 0.05,
+              "hasRafters": true,
+              "rafterWidth": 0.08,
+              "rafterHeight": 0.16,
+              "rafterSpacing": 0.6,
+              "hasWallPlate": true,
+              "wallPlateWidth": 0.14,
+              "wallPlateHeight": 0.14,
+              "hasRingBeam": true,
+              "ringBeamHeight": 0.1,
+              "hasRidgePurlin": true,
+              "ridgePurlinWidth": 0.16,
+              "ridgePurlinHeight": 0.2,
+              "hasFasciaBoard": true,
+              "fasciaThickness": 0.025,
+              "hasMetalFlashing": true
+            }
+          },
+          "roofGroupId": null,
+          "isSlopeLocked": true,
+          "drainage": {
+            "showGutter": false,
+            "showDownpipes": true,
+            "profile": "halfRound",
+            "material": "galvanizedSteel",
+            "gutterWidth": 0.15,
+            "gutterDepth": 0.09,
+            "downpipes": []
+          },
+          "isMansard": false,
+          "upperSlopeDegrees": 25.0
+        }
+      ],
+      "openings": [],
+      "stairs": [],
+      "dimensions": [],
+      "elevationMarkers": [],
+      "annotations": [],
+      "cadPrimitives": [
+        {
+          "id": "cad_366bb3f7_1793217019023976_3",
+          "type": "line",
+          "startPoint": {
+            "x": 14.645,
+            "y": 13.445
+          },
+          "endPoint": {
+            "x": 11.099999999999998,
+            "y": 9.899999999999999
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_366bb3f7_1793217028117106_4",
+          "type": "line",
+          "startPoint": {
+            "x": 14.645,
+            "y": 6.3549999999999995
+          },
+          "endPoint": {
+            "x": 11.099269834116686,
+            "y": 9.900730165883314
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_366bb3f7_1793217038841595_5",
+          "type": "line",
+          "startPoint": {
+            "x": 6.955,
+            "y": 13.444999999999999
+          },
+          "endPoint": {
+            "x": 10.5,
+            "y": 9.899999999999999
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "wall_366bb3f7_1793217278722766_8",
+          "type": "line",
+          "startPoint": {
+            "x": 10.799999999999999,
+            "y": 9.6
+          },
+          "endPoint": {
+            "x": 11.108596911665103,
+            "y": 9.291403088334896
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_366bb3f7_1793217049525811_6",
+          "type": "line",
+          "startPoint": {
+            "x": 6.955,
+            "y": 6.3549999999999995
+          },
+          "endPoint": {
+            "x": 10.5,
+            "y": 9.899999999999999
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_366bb3f7_1793217061884097_7",
+          "type": "line",
+          "startPoint": {
+            "x": 10.5,
+            "y": 9.899999999999999
+          },
+          "endPoint": {
+            "x": 11.099999999999998,
+            "y": 9.899999999999999
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        }
+      ],
+      "components": []
+    }
+  ],
+  "activeStoreyId": "storey_roof",
+  "gridAxes": [
+    {
+      "id": "axis_x_1",
+      "name": "1",
+      "start": {
+        "dx": 0.0,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 0.0,
+        "dy": 14.7
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_x_2",
+      "name": "2",
+      "start": {
+        "dx": 7.2,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 7.2,
+        "dy": 14.7
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_x_3",
+      "name": "3",
+      "start": {
+        "dx": 14.4,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 14.4,
+        "dy": 14.7
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_x_4",
+      "name": "4",
+      "start": {
+        "dx": 21.6,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 21.6,
+        "dy": 14.7
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_0",
+      "name": "A",
+      "start": {
+        "dx": -1.5,
+        "dy": 0.0
+      },
+      "end": {
+        "dx": 23.1,
+        "dy": 0.0
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_1",
+      "name": "B",
+      "start": {
+        "dx": -1.5,
+        "dy": 6.6
+      },
+      "end": {
+        "dx": 23.1,
+        "dy": 6.6
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_2",
+      "name": "C",
+      "start": {
+        "dx": -1.5,
+        "dy": 13.2
+      },
+      "end": {
+        "dx": 23.1,
+        "dy": 13.2
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    }
+  ],
+  "wallTypes": [
+    {
+      "id": "int_12_partition",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "interior",
+      "layers": [],
+      "location": "interior",
+      "loadBearing": false,
+      "totalThickness": 0.12,
+      "brickThickness": 0.12,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4294944550
+    },
+    {
+      "id": "ext_25_brick",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "exterior",
+      "layers": [],
+      "location": "exterior",
+      "loadBearing": false,
+      "totalThickness": 0.25,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4294930499
+    },
+    {
+      "id": "bearing_25_concrete",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "bearing",
+      "layers": [],
+      "location": "interior",
+      "loadBearing": true,
+      "totalThickness": 0.25,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4286091420
+    },
+    {
+      "id": "parapet_12",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "parapet",
+      "layers": [],
+      "location": "exterior",
+      "loadBearing": false,
+      "totalThickness": 0.12,
+      "brickThickness": 0.12,
+      "insulationThickness": 0.0,
+      "customHeight": 1.05,
+      "parapetFinish": "cap",
+      "colorValue": 4280723098
+    },
+    {
+      "id": "ext_25_12_eps",
+      "name": "",
+      "labelId": "ext_25_12_eps",
+      "isCatalogType": true,
+      "usage": "exterior",
+      "layers": [
+        {
+          "id": "insulation",
+          "material": "eps",
+          "role": "insulation",
+          "thickness": 0.12
+        },
+        {
+          "id": "core",
+          "material": "brick",
+          "role": "core",
+          "thickness": 0.25
+        }
+      ],
+      "location": "exterior",
+      "loadBearing": false,
+      "totalThickness": 0.37,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.12,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4293874512
+    }
+  ],
+  "lineStyles": [],
+  "hatchPatterns": [],
+  "openingStyles": [],
+  "slabAssemblies": [],
+  "sections": [
+    {
+      "id": "sec_298564cc_1793200402206232_5",
+      "name": "Section A-A",
+      "start": {
+        "x": 10.797,
+        "y": 16.135623284523536
+      },
+      "end": {
+        "x": 10.797,
+        "y": 3.65
+      },
+      "viewDepth": null,
+      "steps": [],
+      "details": [],
+      "drawing": {
+        "dimensions": [],
+        "elevationMarkers": [],
+        "annotations": [],
+        "cadPrimitives": []
+      }
+    },
+    {
+      "id": "sec_366bb3f7_1793217971056017_14",
+      "name": "Section B-B",
+      "start": {
+        "x": 12.416,
+        "y": 15.697320115524864
+      },
+      "end": {
+        "x": 12.416,
+        "y": 3.759
+      },
+      "viewDepth": null,
+      "steps": [],
+      "details": [],
+      "drawing": {
+        "dimensions": [],
+        "elevationMarkers": [],
+        "annotations": [],
+        "cadPrimitives": []
+      }
+    },
+    {
+      "id": "sec_366bb3f7_1793218061708157_15",
+      "name": "Section C-C",
+      "start": {
+        "x": 15.983318436567508,
+        "y": 9.900000000000002
+      },
+      "end": {
+        "x": 4.415,
+        "y": 9.900000000000002
+      },
+      "viewDepth": null,
+      "steps": [],
+      "details": [],
+      "drawing": {
+        "dimensions": [],
+        "elevationMarkers": [],
+        "annotations": [],
+        "cadPrimitives": []
+      }
+    }
+  ],
+  "sectionVisibility": {},
+  "elevations": [
+    {
+      "id": "elv_366bb3f7_1793217954220408_13",
+      "start": {
+        "x": 5.433000000000001,
+        "y": 4.599
+      },
+      "end": {
+        "x": 5.433000000000001,
+        "y": 15.53358850465695
+      },
+      "viewSide": -1,
+      "viewDepth": null,
+      "steps": [],
+      "drawing": {
+        "dimensions": [],
+        "elevationMarkers": [],
+        "annotations": [],
+        "cadPrimitives": []
+      },
+      "terrain": []
+    }
+  ],
+  "slabCompositionNumbers": {
+    "[[],[\"concrete\",160000000],[]]": 1
+  }
+}

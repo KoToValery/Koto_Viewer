@@ -1,3 +1,4 @@
+import 'architect_projection_test_helper.dart' as projection;
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -73,7 +74,7 @@ Future<void> tapPlan(
   final scale =
       math.min(rect.width / bounds.width, rect.height / bounds.height) * .85;
   await tester.tapAt(rect.center + (p - bounds.center) * scale);
-  await tester.pumpAndSettle();
+  await projection.settleProjection(tester);
 }
 
 Future<void> loadQaFonts() async {
@@ -98,11 +99,11 @@ void main() {
     addTearDown(controller.dispose);
     await workspace.open(tester, controller);
     await tester.tap(find.byKey(const ValueKey('architect-view-elevation')));
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     await tester.tap(
       find.byKey(const ValueKey('architect-building-elevations')),
     );
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     expect(find.byType(ArchitectElevationsScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -120,7 +121,7 @@ void main() {
         await tester.pumpWidget(
           host(ArchitectElevationsScreen(controller: controller), locale, key),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tapPlan(tester, controller.project, const Offset(-1, -2));
         await tapPlan(tester, controller.project, const Offset(9, -1.9));
         await tapPlan(tester, controller.project, const Offset(4, 0));
@@ -136,22 +137,22 @@ void main() {
         await capturePhone(tester, key, 'facade-$locale');
 
         await tester.tap(find.byKey(const ValueKey('architect-north')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tapPlan(tester, controller.project, const Offset(-2, -2));
         await tapPlan(tester, controller.project, const Offset(-2, -4));
         expect(controller.project.northSymbol!.angle, closeTo(0, 1e-6));
         await capturePhone(tester, key, 'plan-$locale');
         final buildingBefore = controller.project.storeys;
         await tester.tap(find.byKey(const ValueKey('architect-north')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.enterText(
           find.byKey(const ValueKey('architect-north-angle')),
           '90',
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await capturePhone(tester, key, 'north-$locale');
         await tester.tap(find.byKey(const ValueKey('architect-north-save')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           controller.project.northSymbol!.angle,
           closeTo(math.pi / 2, 1e-6),
@@ -168,7 +169,7 @@ void main() {
           findsWidgets,
         );
         await tester.tap(find.byKey(const ValueKey('architect-facade-undo')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(controller.project.northSymbol!.angle, closeTo(0, 1e-6));
         expect(tester.takeException(), isNull);
       },
@@ -189,41 +190,41 @@ void main() {
             GlobalKey(),
           ),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         final l = AppLocalizations.of(
           tester.element(find.byType(ArchitectElevationsScreen)),
         )!;
         await tester.tap(find.byKey(const ValueKey('architect-north')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.enterText(
           find.byKey(const ValueKey('architect-north-angle')),
           'NaN',
         );
         await tester.tap(find.byKey(const ValueKey('architect-north-save')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(find.text(l.architectNorthInvalidAngle), findsOneWidget);
         await tester.tap(find.text(l.cancel));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(controller.canUndo, isFalse);
         await tester.tap(find.byKey(const ValueKey('architect-facade-new')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tapPlan(tester, controller.project, const Offset(-1, -2));
         await tester.tap(find.text(l.cancel));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(controller.project.elevations, hasLength(1));
         expect(controller.canUndo, isFalse);
         await tester.tap(find.byType(PopupMenuButton<String>));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.tap(find.text(l.architectFacadeReverse));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(controller.project.elevations.single.viewSide, -1);
         await tester.tap(find.byType(PopupMenuButton<String>));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.tap(find.text(l.delete));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(controller.project.elevations, isEmpty);
         await tester.tap(find.byKey(const ValueKey('architect-facade-undo')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(controller.project.elevations.single.viewSide, -1);
         expect(tester.takeException(), isNull);
       },

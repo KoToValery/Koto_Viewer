@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show compute;
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
@@ -29,6 +30,77 @@ class ArchitectWallComponent {
   Path at(double z) {
     return ArchitectMeshSection.horizontal(triangles, z);
   }
+}
+
+/// Only numerical data crosses the isolate boundary. The original wall and
+/// material objects (and all Flutter Paths) remain in the preparation isolate.
+class _SpecialWallCut {
+  final int index, priority;
+  final String wallId, sortKey;
+  final bool isLog;
+  final List<Triangle3D> triangles;
+  final List<List<Triangle3D>> cutters;
+  const _SpecialWallCut(
+    this.index,
+    this.wallId,
+    this.isLog,
+    this.priority,
+    this.sortKey,
+    this.triangles,
+    this.cutters,
+  );
+}
+
+class _SpecialWallPreparation {
+  final List<ArchitectWallComponent> components;
+  final List<_SpecialWallCut> cuts;
+  const _SpecialWallPreparation(this.components, this.cuts);
+
+  List<ArchitectWallComponent> restore(List<(int, List<Triangle3D>)> meshes) =>
+      [
+        for (final (index, triangles) in meshes)
+          ArchitectWallComponent(
+            components[index].wall,
+            components[index].id,
+            components[index].layer,
+            triangles,
+          ),
+      ];
+}
+
+List<(int, List<Triangle3D>)> _finishSpecialWallCuts(
+  List<_SpecialWallCut> input,
+) {
+  final cuts = [...input]
+    ..sort((a, b) {
+      final p = a.priority.compareTo(b.priority);
+      return p != 0 ? p : a.sortKey.compareTo(b.sortKey);
+    });
+  final clean = <(_SpecialWallCut, List<Triangle3D>, BoundingBox3D)>[];
+  BoundingBox3D bounds(List<Triangle3D> mesh) => BoundingBox3D.fromPoints([
+    for (final t in mesh) ...[t.v0, t.v1, t.v2],
+  ]);
+  for (final cut in cuts) {
+    var mesh = cut.triangles;
+    for (final cutter in cut.cutters) {
+      mesh = ArchitectMeshBoolean.subtract(mesh, cutter);
+      if (mesh.isEmpty) break;
+    }
+    if (mesh.isEmpty) continue;
+    if (!cut.isLog) {
+      final box = bounds(mesh);
+      for (final (previous, triangles, previousBox) in clean) {
+        if (previous.wallId != cut.wallId && box.intersects(previousBox)) {
+          mesh = ArchitectMeshBoolean.subtract(mesh, triangles);
+        }
+      }
+    }
+    if (mesh.isNotEmpty) {
+      mesh = ArchitectMeshBoolean.simplify(mesh);
+      if (mesh.isNotEmpty) clean.add((cut, mesh, bounds(mesh)));
+    }
+  }
+  return [for (final (cut, mesh, _) in clean) (cut.index, mesh)];
 }
 
 class ArchitectLogWallLayout {
@@ -65,7 +137,53 @@ class ArchitectSpecialWallGeometry {
   }
 
   static final _cache =
-      Expando<Map<ArchitectStorey, List<ArchitectWallComponent>>>();
+      Expando<Map<(ArchitectStorey, String), List<ArchitectWallComponent>>>();
+  static final _pending =
+      Expando<
+        Map<(ArchitectStorey, String), Future<List<ArchitectWallComponent>>>
+      >();
+
+  static String _openingKey(Set<String> ids) =>
+      (ids.toList()..sort()).join('\u0000');
+
+  /// Native path preparation stays here; BSP cuts and surface unions run in a
+  /// worker. Cache the result used by both section slicing and the 3D builder.
+  static Future<List<ArchitectWallComponent>> buildAsync(
+    ArchitectStorey storey, {
+    required ArchitectProject project,
+    Set<String> suppressedOpeningIds = const {},
+  }) async {
+    if (!storey.walls.any((w) => w.system.isSpecial)) return const [];
+    final key = (storey, _openingKey(suppressedOpeningIds));
+    final cached = _cache[project]?[key];
+    if (cached != null) return cached;
+    final pending = _pending[project] ??= {};
+    final previous = pending[key];
+    if (previous != null) return previous;
+    final future = _buildAsync(storey, project, suppressedOpeningIds, key);
+    pending[key] = future;
+    try {
+      return await future;
+    } finally {
+      pending.remove(key);
+    }
+  }
+
+  static Future<List<ArchitectWallComponent>> _buildAsync(
+    ArchitectStorey storey,
+    ArchitectProject project,
+    Set<String> suppressedOpeningIds,
+    (ArchitectStorey, String) key,
+  ) async {
+    await Future<void>.delayed(Duration.zero);
+    final prepared = _prepare(storey, project, suppressedOpeningIds);
+    final meshes = await compute(
+      _finishSpecialWallCuts,
+      prepared.cuts,
+      debugLabel: 'architectural-wall-junctions',
+    );
+    return (_cache[project] ??= {})[key] = prepared.restore(meshes);
+  }
 
   static bool compatibleLogs(ArchitectWall a, ArchitectWall b) =>
       ArchitectWallConnectionPolicy.compatibleLogs(a, b);
@@ -181,13 +299,28 @@ class ArchitectSpecialWallGeometry {
     Set<String> suppressedOpeningIds = const {},
   }) {
     if (!storey.walls.any((w) => w.system.isSpecial)) return const [];
-    final cacheable = project != null && suppressedOpeningIds.isEmpty;
-    if (cacheable) {
-      final cached = _cache[project]?[storey];
+    final key = (storey, _openingKey(suppressedOpeningIds));
+    if (project != null) {
+      final cached = _cache[project]?[key];
       if (cached != null) return cached;
     }
+    final prepared = _prepare(storey, project, suppressedOpeningIds);
+    final result = prepared.restore(_finishSpecialWallCuts(prepared.cuts));
+    if (project != null) (_cache[project] ??= {})[key] = result;
+    return result;
+  }
+
+  static _SpecialWallPreparation _prepare(
+    ArchitectStorey storey,
+    ArchitectProject? project,
+    Set<String> suppressedOpeningIds,
+  ) {
     final layouts = logLayouts(storey.walls),
         result = <ArchitectWallComponent>[];
+    final openingCutters = <ArchitectWallComponent, List<List<Triangle3D>>>{};
+    final sharedCutters = <Object, List<Triangle3D>>{};
+    List<Triangle3D> shared(Object key, List<Triangle3D> Function() create) =>
+        sharedCutters.putIfAbsent(key, create);
     final roofs = [
       if (project != null)
         for (final floor in project.storeys)
@@ -213,8 +346,9 @@ class ArchitectSpecialWallGeometry {
             height = math.max(
               height,
               floor.elevation +
-                  (roof.assembly.panels!=null && original.system.isPanel
-                    ?ArchitectPanelRoofGeometry.panelUnderside(roof,point):roof.undersideElevationAt(point)) -
+                  (roof.assembly.panels != null && original.system.isPanel
+                      ? ArchitectPanelRoofGeometry.panelUnderside(roof, point)
+                      : roof.undersideElevationAt(point)) -
                   storey.elevation -
                   original.baseOffset,
             );
@@ -619,14 +753,13 @@ class ArchitectSpecialWallGeometry {
         }
       }
       for (final c in components) {
-        var mesh = c.triangles;
+        final cutters = <List<Triangle3D>>[];
         for (final op in _openings(wall, suppressedOpeningIds)) {
           final log = wall.system.isLog && c.id.startsWith('log_');
           final casing = log && wall.system.openingCasing
               ? wall.system.casingWidth
               : 0.0;
-          mesh = ArchitectMeshBoolean.subtract(
-            mesh,
+          cutters.add(
             _band(
               wall,
               op.$1 - casing,
@@ -638,14 +771,15 @@ class ArchitectSpecialWallGeometry {
             ),
           );
         }
-        result.add(ArchitectWallComponent(wall, c.id, c.layer, mesh));
+        result.add(c);
+        openingCutters[c] = cutters;
       }
     }
     // Lower courses own saddle contact volumes. A nominal cylinder is used as
     // the cutter so a previously cut notch cannot leave a crossing wood sliver.
-    final notched = <ArchitectWallComponent>[];
+    final cuts = <_SpecialWallCut>[];
     for (final c in result) {
-      var mesh = c.triangles;
+      final cutters = openingCutters[c]!;
       final original = storey.walls.firstWhere((w) => w.id == c.wall.id);
       final nominalTop =
           storey.elevation +
@@ -665,8 +799,7 @@ class ArchitectSpecialWallGeometry {
           Path()..addRect(box),
           roofFootprint,
         );
-        mesh = ArchitectMeshBoolean.subtract(
-          mesh,
+        cutters.add(
           ArchitectPathSolid.extrude(
             outside,
             nominalTop,
@@ -689,7 +822,7 @@ class ArchitectSpecialWallGeometry {
               center - other.$2 >= c.wall.thickness - 1e-7) {
             continue;
           }
-          mesh = ArchitectMeshBoolean.subtract(mesh, other.$3);
+          cutters.add(other.$3);
         }
       }
       if (project != null) {
@@ -703,18 +836,22 @@ class ArchitectSpecialWallGeometry {
                 Path()..addPolygon(opening.boundary, true),
               );
             }
-            for (final surface in ArchitectSlabGeometry.surfaces(
+            final surfaces = ArchitectSlabGeometry.surfaces(
               project,
               floor,
               slab,
-            )) {
-              mesh = ArchitectMeshBoolean.subtract(
-                mesh,
-                ArchitectPathSolid.between(
-                  slabPath,
-                  surface.bottomAt,
-                  surface.topAt,
-                  c.layer.material.color,
+            );
+            for (var i = 0; i < surfaces.length; i++) {
+              final surface = surfaces[i];
+              cutters.add(
+                shared(
+                  (floor, slab, i),
+                  () => ArchitectPathSolid.between(
+                    slabPath,
+                    surface.bottomAt,
+                    surface.topAt,
+                    c.layer.material.color,
+                  ),
                 ),
               );
             }
@@ -725,10 +862,13 @@ class ArchitectSpecialWallGeometry {
             continue;
           }
           for (final roof in floor.roofs) {
-            if(c.wall.system.isPanel&&roof.assembly.panels!=null) {
-              for(final member in ArchitectPanelRoofGeometry.build(floor,roof,project:project)
-                .where((m)=>m.structural)) {
-                mesh=ArchitectMeshBoolean.subtract(mesh,member.triangles);
+            if (c.wall.system.isPanel && roof.assembly.panels != null) {
+              for (final member in ArchitectPanelRoofGeometry.build(
+                floor,
+                roof,
+                project: project,
+              ).where((m) => m.structural)) {
+                cutters.add(member.triangles);
               }
             }
             if (c.wall.system.isLog &&
@@ -754,40 +894,62 @@ class ArchitectSpecialWallGeometry {
                     project: project,
                   ).footprint(roof),
                 );
-                mesh = ArchitectMeshBoolean.subtract(
-                  mesh,
-                  ArchitectPathSolid.between(
-                    outline,
-                    (p) =>
-                        floor.elevation +
-                        roof.undersideElevationAt(p) -
-                        roof.assembly.timber.wallPlateHeight,
-                    (p) => floor.elevation + roof.undersideElevationAt(p),
-                    c.layer.material.color,
+                cutters.add(
+                  shared(
+                    (floor, roof, 'wallPlate'),
+                    () => ArchitectPathSolid.between(
+                      outline,
+                      (p) =>
+                          floor.elevation +
+                          roof.undersideElevationAt(p) -
+                          roof.assembly.timber.wallPlateHeight,
+                      (p) => floor.elevation + roof.undersideElevationAt(p),
+                      c.layer.material.color,
+                    ),
                   ),
                 );
               }
             }
-            mesh = ArchitectMeshBoolean.subtract(
-              mesh,
-              ArchitectPathSolid.between(
-                ArchitectRoofJunctions.of(
-                  floor,
-                  project: project,
-                ).footprint(roof),
-                (p) => floor.elevation + (c.wall.system.isPanel && roof.assembly.panels!=null
-                  ?ArchitectPanelRoofGeometry.panelUnderside(roof,p):roof.undersideElevationAt(p)),
-                (_) =>
-                    storey.elevation + c.wall.baseOffset + c.wall.height + 10,
-                c.layer.material.color,
+            final top =
+                storey.elevation + c.wall.baseOffset + c.wall.height + 10;
+            cutters.add(
+              shared(
+                (floor, roof, c.wall.system.isPanel, top),
+                () => ArchitectPathSolid.between(
+                  ArchitectRoofJunctions.of(
+                    floor,
+                    project: project,
+                  ).footprint(roof),
+                  (p) =>
+                      floor.elevation +
+                      (c.wall.system.isPanel && roof.assembly.panels != null
+                          ? ArchitectPanelRoofGeometry.panelUnderside(roof, p)
+                          : roof.undersideElevationAt(p)),
+                  (_) => top,
+                  c.layer.material.color,
+                ),
               ),
             );
           }
         }
       }
-      if (mesh.isNotEmpty) {
-        notched.add(ArchitectWallComponent(c.wall, c.id, c.layer, mesh));
-      }
+      cuts.add(
+        _SpecialWallCut(
+          result.indexOf(c),
+          c.wall.id,
+          c.wall.system.isLog,
+          c.wall.system.isLog
+              ? 0
+              : c.layer.material == ArchitectMaterial.steel
+              ? 1
+              : c.layer.role == ArchitectLayerRole.finish
+              ? 2
+              : 3,
+          '${c.wall.id}:${c.id}',
+          c.triangles,
+          cutters,
+        ),
+      );
     }
     // Resolve mixed contacts from the same ordinary solids used elsewhere.
     // The recursive call contains no special walls and exits this builder.
@@ -800,20 +962,6 @@ class ArchitectSpecialWallGeometry {
             project: project,
             suppressedOpeningIds: suppressedOpeningIds,
           );
-    int priority(ArchitectWallComponent c) => c.wall.system.isLog
-        ? 0
-        : c.layer.material == ArchitectMaterial.steel
-        ? 1
-        : c.layer.role == ArchitectLayerRole.finish
-        ? 2
-        : 3;
-    notched.sort((a, b) {
-      final p = priority(a).compareTo(priority(b));
-      return p != 0
-          ? p
-          : '${a.wall.id}:${a.id}'.compareTo('${b.wall.id}:${b.id}');
-    });
-    final clean = <ArchitectWallComponent>[];
     final columns = [
       for (final column in storey.columns)
         column.build3D(
@@ -821,39 +969,19 @@ class ArchitectSpecialWallGeometry {
           storeyHeight: storey.height,
         ),
     ];
-    for (final c in notched) {
-      var mesh = c.triangles;
-      for (final column in columns) {
-        mesh = ArchitectMeshBoolean.subtract(mesh, column);
-      }
+    for (final cut in cuts) {
+      cut.cutters.addAll(columns);
+      final bounds = BoundingBox3D.fromPoints([
+        for (final t in cut.triangles) ...[t.v0, t.v1, t.v2],
+      ]);
       for (final obstacle in obstacles) {
-        if (c.bounds.max.z < obstacle.bottom || c.bounds.min.z > obstacle.top) {
+        if (bounds.max.z < obstacle.bottom || bounds.min.z > obstacle.top) {
           continue;
         }
-        mesh = ArchitectMeshBoolean.subtract(mesh, obstacle.triangles);
-      }
-      if (!c.wall.system.isLog) {
-        for (final previous in clean) {
-          if (previous.wall.id == c.wall.id ||
-              !c.bounds.intersects(previous.bounds)) {
-            continue;
-          }
-          mesh = ArchitectMeshBoolean.subtract(mesh, previous.triangles);
-        }
-      }
-      if (mesh.isNotEmpty) {
-        clean.add(
-          ArchitectWallComponent(
-            c.wall,
-            c.id,
-            c.layer,
-            ArchitectMeshBoolean.simplify(mesh),
-          ),
-        );
+        cut.cutters.add(obstacle.triangles);
       }
     }
-    if (cacheable) (_cache[project] ??= {})[storey] = clean;
-    return clean;
+    return _SpecialWallPreparation(result, cuts);
   }
 
   static Path _circle(double r, double z) => Path()
@@ -883,6 +1011,7 @@ class ArchitectSpecialWallGeometry {
         from,
         to,
         ArchitectMaterial.timber.color,
+        compactCaps: true,
       ))
         Triangle3D(v0: map(t.v0), v1: map(t.v1), v2: map(t.v2), color: t.color),
     ];

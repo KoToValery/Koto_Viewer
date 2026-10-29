@@ -7,7 +7,8 @@ import '../services/architect_roof_drainage_geometry.dart';
 import 'architect_path_solid.dart';
 
 class ArchitectRoofDrainageMesh {
-  static final _cache = Expando<Map<(ArchitectRoofPlane, bool, bool, bool), List<Triangle3D>>>();
+  static final _cache =
+      Expando<Map<(ArchitectRoofPlane, bool, bool, bool), List<Triangle3D>>>();
   static const thickness = .0015;
   static Color color(ArchitectDrainageMaterial material) => switch (material) {
     ArchitectDrainageMaterial.galvanizedSteel => const Color(0xff87969d),
@@ -23,9 +24,19 @@ class ArchitectRoofDrainageMesh {
     bool includeGutters = true,
     bool includeDownpipes = true,
     bool details = true,
-  }) => (_cache[project] ??= {}).putIfAbsent((roof, includeGutters, includeDownpipes, details),
-    () => List.unmodifiable(_build(project, storey, roof,
-      includeGutters: includeGutters, includeDownpipes: includeDownpipes, details: details)));
+  }) => (_cache[project] ??= {}).putIfAbsent(
+    (roof, includeGutters, includeDownpipes, details),
+    () => List.unmodifiable(
+      _build(
+        project,
+        storey,
+        roof,
+        includeGutters: includeGutters,
+        includeDownpipes: includeDownpipes,
+        details: details,
+      ),
+    ),
+  );
 
   static List<Triangle3D> _build(
     ArchitectProject project,
@@ -38,7 +49,9 @@ class ArchitectRoofDrainageMesh {
     if (!includeGutters && !includeDownpipes) return [];
     final geometry = ArchitectRoofDrainageGeometry.build(project, storey, roof);
     final d = roof.drainage, ink = color(d.material);
-    final box=d.position==ArchitectGutterPosition.internal||d.profile==ArchitectGutterProfile.box;
+    final box =
+        d.position == ArchitectGutterPosition.internal ||
+        d.profile == ArchitectGutterProfile.box;
     final result = <Triangle3D>[];
     final ready = geometry.routes
         .where((r) => r.status == ArchitectDownpipeStatus.ready)
@@ -257,6 +270,15 @@ class ArchitectRoofDrainageMesh {
       final points = [for (final ring in rings) ring.$1];
       final r = route.pipe.diameter / 2;
       final samples = angles[route.pipe.id]!;
+      // Outlet vertices match every intersected gutter facet exactly. Keep
+      // those extra samples at the interface; the rest of the tube uses its
+      // regular profile instead of multiplying them through every elbow.
+      final bodySamples = <double>[
+        for (var i = 0; i < 16; i++) i * math.pi / 8,
+      ];
+      final ringSamples = [
+        for (var i = 0; i < points.length; i++) i == 0 ? samples : bodySamples,
+      ];
       final u = Vector3(-route.inward.dy, route.inward.dx, 0);
       final outer = <List<Vector3>>[], inner = <List<Vector3>>[];
       for (var i = 0; i < points.length; i++) {
@@ -270,7 +292,7 @@ class ArchitectRoofDrainageMesh {
             v = tangent.cross(u).normalized();
         final factor = math.max(.25, tangent.dot(previous));
         List<Vector3> ring(double radius, bool inside) => [
-          for (final angle in samples)
+          for (final angle in ringSamples[i])
             () {
               final p =
                   points[i] +
@@ -324,12 +346,47 @@ class ArchitectRoofDrainageMesh {
         continue;
       }
       for (var i = 0; i + 1 < points.length; i++) {
-        for (var j = 0; j < samples.length; j++) {
-          final k = (j + 1) % samples.length;
-          triangle(outer[i][j], outer[i][k], outer[i + 1][k]);
-          triangle(outer[i][j], outer[i + 1][k], outer[i + 1][j]);
-          triangle(inner[i][j], inner[i + 1][k], inner[i][k]);
-          triangle(inner[i][j], inner[i + 1][j], inner[i + 1][k]);
+        // Merge the two angular walks. Unequal ring counts form a watertight
+        // transition without degenerate quads or T-junctions at the outlet.
+        final a = ringSamples[i], b = ringSamples[i + 1];
+        var j = 0, k = 0;
+        void face(int a0, int a1, int b0, {required bool advanceA}) {
+          if (advanceA) {
+            triangle(outer[i][a0], outer[i][a1], outer[i + 1][b0]);
+            triangle(inner[i][a0], inner[i + 1][b0], inner[i][a1]);
+          } else {
+            triangle(outer[i][a0], outer[i + 1][b0], outer[i + 1][a1]);
+            triangle(inner[i][a0], inner[i + 1][a1], inner[i + 1][b0]);
+          }
+        }
+
+        while (j < a.length || k < b.length) {
+          final nextA = j >= a.length
+              ? double.infinity
+              : j + 1 == a.length
+              ? math.pi * 2
+              : a[j + 1];
+          final nextB = k >= b.length
+              ? double.infinity
+              : k + 1 == b.length
+              ? math.pi * 2
+              : b[k + 1];
+          final aj = j % a.length, bk = k % b.length;
+          if ((nextA - nextB).abs() < 1e-7) {
+            final an = (j + 1) % a.length, bn = (k + 1) % b.length;
+            triangle(outer[i][aj], outer[i][an], outer[i + 1][bn]);
+            triangle(outer[i][aj], outer[i + 1][bn], outer[i + 1][bk]);
+            triangle(inner[i][aj], inner[i + 1][bn], inner[i][an]);
+            triangle(inner[i][aj], inner[i + 1][bk], inner[i + 1][bn]);
+            j++;
+            k++;
+          } else if (nextA < nextB) {
+            face(aj, (j + 1) % a.length, bk, advanceA: true);
+            j++;
+          } else {
+            face(aj, bk, (k + 1) % b.length, advanceA: false);
+            k++;
+          }
         }
       }
       for (var j = 0; j < samples.length; j++) {
@@ -338,6 +395,9 @@ class ArchitectRoofDrainageMesh {
           triangle(outer.first[j], inner.first[j], inner.first[k]);
           triangle(outer.first[j], inner.first[k], outer.first[k]);
         }
+      }
+      for (var j = 0; j < bodySamples.length; j++) {
+        final k = (j + 1) % bodySamples.length;
         triangle(outer.last[j], outer.last[k], inner.last[k]);
         triangle(outer.last[j], inner.last[k], inner.last[j]);
       }

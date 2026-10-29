@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tools;
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -187,6 +188,10 @@ void main() {
     final model = editing.seeded(stage.scene);
     addTearDown(model.dispose);
     await workspace.open(tester, model);
+    await tools.chooseMulti(
+      tester,
+      operation: ArchitectSelectionOperation.replace,
+    );
     await fit(tester);
     await tap(tester, const Offset(2, 1));
     await option(tester, 'operation', 'add');
@@ -214,6 +219,10 @@ void main() {
       final model = editing.seeded(stage.scene);
       addTearDown(model.dispose);
       await workspace.open(tester, model);
+      await tools.chooseMulti(
+        tester,
+        operation: ArchitectSelectionOperation.replace,
+      );
       await fit(tester);
       await tap(tester, const Offset(2, 1));
       await option(tester, 'operation', 'add');
@@ -280,6 +289,10 @@ void main() {
       );
       addTearDown(model.dispose);
       await workspace.open(tester, model);
+      await tools.chooseMulti(
+        tester,
+        operation: ArchitectSelectionOperation.replace,
+      );
       await fit(tester);
       await option(tester, 'relation', 'contained');
       await stage.drag(tester, const Offset(0, 0), const Offset(4, 3));
@@ -300,6 +313,10 @@ void main() {
       final model = editing.seeded(stage.scene);
       addTearDown(model.dispose);
       await workspace.open(tester, model);
+      await tools.chooseMulti(
+        tester,
+        operation: ArchitectSelectionOperation.replace,
+      );
       await fit(tester);
       await tester.tap(find.text('Polygon'));
       await tester.pumpAndSettle();
@@ -376,6 +393,10 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        await tools.chooseMulti(
+          tester,
+          operation: ArchitectSelectionOperation.replace,
+        );
         final l = await AppLocalizations.delegate.load(Locale(locale));
         if (locale == 'bg') {
           await capturePhone(tester, '${brightness.name}-idle');

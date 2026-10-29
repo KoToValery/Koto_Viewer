@@ -1,3 +1,4 @@
+import 'architect_projection_test_helper.dart' as projection;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -26,13 +27,13 @@ ArchitectProject project() => fixture.elevationProject().copyWith(
 
 Future<void> select(WidgetTester tester, String type, String id) async {
   await tester.tap(find.byKey(ValueKey('architect-view-$type')));
-  await tester.pumpAndSettle();
+  await projection.settleProjection(tester);
   await tester.tap(
     find.byWidgetPredicate(
       (w) => w is CheckedPopupMenuItem<String> && w.value == id,
     ),
   );
-  await tester.pumpAndSettle();
+  await projection.settleProjection(tester);
 }
 
 void main() {
@@ -161,27 +162,27 @@ void main() {
     addTearDown(source.dispose);
     await workspace.open(tester, source);
     await tester.tap(find.byKey(const ValueKey('architect-view-elevation')));
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     await tester.tap(
       find.byKey(const ValueKey('architect-building-elevations')),
     );
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     await qa.tapPlan(tester, source.project, const Offset(-1, -2));
     await qa.tapPlan(tester, source.project, const Offset(9, -2));
     await qa.tapPlan(tester, source.project, const Offset(4, 0));
     expect(source.project.elevations, hasLength(1));
     await tester.pageBack();
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     expect(
       find.byKey(const ValueKey('architect-workspace-projection')),
       findsOneWidget,
     );
     await tools.choose(tester, Icons.timeline_rounded);
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     await workspace.wallTap(tester, const Offset(1, -1));
     await workspace.wallTap(tester, const Offset(4, -1));
     await tester.tap(find.byKey(const ValueKey('wall-end')));
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     expect(
       source.project.elevations.single.drawing.cadPrimitives,
       hasLength(1),
@@ -209,17 +210,17 @@ void main() {
           type == 'elevation' ? fixture.facade.id : 'cut',
         );
         await tools.choose(tester, entry.value);
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await workspace.wallTap(tester, const Offset(1, -1));
         await workspace.wallTap(tester, const Offset(4, -2));
         if (entry.key == 'circle' || entry.key == 'rect') {
           await tester.tap(find.byKey(const ValueKey('shape-save')));
-          await tester.pumpAndSettle();
+          await projection.settleProjection(tester);
         } else if (entry.key == 'dimension') {
           await tester.tap(
             find.byKey(const ValueKey('architect-dimension-confirm')),
           );
-          await tester.pumpAndSettle();
+          await projection.settleProjection(tester);
         }
         final drawing = type == 'elevation'
             ? source.project.elevations.single.drawing
@@ -261,7 +262,7 @@ void main() {
             ),
           ),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await select(tester, 'plan', 's1');
         expect(source.project.activeStoreyId, 's1');
         final undo = source.undoCount;
@@ -272,11 +273,11 @@ void main() {
           findsOneWidget,
         );
         await tools.choose(tester, Icons.timeline_rounded);
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await workspace.wallTap(tester, const Offset(1, -1));
         await workspace.wallTap(tester, const Offset(4, -1));
         await tester.tap(find.byKey(const ValueKey('wall-end')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           source.project.elevations.single.drawing.cadPrimitives,
           hasLength(1),
@@ -292,18 +293,18 @@ void main() {
         final savedScale = camera.scale, savedTranslation = camera.translation;
         await select(tester, 'section', 'cut');
         await tools.choose(tester, Icons.title_rounded);
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await workspace.wallTap(tester, const Offset(2, -2));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.enterText(find.byType(TextField), 'Detail A');
         await tester.tap(find.byType(ElevatedButton));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           source.project.sections.single.drawing.annotations.single.text,
           'Detail A',
         );
         await tools.choose(tester, Icons.change_history_rounded);
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await workspace.wallTap(tester, const Offset(4, -3));
         expect(
           source
@@ -319,13 +320,13 @@ void main() {
         expect(source.project.activeStorey.annotations, isEmpty);
         expect(source.project.elevations.single.drawing.annotations, isEmpty);
         await tester.tap(find.byKey(const ValueKey('architect-undo')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           source.project.sections.single.drawing.elevationMarkers,
           isEmpty,
         );
         await tester.tap(find.byKey(const ValueKey('architect-redo')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           source.project.sections.single.drawing.elevationMarkers,
           hasLength(1),
@@ -341,7 +342,7 @@ void main() {
           hasLength(1),
         );
         await tester.tap(find.byKey(const ValueKey('architect-tool-category')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           find.byKey(const ValueKey('architect-category-build')),
           findsNothing,
@@ -351,7 +352,7 @@ void main() {
           findsOneWidget,
         );
         await tester.tapAt(const Offset(10, 90));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         if (const bool.fromEnvironment('WORKSPACE_VIEWS_QA_CAPTURE')) {
           await tester.runAsync(() async {
             final boundary =

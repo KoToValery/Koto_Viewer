@@ -361,6 +361,9 @@ void main() {
       await tester.tapAt(screen(tester, const Offset(2, 0)));
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
+      await tester.pumpAndSettle();
+
       // Tap "Connected" button in selection bar
       final connectedBtn = find.byKey(const ValueKey('architect-select-connected'));
       expect(connectedBtn, findsOneWidget);
@@ -381,6 +384,9 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tapAt(screen(tester, const Offset(2, 0)));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
       await tester.pumpAndSettle();
 
       // Tap "Similar" button

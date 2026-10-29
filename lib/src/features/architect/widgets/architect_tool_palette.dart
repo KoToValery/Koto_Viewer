@@ -1,3 +1,4 @@
+import '../services/architect_interaction_mode.dart';
 // === SECTION: ARCHITECTURAL TOOL PALETTE BAR ===
 import 'package:flutter/material.dart';
 import 'architect_wall_type_label.dart';
@@ -41,7 +42,7 @@ enum ArchitectToolCategory {
 
   static ArchitectToolCategory of(ArchitectTool tool) => switch (tool) {
     ArchitectTool.select => selection,
-    ArchitectTool.pan => plan,
+    ArchitectTool.pan => selection,
     ArchitectTool.zone || ArchitectTool.zoneTable || ArchitectTool.axis => plan,
     ArchitectTool.wall ||
     ArchitectTool.door ||
@@ -70,6 +71,9 @@ enum ArchitectToolCategory {
 class ArchitectToolPalette extends StatefulWidget {
   final ArchitectTool activeTool;
   final bool drawingOnly;
+  final ArchitectInteractionMode? interactionMode;
+  final ArchitectTool? selectionTool;
+  final VoidCallback? onDrawSelection;
   final VoidCallback? onTerrain;
   final ValueChanged<ArchitectTool> onToolChanged;
   final bool multiSelect;
@@ -159,6 +163,9 @@ class ArchitectToolPalette extends StatefulWidget {
     this.zonePresets = const ArchitectZonePresets(),
     required this.activeTool,
     this.drawingOnly = false,
+    this.interactionMode,
+    this.selectionTool,
+    this.onDrawSelection,
     this.onTerrain,
     required this.onToolChanged,
     this.multiSelect = false,
@@ -229,9 +236,7 @@ class ArchitectToolPalette extends StatefulWidget {
 }
 
 class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
-  late ArchitectToolCategory category = ArchitectToolCategory.of(
-    widget.drawingOnly ? ArchitectTool.cadLine : widget.activeTool,
-  );
+  ArchitectToolCategory category = ArchitectToolCategory.selection;
 
   @override
   void didUpdateWidget(ArchitectToolPalette oldWidget) {
@@ -242,13 +247,18 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
         category != ArchitectToolCategory.drawing) {
       category = ArchitectToolCategory.drawing;
     }
-    if (widget.activeTool != oldWidget.activeTool &&
-        widget.activeTool != ArchitectTool.pan) {
-      category = ArchitectToolCategory.of(widget.activeTool);
-    }
   }
 
   ArchitectTool get activeTool => widget.activeTool;
+  ArchitectInteractionMode get mode =>
+      widget.interactionMode ??
+      (widget.multiSelect
+          ? ArchitectInteractionMode.multiSelect
+          : activeTool == ArchitectTool.pan
+          ? ArchitectInteractionMode.navigation
+          : activeTool == ArchitectTool.select
+          ? ArchitectInteractionMode.singleSelect
+          : ArchitectInteractionMode.drawing);
   ValueChanged<ArchitectTool> get onToolChanged => widget.onToolChanged;
   VoidCallback? get onCreateFenestration => widget.onCreateFenestration;
   ArchitectFenestrationStyle? get activeWindowStyle => widget.activeWindowStyle;
@@ -341,67 +351,35 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Contextual Sub-bar for Active Tool parameters
-              if (activeTool == ArchitectTool.zone)
-                _buildZoneSubBar(context)
-              else if (activeTool == ArchitectTool.wall)
-                _buildWallSubBar(context)
-              else if (activeTool == ArchitectTool.door)
-                _buildDoorSubBar(context)
-              else if (activeTool == ArchitectTool.window)
-                _buildWindowSubBar(context)
-              else if (activeTool == ArchitectTool.column)
-                _buildColumnSubBar(context)
-              else if (activeTool == ArchitectTool.beam)
-                _buildBeamSubBar(context)
-              else if (activeTool == ArchitectTool.stair)
-                _buildStairSubBar(context)
-              else if (activeTool == ArchitectTool.component &&
-                  !compactComponents)
-                _buildComponentSubBar(context)
-              else if (activeTool == ArchitectTool.opening)
-                _buildOpeningSubBar(context)
-              else if (activeTool == ArchitectTool.section ||
-                  activeTool == ArchitectTool.elevation)
-                _buildViewsSubBar(context),
-
+              if (mode == ArchitectInteractionMode.drawing) ...[
+                // Contextual Sub-bar for Active Tool parameters
+                if (activeTool == ArchitectTool.zone)
+                  _buildZoneSubBar(context)
+                else if (activeTool == ArchitectTool.wall)
+                  _buildWallSubBar(context)
+                else if (activeTool == ArchitectTool.door)
+                  _buildDoorSubBar(context)
+                else if (activeTool == ArchitectTool.window)
+                  _buildWindowSubBar(context)
+                else if (activeTool == ArchitectTool.column)
+                  _buildColumnSubBar(context)
+                else if (activeTool == ArchitectTool.beam)
+                  _buildBeamSubBar(context)
+                else if (activeTool == ArchitectTool.stair)
+                  _buildStairSubBar(context)
+                else if (activeTool == ArchitectTool.component &&
+                    !compactComponents)
+                  _buildComponentSubBar(context)
+                else if (activeTool == ArchitectTool.opening)
+                  _buildOpeningSubBar(context)
+                else if (activeTool == ArchitectTool.section ||
+                    activeTool == ArchitectTool.elevation)
+                  _buildViewsSubBar(context),
+              ],
               const SizedBox(height: 6),
 
               Row(
                 children: [
-                  IconButton(
-                    key: const ValueKey('architect-tool-pan'),
-                    tooltip: l10n.architectToolPan,
-                    isSelected: activeTool == ArchitectTool.pan,
-                    style: IconButton.styleFrom(
-                      backgroundColor: activeTool == ArchitectTool.pan
-                          ? const Color(0xFF164E63)
-                          : Colors.transparent,
-                      side: activeTool == ArchitectTool.pan
-                          ? const BorderSide(color: Colors.cyanAccent)
-                          : BorderSide.none,
-                    ),
-                    onPressed: () => onToolChanged(ArchitectTool.pan),
-                    icon: Icon(
-                      Icons.pan_tool_rounded,
-                      color: activeTool == ArchitectTool.pan
-                          ? Colors.cyanAccent
-                          : Colors.white70,
-                    ),
-                  ),
-                  if (widget.onToggleMultiSelect != null)
-                    IconButton(
-                      key: const ValueKey('architect-multi-select'),
-                      tooltip: l10n.architectSelectionMulti,
-                      isSelected: widget.multiSelect,
-                      onPressed: widget.onToggleMultiSelect,
-                      icon: Icon(
-                        Icons.library_add_check_outlined,
-                        color: widget.multiSelect
-                            ? Colors.amber
-                            : Colors.white70,
-                      ),
-                    ),
                   PopupMenuButton<ArchitectToolCategory>(
                     key: const ValueKey('architect-tool-category'),
                     tooltip: l10n.architectToolCategories,
@@ -482,12 +460,41 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                             physics: const BouncingScrollPhysics(),
                             child: Row(
                               children: [
-                                if (category == ArchitectToolCategory.selection)
+                                if (category ==
+                                    ArchitectToolCategory.selection) ...[
+                                  _buildToolButton(
+                                    tool: ArchitectTool.pan,
+                                    icon: Icons.pan_tool_rounded,
+                                    label: l10n.architectToolPan,
+                                    iconOnly:
+                                        MediaQuery.sizeOf(context).width < 600,
+                                  ),
                                   _buildToolButton(
                                     tool: ArchitectTool.select,
                                     icon: Icons.near_me_outlined,
                                     label: l10n.architectToolSelect,
+                                    selected:
+                                        mode ==
+                                        ArchitectInteractionMode.singleSelect,
                                   ),
+                                  if (widget.onToggleMultiSelect != null)
+                                    _buildToolButton(
+                                      tool: ArchitectTool.select,
+                                      buttonKey: 'architect-multi-select',
+                                      icon: Icons.library_add_check_outlined,
+                                      label: l10n.architectSelectionMulti,
+                                      selected:
+                                          mode ==
+                                          ArchitectInteractionMode.multiSelect,
+                                      onPressed: widget.onToggleMultiSelect,
+                                    ),
+                                  if (widget.selectionTool != null &&
+                                      widget.onDrawSelection != null)
+                                    _buildDrawingShortcut(
+                                      context,
+                                      widget.selectionTool!,
+                                    ),
+                                ],
                                 if (category ==
                                     ArchitectToolCategory.of(
                                       ArchitectTool.wall,
@@ -722,65 +729,167 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     required ArchitectTool tool,
     required IconData icon,
     required String label,
+    String? buttonKey,
+    bool? selected,
+    VoidCallback? onPressed,
+    bool iconOnly = false,
+    String? tooltip,
   }) {
-    final isSelected = activeTool == tool;
+    final isSelected = selected ?? activeTool == tool;
+    final compact = MediaQuery.sizeOf(context).width < 600;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 3),
-      child: Material(
-        color: isSelected
-            ? const Color(0xFF00E5FF).withValues(alpha: 0.22)
-            : const Color(0xFF262630),
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          key: ValueKey('architect-tool-${tool.name}'),
-          onTap: () {
-            if (isSelected) {
-              onToolChanged(ArchitectTool.select);
-            } else {
-              onToolChanged(tool);
-              if (tool == ArchitectTool.component) {
-                widget.onOpenComponentLibrary?.call();
-              }
-            }
-          },
+      padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 3),
+      child: Tooltip(
+        message: tooltip ?? label,
+        child: Material(
+          color: isSelected
+              ? const Color(0xFF00E5FF).withValues(alpha: 0.22)
+              : const Color(0xFF262630),
           borderRadius: BorderRadius.circular(10),
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 44),
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isSelected
-                    ? const Color(0xFF00E5FF)
-                    : Colors.white.withValues(alpha: 0.12),
-                width: isSelected ? 1.5 : 1.0,
+          child: InkWell(
+            key: ValueKey(buttonKey ?? 'architect-tool-${tool.name}'),
+            onTap:
+                onPressed ??
+                () {
+                  if (isSelected &&
+                      mode != ArchitectInteractionMode.contextEdit) {
+                    onToolChanged(ArchitectTool.pan);
+                  } else {
+                    onToolChanged(tool);
+                    if (tool == ArchitectTool.component) {
+                      widget.onOpenComponentLibrary?.call();
+                    }
+                  }
+                },
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              padding: EdgeInsets.symmetric(
+                horizontal: iconOnly
+                    ? 10
+                    : compact
+                    ? 4
+                    : 13,
+                vertical: 8,
               ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  size: 18,
-                  color: isSelected ? const Color(0xFF00E5FF) : Colors.white70,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFF00E5FF)
+                      : Colors.white.withValues(alpha: 0.12),
+                  width: isSelected ? 1.5 : 1.0,
                 ),
-                const SizedBox(width: 7),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.white70,
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                    fontSize: 12.5,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 18,
+                    color: isSelected
+                        ? const Color(0xFF00E5FF)
+                        : Colors.white70,
                   ),
-                ),
-              ],
+                  if (!iconOnly) ...[
+                    SizedBox(width: compact ? 5 : 7),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.white70,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDrawingShortcut(BuildContext context, ArchitectTool tool) {
+    final l = context.l10n;
+    final (icon, label) = switch (tool) {
+      ArchitectTool.wall => (Icons.line_weight_rounded, l.architectToolWall),
+      ArchitectTool.door => (Icons.meeting_room_rounded, l.architectToolDoor),
+      ArchitectTool.window => (Icons.window_rounded, l.architectToolWindow),
+      ArchitectTool.column => (
+        Icons.view_column_rounded,
+        l.architectToolColumn,
+      ),
+      ArchitectTool.beam => (
+        Icons.horizontal_rule_rounded,
+        l.architectToolBeam,
+      ),
+      ArchitectTool.slab => (Icons.layers_rounded, l.architectToolSlab),
+      ArchitectTool.floorDrain => (
+        Icons.water_drop_outlined,
+        l.architectToolFloorDrain,
+      ),
+      ArchitectTool.roof => (Icons.roofing_rounded, l.architectToolRoof),
+      ArchitectTool.opening => (
+        Icons.crop_free_rounded,
+        l.architectToolOpening,
+      ),
+      ArchitectTool.stair => (Icons.stairs_rounded, l.architectToolStair),
+      ArchitectTool.component => (
+        Icons.chair_outlined,
+        l.architectToolComponent,
+      ),
+      ArchitectTool.zone => (
+        Icons.space_dashboard_rounded,
+        l.architectToolZone,
+      ),
+      ArchitectTool.zoneTable => (
+        Icons.table_chart_rounded,
+        l.architectToolZoneTable,
+      ),
+      ArchitectTool.dimension => (
+        Icons.straighten_rounded,
+        l.architectToolDimension,
+      ),
+      ArchitectTool.level => (
+        Icons.change_history_rounded,
+        l.architectToolLevel,
+      ),
+      ArchitectTool.text => (Icons.title_rounded, l.architectToolText),
+      ArchitectTool.cadLine => (Icons.timeline_rounded, l.architectToolCadLine),
+      ArchitectTool.cadRect => (
+        Icons.crop_square_rounded,
+        l.architectToolCadRect,
+      ),
+      ArchitectTool.hatch => (Icons.texture_rounded, l.architectToolHatch),
+      ArchitectTool.cadCircle => (
+        Icons.radio_button_unchecked_rounded,
+        l.architectToolCadCircle,
+      ),
+      ArchitectTool.section => (
+        Icons.splitscreen_outlined,
+        l.architectToolSection,
+      ),
+      ArchitectTool.elevation => (Icons.apartment, l.architectToolElevation),
+      ArchitectTool.axis => (Icons.grid_on_rounded, l.architectToolAxis),
+      ArchitectTool.measure => (
+        Icons.square_foot_rounded,
+        l.architectToolMeasure,
+      ),
+      _ => (Icons.edit_outlined, l.architectToolSelect),
+    };
+    return _buildToolButton(
+      tool: tool,
+      icon: icon,
+      label: label,
+      buttonKey: 'architect-draw-selection',
+      selected: mode == ArchitectInteractionMode.drawing && activeTool == tool,
+      onPressed: widget.onDrawSelection,
+      tooltip: l.architectDrawSelectedType(label),
     );
   }
 

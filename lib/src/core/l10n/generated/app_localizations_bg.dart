@@ -4320,7 +4320,8 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectEditHoldHint => 'Задръж → редакция · по-дълго → меню';
 
   @override
-  String get architectNavigationHint => 'Местене / мащаб';
+  String get architectNavigationHint =>
+      'Плъзни за местене; посочи обект за редакция.';
 
   @override
   String get architectWallEditRejected => 'Отвор или твърде къса стена.';
@@ -5103,7 +5104,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectSelectionCycleHelp =>
-      'Тап добавя/изключва; повторен тап обхожда застъпванията. Задръж за меню.';
+      'Тап за избор; повторен тап обхожда застъпванията. Задръж за меню.';
 
   @override
   String get architectDimensionOverall => 'Общ размер';
@@ -8503,7 +8504,7 @@ class AppLocalizationsBg extends AppLocalizations {
       'Офсет на всички отсечки на избрания контур. Положителните стойности го разширяват, отрицателните го свиват.';
 
   @override
-  String get architectToolPan => 'Преместване на изгледа';
+  String get architectToolPan => 'Навигация';
 
   @override
   String get architectSelectionClear => 'Изчисти';
@@ -8557,4 +8558,18 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get wallSystemOptions => 'Детайли на конструкцията';
+
+  @override
+  String architectDrawSelectedType(String tool) {
+    return 'Започни чертане: $tool';
+  }
+
+  @override
+  String get architectToolComponent => 'Обект';
+
+  @override
+  String get architectProjectionLoading => 'Изчисляване на изгледа…';
+
+  @override
+  String get architectProjectionLoadFailed => 'Изгледът не може да се изчисли.';
 }

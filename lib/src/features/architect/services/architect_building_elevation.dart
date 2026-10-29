@@ -1,4 +1,6 @@
-import 'package:clipper2/clipper2.dart' as clip;
+import 'package:flutter/foundation.dart' show compute;
+import '../rendering/architect_projection_visibility.dart';
+import '../rendering/architect_mesh_section.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
@@ -66,6 +68,116 @@ class ArchitectBuildingElevation {
         occlusionMasks: occlusionMasks,
         suppressedOpeningIds: classification.suppressedOpeningIds,
         openingDetailLevels: classification.openingDetailLevels,
+      ),
+      view,
+    );
+  }
+
+  /// Interactive views perform hidden-surface removal on a worker isolate.
+  /// Special wall booleans and contact surfaces also run on worker isolates;
+  /// native path preparation and final Flutter paths stay on the UI isolate.
+  static Future<ArchitectBuildingElevation> buildAsync(
+    ArchitectProject project,
+    ArchitectElevation view, {
+    List<List<Offset>> occlusionMasks = const [],
+    ArchitectSectionVisibility? sectionVisibility,
+    Set<String> cutOpeningIds = const {},
+  }) async {
+    final classification = _classifyOpenings(
+      project,
+      view,
+      cutOpeningIds: cutOpeningIds,
+      occlusionMasks: occlusionMasks,
+    );
+    final sources = <Triangle3D, String>{}, groups = <Triangle3D, String>{};
+    final mesh = await Architect3dBuilder.buildProjectMeshAsync(
+      project,
+      previewGeometry: false,
+      sources: sources,
+      silhouetteGroups: groups,
+      cleanDrainage: true,
+      sectionVisibility: sectionVisibility,
+      suppressedOpeningIds: classification.suppressedOpeningIds,
+      openingDetailLevels: classification.openingDetailLevels,
+    );
+    Future<ArchitectBuildingElevation> solve(ArchitectElevation local) async {
+      final prepared = _prepareProjection(
+        mesh.triangles,
+        local,
+        sources: sources,
+        silhouetteGroups: groups,
+        project: project,
+        occlusionMasks: occlusionMasks,
+        suppressedOpeningIds: classification.suppressedOpeningIds,
+      );
+      final contours = await compute(
+        solveArchitectProjection,
+        prepared.request,
+        debugLabel: 'architectural-visibility',
+      );
+      return _fromContours(
+        contours,
+        local,
+        project: project,
+        symbols: prepared.symbols,
+        openingDetailLevels: classification.openingDetailLevels,
+      );
+    }
+
+    if (view.steps.isEmpty) return withTerrain(await solve(view), view);
+    final faces = <Path>[], paths = <String, List<Path>>{};
+    final operations = <({Path lines, Path clip})>[];
+    final slopes = <ArchitectElevationSlope>[];
+    Rect? bounds;
+    for (final segment in view.segments) {
+      final depth = view.viewDepth == null
+          ? null
+          : view.viewDepth! - segment.offset;
+      if (depth != null && depth <= 0) continue;
+      final part = await solve(
+        view.copyWith(
+          start: segment.start,
+          end: segment.end,
+          steps: const [],
+          viewDepth: depth,
+        ),
+      );
+      final delta = (segment.start + segment.end) / 2 - view.centre;
+      final shift = Offset(
+        delta.dx * view.right.dx + delta.dy * view.right.dy,
+        0,
+      );
+      faces.addAll(part.faces.map((p) => p.shift(shift)));
+      for (final entry in part.elementPaths.entries) {
+        (paths[entry.key] ??= []).add(entry.value.shift(shift));
+      }
+      operations.addAll([
+        for (final op in part.operations)
+          (lines: op.lines.shift(shift), clip: op.clip.shift(shift)),
+      ]);
+      slopes.addAll([
+        for (final slope in part.slopes)
+          ArchitectElevationSlope(
+            slope.id,
+            slope.start + shift,
+            slope.end + shift,
+            slope.percent,
+          ),
+      ]);
+      bounds =
+          bounds?.expandToInclude(part.bounds.shift(shift)) ??
+          part.bounds.shift(shift);
+    }
+    return withTerrain(
+      ArchitectBuildingElevation(
+        faces,
+        bounds ?? Rect.fromLTWH(-view.length / 2, 0, view.length, 3),
+        elementPaths: {
+          for (final e in paths.entries)
+            e.key: ArchitectMeshSection.unionPaths(e.value),
+        },
+        operations: operations,
+        slopes: slopes,
       ),
       view,
     );
@@ -424,7 +536,7 @@ class ArchitectBuildingElevation {
       for (final part in parts) {
         for (final e in part.elementPaths.entries) {
           paths[e.key] = paths.containsKey(e.key)
-              ? Path.combine(PathOperation.union, paths[e.key]!, e.value)
+              ? ArchitectMeshSection.unionPaths([paths[e.key]!, e.value])
               : e.value;
         }
       }
@@ -441,252 +553,113 @@ class ArchitectBuildingElevation {
     if (view.length < .01) {
       return const ArchitectBuildingElevation([], Rect.fromLTWH(-1, 0, 2, 3));
     }
-    final groups = <String, _ElevationPlane>{};
-    final cutMasks = [
-      for (final mask in occlusionMasks)
-        if (_hasArea(mask)) (mask, _bounds2(mask)),
-    ];
-    final right = view.right, forward = view.viewDirection;
-    Vector3 projectVector(Vector3 v) {
-      final p = Offset(v.x, v.y) - view.centre;
-      return Vector3(
-        p.dx * right.dx + p.dy * right.dy,
-        v.z,
-        p.dx * forward.dx + p.dy * forward.dy,
-      );
-    }
+    final prepared = _prepareProjection(
+      triangles,
+      view,
+      sources: sources,
+      silhouetteGroups: silhouetteGroups,
+      project: project,
+      occlusionMasks: occlusionMasks,
+      suppressedOpeningIds: suppressedOpeningIds,
+    );
+    return _fromContours(
+      solveArchitectProjection(prepared.request),
+      view,
+      project: project,
+      symbols: prepared.symbols,
+      openingDetailLevels: openingDetailLevels,
+    );
+  }
 
-    for (final triangle in triangles) {
-      final a = projectVector(triangle.v0),
-          b = projectVector(triangle.v1),
-          c = projectVector(triangle.v2);
-      final normal = (b - a).cross(c - a);
-      // Edge-on faces have no projected area.
-      if (normal.z.abs() < 1e-10) continue;
-      final u = -normal.x / normal.z, v = -normal.y / normal.z;
-      final w = a.z - u * a.x - v * a.y;
-      var polygon = _clip3([a, b, c], (p) => p.z);
-      if (view.viewDepth != null) {
-        polygon = _clip3(polygon, (p) => view.viewDepth! - p.z);
-      }
-      polygon = _clip3(polygon, (p) => p.x + view.length / 2);
-      polygon = _clip3(polygon, (p) => view.length / 2 - p.x);
-      if (polygon.length < 3) continue;
-      final path = Path()
-        ..addPolygon([for (final p in polygon) Offset(p.x, p.y)], true);
-      if (path.getBounds().isEmpty) continue;
-      // Keep material boundaries (e.g. a flush window frame) while removing
-      // triangle edges and construction seams within one finish.
-      final key =
-          '${(u * 1e6).round()}:${(v * 1e6).round()}:${(w * 1e6).round()}:${triangle.color?.toARGB32()}:${silhouetteGroups[triangle] ?? ''}';
-      final plane = groups[key];
-      if (plane == null) {
-        groups[key] = _ElevationPlane(
-          u,
-          v,
-          w,
-          path,
-          silhouette: silhouetteGroups[triangle],
-        );
-      } else {
-        plane.path = Path()
-          ..addPath(plane.path, Offset.zero)
-          ..addPath(path, Offset.zero);
-      }
-      final id = sources[triangle];
-      groups[key]!.pieces.add((
-        points: [for (final p in polygon) Offset(p.x, p.y)],
-        source: id,
-      ));
-      if (id != null) {
-        final group = groups[key]!;
-        group.sources[id] = group.sources.containsKey(id)
-            ? (Path()
-                ..addPath(group.sources[id]!, Offset.zero)
-                ..addPath(path, Offset.zero))
-            : path;
-      }
-    }
-    // Curved drainage creates many small surface planes. Query projected
-    // neighbours instead of comparing every tube facet with the whole model.
-    final occluders = _ElevationOcclusionIndex(groups.values.toList());
-    final faces = <Path>[];
-    final silhouettes = <String, List<List<clip.PointD>>>{};
-    Rect? bounds;
-    final elementPaths = <String, Path>{};
-    Path visiblePart(
-      _ElevationPlane face, {
-      String? ignoreSource,
-      String? onlySource,
-      List<List<clip.PointD>>? contoursOut,
-    }) {
-      final subjects = [
-        for (final p in face.pieces)
-          if (onlySource == null || p.source == onlySource) p.points,
-      ];
-      if (subjects.isEmpty) return Path();
-      final box = face.path.getBounds();
-      final masks = <List<Offset>>[];
-      for (final other in occluders.overlapping(box)) {
-        if (identical(face, other) || !box.overlaps(other.path.getBounds())) {
-          continue;
-        }
-        // A closed component's projected union already is its silhouette.
-        // Masking its own coplanar BSP fragments only creates numerical seams.
-        if (face.silhouette != null && face.silhouette == other.silhouette) {
-          continue;
-        }
-        for (final piece in other.pieces) {
-          if (ignoreSource != null && piece.source == ignoreSource) continue;
-          final mask = _clip2(
-            piece.points,
-            (p) => face.depth(p.dx, p.dy) - other.depth(p.dx, p.dy) - 1e-7,
+  static ({
+    ArchitectProjectionRequest request,
+    List<ArchitectElevationOperation> symbols,
+  })
+  _prepareProjection(
+    List<Triangle3D> triangles,
+    ArchitectElevation view, {
+    Map<Triangle3D, String> sources = const {},
+    Map<Triangle3D, String> silhouetteGroups = const {},
+    ArchitectProject? project,
+    List<List<Offset>> occlusionMasks = const [],
+    Set<String> suppressedOpeningIds = const {},
+  }) {
+    final symbols = project == null
+        ? <ArchitectElevationOperation>[]
+        : ArchitectElevationOperation.build(
+            project,
+            view,
+            excludedOpeningIds: suppressedOpeningIds,
           );
-          if (_hasArea(mask) && box.overlaps(_bounds2(mask))) masks.add(mask);
-        }
-      }
-      for (final (mask, bounds) in cutMasks) {
-        if (box.overlaps(bounds)) masks.add(mask);
-      }
-      // Perform the complete union/difference before encoding any Flutter Path.
-      // Clipper uses integer coordinates internally (10 nm in model metres),
-      // so nearly coincident roof edges cannot corrupt intermediate contours.
-      List<clip.PointD> points(List<Offset> p) => [
-        for (final v in _area2(p) < 0 ? p.reversed : p) clip.PointD(v.dx, v.dy),
-      ];
-      final engine = clip.ClipperD(roundingDecimalPrecision: 8)
-        ..preserveCollinear = false
-        ..addSubjects([
-          for (final p in subjects)
-            if (_hasArea(p)) points(p),
-        ])
-        ..addClips([for (final p in masks) points(p)]);
-      final contours = engine.executeClosed(
-        clip.ClipType.difference,
-        clip.FillRule.nonZero,
-      );
-      if (contours == null) {
-        throw StateError('Architectural visibility clipping failed');
-      }
-      contoursOut?.addAll(contours);
-      final path = Path();
+    return (
+      request: ArchitectProjectionRequest(
+        triangles: [
+          for (final t in triangles)
+            (
+              a: t.v0,
+              b: t.v1,
+              c: t.v2,
+              color: t.color?.toARGB32(),
+              source: sources[t],
+              silhouette: silhouetteGroups[t],
+            ),
+        ],
+        centre: view.centre,
+        right: view.right,
+        forward: view.viewDirection,
+        length: view.length,
+        depth: view.viewDepth,
+        masks: occlusionMasks,
+        apertures: [
+          for (final symbol in symbols)
+            (id: symbol.id, points: symbol.aperture),
+        ],
+      ),
+      symbols: symbols,
+    );
+  }
+
+  static ArchitectBuildingElevation _fromContours(
+    ArchitectProjectionContours data,
+    ArchitectElevation view, {
+    ArchitectProject? project,
+    List<ArchitectElevationOperation> symbols = const [],
+    Map<String, FenestrationElevationDetail> openingDetailLevels = const {},
+  }) {
+    Path path(List<List<Offset>> contours) {
+      final result = Path();
       for (final contour in contours) {
-        path.addPolygon([for (final p in contour) Offset(p.x, p.y)], true);
+        result.addPolygon(contour, true);
       }
-      return path;
+      return result;
     }
 
-    for (final face in groups.values) {
-      final contours = face.silhouette == null
-          ? null
-          : (silhouettes[face.silhouette!] ??= <List<clip.PointD>>[]);
-      final visible = visiblePart(face, contoursOut: contours);
-      if (visible.getBounds().isEmpty) continue;
-      if (face.silhouette == null) faces.add(visible);
-      for (final entry in face.sources.entries) {
-        final hit = face.sources.length == 1
-            ? visible
-            : visiblePart(face, onlySource: entry.key);
-        if (hit.getBounds().isEmpty) continue;
-        elementPaths[entry.key] = elementPaths.containsKey(entry.key)
-            ? (Path()
-                ..addPath(elementPaths[entry.key]!, Offset.zero)
-                ..addPath(hit, Offset.zero))
-            : hit;
-      }
-      bounds =
-          bounds?.expandToInclude(visible.getBounds()) ?? visible.getBounds();
-    }
-    // A drawing needs the visible silhouette, not every longitudinal facet,
-    // socket, or inner wall of the 3D tube. Keep depth clipping/occlusion above,
-    // then unite the visible material before encoding the published contour.
-    for (final entry in silhouettes.entries) {
-      final contours = entry.value;
-      if (contours.isEmpty) continue;
-      final engine = clip.ClipperD(roundingDecimalPrecision: 8)
-        ..preserveCollinear = false
-        ..addSubjects(contours);
-      var united = engine.executeClosed(
-        clip.ClipType.union,
-        clip.FillRule.nonZero,
-      );
-      if (united == null) throw StateError('Drainage silhouette union failed');
-      if (entry.key.startsWith('construction:')) {
-        // Weld projection seams below 0.01 mm. This is far below drawing
-        // precision and preserves the explicit courses and opening contours.
-        united = clip.Clipper.inflatePathsD(
-          paths: united,
-          delta: .00001,
-          joinType: clip.JoinType.miter,
-          endType: clip.EndType.polygon,
-          precision: 7,
-        );
-        united = clip.Clipper.inflatePathsD(
-          paths: united,
-          delta: -.00001,
-          joinType: clip.JoinType.miter,
-          endType: clip.EndType.polygon,
-          precision: 7,
-        );
-      }
-      final outline = Path();
-      for (final polygon in united) {
-        outline.addPolygon([for (final p in polygon) Offset(p.x, p.y)], true);
-      }
-      if (!outline.getBounds().isEmpty) faces.add(outline);
-    }
+    final faces = data.faces.map(path).toList();
+    final elementPaths = {
+      for (final entry in data.elements.entries) entry.key: path(entry.value),
+    };
     final operations = <({Path lines, Path clip})>[];
-    if (project != null) {
-      for (final operation in ArchitectElevationOperation.build(
-        project,
-        view,
-        excludedOpeningIds: suppressedOpeningIds,
-      )) {
-        final a = operation.aperture[0], b = operation.aperture[1];
-        if ((b.x - a.x).abs() < 1e-6) continue;
-        final u = (b.z - a.z) / (b.x - a.x);
-        var polygon = _clip3(operation.aperture, (p) => p.z);
-        if (view.viewDepth != null) {
-          polygon = _clip3(polygon, (p) => view.viewDepth! - p.z);
-        }
-        polygon = _clip3(polygon, (p) => p.x + view.length / 2);
-        polygon = _clip3(polygon, (p) => view.length / 2 - p.x);
-        if (polygon.length < 3) continue;
-        final plane = _ElevationPlane(
-          u,
-          0,
-          a.z - u * a.x,
-          Path()..addPolygon([for (final p in polygon) Offset(p.x, p.y)], true),
-        );
-        plane.pieces.add((
-          points: [for (final p in polygon) Offset(p.x, p.y)],
-          source: operation.id,
-        ));
-        final visible = visiblePart(plane, ignoreSource: operation.id);
-        if (!visible.getBounds().isEmpty) {
-          final detailLevel =
-              openingDetailLevels[operation.id] ??
-              FenestrationElevationDetail.clean2D;
-          if (detailLevel != FenestrationElevationDetail.outerContourOnly &&
-              detailLevel != FenestrationElevationDetail.hidden) {
-            operations.add((lines: operation.lines, clip: visible));
-          }
-          // Empty apertures of open doors remain selectable, but a foreground
-          // solid still masks them just like the operation indication.
-          elementPaths[operation.id] = elementPaths.containsKey(operation.id)
-              ? (Path()
-                  ..addPath(elementPaths[operation.id]!, Offset.zero)
-                  ..addPath(visible, Offset.zero))
-              : visible;
-        }
+    for (var i = 0; i < symbols.length; i++) {
+      final symbol = symbols[i], visible = path(data.apertures[i]);
+      if (visible.getBounds().isEmpty) continue;
+      final detail =
+          openingDetailLevels[symbol.id] ?? FenestrationElevationDetail.clean2D;
+      if (detail != FenestrationElevationDetail.outerContourOnly &&
+          detail != FenestrationElevationDetail.hidden) {
+        operations.add((lines: symbol.lines, clip: visible));
       }
+      elementPaths[symbol.id] = ArchitectMeshSection.unionPaths([
+        if (elementPaths[symbol.id] != null) elementPaths[symbol.id]!,
+        visible,
+      ]);
     }
     final slopes = project == null
         ? <ArchitectElevationSlope>[]
         : ArchitectElevationSlope.build(project, view, elementPaths);
+    var bounds = data.bounds;
     for (final slope in slopes) {
-      final arrowBounds = Rect.fromPoints(slope.start, slope.end).inflate(.25);
-      bounds = bounds?.expandToInclude(arrowBounds) ?? arrowBounds;
+      final box = Rect.fromPoints(slope.start, slope.end).inflate(.25);
+      bounds = bounds?.expandToInclude(box) ?? box;
     }
     return ArchitectBuildingElevation(
       faces,
@@ -720,25 +693,6 @@ class ArchitectBuildingElevation {
   static bool _hasArea(List<Offset> p) =>
       p.length >= 3 && _area2(p).abs() > 1e-14;
 
-  static List<Offset> _clip2(
-    List<Offset> input,
-    double Function(Offset) distance,
-  ) {
-    if (input.isEmpty) return [];
-    final result = <Offset>[];
-    var previous = input.last, dp = distance(input.last);
-    for (final current in input) {
-      final dc = distance(current);
-      if ((dp >= 0) != (dc >= 0)) {
-        result.add(previous + (current - previous) * (dp / (dp - dc)));
-      }
-      if (dc >= 0) result.add(current);
-      previous = current;
-      dp = dc;
-    }
-    return result;
-  }
-
   static List<Vector3> _clip3(
     List<Vector3> input,
     double Function(Vector3) distance,
@@ -757,44 +711,5 @@ class ArchitectBuildingElevation {
       dp = dc;
     }
     return output;
-  }
-}
-
-class _ElevationPlane {
-  final double u, v, w;
-  final String? silhouette;
-  Path path;
-  final sources = <String, Path>{};
-  final pieces = <({List<Offset> points, String? source})>[];
-  _ElevationPlane(this.u, this.v, this.w, this.path, {this.silhouette});
-  double depth(double x, double z) => u * x + v * z + w;
-}
-
-class _ElevationOcclusionIndex {
-  late final Rect bounds;
-  late final List<_ElevationPlane> leaves;
-  _ElevationOcclusionIndex? left, right;
-  _ElevationOcclusionIndex(List<_ElevationPlane> faces) {
-    final boxes = {for (final face in faces) face: face.path.getBounds()};
-    bounds = boxes.values.fold<Rect?>(null, (a, b) => a?.expandToInclude(b) ?? b) ?? Rect.zero;
-    if (faces.length <= 8) {
-      leaves = faces;
-      return;
-    }
-    leaves = const [];
-    final horizontal = bounds.width >= bounds.height;
-    faces.sort((a, b) => (horizontal ? boxes[a]!.center.dx : boxes[a]!.center.dy)
-      .compareTo(horizontal ? boxes[b]!.center.dx : boxes[b]!.center.dy));
-    final mid = faces.length ~/ 2;
-    left = _ElevationOcclusionIndex(faces.sublist(0, mid));
-    right = _ElevationOcclusionIndex(faces.sublist(mid));
-  }
-  Iterable<_ElevationPlane> overlapping(Rect box) sync* {
-    if (!bounds.overlaps(box)) return;
-    for (final face in leaves) {
-      if (face.path.getBounds().overlaps(box)) yield face;
-    }
-    if (left != null) yield* left!.overlapping(box);
-    if (right != null) yield* right!.overlapping(box);
   }
 }

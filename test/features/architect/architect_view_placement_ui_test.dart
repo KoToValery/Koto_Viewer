@@ -1,3 +1,4 @@
+import 'architect_projection_test_helper.dart' as projection;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,7 +30,7 @@ Offset screen(WidgetTester tester, String key, Offset p) {
 
 Future<void> tap(WidgetTester tester, String key, Offset p) async {
   await tester.tapAt(screen(tester, key, p));
-  await tester.pumpAndSettle();
+  await projection.settleProjection(tester);
 }
 
 void main() {
@@ -52,7 +53,7 @@ void main() {
             capture,
           ),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           painter(tester).project.activeStorey.stairs.single.plan.nosings,
           isNotEmpty,
@@ -78,14 +79,14 @@ void main() {
         await mouse.moveTo(
           screen(tester, 'building-section-plan', const Offset(3.3, .1)),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(painter(tester).draft!.end.dy, closeTo(0, 1e-6));
         await tap(tester, 'building-section-plan', const Offset(3.3, .1));
         expect(controller.project.sections, isEmpty);
         await mouse.moveTo(
           screen(tester, 'building-section-plan', const Offset(1, -.9)),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(painter(tester).draft!.direction.dy, lessThan(0));
         await qa.capturePhone(tester, capture, 'section-direction-$locale');
         await tap(tester, 'building-section-plan', const Offset(1, -.9));
@@ -104,23 +105,23 @@ void main() {
           tester.element(find.byType(ArchitectBuildingSectionsScreen)),
         )!;
         await tester.tap(find.byType(PopupMenuButton<String>));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.tap(find.text(l.architectFacadeReverse));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           controller.project.sections.single.viewDirection,
           -selected.viewDirection,
         );
         controller.undo();
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           controller.project.sections.single.viewDirection,
           selected.viewDirection,
         );
         await tester.tap(find.byType(PopupMenuButton<String>));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.tap(find.text(l.architectViewDepth));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.enterText(
           find.byKey(const ValueKey('architect-view-depth-input')),
           '3.5',
@@ -128,10 +129,10 @@ void main() {
         await tester.tap(
           find.byKey(const ValueKey('architect-view-depth-save')),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(controller.project.sections.single.viewDepth, 3.5);
         controller.undo();
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           controller.project.sections.single.viewDepth,
           selected.viewDepth,
@@ -159,7 +160,7 @@ void main() {
             capture,
           ),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tap(tester, 'architect-facade-plan', const Offset(-1, -2));
         final anchor = screen(
           tester,
@@ -168,13 +169,13 @@ void main() {
         );
         final gesture = await tester.startGesture(anchor - const Offset(45, 0));
         await gesture.moveTo(anchor);
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(painter(tester).draft!.end.dy, closeTo(-2, 1e-6));
         expect(controller.project.elevations, isEmpty);
         expect(controller.canUndo, isFalse);
         await qa.capturePhone(tester, capture, 'facade-drag-$locale');
         await gesture.up();
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
         await mouse.addPointer(
           location: screen(tester, 'architect-facade-plan', const Offset(4, 1)),
@@ -182,7 +183,7 @@ void main() {
         await mouse.moveTo(
           screen(tester, 'architect-facade-plan', const Offset(4, 1.1)),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         final draft = painter(tester).draft!;
         expect(draft.target!.dy, closeTo(0, 1e-6));
         expect(draft.wall!.id, 'front0');
@@ -212,9 +213,9 @@ void main() {
           tester.element(find.byType(ArchitectElevationsScreen)),
         )!;
         await tester.tap(find.byType(PopupMenuButton<String>));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.tap(find.text(l.architectViewDepth));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.enterText(
           find.byKey(const ValueKey('architect-view-depth-input')),
           '-1',
@@ -222,7 +223,7 @@ void main() {
         await tester.tap(
           find.byKey(const ValueKey('architect-view-depth-save')),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(find.text(l.architectViewDepthInvalid), findsOneWidget);
         await tester.tap(
           find.byKey(const ValueKey('architect-view-depth-unlimited')),
@@ -230,10 +231,10 @@ void main() {
         await tester.tap(
           find.byKey(const ValueKey('architect-view-depth-save')),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(controller.project.elevations.single.viewDepth, isNull);
         controller.undo();
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           controller.project.elevations.single.viewDepth,
           closeTo(3.1, .02),

@@ -1410,7 +1410,7 @@
   "architectWallDraftHint": "Задръж → точка · 2 пръста → мащаб",
   "architectColumnPlacementHint": "Задръж → постави · Тап → избор · X → отказ",
   "architectEditHoldHint": "Задръж → редакция · по-дълго → меню",
-  "architectNavigationHint": "Местене / мащаб",
+  "architectNavigationHint": "Плъзни за местене; посочи обект за редакция.",
   "architectWallEditRejected": "Отвор или твърде къса стена.",
   "architectSaveFailed": "Записът не успя. Проверете паметта.",
   "architectWallExterior": "Външна",
@@ -1649,7 +1649,7 @@
   "architectDimensionChainHint": "Избери стени или точки. Зеленото тикче запазва, минусът премахва.",
   "architectDimensionDirectionHint": "Избери стена или линия, успоредна на размерната линия.",
   "architectDimensionPositionHint": "Посочи място за размерната линия или въведи точно отстояние.",
-  "architectSelectionCycleHelp": "Тап добавя/изключва; повторен тап обхожда застъпванията. Задръж за меню.",
+  "architectSelectionCycleHelp": "Тап за избор; повторен тап обхожда застъпванията. Задръж за меню.",
   "architectDimensionOverall": "Общ размер",
   "architectDimensionSnap30cm": "30 см",
   "architectDimensionSnap40cm": "40 см",
@@ -2839,7 +2839,7 @@
   "architectOffsetOuterContour": "Външен контур",
   "architectOffsetInnerContour": "Контур на отвор",
   "architectOffsetContourHint": "Офсет на всички отсечки на избрания контур. Положителните стойности го разширяват, отрицателните го свиват.",
-  "architectToolPan": "Преместване на изгледа",
+  "architectToolPan": "Навигация",
   "architectSelectionClear": "Изчисти",
   "architectSelectRectangleHint": "Посочи два срещуположни ъгъла или издърпай рамка. Два пръста преместват изгледа.",
   "architectSelectPolygonHint": "Постави точки и затвори полигона с първата точка или с отметката.",
@@ -2856,5 +2856,9 @@
   "wallLogSize": "Диаметър {size}",
   "@wallLogSize": {"placeholders": {"size": {"type": "String"}}},
   "wallChooseType": "Избор на тип",
-  "wallSystemOptions": "Детайли на конструкцията"
+  "wallSystemOptions": "Детайли на конструкцията",
+  "architectDrawSelectedType": "Започни чертане: {tool}",
+  "architectToolComponent": "Обект",
+  "architectProjectionLoading": "Изчисляване на изгледа…",
+  "architectProjectionLoadFailed": "Изгледът не може да се изчисли."
 }

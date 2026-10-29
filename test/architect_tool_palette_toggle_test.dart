@@ -1,3 +1,4 @@
+import 'features/architect/architect_tool_test_helper.dart' as tools;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -56,7 +57,7 @@ class _TestToolPaletteHarnessState extends State<_TestToolPaletteHarness> {
 
 void main() {
   group('ArchitectToolPalette Tool Toggle/Deactivate Tests', () {
-    testWidgets('Tapping an active tool button deactivates it back to ArchitectTool.select',
+    testWidgets('Tapping an active tool button deactivates it back to ArchitectTool.pan',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -72,6 +73,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tools.prepare(tester, Icons.line_weight_rounded);
       final wallBtn = find.byKey(const ValueKey('architect-tool-wall'));
       expect(wallBtn, findsOneWidget);
 
@@ -79,7 +81,7 @@ void main() {
       await tester.tap(wallBtn);
       await tester.pumpAndSettle();
 
-      expect(toolEvents.last, equals(ArchitectTool.select));
+      expect(toolEvents.last, equals(ArchitectTool.pan));
 
       // Tapping wall button again when it is inactive must activate wall
       await tester.tap(wallBtn);
@@ -91,7 +93,7 @@ void main() {
       await tester.tap(wallBtn);
       await tester.pumpAndSettle();
 
-      expect(toolEvents.last, equals(ArchitectTool.select));
+      expect(toolEvents.last, equals(ArchitectTool.pan));
     });
 
     testWidgets('Tapping another tool activates it, and repeated tap deactivates it',
@@ -111,6 +113,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // In 'plan' category by default, zone tool is available
+      await tools.prepare(tester, Icons.space_dashboard_rounded);
       final zoneBtn = find.byKey(const ValueKey('architect-tool-zone'));
       expect(zoneBtn, findsOneWidget);
 
@@ -124,10 +127,10 @@ void main() {
       await tester.tap(zoneBtn);
       await tester.pumpAndSettle();
 
-      expect(toolEvents.last, equals(ArchitectTool.select));
+      expect(toolEvents.last, equals(ArchitectTool.pan));
     });
 
-    testWidgets('Tapping select icon when select is already active keeps select',
+    testWidgets('Tapping active select returns to navigation',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -149,7 +152,7 @@ void main() {
       await tester.tap(selectBtn);
       await tester.pumpAndSettle();
 
-      expect(toolEvents.last, equals(ArchitectTool.select));
+      expect(toolEvents.last, equals(ArchitectTool.pan));
     });
   });
 }

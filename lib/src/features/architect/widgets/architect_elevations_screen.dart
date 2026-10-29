@@ -16,6 +16,8 @@ import 'architect_view_plan.dart';
 import 'architect_projection_editor.dart';
 import 'architect_view_depth_dialog.dart';
 import '../services/architect_view_placement.dart';
+import '../services/architect_projection_loader.dart';
+import 'architect_projection_status.dart';
 
 enum _Placement { none, elevation, north }
 
@@ -53,9 +55,10 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
   String? editingId;
   final planTransform = TransformationController();
   final elevationTransform = TransformationController();
-  ArchitectProject? cachedProject;
-  ArchitectElevation? cachedView;
-  ArchitectBuildingElevation? cachedGeometry;
+  late final ArchitectProjectionLoader<ArchitectBuildingElevation>
+  _geometryLoader = ArchitectProjectionLoader<ArchitectBuildingElevation>(() {
+    if (mounted) setState(() {});
+  });
   ArchitectProject get project => widget.controller.project;
   ArchitectElevation? get selected =>
       project.elevations.where((e) => e.id == selectedId).firstOrNull;
@@ -83,6 +86,7 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
 
   @override
   void dispose() {
+    _geometryLoader.dispose();
     widget.controller.removeListener(changed);
     planTransform.dispose();
     elevationTransform.dispose();
@@ -242,12 +246,18 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
         title: Text(l.architectFacades),
         actions: [
           if (value != null && widget.onDraftRequested != null)
-            ArchitectProjectionDrawingMenu(onTerrain:widget.onTerrainRequested==null?null:() {
-              widget.onTerrainRequested!();Navigator.pop(context);
-            },onSelected: (tool) {
-              widget.onDraftRequested!(tool);
-              Navigator.pop(context);
-            }),
+            ArchitectProjectionDrawingMenu(
+              onTerrain: widget.onTerrainRequested == null
+                  ? null
+                  : () {
+                      widget.onTerrainRequested!();
+                      Navigator.pop(context);
+                    },
+              onSelected: (tool) {
+                widget.onDraftRequested!(tool);
+                Navigator.pop(context);
+              },
+            ),
           IconButton(
             key: const ValueKey('architect-facade-new'),
             tooltip: l.architectFacadeNew,
@@ -429,16 +439,18 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
                   if (value == null) {
                     return Center(child: Text(l.architectFacadeStartHint));
                   }
-                  if (!identical(cachedProject, project) ||
-                      !identical(cachedView, value)) {
-                    cachedGeometry = ArchitectBuildingElevation.build(
-                      project,
-                      value,
-                    );
-                    cachedProject = project;
-                    cachedView = value;
-                  }
-                  final geometry = cachedGeometry!;
+                  final source = project;
+                  _geometryLoader.ensure(
+                    source,
+                    value.id,
+                    () => ArchitectBuildingElevation.buildAsync(source, value),
+                  );
+                  Widget status() => ArchitectProjectionStatus(
+                    failed: _geometryLoader.failed,
+                    onRetry: () => setState(_geometryLoader.invalidate),
+                  );
+                  final geometry = _geometryLoader.data;
+                  if (geometry == null) return status();
                   final bounds = geometry.bounds.inflate(.6);
                   final scale =
                       math.min(
@@ -446,7 +458,7 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
                         size.height / bounds.height,
                       ) *
                       .9;
-                  return ColoredBox(
+                  final drawing = ColoredBox(
                     color: Colors.white,
                     child: geometry.faces.isEmpty && geometry.terrain.isEmpty
                         ? Center(
@@ -525,6 +537,18 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
                             ],
                           ),
                   );
+                  return Stack(
+                    children: [
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          ignoring: _geometryLoader.loading,
+                          child: drawing,
+                        ),
+                      ),
+                      if (_geometryLoader.loading || _geometryLoader.failed)
+                        Positioned.fill(child: status()),
+                    ],
+                  );
                 },
               ),
             ),
@@ -597,19 +621,38 @@ class ArchitectFacadePainter extends CustomPainter {
       canvas.restore();
     }
     if (geometry.terrain.length >= 2) {
-      final ground=geometry.terrain;
-      final band=Path()..addPolygon([...ground,
-        for(final p in ground.reversed) p-const Offset(0,.35)],true);
-      final screenBand=band.transform(matrix.storage);
-      canvas.save(); canvas.clipPath(screenBand);
-      canvas.drawPath(ArchitectHatchGeometry.path(boundary:screenBand,
-        pattern:ArchitectHatchPattern.presets.firstWhere((p)=>p.id=='earth'),
-        unitsPerMm:ArchitectTextScope.current==null ? 3 :
-          ArchitectTextScope.current!.denominator/1000*scale),
-        Paint()..color=stroke..style=PaintingStyle.stroke..strokeWidth=.65);
+      final ground = geometry.terrain;
+      final band = Path()
+        ..addPolygon([
+          ...ground,
+          for (final p in ground.reversed) p - const Offset(0, .35),
+        ], true);
+      final screenBand = band.transform(matrix.storage);
+      canvas.save();
+      canvas.clipPath(screenBand);
+      canvas.drawPath(
+        ArchitectHatchGeometry.path(
+          boundary: screenBand,
+          pattern: ArchitectHatchPattern.presets.firstWhere(
+            (p) => p.id == 'earth',
+          ),
+          unitsPerMm: ArchitectTextScope.current == null
+              ? 3
+              : ArchitectTextScope.current!.denominator / 1000 * scale,
+        ),
+        Paint()
+          ..color = stroke
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = .65,
+      );
       canvas.restore();
-      canvas.drawPath((Path()..addPolygon(ground,false)).transform(matrix.storage),
-        Paint()..color=stroke..style=PaintingStyle.stroke..strokeWidth=1.3);
+      canvas.drawPath(
+        (Path()..addPolygon(ground, false)).transform(matrix.storage),
+        Paint()
+          ..color = stroke
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.3,
+      );
     }
     final labels = <Rect>[];
     Offset screen(Offset p) => MatrixUtils.transformPoint(matrix, p);

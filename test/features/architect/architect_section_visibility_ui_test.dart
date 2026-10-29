@@ -1,3 +1,4 @@
+import 'architect_projection_test_helper.dart' as projection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,9 +16,9 @@ Future<void> choose(WidgetTester tester, String key, String label) async {
   final dropdown = find.byKey(ValueKey(key));
   await tester.ensureVisible(dropdown);
   await tester.tap(dropdown);
-  await tester.pumpAndSettle();
+  await projection.settleProjection(tester);
   await tester.tap(find.text(label).last);
-  await tester.pumpAndSettle();
+  await projection.settleProjection(tester);
 }
 
 void main() {
@@ -43,13 +44,13 @@ void main() {
             key,
           ),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.tap(find.byType(PopupMenuButton<String>));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await tester.tap(
           find.byKey(const ValueKey('architect-section-visibility')),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await choose(
           tester,
           'section-visibility-default-gutters',
@@ -64,7 +65,7 @@ void main() {
         expect(find.text(l.architectSectionVisibility), findsOneWidget);
         await qa.capturePhone(tester, key, 'section-visibility-$locale');
         await tester.tap(find.byKey(const ValueKey('section-visibility-save')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(controller.undoCount, 1);
         expect(
           controller.project.sectionVisibility.modeFor(geometry.gutters),
@@ -77,13 +78,13 @@ void main() {
         expect(controller.project.sections.last.visibility.categories, isEmpty);
         expect(tester.takeException(), isNull);
         controller.undo();
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(
           controller.project.sectionVisibility.modeFor(geometry.gutters),
           geometry.full,
         );
         controller.redo();
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
 
         // Cancel retains both project and view rules.
         final before = controller.project;
@@ -93,14 +94,14 @@ void main() {
           controller,
           sectionId: geometry.throughPipe.id,
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await choose(
           tester,
           'section-visibility-view-downpipes',
           l.architectSectionInherit,
         );
         await tester.tap(find.text(l.cancel));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await canceled;
         expect(identical(controller.project, before), isTrue);
 
@@ -109,14 +110,14 @@ void main() {
           controller,
           sectionId: geometry.throughPipe.id,
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await choose(
           tester,
           'section-visibility-view-downpipes',
           l.architectSectionInherit,
         );
         await tester.tap(find.byKey(const ValueKey('section-visibility-save')));
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         await inherited;
         expect(
           controller.project.sections.first.visibility.categories.containsKey(
@@ -138,11 +139,11 @@ void main() {
       addTearDown(controller.dispose);
       await workspace.open(tester, controller);
       await tester.tap(find.byKey(const ValueKey('architect-view-section')));
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       await tester.tap(
         find.byKey(const ValueKey('architect-section-visibility')),
       );
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(
         find.byKey(const ValueKey('section-visibility-default-gutters')),
         findsOneWidget,
@@ -155,14 +156,14 @@ void main() {
       expect(tester.takeException(), isNull);
       final l = lookupAppLocalizations(const Locale('en'));
       await tester.tap(find.text(l.cancel));
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       await views.select(tester, 'section', geometry.front.id);
       await tester.tap(find.byKey(const ValueKey('architect-view-section')));
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       await tester.tap(
         find.byKey(const ValueKey('architect-section-visibility')),
       );
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(
         find.byKey(const ValueKey('section-visibility-view-gutters')),
         findsOneWidget,

@@ -1,3 +1,4 @@
+import 'architect_projection_test_helper.dart' as projection;
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -61,32 +62,45 @@ void main() {
     await icons.load();
   });
   setUp(() => SharedPreferences.setMockInitialValues({}));
-  testWidgets('workspace opens slab layers through properties and saves to shared history', (tester) async {
-    final controller = ArchitectCommandController(fixture.slabProject());
-    addTearDown(controller.dispose);
-    await workspace.open(tester, controller);
-    await tools.choose(tester, Icons.layers_rounded);
-    final gesture = await tester.startGesture(workspace.screen(tester, const Offset(2, 2)));
-    await tester.pump(const Duration(milliseconds: 451)); await gesture.up();
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('architect-selection-properties')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('architect-property-slab-layers')));
-    await tester.pumpAndSettle();
-    expect(find.byType(ArchitectSlabLayersDialog), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('slab-layers-save')));
-    await tester.pumpAndSettle();
-    expect(controller.project.activeStorey.slabs.single.assemblyId, isNotNull);
-    expect(controller.project.activeStorey.slabs.single.thickness, .2);
-    controller.undo(); await tester.pumpAndSettle();
-    expect(controller.project.activeStorey.slabs.single.assemblyId, isNull);
-    await tester.tap(find.byKey(const ValueKey('architect-view-section')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('architect-building-sections')));
-    await tester.pumpAndSettle();
-    expect(find.byType(ArchitectBuildingSectionsScreen), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'workspace opens slab layers through properties and saves to shared history',
+    (tester) async {
+      final controller = ArchitectCommandController(fixture.slabProject());
+      addTearDown(controller.dispose);
+      await workspace.open(tester, controller);
+      await tools.choose(tester, Icons.near_me_outlined);
+      await projection.settleProjection(tester);
+      await workspace.wallTap(tester, const Offset(2, 2));
+      await projection.settleProjection(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('architect-selection-properties')),
+      );
+      await projection.settleProjection(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('architect-property-slab-layers')),
+      );
+      await projection.settleProjection(tester);
+      expect(find.byType(ArchitectSlabLayersDialog), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('slab-layers-save')));
+      await projection.settleProjection(tester);
+      expect(
+        controller.project.activeStorey.slabs.single.assemblyId,
+        isNotNull,
+      );
+      expect(controller.project.activeStorey.slabs.single.thickness, .2);
+      controller.undo();
+      await projection.settleProjection(tester);
+      expect(controller.project.activeStorey.slabs.single.assemblyId, isNull);
+      await tester.tap(find.byKey(const ValueKey('architect-view-section')));
+      await projection.settleProjection(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('architect-building-sections')),
+      );
+      await projection.settleProjection(tester);
+      expect(find.byType(ArchitectBuildingSectionsScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
   for (final locale in ['bg', 'en']) {
     testWidgets('slab editor fits phone and edits a lower layer ($locale)', (
       tester,
@@ -122,7 +136,7 @@ void main() {
         ),
       );
       await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(tester.takeException(), isNull);
       final lower = find.widgetWithText(
         ChoiceChip,
@@ -130,19 +144,19 @@ void main() {
       );
       await tester.ensureVisible(lower);
       await tester.tap(lower);
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(tester.takeException(), isNull);
       final xps = find.widgetWithText(ListTile, 'XPS');
       await tester.ensureVisible(xps);
       await tester.tap(xps);
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(
         find.text(locale == 'bg' ? 'Дебелина (mm)' : 'Thickness (mm)'),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
       await tester.tap(find.text(locale == 'bg' ? 'Отказ' : 'Cancel').last);
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       await capturePhone(tester, key, 'layers-$locale');
     });
 
@@ -183,7 +197,7 @@ void main() {
             capture: key,
           ),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(tester.takeException(), isNull);
         await capturePhone(tester, key, 'section-$locale');
         controller.commit(
@@ -191,10 +205,10 @@ void main() {
             controller.project.activeStorey.copyWith(slabs: []),
           ),
         );
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(tester.takeException(), isNull);
         controller.undo();
-        await tester.pumpAndSettle();
+        await projection.settleProjection(tester);
         expect(tester.takeException(), isNull);
       },
     );
@@ -207,24 +221,24 @@ void main() {
     await tester.pumpWidget(
       host(ArchitectBuildingSectionsScreen(controller: controller), 'en'),
     );
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     final bounds = tester.getRect(
       find.byKey(const ValueKey('building-section-plan')),
     );
     await tester.tapAt(bounds.centerLeft + const Offset(30, 0));
     await tester.pump();
     await tester.tapAt(bounds.centerRight - const Offset(30, 0));
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     expect(controller.project.sections, isEmpty);
     await tester.tapAt(bounds.center + const Offset(0, 30));
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     expect(controller.project.sections, hasLength(1));
     expect(
       find.byKey(const ValueKey('section-add-slab-detail')),
       findsOneWidget,
     );
     controller.undo();
-    await tester.pumpAndSettle();
+    await projection.settleProjection(tester);
     expect(controller.project.sections, isEmpty);
     expect(tester.takeException(), isNull);
   });
@@ -240,9 +254,9 @@ void main() {
       await tester.pumpWidget(
         host(ArchitectBuildingSectionsScreen(controller: controller), 'en'),
       );
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       await tester.tap(find.byKey(const ValueKey('section-add-slab-detail')));
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       Offset screen(Offset model) {
         final rect = tester.getRect(
           find.byKey(const ValueKey('building-section-view')),
@@ -255,23 +269,23 @@ void main() {
         final scale = sx < sy ? sx : sy;
         return rect.center +
             Offset(
-              (model.dx - bounds.center.dx) * scale,
+              (fixture.cut.drawingStation(model.dx) - bounds.center.dx) * scale,
               -(model.dy - bounds.center.dy) * scale,
             );
       }
 
       await tester.tapAt(screen(const Offset(4, -.1)));
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       await tester.tapAt(screen(const Offset(7, .5)));
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       final detail = controller.project.sections.single.details.single;
       expect(detail.slabId, fixture.slab.id);
       expect(detail.station, closeTo(4, 1e-8));
       controller.undo();
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(controller.project.sections.single.details, isEmpty);
       controller.redo();
-      await tester.pumpAndSettle();
+      await projection.settleProjection(tester);
       expect(controller.project.sections.single.details.single.id, detail.id);
       expect(tester.takeException(), isNull);
     },

@@ -4303,7 +4303,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectEditHoldHint => 'Hold → edit · longer → menu';
 
   @override
-  String get architectNavigationHint => 'Pan / zoom';
+  String get architectNavigationHint => 'Drag to pan; tap an object to edit.';
 
   @override
   String get architectWallEditRejected => 'Opening or wall too short.';
@@ -5082,7 +5082,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectSelectionCycleHelp =>
-      'Tap to add or remove; repeated taps cycle overlaps. Hold for actions.';
+      'Tap to select; repeated taps cycle overlaps. Hold for actions.';
 
   @override
   String get architectDimensionOverall => 'Overall dimension';
@@ -8473,7 +8473,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Offset every edge of the selected contour. Positive values expand it; negative values shrink it.';
 
   @override
-  String get architectToolPan => 'Pan view';
+  String get architectToolPan => 'Navigate';
 
   @override
   String get architectSelectionClear => 'Clear';
@@ -8527,4 +8527,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wallSystemOptions => 'Construction details';
+
+  @override
+  String architectDrawSelectedType(String tool) {
+    return 'Start drawing: $tool';
+  }
+
+  @override
+  String get architectToolComponent => 'Object';
+
+  @override
+  String get architectProjectionLoading => 'Calculating view…';
+
+  @override
+  String get architectProjectionLoadFailed => 'Could not calculate the view.';
 }

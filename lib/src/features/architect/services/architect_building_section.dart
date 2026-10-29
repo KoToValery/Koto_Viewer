@@ -52,6 +52,15 @@ class ArchitectSectionRegion {
 
 class ArchitectBuildingSection {
   static final _drawingCache = Expando<List<ArchitectSectionRegion>>();
+  static final _elementPathCache = Expando<Map<String, Path>>();
+  static final _projectionRequests =
+      Expando<
+        ({
+          List<List<Offset>> masks,
+          Set<String> openingIds,
+          Map<String, Path> apertures,
+        })
+      >();
   final List<ArchitectSectionRegion> regions;
   final Rect bounds;
   final Map<String, Path> roofProfiles;
@@ -178,18 +187,22 @@ class ArchitectBuildingSection {
     return result;
   }
 
-  Map<String, Path> get elementPaths {
-    final result = <String, Path>{...?background?.elementPaths};
+  Map<String, Path> get elementPaths =>
+      _elementPathCache[this] ??= _buildElementPaths();
+
+  Map<String, Path> _buildElementPaths() {
+    final operands = <String, List<Path>>{
+      for (final entry
+          in background?.elementPaths.entries ?? <MapEntry<String, Path>>[])
+        entry.key: [entry.value],
+    };
     for (final region in regions) {
-      result[region.sourceId] = result.containsKey(region.sourceId)
-          ? Path.combine(
-              PathOperation.union,
-              result[region.sourceId]!,
-              region.path,
-            )
-          : region.path;
+      (operands[region.sourceId] ??= []).add(region.path);
     }
-    return result;
+    return Map.unmodifiable({
+      for (final entry in operands.entries)
+        entry.key: ArchitectMeshSection.unionPaths(entry.value),
+    });
   }
 
   static SlabMaterial _mapRoofMaterial(ArchitectRoofMaterial? mat) =>
@@ -244,13 +257,14 @@ class ArchitectBuildingSection {
 
   static ArchitectBuildingSection build(
     ArchitectProject project,
-    ArchitectSection cut,
-  ) {
+    ArchitectSection cut, {
+    bool includeProjection = true,
+  }) {
     if (cut.steps.isNotEmpty) {
       final regions = <ArchitectSectionRegion>[];
-      final profiles = <String, Path>{};
+      final profiles = <String, List<Path>>{};
       final faces = <Path>[];
-      final paths = <String, Path>{};
+      final paths = <String, List<Path>>{};
       final operations = <({Path lines, Path clip})>[];
       Rect? bounds;
       for (final s in cut.segments) {
@@ -283,12 +297,9 @@ class ArchitectBuildingSection {
             ),
           );
         }
-        void merge(Map<String, Path> target, Map<String, Path> source) {
+        void merge(Map<String, List<Path>> target, Map<String, Path> source) {
           for (final e in source.entries) {
-            final p = e.value.shift(shift);
-            target[e.key] = target.containsKey(e.key)
-                ? Path.combine(PathOperation.union, target[e.key]!, p)
-                : p;
+            (target[e.key] ??= []).add(e.value.shift(shift));
           }
         }
 
@@ -308,11 +319,17 @@ class ArchitectBuildingSection {
       return ArchitectBuildingSection(
         regions,
         box,
-        roofProfiles: profiles,
+        roofProfiles: {
+          for (final e in profiles.entries)
+            e.key: ArchitectMeshSection.unionPaths(e.value),
+        },
         background: ArchitectBuildingElevation(
           faces,
           box,
-          elementPaths: paths,
+          elementPaths: {
+            for (final e in paths.entries)
+              e.key: ArchitectMeshSection.unionPaths(e.value),
+          },
           operations: operations,
         ),
       );
@@ -407,18 +424,19 @@ class ArchitectBuildingSection {
     }
 
     */
-    Path? sliceMesh(List<Triangle3D> tris, {double endpointTolerance = 1e-6,
+    Path? sliceMesh(
+      List<Triangle3D> tris, {
+      double endpointTolerance = 1e-6,
       bool exact = false,
     }) {
       if (exact) {
-        final path = ArchitectMeshSection.vertical(tris, cut.start, cut.axis);
-        return path.getBounds().isEmpty
-            ? null
-            : ArchitectMeshSection.combine(
-                PathOperation.intersect,
-                path,
-                Path()..addRect(Rect.fromLTRB(0, -1e6, cut.length, 1e6)),
-              );
+        final path = ArchitectMeshSection.verticalClipped(
+          tris,
+          cut.start,
+          cut.axis,
+          cut.length,
+        );
+        return path.getBounds().isEmpty ? null : path;
       }
       final section = ArchitectStairSection.build(
         [StairSolid(StairSolidMaterial.concrete, tris)],
@@ -472,8 +490,12 @@ class ArchitectBuildingSection {
       }
 
       final useCompositions = floor.walls.any(
-        (w) => w.system.isSpecial ||
-            w.layers.isNotEmpty || w.hasInsulation || w.plinth.enabled || w.isCurved,
+        (w) =>
+            w.system.isSpecial ||
+            w.layers.isNotEmpty ||
+            w.hasInsulation ||
+            w.plinth.enabled ||
+            w.isCurved,
       );
       final sharedSolids = useCompositions
           ? ArchitectWallSolids.build(
@@ -506,23 +528,23 @@ class ArchitectBuildingSection {
         // discard all but the lowest band (for example a 0.85 m plinth).
         // Intersect the closed solids separately, then unite their 2D regions.
         final materialSections = <ArchitectWallSolid, Path>{};
+        final specialSections = <Path>[];
         Path? accumulated;
         void addWallSection(Path? path) {
           if (path == null) return;
+          if (wall.system.isSpecial) {
+            specialSections.add(path);
+            return;
+          }
           accumulated = accumulated == null
               ? path
-              : (wall.system.isSpecial
-                    ? ArchitectMeshSection.combine(
-                        PathOperation.union,
-                        accumulated!,
-                        path,
-                      )
-                    : Path.combine(PathOperation.union, accumulated!, path));
+              : Path.combine(PathOperation.union, accumulated!, path);
         }
 
         if (useCompositions) {
           for (final solid in sharedSolids.where((s) => s.wall.id == wall.id)) {
-            final path = sliceMesh(solid.triangles,
+            final path = sliceMesh(
+              solid.triangles,
               exact: wall.system.isSpecial,
             );
             if (path == null) continue;
@@ -539,6 +561,9 @@ class ArchitectBuildingSection {
           }
         } else {
           accumulated = sliceMesh(wallMesh);
+        }
+        if (specialSections.isNotEmpty) {
+          accumulated = ArchitectMeshSection.unionPaths(specialSections);
         }
         var wallPath = accumulated;
         if (wallPath == null) continue;
@@ -619,10 +644,10 @@ class ArchitectBuildingSection {
           final clippedAperture = wall.system.isSpecial
               ? (Path()..addRect(apertureRect))
               : Path.combine(
-            PathOperation.intersect,
-            Path()..addRect(apertureRect),
-            wallPath!,
-          );
+                  PathOperation.intersect,
+                  Path()..addRect(apertureRect),
+                  wallPath!,
+                );
           if (clippedAperture.getBounds().isEmpty) continue;
           wallPath = Path.combine(
             PathOperation.difference,
@@ -669,20 +694,27 @@ class ArchitectBuildingSection {
             )) {
               final raw = materialSections[part];
               if (raw == null) continue;
-              var region = (wall.system.isSpecial
+              // Log courses and casings already own disjoint 3D volumes after
+              // their saddle/opening cuts. Repeatedly subtracting each course
+              // from a growing 2D remainder retraces every other round profile.
+              var region =
+                  (wall.system.isSpecial
                   ? ArchitectMeshSection.combine
                   : Path.combine)(
-                PathOperation.intersect,
-                remaining,
-                raw,
-              );
-              remaining = (wall.system.isSpecial
-                  ? ArchitectMeshSection.combine
-                  : Path.combine)(
-                PathOperation.difference,
-                remaining,
-                region,
-              );
+                    PathOperation.intersect,
+                    wall.system.isLog ? wallPath : remaining,
+                    raw,
+                  );
+              if (!wall.system.isLog) {
+                remaining =
+                    (wall.system.isSpecial
+                    ? ArchitectMeshSection.combine
+                    : Path.combine)(
+                      PathOperation.difference,
+                      remaining,
+                      region,
+                    );
+              }
               if (!wall.system.isSpecial) {
                 final resolved = wall.resolvedLayers;
                 final firstCoreIdx = resolved.indexWhere(
@@ -900,7 +932,9 @@ class ArchitectBuildingSection {
                   ? member.polygon
                   : null,
               customFillColor: _roofMemberColor(member),
-              hatchPattern: member.material == ArchitectRoofMaterial.metalSeam || member.material==ArchitectRoofMaterial.steel
+              hatchPattern:
+                  member.material == ArchitectRoofMaterial.metalSeam ||
+                      member.material == ArchitectRoofMaterial.steel
                   ? ArchitectSectionHatch.preset('metal')
                   : null,
             ),
@@ -1063,6 +1097,21 @@ class ArchitectBuildingSection {
               for (final p in [t.v0, t.v1, t.v2]) Offset(p.x, p.y) - shift,
             ],
     ];
+    if (!includeProjection) {
+      final partial = _finishProjection(
+        cut,
+        regions,
+        roofProfiles,
+        cutOpeningAperturePaths,
+        const ArchitectBuildingElevation([], Rect.zero),
+      );
+      _projectionRequests[partial] = (
+        masks: cutMasks,
+        openingIds: cutOpeningIds,
+        apertures: cutOpeningAperturePaths,
+      );
+      return partial;
+    }
     final projected = ArchitectBuildingElevation.build(
       project,
       ArchitectElevation(
@@ -1075,7 +1124,149 @@ class ArchitectBuildingSection {
       sectionVisibility: visibility,
       cutOpeningIds: cutOpeningIds,
     );
-    // Cut fills participate in the same double-precision visibility pass;
+    return _finishProjection(
+      cut,
+      regions,
+      roofProfiles,
+      cutOpeningAperturePaths,
+      projected,
+    );
+  }
+
+  static Future<ArchitectBuildingSection> buildAsync(
+    ArchitectProject project,
+    ArchitectSection cut,
+  ) async {
+    // Give the view a frame to show its progress indicator before creating the
+    // native cut paths. The expensive visibility solver runs in compute().
+    await Future<void>.delayed(Duration.zero);
+    if (cut.steps.isNotEmpty) {
+      final regions = <ArchitectSectionRegion>[];
+      final profiles = <String, List<Path>>{}, paths = <String, List<Path>>{};
+      final faces = <Path>[], operations = <({Path lines, Path clip})>[];
+      Rect? bounds;
+      for (final segment in cut.segments) {
+        final depth = cut.viewDepth == null
+            ? null
+            : cut.viewDepth! - segment.offset;
+        if (depth != null && depth <= 0) continue;
+        final part = await buildAsync(
+          project,
+          cut.copyWith(
+            start: segment.start,
+            end: segment.end,
+            steps: const [],
+            details: const [],
+            viewDepth: depth,
+          ),
+        );
+        final shift = Offset(segment.station, 0);
+        regions.addAll([
+          for (final r in part.regions)
+            ArchitectSectionRegion(
+              r.sourceId,
+              r.material,
+              r.path.shift(shift),
+              slab: r.slab,
+              roof: r.roof,
+              customFillColor: r.customFillColor,
+              hatchPattern: r.hatchPattern,
+              timberCrossSectionPolygon: r.timberCrossSectionPolygon
+                  ?.map((p) => p + shift)
+                  .toList(),
+            ),
+        ]);
+        for (final e in part.roofProfiles.entries) {
+          (profiles[e.key] ??= []).add(e.value.shift(shift));
+        }
+        for (final e
+            in part.background?.elementPaths.entries ??
+                <MapEntry<String, Path>>[]) {
+          (paths[e.key] ??= []).add(e.value.shift(shift));
+        }
+        faces.addAll(part.background?.faces.map((p) => p.shift(shift)) ?? []);
+        operations.addAll([
+          for (final op
+              in part.background?.operations ?? <({Path lines, Path clip})>[])
+            (lines: op.lines.shift(shift), clip: op.clip.shift(shift)),
+        ]);
+        bounds =
+            bounds?.expandToInclude(part.bounds.shift(shift)) ??
+            part.bounds.shift(shift);
+      }
+      final box = bounds ?? Rect.fromLTWH(0, 0, cut.length, 3);
+      return ArchitectBuildingSection(
+        regions,
+        box,
+        roofProfiles: {
+          for (final e in profiles.entries)
+            e.key: ArchitectMeshSection.unionPaths(e.value),
+        },
+        background: ArchitectBuildingElevation(
+          faces,
+          box,
+          elementPaths: {
+            for (final e in paths.entries)
+              e.key: ArchitectMeshSection.unionPaths(e.value),
+          },
+          operations: operations,
+        ),
+      );
+    }
+    for (final floor in project.storeys) {
+      if (!floor.walls.any((w) => w.system.isSpecial)) continue;
+      final openings = <String>{
+        for (final wall in floor.walls)
+          for (final op in _findCutOpeningsOnWall(wall, floor.elevation, cut))
+            op.id,
+      };
+      final solids = await ArchitectWallSolids.buildAsync(
+        floor,
+        project,
+        suppressedOpeningIds: openings,
+        specialSuppressedOpeningIds: const {},
+      );
+      await ArchitectMeshSection.prepareVertical(
+        solids.where((s) => s.componentId != null).map((s) => s.triangles),
+        cut.start,
+        cut.axis,
+        cut.length,
+      );
+    }
+    final partial = build(project, cut, includeProjection: false);
+    final request = _projectionRequests[partial]!;
+    final projected = await ArchitectBuildingElevation.buildAsync(
+      project,
+      ArchitectElevation(
+        id: cut.id,
+        start: cut.start,
+        end: cut.end,
+        viewDepth: cut.viewDepth,
+      ),
+      occlusionMasks: request.masks,
+      cutOpeningIds: request.openingIds,
+      sectionVisibility: cut.visibility.resolved(project.sectionVisibility),
+    );
+    return _finishProjection(
+      cut,
+      partial.regions,
+      partial.roofProfiles,
+      request.apertures,
+      projected,
+    );
+  }
+
+  static ArchitectBuildingSection _finishProjection(
+    ArchitectSection cut,
+    List<ArchitectSectionRegion> regions,
+    Map<String, Path> roofProfiles,
+    Map<String, Path> cutOpeningAperturePaths,
+    ArchitectBuildingElevation projected,
+  ) {
+    final shift = Offset(
+      cut.length / 2,
+      0,
+    ); // Cut fills participate in the same double-precision visibility pass;
     // never subtract them again from an already encoded float32 contour.
     Path exposed(Path path) => path.shift(shift);
     final backgroundFaces = <Path>[];
