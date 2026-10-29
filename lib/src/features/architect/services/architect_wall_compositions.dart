@@ -1,5 +1,6 @@
 import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
+import '../models/architect_wall.dart';
 import 'architect_command_controller.dart';
 import 'architect_wall_connection_policy.dart';
 
@@ -85,8 +86,8 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
                           thickness: type.totalThickness,
                           insulationThicknessOverride: type.insulationThickness,
                           wallTypeId: type.id,
-                          location: type.resolvedLocation,
-                          loadBearing: type.isLoadBearing,
+                          location: wall.locationMode == WallResolutionMode.manual
+                              ? wall.location : type.resolvedLocation,
                           parapet: type.isParapet,
                           parapetFinish: type.isParapet
                               ? type.parapetFinish

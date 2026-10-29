@@ -26,6 +26,7 @@ import 'architect_dimension_chain.dart';
 import 'architect_stair_rules.dart';
 import 'architect_panel_supports.dart';
 import 'architect_wall_connection_policy.dart';
+import 'architect_wall_exterior_resolver.dart';
 export 'architect_element_id.dart';
 
 /// Commands accept model metres, never screen coordinates or a camera scale.
@@ -841,7 +842,9 @@ class MirrorArchitectWalls extends ArchitectModelCommand {
       storey.copyWith(
         walls: [
           for (final w in storey.walls)
-            wallIds.contains(w.id) ? w.mirroredAroundCore() : w,
+            wallIds.contains(w.id) ? w.mirroredAroundCore().copyWith(
+              exteriorSideMode: WallResolutionMode.manual,
+            ) : w,
         ],
       ),
     );
@@ -2109,26 +2112,44 @@ class ArchitectCommandController
         restoreView: _retainViewedStorey,
       );
   ArchitectProject get project => value;
+  Set<String> exteriorReviewWallIds = const {};
 
   @override
-  void restore(ArchitectProject next) => super.restore(
-    ArchitectRoofPlacement.resolve(ArchitectSlabAssemblies.resolve(next)),
-  );
+  void undo() { exteriorReviewWallIds = const {}; super.undo(); }
+  @override
+  void redo() { exteriorReviewWallIds = const {}; super.redo(); }
 
   @override
-  void commit(ArchitectProject next) => super.commit(
-    ArchitectRoofPlacement.resolve(
-      ArchitectSlabAssemblies.resolve(
-        ArchitectWallConnectionPolicy.validateProject(
-          ArchitectPanelSupports.resolve(
-            ArchitectDimensionChain.resolve(ArchitectStairRules.resolve(next)),
-            previous: project,
+  void restore(ArchitectProject next) {
+    exteriorReviewWallIds = const {};
+    super.restore(ArchitectRoofPlacement.resolve(ArchitectSlabAssemblies.resolve(next)));
+  }
+
+  @override
+  void commit(ArchitectProject next) {
+    next = ArchitectWallExteriorResolver.resolve(next, project);
+    final oldWalls = {for (final s in project.storeys) for (final w in s.walls) w.id: w};
+    exteriorReviewWallIds = {
+      for (final s in next.storeys) for (final w in s.walls)
+        if (w.isExterior && w.exteriorResolved &&
+            (oldWalls[w.id]?.location != w.location ||
+             oldWalls[w.id]?.exteriorSide != w.exteriorSide ||
+             oldWalls[w.id]?.exteriorResolved != true)) w.id,
+    };
+    super.commit(
+      ArchitectRoofPlacement.resolve(
+        ArchitectSlabAssemblies.resolve(
+          ArchitectWallConnectionPolicy.validateProject(
+            ArchitectPanelSupports.resolve(
+              ArchitectDimensionChain.resolve(ArchitectStairRules.resolve(next)),
+              previous: project,
+            ),
           ),
         ),
+        previous: project,
       ),
-      previous: project,
-    ),
-  );
+    );
+  }
 
   static bool _sameModel(ArchitectProject a, ArchitectProject b) {
     if (identical(a, b)) return true;

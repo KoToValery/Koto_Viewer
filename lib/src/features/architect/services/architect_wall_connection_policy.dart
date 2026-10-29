@@ -5,6 +5,32 @@ import '../models/architect_project.dart';
 
 /// Construction intent is shared by automatic detection and command execution.
 class ArchitectWallConnectionPolicy {
+  /// Largest physical distance from the core axis to either finish face.
+  static double coreJunctionReach(ArchitectWall wall) =>
+      wall.coreThickness / 2 +
+      math.max(wall.exteriorBuildUp, wall.interiorBuildUp);
+
+  /// Stable across a flip that moves the leading line but keeps the core fixed.
+  static Offset? coreJunction(ArchitectWall a, ArchitectWall b) {
+    if (a.isCurved || b.isCurved || a.isDetached || b.isDetached) return null;
+    final u = a.unitVector, v = b.unitVector;
+    final cross = u.dx * v.dy - u.dy * v.dx;
+    if (cross.abs() < 1e-7) return null;
+    final d = b.coreCenterStart - a.coreCenterStart;
+    final s = (d.dx * v.dy - d.dy * v.dx) / cross;
+    final t = (d.dx * u.dy - d.dy * u.dx) / cross;
+    bool accepts(ArchitectWall w, double along, double reach) =>
+        along >= -reach - .0001 &&
+        along <= w.length + reach + .0001 &&
+        (along > reach + .0001 || w.connectStart) &&
+        (along < w.length - reach - .0001 || w.connectEnd);
+    if (!accepts(a, s, coreJunctionReach(b)) ||
+        !accepts(b, t, coreJunctionReach(a))) {
+      return null;
+    }
+    return a.coreCenterStart + u * s;
+  }
+
   static bool compatibleLogs(ArchitectWall a, ArchitectWall b) =>
       a.system.isLog &&
       b.system.isLog &&

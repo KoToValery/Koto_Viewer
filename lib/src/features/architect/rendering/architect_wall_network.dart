@@ -3,6 +3,7 @@ import 'dart:ui';
 import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../models/architect_wall.dart';
 import 'architect_path_solid.dart';
+import '../services/architect_wall_connection_policy.dart';
 
 /// Plan solids are joined by their physical faces, not by axis position.
 class ArchitectWallNetwork {
@@ -170,16 +171,21 @@ class ArchitectWallNetwork {
           b.endPoint,
           finite: true,
         );
-        if (finiteNode == null &&
-            ![
+        final faceContact = [
               if (a.connectStart) (a.startPoint, b),
               if (a.connectEnd) (a.endPoint, b),
               if (b.connectStart) (b.startPoint, a),
               if (b.connectEnd) (b.endPoint, a),
-            ].any((contact) => inside(contact.$2, contact.$1))) {
+            ].any((contact) => inside(contact.$2, contact.$1));
+        // A recognized corner survives movement of an inner/outer leading line
+        // during an orientation flip; its physical core has not moved.
+        final coreFallback = finiteNode == null && !faceContact &&
+            (a.exteriorResolved || b.exteriorResolved) &&
+            ArchitectWallConnectionPolicy.coreJunction(a, b) != null;
+        if (finiteNode == null && !faceContact && !coreFallback) {
           continue;
         }
-        if (solidOnly &&
+        if (solidOnly && !coreFallback &&
             [a, b].every(
               (w) =>
                   (node - w.startPoint).distance > 1e-8 &&

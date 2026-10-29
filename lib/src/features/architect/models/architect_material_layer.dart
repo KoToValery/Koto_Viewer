@@ -3,6 +3,7 @@ import 'dart:ui';
 /// Shared building-layer vocabulary; element placement and slopes belong to adapters.
 enum ArchitectMaterial {
   brick,
+  aeratedConcrete,
   concrete,
   timber,
   panel,
@@ -77,6 +78,7 @@ class ArchitectMaterialLayer {
         .any(
           (l) => !{
             ArchitectMaterial.brick,
+            ArchitectMaterial.aeratedConcrete,
             ArchitectMaterial.concrete,
             ArchitectMaterial.timber,
             ArchitectMaterial.panel,
@@ -91,6 +93,7 @@ class ArchitectMaterialLayer {
 extension ArchitectMaterialAppearance on ArchitectMaterial {
   Color get color => switch (this) {
     ArchitectMaterial.brick => const Color(0xFFC98E73),
+    ArchitectMaterial.aeratedConcrete => const Color(0xFFD9D7CB),
     ArchitectMaterial.concrete => const Color(0xFF9FAEB5),
     ArchitectMaterial.timber => const Color(0xFFD7A86E),
     ArchitectMaterial.panel => const Color(0xFFC4C9CF),
@@ -107,6 +110,7 @@ extension ArchitectMaterialAppearance on ArchitectMaterial {
   };
   ArchitectLayerRole get defaultRole => switch (this) {
     ArchitectMaterial.brick ||
+    ArchitectMaterial.aeratedConcrete ||
     ArchitectMaterial.concrete ||
     ArchitectMaterial.timber ||
     ArchitectMaterial.pir ||

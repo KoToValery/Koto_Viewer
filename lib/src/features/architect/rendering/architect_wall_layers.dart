@@ -10,8 +10,8 @@ import '../services/architect_slab_geometry.dart';
 import '../services/architect_roof_geometry.dart';
 import '../services/architect_roof_junctions.dart';
 
-/// Insulation follows the explicit exterior side. All layers retain the
-/// original reference nodes, so their faces share the same mitred junctions.
+/// Insulation follows the explicit exterior side. All layers share the same
+/// reference and physical core junctions, including after an orientation flip.
 class ArchitectWallLayers {
   late final Map<(ArchitectMaterial, ArchitectLayerRole), Path>
   materialContours = () {

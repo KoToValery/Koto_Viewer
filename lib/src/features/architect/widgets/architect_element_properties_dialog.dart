@@ -1002,6 +1002,48 @@ class _ArchitectElementPropertiesDialogState
                     ],
                   ),
                 numberField('height', true),
+                if (normalWalls) ...[
+                  Tooltip(
+                    message: l.wallLocationAutoHelp,
+                    child: DropdownButtonFormField<String>(
+                      key: const ValueKey('architect-property-location'),
+                      decoration: InputDecoration(labelText: l.wallLocation),
+                      initialValue: records.map((e) => e['locationMode'] == 'manual'
+                          ? e['location'] as String? ?? 'interior' : 'automatic').toSet().length == 1
+                          ? records.first['locationMode'] == 'manual'
+                            ? records.first['location'] as String? ?? 'interior' : 'automatic'
+                          : null,
+                      items: [
+                        DropdownMenuItem(value: 'automatic', child: Text(l.wallAutomatic)),
+                        DropdownMenuItem(value: 'exterior', child: Text(l.wallExterior)),
+                        DropdownMenuItem(value: 'interior', child: Text(l.wallInterior)),
+                      ],
+                      onChanged: (v) => setState(() {
+                        if (v == null) return;
+                        texts['locationMode'] = v == 'automatic' ? 'automatic' : 'manual';
+                        if (v == 'automatic') { texts.remove('location'); }
+                        else { texts['location'] = v; }
+                      }),
+                    ),
+                  ),
+                  Tooltip(
+                    message: l.wallSideAutoHelp,
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey('architect-property-sideMode-${texts['exteriorSideMode'] ?? ''}'),
+                      decoration: InputDecoration(labelText: l.wallExteriorSideLabel),
+                      initialValue: texts['exteriorSideMode'] ??
+                          (records.map((e) => e['exteriorSideMode'] ?? 'automatic').toSet().length == 1
+                            ? records.first['exteriorSideMode'] as String? ?? 'automatic' : null),
+                      items: [
+                        DropdownMenuItem(value: 'automatic', child: Text(l.wallAutomatic)),
+                        DropdownMenuItem(value: 'manual', child: Text(l.wallManual)),
+                      ],
+                      onChanged: (v) => setState(() {
+                        if (v != null) texts['exteriorSideMode'] = v;
+                      }),
+                    ),
+                  ),
+                ],
                 if (normalWalls)
                   CheckboxListTile(
                     key: const ValueKey(
@@ -1034,14 +1076,15 @@ class _ArchitectElementPropertiesDialogState
                             : Theme.of(context).colorScheme.primary)
                         : Theme.of(context).colorScheme.onSurface,
                   ),
-                  onPressed: () => setState(
-                    () => texts['exteriorSide'] =
+                  onPressed: () => setState(() {
+                    texts['exteriorSideMode'] = 'manual';
+                    texts['exteriorSide'] =
                         (texts['exteriorSide'] ??
                                 records.first['exteriorSide']) ==
                             'right'
                         ? 'left'
-                        : 'right',
-                  ),
+                        : 'right';
+                  }),
                 ),
                 DropdownButtonFormField<String>(
                   key: const ValueKey('architect-property-referenceLine'),

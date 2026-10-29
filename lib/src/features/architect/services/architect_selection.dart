@@ -504,6 +504,9 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
               'customText',
               'referenceLine',
               'exteriorSide',
+              'location',
+              'locationMode',
+              'exteriorSideMode',
               'styleId',
               'followStoreyHeight',
               'coreMaterial',
@@ -528,6 +531,12 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         if (value.key == 'cutDisplayMode' &&
             !ArchitectCutDisplayMode.values.any((m) => m.name == value.value)) {
           throw ArgumentError('Invalid cut display mode');
+        }
+        if (value.key == 'location' &&
+            !ArchitectWallLocation.values.any((v) => v.name == value.value) ||
+            {'locationMode', 'exteriorSideMode'}.contains(value.key) &&
+            !WallResolutionMode.values.any((v) => v.name == value.value)) {
+          throw ArgumentError('Invalid wall resolution mode');
         }
         if (value.key == 'isAutoBoundary') {
           if (!{'true', 'false'}.contains(value.value)) {
@@ -575,6 +584,12 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         }
       }
       if (e.containsKey('referenceLine')) {
+        if (textValues.containsKey('location') && !textValues.containsKey('locationMode')) {
+          e['locationMode'] = 'manual';
+        }
+        if (textValues.containsKey('exteriorSide') && !textValues.containsKey('exteriorSideMode')) {
+          e['exteriorSideMode'] = 'manual';
+        }
         final old = project.activeStorey.walls.firstWhere(
           (w) => w.id == e['id'],
         );

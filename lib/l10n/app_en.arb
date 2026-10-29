@@ -3117,8 +3117,6 @@
   "@wallTypeInt12Partition": { "description": "Interior partition wall name" },
   "wallTypeExt25Brick": "Brick 25 cm (no insulation)",
   "@wallTypeExt25Brick": { "description": "Uninsulated brick wall name" },
-  "wallTypeBearing25": "Concrete Shear Wall 25 cm",
-  "@wallTypeBearing25": { "description": "Bearing wall name" },
   "wallTypeParapet12": "Balcony Parapet 12 cm",
   "@wallTypeParapet12": { "description": "Balcony parapet wall name" },
   "architectDefaultProjectName": "Architectural Project",
@@ -4306,7 +4304,6 @@
   "wallLocation": "Use",
   "wallExterior": "Exterior",
   "wallInterior": "Interior",
-  "wallBearing": "Load-bearing",
   "wallLayerCore": "Core",
   "wallLayerInsulation": "Insulation",
   "wallLayerFinish": "Finish",
@@ -5047,5 +5044,14 @@
   "@architectDrawSelectedType": {"description": "Tooltip for drawing another element of the selected type", "placeholders": {"tool": {"type": "String"}}},
   "architectToolComponent": "Object",
   "architectProjectionLoading": "Calculating view…",
-  "architectProjectionLoadFailed": "Could not calculate the view."
+  "architectProjectionLoadFailed": "Could not calculate the view.",
+  "wallMaterialAeratedConcrete": "Aerated concrete",
+  "wallAutomatic": "Auto",
+  "wallManual": "Manual",
+  "wallExteriorSideLabel": "Exterior side",
+  "wallLocationAutoHelp": "Determines wall location from the closed contours of the storey.",
+  "wallSideAutoHelp": "Points the exterior side outwards. Flipping manually preserves your chosen side.",
+  "wallTypeLocationHint": "Initial value; automatic detection refines it from the contour.",
+  "wallExteriorUnresolved": "Some walls need their location or exterior side specified.",
+  "wallExteriorReview": "Review"
 }

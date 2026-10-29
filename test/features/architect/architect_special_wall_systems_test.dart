@@ -38,7 +38,6 @@ ArchitectWall special(
     layers: type.resolvedLayers,
     thickness: type.totalThickness,
     location: type.resolvedLocation,
-    loadBearing: type.isLoadBearing,
     followStoreyHeight: false,
     height: height,
   );

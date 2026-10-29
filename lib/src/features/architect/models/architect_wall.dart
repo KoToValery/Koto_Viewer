@@ -17,6 +17,9 @@ enum WallReferenceLine { center, inner, outer, left, right }
 
 enum WallExteriorSide { left, right }
 
+/// Classification and orientation can be overridden independently per instance.
+enum WallResolutionMode { automatic, manual }
+
 /// The physical line picked on a source wall, rather than its saved reference.
 class ArchitectWallAttachment {
   final ArchitectWall source;
@@ -68,7 +71,9 @@ class ArchitectWall {
   final double arcBulge;
   final List<ArchitectMaterialLayer> layers;
   final ArchitectWallLocation? location;
-  final bool loadBearing;
+  final WallResolutionMode locationMode;
+  final WallResolutionMode exteriorSideMode;
+  final bool exteriorResolved;
   final ArchitectWallPlinth plinth;
   final Offset startPoint;
   final Offset endPoint;
@@ -100,7 +105,9 @@ class ArchitectWall {
     this.arcBulge = 0,
     this.layers = const [],
     this.location,
-    this.loadBearing = false,
+    this.locationMode = WallResolutionMode.automatic,
+    this.exteriorSideMode = WallResolutionMode.automatic,
+    this.exteriorResolved = false,
     this.plinth = const ArchitectWallPlinth(),
     required this.startPoint,
     required this.endPoint,
@@ -336,10 +343,6 @@ class ArchitectWall {
       : (insulationThicknessOverride ?? _standardInsulation[wallTypeId] ?? 0)
             .clamp(0.0, math.max(0.0, thickness - .001));
   bool get hasInsulation => insulationThickness > 1e-4;
-  bool get isLoadBearing =>
-      layers.isEmpty && wallTypeId == 'bearing_25_concrete'
-      ? true
-      : loadBearing;
   bool get isInterior => !isExterior;
   bool get isExterior => location == null
       ? !{'int_12_partition', 'bearing_25_concrete'}.contains(wallTypeId) &&
@@ -440,7 +443,9 @@ class ArchitectWall {
     double? arcBulge,
     List<ArchitectMaterialLayer>? layers,
     ArchitectWallLocation? location,
-    bool? loadBearing,
+    WallResolutionMode? locationMode,
+    WallResolutionMode? exteriorSideMode,
+    bool? exteriorResolved,
     ArchitectWallPlinth? plinth,
     Offset? startPoint,
     Offset? endPoint,
@@ -468,7 +473,9 @@ class ArchitectWall {
     arcBulge: arcBulge ?? this.arcBulge,
     layers: layers ?? _layersForThickness(thickness),
     location: location ?? this.location,
-    loadBearing: loadBearing ?? this.loadBearing,
+    locationMode: locationMode ?? this.locationMode,
+    exteriorSideMode: exteriorSideMode ?? this.exteriorSideMode,
+    exteriorResolved: exteriorResolved ?? this.exteriorResolved,
     plinth: plinth ?? this.plinth,
     startPoint: startPoint ?? this.startPoint,
     endPoint: endPoint ?? this.endPoint,
@@ -590,13 +597,15 @@ class ArchitectWall {
   }
 
   Map<String, dynamic> toJson() => {
+    'locationMode': locationMode.name,
+    'exteriorSideMode': exteriorSideMode.name,
+    'exteriorResolved': exteriorResolved,
     if (system.isSpecial) 'system': system.toJson(),
     if (system.isSpecial) 'systemPlacement': systemPlacement.toJson(),
     'id': id,
     if (isCurved) 'arcBulge': arcBulge,
     'layers': layers.map((l) => l.toJson()).toList(),
     if (location != null) 'location': location!.name,
-    'loadBearing': loadBearing,
     'plinth': plinth.toJson(),
     'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
@@ -620,6 +629,15 @@ class ArchitectWall {
   };
 
   factory ArchitectWall.fromJson(Map<String, dynamic> json) => ArchitectWall(
+    locationMode: WallResolutionMode.values.firstWhere(
+      (v) => v.name == json['locationMode'],
+      orElse: () => WallResolutionMode.automatic,
+    ),
+    exteriorSideMode: WallResolutionMode.values.firstWhere(
+      (v) => v.name == json['exteriorSideMode'],
+      orElse: () => WallResolutionMode.automatic,
+    ),
+    exteriorResolved: json['exteriorResolved'] as bool? ?? false,
     system: ArchitectWallSystem.fromJson(
       json['system'] == null
           ? null
@@ -642,7 +660,6 @@ class ArchitectWall {
     location: ArchitectWallLocation.values
         .where((v) => v.name == json['location'])
         .firstOrNull,
-    loadBearing: json['loadBearing'] as bool? ?? false,
     plinth: ArchitectWallPlinth.fromJson(
       Map<String, dynamic>.from(json['plinth'] as Map? ?? {}),
     ),

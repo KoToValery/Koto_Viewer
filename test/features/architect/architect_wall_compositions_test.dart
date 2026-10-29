@@ -237,11 +237,11 @@ void main() {
         ],
       );
       final changed = SetArchitectWallComposition(
-        type: composition.copyWith(loadBearing: true),
+        type: composition.copyWith(layers: [for (final l in composition.layers) l.role == ArchitectLayerRole.core ? l.copyWith(material: ArchitectMaterial.concrete) : l]),
         replaceTypeId: composition.id,
       ).apply(floors);
       expect(
-        changed.storeys.every((s) => s.walls.every((w) => w.loadBearing)),
+        changed.storeys.every((s) => s.walls.every((w) => w.coreMaterial == WallCoreMaterial.concrete)),
         isTrue,
       );
       expect(changed.activeStorey.walls.first.plinth.height, .6);

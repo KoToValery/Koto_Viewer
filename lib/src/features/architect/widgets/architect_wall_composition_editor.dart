@@ -28,7 +28,6 @@ class _SystemDraft {
   final List<String> dimensions;
   final String name;
   final ArchitectWallLocation location;
-  final bool bearing;
   _SystemDraft(
     this.source,
     this.system,
@@ -36,7 +35,6 @@ class _SystemDraft {
     this.dimensions,
     this.name,
     this.location,
-    this.bearing,
   );
 }
 
@@ -83,7 +81,6 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
       _LayerDraft(layer, widget.project.units),
   ];
   late ArchitectWallLocation location = widget.type.resolvedLocation;
-  late bool bearing = widget.type.isLoadBearing;
   late bool saveToCatalog = widget.type.isCatalogType;
   late ArchitectWallSystem system = widget.type.system;
   late ParapetFinish parapetFinish =
@@ -129,7 +126,6 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
     layers: layers,
     name: name.text.trim(),
     location: location,
-    loadBearing: bearing,
   );
 
   void switchSystem(ArchitectWallSystemKind kind) {
@@ -140,7 +136,6 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
       [for (final d in drafts) d.input.text],
       name.text,
       location,
-      bearing,
     );
     final previous = systemDrafts[kind];
     final template =
@@ -166,7 +161,6 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
     }
     name.text = previous?.name ?? '';
     location = previous?.location ?? template.resolvedLocation;
-    bearing = previous?.bearing ?? template.isLoadBearing;
     expandedLayer = null;
     changed();
   }
@@ -291,7 +285,6 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
         id: pickedType != null && detailsChanged ? widget.type.id : source.id,
         layers: layers,
         location: location,
-        loadBearing: bearing,
         usage: source.isParapet
             ? WallUsage.parapet
             : location == ArchitectWallLocation.exterior
@@ -354,7 +347,6 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
         ]);
       name.text = result.type.isFactoryPreset ? '' : result.type.name;
       location = result.type.resolvedLocation;
-      bearing = result.type.isLoadBearing;
       parapetFinish = result.type.parapetFinish ?? ParapetFinish.cap;
       expandedLayer = null;
     });
@@ -770,6 +762,8 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                             isExpanded: true,
                             decoration: InputDecoration(
                               labelText: l.wallLocation,
+                              suffixIcon: Tooltip(message: l.wallTypeLocationHint,
+                                child: const Icon(Icons.info_outline, size: 18)),
                             ),
                             items: [
                               for (final v in ArchitectWallLocation.values)
@@ -790,15 +784,6 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                                 });
                               }
                             },
-                          ),
-                          CheckboxListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(l.wallBearing),
-                            value: bearing,
-                            onChanged: (v) => setState(() {
-                              changed();
-                              bearing = v ?? false;
-                            }),
                           ),
                         ],
                         if (source.isParapet &&

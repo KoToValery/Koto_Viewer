@@ -55,7 +55,6 @@ class CutWallJunctionSpan {
   bool get isFoundationBearing =>
       !wall.isParapet &&
       (wall.isExterior ||
-          wall.isLoadBearing ||
           wall.coreThickness >= 0.20 - 1e-4 ||
           wall.coreMaterial == WallCoreMaterial.concrete ||
           wall.system.isLog ||
@@ -783,7 +782,8 @@ class ArchitectSectionJunctions {
     final isStudFrame = wall.system.isFrame;
     final isSandwichPanel = wall.system.isPanel;
     final isBrick =
-        !wall.system.isSpecial && wall.coreMaterial == WallCoreMaterial.brick;
+        !wall.system.isSpecial &&
+        {WallCoreMaterial.brick, WallCoreMaterial.aeratedConcrete}.contains(wall.coreMaterial);
 
     if (isSandwichPanel) {
       for (final (f0, f1) in cw.fullIntervals) {

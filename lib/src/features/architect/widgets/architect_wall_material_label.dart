@@ -4,6 +4,7 @@ import '../models/architect_wall_type.dart';
 extension WallCoreMaterialLabel on WallCoreMaterial {
   String label(AppLocalizations l) => switch (this) {
     WallCoreMaterial.brick => l.architectMaterialBrick,
+    WallCoreMaterial.aeratedConcrete => l.wallMaterialAeratedConcrete,
     WallCoreMaterial.concrete => l.architectMaterialConcrete,
     WallCoreMaterial.timber => l.architectMaterialTimber,
     WallCoreMaterial.panel => l.architectMaterialPanel,

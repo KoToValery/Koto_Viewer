@@ -4185,9 +4185,6 @@ class AppLocalizationsBg extends AppLocalizations {
   String get wallTypeExt25Brick => 'Тухла 25 cm (без изолация)';
 
   @override
-  String get wallTypeBearing25 => 'Стоманобетон 25 cm';
-
-  @override
   String get wallTypeParapet12 => 'Борд 12 cm';
 
   @override
@@ -6582,9 +6579,6 @@ class AppLocalizationsBg extends AppLocalizations {
   String get wallInterior => 'Вътрешна';
 
   @override
-  String get wallBearing => 'Носеща';
-
-  @override
   String get wallLayerCore => 'Ядро';
 
   @override
@@ -8579,4 +8573,35 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectProjectionLoadFailed => 'Изгледът не може да се изчисли.';
+
+  @override
+  String get wallMaterialAeratedConcrete => 'Газобетон';
+
+  @override
+  String get wallAutomatic => 'Авто';
+
+  @override
+  String get wallManual => 'Ръчно';
+
+  @override
+  String get wallExteriorSideLabel => 'Външна страна';
+
+  @override
+  String get wallLocationAutoHelp =>
+      'Определя предназначението по затворените контури на етажа.';
+
+  @override
+  String get wallSideAutoHelp =>
+      'Насочва външната страна навън. Ръчното обръщане запазва избраната страна.';
+
+  @override
+  String get wallTypeLocationHint =>
+      'Начална стойност; автоматиката я уточнява по контура.';
+
+  @override
+  String get wallExteriorUnresolved =>
+      'Някои стени изискват уточняване на предназначението или страната.';
+
+  @override
+  String get wallExteriorReview => 'Уточни';
 }

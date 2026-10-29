@@ -29,7 +29,7 @@ class ArchitectWallCatalogGroup {
               '${l.material.name}:${type.isParapet ? '' : l.thickness.toStringAsPrecision(12)}',
         )
         .join('|');
-    return '${type.system.isSpecial ? '${type.system.signature}/' : ''}${ArchitectWallCategory.of(type).name}/${type.isLoadBearing}/'
+    return '${type.system.isSpecial ? '${type.system.signature}/' : ''}${ArchitectWallCategory.of(type).name}/'
         '${type.isParapet ? (type.parapetFinish ?? ParapetFinish.cap).name : ''}/$signature';
   }
 

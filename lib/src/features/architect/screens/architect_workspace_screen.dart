@@ -2900,7 +2900,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             layers: wall.resolvedLayers,
             system: wall.system,
             location: wall.location,
-            loadBearing: wall.isLoadBearing,
             customHeight: wall.height,
             parapetFinish: wall.parapetFinish,
           );
@@ -4252,6 +4251,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         referenceLine: _wallReference,
 
         exteriorSide: _wallExteriorSide,
+      exteriorSideMode: _wallExteriorSideMode,
 
         system: _activeWallType?.system ?? const ArchitectWallSystem(),
         layers: _activeWallType?.layers ?? const [],
@@ -4417,6 +4417,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   WallReferenceLine _wallReference = WallReferenceLine.center;
 
   WallExteriorSide _wallExteriorSide = WallExteriorSide.left;
+  WallResolutionMode _wallExteriorSideMode = WallResolutionMode.automatic;
 
   String? _wallExtendId;
 
@@ -10584,6 +10585,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _handleTap(Offset rawModel) {
+    _modelCommands.exteriorReviewWallIds = const {};
     if (_activeTool == ArchitectTool.select && _marqueeTool.isDrafting) {
       if (_marqueeTool.mode == ArchitectSelectMode.rectangle) {
         _commitMarquee(rectangleEnd: rawModel);
@@ -13241,7 +13243,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     ]);
 
-    if (chain) { _draftChainIds.add(id); } else { _resetDraftGroup(); }
+    if (chain) { _draftChainIds.add(id); } else {
+      _resetDraftGroup();
+      if (command is CreateArchitectWall) _offerWallExteriorReview({id});
+    }
 
   }
 
@@ -13410,8 +13415,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       location: _activeWallType?.resolvedLocation,
 
-      loadBearing: _activeWallType?.isLoadBearing ?? false,
-
       height: _activeWallType?.customHeight ?? _project.activeStorey.height,
 
       followStoreyHeight: _activeWallType?.isParapet != true,
@@ -13425,6 +13428,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       referenceLine: _wallReference,
 
       exteriorSide: _wallExteriorSide,
+      exteriorSideMode: _wallExteriorSideMode,
 
       insulationThicknessOverride: _activeWallType?.insulationThickness,
 
@@ -13443,6 +13447,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
 
       _syncAutoZones(_project.activeStorey);
+      _wallExteriorSideMode = WallResolutionMode.automatic;
 
       _wallDirectionLocked = false;
 
@@ -13484,7 +13489,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  void _offerWallExteriorReview(Set<String> ids) {
+    final unresolved = _project.activeStorey.walls.where((w) => ids.contains(w.id) &&
+      !w.isParapet && !w.exteriorResolved &&
+      (w.locationMode == WallResolutionMode.automatic ||
+       w.exteriorSideMode == WallResolutionMode.automatic)).map((w) => w.id).toSet();
+    if (unresolved.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final l = context.l10n;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(l.wallExteriorUnresolved),
+        action: SnackBarAction(label: l.wallExteriorReview, onPressed: () {
+          setState(() {
+            _selectionIds..clear()..addAll(unresolved);
+            _selectedElementId = unresolved.first;
+          });
+          _showProperties();
+        }),
+      ));
+    });
+  }
+
   void _finishChainedWall() {
+    _offerWallExteriorReview(_liveDraftChainIds);
 
     _finishDraftGroup();
 
@@ -19680,6 +19708,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _handleSelectionTap(Offset point) {
+    _modelCommands.exteriorReviewWallIds = const {};
 
     final selectedRoof = _selectedRoof;
 
@@ -20790,8 +20819,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           : ArchitectWallLocation.interior,
 
-      loadBearing: wall.isLoadBearing,
-
       customHeight: previous?.customHeight,
 
       parapetFinish: wall.parapetFinish,
@@ -21431,8 +21458,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   ? ArchitectWallLocation.exterior
 
                   : ArchitectWallLocation.interior,
-
-              loadBearing: next.isLoadBearing,
 
               customHeight: previous?.customHeight,
 
@@ -28407,6 +28432,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           onPressed: () => setState(() {
 
                             _wallStartAttachment = null;
+                            _wallExteriorSideMode = WallResolutionMode.manual;
 
                             _wallExteriorSide =
 
@@ -29574,6 +29600,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     activeWallReference: _wallReference,
 
     activeWallExteriorSide: _wallExteriorSide,
+    activeWallSideManual: _wallExteriorSideMode == WallResolutionMode.manual,
+    activeWallIsExterior: _activeWallType?.resolvedLocation != ArchitectWallLocation.interior,
+    wallExteriorReviewIds: _modelCommands.exteriorReviewWallIds,
 
     showWallCursor: !_placingWithHold,
 

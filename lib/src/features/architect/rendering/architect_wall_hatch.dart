@@ -23,6 +23,15 @@ class ArchitectWallHatch {
     final paint = Paint()
       ..color = color
       ..strokeWidth = .6 / scale;
+    if ((material ?? wall.coreMaterial) == WallCoreMaterial.aeratedConcrete) {
+      for (var x = (bounds.left / spacing).floor() * spacing; x < bounds.right; x += spacing) {
+        for (var y = (bounds.top / spacing).floor() * spacing; y < bounds.bottom; y += spacing) {
+          canvas.drawCircle(Offset(x + spacing * .5, y + spacing * .5), .65 / scale, paint);
+        }
+      }
+      canvas.restore();
+      return;
+    }
     final start = ((bounds.left - bounds.height) / spacing).floor() * spacing;
     for (var x = start; x <= bounds.right; x += spacing) {
       void line(double offset) => canvas.drawLine(

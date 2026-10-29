@@ -4168,9 +4168,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wallTypeExt25Brick => 'Brick 25 cm (no insulation)';
 
   @override
-  String get wallTypeBearing25 => 'Concrete Shear Wall 25 cm';
-
-  @override
   String get wallTypeParapet12 => 'Balcony Parapet 12 cm';
 
   @override
@@ -6556,9 +6553,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wallInterior => 'Interior';
 
   @override
-  String get wallBearing => 'Load-bearing';
-
-  @override
   String get wallLayerCore => 'Core';
 
   @override
@@ -8548,4 +8542,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectProjectionLoadFailed => 'Could not calculate the view.';
+
+  @override
+  String get wallMaterialAeratedConcrete => 'Aerated concrete';
+
+  @override
+  String get wallAutomatic => 'Auto';
+
+  @override
+  String get wallManual => 'Manual';
+
+  @override
+  String get wallExteriorSideLabel => 'Exterior side';
+
+  @override
+  String get wallLocationAutoHelp =>
+      'Determines wall location from the closed contours of the storey.';
+
+  @override
+  String get wallSideAutoHelp =>
+      'Points the exterior side outwards. Flipping manually preserves your chosen side.';
+
+  @override
+  String get wallTypeLocationHint =>
+      'Initial value; automatic detection refines it from the contour.';
+
+  @override
+  String get wallExteriorUnresolved =>
+      'Some walls need their location or exterior side specified.';
+
+  @override
+  String get wallExteriorReview => 'Review';
 }

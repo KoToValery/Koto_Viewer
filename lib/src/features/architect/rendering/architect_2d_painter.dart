@@ -23,6 +23,7 @@ import 'architect_grid_axis_painter_helper.dart';
 import 'architect_zone_painter_helper.dart';
 import 'architect_scene_geometry.dart';
 import 'architect_wall_network.dart';
+import 'architect_wall_exterior_painter.dart';
 import 'architect_wall_layers.dart';
 import 'architect_wall_hatch.dart';
 import '../models/architect_wall.dart';
@@ -93,6 +94,8 @@ class Architect2dPainter extends CustomPainter {
   final WallReferenceLine activeWallReference;
   final String? activeWallTypeId;
   final WallExteriorSide activeWallExteriorSide;
+  final bool activeWallIsExterior, activeWallSideManual;
+  final Set<String> wallExteriorReviewIds;
   final double? activeWallInsulation;
   final bool showWallCursor;
   final (Offset, Offset)? wallCutGuideLine;
@@ -225,6 +228,9 @@ class Architect2dPainter extends CustomPainter {
     this.activeWallReference = WallReferenceLine.center,
     this.activeWallTypeId,
     this.activeWallExteriorSide = WallExteriorSide.left,
+    this.activeWallIsExterior = true,
+    this.activeWallSideManual = false,
+    this.wallExteriorReviewIds = const {},
     this.activeWallInsulation,
     this.showWallCursor = true,
     this.wallCutGuideLine,
@@ -479,6 +485,14 @@ class Architect2dPainter extends CustomPainter {
       _drawWallEndpointLeaderLine(canvas);
       _drawNewPointPreview(canvas);
       _drawActiveDrafting(canvas);
+      final directionIds = {...wallExteriorReviewIds, ...selectedElementIds,
+        ?selectedElementId};
+      for (final wall in project.activeStorey.walls) {
+        if (directionIds.contains(wall.id)) {
+          ArchitectWallExteriorPainter.draw(canvas, wall, zoomScale,
+            palette.foreground(Colors.black87));
+        }
+      }
       for(final id in selectionPreviewActive?selectionPreviewIds:selectedElementIds) {
         final outline=ArchitectSelection.outline(project,id);
         if(selectionPreviewActive && selectionPreviewAddedIds.contains(id)) {
@@ -1712,6 +1726,7 @@ class Architect2dPainter extends CustomPainter {
 
       final wall = ArchitectWall(
         id: 'preview',
+        location: activeWallIsExterior ? ArchitectWallLocation.exterior : ArchitectWallLocation.interior,
         layers:activeWallLayers,
         arcBulge:activeWallArcEnd==null?0:ArchitectWallArc.through(p1,p2,activeDraftEnd!),
         startPoint: p1,
@@ -1731,6 +1746,8 @@ class Architect2dPainter extends CustomPainter {
           ..style = PaintingStyle.stroke,
         hatchColor: const Color(0xFF00B8CC),
       );
+      ArchitectWallExteriorPainter.draw(canvas, wall, zoomScale,
+        palette.foreground(Colors.black87), provisional: !activeWallSideManual);
 
       canvas.drawCircle(
         p1,

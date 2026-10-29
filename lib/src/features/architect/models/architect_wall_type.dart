@@ -6,7 +6,7 @@ export 'architect_wall_system.dart';
 import 'dart:ui';
 import '../../../core/l10n/generated/app_localizations.dart';
 
-enum WallCoreMaterial { brick, concrete, timber, panel }
+enum WallCoreMaterial { brick, aeratedConcrete, concrete, timber, panel }
 
 enum WallInsulationMaterial { xps, eps, stoneWool }
 
@@ -17,9 +17,6 @@ enum WallUsage {
 
   /// Interior partition wall (e.g. 12 cm single brick).
   interior,
-
-  /// Reinforced concrete shear wall or load-bearing wall.
-  bearing,
 
   /// Balcony or terrace parapet / balustrade edge.
   parapet,
@@ -40,7 +37,6 @@ class ArchitectWallType {
   final String id;
   final List<ArchitectMaterialLayer> layers;
   final ArchitectWallLocation? location;
-  final bool loadBearing;
   final String name;
   final String? labelId;
 
@@ -69,7 +65,6 @@ class ArchitectWallType {
     this.colorValue = 0xFF78909C,
     this.layers = const [],
     this.location,
-    this.loadBearing = false,
   }) : _totalThickness = totalThickness,
        _brickThickness = brickThickness,
        _insulationThickness = insulationThickness;
@@ -77,8 +72,8 @@ class ArchitectWallType {
   double get totalThickness =>
       system.additionalDepth +
       (layers.isEmpty
-      ? _totalThickness
-      : layers.fold<double>(0, (v, l) => v + l.thickness));
+          ? _totalThickness
+          : layers.fold<double>(0, (v, l) => v + l.thickness));
   double get brickThickness => layers.isEmpty
       ? _brickThickness
       : layers
@@ -106,9 +101,7 @@ class ArchitectWallType {
             ),
           ArchitectMaterialLayer(
             id: 'core',
-            material: usage == WallUsage.bearing
-                ? ArchitectMaterial.concrete
-                : ArchitectMaterial.brick,
+            material: ArchitectMaterial.brick,
             role: ArchitectLayerRole.core,
             thickness: totalThickness - insulationThickness,
           ),
@@ -120,11 +113,11 @@ class ArchitectWallType {
         'ext_25_12_eps',
         'int_12_partition',
         'ext_25_brick',
+        'int_25_brick',
+        'int_10_aerated',
         'bearing_25_concrete',
         'parapet_12',
       }.contains(id);
-  bool get isLoadBearing =>
-      layers.isEmpty && usage == WallUsage.bearing ? true : loadBearing;
   bool get isParapet => usage == WallUsage.parapet;
   bool get hasInsulation => insulationThickness > 0.001;
 
@@ -187,11 +180,49 @@ class ArchitectWallType {
       ArchitectWallType(
         id: 'bearing_25_concrete',
         name: '',
-        usage: WallUsage.bearing,
+        usage: WallUsage.interior,
         totalThickness: 0.25,
         brickThickness: 0.25,
         insulationThickness: 0.0,
         colorValue: 0xFF78909C,
+        layers: const [
+          ArchitectMaterialLayer(
+            id: 'core',
+            material: ArchitectMaterial.concrete,
+            role: ArchitectLayerRole.core,
+            thickness: .25,
+          ),
+        ],
+      ),
+      const ArchitectWallType(
+        id: 'int_25_brick',
+        name: '',
+        usage: WallUsage.interior,
+        totalThickness: .25,
+        brickThickness: .25,
+        layers: [
+          ArchitectMaterialLayer(
+            id: 'core',
+            material: ArchitectMaterial.brick,
+            role: ArchitectLayerRole.core,
+            thickness: .25,
+          ),
+        ],
+      ),
+      const ArchitectWallType(
+        id: 'int_10_aerated',
+        name: '',
+        usage: WallUsage.interior,
+        totalThickness: .10,
+        brickThickness: .10,
+        layers: [
+          ArchitectMaterialLayer(
+            id: 'core',
+            material: ArchitectMaterial.aeratedConcrete,
+            role: ArchitectLayerRole.core,
+            thickness: .10,
+          ),
+        ],
       ),
       ArchitectWallType(
         id: 'parapet_12',
@@ -211,7 +242,6 @@ class ArchitectWallType {
           usage: WallUsage.exterior,
           totalThickness: .24,
           location: ArchitectWallLocation.exterior,
-          loadBearing: true,
           system: ArchitectWallSystem(kind: ArchitectWallSystemKind.roundLogs),
           layers: [
             ArchitectMaterialLayer(
@@ -301,13 +331,11 @@ class ArchitectWallType {
     int? colorValue,
     List<ArchitectMaterialLayer>? layers,
     ArchitectWallLocation? location,
-    bool? loadBearing,
   }) => ArchitectWallType(
     system: system ?? this.system,
     id: id ?? this.id,
     layers: layers ?? this.layers,
     location: location ?? this.location,
-    loadBearing: loadBearing ?? this.loadBearing,
     name: name ?? this.name,
     labelId: labelId ?? this.labelId,
     isCatalogType: isCatalogType ?? this.isCatalogType,
@@ -329,7 +357,6 @@ class ArchitectWallType {
     'usage': usage.name,
     'layers': layers.map((l) => l.toJson()).toList(),
     'location': resolvedLocation.name,
-    'loadBearing': loadBearing || usage == WallUsage.bearing,
     'totalThickness': totalThickness,
     'brickThickness': brickThickness,
     'insulationThickness': insulationThickness,
@@ -356,7 +383,6 @@ class ArchitectWallType {
         location: ArchitectWallLocation.values
             .where((l) => l.name == json['location'])
             .firstOrNull,
-        loadBearing: json['loadBearing'] as bool? ?? json['usage'] == 'bearing',
         name: json['name'] as String,
         labelId: json['labelId'] as String?,
         isCatalogType: json['isCatalogType'] as bool? ?? true,

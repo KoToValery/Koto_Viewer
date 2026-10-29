@@ -1366,7 +1366,6 @@
   "wallTypeExt25Eps12": "Външна 25+12 EPS (37 cm)",
   "wallTypeInt12Partition": "Преградна 12 cm",
   "wallTypeExt25Brick": "Тухла 25 cm (без изолация)",
-  "wallTypeBearing25": "Стоманобетон 25 cm",
   "wallTypeParapet12": "Борд 12 cm",
   "architectDefaultProjectName": "Архитектурен проект",
   "architectStoreyCountChip": "{count, plural, =1{1 етаж} other{{count} етажа}}",
@@ -2154,7 +2153,6 @@
   "wallLocation": "Предназначение",
   "wallExterior": "Външна",
   "wallInterior": "Вътрешна",
-  "wallBearing": "Носеща",
   "wallLayerCore": "Ядро",
   "wallLayerInsulation": "Изолация",
   "wallLayerFinish": "Покритие",
@@ -2862,5 +2860,14 @@
   "architectDrawSelectedType": "Започни чертане: {tool}",
   "architectToolComponent": "Обект",
   "architectProjectionLoading": "Изчисляване на изгледа…",
-  "architectProjectionLoadFailed": "Изгледът не може да се изчисли."
+  "architectProjectionLoadFailed": "Изгледът не може да се изчисли.",
+  "wallMaterialAeratedConcrete": "Газобетон",
+  "wallAutomatic": "Авто",
+  "wallManual": "Ръчно",
+  "wallExteriorSideLabel": "Външна страна",
+  "wallLocationAutoHelp": "Определя предназначението по затворените контури на етажа.",
+  "wallSideAutoHelp": "Насочва външната страна навън. Ръчното обръщане запазва избраната страна.",
+  "wallTypeLocationHint": "Начална стойност; автоматиката я уточнява по контура.",
+  "wallExteriorUnresolved": "Някои стени изискват уточняване на предназначението или страната.",
+  "wallExteriorReview": "Уточни"
 }

@@ -17,7 +17,7 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   test(
-    'Groups preserve identity, separate bearing roles and parapet finishes',
+    'Groups preserve identity, core materials and parapet finishes',
     () {
       final catalog = ArchitectWallType.standardCatalog();
       final insulated = catalog.first;
@@ -101,7 +101,7 @@ void main() {
       final empty = p.copyWith(wallTypes: []);
       expect(
         SetArchitectWallComposition(type: saved).apply(empty).wallTypes.length,
-        6,
+        8,
       );
     },
   );

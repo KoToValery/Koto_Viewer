@@ -7277,12 +7277,6 @@ abstract class AppLocalizations {
   /// **'Brick 25 cm (no insulation)'**
   String get wallTypeExt25Brick;
 
-  /// Bearing wall name
-  ///
-  /// In en, this message translates to:
-  /// **'Concrete Shear Wall 25 cm'**
-  String get wallTypeBearing25;
-
   /// Balcony parapet wall name
   ///
   /// In en, this message translates to:
@@ -11627,12 +11621,6 @@ abstract class AppLocalizations {
   /// **'Interior'**
   String get wallInterior;
 
-  /// No description provided for @wallBearing.
-  ///
-  /// In en, this message translates to:
-  /// **'Load-bearing'**
-  String get wallBearing;
-
   /// No description provided for @wallLayerCore.
   ///
   /// In en, this message translates to:
@@ -15340,6 +15328,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not calculate the view.'**
   String get architectProjectionLoadFailed;
+
+  /// No description provided for @wallMaterialAeratedConcrete.
+  ///
+  /// In en, this message translates to:
+  /// **'Aerated concrete'**
+  String get wallMaterialAeratedConcrete;
+
+  /// No description provided for @wallAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get wallAutomatic;
+
+  /// No description provided for @wallManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get wallManual;
+
+  /// No description provided for @wallExteriorSideLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Exterior side'**
+  String get wallExteriorSideLabel;
+
+  /// No description provided for @wallLocationAutoHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Determines wall location from the closed contours of the storey.'**
+  String get wallLocationAutoHelp;
+
+  /// No description provided for @wallSideAutoHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Points the exterior side outwards. Flipping manually preserves your chosen side.'**
+  String get wallSideAutoHelp;
+
+  /// No description provided for @wallTypeLocationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Initial value; automatic detection refines it from the contour.'**
+  String get wallTypeLocationHint;
+
+  /// No description provided for @wallExteriorUnresolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Some walls need their location or exterior side specified.'**
+  String get wallExteriorUnresolved;
+
+  /// No description provided for @wallExteriorReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get wallExteriorReview;
 }
 
 class _AppLocalizationsDelegate

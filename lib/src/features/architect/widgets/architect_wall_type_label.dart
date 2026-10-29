@@ -116,6 +116,14 @@ extension ArchitectWallTypeLabel on ArchitectWallType {
       if (isParapet) return l10n.architectWallParapetCode(_composition);
       if (layers
           .where((l) => l.role == ArchitectLayerRole.core)
+          .every((l) => l.material == ArchitectMaterial.aeratedConcrete)) {
+        return l10n.wallMaterialThickness(
+          l10n.wallMaterialAeratedConcrete,
+          _composition,
+        );
+      }
+      if (layers
+          .where((l) => l.role == ArchitectLayerRole.core)
           .every((l) => l.material == ArchitectMaterial.concrete)) {
         return l10n.architectWallConcreteCode(_composition);
       }

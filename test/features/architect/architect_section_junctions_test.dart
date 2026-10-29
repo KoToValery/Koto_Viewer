@@ -196,7 +196,6 @@ void main() {
         thickness: 0.25,
         height: 3.0,
         location: ArchitectWallLocation.interior,
-        loadBearing: true,
         coreMaterialOverride: WallCoreMaterial.brick,
       );
       const thinPartition = ArchitectWall(
@@ -206,7 +205,6 @@ void main() {
         thickness: 0.12,
         height: 3.0,
         location: ArchitectWallLocation.interior,
-        loadBearing: false,
         coreMaterialOverride: WallCoreMaterial.brick,
       );
 

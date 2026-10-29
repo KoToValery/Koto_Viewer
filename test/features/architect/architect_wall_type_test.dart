@@ -17,13 +17,13 @@ void main() {
       expect(ArchitectWallType.resolveParapetHeight(storeyElevation: 21.0, storeyIndex: 4), 1.20);
     });
 
-    test('standardCatalog returns 5 predefined wall types with exact physical dimensions', () {
+    test('standardCatalog returns 7 predefined wall types with exact physical dimensions', () {
       final catalog = ArchitectWallType.standardCatalog(
         parapetHeight: 1.05,
         parapetFinish: ParapetFinish.cap,
       );
 
-      expect(catalog.length, 5);
+      expect(catalog.length, 7);
 
       final extInsulated = catalog.firstWhere((w) => w.id == 'ext_25_12_eps');
       expect(extInsulated.brickThickness, 0.25);
@@ -41,7 +41,8 @@ void main() {
 
       final bearing = catalog.firstWhere((w) => w.id == 'bearing_25_concrete');
       expect(bearing.totalThickness, 0.25);
-      expect(bearing.usage, WallUsage.bearing);
+      expect(bearing.usage, WallUsage.interior);
+      expect(bearing.resolvedLayers.single.material, ArchitectMaterial.concrete);
 
       final parapet = catalog.firstWhere((w) => w.id == 'parapet_12');
       expect(parapet.totalThickness, 0.12);
@@ -182,7 +183,7 @@ void main() {
       expect(project.gridAxes.length, 7);
 
       // Wall catalog initialized
-      expect(project.wallTypes.length, 5);
+      expect(project.wallTypes.length, 7);
 
       // 3 storeys -> parapet should be 1.05m
       final parapet = project.wallTypes.firstWhere((w) => w.id == 'parapet_12');

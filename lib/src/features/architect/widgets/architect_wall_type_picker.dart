@@ -117,7 +117,6 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
   final query = TextEditingController();
   bool search = false,
       favoritesOnly = false,
-      bearingOnly = false,
       dirty = false;
   Future<void> writes = Future.value();
   String get preferenceKey => 'architect_wall_catalog_${widget.projectId}';
@@ -195,7 +194,6 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                   t.system.kind == systemKind ||
                   category == ArchitectWallCategory.parapet) &&
               (!favoritesOnly || favorites.contains(t.id)) &&
-              (!bearingOnly || t.isLoadBearing) &&
               (q.isEmpty ||
                   '${t.name} ${t.catalogGroupLabel(l, widget.unit)} ${t.compositionLabel(l, widget.unit)} ${architectWallLength(t.totalThickness, widget.unit)} ${ArchitectWallCategory.of(t).label(l)}'
                       .toLowerCase()
@@ -253,7 +251,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
             ),
             title: Text(first.catalogGroupLabel(l, widget.unit)),
             subtitle: Text(
-              '${l.wallVariantCount(group.types.length)}${first.isLoadBearing ? ' · ${l.wallBearing}' : ''}',
+              l.wallVariantCount(group.types.length),
             ),
             trailing: Icon(open ? Icons.expand_less : Icons.expand_more),
             onTap: () {
@@ -341,7 +339,6 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                   expanded[category] = ArchitectWallCatalogGroup.keyOf(
                     matching,
                   );
-                  bearingOnly = false;
                 });
               },
             ),
@@ -364,7 +361,6 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                       ),
                       onPressed: () => setState(() {
                         category = c;
-                        bearingOnly = false;
                         final available = widget.types.where(
                           (t) => ArchitectWallCategory.of(t) == c,
                         );
@@ -405,12 +401,6 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                 selected: favoritesOnly,
                 onSelected: (v) => setState(() => favoritesOnly = v),
               ),
-              if (category != ArchitectWallCategory.parapet)
-                FilterChip(
-                  label: Text(l.wallBearing),
-                  selected: bearingOnly,
-                  onSelected: (v) => setState(() => bearingOnly = v),
-                ),
             ],
           ),
         ),
@@ -548,11 +538,6 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                             if (query.text.isNotEmpty)
                               Text(
                                 ArchitectWallCategory.of(type).label(l),
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            if (type.isLoadBearing)
-                              Text(
-                                l.wallBearing,
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                           ],
