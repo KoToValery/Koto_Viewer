@@ -698,12 +698,11 @@ class ArchitectElementsPainterHelper {
               ..strokeWidth = isSelected ? paint.strokeWidth : .18 * unitsPerMm,
           );
         }
-      } else if (prim.type == CadPrimitiveType.line) {
+      } else if (prim.type == CadPrimitiveType.line ||
+          prim.type == CadPrimitiveType.polyline) {
         canvas.drawPath(
           ArchitectLinePattern.path(
-            Path()
-              ..moveTo(prim.startPoint.dx, prim.startPoint.dy)
-              ..lineTo(prim.endPoint.dx, prim.endPoint.dy),
+            Path()..addPolygon(prim.linePoints, false),
             prim.lineStyle,
             unitsPerMm,
           ),

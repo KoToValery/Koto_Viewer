@@ -34,6 +34,7 @@ import '../widgets/architect_line_style_picker.dart';
 import '../services/architect_line_styles.dart';
 
 import '../services/architect_line_editing.dart';
+import '../services/architect_polyline_editing.dart';
 
 import '../services/architect_offset.dart';
 import '../services/architect_rotation.dart';
@@ -204,6 +205,7 @@ import '../widgets/architect_stair_properties_dialog.dart';
 import '../services/architect_polygon_editor.dart';
 
 import '../services/architect_polygon_dimensions.dart';
+import '../services/architect_polygon_displacement.dart';
 
 import '../services/architect_polygon_geometry.dart';
 
@@ -1728,7 +1730,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ArchitectTool.cadLine => storey.cadPrimitives
 
-          .any((p) => p.id == id && p.type == CadPrimitiveType.line),
+          .any((p) => p.id == id && (p.type == CadPrimitiveType.line ||
+              p.type == CadPrimitiveType.polyline)),
 
       ArchitectTool.cadRect => storey.cadPrimitives
 
@@ -3002,6 +3005,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _automaticHatch = false;
           break;
         case ArchitectTool.cadLine:
+          _cadPolylineMode = json['type'] == CadPrimitiveType.polyline.name;
+          _activeCadLineStyle = ArchitectCadPrimitive.fromJson(json).lineStyle;
+          break;
         case ArchitectTool.cadRect:
         case ArchitectTool.cadCircle:
           _activeCadLineStyle = ArchitectCadPrimitive.fromJson(json).lineStyle;
@@ -4342,6 +4348,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   WallDraftingMode _wallMode = WallDraftingMode.singleLine;
 
+  bool _cadPolylineMode = false;
+  String? _polylineDraftId;
+  int? _polylineVertexIndex;
+
+  ArchitectCadPrimitive? get _selectedPolyline => _effectiveSelection.length == 1
+      ? _project.activeStorey.cadPrimitives.where((p) =>
+          p.id == _effectiveSelection.single &&
+          p.type == CadPrimitiveType.polyline).firstOrNull
+      : null;
+
+  void _setCadPolylineMode(bool value) {
+    if (_cadPolylineMode == value) return;
+    _finishChainedWall();
+    setState(() => _cadPolylineMode = value);
+  }
+
   Offset? _draftStart;
 
   Offset? _draftEnd;
@@ -4385,6 +4407,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   bool _polygonDistanceOpen = false;
+  bool _polygonPrecisionMode = false;
+  (Offset, Offset)? _polygonDisplacementLine;
 
   Offset? _radialMenuScreenPosition;
 
@@ -5244,6 +5268,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       customStyles: _project.lineStyles,
 
       onChanged: (style) {
+
+        final polylineId = _polylineDraftId;
+        if (polylineId != null && _project.activeStorey.cadPrimitives
+            .any((p) => p.id == polylineId)) {
+          _commands.execute(SetArchitectElementProperties(
+            storeyId: _project.activeStoreyId, elementIds: {polylineId},
+            textValues: {'lineStyle': jsonEncode(style.toJson())},
+          ));
+          _saveBiMProjectIfAttached();
+        }
 
         if (!style.isPreset && !_project.lineStyles.any((s) => s == style)) {
 
@@ -6867,6 +6901,34 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
 
+
+    final polyline = _selectedPolyline;
+    if (polyline != null && !_mirrorActive && _offsetOptions == null &&
+        !_splitActive && _newPointTargetId == null) {
+      final points = polyline.linePoints;
+      final hit = ArchitectPolylineEditing.hit(
+          points, rawModel, _currentScale, _handleOffsetLength);
+      if (hit != null) {
+        final (index, isOffset) = hit;
+        final point = points[index];
+        final handle = isOffset ? ArchitectPolylineEditing.handle(
+            points, index, _currentScale, _handleOffsetLength) : point;
+        _polylineVertexIndex = index;
+        _wallDragStart = index == 0;
+        _wallEndpointOriginal = ArchitectWall(id: polyline.id,
+          startPoint: points[index == 0 ? 0 : index - 1],
+          endPoint: points[index == 0 ? 1 : index], thickness: .001);
+        _wallEndpointIsOffset = isOffset;
+        _wallEndpointDisplacement = handle - point;
+        _wallGrabOffset = handle - rawModel;
+        _wallEndpointLeaderLine = isOffset ? (point, handle) : null;
+        _elementMoveOriginal = _project;
+        _elementMovePreview = _project;
+        _isHandleEngaged = true;
+        HapticFeedback.selectionClick();
+        return;
+      }
+    }
 
     // Wall endpoint handle check (works in Wall tool and Select tool)
 
@@ -8847,7 +8909,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       try {
 
-        _elementMovePreview = _linearCommand(
+        final polylineIndex = _polylineVertexIndex;
+        final polyline = _elementMoveOriginal!.activeStorey.cadPrimitives
+            .where((p) => p.id == original.id &&
+                p.type == CadPrimitiveType.polyline).firstOrNull;
+        _elementMovePreview = polylineIndex != null && polyline != null
+            ? UpdateArchitectPolyline(
+                storeyId: _project.activeStoreyId, elementId: original.id,
+                points: ArchitectPolylineEditing.moveVertex(
+                    polyline.linePoints, polylineIndex, snap.point),
+              ).apply(_elementMoveOriginal!)
+            : _linearCommand(
 
           UpdateArchitectWall(
 
@@ -10120,6 +10192,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _wallEndpointOriginal = null;
 
+    _polylineVertexIndex = null;
+
     _wallSnapProject = null;
 
     _wallEndpointIsOffset = false;
@@ -10353,7 +10427,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           ).any((same) => !same);
 
+      final source = _elementMoveOriginal ?? _project;
+      final isCadContour = source.activeStorey.cadPrimitives
+          .any((p) => p.id == id && p.isPolygon);
+      final displacement = _polygonPrecisionMode && isCadContour && valid && changed
+          ? ArchitectPolygonDisplacement.fromDrag(
+              polygon: original, index: _polygonEditor.index!,
+              edge: _polygonEditor.edge, target: _polygonEditor.editedPoint!,
+              mode: _polygonEditor.edgeMode,
+            )
+          : null;
       _cancelActiveDrags();
+
+      if (displacement != null) {
+        unawaited(_editPolygonDisplacement(
+          id: id, holeIndex: holeIndex, source: source, drag: displacement,
+        ));
+        return;
+      }
 
       if (valid && changed) {
 
@@ -13209,7 +13300,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _liveDraftChainIds.length + (_wallDirectionLocked ? 1 : 0) > 1;
 
-  void _resetDraftGroup() { _draftChainIds.clear(); _groupDraftChain = false; }
+  void _resetDraftGroup() {
+    _draftChainIds.clear();
+    _groupDraftChain = false;
+    _polylineDraftId = null;
+  }
 
   void _finishDraftGroup() {
 
@@ -13289,6 +13384,43 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_draftStart == null) return;
 
     if (_activeTool == ArchitectTool.cadLine) {
+
+      if (_cadPolylineMode) {
+        final end = targetPoint;
+        if ((end - _draftStart!).distance < .001) return;
+        final existing = _project.activeStorey.cadPrimitives
+            .where((p) => p.id == _polylineDraftId &&
+                p.type == CadPrimitiveType.polyline).firstOrNull;
+        final chain = continueChain ?? true;
+        final id = existing?.id ?? ArchitectElementId.next('polyline');
+        if (existing == null) {
+          _commands.execute(PlaceArchitectCadPrimitive(
+            storeyId: _project.activeStoreyId,
+            primitive: ArchitectCadPrimitive(id: id,
+              type: CadPrimitiveType.polyline,
+              startPoint: _draftStart!, endPoint: end,
+              polygon: [_draftStart!, end],
+              colorValue: 0xFF9E9E9E, lineStyle: _activeCadLineStyle),
+          ));
+        } else {
+          _commands.execute(UpdateArchitectPolyline(
+            storeyId: _project.activeStoreyId, elementId: id,
+            points: [...existing.linePoints, end],
+          ));
+        }
+        setState(() {
+          _polylineDraftId = chain ? id : null;
+          _draftStart = chain ? end : null;
+          _draftEnd = chain ? end : null;
+          _wallDirectionLocked = false;
+          _wallPanelAnchor = null;
+          _activeSnapLabel = null;
+          _activeMagneticGuides = [];
+        });
+        _saveBiMProjectIfAttached();
+        HapticFeedback.lightImpact();
+        return;
+      }
 
       final end = targetPoint;
 
@@ -14642,9 +14774,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     for (final line in storey.cadPrimitives) {
 
-      if (line.type == CadPrimitiveType.line) {
-
-        testSegment(line.startPoint, line.endPoint);
+      if (line.type == CadPrimitiveType.line ||
+          line.type == CadPrimitiveType.polyline) {
+        final points = line.linePoints;
+        for (var i = 1; i < points.length; i++) {
+          testSegment(points[i - 1], points[i]);
+        }
 
       }
 
@@ -15518,6 +15653,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         ),
 
+                      if (_project.activeStorey.cadPrimitives
+                          .any((p) => p.id == targetId && p.isPolygon))
+                      IconButton(
+                        key: const ValueKey('polygon-exact-offset'),
+                        constraints: const BoxConstraints.tightFor(width: 36, height: 44),
+                        padding: EdgeInsets.zero,
+                        tooltip: context.l10n.architectPolygonExactOffsetHint,
+                        isSelected: _polygonPrecisionMode,
+                        color: _polygonPrecisionMode
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                        selectedIcon: const Icon(Icons.dialpad, size: 20),
+                        icon: const Icon(Icons.dialpad_outlined, size: 20),
+                        onPressed: _polygonDistanceOpen || _polygonEditor.active
+                            ? null
+                            : () => setState(() =>
+                                _polygonPrecisionMode = !_polygonPrecisionMode),
+                      ),
                       Expanded(
 
                         child: !selected && _selectedHatch == null
@@ -15550,7 +15703,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                               )
 
-                            : TextButton.icon(
+                            : LayoutBuilder(builder: (context, constraints) {
+                                final hint = _selectedHatch == null
+                                    ? context.l10n.architectZoneOffset
+                                    : context.l10n.architectOffsetContourHint;
+                                if (constraints.maxWidth < 110) {
+                                  return IconButton(
+                                    key: const ValueKey('polygon-edge-offset'),
+                                    tooltip: hint,
+                                    icon: const Icon(Icons.swap_vert, size: 20),
+                                    onPressed: _polygonDistanceOpen ? null
+                                        : () => _editPolygonDistance(null),
+                                  );
+                                }
+                                return TextButton.icon(
 
                                 key: const ValueKey('polygon-edge-offset'),
 
@@ -15583,7 +15749,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                 ),
 
-                              ),
+                              );
+                              }),
 
                       ),
 
@@ -15671,6 +15838,115 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return BimOffsetGeometry.ring(points, meters);
     } on ArgumentError {
       return null;
+    }
+  }
+
+  Future<void> _editPolygonDisplacement({
+    required String id,
+    required int? holeIndex,
+    required ArchitectProject source,
+    required ArchitectPolygonDisplacement drag,
+  }) async {
+    if (_polygonDistanceOpen || !mounted) return;
+    final previousEdge = _polygonSelectedEdge;
+    final unit = source.units;
+    // The initial preview uses exactly the value displayed by the keypad.
+    final initial = double.parse(unit.toUnit(drag.distance)
+        .toStringAsFixed(source.distanceDecimals));
+    var meters = unit.fromUnit(initial);
+    List<Offset>? candidate;
+    var saved = false;
+
+    void preview() {
+      candidate = drag.atDistance(meters);
+      _elementMovePreview = null;
+      _polygonDisplacementLine = null;
+      if (candidate != null && identical(source, _project)) {
+        try {
+          _elementMovePreview = UpdateArchitectPolygon(
+            storeyId: source.activeStoreyId, elementId: id,
+            polygon: candidate!, holeIndex: holeIndex,
+          ).apply(source);
+          _polygonDisplacementLine = (drag.origin, drag.target(meters));
+        } on ArgumentError {
+          candidate = null;
+        }
+      }
+      _repaintPreview();
+    }
+
+    setState(() => _polygonDistanceOpen = true);
+    preview();
+    try {
+      await showDialog<void>(context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, dialogSetState) => Dialog(
+            alignment: Alignment.bottomCenter,
+            insetPadding: const EdgeInsets.all(12),
+            constraints: const BoxConstraints(maxWidth: 280),
+            backgroundColor: Colors.transparent,
+            child: SingleChildScrollView(child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Material(
+                  color: Theme.of(dialogContext).colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(padding: const EdgeInsets.all(8),
+                    child: Text(drag.edge
+                        ? context.l10n.architectEdgeOffsetHint
+                        : context.l10n.architectVertexOffsetHint,
+                      style: const TextStyle(fontSize: 12))),
+                ),
+                const SizedBox(height: 6),
+                ArchitectShapeDimensionPanel(
+                  key: const ValueKey('polygon-displacement-keypad'),
+                  values: [initial],
+                  labels: [context.l10n.architectPolygonExactOffset],
+                  unit: unit.symbol, decimals: source.distanceDecimals,
+                  minimum: -double.infinity, signed: true,
+                  canSave: candidate != null && identical(source, _project),
+                  onChanged: (_, value) {
+                    meters = unit.fromUnit(value);
+                    preview();
+                    dialogSetState(() {});
+                  },
+                  onSave: () {
+                    if (candidate == null || !identical(source, _project)) return;
+                    _elementMovePreview = null;
+                    _polygonDisplacementLine = null;
+                    if (meters.abs() > ArchitectPolygonGeometry.epsilon) {
+                      _commands.execute(UpdateArchitectPolygon(
+                        storeyId: source.activeStoreyId, elementId: id,
+                        polygon: candidate!, holeIndex: holeIndex,
+                      ));
+                      _saveBiMProjectIfAttached();
+                    }
+                    saved = true;
+                    _polygonSelectedEdge = drag.edge
+                        ? ArchitectPolygonDimensions.hitEdge(
+                            candidate!, drag.target(meters), .001)
+                        : null;
+                    Navigator.of(dialogContext).pop();
+                  },
+                  onCancel: () => Navigator.of(dialogContext).pop(),
+                ),
+              ],
+            )),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _elementMovePreview = null;
+          _polygonDisplacementLine = null;
+          _polygonDistanceOpen = false;
+          if (!saved && identical(source, _project)) {
+            _polygonSelectedEdge = previousEdge;
+          }
+        });
+        _repaintPreview();
+      }
     }
   }
 
@@ -19307,6 +19583,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           });
           if (pick != null) _selectPolygonEdge(pick);
 
+        } else if (_selectedPolyline != null) {
+          _cancelActiveDrags();
+          setState(() => _moveSelection = false);
         } else if (_selectedLinearElement != null) {
 
           _wallEndpointOriginal = _selectedLinearElement;
@@ -28602,7 +28881,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ],
 
-                      if (_activeTool == ArchitectTool.cadLine || !_wallCurved)
+                      if (_activeTool == ArchitectTool.cadLine ? !_cadPolylineMode : !_wallCurved)
 
                         IconButton(
 
@@ -28683,6 +28962,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ],
 
                   ),
+
+                  if (_activeTool == ArchitectTool.cadLine)
+                    Theme(data: ThemeData.dark(), child: Row(children: [
+                      ChoiceChip(key: const ValueKey('architect-line-mode-line'),
+                        label: Text(context.l10n.architectToolCadLine),
+                        selected: !_cadPolylineMode,
+                        onSelected: (_) => _setCadPolylineMode(false)),
+                      const SizedBox(width: 8),
+                      Tooltip(message: context.l10n.architectPolylineHint,
+                        child: ChoiceChip(
+                          key: const ValueKey('architect-line-mode-polyline'),
+                          showCheckmark: false,
+                          avatar: const Icon(Icons.polyline_outlined, size: 16),
+                          label: Text(context.l10n.architectToolPolyline),
+                          selected: _cadPolylineMode,
+                          onSelected: (_) => _setCadPolylineMode(true))),
+                    ])),
 
                   if (_draftGroupChoiceVisible)
 
@@ -29836,7 +30132,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     polygonEditInvalid: _polygonEditor.invalid,
     polygonEditHoleIndex: _selectedPolygonHoleIndex,
 
-    polygonLeaderLine: _polygonEditor.leaderLine,
+    polygonLeaderLine: _polygonEditor.leaderLine ?? _polygonDisplacementLine,
 
     handleOffsetLength: _handleOffsetLength,
 

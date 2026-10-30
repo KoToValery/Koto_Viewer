@@ -260,6 +260,11 @@ class ArchitectSnapGeometry {
       switch (primitive.type) {
         case CadPrimitiveType.line:
           edge(primitive.startPoint, primitive.endPoint, primitive.id);
+        case CadPrimitiveType.polyline:
+          final points = primitive.linePoints;
+          for (var i = 1; i < points.length; i++) {
+            edge(points[i - 1], points[i], primitive.id);
+          }
         case CadPrimitiveType.rect:
         case CadPrimitiveType.hatch:
           polygon(primitive.polygonCorners, primitive.id);

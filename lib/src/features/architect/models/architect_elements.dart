@@ -825,7 +825,7 @@ class ArchitectAnnotation {
 // 8. 2D CAD PRIMITIVES (LINE, RECT, CIRCLE)
 // ===========================================================================
 
-enum CadPrimitiveType { line, rect, circle, hatch }
+enum CadPrimitiveType { line, rect, circle, hatch, polyline }
 
 class ArchitectCadPrimitive {
   // Publication renders eight legacy stroke units per paper millimetre.
@@ -869,6 +869,23 @@ class ArchitectCadPrimitive {
   }
 
   bool get isPolygon => type == CadPrimitiveType.rect || type == CadPrimitiveType.hatch;
+
+  /// Polylines reuse the persisted vertex list, but never imply a closing edge.
+  List<Offset> get linePoints => type == CadPrimitiveType.polyline
+      ? polygon ?? [startPoint, endPoint]
+      : [startPoint, endPoint];
+
+  static void validatePolyline(List<Offset> points) {
+    if (points.length < 2 ||
+        points.any((p) => !p.dx.isFinite || !p.dy.isFinite)) {
+      throw ArgumentError('Invalid polyline vertices');
+    }
+    for (var i = 1; i < points.length; i++) {
+      if ((points[i] - points[i - 1]).distance < .001) {
+        throw ArgumentError('Polyline segment is too short');
+      }
+    }
+  }
 
   ArchitectCadPrimitive copyWith({
     String? id,

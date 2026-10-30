@@ -4015,6 +4015,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectToolCadLine => 'Line';
 
   @override
+  String get architectToolPolyline => 'Polyline';
+
+  @override
+  String get architectPolylineHint =>
+      'Draw connected segments as one object. Select it and drag a vertex or its leader dot to reshape it.';
+
+  @override
   String get architectToolCadRect => 'Rectangle';
 
   @override
@@ -4865,6 +4872,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectEdgeDistance => 'Distance';
+
+  @override
+  String get architectPolygonExactOffset => 'Exact offset';
+
+  @override
+  String get architectPolygonExactOffsetHint =>
+      'Exact offset: drag an edge or vertex to set the direction, then enter the distance with the app keypad.';
+
+  @override
+  String get architectEdgeOffsetHint =>
+      'Positive moves outward; negative moves inward. The distance is measured from the original edge.';
+
+  @override
+  String get architectVertexOffsetHint =>
+      'Distance along the drag direction from the original vertex. Use ± to reverse the direction.';
 
   @override
   String get architectEdgeSelectHint => 'Select an edge';

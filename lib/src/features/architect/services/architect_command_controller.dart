@@ -1729,7 +1729,15 @@ class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
     ArchitectModelCommand.point(primitive.startPoint);
     ArchitectModelCommand.point(primitive.endPoint);
     ArchitectModelCommand.newId(project, primitive.id);
-    if ((primitive.endPoint - primitive.startPoint).distance < .001 ||
+    if (primitive.type == CadPrimitiveType.polyline) {
+      ArchitectCadPrimitive.validatePolyline(primitive.linePoints);
+      if (primitive.startPoint != primitive.linePoints.first ||
+          primitive.endPoint != primitive.linePoints.last) {
+        throw ArgumentError('Inconsistent polyline endpoints');
+      }
+    }
+    if ((primitive.type != CadPrimitiveType.polyline &&
+            (primitive.endPoint - primitive.startPoint).distance < .001) ||
         (primitive.isPolygon &&
             !ArchitectContour.valid(primitive.polygonCorners, primitive.holes))) {
       throw ArgumentError('Invalid CAD shape');
@@ -1756,6 +1764,35 @@ class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
             ),
       floor.copyWith(cadPrimitives: [...floor.cadPrimitives, primitive]),
     );
+  }
+}
+
+/// Replace one open CAD path atomically, preserving its appearance and identity.
+class UpdateArchitectPolyline extends ArchitectModelCommand {
+  const UpdateArchitectPolyline({
+    required this.storeyId,
+    required this.elementId,
+    required this.points,
+  });
+  final String storeyId, elementId;
+  final List<Offset> points;
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectCadPrimitive.validatePolyline(points);
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    if (!floor.cadPrimitives.any((p) =>
+        p.id == elementId && p.type == CadPrimitiveType.polyline)) {
+      throw ArgumentError('Polyline not found');
+    }
+    return ArchitectModelCommand.replace(project, floor.copyWith(
+      cadPrimitives: [for (final p in floor.cadPrimitives)
+        if (p.id == elementId) p.copyWith(
+          polygon: List.unmodifiable(points),
+          startPoint: points.first,
+          endPoint: points.last,
+        ) else p],
+    ));
   }
 }
 
@@ -1985,7 +2022,7 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
       return (
         points: p.isPolygon
             ? p.polygonCorners
-            : [p.startPoint, p.endPoint],
+            : p.linePoints,
         closed: p.isPolygon,
         width: 0,
       );
@@ -2040,6 +2077,14 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
         elementId: elementId,
         polygon: points,
         holeIndex: holeIndex,
+      ).apply(project);
+    }
+    if (storey.cadPrimitives.any((p) =>
+        p.id == elementId && p.type == CadPrimitiveType.polyline)) {
+      return UpdateArchitectPolyline(
+        storeyId: storeyId,
+        elementId: elementId,
+        points: List.of(path.points)..insert(hit.edge + 1, insertion),
       ).apply(project);
     }
     if (storey.dimensions.any((d) => d.id == elementId)) {

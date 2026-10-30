@@ -476,7 +476,8 @@ class ArchitectElementTool extends ChangeNotifier {
       cadPrimitives: storey.cadPrimitives
           .where(
             (p) => switch (tool) {
-              ArchitectTool.cadLine => p.type == CadPrimitiveType.line,
+              ArchitectTool.cadLine => p.type == CadPrimitiveType.line ||
+                  p.type == CadPrimitiveType.polyline,
               ArchitectTool.cadRect => p.type == CadPrimitiveType.rect,
               ArchitectTool.cadCircle => p.type == CadPrimitiveType.circle,
               ArchitectTool.hatch => p.type == CadPrimitiveType.hatch,
@@ -650,10 +651,14 @@ class ArchitectElementTool extends ChangeNotifier {
 
     // Check CAD Primitives
     for (final prim in storey.cadPrimitives) {
-      if (prim.type == CadPrimitiveType.line) {
-        if (_pointToSegmentDistance(point, prim.startPoint, prim.endPoint) <=
-            tolerance) {
-          yield prim.id;
+      if (prim.type == CadPrimitiveType.line ||
+          prim.type == CadPrimitiveType.polyline) {
+        final points = prim.linePoints;
+        for (var i = 1; i < points.length; i++) {
+          if (_pointToSegmentDistance(point, points[i - 1], points[i]) <= tolerance) {
+            yield prim.id;
+            break;
+          }
         }
       } else if (prim.isPolygon) {
         final points = prim.polygonCorners;
@@ -1378,12 +1383,15 @@ class ArchitectElementTool extends ChangeNotifier {
         startPoint: BimTransform2D.mirror(prim.startPoint, origin, direction),
         endPoint: BimTransform2D.mirror(prim.endPoint, origin, direction),
         hatchAngle: math.atan2(hatchDirection.dy, hatchDirection.dx) * 180 / math.pi,
-        polygon: prim.isPolygon || prim.polygon != null
-            ? [
-                for (final p in prim.isPolygon ? prim.polygonCorners : prim.polygon!)
-                  BimTransform2D.mirror(p, origin, direction),
-              ].reversed.toList()
-            : null,
+        polygon: prim.type == CadPrimitiveType.polyline
+            ? [for (final p in prim.linePoints)
+                BimTransform2D.mirror(p, origin, direction)]
+            : prim.isPolygon || prim.polygon != null
+                ? [
+                    for (final p in prim.isPolygon ? prim.polygonCorners : prim.polygon!)
+                      BimTransform2D.mirror(p, origin, direction),
+                  ].reversed.toList()
+                : null,
       );
       if (isDuplicate) {
         return (

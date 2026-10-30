@@ -23,9 +23,13 @@ class ArchitectClosedContour {
     }
 
     for (final p in storey.cadPrimitives) {
-      if (p.type == CadPrimitiveType.line) {
-        if ((p.endPoint - p.startPoint).distance > 1e-8) {
-          segments.add((p.startPoint, p.endPoint));
+      if (p.type == CadPrimitiveType.line ||
+          p.type == CadPrimitiveType.polyline) {
+        final points = p.linePoints;
+        for (var i = 1; i < points.length; i++) {
+          if ((points[i] - points[i - 1]).distance > 1e-8) {
+            segments.add((points[i - 1], points[i]));
+          }
         }
       } else if (p.isPolygon) {
         ring(p.polygonCorners);

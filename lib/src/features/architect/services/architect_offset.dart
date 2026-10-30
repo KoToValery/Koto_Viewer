@@ -31,8 +31,8 @@ class ArchitectOffset {
       final distance = (point - side).distanceSquared;
       if (distance < best) { best = distance; anchor = point; }
     }
-    void ring(List<Offset> points) {
-      for (var i = 0; i < points.length; i++) {
+    void ring(List<Offset> points, {bool closed = true}) {
+      for (var i = 0; i < points.length - (closed ? 0 : 1); i++) {
         final a = points[i], d = points[(i + 1) % points.length] - a;
         if (d.distanceSquared < 1e-12) continue;
         final t = (BimPolygonGeometry.dot(side - a, d) / d.distanceSquared).clamp(0.0, 1.0);
@@ -48,6 +48,7 @@ class ArchitectOffset {
     for (final e in s.zones.where((e) => ids.contains(e.id))) { ring(e.polygon); }
     for (final e in s.cadPrimitives.where((e) => ids.contains(e.id))) {
       if (e.isPolygon) ring(e.polygonCorners);
+      if (e.type == CadPrimitiveType.polyline) ring(e.linePoints, closed: false);
       if (e.type == CadPrimitiveType.circle) {
         final d = side - e.startPoint;
         if (d.distance > 1e-12) consider(e.startPoint + d / d.distance * (e.endPoint - e.startPoint).distance);
@@ -340,6 +341,23 @@ class ArchitectOffset {
           if (!ids.contains(e.id) || copy) e,
         for (final e in s.cadPrimitives.where((e) => ids.contains(e.id)))
           (() {
+            if (e.type == CadPrimitiveType.polyline) {
+              // Reuse the same open-chain miter geometry as connected lines.
+              final points = e.linePoints;
+              final segments = [for (var i = 1; i < points.length; i++)
+                ArchitectCadPrimitive(id: '$i', type: CadPrimitiveType.line,
+                  startPoint: points[i - 1], endPoint: points[i])];
+              final shifted = apply(
+                ArchitectStorey(id: s.id, name: s.name, cadPrimitives: segments),
+                segments.map((p) => p.id).toSet(),
+                distance: distance, side: side,
+              ).cadPrimitives;
+              final result = [shifted.first.startPoint,
+                for (final p in shifted) p.endPoint];
+              ArchitectCadPrimitive.validatePolyline(result);
+              return e.copyWith(id: id(e.id), polygon: result,
+                startPoint: result.first, endPoint: result.last);
+            }
             if (e.type == CadPrimitiveType.line) {
               return e.copyWith(
                 id: id(e.id),

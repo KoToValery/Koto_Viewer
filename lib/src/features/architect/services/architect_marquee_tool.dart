@@ -254,8 +254,14 @@ class ArchitectMarqueeTool {
       if (contour(zone.polygon)) selected.add(zone.id);
     }
     for (final primitive in storey.cadPrimitives) {
-      if (primitive.type == CadPrimitiveType.line) {
-        if (segment(primitive.startPoint, primitive.endPoint)) {
+      if (primitive.type == CadPrimitiveType.line ||
+          primitive.type == CadPrimitiveType.polyline) {
+        final points = primitive.linePoints;
+        final hits = [for (var i = 1; i < points.length; i++)
+          segment(points[i - 1], points[i])];
+        if (relation == ArchitectSelectionRelation.contained
+            ? hits.every((hit) => hit)
+            : hits.any((hit) => hit)) {
           selected.add(primitive.id);
         }
       } else if (primitive.isPolygon) {

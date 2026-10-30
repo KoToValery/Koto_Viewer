@@ -45,7 +45,9 @@ class ArchitectViewDrawing {
           p.copyWith(
             startPoint: point(p.startPoint),
             endPoint: point(p.endPoint),
-            polygon: p.polygon?.map(point).toList().reversed.toList(),
+            polygon: p.type == CadPrimitiveType.polyline
+                ? p.linePoints.map(point).toList()
+                : p.polygon?.map(point).toList().reversed.toList(),
             holes: [
               for (final hole in p.holes)
                 hole.map(point).toList().reversed.toList(),

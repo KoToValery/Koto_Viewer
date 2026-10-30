@@ -1,5 +1,6 @@
 import 'architect_selection_painter.dart';
 import '../models/architect_line_style.dart';
+import '../services/architect_polyline_editing.dart';
 import '../models/architect_hatch_pattern.dart';
 import 'architect_clearance_badge_layout.dart';
 import 'architect_floor_drain_painter_helper.dart';
@@ -703,6 +704,34 @@ class Architect2dPainter extends CustomPainter {
         scale: zoomScale,
         selectedIds: {selectedElementId!},
       );
+      return;
+    }
+    final polyline = selected.cadPrimitives
+        .where((p) => p.type == CadPrimitiveType.polyline).firstOrNull;
+    if (polyline != null) {
+      ArchitectElementsPainterHelper.drawCadPrimitives(
+        dimensionScale: _project.dimensionScale,
+        palette: palette,
+        canvas: canvas,
+        storey: selected,
+        zoomScale: zoomScale,
+        selectedElementId: selectedElementId,
+      );
+      if (marqueePoints.isEmpty) {
+        final points = polyline.linePoints;
+        final scale = math.max(zoomScale, 80.0);
+        const color = Color(0xFF00BCD4);
+        for (var i = 0; i < points.length; i++) {
+          canvas.drawCircle(points[i], 3.5 / scale, Paint()..color = color);
+          if (handleOffsetLength <= 0) continue;
+          final handle = ArchitectPolylineEditing.handle(
+              points, i, zoomScale, handleOffsetLength);
+          canvas.drawLine(points[i], handle, Paint()
+            ..color = const Color(0xFF00E5FF)
+            ..strokeWidth = 1.6 / scale);
+          _drawTouchGrip(canvas, handle, scale, color);
+        }
+      }
       return;
     }
     final selectedLine = selected.cadPrimitives

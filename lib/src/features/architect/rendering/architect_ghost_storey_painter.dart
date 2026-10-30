@@ -106,6 +106,8 @@ class ArchitectGhostStoreyPainter extends CustomPainter {
         switch (primitive.type) {
           case CadPrimitiveType.line:
             canvas.drawLine(primitive.startPoint, primitive.endPoint, stroke);
+          case CadPrimitiveType.polyline:
+            canvas.drawPath(Path()..addPolygon(primitive.linePoints, false), stroke);
           case CadPrimitiveType.rect:
           case CadPrimitiveType.hatch:
             polygon(primitive.polygonCorners);

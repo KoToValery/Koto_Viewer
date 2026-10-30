@@ -6989,6 +6989,18 @@ abstract class AppLocalizations {
   /// **'Line'**
   String get architectToolCadLine;
 
+  /// No description provided for @architectToolPolyline.
+  ///
+  /// In en, this message translates to:
+  /// **'Polyline'**
+  String get architectToolPolyline;
+
+  /// No description provided for @architectPolylineHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw connected segments as one object. Select it and drag a vertex or its leader dot to reshape it.'**
+  String get architectPolylineHint;
+
   /// CAD rectangle tool
   ///
   /// In en, this message translates to:
@@ -8554,6 +8566,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Distance'**
   String get architectEdgeDistance;
+
+  /// No description provided for @architectPolygonExactOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact offset'**
+  String get architectPolygonExactOffset;
+
+  /// No description provided for @architectPolygonExactOffsetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact offset: drag an edge or vertex to set the direction, then enter the distance with the app keypad.'**
+  String get architectPolygonExactOffsetHint;
+
+  /// No description provided for @architectEdgeOffsetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Positive moves outward; negative moves inward. The distance is measured from the original edge.'**
+  String get architectEdgeOffsetHint;
+
+  /// No description provided for @architectVertexOffsetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance along the drag direction from the original vertex. Use ± to reverse the direction.'**
+  String get architectVertexOffsetHint;
 
   /// No description provided for @architectEdgeSelectHint.
   ///

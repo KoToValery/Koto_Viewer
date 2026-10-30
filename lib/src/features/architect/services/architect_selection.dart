@@ -264,9 +264,9 @@ class ArchitectSelection {
       }
     }
     for (final p in s.cadPrimitives) {
-      if (p.id == id && p.type == CadPrimitiveType.line) {
-        return path..moveTo(p.startPoint.dx, p.startPoint.dy)
-          ..lineTo(p.endPoint.dx, p.endPoint.dy);
+      if (p.id == id && (p.type == CadPrimitiveType.line ||
+          p.type == CadPrimitiveType.polyline)) {
+        return path..addPolygon(p.linePoints, false);
       }
       if (p.id == id && p.type == CadPrimitiveType.circle) {
         return path..addOval(Rect.fromCircle(center: p.startPoint,

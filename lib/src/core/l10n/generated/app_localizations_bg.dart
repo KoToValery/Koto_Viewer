@@ -4032,6 +4032,13 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectToolCadLine => 'Линия';
 
   @override
+  String get architectToolPolyline => 'Полилиния';
+
+  @override
+  String get architectPolylineHint =>
+      'Чертае свързани отсечки като един обект. Изберете го и преместете връх или изнесената му точка, за да промените формата.';
+
+  @override
   String get architectToolCadRect => 'Правоъгълник';
 
   @override
@@ -4888,6 +4895,21 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectEdgeDistance => 'Разстояние';
+
+  @override
+  String get architectPolygonExactOffset => 'Точно отместване';
+
+  @override
+  String get architectPolygonExactOffsetHint =>
+      'Точно отместване: изтеглете ръб или връх, за да зададете посоката, после въведете разстоянието с клавиатурата на приложението.';
+
+  @override
+  String get architectEdgeOffsetHint =>
+      'Положителната стойност мести навън, а отрицателната навътре. Разстоянието се измерва от първоначалния ръб.';
+
+  @override
+  String get architectVertexOffsetHint =>
+      'Разстояние от първоначалния връх по посоката на изтегляне. С ± обръщате посоката.';
 
   @override
   String get architectEdgeSelectHint => 'Избери ръб';
