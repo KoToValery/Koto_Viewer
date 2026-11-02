@@ -22,11 +22,20 @@ class ArchitectStairMesh {
   static const concreteColor = Color(0xFF90A4AE);
   static const finishColor = Color(0xFFE8DCC5);
   static const metalColor = Color(0xFF455A64);
-  static final _bodyCache = Expando<List<StairSolid>>();
+  static final _bodyCache = Expando<Map<double, List<StairSolid>>>();
 
-  static List<StairSolid> body(ArchitectStair stair) =>
-      _bodyCache[stair] ??= _body(stair);
-  static List<StairSolid> _body(ArchitectStair stair) {
+  static List<StairSolid> body(
+    ArchitectStair stair, {
+    double? firstRiserBottom,
+  }) {
+    final bottom = firstRiserBottom ?? stair.design?.startOffset ?? 0;
+    return (_bodyCache[stair] ??= {}).putIfAbsent(
+      bottom,
+      () => _body(stair, bottom),
+    );
+  }
+
+  static List<StairSolid> _body(ArchitectStair stair, double firstRiserBottom) {
     final d = stair.design;
     if (d == null) return [];
     final geometry = ArchitectStairGeometry.of(stair), result = <StairSolid>[];
@@ -236,7 +245,10 @@ class ArchitectStairMesh {
               )
               .axis;
         }
-        final low = i * d.riser, high = (i + 1) * d.riser;
+        final low = i == 0
+            ? math.max(0.0, firstRiserBottom - d.startOffset)
+            : i * d.riser;
+        final high = (i + 1) * d.riser;
         if (high - f > low + 1e-8) {
           final coating = math.min(f, math.max(.001, d.nosingProjection));
           result.add(

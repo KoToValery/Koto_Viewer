@@ -1,3 +1,4 @@
+import 'architect_stair_floor_contact.dart';
 import '../models/architect_hatch_pattern.dart';
 import '../models/architect_wall_type.dart';
 import 'architect_section_junctions.dart';
@@ -669,16 +670,33 @@ class ArchitectBuildingSection {
           );
           extraCutMaskPaths.add(clippedAperture);
           cutOpeningAperturePaths[cutOp.id] = clippedAperture;
-          final cleanOpeningSection = _buildCleanOpeningSectionProfile(
+          var cleanOpeningSection = _buildCleanOpeningSectionProfile(
             cutOp,
             clippedAperture,
           );
+          if (cutOp.isWindow && cutOp.isCrossWallCut) {
+            final sill = Path.combine(
+              PathOperation.intersect,
+              _buildWindowSillSection(cutOp),
+              Path()..addRect(Rect.fromLTRB(0, -1e6, cut.length, 1e6)),
+            );
+            wallPath = Path.combine(PathOperation.difference, wallPath, sill);
+            cleanOpeningSection = Path.combine(
+              PathOperation.union,
+              cleanOpeningSection,
+              sill,
+            );
+          }
           if (!cleanOpeningSection.getBounds().isEmpty) {
             regions.add(
               ArchitectSectionRegion(
                 cutOp.id,
                 SlabMaterial.tile,
                 cleanOpeningSection,
+                drawHatch: !cutOp.isWindow,
+                customFillColor: cutOp.isWindow
+                    ? const Color(0xffffffff)
+                    : null,
               ),
             );
           }
@@ -697,7 +715,16 @@ class ArchitectBuildingSection {
           );
           if (clipped.getBounds().isEmpty) continue;
           wallPath = Path.combine(PathOperation.difference, wallPath, clipped);
-          regions.add(ArchitectSectionRegion(id, SlabMaterial.tile, clipped));
+          final isWindow = wall.windows.any((w) => w.id == id);
+          regions.add(
+            ArchitectSectionRegion(
+              id,
+              SlabMaterial.tile,
+              clipped,
+              drawHatch: !isWindow,
+              customFillColor: isWindow ? const Color(0xffffffff) : null,
+            ),
+          );
         }
         if (!wallPath!.getBounds().isEmpty) {
           if (useCompositions) {
@@ -879,7 +906,14 @@ class ArchitectBuildingSection {
 
       for (final stair in floor.stairs) {
         final solids = [
-          ...ArchitectStairMesh.body(stair),
+          ...ArchitectStairMesh.body(
+            stair,
+            firstRiserBottom: ArchitectStairFloorContact.firstRiserBottom(
+              project,
+              floor,
+              stair,
+            ),
+          ),
           ...ArchitectStairMesh.railings(
             stair,
             storey: floor,
@@ -1097,6 +1131,37 @@ class ArchitectBuildingSection {
     // Project the same 3D solids as facades, with real hidden-surface removal.
     // A slice alone cannot show a return flight, landing, or wall behind it.
     final shift = Offset(cut.length / 2, 0);
+    final stairIds = {
+      for (final floor in project.storeys)
+        for (final stair in floor.stairs) stair.id,
+    };
+    final stairCut = ArchitectMeshSection.unionPaths([
+      for (final region in regions)
+        if (stairIds.contains(region.sourceId)) region.path,
+    ]);
+    if (!stairCut.getBounds().isEmpty) {
+      for (var i = 0; i < regions.length; i++) {
+        final r = regions[i];
+        if (!r.slab ||
+            r.material == SlabMaterial.concrete ||
+            !r.path.getBounds().overlaps(stairCut.getBounds())) {
+          continue;
+        }
+        regions[i] = ArchitectSectionRegion(
+          r.sourceId,
+          r.material,
+          Path.combine(PathOperation.difference, r.path, stairCut),
+          slab: r.slab,
+          roof: r.roof,
+          customFillColor: r.customFillColor,
+          hatchPattern: r.hatchPattern,
+          drawHatch: r.drawHatch,
+          mergeOutline: r.mergeOutline,
+          timberCrossSectionPolygon: r.timberCrossSectionPolygon,
+        );
+      }
+    }
+
     // Keep disconnected members separate while triangulating: decomposing one
     // large union creates artificial strips at every other member's X station.
     final cutMasks = [
@@ -1445,6 +1510,8 @@ class ArchitectBuildingSection {
           height: d.height,
           sill: d.sillHeight,
           frame: d.frameThickness,
+          depth: .07,
+          panes: 1,
           isWindow: false,
         ),
       for (final w in wall.windows)
@@ -1454,7 +1521,9 @@ class ArchitectBuildingSection {
           width: w.width,
           height: w.height,
           sill: w.sillHeight,
-          frame: w.frameThickness,
+          frame: w.resolvedStyle?.frameFaceWidth ?? w.frameThickness,
+          depth: w.resolvedStyle?.frameDepth ?? .07,
+          panes: w.panesCount,
           isWindow: true,
         ),
     ];
@@ -1552,6 +1621,14 @@ class ArchitectBuildingSection {
           frameThickness: op.frame.clamp(0.03, 0.08),
           isWindow: op.isWindow,
           isCrossWallCut: isCrossWallCut,
+          frameStation: isCrossWallCut && op.isWindow
+              ? (-wall.exteriorSign * wall.coreAsymmetry / 2 - n0) / dn
+              : (sMin + sMax) / 2,
+          frameDepth: op.depth / (isCrossWallCut && op.isWindow ? dn.abs() : 1),
+          normalScale: isCrossWallCut ? 1 / dn.abs() : 1,
+          exteriorDirection: dn * wall.exteriorSign >= 0 ? 1 : -1,
+          exposed: wall.isExterior || wall.hasInsulation,
+          panes: op.panes,
         ),
       );
     }
@@ -1573,41 +1650,87 @@ class ArchitectBuildingSection {
     final frameFace = math.min(op.frameThickness, spanH * 0.25);
     final raw = Path();
     if (op.isCrossWallCut) {
-      final sMid = (sMin + sMax) / 2.0;
-      final frameDepth = math.min(0.07, spanW * 0.65);
-      // Top head frame
-      raw.addRect(
-        Rect.fromLTRB(
-          sMid - frameDepth / 2.0,
-          zTop - frameFace,
-          sMid + frameDepth / 2.0,
-          zTop,
-        ),
-      );
-      // Bottom sill frame for windows
+      final frameDepth = math.min(op.frameDepth, spanW * 0.8);
+      final sMid = op.frameStation;
       if (op.isWindow) {
+        void frame(double bottom, double top) {
+          final outside = Path()
+            ..addRect(
+              Rect.fromLTRB(
+                sMid - frameDepth / 2,
+                bottom,
+                sMid + frameDepth / 2,
+                top,
+              ),
+            );
+          final skin = math.min(.009, math.min(frameDepth, top - bottom) / 4);
+          final hollow = Path()
+            ..addRect(
+              Rect.fromLTRB(
+                sMid - frameDepth / 2 + skin,
+                bottom + skin,
+                sMid + frameDepth / 2 - skin,
+                top - skin,
+              ),
+            );
+          raw.addPath(
+            Path.combine(PathOperation.difference, outside, hollow),
+            Offset.zero,
+          );
+        }
+
+        frame(zTop - frameFace, zTop);
+        frame(zBottom, zBottom + frameFace);
+        final glassHalf = math.min(.012 * op.normalScale, frameDepth * .25);
+        for (final x in [sMid - glassHalf, sMid + glassHalf - .004]) {
+          raw.addRect(
+            Rect.fromLTRB(x, zBottom + frameFace, x + .004, zTop - frameFace),
+          );
+        }
+        // Sash rebates and glazing beads; sparse outlines remain readable in print.
+        final bead = math.min(.012, frameFace / 3);
+        for (final z in [zBottom + frameFace, zTop - frameFace - bead]) {
+          raw.addRect(
+            Rect.fromLTRB(
+              sMid - glassHalf - .008,
+              z,
+              sMid - glassHalf,
+              z + bead,
+            ),
+          );
+          raw.addRect(
+            Rect.fromLTRB(
+              sMid + glassHalf,
+              z,
+              sMid + glassHalf + .008,
+              z + bead,
+            ),
+          );
+        }
+      } else {
+        // Top head frame
         raw.addRect(
           Rect.fromLTRB(
             sMid - frameDepth / 2.0,
-            zBottom,
+            zTop - frameFace,
             sMid + frameDepth / 2.0,
-            zBottom + frameFace,
+            zTop,
           ),
         );
-      }
-      // Central glazing or door leaf strip
-      final leafHalf = math.min(op.isWindow ? 0.012 : 0.020, frameDepth * 0.35);
-      final zLeafBottom = op.isWindow ? zBottom + frameFace : zBottom;
-      final zLeafTop = zTop - frameFace;
-      if (zLeafTop > zLeafBottom + 1e-4) {
-        raw.addRect(
-          Rect.fromLTRB(
-            sMid - leafHalf,
-            zLeafBottom,
-            sMid + leafHalf,
-            zLeafTop,
-          ),
-        );
+        // Door leaf; window profiles are handled separately above.
+        final leafHalf = math.min(.020, frameDepth * .35);
+        final zLeafBottom = zBottom;
+        final zLeafTop = zTop - frameFace;
+        if (zLeafTop > zLeafBottom + 1e-4) {
+          raw.addRect(
+            Rect.fromLTRB(
+              sMid - leafHalf,
+              zLeafBottom,
+              sMid + leafHalf,
+              zLeafTop,
+            ),
+          );
+        }
       }
     } else {
       // Longitudinal cut along the wall
@@ -1620,7 +1743,17 @@ class ArchitectBuildingSection {
       }
       final zLeafBottom = op.isWindow ? zBottom + frameFace : zBottom;
       final zLeafTop = zTop - frameFace;
-      if (sMax - jambW > sMin + jambW && zLeafTop > zLeafBottom) {
+      if (op.isWindow) {
+        for (var i = 1; i < op.panes; i++) {
+          final x = sMin + spanW * i / op.panes;
+          raw.addRect(
+            Rect.fromLTRB(x - jambW / 2, zLeafBottom, x + jambW / 2, zLeafTop),
+          );
+        }
+      }
+      if (!op.isWindow &&
+          sMax - jambW > sMin + jambW &&
+          zLeafTop > zLeafBottom) {
         raw.addRect(
           Rect.fromLTRB(sMin + jambW, zLeafBottom, sMax - jambW, zLeafTop),
         );
@@ -1631,6 +1764,37 @@ class ArchitectBuildingSection {
     } catch (_) {
       return raw;
     }
+  }
+
+  static Path _buildWindowSillSection(_CutOpeningSpan op) {
+    final direction = op.exteriorDirection;
+    final outside = direction > 0 ? op.sMax : op.sMin;
+    final inside = direction > 0 ? op.sMin : op.sMax;
+    final frame = op.frameStation;
+    final depth = math.min(op.frameDepth, (op.sMax - op.sMin) * .8);
+    final result = Path();
+    // Interior stool meets the bottom frame and projects 20 mm beyond plaster.
+    result.addPolygon([
+      Offset(inside - direction * .02 * op.normalScale, op.zBottom),
+      Offset(frame - direction * depth / 2, op.zBottom),
+      Offset(frame - direction * depth / 2, op.zBottom - .02),
+      Offset(inside - direction * .02 * op.normalScale, op.zBottom - .02),
+    ], true);
+    if (op.exposed) {
+      // 45 mm beyond the finished facade (including insulation), a fall away
+      // from the frame, and a downturned drip edge separated from the facade.
+      final rear = frame + direction * depth / 2;
+      final front = outside + direction * .045 * op.normalScale;
+      result.addPolygon([
+        Offset(rear, op.zBottom),
+        Offset(front, op.zBottom - .015),
+        Offset(front, op.zBottom - .045),
+        Offset(front - direction * .008 * op.normalScale, op.zBottom - .045),
+        Offset(front - direction * .008 * op.normalScale, op.zBottom - .033),
+        Offset(rear, op.zBottom - .018),
+      ], true);
+    }
+    return result;
   }
 
   static ({Path detailPath, Path envelope}) _buildFloorDrainSection(
@@ -1696,6 +1860,9 @@ class _CutOpeningSpan {
   final double frameThickness;
   final bool isWindow;
   final bool isCrossWallCut;
+  final double frameStation, frameDepth, exteriorDirection, normalScale;
+  final bool exposed;
+  final int panes;
 
   const _CutOpeningSpan({
     required this.id,
@@ -1706,5 +1873,11 @@ class _CutOpeningSpan {
     required this.frameThickness,
     required this.isWindow,
     required this.isCrossWallCut,
+    required this.frameStation,
+    required this.frameDepth,
+    required this.normalScale,
+    required this.exteriorDirection,
+    required this.exposed,
+    required this.panes,
   });
 }

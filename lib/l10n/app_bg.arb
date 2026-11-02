@@ -2875,5 +2875,18 @@
   "wallSideAutoHelp": "Насочва външната страна навън. Ръчното обръщане запазва избраната страна.",
   "wallTypeLocationHint": "Начална стойност; автоматиката я уточнява по контура.",
   "wallExteriorUnresolved": "Някои стени изискват уточняване на предназначението или страната.",
-  "wallExteriorReview": "Уточни"
+  "wallExteriorReview": "Уточни",
+  "architectPickTitle": "Избор на елемент",
+  "architectPickPrevious": "Предишен елемент",
+  "architectPickNext": "Следващ елемент",
+  "architectPickAdd": "Добави към избраните",
+  "architectPickRemove": "Махни от избраните",
+  "architectPickNamed": "{type} · {name}",
+  "@architectPickNamed": {"placeholders": {"type": {"type": "String"}, "name": {"type": "String"}}},
+  "architectPickItem": "{label} · {index}",
+  "@architectPickItem": {"placeholders": {"label": {"type": "String"}, "index": {"type": "int"}}},
+  "architectPickPosition": "{label} · {index}/{count}",
+  "@architectPickPosition": {"placeholders": {"label": {"type": "String"}, "index": {"type": "int"}, "count": {"type": "int"}}},
+  "architectTouchSelectionHelp": "Тап за избор; стрелки при застъпване. Задръж за меню.",
+  "architectSelectAll": "Всички"
 }

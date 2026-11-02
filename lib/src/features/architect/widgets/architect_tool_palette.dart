@@ -74,6 +74,7 @@ class ArchitectToolPalette extends StatefulWidget {
   final ArchitectInteractionMode? interactionMode;
   final ArchitectTool? selectionTool;
   final VoidCallback? onDrawSelection;
+  final VoidCallback? onSelectAll;
   final VoidCallback? onTerrain;
   final ValueChanged<ArchitectTool> onToolChanged;
   final bool multiSelect;
@@ -166,6 +167,7 @@ class ArchitectToolPalette extends StatefulWidget {
     this.interactionMode,
     this.selectionTool,
     this.onDrawSelection,
+    this.onSelectAll,
     this.onTerrain,
     required this.onToolChanged,
     this.multiSelect = false,
@@ -473,6 +475,9 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     tool: ArchitectTool.select,
                                     icon: Icons.near_me_outlined,
                                     label: l10n.architectToolSelect,
+                                    iconOnly:
+                                        widget.onSelectAll != null &&
+                                        MediaQuery.sizeOf(context).width < 600,
                                     selected:
                                         mode ==
                                         ArchitectInteractionMode.singleSelect,
@@ -483,10 +488,27 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                       buttonKey: 'architect-multi-select',
                                       icon: Icons.library_add_check_outlined,
                                       label: l10n.architectSelectionMulti,
+                                      iconOnly:
+                                          widget.onSelectAll != null &&
+                                          MediaQuery.sizeOf(context).width <
+                                              600,
                                       selected:
                                           mode ==
                                           ArchitectInteractionMode.multiSelect,
                                       onPressed: widget.onToggleMultiSelect,
+                                    ),
+                                  if (widget.onSelectAll != null)
+                                    _buildToolButton(
+                                      tool: ArchitectTool.select,
+                                      buttonKey: 'architect-select-all',
+                                      icon: Icons.select_all_rounded,
+                                      label: l10n.architectSelectAll,
+                                      iconOnly:
+                                          MediaQuery.sizeOf(context).width <
+                                          600,
+                                      tooltip: l10n.architectSelectSimilar,
+                                      selected: false,
+                                      onPressed: widget.onSelectAll,
                                     ),
                                   if (widget.selectionTool != null &&
                                       widget.onDrawSelection != null)

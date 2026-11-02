@@ -8626,4 +8626,41 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get wallExteriorReview => 'Уточни';
+
+  @override
+  String get architectPickTitle => 'Избор на елемент';
+
+  @override
+  String get architectPickPrevious => 'Предишен елемент';
+
+  @override
+  String get architectPickNext => 'Следващ елемент';
+
+  @override
+  String get architectPickAdd => 'Добави към избраните';
+
+  @override
+  String get architectPickRemove => 'Махни от избраните';
+
+  @override
+  String architectPickNamed(String type, String name) {
+    return '$type · $name';
+  }
+
+  @override
+  String architectPickItem(String label, int index) {
+    return '$label · $index';
+  }
+
+  @override
+  String architectPickPosition(String label, int index, int count) {
+    return '$label · $index/$count';
+  }
+
+  @override
+  String get architectTouchSelectionHelp =>
+      'Тап за избор; стрелки при застъпване. Задръж за меню.';
+
+  @override
+  String get architectSelectAll => 'Всички';
 }

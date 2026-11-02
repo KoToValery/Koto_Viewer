@@ -542,8 +542,9 @@ class ArchitectElementTool extends ChangeNotifier {
     ArchitectStorey? dimensionStorey,
     ArchitectProject? annotationProject,
     String? drawingViewKey,
+    double tolerancePixels = 14,
   }) sync* {
-    final tolerance = 14.0 / scale;
+    final tolerance = tolerancePixels / scale;
 
     // Check Columns
     for (final col in storey.columns) {

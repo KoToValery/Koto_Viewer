@@ -1,3 +1,4 @@
+import '../services/architect_stair_floor_contact.dart';
 import 'architect_roof_drainage_mesh.dart';
 import 'architect_floor_drain_mesh.dart';
 import 'architect_solid_shell.dart';
@@ -210,7 +211,11 @@ class Architect3dBuilder {
       for (final stair in storey.stairs) {
         final first = allTris.length;
         final solids = [
-          ...ArchitectStairMesh.body(stair),
+          ...ArchitectStairMesh.body(
+            stair,
+            firstRiserBottom: ArchitectStairFloorContact.firstRiserBottom(
+              project, storey, stair),
+          ),
           ...ArchitectStairMesh.railings(
             stair,
             storey: storey,

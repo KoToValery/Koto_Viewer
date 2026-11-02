@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'architect_tool_test_helper.dart' as tool_ui;
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -95,7 +96,7 @@ void main() {
   );
 
   testWidgets(
-    'Overlap traversal adds and removes each hit without discarding other selections',
+    'Mouse overlap traversal adds and removes each hit without discarding other selections',
     (tester) async {
       final model = editing.seeded(
         const ArchitectStorey(
@@ -126,7 +127,8 @@ void main() {
         {'other', 'wall'},
         {'other'},
       ]) {
-        await workspace.wallTap(tester, Offset.zero);
+        await tester.tapAt(workspace.screen(tester, Offset.zero), kind: PointerDeviceKind.mouse);
+        await tester.pumpAndSettle();
         expect(workspace.overlay(tester).selectedElementIds, expected);
       }
       expect(model.undoCount, 0);

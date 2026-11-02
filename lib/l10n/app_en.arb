@@ -5059,5 +5059,18 @@
   "wallSideAutoHelp": "Points the exterior side outwards. Flipping manually preserves your chosen side.",
   "wallTypeLocationHint": "Initial value; automatic detection refines it from the contour.",
   "wallExteriorUnresolved": "Some walls need their location or exterior side specified.",
-  "wallExteriorReview": "Review"
+  "wallExteriorReview": "Review",
+  "architectPickTitle": "Choose element",
+  "architectPickPrevious": "Previous element",
+  "architectPickNext": "Next element",
+  "architectPickAdd": "Add to selection",
+  "architectPickRemove": "Remove from selection",
+  "architectPickNamed": "{type} · {name}",
+  "@architectPickNamed": {"placeholders": {"type": {"type": "String"}, "name": {"type": "String"}}},
+  "architectPickItem": "{label} · {index}",
+  "@architectPickItem": {"placeholders": {"label": {"type": "String"}, "index": {"type": "int"}}},
+  "architectPickPosition": "{label} · {index}/{count}",
+  "@architectPickPosition": {"placeholders": {"label": {"type": "String"}, "index": {"type": "int"}, "count": {"type": "int"}}},
+  "architectTouchSelectionHelp": "Tap to select; use arrows for overlaps. Hold for actions.",
+  "architectSelectAll": "Select all"
 }

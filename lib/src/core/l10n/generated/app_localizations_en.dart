@@ -8595,4 +8595,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wallExteriorReview => 'Review';
+
+  @override
+  String get architectPickTitle => 'Choose element';
+
+  @override
+  String get architectPickPrevious => 'Previous element';
+
+  @override
+  String get architectPickNext => 'Next element';
+
+  @override
+  String get architectPickAdd => 'Add to selection';
+
+  @override
+  String get architectPickRemove => 'Remove from selection';
+
+  @override
+  String architectPickNamed(String type, String name) {
+    return '$type · $name';
+  }
+
+  @override
+  String architectPickItem(String label, int index) {
+    return '$label · $index';
+  }
+
+  @override
+  String architectPickPosition(String label, int index, int count) {
+    return '$label · $index/$count';
+  }
+
+  @override
+  String get architectTouchSelectionHelp =>
+      'Tap to select; use arrows for overlaps. Hold for actions.';
+
+  @override
+  String get architectSelectAll => 'Select all';
 }

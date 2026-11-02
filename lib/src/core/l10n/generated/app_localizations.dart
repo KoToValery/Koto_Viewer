@@ -15418,6 +15418,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Review'**
   String get wallExteriorReview;
+
+  /// No description provided for @architectPickTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose element'**
+  String get architectPickTitle;
+
+  /// No description provided for @architectPickPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous element'**
+  String get architectPickPrevious;
+
+  /// No description provided for @architectPickNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next element'**
+  String get architectPickNext;
+
+  /// No description provided for @architectPickAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to selection'**
+  String get architectPickAdd;
+
+  /// No description provided for @architectPickRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from selection'**
+  String get architectPickRemove;
+
+  /// No description provided for @architectPickNamed.
+  ///
+  /// In en, this message translates to:
+  /// **'{type} · {name}'**
+  String architectPickNamed(String type, String name);
+
+  /// No description provided for @architectPickItem.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} · {index}'**
+  String architectPickItem(String label, int index);
+
+  /// No description provided for @architectPickPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} · {index}/{count}'**
+  String architectPickPosition(String label, int index, int count);
+
+  /// No description provided for @architectTouchSelectionHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to select; use arrows for overlaps. Hold for actions.'**
+  String get architectTouchSelectionHelp;
+
+  /// No description provided for @architectSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get architectSelectAll;
 }
 
 class _AppLocalizationsDelegate

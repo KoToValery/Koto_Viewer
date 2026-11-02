@@ -220,7 +220,10 @@ class ArchitectSelection {
       }
     }
     for (final w in s.walls) {
-      if (w.id == id) return path..addPolygon(w.polygonCorners, true);
+      if (w.id == id) {
+        return path..addPolygon(
+          ArchitectSpecialWallGeometry.physicalPlanCorners(w, s.walls), true);
+      }
       for (final o in [
         ...w.doors.map((d) => (d.id, d.offsetRatio, d.width)),
         ...w.windows.map((e) => (e.id, e.offsetRatio, e.width)),

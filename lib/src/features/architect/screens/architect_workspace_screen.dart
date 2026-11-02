@@ -1,3 +1,5 @@
+import '../services/architect_selection_candidates.dart';
+import '../widgets/architect_candidate_picker.dart';
 import '../services/architect_interaction_mode.dart';
 import '../services/architect_projection_loader.dart';
 import '../widgets/architect_projection_status.dart';
@@ -739,7 +741,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       child: SizedBox(
 
-        height: 48,
+        height: ArchitectWorkspaceViewBar.heightFor(context),
 
         child: Row(
 
@@ -1776,6 +1778,80 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _selectedZoneId = _project.activeStorey.zones.any((z) => z.id == primary) ? primary : null;
       _selectionOperation = ArchitectSelectionOperation.add;
     });
+  }
+
+  ArchitectSelectionCandidates? _touchCandidates;
+  Size _touchViewportSize = Size.zero;
+
+  void _onTouchViewportChanged() {
+    final resized = _touchViewportSize != _viewport.size;
+    _touchViewportSize = _viewport.size;
+    // Adopting a tool can open its inspector and resize the canvas. Keep the
+    // model-space snapshot through that layout change; navigation dismisses it.
+    if (!resized) _dismissTouchCandidates();
+  }
+
+  void _dismissTouchCandidates() {
+    if (_touchCandidates != null && mounted) {
+      setState(() => _touchCandidates = null);
+    }
+  }
+
+  List<String> _touchHits(Offset point) =>
+      ArchitectSelectionCandidates.planHits(
+        _project,
+        _elementTool,
+        point,
+        _currentScale,
+        includeComponents: _showFurnitureLayer,
+        drawingViewKey: _workspaceViewKey,
+        allowed: (id) =>
+            (_editingGroup == null || _editingGroup!.elementIds.contains(id)) &&
+            (_acceptsAnySelection || _isElementAllowedForTool(id, _activeTool)),
+      );
+
+  bool _candidateSelected(String id) {
+    final members = _commands.isPlan && _editingGroupId == null
+        ? _project.activeStorey.expandGroups({id})
+        : {id};
+    return members.every(_effectiveSelection.contains);
+  }
+
+  bool _candidateWillRemove(String id) => _explicitSelectionOperation
+      ? _selectionOperation == ArchitectSelectionOperation.remove
+      : _candidateSelected(id);
+
+  void _chooseTouchCandidate(int index) {
+    final session = _touchCandidates;
+    if (session == null) return;
+    final next = session.at(index);
+    setState(() => _touchCandidates = next);
+    if (!_multiSelect) {
+      _applySelectionId(next.current, next.point, direct: true);
+    }
+  }
+
+  void _applyTouchCandidate() {
+    final session = _touchCandidates;
+    if (session == null) return;
+    _applySelectionId(
+      session.current,
+      session.point,
+      toggle: true,
+      direct: true,
+    );
+  }
+
+  Widget _buildTouchCandidatePicker() {
+    final session = _touchCandidates!;
+    return ArchitectCandidatePicker(
+      labels: architectCandidateLabels(context, _project, session.ids),
+      index: session.index,
+      onIndex: _chooseTouchCandidate,
+      onApply: _multiSelect ? _applyTouchCandidate : null,
+      isSelected: _candidateSelected,
+      willRemove: _candidateWillRemove,
+    );
   }
 
   List<String> _selectionCandidates(Offset point) {
@@ -3380,7 +3456,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    setState(() => _is3DView = !_is3DView);
+    setState(() {
+      _touchCandidates = null;
+      _is3DView = !_is3DView;
+    });
 
   }
 
@@ -3594,7 +3673,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _showFurnitureLayer = true;
 
-  void toggleFurnitureLayer() => setState(() => _showFurnitureLayer = !_showFurnitureLayer);
+  void toggleFurnitureLayer() => setState(() {
+    _touchCandidates = null;
+    _showFurnitureLayer = !_showFurnitureLayer;
+  });
 
 
 
@@ -3659,6 +3741,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onModelChanged() {
+    _touchCandidates = null;
 
     if (!mounted) return;
 
@@ -3821,6 +3904,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _cancelDrafting() {
+    _touchCandidates = null;
 
     _editingGroupId = null;
 
@@ -3944,6 +4028,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _changeTool(ArchitectTool tool, {bool toggle = true}) => setState(() {
+    _touchCandidates = null;
     final previousMode = _interactionMode;
     final keepSingle = tool == ArchitectTool.select && !previousMode.isManualSelection
         ? _effectiveSelection.lastOrNull : null;
@@ -4045,6 +4130,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _clearSelection() {
+    _touchCandidates = null;
 
     setState(() {
 
@@ -6010,6 +6096,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ? _draftingSeed?.apply(previous, next) ?? next : next;
 
     _commands.addListener(_onModelChanged);
+    _viewport.addListener(_onTouchViewportChanged);
 
     unawaited(_loadWorkspacePreferences());
 
@@ -6200,6 +6287,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _openingCooldownTimer?.cancel();
 
+    _viewport.removeListener(_onTouchViewportChanged);
     _commands.removeListener(_onModelChanged);
 
     _commands.dispose();
@@ -6467,6 +6555,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onPointerDown(PointerDownEvent event) {
+    _dismissTouchCandidates();
     if (_interactionMode == ArchitectInteractionMode.navigation && !_terrainDrafting) {
       _touchInput = event.kind == PointerDeviceKind.touch;
       _handlePointerDown = event.localPosition;
@@ -17063,6 +17152,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool _onContextHold(Offset screenPoint) {
+    _dismissTouchCandidates();
     if (_marqueeTool.isDrafting) return false;
     if (!_acceptsAnySelection) return false;
 
@@ -20099,20 +20189,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  bool _selectAt(
-
-    Offset point, {
-
-    bool invalidateGesture = true,
-
-    bool toggle = false,
-
+  bool _selectAt(Offset point, {
+    bool invalidateGesture = true, bool toggle = false,
   }) {
-
+    if (_touchInput && invalidateGesture) {
+      final ids = _touchHits(point);
+      setState(() => _touchCandidates = ids.length > 1
+          ? ArchitectSelectionCandidates(ids, point) : null);
+      if (ids.isEmpty) return false;
+      if (ids.length > 1 && _multiSelect) return true;
+      return _applySelectionId(ids.first, point,
+        invalidateGesture: invalidateGesture, toggle: toggle, direct: ids.length > 1);
+    }
     final id = _nextSelection(point, advance: invalidateGesture);
-
     if (id == null) return false;
+    return _applySelectionId(id, point,
+      invalidateGesture: invalidateGesture, toggle: toggle);
+  }
 
+  bool _applySelectionId(String id, Offset point, {
+    bool invalidateGesture = true, bool toggle = false, bool direct = false,
+  }) {
     if (!_acceptsAnySelection &&
 
         !_isElementAllowedForTool(id, _activeTool)) {
@@ -20121,7 +20218,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    if (!_multiSelect && id == _selectedElementId && _selectionIds.length == 1) {
+    if (!direct && !_multiSelect && id == _selectedElementId && _selectionIds.length == 1) {
       final sec = _project.sections.where((s) => s.id == id).firstOrNull;
       if (sec != null) {
         final tol = 20.0 / _currentScale;
@@ -23270,79 +23367,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _selectSimilarElements() {
-    if (!_multiSelect) return;
-
-    final sel = _effectiveSelection;
-
-    if (sel.isEmpty) return;
-
-    final storey = _project.activeStorey;
-
-    final targetIds = <String>{};
-
-
-
-    final hasWalls = storey.walls.any((w) => sel.contains(w.id));
-
-    final hasCols = storey.columns.any((c) => sel.contains(c.id));
-
-    final hasBeams = storey.beams.any((b) => sel.contains(b.id));
-
-    final hasSlabs = storey.slabs.any((s) => sel.contains(s.id));
-
-    final hasRoofs = storey.roofs.any((r) => sel.contains(r.id));
-
-    final hasZones = storey.zones.any((z) => sel.contains(z.id));
-
-    final hasAxes = _project.gridAxes.any((a) => sel.contains(a.id));
-
-
-
-    if (hasWalls) targetIds.addAll(storey.walls.map((w) => w.id));
-
-    if (hasCols) targetIds.addAll(storey.columns.map((c) => c.id));
-
-    if (hasBeams) targetIds.addAll(storey.beams.map((b) => b.id));
-
-    if (hasSlabs) targetIds.addAll(storey.slabs.map((s) => s.id));
-
-    if (hasRoofs) targetIds.addAll(storey.roofs.map((r) => r.id));
-
-    if (hasZones) targetIds.addAll(storey.zones.map((z) => z.id));
-
-    if (hasAxes) targetIds.addAll(_project.gridAxes.map((a) => a.id));
-
-    if (storey.cadPrimitives.any((p) => sel.contains(p.id) && p.type == CadPrimitiveType.hatch)) {
-
-      targetIds.addAll(storey.cadPrimitives.where((p) => p.type == CadPrimitiveType.hatch).map((p) => p.id));
-
-    }
-
-
-
-    if (targetIds.isNotEmpty) {
-
-      setState(() {
-
-        _selectionIds
-
-          ..clear()
-
-          ..addAll(targetIds);
-
-        _selectedElementId = targetIds.first;
-
-        _multiSelect = true;
-
-      });
-
-      HapticFeedback.mediumImpact();
-
-    }
-
+    final selected = Set<String>.of(_effectiveSelection);
+    if (selected.isEmpty) return;
+    final types = ArchitectSelectionCandidates.tools(_project);
+    final kinds = selected.map((id) => types[id]).nonNulls.toSet();
+    final group = _editingGroup;
+    final targets = {
+      for (final entry in types.entries)
+        if (kinds.contains(entry.value) &&
+            (group == null || group.elementIds.contains(entry.key)) &&
+            (_showFurnitureLayer || entry.value != ArchitectTool.component)) entry.key,
+    };
+    if (targets.isEmpty) return;
+    _changeTool(ArchitectTool.select, toggle: false);
+    setState(() {
+      _selectionIds..clear()..addAll(targets);
+      _selectedElementId = selected.where(targets.contains).firstOrNull ?? targets.first;
+      _multiSelect = true;
+    });
+    HapticFeedback.selectionClick();
   }
-
-
 
   Widget _buildDimensionBar() {
 
@@ -25891,7 +25935,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   activeTool: _activeTool,
                   interactionMode: _interactionMode,
                   selectionTool: _selectionDrawingTool ?? _quickDrawingTool,
-                  onDrawSelection: _startDrawingFromSelection,
+                  onSelectAll: _effectiveSelection.isEmpty ? null : _selectSimilarElements,
+                          onDrawSelection: _startDrawingFromSelection,
 
                   onToolChanged: _changeTool,
 
@@ -26885,8 +26930,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ),
 
-                    if (_showSelectionActions)
-                      Positioned(bottom: 0, left: 0, right: 0, child: _buildSelectionBar()),
+                    if (_showSelectionActions || (_touchCandidates != null && !_is3DView && !_printPreview))
+                      Positioned(bottom: 0, left: 0, right: 0, child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_touchCandidates != null && !_is3DView && !_printPreview)
+                            Padding(padding: const EdgeInsets.all(8),
+                              child: _buildTouchCandidatePicker()),
+                          if (_showSelectionActions) Listener(
+                            onPointerDown: (_) => _dismissTouchCandidates(),
+                            child: _buildSelectionBar()),
+                        ],
+                      )),
                   ],
 
                 ),
@@ -28041,7 +28096,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             Positioned.fill(child: _buildDraftCancel()),
 
-            if (!_showSelectionControl) Positioned(
+            if (!_showSelectionControl && _touchCandidates == null) Positioned(
 
               left: 12,
 
@@ -28183,13 +28238,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                       !_moveSelection
 
-                                  ? context.l10n.architectSelectionCycleHelp
+                                  ? (_touchInput ? context.l10n.architectTouchSelectionHelp
+                                    : context.l10n.architectSelectionCycleHelp)
 
                                   : context.l10n.architectEditHoldHint)
 
                             : _activeTool == ArchitectTool.select
 
-                            ? context.l10n.architectSelectionCycleHelp
+                            ? (_touchInput ? context.l10n.architectTouchSelectionHelp
+                                    : context.l10n.architectSelectionCycleHelp)
 
                             : _activeTool == ArchitectTool.column
 
@@ -28239,6 +28296,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ),
 
+      if (_touchCandidates != null && _multiSelect)
+        Positioned.fill(child: IgnorePointer(child: CustomPaint(
+          key: const ValueKey('architect-candidate-preview'),
+          painter: ArchitectCandidateOutline(
+            ArchitectSelection.outline(_project, _touchCandidates!.current),
+            _viewport.toScreen),
+        ))),
       if (_commands.isPlan && _acceptsAnySelection && !_placingDownpipe)
         Positioned.fill(child: AnimatedBuilder(
           animation: Listenable.merge([_viewport, _modelCommands]),

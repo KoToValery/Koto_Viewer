@@ -64,7 +64,8 @@ void main() {
 
       expect(winPath, isNotNull);
       expect(wallPath, isNotNull);
-      expect(winPath!.getBounds().height, closeTo(1.40, 1e-3));
+      // The interior stool extends 20 mm below the original aperture.
+      expect(winPath!.getBounds().height, closeTo(1.42, 1e-3));
 
       // Zero overlap between the cut window aperture and the host wall
       final overlap = Path.combine(PathOperation.intersect, winPath, wallPath!);
@@ -73,13 +74,14 @@ void main() {
       // The cut window must NOT produce operation lines in the background elevation
       expect(section.background?.operations ?? const [], isEmpty);
 
-      // The window section region is clean (only top frame, bottom frame, and glazing strip)
+      // Hollow frame profiles, glazing beads and double glass remain unhatched.
       final winRegions = section.regions.where((r) => r.sourceId == 'win_diag').toList();
       expect(winRegions, isNotEmpty);
       final contourCount = winRegions
           .expand((r) => r.path.computeMetrics())
           .length;
-      expect(contourCount, lessThanOrEqualTo(4));
+      expect(contourCount, lessThanOrEqualTo(16));
+      expect(winRegions.every((r) => !r.drawHatch), isTrue);
     });
 
     test('Doors on diagonal walls simplify at 10-40 cm and hide below 10 cm', () {

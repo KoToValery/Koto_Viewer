@@ -3,6 +3,7 @@ import 'dart:ui';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 import 'architect_selection.dart';
+import 'architect_selection_candidates.dart';
 import 'architect_slab_geometry.dart';
 import 'architect_command_controller.dart';
 
@@ -83,35 +84,39 @@ class ArchitectProjectionEditing {
     Map<String, Path> paths,
     Offset point,
     double tolerance,
+  ) => pickAll(project, paths, point, tolerance).firstOrNull;
+
+  static List<String> pickAll(
+    ArchitectProject project,
+    Map<String, Path> paths,
+    Offset point,
+    double tolerance,
   ) {
-    final candidates = paths.entries
-        .where((e) => find(project, e.key) != null)
-        .toList();
+    final refs = {for (final id in paths.keys) id: find(project, id)};
+    final candidates = paths.entries.where((e) => refs[e.key] != null).toList();
     candidates.sort((a, b) {
-      final ar = find(project, a.key)!, br = find(project, b.key)!;
-      final priority = ar.kind.index.compareTo(br.kind.index);
-      return priority != 0
-          ? priority
-          : a.value.getBounds().size.shortestSide.compareTo(
-              b.value.getBounds().size.shortestSide,
-            );
+      final priority = refs[a.key]!.kind.index.compareTo(
+        refs[b.key]!.kind.index,
+      );
+      if (priority != 0) return priority;
+      final size = a.value.getBounds().size.shortestSide.compareTo(
+        b.value.getBounds().size.shortestSide,
+      );
+      return size != 0 ? size : a.key.compareTo(b.key);
     });
-    for (final margin in [0.0, tolerance]) {
-      for (final e in candidates) {
-        if (!e.value.getBounds().inflate(margin).contains(point)) continue;
-        if (e.value.contains(point) ||
-            (margin > 0 &&
-                [
-                  Offset(margin, 0),
-                  Offset(-margin, 0),
-                  Offset(0, margin),
-                  Offset(0, -margin),
-                ].any((d) => e.value.contains(point + d)))) {
-          return e.key;
-        }
+    final exact = <String>[], near = <String>[];
+    for (final e in candidates) {
+      if (ArchitectSelectionCandidates.pathHit(e.value, point, 1e-7)) {
+        exact.add(e.key);
+      } else if (ArchitectSelectionCandidates.pathHit(
+        e.value,
+        point,
+        tolerance,
+      )) {
+        near.add(e.key);
       }
     }
-    return null;
+    return [...exact, ...near];
   }
 
   static ArchitectProject properties(

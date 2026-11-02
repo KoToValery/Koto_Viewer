@@ -319,6 +319,7 @@ void main() {
           'architect-tool-pan',
           'architect-tool-select',
           'architect-multi-select',
+          'architect-select-all',
           'architect-draw-selection',
         ]) {
           final bounds = tester.getRect(find.byKey(ValueKey(key)));

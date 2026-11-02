@@ -1,3 +1,5 @@
+import '../services/architect_selection_candidates.dart';
+import 'architect_candidate_picker.dart';
 import 'architect_roof_pitch_editor.dart';
 import 'architect_downpipe_handle.dart';
 import 'dart:async';
@@ -61,6 +63,22 @@ class ArchitectProjectionEditor extends StatefulWidget {
 }
 
 class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
+  ArchitectSelectionCandidates? _candidates;
+  ArchitectProject? _candidateProject;
+  Offset? _candidateScreenOrigin;
+  bool _touchInput = false;
+
+  void _chooseCandidate(int index) {
+    final session = _candidates;
+    if (session == null) return;
+    setState(() {
+      _candidates = session.at(index);
+      id = _candidates!.current;
+      _pipeSelectionRevision++;
+      error = null;
+    });
+  }
+
   String? id;
   Offset? dragStart;
   Offset delta = Offset.zero;
@@ -110,6 +128,16 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   @override
   void didUpdateWidget(covariant ArchitectProjectionEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_candidates != null &&
+        (!identical(_candidateProject, project) ||
+            oldWidget.scale != widget.scale ||
+            oldWidget.origin != widget.origin ||
+            oldWidget.right != widget.right ||
+            oldWidget.elevation != widget.elevation ||
+            _candidateScreenOrigin != widget.toScreen(Offset.zero) ||
+            _candidates!.ids.any((id) => !widget.paths.containsKey(id)))) {
+      _candidates = null;
+    }
     if (id != null && (!widget.paths.containsKey(id) || selected == null)) {
       id = null;
       pitchEditing = false;
@@ -193,6 +221,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   }
 
   Future<void> moveNumber(bool horizontal) async {
+    if (_candidates != null) setState(() => _candidates = null);
     final target = id;
     final value = await number(
       horizontal
@@ -215,6 +244,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   }
 
   Future<void> properties() async {
+    if (_candidates != null) setState(() => _candidates = null);
     final ref = selected;
     if (ref == null) return;
     final local = project.copyWith(activeStoreyId: ref.storey.id);
@@ -327,6 +357,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   }
 
   void startPitch() {
+    if (_candidates != null) setState(() => _candidates = null);
     final ref = selected;
     if (ref?.kind != ArchitectProjectionKind.roof) return;
     setState(() {
@@ -343,6 +374,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   }
 
   Future<void> contextMenu(Offset local, Offset global) async {
+    if (_candidates != null) setState(() => _candidates = null);
     final hit = ArchitectProjectionEditing.pick(
       project,
       widget.paths,
@@ -420,6 +452,8 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
       children: [
         Listener(
           onPointerDown: (event) {
+            _touchInput = event.kind == PointerDeviceKind.touch;
+            if (_candidates != null) setState(() => _candidates = null);
             _contextHold?.cancel();
             if (_pointers.isEmpty) {
               _contextDown = event.localPosition;
@@ -479,16 +513,24 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                   return;
                 }
               }
-              final hit = ArchitectProjectionEditing.pick(
+              final point = widget.toView(details.localPosition);
+              final hits = ArchitectProjectionEditing.pickAll(
                 project,
                 widget.paths,
-                widget.toView(details.localPosition),
-                10 / widget.scale,
+                point,
+                (_touchInput ? ArchitectSelectionCandidates.touchPixels : 10) /
+                    widget.scale,
               );
+              final hit = hits.firstOrNull;
               setState(() {
                 _pipeSelectionRevision++;
                 id = hit;
                 error = null;
+                _candidates = _touchInput && hits.length > 1
+                    ? ArchitectSelectionCandidates(hits, point)
+                    : null;
+                _candidateProject = project;
+                _candidateScreenOrigin = widget.toScreen(Offset.zero);
               });
               if (hit == null) widget.onMissTap?.call(details.localPosition);
             },
@@ -497,6 +539,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                 ? null
                 : (d) {
                     _contextHold?.cancel();
+                    setState(() => _candidates = null);
                     lastScale = 1;
                     // Gesture recognition can begin outside a thin roof after
                     // touch slop. Keep the element and point from pointer-down.
@@ -607,7 +650,10 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
           controller: widget.controller,
           onNavigate: widget.onNavigate,
           selectionRevision: _pipeSelectionRevision,
-          onSelected: () => setState(() => id = null),
+          onSelected: () => setState(() {
+            id = null;
+            _candidates = null;
+          }),
           roofIds: widget.paths.keys.toSet(),
           visibleAt: (id, p, z) =>
               widget.paths[id]?.contains(
@@ -639,6 +685,19 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (_candidates != null)
+                        ArchitectCandidatePicker(
+                          labels: architectCandidateLabels(
+                            context,
+                            project,
+                            _candidates!.ids,
+                            includeStorey: true,
+                          ),
+                          index: _candidates!.index,
+                          onIndex: _chooseCandidate,
+                          isSelected: (candidate) => candidate == id,
+                          willRemove: (_) => false,
+                        ),
                       if (error != null)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 4),

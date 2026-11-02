@@ -691,7 +691,7 @@ void main() {
     },
   );
   testWidgets(
-    'General selection retains Select and Select similar keeps only hatches',
+    'General selection retains Select and Edit Select all keeps only hatches',
     (tester) async {
       final model = ArchitectCommandController(
         fixture([
@@ -723,7 +723,9 @@ void main() {
         ArchitectTool.select,
       );
       final before = model.project.toJson();
-      await tester.tap(find.byKey(const ValueKey('architect-select-similar')));
+      final all = find.byKey(const ValueKey('architect-select-all'));
+      await tester.ensureVisible(all);
+      await tester.tap(all);
       await tester.pumpAndSettle();
       expect(workspace.overlay(tester).selectedElementIds, {'h', 'h2'});
       expect(model.project.toJson(), before);

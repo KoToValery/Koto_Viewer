@@ -5,6 +5,13 @@ import '../services/architect_workspace_view_controller.dart';
 import 'architect_elevation_labels.dart';
 
 class ArchitectWorkspaceViewBar extends StatelessWidget {
+  static double heightFor(BuildContext context) =>
+      48 +
+      (MediaQuery.textScalerOf(context).scale(32) - 32).clamp(
+        0,
+        double.infinity,
+      );
+
   final ArchitectProject project;
   final ArchitectWorkspaceView view;
   final String? viewId;
@@ -201,7 +208,7 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                     ),
                 ],
                 child: Container(
-                  height: 48,
+                  height: heightFor(context),
                   decoration: BoxDecoration(
                     border: Border(
                       bottom: BorderSide(
