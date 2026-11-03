@@ -21842,6 +21842,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   _cancelActiveDrags();
 
+                  _beginGeometryCommand(ArchitectRadialAction.straighten);
                   _commands.commit(command?.apply(edited) ?? edited);
 
                   _saveBiMProjectIfAttached();
@@ -24082,7 +24083,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Widget _buildSelectionBar() {
-    if (_commandReady) return const SizedBox.shrink();
+    if (_commandReady ||
+        (_commandPreview != null && _commandAction != ArchitectRadialAction.move)) {
+      return const SizedBox.shrink();
+    }
     final l = context.l10n;
     final ids = _effectiveSelection;
 
@@ -27130,7 +27134,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                   const SizedBox(width: 12),
 
-                                  GestureDetector(
+                                  if (_commandPreview == null) GestureDetector(
 
                                     key: const ValueKey(
 

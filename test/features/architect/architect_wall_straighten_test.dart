@@ -40,6 +40,8 @@ void main() {
       await tester.tap(straightenFinder);
       await tester.pumpAndSettle();
 
+      expect(model.undoCount, 0);
+      await editing.acceptGeometryCommand(tester);
       // Check wall 'a' is straightened onto the horizontal axis (dy == 0) while preserving length
       final updatedA = model.project.activeStorey.walls.firstWhere(
         (w) => w.id == 'a',

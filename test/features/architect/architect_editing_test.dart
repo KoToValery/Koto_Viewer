@@ -750,6 +750,7 @@ void main() {
       await move.moveTo(workspace.screen(tester, const Offset(0, 1)));
       await move.up();
       await tester.pump();
+      await acceptGeometryCommand(tester);
       expect(
         model.project.activeStorey.walls[1].startPoint,
         const Offset(2, 1),
@@ -804,6 +805,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tapAt(workspace.screen(tester, const Offset(3, 2)));
       await tester.pumpAndSettle();
+      await acceptGeometryCommand(tester);
       expect(
         model.project.activeStorey.walls.first.endPoint,
         const Offset(3, 0),
