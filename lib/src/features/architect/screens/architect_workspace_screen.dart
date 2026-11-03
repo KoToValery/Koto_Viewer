@@ -234,6 +234,7 @@ import '../services/architect_wall_relations.dart';
 
 import '../rendering/architect_clearance_badge_layout.dart';
 
+import '../rendering/architect_wall_exterior_painter.dart';
 import '../rendering/architect_wall_network.dart';
 
 import '../widgets/architect_element_properties_dialog.dart';
@@ -13729,9 +13730,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       applyDraftingDefaults: true,
     );
 
-    if (chain) { _draftChainIds.add(id); } else {
+    if (chain) {
+      _draftChainIds.add(id);
+    } else {
       _resetDraftGroup();
-      if (command is CreateArchitectWall) _offerWallExteriorReview({id});
     }
 
   }
@@ -14006,36 +14008,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  void _offerWallExteriorReview(Set<String> ids) {
-    final unresolved = _project.activeStorey.walls.where((w) => ids.contains(w.id) &&
-      !w.isParapet && !w.exteriorResolved &&
-      (w.locationMode == WallResolutionMode.automatic ||
-       w.exteriorSideMode == WallResolutionMode.automatic)).map((w) => w.id).toSet();
-    if (unresolved.isEmpty) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final l = context.l10n;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(l.wallExteriorUnresolved),
-        action: SnackBarAction(label: l.wallExteriorReview, onPressed: () {
-          setState(() {
-            _selectionIds..clear()..addAll(unresolved);
-            _selectedElementId = unresolved.first;
-          });
-          _showProperties();
-        }),
-      ));
-    });
-  }
 
   void _finishChainedWall() {
-    _offerWallExteriorReview(_liveDraftChainIds);
-
+    final chainIds = Set<String>.from(_liveDraftChainIds);
     _finishDraftGroup();
 
-    setState(_resetWallDraft);
+    setState(() {
+      _resetWallDraft();
+      if (chainIds.isNotEmpty) {
+        _selectionIds
+          ..clear()
+          ..addAll(chainIds);
+        _selectedElementId = chainIds.last;
+      }
+    });
     _repaintPreview();
-
   }
 
   /// End/cancel always returns the still-active tool to an idle picking state.
@@ -20378,6 +20365,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _handleSelectionTap(Offset point) {
+    final activeStorey = _project.activeStorey;
+    final candidateWallIds = {
+      ..._selectionIds,
+      ?_selectedElementId,
+      ..._modelCommands.exteriorReviewWallIds,
+    };
+    if (candidateWallIds.isNotEmpty) {
+      final candidateWalls = activeStorey.walls
+          .where((w) => candidateWallIds.contains(w.id))
+          .toList();
+      for (final wall in candidateWalls) {
+        if (ArchitectWallExteriorPainter.hitTest(wall, point, _currentScale)) {
+          final flipIds = _selectionIds.isNotEmpty && _selectionIds.contains(wall.id)
+              ? _selectionIds
+                  .where((id) => activeStorey.walls.any((w) => w.id == id))
+                  .toSet()
+              : {wall.id};
+          _executeWallEdit(
+            MirrorArchitectWalls(storeyId: activeStorey.id, wallIds: flipIds),
+          );
+          if (!_selectionIds.contains(wall.id)) {
+            setState(() {
+              _selectionIds
+                ..clear()
+                ..add(wall.id);
+              _selectedElementId = wall.id;
+            });
+          }
+          HapticFeedback.selectionClick();
+          return;
+        }
+      }
+    }
+
     _modelCommands.exteriorReviewWallIds = const {};
 
     final selectedRoof = _selectedRoof;

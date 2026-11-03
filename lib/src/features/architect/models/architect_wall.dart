@@ -345,13 +345,19 @@ class ArchitectWall {
   bool get hasInsulation => insulationThickness > 1e-4;
   bool get isInterior => !isExterior;
   bool get isExterior => location == null
-      ? !{'int_12_partition', 'bearing_25_concrete'}.contains(wallTypeId) &&
+      ? !{
+          'int_12_partition',
+          'bearing_25_concrete',
+          'int_25_brick',
+          'int_10_aerated',
+        }.contains(wallTypeId) &&
             (hasInsulation ||
-                {
-                  'ext_25_brick',
-                  'ext_25_12_eps',
-                  'parapet_12',
-                }.contains(wallTypeId))
+                isParapet ||
+                (wallTypeId != null &&
+                    (wallTypeId!.startsWith('ext_') ||
+                        wallTypeId!.startsWith('parapet_') ||
+                        wallTypeId!.contains('exterior') ||
+                        wallTypeId!.contains('parapet'))))
       : location == ArchitectWallLocation.exterior;
   List<ArchitectMaterialLayer> get resolvedLayers => layers.isNotEmpty
       ? layers

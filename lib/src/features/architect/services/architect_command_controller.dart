@@ -854,6 +854,7 @@ class MirrorArchitectWalls extends ArchitectModelCommand {
           for (final w in storey.walls)
             wallIds.contains(w.id) ? w.mirroredAroundCore().copyWith(
               exteriorSideMode: WallResolutionMode.manual,
+              exteriorResolved: true,
             ) : w,
         ],
       ),
@@ -2190,11 +2191,11 @@ class ArchitectCommandController
     exteriorReviewWallIds = {
       for (final s in next.storeys)
         for (final w in s.walls)
-          if (w.isExterior &&
-              w.exteriorResolved &&
-              (oldWalls[w.id]?.location != w.location ||
+          if ((w.isExterior || w.isParapet) &&
+              (oldWalls[w.id] == null ||
+                  oldWalls[w.id]?.location != w.location ||
                   oldWalls[w.id]?.exteriorSide != w.exteriorSide ||
-                  oldWalls[w.id]?.exteriorResolved != true))
+                  oldWalls[w.id]?.exteriorResolved != w.exteriorResolved))
             w.id,
     };
     super.commit(next);
