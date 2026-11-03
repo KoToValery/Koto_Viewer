@@ -238,6 +238,7 @@ void main() {
       }
       await tester.tap(find.byKey(const ValueKey('wall-end')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(model.project.activeStorey.walls[0].endPoint, const Offset(4, 4));
       expect(
         model.project.activeStorey.walls[0].startPoint.dx,
@@ -301,6 +302,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('architect-axis-value-save')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       final wall = model.project.activeStorey.walls.single;
       expect((wall.unitVector - const Offset(.8, .6)).distance, lessThan(1e-8));
       expect(

@@ -1,0 +1,59 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
+import 'package:kotoview/src/features/architect/models/architect_project.dart';
+import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
+import 'architect_command_confirmation_test.dart' as scene;
+import 'architect_editing_test.dart' as editing;
+import 'architect_workspace_interaction_test.dart' as workspace;
+
+void main() {
+  testWidgets('Visual review of command controls on a Bulgarian phone', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.runAsync(() async {
+    await (FontLoader('Roboto')..addFont(File('C:/Windows/Fonts/arial.ttf').readAsBytes().then(ByteData.sublistView))).load();
+    await (FontLoader('MaterialIcons')..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+    final model = editing.seeded(const ArchitectStorey(id: 's', name: '', walls: [scene.interior]));
+    addTearDown(model.dispose);
+    const capture = ValueKey('command-visual-capture');
+    await tester.pumpWidget(RepaintBoundary(key: capture, child: MaterialApp(
+      locale: const Locale('bg'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: ArchitectWorkspaceScreen(commandController: model),
+    )));
+    await tester.pumpAndSettle();
+    workspace.camera(tester).fit(const Rect.fromLTRB(-4, -4, 4, 4), padding: 32);
+    await tester.pumpAndSettle();
+    await editing.ensureSelectionTool(tester);
+    await workspace.wallTap(tester, const Offset(2, -1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('architect-selection-mirror-copy')));
+    await tester.pumpAndSettle();
+    await tester.tapAt(workspace.screen(tester, Offset.zero));
+    await tester.pumpAndSettle();
+    Future<void> screenshot(String name) async {
+      final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(capture));
+      await tester.runAsync(() async {
+        final image = await boundary.toImage(pixelRatio: 2);
+        final data = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+        await File('scratch/$name.png').writeAsBytes(data.buffer.asUint8List());
+        image.dispose();
+      });
+    }
+    await screenshot('command_mirror_aim_bg');
+    await tester.tap(find.byKey(const ValueKey('architect-mirror-vertical-btn')));
+    await tester.pumpAndSettle();
+    await screenshot('command_mirror_review_bg');
+    expect(model.project.activeStorey.walls, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+}

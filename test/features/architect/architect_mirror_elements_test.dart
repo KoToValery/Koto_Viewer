@@ -202,7 +202,7 @@ void main() {
         final previewId = mirrored.id;
         expect(model.project.activeStorey.toJson(), before);
         await tester.tap(
-          find.byKey(const ValueKey('architect-mirror-cancel-btn')),
+          find.byKey(const ValueKey('architect-command-cancel')),
         );
         await tester.pumpAndSettle();
         expect(workspace.overlay(tester).project.activeStorey.toJson(), before);
@@ -212,6 +212,7 @@ void main() {
         await tester.pump();
         await tester.tapAt(workspace.screen(tester, const Offset(3, 2)));
         await tester.pumpAndSettle();
+        await editing.acceptGeometryCommand(tester);
         final committed = model.project.activeStorey.cadPrimitives;
         expect(committed, hasLength(copy ? 3 : 2));
         final finalMirror = copy ? committed.last : committed.first;
@@ -557,6 +558,7 @@ void main() {
           findsNothing,
         );
 
+        await editing.acceptGeometryCommand(tester);
         // Verify that activeStorey now has 2 walls, one at x = 2, one at x = -2
         final walls = controller.project.activeStorey.walls;
         expect(walls.length, 2);

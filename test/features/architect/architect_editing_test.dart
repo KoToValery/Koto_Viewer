@@ -85,6 +85,15 @@ Future<void> ensureSelectionTool(WidgetTester tester) async {
   }
 }
 
+/// Accept the frozen result of an explicitly started geometry command.
+Future<void> acceptGeometryCommand(WidgetTester tester) async {
+  final apply = find.byKey(const ValueKey('architect-command-apply'));
+  expect(apply, findsOneWidget);
+  expect(tester.widget<IconButton>(apply).onPressed, isNotNull);
+  await tester.tap(apply);
+  await tester.pumpAndSettle();
+}
+
 Future<void> hold(WidgetTester tester, Offset point) async {
   await ensureSelectionTool(tester);
   final g = await tester.startGesture(workspace.screen(tester, point));

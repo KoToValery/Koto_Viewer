@@ -51,6 +51,7 @@ void main() {
     await workspace.wallTap(tester, const Offset(5, 3));
     await tester.pumpAndSettle();
 
+    await editing.acceptGeometryCommand(tester);
     final walls = model.project.activeStorey.walls;
     expect(walls[0].endPoint, const Offset(5, 0));
     expect(walls[1].startPoint, const Offset(5, 0));
@@ -96,6 +97,7 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
 
+    await editing.acceptGeometryCommand(tester);
     final walls = model.project.activeStorey.walls;
     expect(walls[0].endPoint, const Offset(5, 0));
     expect(walls[1].startPoint, const Offset(5, 0));
@@ -145,6 +147,7 @@ void main() {
     await workspace.wallTap(tester, const Offset(5, 3));
     await tester.pumpAndSettle();
 
+    await editing.acceptGeometryCommand(tester);
     final walls = model.project.activeStorey.walls;
     expect(walls[0].endPoint, const Offset(5, 0));
     expect(walls[1].startPoint, const Offset(5, 0));

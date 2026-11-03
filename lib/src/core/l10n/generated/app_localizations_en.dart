@@ -1480,6 +1480,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get architectCommandReview => 'Review. ✓ saves; X cancels.';
+
+  @override
+  String get architectCommandAim => 'Define the edit. X cancels.';
+
+  @override
   String get applyAction => 'Apply';
 
   @override

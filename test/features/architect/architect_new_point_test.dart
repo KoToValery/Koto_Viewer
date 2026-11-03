@@ -287,7 +287,7 @@ void main() {
 
   for (final kind in kinds) {
     testWidgets(
-      'context New point inserts at the indicated midpoint on $kind immediately',
+      'context New point inserts at the indicated midpoint on $kind after confirmation',
       (tester) async {
         final model = editing.seeded(fixture(kind));
         addTearDown(model.dispose);
@@ -318,13 +318,14 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.byKey(const ValueKey('architect-new-point-cancel')),
+          find.byKey(const ValueKey('architect-command-cancel')),
           findsOneWidget,
         );
         workspace.camera(tester).fit(const Rect.fromLTWH(-1, -1, 10, 8));
         await tester.pumpAndSettle();
         await tester.tapAt(workspace.screen(tester, const Offset(4, 0)));
         await tester.pumpAndSettle();
+        await editing.acceptGeometryCommand(tester);
         final path = InsertArchitectElementPoint.pathOf(
           model.project.activeStorey,
           'p',
@@ -332,7 +333,7 @@ void main() {
         expect(path.points, contains(const Offset(4, 0)));
         expect(model.canUndo, isTrue);
         expect(
-          find.byKey(const ValueKey('architect-new-point-cancel')),
+          find.byKey(const ValueKey('architect-command-cancel')),
           findsNothing,
         );
         model.undo();
@@ -400,6 +401,7 @@ void main() {
       expect(find.byKey(const ValueKey('architect-new-point-banner')), findsOneWidget);
       await tester.tapAt(workspace.screen(tester, const Offset(4, 0)));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(model.project.activeStorey.walls, hasLength(2));
       expect(model.project.activeStorey.walls.first.connectEnd, isTrue);
       expect(
@@ -447,6 +449,7 @@ void main() {
       await tester.tapAt(workspace.screen(tester, Offset(coreX + 0.02, 0.01)));
       await tester.pumpAndSettle();
 
+      await editing.acceptGeometryCommand(tester);
       final walls = model.project.activeStorey.walls;
       expect(walls.length, greaterThanOrEqualTo(2));
       final splitWall = walls.firstWhere(

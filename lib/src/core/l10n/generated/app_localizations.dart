@@ -2689,6 +2689,18 @@ abstract class AppLocalizations {
   /// **'Column {name} on {storey} is floating on the slab (no lower support)!'**
   String floatingColumnWarning(String name, String storey);
 
+  /// No description provided for @architectCommandReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review. ✓ saves; X cancels.'**
+  String get architectCommandReview;
+
+  /// No description provided for @architectCommandAim.
+  ///
+  /// In en, this message translates to:
+  /// **'Define the edit. X cancels.'**
+  String get architectCommandAim;
+
   /// Apply action button
   ///
   /// In en, this message translates to:

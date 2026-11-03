@@ -96,6 +96,7 @@ void main() {
             find.byKey(const ValueKey('architect-axis-value-save')),
           );
           await tester.pumpAndSettle();
+          await editing.acceptGeometryCommand(tester);
           final walls = model.project.activeStorey.walls;
           expect(walls.first.startPoint, Offset(-2, distance));
           expect(walls.first.endPoint, Offset(2, distance));
@@ -135,6 +136,7 @@ void main() {
     await gesture.moveTo(workspace.screen(tester, const Offset(3, 2.5)));
     await gesture.up();
     await tester.pumpAndSettle();
+    await editing.acceptGeometryCommand(tester);
     final moved = model.project.activeStorey.walls.single;
     final delta = moved.startPoint - wall.startPoint;
     expect(
@@ -142,7 +144,6 @@ void main() {
       greaterThan(.5),
     );
     expect(model.undoCount, 1);
-    await chooseMove(tester, 'stop');
     final button = tester.widget<ArchitectSelectionMoveButton>(
       find.byType(ArchitectSelectionMoveButton),
     );
@@ -186,7 +187,8 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('architect-axis-value-save')));
       await tester.pumpAndSettle();
-      final next = model.project.activeStorey.cadPrimitives.single;
+      await editing.acceptGeometryCommand(tester);
+    final next = model.project.activeStorey.cadPrimitives.single;
       expect(next.startPoint, const Offset(-2, -.5));
       expect(next.endPoint, const Offset(2, -.5));
       expect(next.id, line.id);

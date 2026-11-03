@@ -7,6 +7,9 @@ import '../widgets/architect_projection_status.dart';
 import '../services/architect_drafting_seed.dart';
 import '../widgets/architect_selection_control.dart';
 import '../widgets/architect_selection_move_button.dart';
+import '../widgets/architect_command_preview_bar.dart';
+import '../services/architect_command_preview.dart';
+import '../../bim_editing/commands/bim_edit_history.dart';
 import '../../../core/services/ui_settings_service.dart';
 
 import '../models/architect_floor_drain.dart';
@@ -895,10 +898,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (mode == 'straight') {
+      _beginGeometryCommand(ArchitectRadialAction.straighten);
 
       final p = _modelCommands.project;
 
-      _modelCommands.commit(
+      _commands.commit(
 
         p.copyWith(
 
@@ -946,6 +950,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     );
 
+    if (id != null) {
+      _selectionIds..clear()..add(id);
+      _selectedElementId = id;
+      _beginGeometryCommand(ArchitectRadialAction.edit);
+    }
     setState(
 
       () =>
@@ -2114,8 +2123,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             roof: plane,
 
           ),
-
-        );
+      applyDraftingDefaults: true,
+    );
 
       }
 
@@ -3696,6 +3705,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _saveBiMProjectIfAttached() {
+    if (_commandPreview != null) return;
 
     if (widget.bimProject == null) return;
 
@@ -3746,6 +3756,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onModelChanged() {
+    if (_commandPreview != null &&
+        !identical(_commandPreview!.document, _modelCommands.project)) {
+      _discardGeometryCommand();
+    }
     _touchCandidates = null;
 
     if (!mounted) return;
@@ -3909,6 +3923,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _cancelDrafting() {
+    if (_commandPreview != null) { _cancelGeometryCommand(); return; }
     _touchCandidates = null;
 
     _editingGroupId = null;
@@ -4027,6 +4042,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _changeTool(ArchitectTool tool, {bool toggle = true}) => setState(() {
+    _discardGeometryCommand();
     _touchCandidates = null;
     final previousMode = _interactionMode;
     final keepSingle = tool == ArchitectTool.select && !previousMode.isManualSelection
@@ -4119,6 +4135,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _clearSelection() {
+    _discardGeometryCommand();
     _touchCandidates = null;
 
     setState(() {
@@ -4797,6 +4814,216 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _moveSelection = false;
 
+  ArchitectCommandPreview? _commandPreview;
+  ArchitectProject? _commandLiveCandidate;
+  ArchitectRadialAction? _commandAction;
+  ({
+    Set<String> ids,
+    String? element,
+    String? zone,
+    ArchitectTool tool,
+    ArchitectInteractionMode mode,
+    bool contextActive,
+    String? group,
+    String? contour,
+    int ring,
+    String? polygonEdit,
+    int? polygonEdge,
+    ArchitectDraftingSeed? seed,
+    ArchitectTool? quickTool,
+    ArchitectWallType? wallType,
+    double wallThickness,
+  })?
+  _commandSelection;
+
+  Object get _commandContext => (
+    _modelCommands.project,
+    _commands.view,
+    _commands.viewId,
+    _commands.documentProject.activeStoreyId,
+  );
+  bool get _commandReady => _commandPreview?.ready == true;
+  bool get _commandCanConfirm =>
+      _commandReady ||
+      _commandLiveCandidate != null ||
+      (_commandAction == ArchitectRadialAction.cutOpening &&
+          _canConfirmContour);
+
+  void _beginGeometryCommand(ArchitectRadialAction action) {
+    if (_commandPreview != null && !_commandReady && _commandAction == action)
+      return;
+    _discardGeometryCommand();
+    _commandSelection = (
+      ids: Set<String>.of(_selectionIds),
+      element: _selectedElementId,
+      zone: _selectedZoneId,
+      tool: _activeTool,
+      mode: _interactionMode,
+      contextActive: _selectionContextActive,
+      group: _editingGroupId,
+      contour: _polygonContourElementId,
+      ring: _polygonContourIndex,
+      polygonEdit: _polygonEditId,
+      polygonEdge: _polygonSelectedEdge,
+      seed: _draftingSeed,
+      quickTool: _quickDrawingTool,
+      wallType: _activeWallType,
+      wallThickness: _wallThickness,
+    );
+    _commandAction = action;
+    _commandPreview = ArchitectCommandPreview(
+      action: action.name,
+      document: _modelCommands.project,
+      context: _commandContext,
+      original: _commands.documentProject,
+    );
+    setState(() {});
+  }
+
+  bool _captureGeometryPreview(ArchitectProject next) {
+    final session = _commandPreview;
+    if (session == null) return false;
+    if (!identical(session.document, _modelCommands.project)) {
+      _discardGeometryCommand();
+      return true;
+    }
+    // Room updates belong to the same transaction as their wall edit.
+    if (_commands.isPlan) {
+      final storey = next.activeStorey;
+      final zones = storey.zones.map((originalZone) {
+        final zone =
+            (_commandAction == ArchitectRadialAction.move ||
+                    _commandAction == ArchitectRadialAction.edit) &&
+                _effectiveSelection.contains(originalZone.id)
+            ? originalZone.copyWith(isAutoBoundary: false)
+            : originalZone;
+        return zone.isAutoBoundary
+            ? ArchitectRoomDetector.automaticZone(zone, storey.walls) ?? zone
+            : zone;
+      }).toList();
+      next = _modelCommands.prepare(
+        next.updateActiveStorey(storey.copyWith(zones: zones)),
+      );
+    } else {
+      next = ArchitectDimensionChain.resolve(next);
+    }
+    session.stage(_commandContext, next);
+    _commands.editPreview = next;
+    setState(() {});
+    _repaintPreview();
+    return true;
+  }
+
+  void _discardGeometryCommand() {
+    final selection = _commandSelection;
+    if (_commandPreview == null) return;
+    _commandLiveCandidate = null;
+    _viewDraft = null;
+    _commandPreview!.cancel();
+    _commandPreview = null;
+    _commandAction = null;
+    _commandSelection = null;
+    _commands.editPreview = null;
+    _cancelActiveDrags();
+    _mirrorActive = false;
+    _mirrorAnchor = null;
+    _mirrorCurrentPoint = null;
+    _mirrorIdMap = null;
+    _splitActive = false;
+    _splitWallIds.clear();
+    _splitPoint1 = null;
+    _splitPoint2 = null;
+    _splitWaitingForSide = false;
+    _splitPerpendicularNormal = null;
+    _splitGuidePerpendicular = null;
+    _wallCutIds = {};
+    _wallCutConfirmedDir = null;
+    _wallCutStroke = false;
+    _wallCutStart = null;
+    _wallExtendId = null;
+    _wallJoinSourceId = null;
+    _newPointTargetId = null;
+    _newPointCandidate = null;
+    _newPointHoleIndex = null;
+    _newPointLeaderLine = null;
+    _polygonEditId = null;
+    _polygonSelectedEdge = null;
+    _cutOpeningTargetId = null;
+    _elementTool.cancelSlabDrafting();
+    _moveSelection = false;
+    _transverseMove = false;
+    if (selection != null) {
+      _selectionIds
+        ..clear()
+        ..addAll(selection.ids);
+      _selectedElementId = selection.element;
+      _selectedZoneId = selection.zone;
+      _activeTool = selection.tool;
+      _interactionMode = selection.mode;
+      _selectionContextActive = selection.contextActive;
+      _editingGroupId = selection.group;
+      _polygonContourElementId = selection.contour;
+      _polygonContourIndex = selection.ring;
+      _polygonEditId = selection.polygonEdit;
+      _polygonSelectedEdge = selection.polygonEdge;
+      _draftingSeed = selection.seed;
+      _quickDrawingTool = selection.quickTool;
+      _activeWallType = selection.wallType;
+      _wallThickness = selection.wallThickness;
+    }
+  }
+
+  void _cancelGeometryCommand() {
+    setState(_discardGeometryCommand);
+    _repaintPreview();
+  }
+
+  void _confirmGeometryCommand() {
+    if (_commandLiveCandidate case final candidate?) {
+      _commands.commit(candidate);
+    }
+    if (!_commandReady &&
+        _commandAction == ArchitectRadialAction.cutOpening &&
+        _canConfirmContour) {
+      _commitCutOpening();
+    }
+    final session = _commandPreview;
+    if (session == null || !session.ready) return;
+    final next = session.confirm(_commandContext);
+    if (next == null) {
+      _cancelGeometryCommand();
+      return;
+    }
+    final ids = Set<String>.of(_effectiveSelection);
+    final configuration = _commandSelection;
+    _discardGeometryCommand();
+    try {
+      _commands.commit(next);
+      final valid = ArchitectSelection.records(
+        _project.toJson(),
+        _project.activeStoreyId,
+      ).map((e) => e['id'] as String).toSet();
+      setState(() {
+        _selectionIds
+          ..clear()
+          ..addAll(ids.intersection(valid));
+        _selectedElementId = _selectionIds.firstOrNull;
+        _selectedZoneId = null;
+        if (configuration != null) {
+          _draftingSeed = configuration.seed;
+          _quickDrawingTool = configuration.quickTool;
+          _activeWallType = configuration.wallType;
+          _wallThickness = configuration.wallThickness;
+        }
+      });
+      _saveBiMProjectIfAttached();
+      HapticFeedback.mediumImpact();
+    } on ArgumentError {
+      _operationError();
+    }
+    _repaintPreview();
+  }
+
   String? _editingGroupId;
 
   ArchitectElementGroup? get _editingGroup => _project.activeStorey.groups.where((g) => g.id == _editingGroupId).firstOrNull;
@@ -5203,8 +5430,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           drain: drain,
 
         ),
-
-      );
+      applyDraftingDefaults: true,
+    );
 
       setState(() {
 
@@ -5310,7 +5537,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           type: CadPrimitiveType.hatch, startPoint: bounds.topLeft, endPoint: bounds.bottomRight,
 
           polygon: points, holes: contour?.holes ?? const [], hatchPattern: _activeHatchPattern,
-          colorValue: _activeHatchColor.argb, colorPresetId: _activeHatchColor.presetId)));
+          colorValue: _activeHatchColor.argb, colorPresetId: _activeHatchColor.presetId)),
+      applyDraftingDefaults: true,
+    );
 
       setState(_elementTool.cancelSlabDrafting);
 
@@ -5321,12 +5550,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _startCutOpening(String id) {
+    _beginGeometryCommand(ArchitectRadialAction.cutOpening);
 
-    _cancelDrafting();
+    _cancelActiveDrags();
+    _resetWallDraft();
 
     setState(() {
 
       _cutOpeningTargetId = id;
+      _selectionIds.clear();
+      _selectedElementId = null;
+      _selectedZoneId = null;
+      _polygonEditId = null;
+      _moveSelection = false;
+      _transverseMove = false;
 
       _activeTool = ArchitectTool.slab;
 
@@ -5352,9 +5589,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         polygon: List.of(_elementTool.slabDraftPoints)));
 
-      _cancelDrafting();
-
-      setState(() => _activeTool = ArchitectTool.pan);
+      _cutOpeningTargetId = null;
+      _elementTool.cancelSlabDrafting();
 
       _saveBiMProjectIfAttached();
 
@@ -5402,7 +5638,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         })),
 
-      IconButton(key: const ValueKey('opening-draft-finish'),
+      if (_commandPreview == null) IconButton(key: const ValueKey('opening-draft-finish'),
 
         tooltip: context.l10n.architectCutOpening,
 
@@ -5410,7 +5646,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         onPressed: _canConfirmContour ? _commitCutOpening : null),
 
-      IconButton(key: const ValueKey('opening-draft-cancel'),
+      if (_commandPreview == null) IconButton(key: const ValueKey('opening-draft-cancel'),
 
         tooltip: context.l10n.cancel, icon: const Icon(Icons.close),
 
@@ -5575,6 +5811,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _editMoveOffset();
       return;
     }
+    if (action == ArchitectSelectionMoveAction.stop) {
+      _cancelGeometryCommand();
+      return;
+    }
+    _beginGeometryCommand(ArchitectRadialAction.move);
     _cancelActiveDrags();
     setState(() {
       _radialMenuScreenPosition = null;
@@ -5587,6 +5828,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Future<void> _editMoveOffset() async {
+    _beginGeometryCommand(ArchitectRadialAction.move);
     final wall = _selectedLinearElement;
     if (wall == null || wall.isCurved || _effectiveSelection.length != 1) return;
     final source = _project;
@@ -5598,6 +5840,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       value: '0',
       numeric: true,
     );
+    if (mounted && value == null) { _cancelGeometryCommand(); return; }
     if (!mounted ||
         value == null ||
         !identical(source, _project) ||
@@ -5735,6 +5978,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _handleTrimOvershoot(ArchitectWallOvershoot overshoot) {
+    _beginGeometryCommand(ArchitectRadialAction.cut);
 
     final commands = ArchitectWallOvershootDetector.createTrimCommands(
 
@@ -5857,6 +6101,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   String? _duplicateMoveId, _duplicateSourceId;
 
   void _beginDuplicateMove(String id) {
+    _beginGeometryCommand(ArchitectRadialAction.duplicate);
 
     _cancelActiveDrags();
 
@@ -6149,6 +6394,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     _commands = ArchitectWorkspaceViewController(_modelCommands)
+      ..previewEdit = _captureGeometryPreview
       ..prepareCreation = (previous, next) => _interactionMode == ArchitectInteractionMode.drawing
           ? _draftingSeed?.apply(previous, next) ?? next : next;
 
@@ -6530,8 +6776,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             zone: _applyZoneFinishPresets(newZone).copyWith(kind: _activeZoneKind),
 
           ),
-
-        );
+      applyDraftingDefaults: true,
+    );
 
         _selectedZoneId = newZone.id;
 
@@ -6612,6 +6858,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onPointerDown(PointerDownEvent event) {
+    if (_commandReady) return;
     _dismissTouchCandidates();
     if (_interactionMode == ArchitectInteractionMode.navigation && !_terrainDrafting) {
       _touchInput = event.kind == PointerDeviceKind.touch;
@@ -7619,6 +7866,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onPointerMove(PointerMoveEvent event) {
+    if (_commandReady) return;
     if (_interactionMode == ArchitectInteractionMode.navigation && !_terrainDrafting) return;
     if (_selectionBoxDown != null && _selectionBoxDownScreen != null &&
         _marqueeTool.mode == ArchitectSelectMode.rectangle) {
@@ -8721,6 +8969,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _updatePointerPreview(Offset screenPosition) {
+    if (_commandReady) return;
 
     if (_pendingShape != null) return;
 
@@ -10065,6 +10314,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onPointerHover(PointerHoverEvent event) {
+    if (_commandReady) return;
     if (_interactionMode == ArchitectInteractionMode.navigation && !_terrainDrafting) return;
 
     if (_draftOverlayContains(event.localPosition)) return;
@@ -10078,6 +10328,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onPointerUp(PointerUpEvent event) {
+    if (_commandReady) return;
     if (_interactionMode == ArchitectInteractionMode.navigation && !_terrainDrafting) {
       _handleTap(_screenToModel(event.localPosition));
       return;
@@ -10809,6 +11060,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _handleTap(Offset rawModel) {
+    if (_commandReady) return;
     _modelCommands.exteriorReviewWallIds = const {};
     if (_activeTool == ArchitectTool.select && _marqueeTool.isDrafting) {
       if (_marqueeTool.mode == ArchitectSelectMode.rectangle) {
@@ -11617,7 +11869,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             _selectedElementId = null;
 
-            _project = _project.updateActiveStorey(updatedStorey);
+            _commands.commit(_project.updateActiveStorey(updatedStorey), applyDraftingDefaults: true);
 
           });
 
@@ -11699,7 +11951,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           final (updatedProj, newAxis) = result;
 
-          setState(() => _project = updatedProj);
+          setState(() => _commands.commit(updatedProj, applyDraftingDefaults: true));
 
           HapticFeedback.mediumImpact();
 
@@ -11727,7 +11979,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         if (result != null) {
 
-          setState(() => _project = result.$1);
+          setState(() => _commands.commit(result.$1, applyDraftingDefaults: true));
 
           _saveBiMProjectIfAttached();
 
@@ -11962,8 +12214,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 zone: _applyZoneFinishPresets(newZone),
 
               ),
-
-            );
+      applyDraftingDefaults: true,
+    );
 
             _selectedZoneId = newZone.id;
 
@@ -12061,7 +12313,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       setState(() {
 
-        _project = _project.updateActiveStorey(updatedStorey);
+        _commands.commit(_project.updateActiveStorey(updatedStorey), applyDraftingDefaults: true);
 
         _isZoneTableSelected = true;
 
@@ -12255,7 +12507,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       setState(() {
 
-        _project = _project.copyWith(
+        _commands.commit(_project.copyWith(
 
           storeys: [
 
@@ -12265,7 +12517,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           ],
 
-        );
+        ), applyDraftingDefaults: true);
 
       });
 
@@ -12324,8 +12576,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             column: newCol,
 
           ),
-
-        );
+      applyDraftingDefaults: true,
+    );
 
       });
 
@@ -12393,7 +12645,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           setState(() {
 
-            _project = _project.updateActiveStorey(res.$1);
+            _commands.commit(_project.updateActiveStorey(res.$1), applyDraftingDefaults: true);
 
             _draftStart = null;
 
@@ -12467,7 +12719,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           setState(() {
 
-            _project = _project.updateActiveStorey(res.$1);
+            _commands.commit(_project.updateActiveStorey(res.$1), applyDraftingDefaults: true);
 
           });
 
@@ -12557,7 +12809,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           setState(() {
 
-            _project = _project.updateActiveStorey(res.$1);
+            _commands.commit(_project.updateActiveStorey(res.$1), applyDraftingDefaults: true);
 
             _draftStart = null;
 
@@ -12781,7 +13033,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       setState(() {
 
-        _project = _project.updateActiveStorey(updatedStorey);
+        _commands.commit(_project.updateActiveStorey(updatedStorey), applyDraftingDefaults: true);
 
       });
 
@@ -13316,6 +13568,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _syncAutoZones(ArchitectStorey storey) {
+    if (_commandPreview != null) return;
 
     if (storey.zones.isEmpty) return;
 
@@ -13469,7 +13722,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           groupId: ArchitectElementId.next('group'), elementIds: ids),
 
-    ]);
+    ],
+      applyDraftingDefaults: true,
+    );
 
     if (chain) { _draftChainIds.add(id); } else {
       _resetDraftGroup();
@@ -13534,7 +13789,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               startPoint: _draftStart!, endPoint: end,
               polygon: [_draftStart!, end],
               colorValue: 0xFF9E9E9E, lineStyle: _activeCadLineStyle),
-          ));
+          ),
+      applyDraftingDefaults: true,
+    );
         } else {
           _commands.execute(UpdateArchitectPolyline(
             storeyId: _project.activeStoreyId, elementId: id,
@@ -13925,6 +14182,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // === SECTION: WALL SPLIT, SURFACE DETECTION & CLEARANCES ===
 
   void _startCutSession(Set<String> wallIds) {
+    _beginGeometryCommand(ArchitectRadialAction.cut);
 
     _cancelActiveDrags();
 
@@ -13983,6 +14241,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _startSplitSession({Set<String>? wallIds}) {
+    _beginGeometryCommand(ArchitectRadialAction.split);
 
     _cancelActiveDrags();
 
@@ -14460,7 +14719,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
               const SizedBox(width: 8),
 
-              GestureDetector(
+              if (_commandPreview == null) GestureDetector(
 
                 key: const ValueKey('architect-cut-cancel'),
 
@@ -14718,7 +14977,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
               const SizedBox(width: 6),
 
-              IconButton(
+              if (_commandPreview == null) IconButton(
 
                 key: const ValueKey('architect-split-cancel-btn'),
 
@@ -15721,7 +15980,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
               Positioned(
 
-                top: 8,
+                top: _commandPreview == null ? 8 : null,
+                bottom: _commandPreview == null ? null : 8,
 
                 left: 8,
 
@@ -16097,6 +16357,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Future<void> _editPolygonDistance(ArchitectPolygonDistance? dimension) async {
+    _beginGeometryCommand(ArchitectRadialAction.edit);
 
     if (_polygonDistanceOpen) return;
 
@@ -16596,6 +16857,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _executeWallEdit(ArchitectModelCommand command) {
+    _beginGeometryCommand(_commandAction ??
+        (command is MirrorArchitectWalls ? ArchitectRadialAction.flip :
+         command is TrimArchitectWall || command is CutArchitectWalls
+             ? ArchitectRadialAction.cut : ArchitectRadialAction.edit));
 
     try {
 
@@ -16882,11 +17147,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _selectedElementId = null;
 
-      _project = _project.updateActiveStorey(
+      _commands.commit(_project.updateActiveStorey(
 
         activeStorey.copyWith(walls: updatedWalls),
 
-      );
+      ), applyDraftingDefaults: true);
 
     });
 
@@ -18545,6 +18810,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _startNewPointSession(String id, {Offset? initialPick}) {
+    _beginGeometryCommand(ArchitectRadialAction.newPoint);
     _marqueeTool.cancel();
 
     if (initialPick != null) _selectPolygonContour(initialPick);
@@ -19385,7 +19651,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
               const SizedBox(width: 8),
 
-              GestureDetector(
+              if (_commandPreview == null) GestureDetector(
 
                 key: const ValueKey('architect-new-point-cancel'),
 
@@ -19410,6 +19676,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _groupSelection() {
+    _discardGeometryCommand();
 
     final ids = _effectiveSelection;
 
@@ -19436,6 +19703,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _ungroupSelection() {
+    _discardGeometryCommand();
 
     final group = _selectedGroup;
 
@@ -19448,6 +19716,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _enterGroup() {
+    _discardGeometryCommand();
 
     final group = _selectedGroup;
 
@@ -19518,6 +19787,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
 
     if (id == null) return;
+    if (const {
+      ArchitectRadialAction.move, ArchitectRadialAction.edit,
+      ArchitectRadialAction.duplicate, ArchitectRadialAction.rotate,
+      ArchitectRadialAction.flip, ArchitectRadialAction.split,
+      ArchitectRadialAction.cut, ArchitectRadialAction.cutOpening,
+      ArchitectRadialAction.offset, ArchitectRadialAction.newPoint,
+      ArchitectRadialAction.join, ArchitectRadialAction.straighten,
+      ArchitectRadialAction.mirrorMove, ArchitectRadialAction.mirrorCopy,
+    }.contains(action)) {
+      _beginGeometryCommand(action);
+    } else {
+      _discardGeometryCommand();
+    }
 
     if (action == ArchitectRadialAction.rotate && _commands.isPlan &&
         ArchitectRotation.supports(_project.activeStorey, _effectiveSelection)) {
@@ -19691,31 +19973,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       case ArchitectRadialAction.edit:
         if (pick != null) _selectPolygonContour(pick);
 
-        final zoneToEdit = _project.activeStorey.zones.where((z) => z.id == id).firstOrNull;
 
-        if (zoneToEdit != null && zoneToEdit.isAutoBoundary) {
 
-          _commands.commit(
-
-            _project.updateActiveStorey(
-
-              _project.activeStorey.copyWith(
-
-                zones: [
-
-                  for (final z in _project.activeStorey.zones)
-
-                    if (z.id == id) z.copyWith(isAutoBoundary: false) else z,
-
-                ],
-
-              ),
-
-            ),
-
-          );
-
-        }
 
         final polygon = _selectedPolygon;
 
@@ -19774,31 +20033,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _cancelActiveDrags();
 
-        final zoneToMove = _project.activeStorey.zones.where((z) => z.id == id).firstOrNull;
 
-        if (zoneToMove != null && zoneToMove.isAutoBoundary) {
 
-          _commands.commit(
-
-            _project.updateActiveStorey(
-
-              _project.activeStorey.copyWith(
-
-                zones: [
-
-                  for (final z in _project.activeStorey.zones)
-
-                    if (z.id == id) z.copyWith(isAutoBoundary: false) else z,
-
-                ],
-
-              ),
-
-            ),
-
-          );
-
-        }
 
         setState(() {
 
@@ -21422,6 +21658,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _showProperties() {
+    _discardGeometryCommand();
 
     final ids = _effectiveSelection;
 
@@ -21679,6 +21916,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _triggerWallJoin() {
+    _beginGeometryCommand(ArchitectRadialAction.join);
 
     final wallIds = _selectedLineIds.isNotEmpty
 
@@ -22003,6 +22241,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   );
 
   Widget _buildWallSelectionActions(Set<String> wallIds) {
+    if (_commandPreview != null) return const SizedBox.shrink();
 
     final l = context.l10n;
 
@@ -22429,6 +22668,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ),
 
                     onPressed: () {
+                      _beginGeometryCommand(ArchitectRadialAction.edit);
 
                       _cancelActiveDrags();
 
@@ -22698,6 +22938,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+    _beginGeometryCommand(ArchitectRadialAction.straighten);
     final command = _straightenWallCommand(_project, wall)!;
 
     try {
@@ -22731,6 +22972,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _deleteSelection() {
+    _discardGeometryCommand();
 
     final ids = _effectiveSelection;
 
@@ -22775,6 +23017,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _beginDuplicateSelection() {
+    _beginGeometryCommand(ArchitectRadialAction.duplicate);
 
     if (_selectionHasAutoZones) return;
 
@@ -22833,6 +23076,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _startRotation() {
+    _beginGeometryCommand(ArchitectRadialAction.rotate);
     final ids = Set<String>.of(_effectiveSelection);
     if (!ArchitectRotation.supports(_project.activeStorey, ids)) return;
     final bounds = [for (final id in ids)
@@ -22855,7 +23099,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       animation: Listenable.merge([_viewport, _previewRevision]),
       builder: (_, _) {
         final ids = _effectiveSelection;
-        if (_is3DView || _printPreview || ids.length != 1 ||
+        if (_commandPreview != null || _is3DView || _printPreview || ids.length != 1 ||
             _multiSelect || _moveSelection || _mirrorActive || _splitActive ||
             _offsetOptions != null || _rotationSource != null ||
             _duplicateMove != null || _newPointTargetId != null ||
@@ -22932,6 +23176,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Future<void> _startOffset() async {
+    _beginGeometryCommand(ArchitectRadialAction.offset);
 
     final ids = Set<String>.of(_effectiveSelection);
 
@@ -22947,7 +23192,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       unitToMeters: source.units.scaleToMeters, unitSymbol: source.units.symbol);
 
-    if (!mounted || options == null || epoch != _offsetEpoch || !identical(source, _project)) return;
+    if (!mounted) return;
+    if (options == null) { _cancelGeometryCommand(); return; }
+    if (epoch != _offsetEpoch || !identical(source, _project)) return;
 
     setState(() {
 
@@ -23093,7 +23340,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         maxLines: 2, overflow: TextOverflow.ellipsis))),
 
-      IconButton(key: const ValueKey('architect-offset-cancel'), tooltip: context.l10n.cancel,
+      if (_commandPreview == null) IconButton(key: const ValueKey('architect-offset-cancel'), tooltip: context.l10n.cancel,
 
         icon: const Icon(Icons.close), onPressed: () {
 
@@ -23113,6 +23360,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _activeMagneticGuides = snap.magneticGuides;
     _mirrorCurrentPoint = snap.point;
     final anchor = _mirrorAnchor;
+    try {
     if (anchor != null) {
       final direction = snap.point - anchor;
       _elementMovePreview = direction.distanceSquared <= 1e-8 ? null :
@@ -23121,6 +23369,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           isDuplicate: _mirrorIsDuplicate, idMap: _mirrorIdMap,
           copyGroups: _editingGroupId == null).apply(_project);
     }
+    } on ArgumentError { _elementMovePreview = null; }
     _repaintPreview();
   }
 
@@ -23135,6 +23384,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _startMirrorSession({required bool isDuplicate}) {
+    _beginGeometryCommand(isDuplicate
+        ? ArchitectRadialAction.mirrorCopy : ArchitectRadialAction.mirrorMove);
 
     if (_selectionHasAutoZones) return;
 
@@ -23313,7 +23564,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               icon: const Icon(Icons.center_focus_strong),
               onPressed: () { setState(() { _mirrorAnchor = null; _mirrorCurrentPoint = null;
                 _elementMovePreview = null; }); _repaintPreview(); }),
-            IconButton(key: const ValueKey('architect-mirror-cancel-btn'),
+            if (_commandPreview == null) IconButton(key: const ValueKey('architect-mirror-cancel-btn'),
               tooltip: l.cancel, onPressed: _cancelMirrorSession, icon: const Icon(Icons.close)),
           ]),
           if (anchor != null) Row(children: [
@@ -23340,7 +23591,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _flipSection(String id) {
     final sec = _project.sections.where((s) => s.id == id).firstOrNull;
     if (sec == null) return;
-    _modelCommands.commit(
+    _commands.commit(
       _project.copyWith(
         sections: [
           for (final s in _project.sections)
@@ -23354,7 +23605,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _flipElevation(String id) {
     final elv = _project.elevations.where((e) => e.id == id).firstOrNull;
     if (elv == null) return;
-    _modelCommands.commit(
+    _commands.commit(
       _project.copyWith(
         elevations: [
           for (final e in _project.elevations)
@@ -23759,6 +24010,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     void _flipDoorsSwing(Set<String> doorIds) {
+    _beginGeometryCommand(ArchitectRadialAction.flip);
     if (doorIds.isEmpty) return;
     for (final id in doorIds) {
       final door = _project.activeStorey.walls
@@ -23781,6 +24033,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _flipDoorsHinge(Set<String> doorIds) {
+    _beginGeometryCommand(ArchitectRadialAction.flip);
     if (doorIds.isEmpty) return;
     for (final id in doorIds) {
       final door = _project.activeStorey.walls
@@ -23803,6 +24056,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _flipWindowsSide(Set<String> windowIds) {
+    _beginGeometryCommand(ArchitectRadialAction.flip);
     if (windowIds.isEmpty) return;
     for (final id in windowIds) {
       final window = _project.activeStorey.walls
@@ -23825,6 +24079,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Widget _buildSelectionBar() {
+    if (_commandReady) return const SizedBox.shrink();
     final l = context.l10n;
     final ids = _effectiveSelection;
 
@@ -23912,13 +24167,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       size: 18,
                       color: _moveSelection ? Colors.amber : Colors.white70,
                     ),
-                    onPressed: () => setState(() {
-                      _radialMenuScreenPosition = null;
-                      _polygonEditId = null;
-                      _polygonSelectedEdge = null;
-                      _transverseMove = false;
-                      _moveSelection = !_moveSelection;
-                    }),
+                    onPressed: () => _setSelectionMove(_moveSelection
+                        ? ArchitectSelectionMoveAction.stop
+                        : ArchitectSelectionMoveAction.free),
                   ),
                   IconButton(
                     key: const ValueKey('architect-selection-properties'),
@@ -24004,13 +24255,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       size: 18,
                       color: _moveSelection ? Colors.amber : Colors.white70,
                     ),
-                    onPressed: () => setState(() {
-                      _radialMenuScreenPosition = null;
-                      _polygonEditId = null;
-                      _polygonSelectedEdge = null;
-                      _transverseMove = false;
-                      _moveSelection = !_moveSelection;
-                    }),
+                    onPressed: () => _setSelectionMove(_moveSelection
+                        ? ArchitectSelectionMoveAction.stop
+                        : ArchitectSelectionMoveAction.free),
                   ),
                   IconButton(
                     key: const ValueKey('architect-selection-properties'),
@@ -24594,6 +24841,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         _startMirrorSession(isDuplicate: true);
 
                       } else if (action == 'join') {
+                        _beginGeometryCommand(ArchitectRadialAction.join);
 
                         try {
 
@@ -25034,6 +25282,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       unitSymbol: _project.units.symbol,
 
       onStartDragMode: (distance) {
+        _beginGeometryCommand(ArchitectRadialAction.offset);
 
         _axisTool.startOffsetDrag(axis, distance);
 
@@ -25080,6 +25329,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _handleAxisAlign(StructuralGridAxis axis) {
+    _beginGeometryCommand(ArchitectRadialAction.straighten);
 
     final isBg = Localizations.localeOf(context).languageCode == 'bg';
 
@@ -25106,6 +25356,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _handleAlignAllAxes() {
+    _beginGeometryCommand(ArchitectRadialAction.straighten);
 
     final isBg = Localizations.localeOf(context).languageCode == 'bg';
 
@@ -25241,6 +25492,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         Offset(math.cos(radians), math.sin(radians)) * current.length / 2;
 
+    _beginGeometryCommand(ArchitectRadialAction.rotate);
     _replaceAxis(
 
       current.copyWith(start: midpoint - half, end: midpoint + half),
@@ -27351,7 +27603,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (result != null) {
 
-        setState(() => _project = _project.updateActiveStorey(result.$1));
+        setState(() => _commands.commit(_project.updateActiveStorey(result.$1), applyDraftingDefaults: true));
 
         _saveBiMProjectIfAttached();
 
@@ -27477,6 +27729,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     builder: (context, _) {
 
+      if (_commandPreview != null) {
+        _renderedDraftCancelRect = null;
+        _renderedDraftConfirmRect = null;
+        return const SizedBox.shrink();
+      }
       final rect = _draftCancelRect;
 
       _renderedDraftCancelRect = rect;
@@ -28337,7 +28594,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         Positioned(
 
-          top: 8,
+          bottom: 8,
 
           left: 8,
 
@@ -28385,7 +28642,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   ),
 
-                  TextButton(
+                  if (_commandPreview == null) TextButton(
 
                     onPressed: () {
 
@@ -28488,7 +28745,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (_cutOpeningTargetId != null)
 
-        Positioned(top: 8, left: 8, right: 8, child: _cutOpeningControl()),
+        Positioned(bottom: 8, left: 8, right: 8, child: _cutOpeningControl()),
 
       if (_editingGroupId != null)
 
@@ -28510,13 +28767,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (_wallCutIds.isNotEmpty && !_wallCutStroke)
 
-        Positioned(top: 8, left: 8, right: 64, child: _buildCutPromptBanner()),
+        Positioned(top: _commandPreview == null ? 8 : null,
+          bottom: _commandPreview == null ? null : 8, left: 8, right: 64, child: _buildCutPromptBanner()),
 
       if (_splitActive)
 
         Positioned(
 
-          top: 8,
+          top: _commandPreview == null ? 8 : null,
+          bottom: _commandPreview == null ? null : 8,
 
           left: 8,
 
@@ -28530,7 +28789,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         Positioned(
 
-          top: 8,
+          top: _commandPreview == null ? 8 : null,
+          bottom: _commandPreview == null ? null : 8,
 
           left: 8,
 
@@ -29246,6 +29506,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               key: ValueKey(_viewDraft),
 
               controller: _modelCommands,
+              onCommit: _commandPreview == null ? null : (next) => _commands.commit(next),
+              onPreview: _commandPreview == null ? null : (next) {
+                final original = _commandPreview!.original;
+                final before = original.toJson()..remove('updatedAt');
+                final after = next.toJson()..remove('updatedAt');
+                setState(() {
+                  _commandLiveCandidate = bimValuesEqual(before, after) ? null : next;
+                  _elementMovePreview = _commandLiveCandidate;
+                });
+                _repaintPreview();
+              },
 
               type: _viewDraft!.type,
 
@@ -29275,7 +29546,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 setState(() => _viewDraft = null);
 
-                if (id != null) {
+                if (id != null && _commandPreview == null) {
 
                   _saveBiMProjectIfAttached();
 
@@ -29303,7 +29574,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               previousFocal: focal - delta, focal: focal, scaleFactor: factor),
           ),
         )),
-        Positioned(top: 8, left: 8, right: 8, child: _buildMirrorPromptBanner()),
+        Positioned(bottom: 8, left: 8, right: 8, child: _buildMirrorPromptBanner()),
       ],
       if (_offsetOptions != null) ...[
         Positioned.fill(child: IgnorePointer(child: AnimatedBuilder(
@@ -29318,7 +29589,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           ),
         ))),
-        Positioned(top: 8, left: 8, right: 8, child: _offsetBanner()),
+        Positioned(bottom: 8, left: 8, right: 8, child: _offsetBanner()),
       ],
       if (_rotationSource != null)
         Positioned.fill(child: AnimatedBuilder(animation: _viewport,
@@ -29343,6 +29614,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               previousFocal: focal - delta, focal: focal, scaleFactor: factor),
           ),
         )),
+      if (_commandReady)
+        Positioned.fill(child: ArchitectTransformPointInput(
+          key: const ValueKey('architect-command-review-input'),
+          toModel: _screenToModel, toScreen: _viewport.toScreen,
+          snap: (raw, touch) => _snapTransformPoint(raw, touch),
+          localizeSnap: _localizedSnapLabel,
+          onAim: (_) {}, onPick: (_) {},
+          onNavigate: (delta, factor, focal) => _viewport.navigate(
+            previousFocal: focal - delta, focal: focal, scaleFactor: factor),
+        )),
+      if (_commandPreview != null)
+        Positioned(top: 8, left: 8, right: 8,
+          child: ArchitectCommandPreviewBar(
+            label: BimEditActions.label(_commandAction!, context.l10n),
+            ready: _commandCanConfirm,
+            onCancel: _cancelGeometryCommand,
+            onConfirm: _confirmGeometryCommand,
+          )),
     ],
 
   );
@@ -29408,8 +29697,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           primitive: result.$2,
 
         ),
-
-      );
+      applyDraftingDefaults: true,
+    );
 
       _cancelCadShape();
 
@@ -29719,7 +30008,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   ArchitectProject get _drawingProject {
 
-    var project = _duplicateMove?.preview ?? _elementMovePreview ?? _project;
+    var project = _commandReady ? _commandPreview!.preview
+        : _duplicateMove?.preview ?? _elementMovePreview ?? _project;
 
     if (_dimensionEditing != null) {
 

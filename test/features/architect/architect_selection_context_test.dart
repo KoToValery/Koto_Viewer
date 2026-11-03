@@ -15,6 +15,7 @@ import 'package:kotoview/src/features/architect/services/architect_command_contr
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_wall_drafting_panel.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_radial_menu.dart';
+import 'architect_editing_test.dart' as editing;
 import 'architect_manual_selection_test.dart' as selection;
 import 'architect_workspace_interaction_test.dart' as workspace;
 
@@ -503,6 +504,7 @@ void main() {
       panel.onLength(1.5);
       await tester.tap(find.byKey(const ValueKey('wall-end')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(c.undoCount, 1);
       expect(
         c.project.activeStorey.walls.first.startPoint.dy.abs(),

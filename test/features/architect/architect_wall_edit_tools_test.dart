@@ -365,11 +365,13 @@ void main() {
       await editing.hold(tester, const Offset(2, .2));
       await tester.tap(find.byKey(const ValueKey('wall-detach')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(model.project.activeStorey.walls.single.isDetached, isTrue);
       await tester.tap(find.byKey(const ValueKey('architect-wall-actions')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('wall-mirror')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(
         (model.project.activeStorey.walls.single.coreCenterStart -
                 w.coreCenterStart)
@@ -389,6 +391,7 @@ void main() {
       expect(workspace.overlay(tester).wallCutLine, isNotNull);
       await g.up();
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(model.project.activeStorey.walls, hasLength(2));
       expect(tester.takeException(), isNull);
     },
@@ -539,6 +542,7 @@ void main() {
     }
     await gesture.up();
     await tester.pumpAndSettle();
+    await editing.acceptGeometryCommand(tester);
     expect(model.project.activeStorey.walls, hasLength(4));
   });
 }

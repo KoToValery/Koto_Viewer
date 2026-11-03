@@ -130,6 +130,7 @@ void main() {
       expect(preview.radius, closeTo(2.75, 1e-9));
       expect(model.canUndo, isFalse);
       await button(tester, 'wall-arc-dimension-save');
+      await editing.acceptGeometryCommand(tester);
       expect(
         model.project.activeStorey.walls.single.arc!.radius,
         closeTo(2.75, 1e-9),
@@ -160,6 +161,7 @@ void main() {
       await tester.pumpAndSettle();
       await enter(tester, '500');
       await button(tester, 'wall-arc-dimension-save');
+      await editing.acceptGeometryCommand(tester);
       expect(camera.scale, scale);
       expect(camera.translation, translation);
       for (final factor in [.5, 3.0]) {
@@ -382,6 +384,7 @@ void main() {
           await tester.pump();
         }
         await button(tester, 'wall-arc-dimension-save');
+        await editing.acceptGeometryCommand(tester);
         final changed = model.project.activeStorey.walls.first;
         expect(changed.arc!.sagitta, closeTo(1.255, 1e-8));
         expect(changed.startPoint, arc.startPoint);

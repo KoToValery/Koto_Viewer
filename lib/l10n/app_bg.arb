@@ -440,6 +440,8 @@
   "ec8SeismicButton": "EC8 Сеизмичност",
   "beamDepthWarning": "Препоръчителна височина: мин. {depth} cm",
   "floatingColumnWarning": "Колона {name} на {storey} е насадена върху плочата (липсва долна опора)!",
+  "architectCommandReview": "Прегледай. ✓ записва, X отказва.",
+  "architectCommandAim": "Задай промяната. X отказва.",
   "applyAction": "Приложи",
   "offsetAction": "Офсет",
   "renameColumnTitle": "Преименуване на колона",

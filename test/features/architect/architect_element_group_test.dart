@@ -360,6 +360,7 @@ void main() {
     await tester.pump();
     await gesture.up();
     await tester.pumpAndSettle();
+    await editing.acceptGeometryCommand(tester);
     expect(model.project.activeStorey.cadPrimitives, hasLength(4));
     expect(model.project.activeStorey.groups.single.elementIds, hasLength(3));
     expect(find.byKey(const ValueKey('architect-group-done')), findsOneWidget);

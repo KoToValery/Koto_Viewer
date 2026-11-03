@@ -461,7 +461,7 @@ void main() {
         await tester.tapAt(workspace.screen(tester, hole.first));
         await tester.pumpAndSettle();
         expect(model.canUndo, isFalse);
-        await tester.tap(find.byKey(const ValueKey('opening-draft-cancel')));
+        await tester.tap(find.byKey(const ValueKey('architect-command-cancel')));
         await tester.pumpAndSettle();
         expect(model.canUndo, isFalse);
         await editing.contextHold(tester, const Offset(1, 1));
@@ -471,7 +471,7 @@ void main() {
           await tester.tapAt(workspace.screen(tester, point));
           await tester.pumpAndSettle();
         }
-        await tester.tap(find.byKey(const ValueKey('opening-draft-finish')));
+        await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
         await tester.pumpAndSettle();
         expect(
           CutArchitectContourOpening.target(model.project.activeStorey, id)!.$2,

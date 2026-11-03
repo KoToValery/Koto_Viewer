@@ -100,6 +100,7 @@ class _RotationState extends State<ArchitectRotationOverlay> {
       angle = degrees * math.pi / 180;
     });
     widget.onPreview(pivot, angle);
+    if (angle.abs() > 1e-8) widget.onApply(pivot, angle);
   }
 
   @override
@@ -136,7 +137,7 @@ class _RotationState extends State<ArchitectRotationOverlay> {
           ),
         ),
         Positioned(
-          top: 8,
+          bottom: 8,
           left: 8,
           right: 8,
           child: Material(
@@ -171,12 +172,6 @@ class _RotationState extends State<ArchitectRotationOverlay> {
                         },
                         icon: const Icon(Icons.center_focus_strong),
                       ),
-                      IconButton(
-                        tooltip: l.cancel,
-                        key: const ValueKey('architect-rotation-cancel'),
-                        onPressed: widget.onCancel,
-                        icon: const Icon(Icons.close),
-                      ),
                     ],
                   ),
                   Row(
@@ -197,14 +192,6 @@ class _RotationState extends State<ArchitectRotationOverlay> {
                             '${(angle * 180 / math.pi).toStringAsFixed(1)}°',
                           ),
                         ),
-                      ),
-                      IconButton(
-                        key: const ValueKey('architect-rotation-apply'),
-                        tooltip: l.applyAction,
-                        onPressed: angle.abs() > 1e-8
-                            ? () => widget.onApply(pivot, angle)
-                            : null,
-                        icon: const Icon(Icons.check),
                       ),
                     ],
                   ),

@@ -1265,6 +1265,8 @@
       "storey": { "type": "String" }
     }
   },
+  "architectCommandReview": "Review. ✓ saves; X cancels.",
+  "architectCommandAim": "Define the edit. X cancels.",
   "applyAction": "Apply",
   "@applyAction": { "description": "Apply action button" },
   "offsetAction": "Offset",

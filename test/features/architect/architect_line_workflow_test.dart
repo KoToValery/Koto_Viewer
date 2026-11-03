@@ -346,6 +346,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('wall-cut')));
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(3, 0));
+      await editing.acceptGeometryCommand(tester);
       expect(model.project.activeStorey.cadPrimitives, hasLength(4));
       model.undo();
       await tester.pumpAndSettle();

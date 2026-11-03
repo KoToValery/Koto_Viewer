@@ -342,6 +342,7 @@ void main() {
     await tester.pump();
     await gesture.up();
     await tester.pumpAndSettle();
+    await editing.acceptGeometryCommand(tester);
     final moved = model.project.activeStorey.walls.single;
     final delta = moved.startPoint - wall.startPoint;
     expect(delta.distance, greaterThan(.01));

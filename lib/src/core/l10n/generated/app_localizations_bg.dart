@@ -1485,6 +1485,12 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
+  String get architectCommandReview => 'Прегледай. ✓ записва, X отказва.';
+
+  @override
+  String get architectCommandAim => 'Задай промяната. X отказва.';
+
+  @override
   String get applyAction => 'Приложи';
 
   @override

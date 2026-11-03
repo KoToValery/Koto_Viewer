@@ -1123,18 +1123,18 @@ class ArchitectElementTool extends ChangeNotifier {
       final newDoors = [
         for (final d in wall.doors)
           d.copyWith(
-            id: isDuplicate ? ArchitectElementId.next('door') : d.id,
+            id: isDuplicate ? '${targetId}_door_${d.id}' : d.id,
             wallId: targetId,
-            uuid: isDuplicate ? ArchitectElementId.next('UUID') : d.uuid,
+            uuid: isDuplicate ? '${targetId}_uuid_${d.uuid}' : d.uuid,
             isHingeLeft: !d.isHingeLeft,
           ),
       ];
       final newWindows = [
         for (final w in wall.windows)
           w.copyWith(
-            id: isDuplicate ? ArchitectElementId.next('window') : w.id,
+            id: isDuplicate ? '${targetId}_window_${w.id}' : w.id,
             wallId: targetId,
-            uuid: isDuplicate ? ArchitectElementId.next('UUID') : w.uuid,
+            uuid: isDuplicate ? '${targetId}_uuid_${w.uuid}' : w.uuid,
           ),
       ];
       final newWall = wall.copyWith(
@@ -1437,8 +1437,10 @@ class ArchitectElementTool extends ChangeNotifier {
       }
     }
     if (isDuplicate && copyGroups) {
+      var groupIndex = 0;
       currentStorey = currentStorey.copyWith(groups: [...currentStorey.groups,
-        ...ArchitectElementGroup.copies(storey.groups, copied, () => ArchitectElementId.next('group'))]);
+        ...ArchitectElementGroup.copies(storey.groups, copied, () => idMap != null && affectedIds.isNotEmpty
+            ? '${affectedIds.first}_group_${groupIndex++}' : ArchitectElementId.next('group'))]);
     }
     return (currentStorey, affectedIds);
   }

@@ -2172,27 +2172,37 @@ class ArchitectCommandController
 
   @override
   void commit(ArchitectProject next) {
-    next = ArchitectWallExteriorResolver.resolve(next, project);
-    final oldWalls = {for (final s in project.storeys) for (final w in s.walls) w.id: w};
-    exteriorReviewWallIds = {
-      for (final s in next.storeys) for (final w in s.walls)
-        if (w.isExterior && w.exteriorResolved &&
-            (oldWalls[w.id]?.location != w.location ||
-             oldWalls[w.id]?.exteriorSide != w.exteriorSide ||
-             oldWalls[w.id]?.exteriorResolved != true)) w.id,
+    next = prepare(next);
+    final oldWalls = {
+      for (final s in project.storeys)
+        for (final w in s.walls) w.id: w,
     };
-    super.commit(
-      ArchitectRoofPlacement.resolve(
-        ArchitectSlabAssemblies.resolve(
-          ArchitectWallConnectionPolicy.validateProject(
-            ArchitectPanelSupports.resolve(
-              ArchitectDimensionChain.resolve(ArchitectStairRules.resolve(next)),
-              previous: project,
-            ),
+    exteriorReviewWallIds = {
+      for (final s in next.storeys)
+        for (final w in s.walls)
+          if (w.isExterior &&
+              w.exteriorResolved &&
+              (oldWalls[w.id]?.location != w.location ||
+                  oldWalls[w.id]?.exteriorSide != w.exteriorSide ||
+                  oldWalls[w.id]?.exteriorResolved != true))
+            w.id,
+    };
+    super.commit(next);
+  }
+
+  /// Pure validation and junction resolution shared by preview and publication.
+  ArchitectProject prepare(ArchitectProject next) {
+    next = ArchitectWallExteriorResolver.resolve(next, project);
+    return ArchitectRoofPlacement.resolve(
+      ArchitectSlabAssemblies.resolve(
+        ArchitectWallConnectionPolicy.validateProject(
+          ArchitectPanelSupports.resolve(
+            ArchitectDimensionChain.resolve(ArchitectStairRules.resolve(next)),
+            previous: project,
           ),
         ),
-        previous: project,
       ),
+      previous: project,
     );
   }
 
