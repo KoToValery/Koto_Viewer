@@ -13,6 +13,9 @@ class BimDistanceDraftingPanel extends StatefulWidget {
   final VoidCallback onEnd, onContinue, onUnlock, onCancel;
   final bool showContinue, showDirection, keypadInitiallyOpen;
   final String? title, endLabel;
+
+  /// Tool-specific controls above the length, without changing keypad state.
+  final Widget? extraControls;
   const BimDistanceDraftingPanel({
     super.key,
     required this.length,
@@ -29,6 +32,7 @@ class BimDistanceDraftingPanel extends StatefulWidget {
     this.keypadInitiallyOpen = false,
     this.title,
     this.endLabel,
+    this.extraControls,
   });
   @override
   State<BimDistanceDraftingPanel> createState() =>
@@ -84,6 +88,10 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (widget.extraControls != null) ...[
+              widget.extraControls!,
+              const SizedBox(height: 4),
+            ],
             if (widget.title != null && widget.title!.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.only(bottom: 4, left: 2, right: 2),

@@ -8699,6 +8699,12 @@ abstract class AppLocalizations {
   /// **'Leading line'**
   String get architectWallLeadingLine;
 
+  /// No description provided for @architectWallLeadingLineHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the axis or face to follow for this and the following segments.'**
+  String get architectWallLeadingLineHelp;
+
   /// No description provided for @architectWallCoreThickness.
   ///
   /// In en, this message translates to:

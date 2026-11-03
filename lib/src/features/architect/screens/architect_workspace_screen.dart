@@ -1,5 +1,6 @@
 import '../services/architect_selection_candidates.dart';
 import '../widgets/architect_candidate_picker.dart';
+import '../widgets/architect_wall_reference_control.dart';
 import '../services/architect_interaction_mode.dart';
 import '../services/architect_projection_loader.dart';
 import '../widgets/architect_projection_status.dart';
@@ -2894,6 +2895,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   ArchitectTool _tool = ArchitectTool.pan;
   ArchitectTool get _activeTool => _tool;
   set _activeTool(ArchitectTool tool) {
+    if (_tool != tool) _wallReferenceManual = false;
     if (_draftingSeed != null && _draftingSeed!.tool != tool) {
       _draftingSeed = null;
       _quickDrawingTool = null;
@@ -3993,13 +3995,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     setState(() {
 
-      _draftStart = null;
-
-      _wallArcEnd = null;
-
-      _draftEnd = null;
-
-      _wallDirectionLocked = false;
+      _resetWallDraft();
 
       _selectedZoneId = null;
 
@@ -4107,17 +4103,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _cursorModel = null;
 
-    _draftStart = null;
-
-    _wallArcEnd = null;
-
-    _draftEnd = null;
-
-    _wallDirectionLocked = false;
-
-    _activeMagneticGuides = [];
-
-    _activeSnapLabel = null;
+    _resetWallDraft();
 
     _selectionContextActive = false;
 
@@ -4525,6 +4511,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _wallPanelAnchor;
 
   WallReferenceLine _wallReference = WallReferenceLine.center;
+  bool _wallReferenceManual = false;
 
   WallExteriorSide _wallExteriorSide = WallExteriorSide.left;
   WallResolutionMode _wallExteriorSideMode = WallResolutionMode.automatic;
@@ -10733,31 +10720,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool _selectDraftingElement(Offset point) {
-
-    final id = _hitSelection(point);
-
-    if (id == null) return false;
-
-    final wall = _project.activeStorey.walls
-
-        .where((w) => w.id == id)
-
-        .firstOrNull;
-
-    if (wall != null &&
-
-        !wall.containsPoint(
-
-          point,
-
-          tolerance: math.min(6 / _currentScale, .08),
-
-        )) {
-
+    // Touch selection uses the physical outline (including joined ends) and
+    // the same tolerance as the selection tool, before snapping for placement.
+    if (_activeTool != ArchitectTool.wall && _hitSelection(point) == null) {
       return false;
-
     }
-
     return _selectAt(point);
 
   }
@@ -13671,6 +13638,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _wallExteriorSideMode = WallResolutionMode.automatic;
 
       _wallDirectionLocked = false;
+      _wallPanelAnchor = null;
+      _activeMagneticGuides = [];
 
       if (continueChain == true) _wallMode = WallDraftingMode.chained;
 
@@ -13684,17 +13653,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       } else {
 
-        _draftStart = null;
-
-        _wallArcEnd = null;
-
-        _draftEnd = null;
-
-        _wallStartAttachment = null;
-
-        _wallDirectionLocked = false;
-
-        _activeSnapLabel = null;
+        _resetWallDraft();
 
       }
 
@@ -13737,29 +13696,45 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _finishDraftGroup();
 
-    setState(() {
-
-      _wallArcEnd = null;
-
-      _draftStart = null;
-
-      _wallArcEnd = null;
-
-      _draftEnd = null;
-
-      _wallDirectionLocked = false;
-
-      _activeSnapLabel = null;
-
-    });
+    setState(_resetWallDraft);
+    _repaintPreview();
 
   }
 
+  /// End/cancel always returns the still-active tool to an idle picking state.
+  /// Preferences such as the reference line and chain mode survive this reset.
+  void _resetWallDraft() {
+    _interactionEpoch++;
+    _draftStart = null;
+    _draftEnd = null;
+    _wallArcEnd = null;
+    _wallStartAttachment = null;
+    _wallDirectionLocked = false;
+    _wallPanelAnchor = null;
+    _activeSnapLabel = null;
+    _activeMagneticGuides = [];
+    _cursorModel = null;
+    _placingWithHold = false;
+    _touchPosition = null;
+  }
+
+  void _setDraftWallReference(WallReferenceLine reference) {
+    setState(() {
+      _wallReference = reference;
+      _wallReferenceManual = true;
+      // The user's choice overrides the orientation inherited at this start.
+      _wallStartAttachment = null;
+    });
+    _repaintPreview();
+  }
 
 
   void _adoptWallReference(ArchitectWallAttachment? attachment) {
 
-    if (_activeTool != ArchitectTool.wall || attachment == null) return;
+    if (_activeTool != ArchitectTool.wall ||
+        _wallReferenceManual || attachment == null) {
+      return;
+    }
 
     if (_wallReference != attachment.reference) {
 
@@ -13783,7 +13758,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    final side = _wallStartAttachment!.sideFor(
+    final side = ArchitectWallAttachment(
+      _wallStartAttachment!.source,
+      _wallReference,
+    ).sideFor(
 
       _draftStart!,
 
@@ -17055,7 +17033,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _onSelectionHold(Offset screenPoint) {
     if (_marqueeTool.isDrafting) return false;
-    if (!_acceptsAnySelection) return false;
+    if (!_acceptsAnySelection && _activeTool != ArchitectTool.wall) return false;
 
     if (_wallCutIds.isNotEmpty ||
 
@@ -28638,106 +28616,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         Expanded(
 
-                          child: DropdownButton<WallReferenceLine>(
-
-                            isExpanded: true,
-
-                            value: _wallReference,
-
-                            dropdownColor: const Color(0xFF1E242C),
-
-                            iconEnabledColor: Colors.white,
-
-                            iconDisabledColor: Colors.white38,
-
-                            underline: const SizedBox.shrink(),
-
-                            style: Theme.of(context).textTheme.bodySmall
-
-                                ?.copyWith(color: Colors.white, fontSize: 12),
-
-                            items: [
-
-                              for (final reference in [
-
-                                WallReferenceLine.center,
-
-                                WallReferenceLine.inner,
-
-                                WallReferenceLine.outer,
-
-                              ])
-
-                                DropdownMenuItem(
-
-                                  value: reference,
-
-                                  child: Text(
-
-                                    switch (reference) {
-
-                                      WallReferenceLine.center =>
-
-                                        context
-
-                                            .l10n
-
-                                            .architectWallReferenceCenter,
-
-                                      WallReferenceLine.inner =>
-
-                                        context
-
-                                            .l10n
-
-                                            .architectWallReferenceInner,
-
-                                      WallReferenceLine.outer =>
-
-                                        context
-
-                                            .l10n
-
-                                            .architectWallReferenceOuter,
-
-                                      _ =>
-
-                                        context
-
-                                            .l10n
-
-                                            .architectWallReferenceCenter,
-
-                                    },
-
-                                    maxLines: 1,
-
-                                    overflow: TextOverflow.ellipsis,
-
-                                  ),
-
-                                ),
-
-                            ],
-
-                            onChanged: (value) {
-
-                              if (value != null) {
-
-                                setState(() {
-
-                                  _wallReference = value;
-
-                                  _wallStartAttachment = null;
-
-                                });
-
-                              }
-
-                            },
-
+                          child: Theme(
+                            data: ThemeData.dark(),
+                            child: SizedBox(
+                              height: 40,
+                              child: ArchitectWallReferenceControl(
+                                key: const ValueKey('wall-toolbar-reference'),
+                                value: _wallReference,
+                                onChanged: _setDraftWallReference,
+                              ),
+                            ),
                           ),
-
                         ),
 
                       if (_activeTool == ArchitectTool.wall)
@@ -29217,6 +29106,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         decimals: _project.distanceDecimals,
 
                         minimumLength: _project.units.toUnit(.001),
+
+                        extraControls: _activeTool == ArchitectTool.wall
+                            ? SizedBox(
+                                height: 36,
+                                child: ArchitectWallReferenceControl(
+                                  key: const ValueKey('wall-panel-reference'),
+                                  value: _wallReference,
+                                  onChanged: _setDraftWallReference,
+                                ),
+                              )
+                            : null,
 
                         onLength: (value) {
 

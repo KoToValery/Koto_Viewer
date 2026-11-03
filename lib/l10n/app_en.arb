@@ -3581,6 +3581,7 @@
   "architectWallType": "Wall type",
   "architectWallFollowStorey": "Follow storey",
   "architectWallLeadingLine": "Leading line",
+  "architectWallLeadingLineHelp": "Choose the axis or face to follow for this and the following segments.",
   "architectWallCoreThickness": "Core thickness",
   "architectPropertyTotal": "Total",
   "architectMaterialBrick": "Brick",

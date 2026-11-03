@@ -1608,6 +1608,7 @@
   "architectWallType": "Тип стена",
   "architectWallFollowStorey": "По етаж",
   "architectWallLeadingLine": "Водеща линия",
+  "architectWallLeadingLineHelp": "Изберете ос или лице за водене на текущия и следващите сегменти.",
   "architectWallCoreThickness": "Дебелина ядро",
   "architectPropertyTotal": "Общо",
   "architectMaterialBrick": "Тухла",

@@ -4950,6 +4950,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallLeadingLine => 'Leading line';
 
   @override
+  String get architectWallLeadingLineHelp =>
+      'Choose the axis or face to follow for this and the following segments.';
+
+  @override
   String get architectWallCoreThickness => 'Core thickness';
 
   @override

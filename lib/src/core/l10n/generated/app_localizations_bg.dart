@@ -4972,6 +4972,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallLeadingLine => 'Водеща линия';
 
   @override
+  String get architectWallLeadingLineHelp =>
+      'Изберете ос или лице за водене на текущия и следващите сегменти.';
+
+  @override
   String get architectWallCoreThickness => 'Дебелина ядро';
 
   @override
