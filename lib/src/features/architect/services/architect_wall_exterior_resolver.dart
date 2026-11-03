@@ -182,7 +182,7 @@ class ArchitectWallExteriorResolver {
             )) {
           continue;
         }
-        final nodes = a.intersections(b, finite: false);
+        final nodes = a.intersections(b, finite: false).toList();
         if (!a.isCurved &&
             !b.isCurved &&
             _cross(a.unitVector, b.unitVector).abs() < _epsilon &&

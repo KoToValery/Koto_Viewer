@@ -288,17 +288,17 @@ class ArchitectWall {
 
   List<Offset> intersections(ArchitectWall other, {bool finite = true}) {
     if (isCurved && other.isCurved) {
-      return arc!.arcIntersections(other.arc!, finite: finite);
+      return arc!.arcIntersections(other.arc!, finite: finite).toList();
     }
     if (isCurved) {
       return arc!.lineIntersections(
         other.startPoint,
         other.endPoint,
         finite: finite,
-      );
+      ).toList();
     }
     if (other.isCurved) {
-      return other.arc!.lineIntersections(startPoint, endPoint, finite: finite);
+      return other.arc!.lineIntersections(startPoint, endPoint, finite: finite).toList();
     }
     final p = BimLineGeometry.intersection(
       startPoint,

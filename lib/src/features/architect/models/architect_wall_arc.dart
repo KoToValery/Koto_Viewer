@@ -100,11 +100,11 @@ class ArchitectWallArc {
 
   List<Offset> lineIntersections(Offset a, Offset b, {bool finite = true}) {
     final d = b - a, f = a - center, aa = d.dx * d.dx + d.dy * d.dy;
-    if (aa < 1e-12) return const [];
+    if (aa < 1e-12) return <Offset>[];
     final bb = 2 * (f.dx * d.dx + f.dy * d.dy),
         cc = f.dx * f.dx + f.dy * f.dy - radius * radius,
         disc = bb * bb - 4 * aa * cc;
-    if (disc < 0) return const [];
+    if (disc < 0) return <Offset>[];
     final result = <Offset>[];
     for (final t in {
       (-bb - math.sqrt(disc)) / (2 * aa),
@@ -124,7 +124,7 @@ class ArchitectWallArc {
     if (d < 1e-8 ||
         d > radius + other.radius + 1e-8 ||
         d < (radius - other.radius).abs() - 1e-8) {
-      return const [];
+      return <Offset>[];
     }
     final a = (radius * radius - other.radius * other.radius + d * d) / (2 * d),
         h = math.sqrt(math.max(0, radius * radius - a * a));

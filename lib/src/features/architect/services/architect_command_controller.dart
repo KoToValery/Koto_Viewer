@@ -1570,7 +1570,7 @@ class JoinArchitectWalls extends ArchitectModelCommand {
       final a = walls[i];
       for (final b in walls.skip(i + 1)) {
         if(a.isCurved||b.isCurved) {
-          final points=a.intersections(b,finite:false);
+          final points = a.intersections(b, finite: false).toList();
           double score(Offset p)=>math.min((p-a.startPoint).distance,(p-a.endPoint).distance)+math.min((p-b.startPoint).distance,(p-b.endPoint).distance);
           points.sort((p,q)=>score(p).compareTo(score(q)));
           if(points.isNotEmpty){compatible=true;extend(a,points.first);extend(b,points.first);}
