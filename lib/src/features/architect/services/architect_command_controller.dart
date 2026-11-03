@@ -254,16 +254,26 @@ class UpdateArchitectWall extends ArchitectModelCommand {
     ArchitectModelCommand.point(wall.endPoint);
     ArchitectModelCommand.positive(wall.thickness);
     ArchitectModelCommand.positive(wall.height);
+    final movedStart = (wall.startPoint - previous.startPoint).distance > 1e-4;
+    final movedEnd = (wall.endPoint - previous.endPoint).distance > 1e-4;
     Offset attached(Offset p) {
       if (!carryConnections || !previous.connectsAt(p)) return p;
-      if ((p - previous.startPoint).distance < 1e-8) return wall.startPoint;
-      if ((p - previous.endPoint).distance < 1e-8) return wall.endPoint;
+      if ((p - previous.startPoint).distance < 1e-4) return wall.startPoint;
+      if ((p - previous.endPoint).distance < 1e-4) return wall.endPoint;
       final vector = p - previous.startPoint;
       final along =
           vector.dx * previous.unitVector.dx +
           vector.dy * previous.unitVector.dy;
-      final ratio = along / previous.length;
-      if (ratio < 0 || ratio > 1) return p;
+      if (along < -1e-4 || along > previous.length + 1e-4) return p;
+      final double targetRatio;
+      if (movedStart && !movedEnd) {
+        final fromEnd = previous.length - along;
+        targetRatio = ((wall.length - fromEnd) / wall.length).clamp(0.0, 1.0);
+      } else if (!movedStart && movedEnd) {
+        targetRatio = (along / wall.length).clamp(0.0, 1.0);
+      } else {
+        targetRatio = (along / previous.length).clamp(0.0, 1.0);
+      }
       final lateral =
           vector.dx * previous.normalVector.dx +
           vector.dy * previous.normalVector.dy;
@@ -274,16 +284,16 @@ class UpdateArchitectWall extends ArchitectModelCommand {
           wall.centerOffset.dx * wall.normalVector.dx +
           wall.centerOffset.dy * wall.normalVector.dy;
       double? offset;
-      if (lateral.abs() < 1e-8) {
+      if (lateral.abs() < 1e-4) {
         offset = 0;
-      } else if ((lateral - oldOffset - previous.thickness / 2).abs() < 1e-8) {
+      } else if ((lateral - oldOffset - previous.thickness / 2).abs() < 1e-4) {
         offset = newOffset + wall.thickness / 2;
-      } else if ((lateral - oldOffset + previous.thickness / 2).abs() < 1e-8) {
+      } else if ((lateral - oldOffset + previous.thickness / 2).abs() < 1e-4) {
         offset = newOffset - wall.thickness / 2;
       }
       if (offset != null) {
         return wall.startPoint +
-            (wall.endPoint - wall.startPoint) * ratio +
+            (wall.endPoint - wall.startPoint) * targetRatio +
             wall.normalVector * offset;
       }
       return p;

@@ -16,6 +16,7 @@ class ArchitectWallSnap {
   static ArchitectSnapResult resolve({
     required Offset raw,
     Offset? anchor,
+    Offset? dragOrigin,
     required ArchitectProject project,
     required double scale,
     double capturePixels = 14,
@@ -35,7 +36,8 @@ class ArchitectWallSnap {
             midpointReferences: midpointReferences,
           )
         : ArchitectSnapResult(point: raw);
-    if (anchor != null && (best.point - anchor).distance < .001) {
+    if ((anchor != null && (best.point - anchor).distance < .001) ||
+        (dragOrigin != null && (best.point - dragOrigin).distance < .001)) {
       best = ArchitectSnapResult(point: raw);
     }
     var distance = best.isSnapped ? (best.point - raw).distance : radius + 1e-9;
@@ -52,6 +54,7 @@ class ArchitectWallSnap {
         : 3;
     void consider(Offset point, String label, int rank) {
       if (anchor != null && (point - anchor).distance < .001) return;
+      if (dragOrigin != null && (point - dragOrigin).distance < .001) return;
       final d = (point - raw).distance;
       if (d <= radius &&
           (rank < priority || (rank == priority && d < distance - 1e-9))) {

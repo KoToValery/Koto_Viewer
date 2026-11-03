@@ -4850,8 +4850,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _canConfirmContour);
 
   void _beginGeometryCommand(ArchitectRadialAction action) {
-    if (_commandPreview != null && !_commandReady && _commandAction == action)
+    if (_commandPreview != null && !_commandReady && _commandAction == action) {
       return;
+    }
     _discardGeometryCommand();
     _commandSelection = (
       ids: Set<String>.of(_selectionIds),
@@ -9278,6 +9279,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         anchor: _wallDragStart ? original.endPoint : original.startPoint,
 
+        dragOrigin: _wallDragStart ? original.startPoint : original.endPoint,
+
         project: snapProject,
 
         scale: _currentScale,
@@ -9326,7 +9329,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             wall: updated,
 
-            carryConnections: false,
+            carryConnections: true,
 
           ),
 
@@ -16957,7 +16960,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     ),
 
-                    carryConnections: false,
+                    carryConnections: true,
 
                   ),
 
@@ -16985,7 +16988,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     ),
 
-                    carryConnections: false,
+                    carryConnections: true,
 
                   ),
 
