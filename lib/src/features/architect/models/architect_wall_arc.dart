@@ -1,11 +1,51 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+enum ArchitectArcDimension { sagitta, radius }
+
 /// Signed circular arc: bulge = tan(sweep / 4). Stored independently of tessellation.
 class ArchitectWallArc {
   final Offset start, end;
   final double bulge;
   const ArchitectWallArc(this.start, this.end, this.bulge);
+  double get chordLength => (end - start).distance;
+  Offset get chordMidpoint => (start + end) / 2;
+  double get sagitta => chordLength * bulge.abs() / 2;
+
+  /// Exact midpoint, avoiding subtraction of large circle coordinates on a
+  /// shallow arc. Its signed displacement is opposite the bulge's normal.
+  Offset get midpoint {
+    final chord = end - start;
+    return chordMidpoint - Offset(-chord.dy, chord.dx) * (bulge / 2);
+  }
+
+  ArchitectWallArc withSagitta(double value) {
+    if (!value.isFinite || value <= 0 || chordLength < .001) {
+      throw ArgumentError('Invalid arc sagitta');
+    }
+    return ArchitectWallArc(
+      start,
+      end,
+      (bulge < 0 ? -1 : 1) * 2 * value / chordLength,
+    );
+  }
+
+  ArchitectWallArc withRadius(double value) {
+    final half = chordLength / 2;
+    if (!value.isFinite || value <= 0 || half < .0005 || value < half) {
+      throw ArgumentError('Invalid arc radius');
+    }
+    final root = math.sqrt(math.max(0, (value - half) * (value + half)));
+    // The reciprocal form keeps shallow arcs accurate instead of R - root.
+    final magnitude = bulge.abs() > 1
+        ? (value + root) / half
+        : half / (value + root);
+    if (!magnitude.isFinite || magnitude == 0) {
+      throw ArgumentError('Invalid arc radius');
+    }
+    return ArchitectWallArc(start, end, (bulge < 0 ? -1 : 1) * magnitude);
+  }
+
   double get sweep => 4 * math.atan(bulge);
   double get radius =>
       (end - start).distance * (1 + bulge * bulge) / (4 * bulge.abs());

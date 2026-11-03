@@ -4295,10 +4295,6 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallInsertPoint => 'Точка';
 
   @override
-  String get architectWallParallelHelp =>
-      'Тап за местене напречно без промяна на ъгъла. Задръж за точен отстъп със знак.';
-
-  @override
   String architectWallEndpointValue(int endpoint, String distance) {
     return '$endpoint · $distance';
   }
@@ -4309,9 +4305,6 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectMagnetHelp =>
       'Прилепване към стени, оси и точки от чертежа.';
-
-  @override
-  String get architectWallParallel => 'Успоредно';
 
   @override
   String get architectWallDraftHint => 'Задръж → точка · 2 пръста → мащаб';
@@ -4361,7 +4354,23 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectSelectionMulti => 'Много';
 
   @override
-  String get architectSelectionMove => 'Влачене';
+  String get architectSelectionMove => 'Премести';
+
+  @override
+  String get architectMoveFree => 'Свободно';
+
+  @override
+  String get architectMoveTransverse => 'Напречно';
+
+  @override
+  String get architectMoveOffset => 'Отстъп…';
+
+  @override
+  String get architectMoveStop => 'Спри';
+
+  @override
+  String get architectMoveHelp =>
+      'Премести: свободно, напречно или с точен отстъп със знак.';
 
   @override
   String get architectSelectConnected => 'Свързани';
@@ -6693,6 +6702,21 @@ class AppLocalizationsBg extends AppLocalizations {
   String get wallArc => 'Заоблена стена';
 
   @override
+  String get wallArcSagitta => 'Стрела';
+
+  @override
+  String get wallArcSagittaHelp =>
+      'Разстояние от средата на хордата до средата на дъгата по водещата линия.';
+
+  @override
+  String get wallArcDimensionHelp =>
+      'Докоснете за промяна на стрелата или радиуса. Началото и краят остават неподвижни.';
+
+  @override
+  String get wallArcInvalidDimension =>
+      'Невалиден размер за тази стена или отворите ѝ.';
+
+  @override
   String get wallArcPickEnd => 'Посочи края на дъгата';
 
   @override
@@ -7188,10 +7212,6 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectApartmentRoomsHelp =>
       'Помещенията се включват автоматично според най-голямата обща площ с апартамента. Всяко помещение се отчита изцяло само веднъж. При равни площи се запазва текущият апартамент. Помещенията извън всички апартаменти остават без апартамент.';
-
-  @override
-  String get architectLineParallelHelp =>
-      'Докоснете за успоредно местене на линията. Задръжте за въвеждане на отместване със знак.';
 
   @override
   String get architectLineJoinSuccess => 'Линиите са свързани';

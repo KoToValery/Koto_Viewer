@@ -249,7 +249,7 @@ void main() {
   );
 
   testWidgets(
-    'Magnet lives in Settings and Parallel supports a signed exact offset',
+    'Magnet lives in Settings and Move supports a signed exact offset',
     (tester) async {
       final model = editing.seeded(
         ArchitectStorey(
@@ -271,22 +271,28 @@ void main() {
       await selection.selectTool(tester);
       await workspace.wallTap(tester, const Offset(1, .75));
       await tester.pumpAndSettle();
-      final parallel = find.byKey(const ValueKey('architect-wall-parallel'));
+      final move = find.byKey(const ValueKey('architect-selection-move'));
+      expect(
+        find.byKey(const ValueKey('architect-wall-parallel')),
+        findsNothing,
+      );
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('architect-selection-bar')),
-          matching: parallel,
+          matching: move,
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('architect-wall-floating-actions')),
-          matching: parallel,
+          matching: move,
         ),
         findsNothing,
       );
-      await tester.longPress(parallel);
+      await tester.tap(move);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('architect-move-offset')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('architect-axis-value')),

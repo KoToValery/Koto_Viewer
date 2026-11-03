@@ -6,6 +6,7 @@ import '../services/architect_projection_loader.dart';
 import '../widgets/architect_projection_status.dart';
 import '../services/architect_drafting_seed.dart';
 import '../widgets/architect_selection_control.dart';
+import '../widgets/architect_selection_move_button.dart';
 import '../../../core/services/ui_settings_service.dart';
 
 import '../models/architect_floor_drain.dart';
@@ -63,7 +64,9 @@ import '../widgets/architect_wall_types_manager.dart';
 
 import '../widgets/architect_wall_composition_editor.dart';
 
-import '../widgets/architect_wall_radius_dialog.dart';
+import '../widgets/architect_wall_arc_dimension_dialog.dart';
+import '../widgets/architect_wall_arc_dimension_overlay.dart';
+import '../services/architect_wall_arc_editing.dart';
 
 import '../widgets/architect_wall_plinth_dialog.dart';
 
@@ -3958,7 +3961,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _moveSelection = false;
 
-    _wallParallelMove = false;
+    _transverseMove = false;
 
     _interactionEpoch++;
 
@@ -4075,7 +4078,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _selectedElementId = null;
 
-    _wallParallelMove = false;
+    _transverseMove = false;
 
     _wallEndpointClearanceId = null;
 
@@ -4148,7 +4151,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _moveSelection = false;
 
-      _wallParallelMove = false;
+      _transverseMove = false;
 
       _wallEndpointClearanceId = null;
 
@@ -4295,6 +4298,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _wallCurved = false;
 
   Offset? _wallArcEnd;
+  double? _draftArcExactBulge;
+  double _lastDraftArcBulge = -.4;
+  ArchitectArcDimension _arcDimension = ArchitectArcDimension.sagitta;
+  bool _arcEditorOpen = false;
 
   double get _draftArcBulge =>
 
@@ -4302,7 +4309,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ? 0
 
-      : ArchitectWallArc.through(_draftStart!, _wallArcEnd!, _draftEnd!);
+      : _draftArcExactBulge ??
+          ArchitectWallArc.through(_draftStart!, _wallArcEnd!, _draftEnd!);
 
   void _commitWallArc() {
 
@@ -4360,63 +4368,151 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  Future<void> _editDraftArcRadius() async {
-
-    if (_wallArcEnd == null || _draftStart == null) return;
-
-    final start = _draftStart!, end = _wallArcEnd!, bulge = _draftArcBulge;
-
-    final chord = (end - start).distance,
-
-        previous = bulge.abs() < 1e-6
-
-            ? chord
-
-            : ArchitectWallArc(start, end, bulge).radius;
-
-    final radius = await showDialog<double>(
-
-      context: context,
-
-      builder: (_) => ArchitectWallRadiusDialog(
-
-        project: _project,
-
-        radius: previous,
-
-        minimum: chord / 2,
-
-      ),
-
-    );
-
-    if (radius == null ||
-
-        !mounted ||
-
-        _draftStart != start ||
-
-        _wallArcEnd != end) {
-
-      return;
-
+  ArchitectWall? get _draftArcWall {
+    if (_activeTool != ArchitectTool.wall ||
+        !_wallCurved ||
+        _draftStart == null ||
+        _wallArcEnd == null ||
+        _draftEnd == null) {
+      return null;
     }
-
-    final root = math.sqrt(math.max(0, radius * radius - chord * chord / 4));
-
-    final next =
-
-        (bulge < 0 ? -1 : 1) *
-
-        (radius + (bulge.abs() > 1 ? root : -root)) /
-
-        (chord / 2);
-
-    setState(() => _draftEnd = ArchitectWallArc(start, end, next).pointAt(.5));
-
+    return ArchitectWall(
+      id: 'arc-preview',
+      startPoint: _draftStart!,
+      endPoint: _wallArcEnd!,
+      arcBulge: _draftArcBulge,
+      thickness: _wallThickness,
+      referenceLine: _wallReference,
+      exteriorSide: _wallExteriorSide,
+      exteriorSideMode: _wallExteriorSideMode,
+      system: _activeWallType?.system ?? const ArchitectWallSystem(),
+      layers: _activeWallType?.resolvedLayers ?? const [],
+      wallTypeId: _activeWallType?.id,
+      insulationThicknessOverride: _activeWallType?.insulationThickness,
+    );
   }
 
+  Future<void> _editWallArcDimension({ArchitectArcDimension? dimension}) async {
+    if (_arcEditorOpen) return;
+    final draft = _draftArcWall;
+    final original =
+        draft ?? (_effectiveSelection.length == 1 ? _selectedWall : null);
+    if (original == null || (draft == null && !original.isCurved)) return;
+    _cancelActiveDrags();
+    final source = _project, start = _draftStart, end = _wallArcEnd;
+    final oldPoint = _draftEnd, oldExact = _draftArcExactBulge;
+    final wall = original.isCurved
+        ? original
+        : original.copyWith(arcBulge: _lastDraftArcBulge);
+    if (dimension != null) _arcDimension = dimension;
+    _arcEditorOpen = true;
+    bool current() =>
+        mounted &&
+        identical(_project, source) &&
+        (draft == null || (_draftStart == start && _wallArcEnd == end));
+    ArchitectModelCommand command(ArchitectWall candidate) =>
+        UpdateArchitectWall(
+          storeyId: source.activeStoreyId,
+          wall: candidate,
+          carryConnections: false,
+        );
+    ArchitectWall? result;
+    try {
+      result = await showDialog<ArchitectWall>(
+        context: context,
+        builder: (_) => ArchitectWallArcDimensionDialog(
+          project: source,
+          wall: wall,
+          dimension: _arcDimension,
+          confirmLabel: draft != null
+              ? context.l10n.applyAction
+              : context.l10n.save,
+          onDimension: (value) {
+            if (!current()) return;
+            setState(() => _arcDimension = value);
+            _repaintPreview();
+          },
+          validate: (candidate) {
+            if (!current()) throw ArgumentError('Arc edit context changed');
+            candidate.validateGeometry();
+            ArchitectWallArcEditing.validateOpenings(candidate);
+            if (draft == null) command(candidate).apply(source);
+          },
+          onPreview: (candidate) {
+            if (!current()) return;
+            setState(() {
+              if (draft != null) {
+                _draftEnd = candidate.arc!.midpoint;
+                _draftArcExactBulge = candidate.arcBulge;
+              } else {
+                _elementMovePreview = command(candidate).apply(source);
+              }
+            });
+            _repaintPreview();
+          },
+        ),
+      );
+    } finally {
+      _arcEditorOpen = false;
+      if (mounted) {
+        setState(() {
+          _elementMovePreview = null;
+          if (current() && draft != null) {
+            _draftEnd = result?.arc?.midpoint ?? oldPoint;
+            _draftArcExactBulge = result?.arcBulge ?? oldExact;
+            if (result != null) _lastDraftArcBulge = result.arcBulge;
+          }
+        });
+        _repaintPreview();
+      }
+    }
+    if (current() &&
+        draft == null &&
+        result != null &&
+        (result.arcBulge - original.arcBulge).abs() > 1e-12) {
+      _executeWallEdit(command(result));
+    }
+  }
 
+  Widget _buildWallArcDimensionOverlay() => Positioned.fill(
+    child: AnimatedBuilder(
+      animation: Listenable.merge([_viewport, _previewRevision]),
+      builder: (context, _) {
+        if (!_commands.isPlan ||
+            _mirrorActive ||
+            _offsetOptions != null ||
+            _splitActive ||
+            _newPointTargetId != null ||
+            _wallCutIds.isNotEmpty ||
+            _wallExtendId != null ||
+            _radialMenuScreenPosition != null) {
+          return const SizedBox.shrink();
+        }
+        final draft = _draftArcWall;
+        final selected = _effectiveSelection.length == 1 ? _selectedWall : null;
+        final wall =
+            draft ??
+            (selected == null
+                ? null
+                : _drawingProject.activeStorey.walls
+                      .where((w) => w.id == selected.id && w.isCurved)
+                      .firstOrNull);
+        if (wall == null) return const SizedBox.shrink();
+        return ArchitectWallArcDimensionOverlay(
+          arc: ArchitectWallArc(wall.startPoint, wall.endPoint, wall.arcBulge),
+          dimension: _arcDimension,
+          toScreen: _viewport.toScreen,
+          toModel: _viewport.toModel,
+          format: _project.formatLength,
+          obstacles: ArchitectWallNetwork.body([
+            ..._drawingProject.activeStorey.walls,
+            ?draft,
+          ]),
+          onEdit: _editWallArcDimension,
+        );
+      },
+    ),
+  );
 
   WallDraftingMode _wallMode = WallDraftingMode.singleLine;
 
@@ -4868,7 +4964,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   (Offset, Offset)? _wallEndpointLeaderLine;
 
-  bool _wallParallelMove = false;
+  bool _transverseMove = false;
 
   ArchitectLineStyle _activeCadLineStyle = ArchitectLineStyle.solid;
 
@@ -5474,89 +5570,63 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   String? _wallEndpointClearanceId;
 
-  void _toggleParallelMove() {
-
+  void _setSelectionMove(ArchitectSelectionMoveAction action) {
+    if (action == ArchitectSelectionMoveAction.offset) {
+      _editMoveOffset();
+      return;
+    }
     _cancelActiveDrags();
-
     setState(() {
-
-      _wallParallelMove = !_wallParallelMove;
-
-      _moveSelection = _wallParallelMove;
-
+      _radialMenuScreenPosition = null;
       _polygonEditId = null;
-
+      _polygonSelectedEdge = null;
       _wallCutIds = {};
-
+      _transverseMove = action == ArchitectSelectionMoveAction.transverse;
+      _moveSelection = action != ArchitectSelectionMoveAction.stop;
     });
-
   }
 
-
-
-  Future<void> _editParallelOffset() async {
-
+  Future<void> _editMoveOffset() async {
     final wall = _selectedLinearElement;
-
-    if (wall == null || _effectiveSelection.length != 1) return;
-
+    if (wall == null || wall.isCurved || _effectiveSelection.length != 1) return;
+    final source = _project;
+    _cancelActiveDrags();
     final value = await showArchitectAxisValueDialog(
-
       context: context,
-
-      title: context.l10n.architectWallParallel,
-
+      title: context.l10n.architectSelectionMove,
       label: '${context.l10n.offsetAction} (${_project.units.symbol})',
-
       value: '0',
-
       numeric: true,
-
     );
-
-    if (!mounted || value == null) return;
-
+    if (!mounted ||
+        value == null ||
+        !identical(source, _project) ||
+        _effectiveSelection.length != 1 ||
+        !_effectiveSelection.contains(wall.id)) {
+      return;
+    }
     final distance = _project.units.fromUnit(
-
       double.parse(value.replaceAll(',', '.')),
-
     );
-
     if (distance.abs() < 1e-9) return;
-
     final current = _linearEditWalls.where((w) => w.id == wall.id).firstOrNull;
-
     if (current == null) return;
-
     _executeWallEdit(
-
       MoveArchitectElements(
-
         storeyId: _project.activeStoreyId,
-
         elementIds: {wall.id},
-
         delta: current.normalVector * distance,
-
       ),
-
     );
-
     setState(() {
-
-      _wallParallelMove = true;
-
+      _transverseMove = true;
       _moveSelection = true;
-
     });
-
   }
 
+  Offset _constrainMoveDelta(Offset delta, Set<String> ids) {
 
-
-  Offset _parallelDelta(Offset delta, Set<String> ids) {
-
-    if (!_wallParallelMove || ids.length != 1) return delta;
+    if (!_transverseMove || ids.length != 1) return delta;
 
     final floor = (_elementMoveOriginal ?? _project).activeStorey;
 
@@ -6557,6 +6627,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
 
     }
+
+    // Only an explicit canvas gesture resumes three-point shaping. Hover must
+    // never replace a curvature entered with the numeric editor.
+    if (_wallArcEnd != null) _draftArcExactBulge = null;
 
     if (_radialMenuScreenPosition != null) {
 
@@ -9095,7 +9169,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ).inputPoint(rawModel - _elementMoveStart!);
 
-      delta = _parallelDelta(delta, _groupDragIds);
+      delta = _constrainMoveDelta(delta, _groupDragIds);
 
       if (_magnetEnabled &&
 
@@ -9115,7 +9189,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           _currentScale,
 
-          parallelOnly: _wallParallelMove,
+          parallelOnly: _transverseMove,
 
         );
 
@@ -9129,7 +9203,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       }
 
-      delta = _parallelDelta(delta, _groupDragIds);
+      delta = _constrainMoveDelta(delta, _groupDragIds);
 
       try {
 
@@ -9221,7 +9295,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       }
 
-      if (selectedWall != null && _wallParallelMove) {
+      if (selectedWall != null && _transverseMove) {
 
         final n = selectedWall.normalVector;
 
@@ -9241,7 +9315,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           _currentScale,
 
-          parallelOnly: _wallParallelMove,
+          parallelOnly: _transverseMove,
 
         );
 
@@ -9321,7 +9395,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       }
 
-      delta = _parallelDelta(delta, {_draggingElementId!});
+      delta = _constrainMoveDelta(delta, {_draggingElementId!});
 
       _elementMoveDelta = delta;
 
@@ -9579,7 +9653,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           _wallArcEnd != null) {
 
-        _draftEnd = _snapElement(rawModel).point;
+        if (_draftArcExactBulge == null && !_arcEditorOpen) {
+          _draftEnd = _snapElement(rawModel).point;
+          if (_draftArcBulge.abs() > 1e-8) _lastDraftArcBulge = _draftArcBulge;
+        }
 
         _repaintPreview();
 
@@ -13708,6 +13785,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _draftStart = null;
     _draftEnd = null;
     _wallArcEnd = null;
+    _draftArcExactBulge = null;
+    _lastDraftArcBulge = -.4;
     _wallStartAttachment = null;
     _wallDirectionLocked = false;
     _wallPanelAnchor = null;
@@ -13873,7 +13952,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _moveSelection = false;
 
-      _wallParallelMove = false;
+      _transverseMove = false;
 
     });
 
@@ -13939,7 +14018,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _moveSelection = false;
 
-      _wallParallelMove = false;
+      _transverseMove = false;
 
       _wallCutIds = {};
 
@@ -16314,7 +16393,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _wallEndpointClearanceId = gap.wallId;
 
-        _wallParallelMove = false;
+        _transverseMove = false;
 
         _moveSelection = false;
 
@@ -16565,6 +16644,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final wall = _selectedLinearElement;
 
     if (wall == null) return;
+
+    if (wall.isCurved) {
+      _editWallArcDimension();
+      return;
+    }
 
     var length = wall.length;
 
@@ -19722,7 +19806,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           _polygonSelectedEdge = null;
 
-          _wallParallelMove = false;
+          _transverseMove = false;
 
           _moveSelection = true;
 
@@ -20302,7 +20386,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (primary != _selectedElementId || _selectionIds.length != 1) {
         _wallEndpointClearanceId = null;
 
-        _wallParallelMove = false;
+        _transverseMove = false;
 
         _moveSelection = false;
 
@@ -21674,7 +21758,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _moveSelection = false;
 
-        _wallParallelMove = false;
+        _transverseMove = false;
 
         if (_wallJoinSourceId == sourceId) {
 
@@ -22358,7 +22442,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         _moveSelection = false;
 
-                        _wallParallelMove = false;
+                        _transverseMove = false;
 
                         _wallExtendId = _wallExtendId == wallIds.single
 
@@ -22762,7 +22846,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _polygonEditId = null;
       _polygonSelectedEdge = null;
       _moveSelection = false;
-      _wallParallelMove = false;
+      _transverseMove = false;
     });
   }
 
@@ -22893,7 +22977,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _moveSelection = false;
 
-      _wallParallelMove = false;
+      _transverseMove = false;
 
       _zoneTool.cancelAll();
 
@@ -23832,7 +23916,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       _radialMenuScreenPosition = null;
                       _polygonEditId = null;
                       _polygonSelectedEdge = null;
-                      _wallParallelMove = false;
+                      _transverseMove = false;
                       _moveSelection = !_moveSelection;
                     }),
                   ),
@@ -23924,7 +24008,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       _radialMenuScreenPosition = null;
                       _polygonEditId = null;
                       _polygonSelectedEdge = null;
-                      _wallParallelMove = false;
+                      _transverseMove = false;
                       _moveSelection = !_moveSelection;
                     }),
                   ),
@@ -24252,47 +24336,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 ),
 
                 if (!_selectionHasAutoZones)
-
-                  IconButton(
-
-                    constraints: const BoxConstraints.tightFor(
-
-                      width: 26,
-
-                      height: 40,
-
-                    ),
-
-                    padding: EdgeInsets.zero,
-
-                    key: const ValueKey('architect-selection-move'),
-
-                    tooltip: l.architectSelectionMove,
-
-                    icon: Icon(
-
-                      Icons.open_with,
-
-                      size: 18,
-
-                      color: _moveSelection ? Colors.amber : Colors.white70,
-
-                    ),
-
-                    onPressed: () => setState(() {
-
-                      _radialMenuScreenPosition = null;
-
-                      _polygonEditId = null;
-
-                      _polygonSelectedEdge = null;
-
-                      _wallParallelMove = false;
-
-                      _moveSelection = !_moveSelection;
-
-                    }),
-
+                  ArchitectSelectionMoveButton(
+                    active: _moveSelection,
+                    transverse: _transverseMove,
+                    supportsTransverse: ids.length == 1 &&
+                        segmentIds.length == 1 &&
+                        _selectedLinearElement?.isCurved == false,
+                    onSelected: _setSelectionMove,
                   ),
 
                 if (!_selectionHasAutoZones)
@@ -24356,50 +24406,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ),
 
                     onPressed: () => _startMirrorSession(isDuplicate: true),
-
-                  ),
-
-                if (segmentIds.length == 1 && ids.length == 1)
-
-                  Tooltip(
-
-                    message: lineIds.isNotEmpty
-
-                        ? l.architectLineParallelHelp
-
-                        : l.architectWallParallelHelp,
-
-                    child: InkWell(
-
-                      key: const ValueKey('architect-wall-parallel'),
-
-                      onTap: _toggleParallelMove,
-
-                      onLongPress: _editParallelOffset,
-
-                      child: SizedBox(
-
-                        width: 32,
-
-                        height: 40,
-
-                        child: Icon(
-
-                          Icons.swap_vert,
-
-                          size: 19,
-
-                          color: _wallParallelMove
-
-                              ? Colors.amber
-
-                              : Colors.white70,
-
-                        ),
-
-                      ),
-
-                    ),
 
                   ),
 
@@ -24703,7 +24709,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           value: 'length',
 
-                          child: Text(l.architectWallLength),
+                          child: Text(_selectedLinearElement?.isCurved == true
+                            ? l.wallArc : l.architectWallLength),
 
                         ),
 
@@ -28433,6 +28440,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
 
       _buildWallClearanceOverlay(),
+      _buildWallArcDimensionOverlay(),
 
       if (_placingDownpipe)
 
@@ -28808,7 +28816,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           key: const ValueKey('wall-arc-radius'),
 
-                          onPressed: _editDraftArcRadius,
+                          onPressed: () => _editWallArcDimension(
+                            dimension: ArchitectArcDimension.radius),
 
                           child: const Text('R='),
 
@@ -29993,6 +30002,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     activeWallTypeId: _activeWallType?.id,
 
     activeWallArcEnd: _wallArcEnd,
+    activeWallArcBulge: _wallArcEnd == null ? null : _draftArcBulge,
+    activeWallCurved: _wallCurved,
 
     activeWallLayers: _activeWallType?.resolvedLayers ?? const [],
 

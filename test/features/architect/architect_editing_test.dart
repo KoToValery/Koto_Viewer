@@ -874,7 +874,6 @@ void main() {
     for (final key in [
       'architect-wall-flip',
       'architect-wall-cut',
-      'architect-wall-parallel',
     ]) {
       final button = find.byKey(ValueKey(key));
       final rect = tester.getRect(button);
@@ -882,8 +881,7 @@ void main() {
       expect(rect.right, lessThanOrEqualTo(360));
       expect(
         find.descendant(
-          of: find.byKey(ValueKey(key == 'architect-wall-parallel'
-            ? 'architect-selection-bar' : 'architect-wall-floating-actions')),
+          of: find.byKey(const ValueKey('architect-wall-floating-actions')),
           matching: button,
         ),
         findsOneWidget,

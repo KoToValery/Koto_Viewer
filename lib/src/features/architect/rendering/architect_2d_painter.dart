@@ -88,6 +88,8 @@ class Architect2dPainter extends CustomPainter {
   final ArchitectLineStyle activeCadLineStyle;
   final List<ArchitectMaterialLayer> activeWallLayers;
   final Offset? activeWallArcEnd;
+  final double? activeWallArcBulge;
+  final bool activeWallCurved;
   final Offset? activeDraftStart;
   final Offset? activeDraftEnd;
   final ArchitectStair? stairPreview;
@@ -222,6 +224,8 @@ class Architect2dPainter extends CustomPainter {
     this.activeCadLineStyle = ArchitectLineStyle.solid,
     this.activeWallLayers = const [],
     this.activeWallArcEnd,
+    this.activeWallArcBulge,
+    this.activeWallCurved = false,
     this.activeDraftStart,
     this.activeDraftEnd,
     this.stairPreview,
@@ -1757,7 +1761,7 @@ class Architect2dPainter extends CustomPainter {
         id: 'preview',
         location: activeWallIsExterior ? ArchitectWallLocation.exterior : ArchitectWallLocation.interior,
         layers:activeWallLayers,
-        arcBulge:activeWallArcEnd==null?0:ArchitectWallArc.through(p1,p2,activeDraftEnd!),
+        arcBulge:activeWallArcEnd==null?0:activeWallArcBulge ?? ArchitectWallArc.through(p1,p2,activeDraftEnd!),
         startPoint: p1,
         endPoint: p2,
         thickness: activeWallThickness,
@@ -1784,6 +1788,8 @@ class Architect2dPainter extends CustomPainter {
         Paint()..color = Colors.orangeAccent,
       );
       canvas.drawCircle(p2, 2 / draftingScale, Paint()..color = Colors.cyanAccent);
+      // The interactive overlay owns the rise/radius dimension for arc drafts.
+      if (activeWallCurved || activeWallArcEnd != null) return;
       // Keep a single target marker and a length-only badge outside the body.
       final textSpan = TextSpan(
         text: project.formatLength(wall.length),

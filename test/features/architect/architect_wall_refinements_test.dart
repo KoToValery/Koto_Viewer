@@ -281,75 +281,78 @@ void main() {
     );
   }
 
-  testWidgets(
-    'Parallel quick action constrains a body move even with snapping enabled',
-    (tester) async {
-      final wall = const ArchitectWall(
-        id: 'w',
-        startPoint: Offset.zero,
-        endPoint: Offset(4, 3),
-      );
-      final model = editing.seeded(
-        ArchitectStorey(id: 's', name: 'Floor', walls: [wall]),
-      );
-      addTearDown(model.dispose);
-      await workspace.open(tester, model);
-      await editing.selectTool(tester, 'wall');
-      await workspace.wallTap(tester, const Offset(1, .75));
-      await tester.pumpAndSettle();
-      for (final key in [
-        'architect-wall-flip',
-        'architect-wall-cut',
-        'architect-wall-parallel',
-      ]) {
-        expect(find.byKey(ValueKey(key)), findsOneWidget);
-      }
-      final floating = find.byKey(
-        const ValueKey('architect-wall-floating-actions'),
-      );
-      final selection = find.byKey(const ValueKey('architect-selection-bar'));
+  testWidgets('Move menu constrains a body move even with snapping enabled', (
+    tester,
+  ) async {
+    final wall = const ArchitectWall(
+      id: 'w',
+      startPoint: Offset.zero,
+      endPoint: Offset(4, 3),
+    );
+    final model = editing.seeded(
+      ArchitectStorey(id: 's', name: 'Floor', walls: [wall]),
+    );
+    addTearDown(model.dispose);
+    await workspace.open(tester, model);
+    await editing.selectTool(tester, 'wall');
+    await workspace.wallTap(tester, const Offset(1, .75));
+    await tester.pumpAndSettle();
+    for (final key in [
+      'architect-wall-flip',
+      'architect-wall-cut',
+      'architect-selection-move',
+    ]) {
+      expect(find.byKey(ValueKey(key)), findsOneWidget);
+    }
+    final floating = find.byKey(
+      const ValueKey('architect-wall-floating-actions'),
+    );
+    final selection = find.byKey(const ValueKey('architect-selection-bar'));
+    expect(
+      tester.getTopLeft(floating).dy,
+      closeTo(
+        tester.getBottomLeft(find.byType(ArchitectWorkspaceViewBar)).dy + 8,
+        .1,
+      ),
+    );
+    for (final key in [
+      'architect-wall-flip',
+      'architect-wall-cut',
+      'architect-selection-move',
+    ]) {
+      final button = find.byKey(ValueKey(key));
       expect(
-        tester.getTopLeft(floating).dy,
-        closeTo(
-          tester.getBottomLeft(find.byType(ArchitectWorkspaceViewBar)).dy + 8,
-          .1,
-        ),
+        find.descendant(of: floating, matching: button),
+        key == 'architect-selection-move' ? findsNothing : findsOneWidget,
       );
-      for (final key in [
-        'architect-wall-flip',
-        'architect-wall-cut',
-        'architect-wall-parallel',
-      ]) {
-        final button = find.byKey(ValueKey(key));
-        expect(find.descendant(of: floating, matching: button),
-          key == 'architect-wall-parallel' ? findsNothing : findsOneWidget);
-        expect(find.descendant(of: selection, matching: button),
-          key == 'architect-wall-parallel' ? findsOneWidget : findsNothing);
-      }
-      await tester.tap(find.byKey(const ValueKey('architect-wall-parallel')));
-      await tester.pump();
-      final gesture = await tester.startGesture(
-        workspace.screen(tester, const Offset(2, 1.5)),
-      );
-      await gesture.moveTo(workspace.screen(tester, const Offset(4, 3.5)));
-      await tester.pump();
-      await gesture.up();
-      await tester.pumpAndSettle();
-      final moved = model.project.activeStorey.walls.single;
-      final delta = moved.startPoint - wall.startPoint;
-      expect(delta.distance, greaterThan(.01));
       expect(
-        delta.dx * wall.unitVector.dx + delta.dy * wall.unitVector.dy,
-        closeTo(0, 1e-9),
+        find.descendant(of: selection, matching: button),
+        key == 'architect-selection-move' ? findsOneWidget : findsNothing,
       );
-      expect(moved.length, closeTo(wall.length, 1e-9));
-      model.undo();
-      expect(
-        model.project.activeStorey.walls.single.startPoint,
-        wall.startPoint,
-      );
-    },
-  );
+    }
+    expect(find.byKey(const ValueKey('architect-wall-parallel')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('architect-selection-move')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('architect-move-transverse')));
+    await tester.pumpAndSettle();
+    final gesture = await tester.startGesture(
+      workspace.screen(tester, const Offset(2, 1.5)),
+    );
+    await gesture.moveTo(workspace.screen(tester, const Offset(4, 3.5)));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+    final moved = model.project.activeStorey.walls.single;
+    final delta = moved.startPoint - wall.startPoint;
+    expect(delta.distance, greaterThan(.01));
+    expect(
+      delta.dx * wall.unitVector.dx + delta.dy * wall.unitVector.dy,
+      closeTo(0, 1e-9),
+    );
+    expect(moved.length, closeTo(wall.length, 1e-9));
+    model.undo();
+    expect(model.project.activeStorey.walls.single.startPoint, wall.startPoint);
+  });
 
   testWidgets(
     'Wall properties expose default height follow, materials and leading line last',

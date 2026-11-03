@@ -4279,10 +4279,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallInsertPoint => 'Point';
 
   @override
-  String get architectWallParallelHelp =>
-      'Tap to move across the wall without changing its angle. Hold to enter a signed offset.';
-
-  @override
   String architectWallEndpointValue(int endpoint, String distance) {
     return '$endpoint · $distance';
   }
@@ -4292,9 +4288,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectMagnetHelp => 'Snap to walls, axes and drawing points.';
-
-  @override
-  String get architectWallParallel => 'Parallel';
 
   @override
   String get architectWallDraftHint => 'Hold → point · 2 fingers → zoom';
@@ -4343,7 +4336,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectSelectionMulti => 'Multi';
 
   @override
-  String get architectSelectionMove => 'Drag';
+  String get architectSelectionMove => 'Move';
+
+  @override
+  String get architectMoveFree => 'Free';
+
+  @override
+  String get architectMoveTransverse => 'Across';
+
+  @override
+  String get architectMoveOffset => 'Offset…';
+
+  @override
+  String get architectMoveStop => 'Stop';
+
+  @override
+  String get architectMoveHelp =>
+      'Move freely, across the element, or by an exact signed offset.';
 
   @override
   String get architectSelectConnected => 'Connected';
@@ -6668,6 +6677,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wallArc => 'Arc wall';
 
   @override
+  String get wallArcSagitta => 'Rise';
+
+  @override
+  String get wallArcSagittaHelp =>
+      'Distance from the chord midpoint to the arc midpoint along the reference line.';
+
+  @override
+  String get wallArcDimensionHelp =>
+      'Tap to change the rise or radius. The start and end stay fixed.';
+
+  @override
+  String get wallArcInvalidDimension =>
+      'Invalid dimension for this wall or its openings.';
+
+  @override
   String get wallArcPickEnd => 'Pick the end of the arc';
 
   @override
@@ -7160,10 +7184,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectApartmentRoomsHelp =>
       'Rooms are assigned automatically by the largest overlapping area with an apartment. Each room is counted in full only once. Equal areas retain the current apartment. Rooms outside all apartments stay unassigned.';
-
-  @override
-  String get architectLineParallelHelp =>
-      'Tap to move across the line without changing its angle. Hold to enter a signed offset.';
 
   @override
   String get architectLineJoinSuccess => 'Lines joined';

@@ -7475,12 +7475,6 @@ abstract class AppLocalizations {
   /// **'Point'**
   String get architectWallInsertPoint;
 
-  /// Wall positioning control guidance
-  ///
-  /// In en, this message translates to:
-  /// **'Tap to move across the wall without changing its angle. Hold to enter a signed offset.'**
-  String get architectWallParallelHelp;
-
   /// Endpoint marker number and its editable offset
   ///
   /// In en, this message translates to:
@@ -7498,12 +7492,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Snap to walls, axes and drawing points.'**
   String get architectMagnetHelp;
-
-  /// No description provided for @architectWallParallel.
-  ///
-  /// In en, this message translates to:
-  /// **'Parallel'**
-  String get architectWallParallel;
 
   /// No description provided for @architectWallDraftHint.
   ///
@@ -7598,8 +7586,38 @@ abstract class AppLocalizations {
   /// No description provided for @architectSelectionMove.
   ///
   /// In en, this message translates to:
-  /// **'Drag'**
+  /// **'Move'**
   String get architectSelectionMove;
+
+  /// No description provided for @architectMoveFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get architectMoveFree;
+
+  /// No description provided for @architectMoveTransverse.
+  ///
+  /// In en, this message translates to:
+  /// **'Across'**
+  String get architectMoveTransverse;
+
+  /// No description provided for @architectMoveOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Offset…'**
+  String get architectMoveOffset;
+
+  /// No description provided for @architectMoveStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get architectMoveStop;
+
+  /// No description provided for @architectMoveHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move freely, across the element, or by an exact signed offset.'**
+  String get architectMoveHelp;
 
   /// Select connected chain of elements
   ///
@@ -11831,6 +11849,30 @@ abstract class AppLocalizations {
   /// **'Arc wall'**
   String get wallArc;
 
+  /// No description provided for @wallArcSagitta.
+  ///
+  /// In en, this message translates to:
+  /// **'Rise'**
+  String get wallArcSagitta;
+
+  /// No description provided for @wallArcSagittaHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance from the chord midpoint to the arc midpoint along the reference line.'**
+  String get wallArcSagittaHelp;
+
+  /// No description provided for @wallArcDimensionHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to change the rise or radius. The start and end stay fixed.'**
+  String get wallArcDimensionHelp;
+
+  /// No description provided for @wallArcInvalidDimension.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid dimension for this wall or its openings.'**
+  String get wallArcInvalidDimension;
+
   /// No description provided for @wallArcPickEnd.
   ///
   /// In en, this message translates to:
@@ -12784,12 +12826,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rooms are assigned automatically by the largest overlapping area with an apartment. Each room is counted in full only once. Equal areas retain the current apartment. Rooms outside all apartments stay unassigned.'**
   String get architectApartmentRoomsHelp;
-
-  /// No description provided for @architectLineParallelHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap to move across the line without changing its angle. Hold to enter a signed offset.'**
-  String get architectLineParallelHelp;
 
   /// No description provided for @architectLineJoinSuccess.
   ///

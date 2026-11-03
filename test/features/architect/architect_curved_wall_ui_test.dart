@@ -51,12 +51,14 @@ void main() {
         expect(model.project.activeStorey.walls, isEmpty);
         await tester.tap(find.byKey(const ValueKey('wall-arc-radius')));
         await tester.pumpAndSettle();
-        await tester.enterText(
-          find.byKey(const ValueKey('wall-arc-radius-input')),
-          '200',
-        );
+        for (final key in ['2', '0', '0']) {
+          await tester.tap(find.byKey(ValueKey('arc-key-$key')));
+          await tester.pump();
+        }
         final l = AppLocalizations.of(
-          tester.element(find.byKey(const ValueKey('wall-arc-radius-input'))),
+          tester.element(
+            find.byKey(const ValueKey('wall-arc-dimension-input')),
+          ),
         )!;
         await tester.tap(find.text(l.applyAction));
         await tester.pumpAndSettle();

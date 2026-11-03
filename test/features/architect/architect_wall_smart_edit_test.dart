@@ -305,6 +305,8 @@ void main() {
     await editing.hold(tester, const Offset(2, 0));
     await tester.tap(find.byKey(const ValueKey('architect-selection-move')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('architect-move-free')));
+    await tester.pumpAndSettle();
     final jitter = await tester.startGesture(
       workspace.screen(tester, const Offset(2, 0)),
     );

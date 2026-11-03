@@ -8,6 +8,7 @@ import '../models/architect_hatch_pattern.dart';
 import '../models/architect_drawing_color.dart';
 import 'dart:ui';
 import 'dart:math' as math;
+import 'architect_wall_arc_editing.dart';
 import '../models/architect_column.dart';
 import '../models/architect_project.dart';
 import '../models/architect_elements.dart';
@@ -418,10 +419,8 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
           throw ArgumentError('Unsupported property');
         }
         if(value.key=='arcRadius') {
-          final wall=ArchitectWall.fromJson(e),chord=(wall.endPoint-wall.startPoint).distance;
-          if(value.value<chord/2)throw ArgumentError('Invalid arc radius');
-          final root=math.sqrt(math.max(0,value.value*value.value-chord*chord/4));
-          e['arcBulge']=wall.arcBulge.sign*(value.value+(wall.arcBulge.abs()>1?root:-root))/(chord/2);
+          final wall = ArchitectWall.fromJson(e);
+          e['arcBulge'] = wall.arc!.withRadius(value.value).bulge;
           continue;
         }
         e[value.key] = value.key == 'stepCount' 
@@ -664,6 +663,9 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
     )) {
       final old = project.activeStorey.walls.firstWhere((w) => w.id == wall.id);
       var updated = wall;
+      if (values.containsKey('arcRadius')) {
+        ArchitectWallArcEditing.validateOpenings(updated);
+      }
       final flipped = old.exteriorSide != wall.exteriorSide;
       if (flipped && wall.isCurved) {
         updated=wall.copyWith(exteriorSide:old.exteriorSide).mirroredAroundCore();
@@ -677,7 +679,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
       result = UpdateArchitectWall(
         storeyId: storeyId,
         wall: updated,
-        carryConnections: !flipped,
+        carryConnections: !flipped && !values.containsKey('arcRadius'),
       ).apply(result);
     }
     // Non-wall fields come from the same validated transaction.
