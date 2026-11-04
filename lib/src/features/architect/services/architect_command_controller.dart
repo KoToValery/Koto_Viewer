@@ -2000,6 +2000,69 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
   final bool atMidpoint;
   final int? holeIndex;
 
+  /// Locate the actual native edge, including the reference arc of a wall.
+  static ({Offset point, int edge, double ratio})? locate(
+    ArchitectStorey storey,
+    String id,
+    Offset pick, {
+    bool atMidpoint = false,
+    int? holeIndex,
+  }) {
+    if (!pick.dx.isFinite || !pick.dy.isFinite) return null;
+    final wall = holeIndex == null
+        ? storey.walls.where((w) => w.id == id && w.isCurved).firstOrNull
+        : null;
+    if (wall != null) {
+      final ratio = atMidpoint ? .5 : wall.arc!.parameter(pick).clamp(0.0, 1.0);
+      return (point: wall.referencePointAt(ratio), edge: 0, ratio: ratio);
+    }
+    final path = pathOf(storey, id, holeIndex: holeIndex);
+    if (path == null) return null;
+    final hit = BimLineGeometry.insertion(path.points, pick, closed: path.closed);
+    if (hit == null) return null;
+    final a = path.points[hit.edge];
+    final b = path.points[(hit.edge + 1) % path.points.length];
+    return (
+      point: atMidpoint ? (a + b) / 2 : hit.point,
+      edge: hit.edge,
+      ratio: atMidpoint ? .5 : BimLineGeometry.parameter(hit.point, a, b),
+    );
+  }
+
+  /// The same validation drives the movable preview and the final command.
+  static bool canInsert(
+    ArchitectStorey storey,
+    String id,
+    Offset point, {
+    int? holeIndex,
+  }) {
+    final hit = locate(storey, id, point, holeIndex: holeIndex);
+    final path = pathOf(storey, id, holeIndex: holeIndex);
+    if (hit == null || path == null ||
+        path.points.any((p) => (p - hit.point).distance < .001)) {
+      return false;
+    }
+    if (holeIndex == null) {
+      final wall = storey.walls.where((w) => w.id == id).firstOrNull;
+      if (wall != null) {
+        if (hit.ratio * wall.length < .001 ||
+            (1 - hit.ratio) * wall.length < .001) {
+          return false;
+        }
+        for (final opening in [
+          ...wall.doors.map((o) => (o.offsetRatio, o.width)),
+          ...wall.windows.map((o) => (o.offsetRatio, o.width)),
+        ]) {
+          if ((opening.$1 - hit.ratio).abs() * wall.length <
+              wall.openingArcSpan(opening.$2) / 2 + .001) {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
   static ({List<Offset> points, bool closed, double width})? pathOf(
     ArchitectStorey storey,
     String id, {
@@ -2066,18 +2129,11 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     if (path == null) throw ArgumentError('Element has no editable path');
     // The pick identifies the segment; midpoint insertion ignores its distance
     // along that segment and works equally for open paths and closing edges.
-    final hit = BimLineGeometry.insertion(
-      path.points,
-      point,
-      closed: path.closed,
-    );
+    final hit = locate(storey, elementId, point,
+        atMidpoint: atMidpoint, holeIndex: holeIndex);
     if (hit == null) throw ArgumentError('Element has no editable segment');
-    final insertion = atMidpoint
-        ? (path.points[hit.edge] +
-                  path.points[(hit.edge + 1) % path.points.length]) /
-              2
-        : hit.point;
-    if (path.points.any((p) => (p - insertion).distance < .001)) {
+    final insertion = hit.point;
+    if (!canInsert(storey, elementId, insertion, holeIndex: holeIndex)) {
       throw ArgumentError('Point already exists or segment is too short');
     }
     if (path.closed) {
@@ -2120,11 +2176,8 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
         storeyId: storeyId,
         wallId: elementId,
         newWallId: newElementId,
-        ratio: BimLineGeometry.parameter(
-          insertion,
-          wall.startPoint,
-          wall.endPoint,
-        ),
+        ratio: wall.isCurved ? hit.ratio : BimLineGeometry.parameter(
+          insertion, wall.startPoint, wall.endPoint),
       ).apply(project);
     }
     return ArchitectModelCommand.replace(

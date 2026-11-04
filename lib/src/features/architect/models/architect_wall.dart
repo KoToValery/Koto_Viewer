@@ -182,8 +182,12 @@ class ArchitectWall {
           : WallCoreMaterial.brick);
 
   bool get isCurved => arcBulge.abs() > 1e-8;
-  ArchitectWallArc? get arc =>
-      isCurved ? ArchitectWallArc(startPoint, endPoint, arcBulge) : null;
+  static final _arcs = Expando<ArchitectWallArc>();
+  static final _facePolygons =
+      Expando<Map<(double, double), List<Offset>>>();
+  ArchitectWallArc? get arc => isCurved
+      ? (_arcs[this] ??= ArchitectWallArc(startPoint, endPoint, arcBulge))
+      : null;
   double get length => arc?.length ?? (endPoint - startPoint).distance;
   double get centerLineOffset =>
       centerOffset.dx * normalVector.dx + centerOffset.dy * normalVector.dy;
@@ -208,8 +212,8 @@ class ArchitectWall {
     double high, {
     double from = 0,
     double to = 1,
-  }) =>
-      arc?.face(
+  }) {
+    List<Offset> build() => arc?.face(
         low,
         high,
         from: from,
@@ -222,6 +226,14 @@ class ArchitectWall {
         referencePointAt(to) + normalVector * high,
         referencePointAt(from) + normalVector * high,
       ];
+    // Full skins are immutable and shared by drawing, hit testing and snaps.
+    // Partial/extended skins are transient and must not grow an unbounded cache.
+    if (!isCurved || from != 0 || to != 1) return build();
+    return (_facePolygons[this] ??= {}).putIfAbsent(
+      (low, high),
+      () => List<Offset>.unmodifiable(build()),
+    );
+  }
   void validateGeometry() {
     system.validate(thickness);
     systemPlacement.validate();

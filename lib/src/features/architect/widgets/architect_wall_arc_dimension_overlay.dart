@@ -6,6 +6,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../models/architect_wall_arc.dart';
 import '../rendering/architect_clearance_badge_layout.dart';
+import '../rendering/architect_clearance_obstacles.dart';
 
 /// A temporary, screen-space dimension. It never becomes a drawing annotation.
 class ArchitectWallArcDimensionOverlay extends StatelessWidget {
@@ -14,7 +15,8 @@ class ArchitectWallArcDimensionOverlay extends StatelessWidget {
   final Offset Function(Offset) toScreen;
   final Offset Function(Offset) toModel;
   final String Function(double) format;
-  final Path obstacles;
+  final Path? obstacles;
+  final ArchitectClearanceObstacles? indexedObstacles;
   final VoidCallback onEdit;
 
   const ArchitectWallArcDimensionOverlay({
@@ -24,7 +26,8 @@ class ArchitectWallArcDimensionOverlay extends StatelessWidget {
     required this.toScreen,
     required this.toModel,
     required this.format,
-    required this.obstacles,
+    this.obstacles,
+    this.indexedObstacles,
     required this.onEdit,
   });
 
@@ -51,21 +54,17 @@ class ArchitectWallArcDimensionOverlay extends StatelessWidget {
         constraints.maxWidth - 8,
         constraints.maxHeight - 64,
       );
+      final index =
+          indexedObstacles ??
+          ArchitectClearanceObstacles.forPath(obstacles ?? Path());
       final rect = ArchitectClearanceBadgeLayout.place(
         preferred: preferred,
         available: available,
         excluded: const [],
         size: const Size(112, 40),
-        intersectsWall: (rect) => Path.combine(
-          PathOperation.intersect,
-          obstacles,
-          Path()..addPolygon([
-            toModel(rect.topLeft),
-            toModel(rect.topRight),
-            toModel(rect.bottomRight),
-            toModel(rect.bottomLeft),
-          ], true),
-        ).computeMetrics().isNotEmpty,
+        intersectsWall: (rect) => index.intersects(
+          Rect.fromPoints(toModel(rect.topLeft), toModel(rect.bottomRight)),
+        ),
       );
       return ClipRect(
         child: Stack(
@@ -179,5 +178,10 @@ class _ArcDimensionPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _ArcDimensionPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _ArcDimensionPainter oldDelegate) =>
+      chordStart != oldDelegate.chordStart ||
+      chordEnd != oldDelegate.chordEnd ||
+      start != oldDelegate.start ||
+      end != oldDelegate.end ||
+      badge != oldDelegate.badge;
 }

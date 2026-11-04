@@ -233,6 +233,9 @@ import '../widgets/architect_dimension_edit_overlay.dart';
 import '../services/architect_wall_relations.dart';
 
 import '../rendering/architect_clearance_badge_layout.dart';
+import '../rendering/architect_clearance_obstacles.dart';
+import '../rendering/architect_dynamic_dimension_layout.dart';
+import '../widgets/architect_dynamic_dimension_painter.dart';
 
 import '../rendering/architect_wall_exterior_painter.dart';
 import '../rendering/architect_wall_network.dart';
@@ -4534,10 +4537,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           toScreen: _viewport.toScreen,
           toModel: _viewport.toModel,
           format: _project.formatLength,
-          obstacles: ArchitectWallNetwork.body([
-            ..._drawingProject.activeStorey.walls,
-            ?draft,
-          ]),
+          indexedObstacles: ArchitectClearanceObstacles.forWalls(draft == null
+              ? _drawingProject.activeStorey.walls
+              : [..._drawingProject.activeStorey.walls, draft]),
           onEdit: _editWallArcDimension,
         );
       },
@@ -4860,6 +4862,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool get _commandCanConfirm =>
       _commandReady ||
       _commandLiveCandidate != null ||
+      (_newPointTargetId != null && _newPointValid) ||
       (_commandAction == ArchitectRadialAction.cutOpening &&
           _canConfirmContour);
 
@@ -4959,6 +4962,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _wallJoinSourceId = null;
     _newPointTargetId = null;
     _newPointCandidate = null;
+    _newPointSource = null;
+    _newPointValid = false;
+    _newPointDragOffset = Offset.zero;
     _newPointHoleIndex = null;
     _newPointLeaderLine = null;
     _polygonEditId = null;
@@ -4994,6 +5000,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _confirmGeometryCommand() {
+    if (_newPointTargetId != null) {
+      if (!_newPointValid) return;
+      _commitNewPoint();
+    }
     if (_commandLiveCandidate case final candidate?) {
       _commands.commit(candidate);
     }
@@ -5181,6 +5191,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _newPointCandidate;
 
   (Offset, Offset)? _newPointLeaderLine;
+  ArchitectStorey? _newPointSource;
+  bool _newPointValid = false;
+  Offset _newPointDragOffset = Offset.zero;
+  Offset _newPointGripDirection = const Offset(0, -1);
+
+  Offset get _newPointGripOffset =>
+      _newPointGripDirection * (_handleOffsetLength > 0 ? _handleOffsetLength : 48);
+
+  Offset? get _newPointGrip => _newPointCandidate == null ? null :
+      _viewport.toScreen(_newPointCandidate!) + _newPointGripOffset;
 
 
 
@@ -5820,6 +5840,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   String? _wallEndpointClearanceId;
+  String? _activeWallClearanceKey;
 
   void _setSelectionMove(ArchitectSelectionMoveAction action) {
     if (action == ArchitectSelectionMoveAction.offset) {
@@ -5947,89 +5968,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   ArchitectWallOvershoot? get _activeOvershoot {
-
-    if (_is3DView) return null;
-
-    final walls = _project.activeStorey.walls;
-
-    if (_selectedWallIds.length == 1) {
-
-      final wall = walls
-
-          .where((w) => w.id == _selectedWallIds.first)
-
-          .firstOrNull;
-
-      if (wall != null) {
-
-        final list = ArchitectWallOvershootDetector.detectForWall(
-
-          wall,
-
-          walls,
-
-          ignoredIds: _dismissedOvershoots,
-
-        );
-
-        if (list.isNotEmpty) return list.first;
-
-      }
-
-    }
-
+    if (_is3DView || _commandPreview != null) return null;
     final all = ArchitectWallOvershootDetector.detectInStorey(
-
-      _project.activeStorey,
-
-      ignoredIds: _dismissedOvershoots,
-
+      _project.activeStorey, ignoredIds: _dismissedOvershoots,
     );
-
+    if (_selectedWallIds.length == 1) {
+      final selected = all.where((os) => os.wall.id == _selectedWallIds.first).firstOrNull;
+      if (selected != null) return selected;
+    }
     return all.firstOrNull;
-
   }
-
-
 
   void _handleTrimOvershoot(ArchitectWallOvershoot overshoot) {
-    _beginGeometryCommand(ArchitectRadialAction.cut);
-
     final commands = ArchitectWallOvershootDetector.createTrimCommands(
-
-      storeyId: _project.activeStoreyId,
-
-      overshoot: overshoot,
-
+      storeyId: _project.activeStoreyId, overshoot: overshoot,
     );
-
+    if (commands.isEmpty) return;
+    _beginGeometryCommand(ArchitectRadialAction.cut);
     _commands.executeBatch(commands);
-
-    _saveBiMProjectIfAttached();
-
-    HapticFeedback.mediumImpact();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-
-      SnackBar(
-
-        content: Text(
-
-          context.l10n.architectWallOvershootTrimmed(overshoot.overshootCm),
-
-        ),
-
-        duration: const Duration(seconds: 2),
-
-      ),
-
-    );
-
+    if (!_commandReady) {
+      _cancelGeometryCommand();
+      return;
+    }
+    HapticFeedback.selectionClick();
     setState(() {});
-
   }
-
-
 
   void _handleDismissOvershoot(ArchitectWallOvershoot overshoot) {
 
@@ -6921,13 +6884,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (_newPointTargetId != null) {
-
       _touchPosition = null;
       _placingWithHold = false;
-      _updateNewPointCandidate(rawModel, isTouch: _touchInput);
-
+      final grip = _newPointGrip;
+      _newPointDragOffset = grip != null && (grip - event.localPosition).distance <= 24
+          ? _viewport.toScreen(_newPointCandidate!) - event.localPosition
+          : Offset.zero;
+      _updateNewPointCandidate(
+        _screenToModel(event.localPosition + _newPointDragOffset), isTouch: _touchInput);
       return;
-
     }
 
     if (_showSelectionControl && _marqueeTool.isDrafting) {
@@ -10015,11 +9980,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     if (_newPointTargetId != null) {
-
-      _updateNewPointCandidate(rawModel, isTouch: _touchInput);
-
+      _updateNewPointCandidate(
+        rawModel + _newPointDragOffset / _currentScale, isTouch: _touchInput);
       return;
-
     }
 
 
@@ -10337,7 +10300,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_draftOverlayContains(event.localPosition)) return;
 
     _touchInput = false;
-
+    _newPointDragOffset = Offset.zero;
     _updatePointerPreview(event.localPosition);
 
   }
@@ -10379,11 +10342,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (_newPointTargetId != null) {
-
-      _commitNewPoint();
-
+      _updateNewPointCandidate(
+        _screenToModel(event.localPosition + _newPointDragOffset), isTouch: _touchInput);
+      _newPointDragOffset = Offset.zero;
       return;
-
     }
 
     if (_isDraggingVertexOrHandle && !_handleMoved) {
@@ -11197,13 +11159,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    if (_newPointTargetId != null) {
-
-      _commitNewPoint();
-
-      return;
-
-    }
+    if (_newPointTargetId != null) return;
 
 
 
@@ -15412,378 +15368,138 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   Widget _buildWallClearanceOverlay() => Positioned.fill(
-
     child: AnimatedBuilder(
-
       animation: Listenable.merge([_viewport, _previewRevision, UiSettingsService.contextMenu]),
-
       builder: (context, child) {
-
         final clearances = _wallClearances;
-
-        final openingClearances = _draggingElementId == null
-
-            ? _selectedOpeningClearances
-
-            : const <ArchitectOpeningClearance>[];
-
-        if (clearances.isEmpty && openingClearances.isEmpty) {
-
+        final openings = _draggingElementId == null
+            ? _selectedOpeningClearances : const <ArchitectOpeningClearance>[];
+        if ((clearances.isEmpty && openings.isEmpty) ||
+            _viewport.size.width < 104 || _viewport.size.height < 180) {
           return const SizedBox.shrink();
-
         }
-
         final walls = (_elementMovePreview ?? _project).activeStorey.walls;
-
-        final body = ArchitectWallNetwork.body(walls);
-
-        if (_viewport.size.width < 104 || _viewport.size.height < 180) {
-
-          return const SizedBox.shrink();
-
-        }
-
-        final available = Rect.fromLTRB(
-
-          8,
-
-          64,
-
-          _viewport.size.width - 8,
-
-          _viewport.size.height - 80,
-
-        );
-
+        final obstacles = ArchitectClearanceObstacles.forWalls(walls);
+        bool intersectsWall(Rect rect) => obstacles.intersects(Rect.fromPoints(
+          _viewport.toModel(rect.topLeft), _viewport.toModel(rect.bottomRight)));
+        final available = Rect.fromLTRB(8, 64,
+          _viewport.size.width - 8, _viewport.size.height - 80);
+        final bounds = (Offset.zero & _viewport.size).deflate(8);
         final excluded = <Rect>[
-
           if (_radialMenuScreenPosition != null && _radialMenuItems.isNotEmpty)
-
             ...ArchitectRadialLayout.compute(
-
-              size: _viewport.size,
-
-              center: _radialMenuScreenPosition!,
-
+              size: _viewport.size, center: _radialMenuScreenPosition!,
               mode: UiSettingsService.contextMenu.value.mode,
-
               hasTitle: _effectiveSelection.length > 1,
-
               elementBounds: _radialElementBounds,
-
             ).occupied,
-
         ];
-
-        final placements = <String, Rect>{};
-
+        final selected = walls.where((w) => _effectiveSelection.contains(w.id)).firstOrNull;
+        if (selected != null) {
+          for (final handle in [
+            _viewport.toScreen(selected.startPoint) - selected.tangentAt(0) * _handleOffsetLength,
+            _viewport.toScreen(selected.endPoint) + selected.tangentAt(1) * _handleOffsetLength,
+          ]) {
+            excluded.add(Rect.fromCircle(center: handle, radius: 12));
+          }
+        }
+        final dimensions = <String, ArchitectDynamicDimensionLayout>{};
         for (final gap in clearances) {
-
-          final start = _viewport.toScreen(gap.start),
-
-              end = _viewport.toScreen(gap.end);
-
-          final segment = BimLineGeometry.visibleSegment(start, end, available);
-
-          final preferred = segment == null
-
-              ? (start + end) / 2
-
-              : (segment.$1 + segment.$2) / 2;
-
-          final rect = ArchitectClearanceBadgeLayout.place(
-
-            preferred: preferred,
-
-            available: available,
-
-            excluded: excluded,
-
-            intersectsWall: (rect) {
-
-              final modelRect = Rect.fromPoints(
-
-                _viewport.toModel(rect.topLeft),
-
-                _viewport.toModel(rect.bottomRight),
-
-              );
-
-              return Path.combine(
-
-                PathOperation.intersect,
-
-                body,
-
-                Path()..addRect(modelRect),
-
-              ).computeMetrics().isNotEmpty;
-
-            },
-
+          final dim = ArchitectDynamicDimensionLayout.place(
+            start: _viewport.toScreen(gap.start), end: _viewport.toScreen(gap.end),
+            available: available, viewport: bounds, excluded: excluded,
+            intersectsWall: intersectsWall,
+            endpoint: gap.atStart == null ? null : gap.atStart! ? 1 : 2,
+            active: _activeWallClearanceKey == gap.key,
           );
-
-          placements[gap.key] = rect;
-
-          excluded.add(rect);
-
+          dimensions[gap.key] = dim;
+          excluded.add(dim.label);
         }
-
-        for (final gap in openingClearances) {
-
-          final start = _viewport.toScreen(gap.start),
-
-              end = _viewport.toScreen(gap.end);
-
+        final openingRects = <String, Rect>{};
+        for (final gap in openings) {
+          final start = _viewport.toScreen(gap.start), end = _viewport.toScreen(gap.end);
           final segment = BimLineGeometry.visibleSegment(start, end, available);
-
-          final preferred = segment == null
-
-              ? (start + end) / 2
-
-              : (segment.$1 + segment.$2) / 2;
-
           final rect = ArchitectClearanceBadgeLayout.place(
-
-            preferred: preferred,
-
-            size: ArchitectClearanceBadgeLayout.openingSize(
-
-              _currentScale, available,
-
-            ),
-
-            available: available,
-
-            excluded: excluded,
-
-            intersectsWall: (rect) {
-
-              final modelRect = Rect.fromPoints(
-
-                _viewport.toModel(rect.topLeft),
-
-                _viewport.toModel(rect.bottomRight),
-
-              );
-
-              return Path.combine(
-
-                PathOperation.intersect,
-
-                body,
-
-                Path()..addRect(modelRect),
-
-              ).computeMetrics().isNotEmpty;
-
-            },
-
+            preferred: segment == null ? (start + end) / 2 : (segment.$1 + segment.$2) / 2,
+            size: ArchitectClearanceBadgeLayout.openingSize(_currentScale, available),
+            available: available, excluded: excluded, intersectsWall: intersectsWall,
           );
-
-          placements[gap.key] = rect;
-
+          openingRects[gap.key] = rect;
           excluded.add(rect);
-
         }
-
-        return Stack(
-
-          children: [
-
-            for (final gap in clearances)
-
-              Builder(
-
-                builder: (context) {
-
-                  final rect = placements[gap.key]!;
-
-                  return Positioned.fromRect(
-
-                    rect: rect,
-
-                    child: IgnorePointer(
-
-                      ignoring: _radialMenuScreenPosition != null || _multiSelect || _marqueeTool.isDrafting,
-
-                      child: Tooltip(
-
-                        message: gap.atStart == null
-
-                            ? context.l10n.architectWallClearance
-
-                            : context.l10n.architectWallEndpointClearance,
-
-                        child: Material(
-
-                          color: const Color(0xEE1E242C),
-
-                          elevation: 3,
-
-                          shadowColor: Colors.black54,
-
-                          shape: RoundedRectangleBorder(
-
-                            borderRadius: BorderRadius.circular(6),
-
-                            side: const BorderSide(color: Colors.white24),
-
-                          ),
-
-                          child: InkWell(
-
-                            key: ValueKey('wall-clearance-${gap.key}'),
-
-                            onTap: () {
-
-                              setState(() => _radialMenuScreenPosition = null);
-
-                              _editWallClearance(gap);
-
-                            },
-
-                            child: Center(
-
-                              child: Text(
-
-                                gap.atStart == null
-
-                                    ? _project.formatLength(gap.distance)
-
-                                    : context.l10n.architectWallEndpointValue(
-
-                                        gap.atStart! ? 1 : 2,
-
-                                        _project.formatLength(gap.distance),
-
-                                      ),
-
-                                style: TextStyle(
-
-                                  color: gap.atStart == null
-
-                                      ? Colors.cyanAccent
-
-                                      : const Color(0xFFFFB74D),
-
-                                  fontSize: 12,
-
-                                ),
-
-                              ),
-
-                            ),
-
-                          ),
-
-                        ),
-
-                      ),
-
-                    ),
-
-                  );
-
-                },
-
-              ),
-
-            for (final gap in openingClearances)
-
-              Positioned.fromRect(
-
-                rect: placements[gap.key]!,
-
-                child: IgnorePointer(
-
-                  ignoring: _radialMenuScreenPosition != null || _multiSelect || _marqueeTool.isDrafting,
-
-                  child: Tooltip(
-
-                    message: context.l10n.architectOpeningClearance,
-
-                    child: FittedBox(
-
-                      key: ValueKey('opening-clearance-${gap.key}'),
-
-                      child: SizedBox(
-
-                        width: ArchitectClearanceBadgeLayout.openingBaseSize.width,
-
-                        height: ArchitectClearanceBadgeLayout.openingBaseSize.height,
-
-                        child: Material(
-
-                          color: Colors.white,
-
-                          shape: RoundedRectangleBorder(
-
-                            borderRadius: BorderRadius.circular(3),
-
-                            side: const BorderSide(color: Color(0xFF78818A), width: .7),
-
-                          ),
-
-                          child: InkWell(
-
-                            onTap: () {
-
-                              setState(() => _radialMenuScreenPosition = null);
-
-                              _editOpeningClearance(gap);
-
-                            },
-
-                            child: Center(
-
-                              child: Text(
-
-                                _project.formatLength(gap.distance),
-
-                                style: TextStyle(
-
-                                  color: const Color(0xFF20252A),
-
-                                  fontSize: 11,
-
-                                  fontWeight: gap.isModularSnap
-
-                                      ? FontWeight.w600
-
-                                      : FontWeight.normal,
-
-                                ),
-
-                              ),
-
-                            ),
-
-                          ),
-
-                        ),
-
-                      ),
-
-                    ),
-
+        final ignore = _radialMenuScreenPosition != null || _multiSelect || _marqueeTool.isDrafting;
+        return Stack(children: [
+          Positioned.fill(child: IgnorePointer(child: CustomPaint(
+            key: const ValueKey('architect-dynamic-dimensions'),
+            painter: ArchitectDynamicDimensionPainter(dimensions.values.toList()),
+          ))),
+          for (final gap in clearances)
+            Positioned.fromRect(
+              rect: dimensions[gap.key]!.label,
+              child: IgnorePointer(ignoring: ignore, child: Tooltip(
+                message: gap.atStart == null ? context.l10n.architectWallClearance
+                    : context.l10n.architectWallEndpointClearance,
+                child: Material(
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                    side: BorderSide(color: _activeWallClearanceKey == gap.key
+                        ? const Color(0xff006e91) : const Color(0xff78818a), width: .7),
                   ),
-
+                  child: InkWell(
+                    key: ValueKey('wall-clearance-${gap.key}'),
+                    onTapDown: (_) => setState(() => _activeWallClearanceKey = gap.key),
+                    onTapCancel: () => setState(() => _activeWallClearanceKey = null),
+                    onTap: () {
+                      setState(() => _radialMenuScreenPosition = null);
+                      _editWallClearance(gap);
+                    },
+                    child: Center(child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: FittedBox(fit: BoxFit.scaleDown, child: Text(
+                        gap.atStart == null ? _project.formatLength(gap.distance)
+                            : context.l10n.architectWallEndpointValue(
+                                gap.atStart! ? 1 : 2, _project.formatLength(gap.distance)),
+                        style: const TextStyle(color: Color(0xff20252a), fontSize: 12,
+                          fontWeight: FontWeight.w500),
+                      )),
+                    )),
+                  ),
                 ),
-
-              ),
-
-          ],
-
-        );
-
+              )),
+            ),
+          for (final gap in openings)
+            Positioned.fromRect(
+              rect: openingRects[gap.key]!,
+              child: IgnorePointer(ignoring: ignore, child: Tooltip(
+                message: context.l10n.architectOpeningClearance,
+                child: FittedBox(
+                  key: ValueKey('opening-clearance-${gap.key}'),
+                  child: SizedBox(
+                    width: ArchitectClearanceBadgeLayout.openingBaseSize.width,
+                    height: ArchitectClearanceBadgeLayout.openingBaseSize.height,
+                    child: Material(
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3),
+                        side: const BorderSide(color: Color(0xff78818a), width: .7)),
+                      child: InkWell(
+                        onTap: () {
+                          setState(() => _radialMenuScreenPosition = null);
+                          _editOpeningClearance(gap);
+                        },
+                        child: Center(child: Text(_project.formatLength(gap.distance),
+                          style: TextStyle(color: const Color(0xff20252a), fontSize: 11,
+                            fontWeight: gap.isModularSnap ? FontWeight.w600 : FontWeight.normal))),
+                      ),
+                    ),
+                  ),
+                ),
+              )),
+            ),
+        ]);
       },
-
     ),
-
   );
-
-
 
   String? get _activePolygonDistanceElementId =>
 
@@ -16757,7 +16473,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ),
 
-    );
+    ).whenComplete(() {
+      if (mounted) setState(() => _activeWallClearanceKey = null);
+    });
 
   }
 
@@ -18815,40 +18533,45 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _startNewPointSession(String id, {Offset? initialPick}) {
     _beginGeometryCommand(ArchitectRadialAction.newPoint);
     _marqueeTool.cancel();
-
     if (initialPick != null) _selectPolygonContour(initialPick);
     final holeIndex = _selectedPolygonHoleIndex;
-    final path = InsertArchitectElementPoint.pathOf(_project.activeStorey, id,
-        holeIndex: holeIndex);
-
-    if (path == null || path.points.length < 2) return;
-
+    final source = _project.activeStorey;
+    final path = InsertArchitectElementPoint.pathOf(source, id, holeIndex: holeIndex);
+    if (path == null || path.points.length < 2) {
+      _cancelGeometryCommand();
+      return;
+    }
     _cancelActiveDrags();
-
     setState(() {
-
       _newPointTargetId = id;
       _newPointHoleIndex = holeIndex;
-
+      _newPointSource = source;
       _newPointCandidate = null;
-
+      _newPointValid = false;
+      _newPointDragOffset = Offset.zero;
       _newPointLeaderLine = null;
-
       _radialMenuScreenPosition = null;
-
       _activeSnapLabel = null;
-
     });
-
-    if (initialPick != null) {
-
-      _updateNewPointCandidate(initialPick, isTouch: false);
-
+    final seed = initialPick ?? InsertArchitectElementPoint.locate(
+      source, id, (path.points[0] + path.points[1]) / 2,
+      atMidpoint: true, holeIndex: holeIndex,
+    )!.point;
+    final hit = InsertArchitectElementPoint.locate(source, id, seed, holeIndex: holeIndex)!;
+    final wall = source.walls.where((w) => w.id == id).firstOrNull;
+    final edge = path.points[(hit.edge + 1) % path.points.length] - path.points[hit.edge];
+    final tangent = wall?.tangentAt(hit.ratio) ?? edge / edge.distance;
+    var normal = Offset(-tangent.dy, tangent.dx);
+    if (normal.dy > 0 || (normal.dy.abs() < 1e-8 && normal.dx < 0)) normal = -normal;
+    final screen = _viewport.toScreen(hit.point);
+    final length = _handleOffsetLength > 0 ? _handleOffsetLength : 48.0;
+    final safe = (Offset.zero & _viewport.size).deflate(24);
+    if (!safe.contains(screen + normal * length) && safe.contains(screen - normal * length)) {
+      normal = -normal;
     }
-
+    _newPointGripDirection = normal;
+    _updateNewPointCandidate(seed, isTouch: false);
   }
-
-
 
   void _cancelNewPointSession() {
 
@@ -18877,9 +18600,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_newPointTargetId == null) return;
 
+    final source = _newPointSource ?? _project.activeStorey;
+    final curvedTarget = source.walls.where((w) => w.id == _newPointTargetId && w.isCurved).firstOrNull;
+    if (curvedTarget != null) {
+      var hit = InsertArchitectElementPoint.locate(source, curvedTarget.id, rawModel)!;
+      String? label;
+      final mid = curvedTarget.referencePointAt(.5);
+      if ((hit.point - mid).distance * _currentScale <= 16) {
+        hit = (point: mid, edge: 0, ratio: .5);
+        label = 'Midpoint';
+      }
+      _setNewPointCandidate(hit.point, label, const []);
+      return;
+    }
     final path = InsertArchitectElementPoint.pathOf(
 
-      _project.activeStorey,
+      source,
 
       _newPointTargetId!,
       holeIndex: _newPointHoleIndex,
@@ -18922,7 +18658,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     var bestDist = snapTol;
 
-    final storeyWalls = _project.activeStorey.walls;
+    final storeyWalls = source.walls;
 
 
 
@@ -19454,31 +19190,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    (Offset, Offset)? leaderLine;
-
-    if (_handleOffsetLength > 0 && (rawModel - candidate).distance > 1e-3) {
-
-      leaderLine = (candidate, rawModel);
-
-    }
-
-
-
-    _newPointCandidate = candidate;
-
-    _newPointLeaderLine = leaderLine;
-
-    _activeSnapLabel = snapLabel;
-
-    _activeMagneticGuides = guides;
-
-    _cursorModel = candidate;
-
-    _repaintPreview();
-
+    _setNewPointCandidate(candidate, snapLabel, guides);
   }
 
-
+  void _setNewPointCandidate(Offset candidate, String? snapLabel,
+      List<(Offset, Offset)> guides) {
+    final wasValid = _newPointValid;
+    _newPointCandidate = candidate;
+    _newPointValid = InsertArchitectElementPoint.canInsert(
+      _newPointSource ?? _project.activeStorey, _newPointTargetId!, candidate,
+      holeIndex: _newPointHoleIndex,
+    );
+    _newPointLeaderLine = (candidate, candidate + _newPointGripOffset / _currentScale);
+    _activeSnapLabel = snapLabel;
+    _activeMagneticGuides = guides;
+    _cursorModel = candidate;
+    if (wasValid != _newPointValid) setState(() {});
+    _repaintPreview();
+  }
 
   void _commitNewPoint() {
 
@@ -19598,7 +19327,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Widget _buildNewPointPromptBanner() {
 
-    return Material(
+    return Tooltip(
+      message: context.l10n.bimNewPointHint,
+      child: Material(
 
       key: const ValueKey('architect-new-point-banner'),
 
@@ -19646,7 +19377,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
               Text(
 
-                context.l10n.architectNewPointPrompt,
+                _newPointValid ? context.l10n.architectNewPointPrompt
+                    : context.l10n.architectNewPointInvalid,
 
                 style: const TextStyle(color: Colors.white, fontSize: 12),
 
@@ -19672,7 +19404,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ),
 
-    );
+    ));
 
   }
 
@@ -27692,7 +27424,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             Positioned.fill(child: _buildDraftCancel()),
 
-            if (!_showSelectionControl && _touchCandidates == null) Positioned(
+            if (!_showSelectionControl && _touchCandidates == null && _newPointTargetId == null) Positioned(
 
               left: 12,
 
@@ -29760,6 +29492,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     wallJoinLeaderLine: _wallJoinLeaderLine,
 
     newPointCandidate: _newPointCandidate,
+    newPointHandleOffset: _newPointTargetId == null ? null : _newPointGripOffset,
+    newPointValid: _newPointValid,
 
     newPointLeaderLine: _newPointLeaderLine,
 

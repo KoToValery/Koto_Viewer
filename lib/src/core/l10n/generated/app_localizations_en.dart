@@ -4942,12 +4942,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bimNewPoint => 'New point';
 
   @override
-  String get bimNewPointHint =>
-      'Specify position along the edge for the new point';
+  String get bimNewPointHint => 'Drag the handle, then confirm.';
 
   @override
-  String get architectNewPointPrompt =>
-      'Specify position along the edge for the new point';
+  String get architectNewPointPrompt => 'Position';
+
+  @override
+  String get architectNewPointInvalid => 'Avoid ends and openings';
 
   @override
   String get bimWallNewPointHelp =>

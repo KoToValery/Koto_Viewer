@@ -4965,11 +4965,13 @@ class AppLocalizationsBg extends AppLocalizations {
   String get bimNewPoint => 'Нова точка';
 
   @override
-  String get bimNewPointHint => 'Посочете позиция по ръба за новата точка';
+  String get bimNewPointHint => 'Плъзнете дръжката, после потвърдете.';
 
   @override
-  String get architectNewPointPrompt =>
-      'Посочете позиция по ръба за новата точка';
+  String get architectNewPointPrompt => 'Позиция';
+
+  @override
+  String get architectNewPointInvalid => 'Извън краища и отвори';
 
   @override
   String get bimWallNewPointHelp =>

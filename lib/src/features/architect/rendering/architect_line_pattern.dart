@@ -3,8 +3,78 @@ import 'dart:typed_data';
 import 'dart:ui';
 import '../models/architect_line_style.dart';
 import '../models/architect_line_symbol.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 
 class ArchitectLinePattern {
+  /// Clip work, not dash phase. An offscreen kilometre must cost no more than
+  /// the few visible strokes; subdivision also handles closed contours.
+  static List<(double, double)> _ranges(PathMetric metric, Rect? visible) {
+    if (visible == null) return [(0, metric.length)];
+    final result = <(double, double)>[];
+    final extent = math.max(visible.width, visible.height);
+    void visit(double from, double to, int depth) {
+      final bounds = metric.extractPath(from, to).getBounds().inflate(1e-9);
+      if (!bounds.overlaps(visible)) return;
+      if (depth >= 32 ||
+          to - from <= extent ||
+          (visible.contains(bounds.topLeft) &&
+              visible.contains(bounds.bottomRight))) {
+        if (result.isNotEmpty && (result.last.$2 - from).abs() < 1e-8) {
+          result[result.length - 1] = (result.last.$1, to);
+        } else {
+          result.add((from, to));
+        }
+        return;
+      }
+      final mid = (from + to) / 2;
+      visit(from, mid, depth + 1);
+      visit(mid, to, depth + 1);
+    }
+
+    visit(0, metric.length, 0);
+    return result;
+  }
+
+  static void drawLine(
+    Canvas canvas,
+    Offset start,
+    Offset end,
+    Paint paint,
+    List<double> lengths, {
+    bool clip = true,
+  }) {
+    final delta = end - start;
+    if (delta.distance < 1e-9) return;
+    final visible = !clip
+        ? (start, end)
+        : BimLineGeometry.visibleSegment(
+            start,
+            end,
+            canvas.getLocalClipBounds().inflate(paint.strokeWidth),
+          );
+    if (visible == null) return;
+    final unit = delta / delta.distance;
+    final from = (visible.$1 - start).distance;
+    final to = (visible.$2 - start).distance;
+    final period = lengths.reduce((a, b) => a + b);
+    var phase = from % period;
+    var index = 0;
+    while (phase >= lengths[index]) {
+      phase -= lengths[index];
+      index = (index + 1) % lengths.length;
+    }
+    var at = from;
+    while (at < to) {
+      final next = math.min(to, at + lengths[index] - phase);
+      if (index.isEven) {
+        canvas.drawLine(start + unit * at, start + unit * next, paint);
+      }
+      at = next;
+      phase = 0;
+      index = (index + 1) % lengths.length;
+    }
+  }
+
   /// All components are vector strokes. Dash phase follows the original contour
   /// even where a symbol interrupts it; rectangles retain phase around corners.
   static Path path(
@@ -12,6 +82,7 @@ class ArchitectLinePattern {
     ArchitectLineStyle style,
     double unitsPerMm, {
     double phase = 0,
+    Rect? visibleBounds,
   }) {
     style.validate();
     if (!unitsPerMm.isFinite || unitsPerMm <= 0 || !phase.isFinite) {
@@ -23,6 +94,8 @@ class ArchitectLinePattern {
     final symbol = style.symbol;
     final glyph = symbol == null ? null : symbolPath(symbol);
     for (final contour in source.computeMetrics()) {
+      final ranges = _ranges(contour, visibleBounds);
+      if (ranges.isEmpty) continue;
       final cuts = <(double, double)>[];
       if (symbol != null && glyph != null && contour.length > 1e-9) {
         final spacing = symbol.spacingMm * unitsPerMm;
@@ -30,12 +103,14 @@ class ArchitectLinePattern {
         if (contour.length < spacing && phase == 0) {
           stations.add(contour.length / 2);
         } else {
-          for (
-            var at = (spacing / 2 - phase) % spacing;
-            at < contour.length;
-            at += spacing
-          ) {
-            stations.add(at);
+          for (final (from, to) in ranges) {
+            for (
+              var at = from + (spacing / 2 - phase - from) % spacing;
+              at < to;
+              at += spacing
+            ) {
+              stations.add(at);
+            }
           }
         }
         for (final at in stations) {
@@ -113,23 +188,24 @@ class ArchitectLinePattern {
       }
 
       if (lengths.isEmpty) {
-        baseline(0, contour.length);
-      } else {
-        var offset = 0.0, index = 0;
-        var remaining = phase % lengths.reduce((a, b) => a + b);
-        while (remaining >= lengths[index]) {
-          remaining -= lengths[index];
-          index = (index + 1) % lengths.length;
+        for (final range in ranges) {
+          baseline(range.$1, range.$2);
         }
-        while (offset < contour.length) {
-          final end = math.min(
-            contour.length,
-            offset + lengths[index] - remaining,
-          );
-          if (index.isEven) baseline(offset, end);
-          offset = end;
-          remaining = 0;
-          index = (index + 1) % lengths.length;
+      } else {
+        for (final range in ranges) {
+          var offset = range.$1, index = 0;
+          var remaining = (phase + offset) % lengths.reduce((a, b) => a + b);
+          while (remaining >= lengths[index]) {
+            remaining -= lengths[index];
+            index = (index + 1) % lengths.length;
+          }
+          while (offset < range.$2) {
+            final end = math.min(range.$2, offset + lengths[index] - remaining);
+            if (index.isEven) baseline(offset, end);
+            offset = end;
+            remaining = 0;
+            index = (index + 1) % lengths.length;
+          }
         }
       }
     }

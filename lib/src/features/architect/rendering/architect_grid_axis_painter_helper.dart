@@ -1,5 +1,7 @@
 import 'architect_vector_scene.dart';
 import 'architect_canvas_palette.dart';
+import 'architect_line_presentation.dart';
+import 'architect_line_pattern.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. IMPORTS & DEFINITIONS
 // 2. MAIN AXIS RENDERING (drawAxes)
@@ -40,9 +42,12 @@ class ArchitectGridAxisPainterHelper {
       ..color = palette
           .foreground(const Color(0xFFC62828))
           .withValues(alpha: 0.80)
-      ..strokeWidth = ArchitectTextScope.current == null
-          ? 1.2 / zoomScale
-          : ArchitectDrawingScale(ArchitectTextScope.current!.denominator).paperToModel(.15)
+      ..strokeWidth = ArchitectLinePresentation.stroke(
+        zoomScale,
+        .15,
+        canvas: canvas,
+        denominator: project.dimensionScale.denominator,
+      )
       ..style = PaintingStyle.stroke;
 
     // Selected axis paint
@@ -328,11 +333,7 @@ class ArchitectGridAxisPainterHelper {
     canvas.translate(center.dx, center.dy);
     final scope = ArchitectTextScope.current;
     final localScale = scope != null
-        ? scope.height(
-                elementId ?? label,
-                ArchitectAnnotationRole.symbol,
-              ) /
-              11
+        ? scope.height(elementId ?? label, ArchitectAnnotationRole.symbol) / 11
         : 1 / zoomScale;
     canvas.scale(localScale);
     center = Offset.zero;
@@ -391,25 +392,18 @@ class ArchitectGridAxisPainterHelper {
     Paint paint,
     double zoomScale,
   ) {
-    final d = p2 - p1;
-    final total = d.distance;
-    if (total < 1e-4) return;
-    final u = d / total;
-
-    final dash = 12.0 / zoomScale;
-    final gap = 4.0 / zoomScale;
-    final dot = 2.0 / zoomScale;
-
-    double cur = 0;
-    while (cur < total) {
-      final segEnd = (cur + dash).clamp(0.0, total);
-      canvas.drawLine(p1 + u * cur, p1 + u * segEnd, paint);
-      cur += dash + gap;
-      if (cur >= total) break;
-      final dotEnd = (cur + dot).clamp(0.0, total);
-      canvas.drawLine(p1 + u * cur, p1 + u * dotEnd, paint);
-      cur += dot + gap;
-    }
+    final unit = ArchitectLinePresentation.paper(canvas)
+        ? ArchitectDrawingScale(
+                ArchitectTextScope.current?.denominator ?? 100,
+              ).paperToModel(1) /
+              (96 / 25.4)
+        : 1 / zoomScale;
+    ArchitectLinePattern.drawLine(canvas, p1, p2, paint, [
+      12 * unit,
+      4 * unit,
+      2 * unit,
+      4 * unit,
+    ]);
   }
 
   static void _drawDashedLine(
@@ -419,19 +413,9 @@ class ArchitectGridAxisPainterHelper {
     Paint paint,
     double zoomScale,
   ) {
-    final d = p2 - p1;
-    final total = d.distance;
-    if (total < 1e-4) return;
-    final u = d / total;
-
-    final dash = 8.0 / zoomScale;
-    final gap = 5.0 / zoomScale;
-
-    double cur = 0;
-    while (cur < total) {
-      final segEnd = (cur + dash).clamp(0.0, total);
-      canvas.drawLine(p1 + u * cur, p1 + u * segEnd, paint);
-      cur += dash + gap;
-    }
+    ArchitectLinePattern.drawLine(canvas, p1, p2, paint, [
+      8 / zoomScale,
+      5 / zoomScale,
+    ]);
   }
 }

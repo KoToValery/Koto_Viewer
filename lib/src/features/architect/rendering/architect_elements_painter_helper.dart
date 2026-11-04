@@ -1,3 +1,4 @@
+import 'architect_line_presentation.dart';
 import '../models/architect_contour.dart';
 import '../models/architect_line_style.dart';
 import 'architect_hatch_geometry.dart';
@@ -644,6 +645,8 @@ class ArchitectElementsPainterHelper {
     final unitsPerMm = ArchitectDrawingScale(
       ArchitectTextScope.current?.denominator ?? dimensionScale.denominator,
     ).paperToModel(1);
+    final patternUnits = ArchitectLinePresentation.patternUnits(zoomScale, unitsPerMm, canvas: canvas);
+    final visible = ArchitectLinePresentation.paper(canvas) ? null : canvas.getLocalClipBounds().inflate(4 / zoomScale);
     for (final prim in storey.cadPrimitives) {
       if (hatchesOnly != null && (prim.type == CadPrimitiveType.hatch) != hatchesOnly) continue;
       architectDrawingSources(canvas, {prim.id}, 'cadPrimitives');
@@ -681,7 +684,9 @@ class ArchitectElementsPainterHelper {
                 origin: prim.polygonCorners.first,
               ),
               Paint()..color = color..style = PaintingStyle.stroke
-                ..strokeWidth = .13 * unitsPerMm,
+                ..strokeWidth = ArchitectLinePresentation.stroke(
+                  zoomScale, .13, pixels: .8, canvas: canvas,
+                  denominator: dimensionScale.denominator),
             );
           }
           canvas.restore();
@@ -692,10 +697,10 @@ class ArchitectElementsPainterHelper {
               ? palette.foreground(ArchitectPaperStyle.rule) : color;
           canvas.drawPath(
             prim.hatchBorder
-                ? ArchitectLinePattern.path(boundary, prim.lineStyle, unitsPerMm)
+                ? ArchitectLinePattern.path(boundary, prim.lineStyle, patternUnits, visibleBounds: visible)
                 : boundary,
             Paint()..color = borderColor..style = PaintingStyle.stroke
-              ..strokeWidth = isSelected ? paint.strokeWidth : .18 * unitsPerMm,
+              ..strokeWidth = isSelected ? paint.strokeWidth : ArchitectLinePresentation.stroke(zoomScale, .18, pixels: 1, canvas: canvas, denominator: dimensionScale.denominator),
           );
         }
       } else if (prim.type == CadPrimitiveType.line ||
@@ -704,7 +709,8 @@ class ArchitectElementsPainterHelper {
           ArchitectLinePattern.path(
             Path()..addPolygon(prim.linePoints, false),
             prim.lineStyle,
-            unitsPerMm,
+            patternUnits,
+            visibleBounds: visible,
           ),
           paint,
         );
@@ -713,7 +719,8 @@ class ArchitectElementsPainterHelper {
           ArchitectLinePattern.path(
             ArchitectContour.path(prim.polygonCorners, prim.holes),
             prim.lineStyle,
-            unitsPerMm,
+            patternUnits,
+            visibleBounds: visible,
           ),
           paint,
         );
@@ -826,7 +833,9 @@ class ArchitectElementsPainterHelper {
           ArchitectLinePattern.path(
             Path()..addRect(rect),
             lineStyle,
-            ArchitectDrawingScale(dimensionScale.denominator).paperToModel(1),
+            ArchitectLinePresentation.patternUnits(zoomScale,
+              ArchitectDrawingScale(dimensionScale.denominator).paperToModel(1), canvas: canvas),
+            visibleBounds: ArchitectLinePresentation.paper(canvas) ? null : canvas.getLocalClipBounds(),
           ),
           previewPaint,
         );
@@ -866,7 +875,9 @@ class ArchitectElementsPainterHelper {
             ..moveTo(p1.dx, p1.dy)
             ..lineTo(p2.dx, p2.dy),
           lineStyle,
-          ArchitectDrawingScale(dimensionScale.denominator).paperToModel(1),
+          ArchitectLinePresentation.patternUnits(zoomScale,
+            ArchitectDrawingScale(dimensionScale.denominator).paperToModel(1), canvas: canvas),
+          visibleBounds: ArchitectLinePresentation.paper(canvas) ? null : canvas.getLocalClipBounds(),
         ),
         previewPaint,
       );

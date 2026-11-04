@@ -61,21 +61,19 @@ class ArchitectWallOvershootDetector {
   /// Maximum overshoot distance to consider an unintentional drafting error (50 cm).
   static const double maxOvershootMeters = 0.50;
 
+  static final _cache = Expando<List<ArchitectWallOvershoot>>();
+
   /// Detects all overshoots for walls in a storey.
   static List<ArchitectWallOvershoot> detectInStorey(
     ArchitectStorey storey, {
     Set<String> ignoredIds = const {},
   }) {
-    final results = <ArchitectWallOvershoot>[];
-    for (final wall in storey.walls) {
-      final overshoots = detectForWall(wall, storey.walls, ignoredIds: ignoredIds);
-      for (final os in overshoots) {
-        if (!results.any((existing) => existing.id == os.id)) {
-          results.add(os);
-        }
-      }
-    }
-    return results;
+    final results = _cache[storey.walls] ??= List.unmodifiable([
+      for (final wall in storey.walls) ...detectForWall(wall, storey.walls),
+    ]);
+    return ignoredIds.isEmpty
+        ? results
+        : results.where((os) => !ignoredIds.contains(os.id)).toList();
   }
 
   /// Detects overshoots specifically for [wall] against [allWalls].
@@ -84,16 +82,22 @@ class ArchitectWallOvershootDetector {
     List<ArchitectWall> allWalls, {
     Set<String> ignoredIds = const {},
   }) {
-    if (wall.length < 0.20) return const [];
+    if (wall.isCurved || wall.isDetached || wall.length < 0.20) return const [];
     final list = <ArchitectWallOvershoot>[];
 
     for (final other in allWalls) {
-      if (other.id == wall.id || other.length < 0.20) continue;
+      if (other.id == wall.id ||
+          other.isCurved ||
+          other.isDetached ||
+          other.length < 0.20) {
+        continue;
+      }
 
       // Lines must not be nearly parallel.
-      final cross = (wall.unitVector.dx * other.unitVector.dy -
-              wall.unitVector.dy * other.unitVector.dx)
-          .abs();
+      final cross =
+          (wall.unitVector.dx * other.unitVector.dy -
+                  wall.unitVector.dy * other.unitVector.dx)
+              .abs();
       if (cross < 0.20) continue; // angle < ~11.5 deg
 
       final pInt = ArchitectWallNetwork.intersection(
@@ -108,12 +112,14 @@ class ArchitectWallOvershootDetector {
       final dOther = pInt - other.startPoint;
       final tOther =
           dOther.dx * other.unitVector.dx + dOther.dy * other.unitVector.dy;
-      if (tOther < -other.thickness || tOther > other.length + other.thickness) {
+      if (tOther < -other.thickness ||
+          tOther > other.length + other.thickness) {
         continue;
       }
 
       // Along wall, calculate physical face boundaries of other
-      final denom = wall.unitVector.dx * other.normalVector.dx +
+      final denom =
+          wall.unitVector.dx * other.normalVector.dx +
           wall.unitVector.dy * other.normalVector.dy;
       if (denom.abs() < 1e-4) continue;
 
@@ -132,7 +138,8 @@ class ArchitectWallOvershootDetector {
       final otherMeetsAtAxis = distToOtherEnd < 0.02;
 
       // Along other, calculate physical face boundaries of wall
-      final denomOther = other.unitVector.dx * wall.normalVector.dx +
+      final denomOther =
+          other.unitVector.dx * wall.normalVector.dx +
           other.unitVector.dy * wall.normalVector.dy;
       double tMinWall = 0, tMaxWall = 0;
       if (denomOther.abs() >= 1e-4) {
@@ -152,11 +159,12 @@ class ArchitectWallOvershootDetector {
       // Check if other wall also overshoots at this intersection
       bool otherOvershoots = false;
       bool? otherStart;
-      if (tOther < other.length) {
+      if (other.connectEnd && tOther < other.length) {
         final dOtherEnd = other.length - tOther;
         final protrudesOtherEnd = dOtherEnd > tMaxWall + minOvershootMeters;
-        final isOtherEndOvershoot =
-            wallMeetsAtAxis ? dOtherEnd >= minOvershootMeters : protrudesOtherEnd;
+        final isOtherEndOvershoot = wallMeetsAtAxis
+            ? dOtherEnd >= minOvershootMeters
+            : protrudesOtherEnd;
         if (isOtherEndOvershoot &&
             dOtherEnd <= maxOvershootMeters &&
             tOther >= math.max(0.20, dOtherEnd * 1.5)) {
@@ -164,10 +172,11 @@ class ArchitectWallOvershootDetector {
           otherStart = false;
         }
       }
-      if (!otherOvershoots && tOther > 0) {
+      if (!otherOvershoots && other.connectStart && tOther > 0) {
         final dOtherStart = tOther;
         final remOther = other.length - tOther;
-        final protrudesOtherStart = dOtherStart > -tMinWall + minOvershootMeters;
+        final protrudesOtherStart =
+            dOtherStart > -tMinWall + minOvershootMeters;
         final isOtherStartOvershoot = wallMeetsAtAxis
             ? dOtherStart >= minOvershootMeters
             : protrudesOtherStart;
@@ -185,7 +194,7 @@ class ArchitectWallOvershootDetector {
           dWall.dx * wall.unitVector.dx + dWall.dy * wall.unitVector.dy;
 
       // Check endPoint overshoot (tWall < wall.length)
-      if (tWall < wall.length) {
+      if (wall.connectEnd && tWall < wall.length) {
         final deltaEnd = wall.length - tWall;
         final protrudesPastFace = deltaEnd > tMaxOther + minOvershootMeters;
         final isOvershoot = (otherMeetsAtAxis || otherOvershoots)
@@ -218,7 +227,8 @@ class ArchitectWallOvershootDetector {
               otherAlsoOvershoots: otherOvershoots,
               otherAtStart: otherStart,
             );
-            if (!ignoredIds.contains(overshoot.id)) {
+            if (!ignoredIds.contains(overshoot.id) &&
+                isSafe(overshoot, allWalls)) {
               list.add(overshoot);
             }
           }
@@ -226,7 +236,7 @@ class ArchitectWallOvershootDetector {
       }
 
       // Check startPoint overshoot (tWall > 0)
-      if (tWall > 0) {
+      if (wall.connectStart && tWall > 0) {
         final deltaStart = tWall;
         final faceDist = -tMinOther;
         final protrudesPastFace = deltaStart > faceDist + minOvershootMeters;
@@ -261,7 +271,8 @@ class ArchitectWallOvershootDetector {
               otherAlsoOvershoots: otherOvershoots,
               otherAtStart: otherStart,
             );
-            if (!ignoredIds.contains(overshoot.id)) {
+            if (!ignoredIds.contains(overshoot.id) &&
+                isSafe(overshoot, allWalls)) {
               list.add(overshoot);
             }
           }
@@ -272,56 +283,157 @@ class ArchitectWallOvershootDetector {
     return list;
   }
 
-  /// Creates the batch commands to trim the wall (and paired wall if applicable) flush to intersection.
+  /// A real contact, respecting detached ends and the physical finished faces.
+  static bool hasContact(ArchitectWall a, ArchitectWall b) {
+    if (a.isDetached || b.isDetached) return false;
+    bool accepts(ArchitectWall w, Offset p) {
+      final (ratio, distance) = w.projectPoint(p);
+      final along = ratio * w.length;
+      return distance <= w.thickness / 2 + .0001 &&
+          along >= -.0001 &&
+          along <= w.length + .0001 &&
+          (along > .0001 || w.connectStart) &&
+          (w.length - along > .0001 || w.connectEnd);
+    }
+
+    for (final node in a.intersections(b)) {
+      if (accepts(a, node) && accepts(b, node)) return true;
+    }
+    for (final (host, other) in [(a, b), (b, a)]) {
+      for (final (enabled, points) in [
+        (
+          host.connectStart,
+          [host.startPoint, host.centerStart, host.coreCenterStart],
+        ),
+        (host.connectEnd, [host.endPoint, host.centerEnd, host.coreCenterEnd]),
+      ]) {
+        if (enabled && points.any((p) => accepts(other, p))) return true;
+      }
+    }
+    return false;
+  }
+
+  static Map<String, ArchitectWall>? _trimmed(ArchitectWallOvershoot os) {
+    final result = <String, ArchitectWall>{};
+    bool trim(ArchitectWall w, bool atStart) {
+      if (!(atStart ? w.connectStart : w.connectEnd) ||
+          ArchitectWallConnectionPolicy.protectsLogTail(
+            w,
+            w.id == os.wall.id ? os.otherWall : os.wall,
+            atStart,
+            os.intersectionPoint,
+          )) {
+        return false;
+      }
+      final point = os.intersectionPoint;
+      final shift = atStart ? (point - w.startPoint).distance : 0.0;
+      final next = atStart
+          ? w.copyWith(startPoint: point)
+          : w.copyWith(endPoint: point);
+      if (next.length < .001 || next.length >= w.length) return false;
+      double? ratio(double old, double width) {
+        final along = old * w.length - shift;
+        final half = w.openingArcSpan(width) / 2;
+        if (along - half < -.0001 || along + half > next.length + .0001) {
+          return null;
+        }
+        return along / next.length;
+      }
+
+      for (final opening in [
+        ...w.doors.map((o) => (o.offsetRatio, o.width)),
+        ...w.windows.map((o) => (o.offsetRatio, o.width)),
+      ]) {
+        if (ratio(opening.$1, opening.$2) == null) return false;
+      }
+      result[w.id] = next.copyWith(
+        doors: [
+          for (final d in w.doors)
+            d.copyWith(offsetRatio: ratio(d.offsetRatio, d.width)!),
+        ],
+        windows: [
+          for (final o in w.windows)
+            o.copyWith(offsetRatio: ratio(o.offsetRatio, o.width)!),
+        ],
+      );
+      return true;
+    }
+
+    if (!trim(os.wall, os.atStart)) return null;
+    if (os.otherAlsoOvershoots &&
+        os.otherAtStart != null &&
+        !trim(os.otherWall, os.otherAtStart!)) {
+      return null;
+    }
+    return result;
+  }
+
+  /// Test the whole proposed result; a short tail may support an existing return.
+  static bool isSafe(ArchitectWallOvershoot os, List<ArchitectWall> walls) {
+    final next = _trimmed(os);
+    if (next == null ||
+        !hasContact(next[os.wall.id]!, next[os.otherWall.id] ?? os.otherWall)) {
+      return false;
+    }
+    for (final old in [
+      os.wall,
+      if (next.containsKey(os.otherWall.id)) os.otherWall,
+    ]) {
+      for (final other in walls) {
+        if (other.id == old.id) continue;
+        if (hasContact(old, other) &&
+            !hasContact(next[old.id]!, next[other.id] ?? other)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /// Kept as a list for existing callers; the complete trim is one atomic command.
   static List<ArchitectModelCommand> createTrimCommands({
     required String storeyId,
     required ArchitectWallOvershoot overshoot,
-  }) {
-    final commands = <ArchitectModelCommand>[];
-    if (ArchitectWallConnectionPolicy.protectsLogTail(
-      overshoot.wall,
-      overshoot.otherWall,
-      overshoot.atStart,
-      overshoot.intersectionPoint,
-    )) {
-      return commands;
+  }) => _trimmed(overshoot) == null
+      ? const []
+      : [TrimArchitectWallOvershoot(storeyId: storeyId, overshoot: overshoot)];
+}
+
+/// Re-resolves the suggestion against the current storey before changing anything.
+class TrimArchitectWallOvershoot extends ArchitectModelCommand {
+  final String storeyId;
+  final ArchitectWallOvershoot overshoot;
+  const TrimArchitectWallOvershoot({
+    required this.storeyId,
+    required this.overshoot,
+  });
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final storey = ArchitectModelCommand.storey(project, storeyId);
+    final wall = storey.walls
+        .where((w) => w.id == overshoot.wall.id)
+        .firstOrNull;
+    if (wall == null) return project;
+    final current =
+        ArchitectWallOvershootDetector.detectForWall(wall, storey.walls)
+            .where(
+              (os) =>
+                  os.id == overshoot.id &&
+                  (os.stubPoint - overshoot.stubPoint).distance < .000001 &&
+                  (os.intersectionPoint - overshoot.intersectionPoint)
+                          .distance <
+                      .000001,
+            )
+            .firstOrNull;
+    if (current == null) return project;
+    final next = ArchitectWallOvershootDetector._trimmed(current)!;
+    for (final w in next.values) {
+      w.validateGeometry();
     }
-
-    // Primary wall trim
-    final wall = overshoot.wall;
-    final trimmedWall = overshoot.atStart
-        ? wall.copyWith(startPoint: overshoot.intersectionPoint)
-        : wall.copyWith(endPoint: overshoot.intersectionPoint);
-
-    commands.add(
-      UpdateArchitectWall(
-        storeyId: storeyId,
-        wall: trimmedWall,
-        carryConnections: false,
-      ),
+    return ArchitectModelCommand.replace(
+      project,
+      storey.copyWith(walls: [for (final w in storey.walls) next[w.id] ?? w]),
     );
-
-    // If other wall also overshoots at this corner (X-crossing), trim it as well
-    if (overshoot.otherAlsoOvershoots && overshoot.otherAtStart != null &&
-        !ArchitectWallConnectionPolicy.protectsLogTail(
-          overshoot.otherWall,
-          wall,
-          overshoot.otherAtStart!,
-          overshoot.intersectionPoint,
-        )) {
-      final other = overshoot.otherWall;
-      final trimmedOther = overshoot.otherAtStart!
-          ? other.copyWith(startPoint: overshoot.intersectionPoint)
-          : other.copyWith(endPoint: overshoot.intersectionPoint);
-      commands.add(
-        UpdateArchitectWall(
-          storeyId: storeyId,
-          wall: trimmedOther,
-          carryConnections: false,
-        ),
-      );
-    }
-
-    return commands;
   }
 }

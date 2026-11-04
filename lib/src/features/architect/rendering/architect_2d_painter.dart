@@ -196,6 +196,8 @@ class Architect2dPainter extends CustomPainter {
   final double handleOffsetLength;
   final (Offset, Offset)? wallEndpointLeaderLine;
   final Offset? newPointCandidate;
+  final Offset? newPointHandleOffset;
+  final bool newPointValid;
   final (Offset, Offset)? newPointLeaderLine;
   final ArchitectWallOvershoot? activeOvershoot;
   final List<ArchitectOverhang>? upperOverhangs;
@@ -313,6 +315,8 @@ class Architect2dPainter extends CustomPainter {
     this.handleOffsetLength = 50.0,
     this.wallEndpointLeaderLine,
     this.newPointCandidate,
+    this.newPointHandleOffset,
+    this.newPointValid = true,
     this.newPointLeaderLine,
   }) : _project = project,
        _zoomScale = zoomScale,
@@ -882,11 +886,14 @@ class Architect2dPainter extends CustomPainter {
 
   void _drawNewPointPreview(Canvas canvas) {
     if (newPointCandidate == null) return;
-    final draftingScale = math.max(zoomScale, 80.0);
-    const candidateColor = Color(0xFF00E5FF);
+    final draftingScale = zoomScale;
+    final candidateColor = newPointValid
+        ? const Color(0xFF006E91) : const Color(0xFFB3261E);
 
     if (newPointLeaderLine != null) {
-      final (from, to) = newPointLeaderLine!;
+      final from = newPointCandidate!;
+      final to = newPointHandleOffset == null ? newPointLeaderLine!.$2
+          : from + newPointHandleOffset! / zoomScale;
       final bgLeaderPaint = Paint()
         ..color = const Color(0x66000000)
         ..strokeWidth = 2.6 / draftingScale
@@ -1297,51 +1304,8 @@ class Architect2dPainter extends CustomPainter {
   // ===========================================================================
 
   void _drawActiveDrafting(Canvas canvas) {
-    for (final gap in wallClearances) {
-      final wall = project.activeStorey.walls.firstWhere(
-        (w) => w.id == gap.wallId,
-      );
-      final direction = gap.end - gap.start;
-      final tick =
-          (direction.distance < 1e-8
-              ? wall.unitVector
-              : Offset(-direction.dy, direction.dx) / direction.distance) *
-          (4 / draftingScale);
-      final paint = Paint()
-        ..color = palette.foreground(const Color(0xFF008C9E))
-        ..strokeWidth = 1 / draftingScale;
-      canvas.drawLine(gap.start, gap.end, paint);
-      for (final point in [gap.start, gap.end]) {
-        canvas.drawLine(point - tick, point + tick, paint);
-      }
-      if (gap.atStart != null) {
-        final dotRadius = 7 / draftingScale;
-        canvas.drawCircle(
-          gap.start,
-          dotRadius,
-          Paint()..color = const Color(0xFFFFB74D),
-        );
-        if (dotRadius * zoomScale >= 4.5) {
-          final marker = ArchitectTextPainter(
-            text: TextSpan(
-              text: gap.atStart! ? '1' : '2',
-              style: TextStyle(
-                color: Colors.black,
-                fontFamily: 'Roboto',
-                fontWeight: FontWeight.bold,
-                fontSize: 10 / draftingScale,
-              ),
-            ),
-            textDirection: TextDirection.ltr,
-          )..layout();
-          marker.paint(
-            canvas,
-            gap.start - Offset(marker.width / 2, marker.height / 2),
-          );
-        }
-      }
-    }
-
+    // Wall dimensions and their editable labels share one screen-space layout.
+    // The workspace interaction overlay paints both witnesses and dimensions.
     if (doorPreview != null) {
       final hostWall = _project.activeStorey.walls
           .where((w) => w.id == doorPreview!.wallId)
@@ -1943,6 +1907,8 @@ class Architect2dPainter extends CustomPainter {
       polygonLeaderLine != oldDelegate.polygonLeaderLine ||
       wallEndpointLeaderLine != oldDelegate.wallEndpointLeaderLine ||
       newPointCandidate != oldDelegate.newPointCandidate ||
+      newPointHandleOffset != oldDelegate.newPointHandleOffset ||
+      newPointValid != oldDelegate.newPointValid ||
       newPointLeaderLine != oldDelegate.newPointLeaderLine ||
       handleOffsetLength != oldDelegate.handleOffsetLength ||
       wallCutGuideLine != oldDelegate.wallCutGuideLine ||
