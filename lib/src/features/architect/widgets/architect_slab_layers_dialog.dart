@@ -287,23 +287,68 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                 ),
               ],
             ),
-            DropdownButtonFormField<int>(
-              key: ValueKey('slab-presets-${filter?.name}-${library.length}'),
-              isExpanded: true,
-              decoration: InputDecoration(labelText: l.slabPreset),
-              items: [
-                for (var i = 0; i < options.length; i++)
-                  DropdownMenuItem(
-                    value: i,
-                    child: Text(
-                      options[i].label(l),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<int>(
+                    key: ValueKey('slab-presets-${filter?.name}-${library.length}'),
+                    isExpanded: true,
+                    decoration: InputDecoration(labelText: l.slabPreset),
+                    items: [
+                      for (var i = 0; i < options.length; i++)
+                        DropdownMenuItem(
+                          value: i,
+                          child: Text(
+                            options[i].label(l),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (i) {
+                      if (i != null) load(options[i]);
+                    },
+                  ),
+                ),
+                if (library.any((a) => a.id == draft.id))
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                    tooltip: l.slabDeleteLibrary,
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text(l.slabDeleteLibrary),
+                          content: Text(
+                            l.slabDeleteConfirm(
+                              draft.customName.isNotEmpty
+                                  ? draft.customName
+                                  : draft.usage.label(l),
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: Text(l.cancel),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: Text(l.delete),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        await ArchitectSlabLibrary.delete(draft.id);
+                        await _loadLibrary();
+                        if (!mounted) return;
+                        messenger.showSnackBar(
+                          SnackBar(content: Text(l.slabLibraryDeleted)),
+                        );
+                      }
+                    },
                   ),
               ],
-              onChanged: (i) {
-                if (i != null) load(options[i]);
-              },
             ),
             Row(
               children: [
@@ -320,6 +365,11 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                       value: 'library',
                       child: Text(l.slabSaveLibrary),
                     ),
+                    if (library.any((a) => a.id == draft.id))
+                      PopupMenuItem(
+                        value: 'delete_library',
+                        child: Text(l.slabDeleteLibrary),
+                      ),
                     PopupMenuItem(value: 'new', child: Text(l.slabNewType)),
                   ],
                   onSelected: (action) async {
@@ -332,10 +382,46 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                       });
                       return;
                     }
+                    if (action == 'delete_library') {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text(l.slabDeleteLibrary),
+                          content: Text(
+                            l.slabDeleteConfirm(
+                              draft.customName.isNotEmpty
+                                  ? draft.customName
+                                  : draft.usage.label(l),
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: Text(l.cancel),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: Text(l.delete),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        await ArchitectSlabLibrary.delete(draft.id);
+                        await _loadLibrary();
+                        if (!mounted) return;
+                        messenger.showSnackBar(
+                          SnackBar(content: Text(l.slabLibraryDeleted)),
+                        );
+                      }
+                      return;
+                    }
                     if (!valid()) return;
+                    final messenger = ScaffoldMessenger.of(context);
                     final ok = await ArchitectSlabLibrary.save(named);
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    if (!mounted) return;
+                    messenger.showSnackBar(
                       SnackBar(
                         content: Text(
                           ok ? l.slabLibrarySaved : l.slabLibraryFailed,

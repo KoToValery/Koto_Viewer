@@ -26,6 +26,8 @@ Future<ArchitectWallPickerResult?> showArchitectWallTypePicker(
   ArchitectUnit unit = ArchitectUnit.centimeters,
   bool allowVariant = false,
   bool allowManage = false,
+  ValueChanged<ArchitectWallType>? onDelete,
+  bool Function(ArchitectWallType)? canDelete,
 }) => showModalBottomSheet<ArchitectWallPickerResult>(
   context: context,
   isScrollControlled: true,
@@ -66,6 +68,8 @@ Future<ArchitectWallPickerResult?> showArchitectWallTypePicker(
                 ),
               )
             : null,
+        onDelete: onDelete,
+        canDelete: canDelete,
         onClose: () => Navigator.pop(context),
       ),
     ),
@@ -580,7 +584,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                     ? widget.onCopy?.call(type)
                     : widget.onDelete?.call(type),
               )
-            else
+            else ...[
               IconButton(
                 key: ValueKey('wall-favorite-${type.id}'),
                 tooltip: l.wallFavoriteToggle,
@@ -596,6 +600,17 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                   _persist();
                 },
               ),
+              if (!type.isFactoryPreset && widget.onDelete != null)
+                IconButton(
+                  key: ValueKey('wall-delete-${type.id}'),
+                  tooltip: l.delete,
+                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                  onPressed: () {
+                    Navigator.maybePop(context);
+                    widget.onDelete?.call(type);
+                  },
+                ),
+            ],
           ],
         ),
       ),

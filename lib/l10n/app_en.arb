@@ -3397,6 +3397,18 @@
   "@architectFenestrationSave": { "description": "Button to save window/door model to library" },
   "architectFenestrationSaveSuccess": "Model saved to library",
   "@architectFenestrationSaveSuccess": { "description": "Toast message on model save success" },
+  "architectFenestrationDelete": "Delete from Library",
+  "@architectFenestrationDelete": { "description": "Button to delete window/door model from library" },
+  "architectFenestrationDeleteSuccess": "Model deleted from library",
+  "@architectFenestrationDeleteSuccess": { "description": "Toast message on model delete success" },
+  "architectFenestrationDeleteConfirm": "Delete \"{name}\" from library?",
+  "@architectFenestrationDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "architectFenestrationLibrary": "Openings Library",
   "@architectFenestrationLibrary": { "description": "Openings library title" },
   "architectFenestrationCasing": "Trim / Casing",
@@ -3951,6 +3963,16 @@
   "slabLibrary": "Personal library",
   "slabLibrarySaved": "Assembly saved to library.",
   "slabSaveLibrary": "Save to library",
+  "slabDeleteLibrary": "Delete from library",
+  "slabLibraryDeleted": "Assembly deleted from library.",
+  "slabDeleteConfirm": "Delete \"{name}\" from personal library?",
+  "@slabDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "slabLibraryFailed": "Could not save the library.",
   "slabPresetHelp": "Editable starting dimensions, not a calculation for this building. Foundation: waterproofing below concrete; ground floor: waterproofing above concrete. Cold attic: non-walkable insulation. Ceiling insulation: suspended lining. Roof and terrace presets include one slope field; junctions and drainage need separate detailing.",
   "slabAddLayer": "Add layer",
@@ -4332,6 +4354,15 @@
   "wallTypeApply": "Apply to type ({count})",
   "@wallTypeApply": {"placeholders": {"count": {"type": "int"}}},
   "wallTypeReplacement": "Replace with",
+  "wallTypeDeleteConfirm": "Delete custom wall type \"{name}\"?",
+  "@wallTypeDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "wallTypeDeleted": "Wall type deleted.",
   "wallTypeInUse": "Select a replacement for the walls using this type.",
   "wallCompositionAction": "Construction",
   "wallManageTypes": "Manage types",
@@ -4452,6 +4483,16 @@
   "architectCategoryOutdoor": "Outdoor",
   "architectComponentRotateBtn": "Rotate 90° (R)",
   "architectComponentSavedMsg": "Component saved to custom library!",
+  "architectComponentDelete": "Delete from library",
+  "architectComponentDeleted": "Component deleted from library",
+  "architectComponentDeleteConfirm": "Delete \"{name}\" from library?",
+  "@architectComponentDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "architectComponentCompileBtn": "Preview",
   "architectComponentSaveBtn": "Save",
   "architectComponentTemplateHint": "Select template...",
@@ -4528,6 +4569,16 @@
   "architectLineLongShortDash": "Long–short dash",
   "architectLineDoubleDashDot": "Double dash–dot",
   "architectLinePatternEditor": "Custom pattern",
+  "architectLineDeleteConfirmTitle": "Delete line style",
+  "architectLineDeleteConfirmPrompt": "Delete custom line style \"{name}\"?",
+  "@architectLineDeleteConfirmPrompt": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "architectLineStyleDeleted": "Line style deleted.",
   "architectLineDash": "Dash",
   "architectLineGap": "Gap",
   "architectLinePatternHint": "Dashes, gaps and symbols. Sizes are measured on paper.",
@@ -4906,6 +4957,19 @@
   },
   "roofUiNewScope": "For new roofs",
   "roofUiSaveDefaults": "Use for future roofs",
+  "roofSaveLibrary": "Save to library",
+  "roofDeleteLibrary": "Delete from library",
+  "roofLibrarySaved": "Roof build-up saved to library.",
+  "roofLibraryDeleted": "Roof build-up deleted from library.",
+  "roofDeleteConfirm": "Delete \"{name}\" from personal library?",
+  "@roofDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "roofCustomNamePrompt": "Build-up name",
   "roofUiScopeHelp": "Only edited fields change. Pipe positions stay with their own plane.",
   "roofUiIndependentHelp": "Changing one pitch makes the plane independent.",
   "roofUiPreview": "Diagram",

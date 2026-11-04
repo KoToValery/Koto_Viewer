@@ -366,17 +366,24 @@ class ArchitectRoofTimberSpec {
 // === SECTION: ROOF ASSEMBLY & PRESETS ===
 
 class ArchitectRoofAssembly {
+  final String id;
+  final String customName;
   final ArchitectRoofPanelSpec? panels;
   final ArchitectRoofPreset preset;
   final List<ArchitectRoofLayer> layers;
   final ArchitectRoofTimberSpec timber;
 
   const ArchitectRoofAssembly({
+    this.id = '',
+    this.customName = '',
     this.panels,
     required this.preset,
     required this.layers,
     required this.timber,
   });
+
+  String label(AppLocalizations l10n) =>
+      customName.isNotEmpty ? customName : preset.label(l10n);
 
   factory ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset preset) {
     switch (preset) {
@@ -685,12 +692,16 @@ class ArchitectRoofAssembly {
   }
 
   ArchitectRoofAssembly copyWith({
+    String? id,
+    String? customName,
     ArchitectRoofPanelSpec? panels,
     bool clearPanels=false,
     ArchitectRoofPreset? preset,
     List<ArchitectRoofLayer>? layers,
     ArchitectRoofTimberSpec? timber,
   }) => ArchitectRoofAssembly(
+    id: id ?? this.id,
+    customName: customName ?? this.customName,
     panels:clearPanels?null:panels??this.panels,
     preset: preset ?? this.preset,
     layers: layers ?? this.layers.map((l) => l.copyWith()).toList(),
@@ -698,6 +709,8 @@ class ArchitectRoofAssembly {
   );
 
   Map<String, dynamic> toJson() => {
+    if (id.isNotEmpty) 'id': id,
+    if (customName.isNotEmpty) 'customName': customName,
     if(panels!=null) 'panels':panels!.toJson(),
     'preset': preset.name,
     'layers': layers.map((l) => l.toJson()).toList(),
@@ -711,6 +724,8 @@ class ArchitectRoofAssembly {
     final rawLayers = json['layers'] as List<dynamic>?;
     final rawTimber = json['timber'] as Map<String, dynamic>?;
     return ArchitectRoofAssembly(
+      id: json['id'] as String? ?? '',
+      customName: json['customName'] as String? ?? '',
       panels:json['panels'] is Map?ArchitectRoofPanelSpec.fromJson(json['panels'] as Map):
         (preset==ArchitectRoofPreset.sandwichPitched||preset==ArchitectRoofPreset.sandwichMembrane
           ?ArchitectRoofPanelSpec(membrane:preset==ArchitectRoofPreset.sandwichMembrane,

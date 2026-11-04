@@ -6,6 +6,7 @@ import '../models/architect_drawing_color.dart';
 import 'architect_drawing_color_picker.dart';
 import 'architect_hatch_picker.dart';
 import 'architect_line_style_picker.dart';
+import '../services/architect_line_styles.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -1184,6 +1185,15 @@ class _ArchitectElementPropertiesDialogState
               key: const ValueKey('architect-property-line-style'),
               value: _lineStyle,
               customStyles: widget.project.lineStyles,
+              onDeleteStyle: (style) {
+                ArchitectLineStyleLibrary.delete(style.id);
+                setState(() {
+                  if (_lineStyle?.id == style.id) {
+                    _lineStyle = ArchitectLineStyle.solid;
+                    texts['lineStyle'] = jsonEncode(ArchitectLineStyle.solid.toJson());
+                  }
+                });
+              },
               onChanged: (style) => setState(() {
                 _lineStyle = style;
                 texts['lineStyle'] = jsonEncode(style.toJson());

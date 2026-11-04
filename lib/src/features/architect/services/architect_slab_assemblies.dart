@@ -170,4 +170,15 @@ class ArchitectSlabLibrary {
       ]),
     );
   }
+
+  static Future<bool> delete(String id) async {
+    final entries = await load();
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.setString(
+      storageKey,
+      jsonEncode(
+        entries.where((a) => a.id != id).map((a) => a.toJson()).toList(),
+      ),
+    );
+  }
 }

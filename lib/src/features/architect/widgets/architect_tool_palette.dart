@@ -106,6 +106,7 @@ class ArchitectToolPalette extends StatefulWidget {
   final ValueChanged<ArchitectWallType>? onWallTypeSelected;
   final ValueChanged<ArchitectWallType>? onCreateWallVariant;
   final VoidCallback? onManageWallTypes;
+  final ValueChanged<ArchitectWallType>? onDeleteWallType;
   final String wallProjectId;
   final ArchitectUnit wallUnit;
 
@@ -187,6 +188,7 @@ class ArchitectToolPalette extends StatefulWidget {
     this.onWallTypeSelected,
     this.onCreateWallVariant,
     this.onManageWallTypes,
+    this.onDeleteWallType,
     this.wallProjectId = '',
     this.wallUnit = ArchitectUnit.centimeters,
     this.onCreateFenestration,
@@ -925,6 +927,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
       unit: widget.wallUnit,
       allowVariant: widget.onCreateWallVariant != null,
       allowManage: widget.onManageWallTypes != null,
+      onDelete: widget.onDeleteWallType,
     );
     if (!mounted || result == null) return;
     switch (result.action) {
@@ -1655,15 +1658,66 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                           color: Colors.white54,
                         ),
                       ),
-                      trailing: Chip(
-                        label: Text(
-                          s.isPreset
-                              ? l10n.architectFenestrationPreset
-                              : l10n.architectFenestrationCustom,
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Chip(
+                            label: Text(
+                              s.isPreset
+                                  ? l10n.architectFenestrationPreset
+                                  : l10n.architectFenestrationCustom,
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                          ),
+                          if (!s.isPreset)
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.redAccent,
+                                size: 20,
+                              ),
+                              tooltip: l10n.delete,
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: ctx,
+                                  builder: (dialogCtx) => AlertDialog(
+                                    title: Text(l10n.architectFenestrationDelete),
+                                    content: Text(
+                                      l10n.architectFenestrationDeleteConfirm(
+                                        s.localizedName(l10n),
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(dialogCtx, false),
+                                        child: Text(l10n.cancel),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () => Navigator.pop(dialogCtx, true),
+                                        child: Text(l10n.delete),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  await FenestrationLibraryService.instance
+                                      .deleteStyle(s.id);
+                                  if (!ctx.mounted) return;
+                                  Navigator.pop(ctx);
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        l10n.architectFenestrationDeleteSuccess,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                        ],
                       ),
                       onTap: () {
                         Navigator.pop(ctx);

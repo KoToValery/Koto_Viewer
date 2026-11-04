@@ -65,6 +65,7 @@ import '../services/architect_drawing_publisher.dart';
 import '../rendering/architect_vector_scene.dart';
 
 import '../widgets/architect_wall_types_manager.dart';
+import '../widgets/architect_wall_type_label.dart';
 
 import '../widgets/architect_wall_composition_editor.dart';
 
@@ -5707,6 +5708,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       customStyles: _project.lineStyles,
 
+      onDeleteStyle: (style) {
+        _commands.execute(DeleteArchitectLineStyle(style.id));
+        ArchitectLineStyleLibrary.delete(style.id);
+        _saveBiMProjectIfAttached();
+        if (_activeCadLineStyle.id == style.id) {
+          setState(() => _activeCadLineStyle = ArchitectLineStyle.solid);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.architectLineStyleDeleted)),
+        );
+      },
+
       onChanged: (style) {
 
         final polylineId = _polylineDraftId;
@@ -5722,6 +5735,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         if (!style.isPreset && !_project.lineStyles.any((s) => s == style)) {
 
           _commands.execute(SaveArchitectLineStyle(style));
+          ArchitectLineStyleLibrary.save(style);
 
           _saveBiMProjectIfAttached();
 
@@ -21063,6 +21077,51 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  Future<void> _deleteWallType(ArchitectWallType type) async {
+    final l = context.l10n;
+    final uses = _project.storeys.fold(
+      0,
+      (v, s) => v + s.walls.where((w) => w.wallTypeId == type.id).length,
+    );
+    if (uses > 0) {
+      _showWallTypes();
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.delete),
+        content: Text(
+          l.wallTypeDeleteConfirm(type.catalogLabel(l, _project.units)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l.delete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      try {
+        _modelCommands.commit(
+          DeleteArchitectWallType(type.id).apply(_modelCommands.project),
+        );
+        _restoreWallType();
+        _saveBiMProjectIfAttached();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.wallTypeDeleted)),
+        );
+      } on ArgumentError {
+        _operationError();
+      }
+    }
+  }
+
   void _showWallTypes() {
 
     showDialog<void>(
@@ -25327,6 +25386,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   onCreateWallVariant: _createWallVariant,
                   onManageWallTypes: _showWallTypes,
+                  onDeleteWallType: _deleteWallType,
                   wallProjectId: _project.id,
                   wallUnit: _project.units,
 

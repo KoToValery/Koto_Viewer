@@ -4663,6 +4663,18 @@ class AppLocalizationsBg extends AppLocalizations {
       'Моделът е запазен в библиотеката';
 
   @override
+  String get architectFenestrationDelete => 'Изтрий от библиотеката';
+
+  @override
+  String get architectFenestrationDeleteSuccess =>
+      'Моделът е изтрит от библиотеката';
+
+  @override
+  String architectFenestrationDeleteConfirm(String name) {
+    return 'Изтриване на „$name“ от библиотеката?';
+  }
+
+  @override
   String get architectFenestrationLibrary => 'Библиотека дограма';
 
   @override
@@ -5735,6 +5747,17 @@ class AppLocalizationsBg extends AppLocalizations {
   String get slabSaveLibrary => 'Запази в библиотеката';
 
   @override
+  String get slabDeleteLibrary => 'Изтрий от библиотеката';
+
+  @override
+  String get slabLibraryDeleted => 'Съставът е изтрит от библиотеката.';
+
+  @override
+  String slabDeleteConfirm(String name) {
+    return 'Изтриване на „$name“ от личната библиотека?';
+  }
+
+  @override
   String get slabLibraryFailed => 'Библиотеката не е записана.';
 
   @override
@@ -6668,6 +6691,14 @@ class AppLocalizationsBg extends AppLocalizations {
   String get wallTypeReplacement => 'Замени с';
 
   @override
+  String wallTypeDeleteConfirm(String name) {
+    return 'Изтриване на къстъм стена „$name“?';
+  }
+
+  @override
+  String get wallTypeDeleted => 'Типът стена е изтрит.';
+
+  @override
   String get wallTypeInUse => 'Изберете заместител за стените с този тип.';
 
   @override
@@ -7040,6 +7071,18 @@ class AppLocalizationsBg extends AppLocalizations {
       'Обектът е запазен в потребителската библиотека!';
 
   @override
+  String get architectComponentDelete => 'Изтрий от библиотеката';
+
+  @override
+  String get architectComponentDeleted =>
+      'Компонентът е изтрит от библиотеката';
+
+  @override
+  String architectComponentDeleteConfirm(String name) {
+    return 'Изтриване на „$name“ от библиотеката?';
+  }
+
+  @override
   String get architectComponentCompileBtn => 'Преглед';
 
   @override
@@ -7276,6 +7319,17 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectLinePatternEditor => 'Собствена шарка';
+
+  @override
+  String get architectLineDeleteConfirmTitle => 'Изтриване на стил линия';
+
+  @override
+  String architectLineDeleteConfirmPrompt(String name) {
+    return 'Изтриване на къстъм стил линия „$name“?';
+  }
+
+  @override
+  String get architectLineStyleDeleted => 'Стилът линия е изтрит.';
 
   @override
   String get architectLineDash => 'Тире';
@@ -8239,6 +8293,27 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get roofUiSaveDefaults => 'За следващите покриви';
+
+  @override
+  String get roofSaveLibrary => 'Запази в библиотеката';
+
+  @override
+  String get roofDeleteLibrary => 'Изтрий от библиотеката';
+
+  @override
+  String get roofLibrarySaved => 'Покривният състав е запазен в библиотеката.';
+
+  @override
+  String get roofLibraryDeleted =>
+      'Покривният състав е изтрит от библиотеката.';
+
+  @override
+  String roofDeleteConfirm(String name) {
+    return 'Изтриване на „$name“ от личната библиотека?';
+  }
+
+  @override
+  String get roofCustomNamePrompt => 'Име на състава';
 
   @override
   String get roofUiScopeHelp =>

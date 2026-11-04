@@ -8105,6 +8105,24 @@ abstract class AppLocalizations {
   /// **'Model saved to library'**
   String get architectFenestrationSaveSuccess;
 
+  /// Button to delete window/door model from library
+  ///
+  /// In en, this message translates to:
+  /// **'Delete from Library'**
+  String get architectFenestrationDelete;
+
+  /// Toast message on model delete success
+  ///
+  /// In en, this message translates to:
+  /// **'Model deleted from library'**
+  String get architectFenestrationDeleteSuccess;
+
+  /// No description provided for @architectFenestrationDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\" from library?'**
+  String architectFenestrationDeleteConfirm(String name);
+
   /// Openings library title
   ///
   /// In en, this message translates to:
@@ -10031,6 +10049,24 @@ abstract class AppLocalizations {
   /// **'Save to library'**
   String get slabSaveLibrary;
 
+  /// No description provided for @slabDeleteLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete from library'**
+  String get slabDeleteLibrary;
+
+  /// No description provided for @slabLibraryDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Assembly deleted from library.'**
+  String get slabLibraryDeleted;
+
+  /// No description provided for @slabDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\" from personal library?'**
+  String slabDeleteConfirm(String name);
+
   /// No description provided for @slabLibraryFailed.
   ///
   /// In en, this message translates to:
@@ -11783,6 +11819,18 @@ abstract class AppLocalizations {
   /// **'Replace with'**
   String get wallTypeReplacement;
 
+  /// No description provided for @wallTypeDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete custom wall type \"{name}\"?'**
+  String wallTypeDeleteConfirm(String name);
+
+  /// No description provided for @wallTypeDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall type deleted.'**
+  String get wallTypeDeleted;
+
   /// No description provided for @wallTypeInUse.
   ///
   /// In en, this message translates to:
@@ -12497,6 +12545,24 @@ abstract class AppLocalizations {
   /// **'Component saved to custom library!'**
   String get architectComponentSavedMsg;
 
+  /// No description provided for @architectComponentDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete from library'**
+  String get architectComponentDelete;
+
+  /// No description provided for @architectComponentDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Component deleted from library'**
+  String get architectComponentDeleted;
+
+  /// No description provided for @architectComponentDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\" from library?'**
+  String architectComponentDeleteConfirm(String name);
+
   /// No description provided for @architectComponentCompileBtn.
   ///
   /// In en, this message translates to:
@@ -12952,6 +13018,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Custom pattern'**
   String get architectLinePatternEditor;
+
+  /// No description provided for @architectLineDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete line style'**
+  String get architectLineDeleteConfirmTitle;
+
+  /// No description provided for @architectLineDeleteConfirmPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete custom line style \"{name}\"?'**
+  String architectLineDeleteConfirmPrompt(String name);
+
+  /// No description provided for @architectLineStyleDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Line style deleted.'**
+  String get architectLineStyleDeleted;
 
   /// No description provided for @architectLineDash.
   ///
@@ -14740,6 +14824,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use for future roofs'**
   String get roofUiSaveDefaults;
+
+  /// No description provided for @roofSaveLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to library'**
+  String get roofSaveLibrary;
+
+  /// No description provided for @roofDeleteLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete from library'**
+  String get roofDeleteLibrary;
+
+  /// No description provided for @roofLibrarySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Roof build-up saved to library.'**
+  String get roofLibrarySaved;
+
+  /// No description provided for @roofLibraryDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Roof build-up deleted from library.'**
+  String get roofLibraryDeleted;
+
+  /// No description provided for @roofDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\" from personal library?'**
+  String roofDeleteConfirm(String name);
+
+  /// No description provided for @roofCustomNamePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Build-up name'**
+  String get roofCustomNamePrompt;
 
   /// No description provided for @roofUiScopeHelp.
   ///

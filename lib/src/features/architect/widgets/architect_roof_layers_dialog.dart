@@ -12,6 +12,7 @@ import 'architect_roof_number_field.dart';
 import 'architect_roof_layer_editor.dart';
 import 'architect_roof_construction_preview.dart';
 import 'architect_roof_panel_fields.dart';
+import '../services/architect_roof_assemblies.dart';
 
 class ArchitectRoofLayersDialog extends StatefulWidget {
   final ArchitectRoofAssembly initialAssembly;
@@ -68,6 +69,19 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
     vsync: this,
     initialIndex: widget.initialTab,
   );
+  List<ArchitectRoofAssembly> _library = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLibrary();
+  }
+
+  Future<void> _loadLibrary() async {
+    final loaded = await ArchitectRoofLibrary.load();
+    if (mounted) setState(() => _library = loaded);
+  }
+
   late ArchitectRoofAssembly _assembly = widget.initialAssembly.copyWith();
   late double _slopeDegrees = widget.initialSlopeDegrees,
       _eavesOverhang = widget.initialEavesOverhang;
@@ -111,6 +125,91 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       c.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _saveToLibrary() async {
+    final l = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final nameController = TextEditingController(text: _assembly.customName);
+    final chosenName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.roofSaveLibrary),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: InputDecoration(labelText: l.roofCustomNamePrompt),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, nameController.text.trim()),
+            child: Text(l.save),
+          ),
+        ],
+      ),
+    );
+    if (chosenName != null && chosenName.isNotEmpty) {
+      final toSave = _assembly.copyWith(
+        id: _assembly.id.isNotEmpty ? _assembly.id : ArchitectElementId.next('roof_assembly'),
+        preset: ArchitectRoofPreset.custom,
+        customName: chosenName,
+      );
+      final ok = await ArchitectRoofLibrary.save(toSave);
+      await _loadLibrary();
+      setState(() => _assembly = toSave);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(ok ? l.roofLibrarySaved : l.slabLibraryFailed),
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteFromLibrary() async {
+    final l = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.roofDeleteLibrary),
+        content: Text(l.roofDeleteConfirm(_assembly.label(l))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l.delete),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ArchitectRoofLibrary.delete(_assembly.id);
+      await _loadLibrary();
+      setState(() {
+        _assembly = ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles);
+      });
+      _queuePreview();
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.roofLibraryDeleted)),
+      );
+    }
+  }
+
+  void _selectLibraryAssembly(ArchitectRoofAssembly libAssembly) {
+    setState(() {
+      _assembly = libAssembly.copyWith();
+      _error = null;
+    });
+    _queuePreview();
   }
 
   void _selectPreset(ArchitectRoofPreset preset) {
@@ -751,23 +850,96 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          DropdownButtonFormField<ArchitectRoofPreset>(
-            key: ValueKey('roof-preset-${_assembly.preset.name}'),
-            initialValue: _assembly.preset,
-            isExpanded: true,
-            decoration: InputDecoration(labelText: l.roofUiAssembly),
-            items: [
-              for (final p in ArchitectRoofPreset.values)
-                if (p != ArchitectRoofPreset.custom || _assembly.preset == p)
-                  DropdownMenuItem(
-                    value: p,
-                    enabled: p != ArchitectRoofPreset.custom,
-                    child: Text(p.label(l), overflow: TextOverflow.ellipsis),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l.roofUiAssembly,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              PopupMenuButton<String>(
+                tooltip: l.propertiesMore,
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'library_save',
+                    child: Text(l.roofSaveLibrary),
                   ),
+                  if (_library.any((a) => a.id == _assembly.id))
+                    PopupMenuItem(
+                      value: 'library_delete',
+                      child: Text(l.roofDeleteLibrary),
+                    ),
+                ],
+                onSelected: (action) async {
+                  if (action == 'library_save') {
+                    await _saveToLibrary();
+                  } else if (action == 'library_delete') {
+                    await _deleteFromLibrary();
+                  }
+                },
+              ),
             ],
-            onChanged: (p) {
-              if (p != null) _selectPreset(p);
-            },
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey(
+                    'roof-preset-${_library.any((a) => a.id == _assembly.id) ? _assembly.id : _assembly.preset.name}-${_library.length}',
+                  ),
+                  initialValue: _library.any((a) => a.id == _assembly.id)
+                      ? 'lib_${_assembly.id}'
+                      : (_assembly.preset == ArchitectRoofPreset.custom
+                          ? 'preset_custom'
+                          : 'preset_${_assembly.preset.name}'),
+                  isExpanded: true,
+                  decoration: InputDecoration(labelText: l.roofUiAssembly),
+                  items: [
+                    for (final p in ArchitectRoofPreset.values)
+                      if (p != ArchitectRoofPreset.custom ||
+                          (_assembly.preset == p && !_library.any((a) => a.id == _assembly.id)))
+                        DropdownMenuItem(
+                          value: 'preset_${p.name}',
+                          enabled: p != ArchitectRoofPreset.custom,
+                          child: Text(
+                            p.label(l),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    for (final libItem in _library)
+                      DropdownMenuItem(
+                        value: 'lib_${libItem.id}',
+                        child: Text(
+                          libItem.label(l),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (val) {
+                    if (val == null) return;
+                    if (val.startsWith('lib_')) {
+                      final id = val.substring(4);
+                      final found = _library.where((a) => a.id == id).firstOrNull;
+                      if (found != null) _selectLibraryAssembly(found);
+                    } else if (val.startsWith('preset_')) {
+                      final pName = val.substring(7);
+                      final foundPreset = ArchitectRoofPreset.values
+                          .where((p) => p.name == pName)
+                          .firstOrNull;
+                      if (foundPreset != null) _selectPreset(foundPreset);
+                    }
+                  },
+                ),
+              ),
+              if (_library.any((a) => a.id == _assembly.id))
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                  tooltip: l.roofDeleteLibrary,
+                  onPressed: _deleteFromLibrary,
+                ),
+            ],
           ),
           if (_assembly.panels != null)
             ArchitectRoofPanelFields(

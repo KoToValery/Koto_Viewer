@@ -4641,6 +4641,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectFenestrationSaveSuccess => 'Model saved to library';
 
   @override
+  String get architectFenestrationDelete => 'Delete from Library';
+
+  @override
+  String get architectFenestrationDeleteSuccess => 'Model deleted from library';
+
+  @override
+  String architectFenestrationDeleteConfirm(String name) {
+    return 'Delete \"$name\" from library?';
+  }
+
+  @override
   String get architectFenestrationLibrary => 'Openings Library';
 
   @override
@@ -5711,6 +5722,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get slabSaveLibrary => 'Save to library';
 
   @override
+  String get slabDeleteLibrary => 'Delete from library';
+
+  @override
+  String get slabLibraryDeleted => 'Assembly deleted from library.';
+
+  @override
+  String slabDeleteConfirm(String name) {
+    return 'Delete \"$name\" from personal library?';
+  }
+
+  @override
   String get slabLibraryFailed => 'Could not save the library.';
 
   @override
@@ -6641,6 +6663,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wallTypeReplacement => 'Replace with';
 
   @override
+  String wallTypeDeleteConfirm(String name) {
+    return 'Delete custom wall type \"$name\"?';
+  }
+
+  @override
+  String get wallTypeDeleted => 'Wall type deleted.';
+
+  @override
   String get wallTypeInUse =>
       'Select a replacement for the walls using this type.';
 
@@ -7012,6 +7042,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectComponentSavedMsg => 'Component saved to custom library!';
 
   @override
+  String get architectComponentDelete => 'Delete from library';
+
+  @override
+  String get architectComponentDeleted => 'Component deleted from library';
+
+  @override
+  String architectComponentDeleteConfirm(String name) {
+    return 'Delete \"$name\" from library?';
+  }
+
+  @override
   String get architectComponentCompileBtn => 'Preview';
 
   @override
@@ -7246,6 +7287,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectLinePatternEditor => 'Custom pattern';
+
+  @override
+  String get architectLineDeleteConfirmTitle => 'Delete line style';
+
+  @override
+  String architectLineDeleteConfirmPrompt(String name) {
+    return 'Delete custom line style \"$name\"?';
+  }
+
+  @override
+  String get architectLineStyleDeleted => 'Line style deleted.';
 
   @override
   String get architectLineDash => 'Dash';
@@ -8208,6 +8260,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roofUiSaveDefaults => 'Use for future roofs';
+
+  @override
+  String get roofSaveLibrary => 'Save to library';
+
+  @override
+  String get roofDeleteLibrary => 'Delete from library';
+
+  @override
+  String get roofLibrarySaved => 'Roof build-up saved to library.';
+
+  @override
+  String get roofLibraryDeleted => 'Roof build-up deleted from library.';
+
+  @override
+  String roofDeleteConfirm(String name) {
+    return 'Delete \"$name\" from personal library?';
+  }
+
+  @override
+  String get roofCustomNamePrompt => 'Build-up name';
 
   @override
   String get roofUiScopeHelp =>

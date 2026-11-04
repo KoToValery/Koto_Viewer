@@ -80,7 +80,26 @@ class _TypesState extends State<ArchitectWallTypesManager> {
 
   Future<void> remove(ArchitectWallType type) async {
     var replacement = '';
-    if (uses(type.id) > 0) {
+    if (uses(type.id) == 0) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(ctx.l10n.delete),
+          content: Text(ctx.l10n.wallTypeDeleteConfirm(type.catalogLabel(ctx.l10n, project.units))),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(ctx.l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(ctx.l10n.delete),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    } else {
       final choices = project.wallTypes
           .where(
             (t) =>

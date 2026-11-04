@@ -341,6 +341,7 @@ class _ArchitectComponentLibraryDialogState
                       itemBuilder: (context, index) {
                         if (index >= definitions.length) {
                           final style = styles[index - definitions.length];
+                          final isCustomStyle = !presetIds.contains(style.id);
                           return _card(
                             style.localizedName(l),
                             '${(style.defaultWidth * 100).round()}×${(style.defaultHeight * 100).round()} cm',
@@ -355,6 +356,43 @@ class _ArchitectComponentLibraryDialogState
                               widget.onSelectFenestration?.call(style);
                               Navigator.of(context).pop();
                             },
+                            onDelete: isCustomStyle
+                                ? () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: Text(l.architectFenestrationDelete),
+                                        content: Text(
+                                          l.architectFenestrationDeleteConfirm(
+                                            style.localizedName(l),
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx, false),
+                                            child: Text(l.cancel),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () => Navigator.pop(ctx, true),
+                                            child: Text(l.delete),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true) {
+                                      await FenestrationLibraryService.instance
+                                          .deleteStyle(style.id);
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            l.architectFenestrationDeleteSuccess,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                : null,
                           );
                         }
                         final d = definitions[index];
@@ -389,6 +427,40 @@ class _ArchitectComponentLibraryDialogState
                                   initialScriptJson: d.rawSourceJson,
                                 )
                               : null,
+                          onDelete: d is ScriptedComponentDefinition
+                              ? () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: Text(l.architectComponentDelete),
+                                      content: Text(
+                                        l.architectComponentDeleteConfirm(
+                                          componentLabel(l, d),
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx, false),
+                                          child: Text(l.cancel),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          child: Text(l.delete),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    await library.deleteCustomScript(d.id);
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(l.architectComponentDeleted),
+                                      ),
+                                    );
+                                  }
+                                }
+                              : null,
                         );
                       },
                     ),
@@ -405,6 +477,7 @@ class _ArchitectComponentLibraryDialogState
     Widget preview,
     VoidCallback select, {
     VoidCallback? onEdit,
+    VoidCallback? onDelete,
   }) => Card(
     color: const Color(0xFF2A2A38),
     clipBehavior: Clip.antiAlias,
@@ -427,6 +500,16 @@ class _ArchitectComponentLibraryDialogState
                         tooltip: context.l10n.architectComponentStudioTitle,
                         icon: const Icon(Icons.code, size: 18),
                         onPressed: onEdit,
+                      ),
+                    ),
+                  if (onDelete != null)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      child: IconButton(
+                        tooltip: context.l10n.delete,
+                        icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                        onPressed: onDelete,
                       ),
                     ),
                 ],
