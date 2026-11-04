@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -255,9 +256,9 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
             ),
             title: Text(first.catalogGroupLabel(l, widget.unit)),
             subtitle: Text(
-              l.wallVariantCount(group.types.length),
+              l.wallVariantCount(group.types.length)),
+            trailing: AppIcon.fromMaterial(open ? Icons.expand_less : Icons.expand_more,
             ),
-            trailing: Icon(open ? Icons.expand_less : Icons.expand_more),
             onTap: () {
               setState(() => expanded[category] = open ? '' : group.key);
               _persist();
@@ -282,7 +283,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
               ),
               IconButton(
                 tooltip: l.search,
-                icon: const Icon(Icons.search),
+                icon: const AppIcon(AppIconId.search),
                 onPressed: () => setState(() {
                   search = !search;
                   if (!search) query.clear();
@@ -292,7 +293,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                 IconButton(
                   tooltip: l.close,
                   onPressed: widget.onClose,
-                  icon: const Icon(Icons.close),
+                  icon: const AppIcon(AppIconId.close),
                 ),
             ],
           ),
@@ -306,7 +307,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
               autofocus: true,
               decoration: InputDecoration(
                 hintText: l.wallPickerSearch,
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: const AppIcon(AppIconId.search),
                 isDense: true,
               ),
               onChanged: (_) => setState(() {}),
@@ -401,7 +402,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
               FilterChip(
                 key: const ValueKey('wall-favorites-filter'),
                 label: Text(l.wallFavorites),
-                avatar: const Icon(Icons.star_border, size: 18),
+                avatar: const AppIcon(AppIconId.star, size: 18),
                 selected: favoritesOnly,
                 onSelected: (v) => setState(() => favoritesOnly = v),
               ),
@@ -438,21 +439,21 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                   TextButton.icon(
                     key: const ValueKey('wall-type-add'),
                     onPressed: widget.onNewType,
-                    icon: const Icon(Icons.add),
+                    icon: const AppIcon(AppIconId.add),
                     label: Text(l.wallNewType),
                   )
                 else if (widget.onVariant != null)
                   TextButton.icon(
                     key: const ValueKey('wall-new-variant'),
                     onPressed: () => widget.onVariant!(base),
-                    icon: const Icon(Icons.add),
+                    icon: const AppIcon(AppIconId.add),
                     label: Text(l.wallVariant),
                   ),
                 const Spacer(),
                 if (widget.onManage != null)
                   TextButton.icon(
                     onPressed: widget.onManage,
-                    icon: const Icon(Icons.tune),
+                    icon: const AppIcon(AppIconId.properties),
                     label: Text(l.wallTypesShort),
                   ),
               ],
@@ -561,7 +562,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                         ),
                       if (selected) ...[
                         const SizedBox(width: 4),
-                        const Icon(Icons.check, size: 16),
+                        const AppIcon(AppIconId.confirm, size: 16),
                       ],
                     ],
                   ),
@@ -572,12 +573,19 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
               PopupMenuButton<String>(
                 tooltip: l.wallTypeDetails,
                 itemBuilder: (_) => [
-                  PopupMenuItem(value: 'copy', child: Text(l.wallTypeCopy)),
+                  PopupMenuItem(value: 'copy', child: AppMenuLabel(
+                      icon: AppIconId.duplicate,
+                      child: Text(l.wallTypeCopy),
+                    ),
+                  ),
                   if (widget.onDelete != null)
                     PopupMenuItem(
                       value: 'delete',
                       enabled: widget.canDelete?.call(type) ?? true,
-                      child: Text(l.delete),
+                      child: AppMenuLabel(
+                        icon: AppIconId.delete,
+                        child: Text(l.delete),
+                      ),
                     ),
                 ],
                 onSelected: (action) => action == 'copy'
@@ -589,8 +597,8 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                 key: ValueKey('wall-favorite-${type.id}'),
                 tooltip: l.wallFavoriteToggle,
                 isSelected: favorites.contains(type.id),
-                icon: const Icon(Icons.star_border),
-                selectedIcon: const Icon(Icons.star),
+                icon: const AppIcon(AppIconId.star),
+                selectedIcon: const AppIcon(AppIconId.star),
                 onPressed: () {
                   setState(() {
                     favorites.contains(type.id)
@@ -604,7 +612,9 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                 IconButton(
                   key: ValueKey('wall-delete-${type.id}'),
                   tooltip: l.delete,
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                  icon: const AppIcon(
+                    AppIconId.delete, color: Colors.redAccent, size: 20,
+                  ),
                   onPressed: () {
                     Navigator.maybePop(context);
                     widget.onDelete?.call(type);

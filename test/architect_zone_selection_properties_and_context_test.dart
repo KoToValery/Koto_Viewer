@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -88,7 +89,7 @@ void main() {
 
       expect(
         BimEditActions.icon(BimEditAction.schedule),
-        Icons.table_chart_rounded,
+        AppIconId.zoneSchedule,
       );
       expect(
         BimEditActions.label(BimEditAction.schedule, enL10n),

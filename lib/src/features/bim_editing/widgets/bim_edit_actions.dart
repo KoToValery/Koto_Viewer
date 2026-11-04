@@ -1,3 +1,4 @@
+import '../../../core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../scene/bim_element_adapter.dart';
@@ -53,29 +54,29 @@ class BimEditActions {
         BimEditAction.editGroup => l.bimEditGroup,
         BimEditAction.openView => l.architectOpenView,
       };
-  static IconData icon(BimEditAction action) => switch (action) {
-    BimEditAction.move => Icons.open_with_rounded,
-    BimEditAction.edit => Icons.edit_outlined,
-    BimEditAction.delete => Icons.delete_outline_rounded,
-    BimEditAction.duplicate => Icons.copy_all,
-    BimEditAction.rotate => Icons.rotate_right_rounded,
-    BimEditAction.flip => Icons.flip_rounded,
-    BimEditAction.properties => Icons.tune_rounded,
-    BimEditAction.split => Icons.call_split,
-    BimEditAction.cut => Icons.content_cut,
-    BimEditAction.cutOpening => Icons.cut_outlined,
-    BimEditAction.offset => Icons.straighten_rounded,
-    BimEditAction.newPoint => Icons.adjust,
-    BimEditAction.rename => Icons.drive_file_rename_outline_rounded,
-    BimEditAction.join => Icons.polyline_outlined,
-    BimEditAction.straighten => Icons.square_foot,
-    BimEditAction.mirrorMove => Icons.flip,
-    BimEditAction.mirrorCopy => Icons.copy_all,
-    BimEditAction.schedule => Icons.table_chart_rounded,
-    BimEditAction.group => Icons.group_work_outlined,
-    BimEditAction.ungroup => Icons.workspaces_outline,
-    BimEditAction.editGroup => Icons.edit_note,
-    BimEditAction.openView => Icons.visibility_outlined,
+  static AppIconId icon(BimEditAction action) => switch (action) {
+    BimEditAction.move => AppIconId.move,
+    BimEditAction.edit => AppIconId.edit,
+    BimEditAction.delete => AppIconId.delete,
+    BimEditAction.duplicate => AppIconId.duplicate,
+    BimEditAction.rotate => AppIconId.rotate,
+    BimEditAction.flip => AppIconId.flipHorizontal,
+    BimEditAction.properties => AppIconId.properties,
+    BimEditAction.split => AppIconId.split,
+    BimEditAction.cut => AppIconId.cut,
+    BimEditAction.cutOpening => AppIconId.cutOpening,
+    BimEditAction.offset => AppIconId.offset,
+    BimEditAction.newPoint => AppIconId.newPoint,
+    BimEditAction.rename => AppIconId.rename,
+    BimEditAction.join => AppIconId.join,
+    BimEditAction.straighten => AppIconId.straighten,
+    BimEditAction.mirrorMove => AppIconId.mirrorMove,
+    BimEditAction.mirrorCopy => AppIconId.mirrorCopy,
+    BimEditAction.schedule => AppIconId.zoneSchedule,
+    BimEditAction.group => AppIconId.group,
+    BimEditAction.ungroup => AppIconId.ungroup,
+    BimEditAction.editGroup => AppIconId.editGroup,
+    BimEditAction.openView => AppIconId.visible,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};
@@ -108,7 +109,7 @@ class BimActionButton extends StatelessWidget {
     this.tooltip,
     this.action,
   });
-  final IconData icon;
+  final AppIconId icon;
   final BimEditAction? action;
   final String label;
   final Color color;
@@ -150,7 +151,7 @@ class BimActionButton extends StatelessWidget {
 /// Shared drafting symbols, independent of map/navigation iconography.
 class BimEditingSymbol extends StatelessWidget {
   final BimEditAction? action;
-  final IconData? fallback;
+  final AppIconId? fallback;
   final double size;
   final Color? color;
   const BimEditingSymbol(
@@ -161,67 +162,9 @@ class BimEditingSymbol extends StatelessWidget {
     this.color,
   });
   @override
-  Widget build(BuildContext context) {
-    if (action != BimEditAction.newPoint && action != BimEditAction.join) {
-      return Icon(
+  Widget build(BuildContext context) => AppIcon(
         fallback ?? BimEditActions.icon(action!),
         size: size,
         color: color,
       );
     }
-    return SizedBox.square(
-      dimension: size,
-      child: CustomPaint(
-        painter: _DraftingSymbolPainter(
-          action!,
-          color ?? IconTheme.of(context).color ?? Colors.black,
-        ),
-      ),
-    );
-  }
-}
-
-class _DraftingSymbolPainter extends CustomPainter {
-  final BimEditAction action;
-  final Color color;
-  const _DraftingSymbolPainter(this.action, this.color);
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.save();
-    canvas.scale(size.width / 24, size.height / 24);
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-    if (action == BimEditAction.newPoint) {
-      canvas.drawCircle(const Offset(12, 12), 3, paint);
-      final ringPaint = Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8;
-      canvas.drawCircle(const Offset(12, 12), 7.5, ringPaint);
-    } else {
-      // Existing halves are solid; the proposed perpendicular junction is dashed.
-      canvas.drawLine(const Offset(5, 3), const Offset(5, 11), paint);
-      canvas.drawLine(const Offset(21, 19), const Offset(13, 19), paint);
-      final dashed = Paint()
-        ..color = color
-        ..strokeWidth = 2
-        ..strokeCap = StrokeCap.butt;
-      for (final distance in [0.0, 3.5, 7.0]) {
-        final end = (distance + 1.5).clamp(0.0, 8.0);
-        canvas.drawLine(Offset(5, 11 + distance), Offset(5, 11 + end), dashed);
-        canvas.drawLine(
-          Offset(13 - distance, 19),
-          Offset(13 - end, 19),
-          dashed,
-        );
-      }
-    }
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(_DraftingSymbolPainter old) =>
-      old.action != action || old.color != color;
-}

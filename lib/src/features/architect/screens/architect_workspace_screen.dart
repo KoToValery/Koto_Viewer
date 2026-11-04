@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../services/architect_selection_candidates.dart';
 import '../widgets/architect_candidate_picker.dart';
 import '../widgets/architect_wall_reference_control.dart';
@@ -640,15 +641,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             tooltip: l.architectSheets,
 
-            icon: const Icon(Icons.layers_outlined, color: Colors.white),
+            icon: const AppIcon(AppIconId.layers, color: Colors.white),
 
             onSelected: action,
 
             itemBuilder: (_) => [
 
-              PopupMenuItem(value: 'model', child: Text(l.architectModel)),
+              PopupMenuItem(value: 'model', child: AppMenuLabel(
+                  icon: AppIconId.view3D,
+                  child: Text(l.architectModel),
+                ),
+              ),
 
-              PopupMenuItem(value: 'sheets', child: Text(l.architectSheets)),
+              PopupMenuItem(value: 'sheets', child: AppMenuLabel(
+                  icon: AppIconId.file,
+                  child: Text(l.architectSheets),
+                ),
+              ),
 
               PopupMenuItem(
 
@@ -656,8 +665,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 enabled: available,
 
-                child: Text(l.architectPrintPreview),
+                child: AppMenuLabel(
+                  icon: AppIconId.print,
+                  child: Text(l.architectPrintPreview),
 
+              ),
               ),
 
               PopupMenuItem(
@@ -666,7 +678,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 enabled: available,
 
-                child: Text(l.architectAnnotationSettings),
+                child: AppMenuLabel(
+                  icon: AppIconId.properties,
+                  child: Text(l.architectAnnotationSettings),
+                ),
 
               ),
 
@@ -718,7 +733,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             onPressed: available ? () => action('preview') : null,
 
-            icon: Icon(_printPreview ? Icons.visibility : Icons.print_outlined),
+            icon: AppIcon.fromMaterial(_printPreview ? Icons.visibility : Icons.print_outlined,
+            ),
 
           ),
 
@@ -730,7 +746,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             onPressed: available ? () => action('annotations') : null,
 
-            icon: const Icon(Icons.text_fields),
+            icon: const AppIcon(AppIconId.text),
 
           ),
 
@@ -889,9 +905,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   ) {
 
     if (mode == 'new') {
-      _selectWorkspaceView(ArchitectWorkspaceView.plan, _modelCommands.project.activeStoreyId);
+      _selectWorkspaceView(ArchitectWorkspaceView.plan, _modelCommands.project.activeStoreyId,
+      );
       _changeTool(type == ArchitectWorkspaceView.section ? ArchitectTool.section : ArchitectTool.elevation,
-        toggle: false);
+        toggle: false,
+      );
       return;
     }
 
@@ -1177,7 +1195,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   ArchitectProject get _projectionModelProject {
 
-    final base = _withDrawingScale(_propertiesModelPreview ?? _modelCommands.project);
+    final base = _withDrawingScale(_propertiesModelPreview ?? _modelCommands.project,
+    );
 
     if (_selectedSectionRoofId == null ||
 
@@ -1268,7 +1287,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (e != null) {
 
         _facadeLoader.ensure(original, _workspaceViewKey,
-          () => ArchitectBuildingElevation.buildAsync(original, e));
+          () => ArchitectBuildingElevation.buildAsync(original, e),
+        );
         _facadeGeometry = _facadeLoader.data;
 
       }
@@ -1284,7 +1304,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (s != null) {
 
         _sectionLoader.ensure(original, _workspaceViewKey,
-          () async => (await ArchitectBuildingSection.buildAsync(original, s)).forView(s));
+          () async => (await ArchitectBuildingSection.buildAsync(original, s,
+          )).forView(s),
+        );
         _sectionGeometry = _sectionLoader.data;
 
       }
@@ -1728,11 +1750,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ArchitectTool.door =>
 
-        storey.walls.any((w) => w.doors.any((d) => d.id == id)),
+        storey.walls.any((w) => w.doors.any((d) => d.id == id),
+      ),
 
       ArchitectTool.window =>
 
-        storey.walls.any((w) => w.windows.any((win) => win.id == id)),
+        storey.walls.any((w) => w.windows.any((win) => win.id == id),
+      ),
 
       ArchitectTool.column => storey.columns.any((c) => c.id == id),
 
@@ -1761,21 +1785,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ArchitectTool.cadLine => storey.cadPrimitives
 
           .any((p) => p.id == id && (p.type == CadPrimitiveType.line ||
-              p.type == CadPrimitiveType.polyline)),
+              p.type == CadPrimitiveType.polyline),
+      ),
 
       ArchitectTool.cadRect => storey.cadPrimitives
 
-          .any((p) => p.id == id && p.type == CadPrimitiveType.rect),
+          .any((p) => p.id == id && p.type == CadPrimitiveType.rect,
+      ),
 
       ArchitectTool.floorDrain => storey.floorDrains.any((d) => d.id == id),
 
       ArchitectTool.cadCircle => storey.cadPrimitives
 
-          .any((p) => p.id == id && p.type == CadPrimitiveType.circle),
+          .any((p) => p.id == id && p.type == CadPrimitiveType.circle,
+      ),
 
       ArchitectTool.hatch => storey.cadPrimitives
 
-          .any((p) => p.id == id && p.type == CadPrimitiveType.hatch),
+          .any((p) => p.id == id && p.type == CadPrimitiveType.hatch,
+      ),
 
       ArchitectTool.axis => _project.gridAxes.any((a) => a.id == id),
 
@@ -2173,9 +2201,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final createdList = _roofTool.finishDraft(
 
-      storey: _project.activeStorey,
-
-    );
+      storey: _project.activeStorey);
 
     if (createdList != null && createdList.isNotEmpty) {
 
@@ -2964,7 +2990,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     if (tool == ArchitectTool.component) {
       final component = _project.activeStorey.components.where((c) => c.id == ids.single).firstOrNull;
-      if (component == null || ComponentLibraryService.instance.findDefinition(component.definitionId) == null) {
+      if (component == null || ComponentLibraryService.instance.findDefinition(component.definitionId,
+              ) == null) {
         return null;
       }
     }
@@ -4240,7 +4267,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (types.isEmpty) return ArchitectWallType.standardCatalog(includeSpecial: true);
     return [
       ...types,
-      for (final preset in ArchitectWallType.standardCatalog(includeSpecial: true))
+      for (final preset in ArchitectWallType.standardCatalog(includeSpecial: true,
+      ))
         if (preset.system.isSpecial &&
             !types.any((t) => t.system.kind == preset.system.kind)) preset,
     ];
@@ -4540,7 +4568,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           format: _project.formatLength,
           indexedObstacles: ArchitectClearanceObstacles.forWalls(draft == null
               ? _drawingProject.activeStorey.walls
-              : [..._drawingProject.activeStorey.walls, draft]),
+              : [..._drawingProject.activeStorey.walls, draft],
+          ),
           onEdit: _editWallArcDimension,
         );
       },
@@ -4556,7 +4585,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   ArchitectCadPrimitive? get _selectedPolyline => _effectiveSelection.length == 1
       ? _project.activeStorey.cadPrimitives.where((p) =>
           p.id == _effectiveSelection.single &&
-          p.type == CadPrimitiveType.polyline).firstOrNull
+          p.type == CadPrimitiveType.polyline,
+            ).firstOrNull
       : null;
 
   void _setCadPolylineMode(bool value) {
@@ -4598,7 +4628,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final host = CutArchitectContourOpening.target(_project.activeStorey, id);
     if (host == null) return;
     final ring = ArchitectPolygonEditor.hitContour(host.$1, host.$2,
-        point, _currentScale, offsetLengthPx: _handleOffsetLength);
+        point, _currentScale, offsetLengthPx: _handleOffsetLength,
+    );
     if (ring == null) return;
     if (_polygonContourElementId != id || _polygonContourIndex != ring) {
       _polygonSelectedEdge = null;
@@ -5060,7 +5091,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final ids = _effectiveSelection;
 
-    return _project.activeStorey.groups.where((g) => g.elementIds.length == ids.length && g.elementIds.containsAll(ids)).firstOrNull;
+    return _project.activeStorey.groups.where((g) => g.elementIds.length == ids.length && g.elementIds.containsAll(ids),
+        ).firstOrNull;
 
   }
 
@@ -5558,7 +5590,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _commitHatch({ArchitectClosedContour? contour}) {
 
-    final points = List<Offset>.unmodifiable(contour?.polygon ?? _elementTool.slabDraftPoints);
+    final points = List<Offset>.unmodifiable(contour?.polygon ?? _elementTool.slabDraftPoints,
+    );
 
     if (!ArchitectPolygonGeometry.valid(points)) { _operationError(); return; }
 
@@ -5573,7 +5606,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           type: CadPrimitiveType.hatch, startPoint: bounds.topLeft, endPoint: bounds.bottomRight,
 
           polygon: points, holes: contour?.holes ?? const [], hatchPattern: _activeHatchPattern,
-          colorValue: _activeHatchColor.argb, colorPresetId: _activeHatchColor.presetId)),
+          colorValue: _activeHatchColor.argb, colorPresetId: _activeHatchColor.presetId,
+          ),
+        ),
       applyDraftingDefaults: true,
     );
 
@@ -5623,7 +5658,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         storeyId: _project.activeStoreyId, elementId: id,
 
-        polygon: List.of(_elementTool.slabDraftPoints)));
+        polygon: List.of(_elementTool.slabDraftPoints),
+        ),
+      );
 
       _cutOpeningTargetId = null;
       _elementTool.cancelSlabDrafting();
@@ -5636,7 +5673,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
 
-        content: Text(context.l10n.architectCutOpeningInvalid)));
+        content: Text(context.l10n.architectCutOpeningInvalid)),
+      );
 
     }
 
@@ -5658,13 +5696,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         child: Padding(padding: const EdgeInsets.only(left: 12),
 
-          child: Text(context.l10n.architectCutOpening)),
-
-      )),
+          child: Text(context.l10n.architectCutOpening),
+            ),
+          ),
+        ),
 
       IconButton(key: const ValueKey('opening-draft-undo'),
 
-        tooltip: context.l10n.undoAction, icon: const Icon(Icons.undo),
+        tooltip: context.l10n.undoAction, icon: const AppIcon(AppIconId.undo),
 
         onPressed: _elementTool.slabDraftPoints.isEmpty ? null : () => setState(() {
 
@@ -5672,23 +5711,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           _elementTool.slabCandidatePoint = null;
 
-        })),
+        }),
+        ),
 
       if (_commandPreview == null) IconButton(key: const ValueKey('opening-draft-finish'),
 
         tooltip: context.l10n.architectCutOpening,
 
-        icon: const Icon(Icons.check),
+        icon: const AppIcon(AppIconId.confirm),
 
-        onPressed: _canConfirmContour ? _commitCutOpening : null),
+        onPressed: _canConfirmContour ? _commitCutOpening : null,
+          ),
 
       if (_commandPreview == null) IconButton(key: const ValueKey('opening-draft-cancel'),
 
-        tooltip: context.l10n.cancel, icon: const Icon(Icons.close),
+        tooltip: context.l10n.cancel, icon: const AppIcon(AppIconId.close),
 
-        onPressed: _cancelDrafting),
+        onPressed: _cancelDrafting,
+          ),
 
-    ]),
+    ],
+    ),
 
   );
 
@@ -5724,11 +5767,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         final polylineId = _polylineDraftId;
         if (polylineId != null && _project.activeStorey.cadPrimitives
-            .any((p) => p.id == polylineId)) {
+            .any((p) => p.id == polylineId,
+            )) {
           _commands.execute(SetArchitectElementProperties(
             storeyId: _project.activeStoreyId, elementIds: {polylineId},
             textValues: {'lineStyle': jsonEncode(style.toJson())},
-          ));
+          ),
+          );
           _saveBiMProjectIfAttached();
         }
 
@@ -5825,7 +5870,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           endPoint: sec.end,
           wallTypeId: 'section',
           thickness: 0.001,
-        )
+        ),
       ];
     }
     final elv = _project.elevations
@@ -5839,7 +5884,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           endPoint: elv.end,
           wallTypeId: 'elevation',
           thickness: 0.001,
-        )
+        ),
       ];
     }
     return _project.activeStorey.walls;
@@ -6115,7 +6160,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       draft = AddArchitectGroupMembers(storeyId: _project.activeStoreyId,
 
-        groupId: _editingGroupId!, elementIds: {copyId}).apply(draft);
+        groupId: _editingGroupId!, elementIds: {copyId},
+      ).apply(draft);
 
     }
 
@@ -6765,7 +6811,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             storeyId: activeStorey.id,
 
-            zone: _applyZoneFinishPresets(newZone).copyWith(kind: _activeZoneKind),
+            zone: _applyZoneFinishPresets(newZone,
+            ).copyWith(kind: _activeZoneKind),
 
           ),
       applyDraftingDefaults: true,
@@ -6905,7 +6952,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ? _viewport.toScreen(_newPointCandidate!) - event.localPosition
           : Offset.zero;
       _updateNewPointCandidate(
-        _screenToModel(event.localPosition + _newPointDragOffset), isTouch: _touchInput);
+        _screenToModel(event.localPosition + _newPointDragOffset), isTouch: _touchInput,
+      );
       return;
     }
 
@@ -7259,11 +7307,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       final clearance = _handleOffsetLength / _currentScale;
 
-      final handlePt = ArchitectFloorDrainPainterHelper.offsetHandle(selectedDrain, clearance);
+      final handlePt = ArchitectFloorDrainPainterHelper.offsetHandle(selectedDrain, clearance,
+      );
 
       final offsetTol = math.max(28.0 / _currentScale, 0.35);
 
-      final directTol = math.max(14.0 / _currentScale, selectedDrain.halfWidth + 0.1);
+      final directTol = math.max(14.0 / _currentScale, selectedDrain.halfWidth + 0.1,
+      );
 
       final hitOffset = _handleOffsetLength > 0 && (rawModel - handlePt).distance <= offsetTol;
 
@@ -7298,17 +7348,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         !_splitActive && _newPointTargetId == null) {
       final points = polyline.linePoints;
       final hit = ArchitectPolylineEditing.hit(
-          points, rawModel, _currentScale, _handleOffsetLength);
+          points, rawModel, _currentScale, _handleOffsetLength,
+      );
       if (hit != null) {
         final (index, isOffset) = hit;
         final point = points[index];
         final handle = isOffset ? ArchitectPolylineEditing.handle(
-            points, index, _currentScale, _handleOffsetLength) : point;
+            points, index, _currentScale, _handleOffsetLength,
+              ) : point;
         _polylineVertexIndex = index;
         _wallDragStart = index == 0;
         _wallEndpointOriginal = ArchitectWall(id: polyline.id,
           startPoint: points[index == 0 ? 0 : index - 1],
-          endPoint: points[index == 0 ? 1 : index], thickness: .001);
+          endPoint: points[index == 0 ? 1 : index], thickness: .001,
+        );
         _wallEndpointIsOffset = isOffset;
         _wallEndpointDisplacement = handle - point;
         _wallGrabOffset = handle - rawModel;
@@ -8228,7 +8281,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  ArchitectSnapResult _snapElement(Offset raw, {Offset? anchor, double? tolerancePixels}) {
+  ArchitectSnapResult _snapElement(Offset raw, {Offset? anchor, double? tolerancePixels,
+  }) {
 
     if (_splitActive && _splitGuidePerpendicular != null) {
 
@@ -8323,29 +8377,34 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   ArchitectSnapResult _snapTransformPoint(Offset raw, bool touch,
-      {bool selectionOnly = false, Offset? anchor}) {
+      {bool selectionOnly = false, Offset? anchor,
+  }) {
     final source = _rotationSource ?? _project;
     final tolerance = (touch ? 12 : 8) / _currentScale;
     if (selectionOnly) {
       return ArchitectSnapHelper.snapFree(rawPoint: raw, project: source,
         tolerance: tolerance, includedIds: _rotationIds,
-        midpointReferences: _midpointTracking.references);
+        midpointReferences: _midpointTracking.references,
+      );
     }
     if (anchor != null) {
       return ArchitectSnapHelper.snapWithAnchor(rawPoint: raw, anchor: anchor,
         project: source, tolerance: tolerance, magnetic: _magnetEnabled,
         alignment: true, midpointReferences: _midpointTracking.references,
         underlay: _currentUnderlayDoc, frame: widget.underlayFrame,
-        visibility: _underlayLayerVisibility);
+        visibility: _underlayLayerVisibility,
+      );
     }
     return ArchitectSnapHelper.snapFree(rawPoint: raw, project: source,
       tolerance: tolerance, magnetic: _magnetEnabled, alignment: true,
       midpointReferences: _midpointTracking.references,
       underlay: _currentUnderlayDoc, frame: widget.underlayFrame,
-      visibility: _underlayLayerVisibility);
+      visibility: _underlayLayerVisibility,
+    );
   }
 
-  (Offset, double) _snapComponent(Offset rawModel, ArchitectComponentDefinition def) {
+  (Offset, double) _snapComponent(Offset rawModel, ArchitectComponentDefinition def,
+  ) {
 
     if (def.placementMode == ComponentPlacementMode.wallAttached) {
 
@@ -8899,7 +8958,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   ArchitectCadPrimitive? get _selectedHatch => _effectiveSelection.length == 1
       ? _project.activeStorey.cadPrimitives.where((p) =>
-          p.id == _selectedElementId && p.type == CadPrimitiveType.hatch).firstOrNull
+          p.id == _selectedElementId && p.type == CadPrimitiveType.hatch,
+            ).firstOrNull
       : null;
 
   List<Offset>? get _selectedPolygon {
@@ -9139,9 +9199,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         },
 
-        math.min(12 / _currentScale, .20),
-
-      );
+        math.min(12 / _currentScale, .20));
 
       final snap = _polygonEditor.activeSnap;
 
@@ -9307,12 +9365,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         final polylineIndex = _polylineVertexIndex;
         final polyline = _elementMoveOriginal!.activeStorey.cadPrimitives
             .where((p) => p.id == original.id &&
-                p.type == CadPrimitiveType.polyline).firstOrNull;
+                p.type == CadPrimitiveType.polyline,
+            ).firstOrNull;
         _elementMovePreview = polylineIndex != null && polyline != null
             ? UpdateArchitectPolyline(
                 storeyId: _project.activeStoreyId, elementId: original.id,
                 points: ArchitectPolylineEditing.moveVertex(
-                    polyline.linePoints, polylineIndex, snap.point),
+                    polyline.linePoints, polylineIndex, snap.point,
+                ),
               ).apply(_elementMoveOriginal!)
             : _linearCommand(
 
@@ -9352,7 +9412,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       final clearance = _handleOffsetLength / _currentScale;
 
-      final handlePt = ArchitectFloorDrainPainterHelper.offsetHandle(original, clearance);
+      final handlePt = ArchitectFloorDrainPainterHelper.offsetHandle(original, clearance,
+      );
 
       final displacement = _drainDragIsOffset ? (handlePt - original.position) : Offset.zero;
 
@@ -9420,9 +9481,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           _linearEditWalls.any(
 
-            (w) => _groupDragIds.contains(w.id),
-
-          )) {
+            (w) => _groupDragIds.contains(w.id))) {
 
         final alignment = ArchitectWallAlignment.move(
 
@@ -9995,7 +10054,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_newPointTargetId != null) {
       _updateNewPointCandidate(
-        rawModel + _newPointDragOffset / _currentScale, isTouch: _touchInput);
+        rawModel + _newPointDragOffset / _currentScale, isTouch: _touchInput,
+      );
       return;
     }
 
@@ -10083,7 +10143,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final anchor = isPolyMode ? points.lastOrNull : null;
 
-    final snap = _snapElement(raw, anchor: anchor, tolerancePixels: _touchInput ? 18 : 12);
+    final snap = _snapElement(raw, anchor: anchor, tolerancePixels: _touchInput ? 18 : 12,
+    );
 
     final midpointSnap = snap.snapLabel == 'Midpoint' ||
 
@@ -10154,7 +10215,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         anchor: anchor,
         draftPoints: points,
         activeStorey: _project.activeStorey.walls.isEmpty
-            ? (ArchitectRoofGeometry.supportingWallStorey(_project, _project.activeStorey) ?? _project.activeStorey)
+            ? (ArchitectRoofGeometry.supportingWallStorey(_project, _project.activeStorey,
+                      ) ?? _project.activeStorey)
                 .copyWith(roofs: _project.activeStorey.roofs)
             : _project.activeStorey,
         currentSlopeDegrees: _roofTool.slopeDegrees,
@@ -10193,11 +10255,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final snapped = ArchitectApartmentZones.snapBoundary(point,
 
-      _project.activeStorey.walls, math.min(18 / _currentScale, .25));
+      _project.activeStorey.walls, math.min(18 / _currentScale, .25),
+    );
 
     return snapped == null ? null : ArchitectSnapResult(point: snapped,
 
-      isSnapped: true, snapLabel: context.l10n.architectApartment);
+      isSnapped: true, snapLabel: context.l10n.architectApartment,
+          );
 
   }
 
@@ -10241,7 +10305,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_activeTool == ArchitectTool.zone && _activeZoneKind == ArchitectZoneKind.apartment && _magnetEnabled) {
 
-      final boundary = ArchitectApartmentZones.snapBoundary(raw, _project.activeStorey.walls, math.min(18 / _currentScale, .25));
+      final boundary = ArchitectApartmentZones.snapBoundary(raw, _project.activeStorey.walls, math.min(18 / _currentScale, .25),
+      );
 
       if (boundary != null) {
 
@@ -10357,7 +10422,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_newPointTargetId != null) {
       _updateNewPointCandidate(
-        _screenToModel(event.localPosition + _newPointDragOffset), isTouch: _touchInput);
+        _screenToModel(event.localPosition + _newPointDragOffset), isTouch: _touchInput,
+      );
       _newPointDragOffset = Offset.zero;
       return;
     }
@@ -10673,7 +10739,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       final tables = ArchitectZonePainterHelper.scheduleTables(project: _project,
 
-        storey: current, l10n: context.l10n, viewKey: _workspaceViewKey, zoomScale: _currentScale);
+        storey: current, l10n: context.l10n, viewKey: _workspaceViewKey, zoomScale: _currentScale,
+      );
 
       final origins = {for (final t in tables) t.group.id: t.origin};
 
@@ -10687,9 +10754,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           zones: [for (final z in current.zones) z.isApartment
 
-            ? z.copyWith(scheduleOrigin: z.id == tableId ? newOrigin : origins[z.id]) : z],
+            ? z.copyWith(scheduleOrigin: z.id == tableId ? newOrigin : origins[z.id],
+                      ) : z,
+            ],
 
-        ));
+        ),
+        );
 
       });
 
@@ -10826,7 +10896,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       final source = _elementMoveOriginal ?? _project;
       final isCadContour = source.activeStorey.cadPrimitives
-          .any((p) => p.id == id && p.isPolygon);
+          .any((p) => p.id == id && p.isPolygon,
+      );
       final displacement = _polygonPrecisionMode && isCadContour && valid && changed
           ? ArchitectPolygonDisplacement.fromDrag(
               polygon: original, index: _polygonEditor.index!,
@@ -10839,7 +10910,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (displacement != null) {
         unawaited(_editPolygonDisplacement(
           id: id, holeIndex: holeIndex, source: source, drag: displacement,
-        ));
+        ),
+        );
         return;
       }
 
@@ -11102,13 +11174,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _effectiveSelection.isEmpty) {
 
-      final contour = ArchitectClosedContour.detect(_project.activeStorey, rawModel);
+      final contour = ArchitectClosedContour.detect(_project.activeStorey, rawModel,
+      );
 
       if (contour == null) {
 
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
 
-          content: Text(context.l10n.architectDrainRoomNotFound)));
+          content: Text(context.l10n.architectDrainRoomNotFound)),
+        );
 
       } else {
 
@@ -11126,13 +11200,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _effectiveSelection.isEmpty) {
 
-      final contour = ArchitectClosedContour.detect(_project.activeStorey, rawModel);
+      final contour = ArchitectClosedContour.detect(_project.activeStorey, rawModel,
+      );
 
       if (contour == null) {
 
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
 
-          content: Text(context.l10n.architectHatchAutoFailed)));
+          content: Text(context.l10n.architectHatchAutoFailed)),
+        );
 
       } else {
 
@@ -11856,7 +11932,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             _selectedElementId = null;
 
-            _commands.commit(_project.updateActiveStorey(updatedStorey), applyDraftingDefaults: true);
+            _commands.commit(_project.updateActiveStorey(updatedStorey), applyDraftingDefaults: true,
+            );
 
           });
 
@@ -11938,7 +12015,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           final (updatedProj, newAxis) = result;
 
-          setState(() => _commands.commit(updatedProj, applyDraftingDefaults: true));
+          setState(() => _commands.commit(updatedProj, applyDraftingDefaults: true),
+          );
 
           HapticFeedback.mediumImpact();
 
@@ -11966,7 +12044,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         if (result != null) {
 
-          setState(() => _commands.commit(result.$1, applyDraftingDefaults: true));
+          setState(() => _commands.commit(result.$1, applyDraftingDefaults: true),
+          );
 
           _saveBiMProjectIfAttached();
 
@@ -12300,7 +12379,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       setState(() {
 
-        _commands.commit(_project.updateActiveStorey(updatedStorey), applyDraftingDefaults: true);
+        _commands.commit(_project.updateActiveStorey(updatedStorey), applyDraftingDefaults: true,
+        );
 
         _isZoneTableSelected = true;
 
@@ -12490,7 +12570,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       final updatedComponents = [..._project.activeStorey.components, newComp];
 
-      final updatedStorey = _project.activeStorey.copyWith(components: updatedComponents);
+      final updatedStorey = _project.activeStorey.copyWith(components: updatedComponents,
+      );
 
       setState(() {
 
@@ -12504,7 +12585,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           ],
 
-        ), applyDraftingDefaults: true);
+        ), applyDraftingDefaults: true,
+        );
 
       });
 
@@ -12632,7 +12714,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           setState(() {
 
-            _commands.commit(_project.updateActiveStorey(res.$1), applyDraftingDefaults: true);
+            _commands.commit(_project.updateActiveStorey(res.$1), applyDraftingDefaults: true,
+            );
 
             _draftStart = null;
 
@@ -12706,7 +12789,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           setState(() {
 
-            _commands.commit(_project.updateActiveStorey(res.$1), applyDraftingDefaults: true);
+            _commands.commit(_project.updateActiveStorey(res.$1), applyDraftingDefaults: true,
+            );
 
           });
 
@@ -12796,7 +12880,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           setState(() {
 
-            _commands.commit(_project.updateActiveStorey(res.$1), applyDraftingDefaults: true);
+            _commands.commit(_project.updateActiveStorey(res.$1), applyDraftingDefaults: true,
+            );
 
             _draftStart = null;
 
@@ -13020,7 +13105,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       setState(() {
 
-        _commands.commit(_project.updateActiveStorey(updatedStorey), applyDraftingDefaults: true);
+        _commands.commit(_project.updateActiveStorey(updatedStorey), applyDraftingDefaults: true,
+        );
 
       });
 
@@ -13278,17 +13364,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final base = current.copyWith(zoneScheduleOrigin: origin, zones: [for (final z in current.zones)
 
-      z.isApartment ? z.copyWith(clearScheduleOrigin: true) : z]);
+      z.isApartment ? z.copyWith(clearScheduleOrigin: true) : z,
+      ],
+    );
 
     final tables = ArchitectZonePainterHelper.scheduleTables(project: _project,
 
-      storey: base, l10n: context.l10n, viewKey: _workspaceViewKey, zoomScale: _currentScale);
+      storey: base, l10n: context.l10n, viewKey: _workspaceViewKey, zoomScale: _currentScale,
+    );
 
     final origins = {for (final t in tables) t.group.id: t.origin};
 
     return base.copyWith(zones: [for (final z in base.zones)
 
-      z.isApartment ? z.copyWith(scheduleOrigin: origins[z.id]) : z]);
+      z.isApartment ? z.copyWith(scheduleOrigin: origins[z.id]) : z,
+      ],
+    );
 
   }
 
@@ -13318,7 +13409,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             ? _project.activeStorey.copyWith(clearZoneScheduleOrigin: true)
 
-            : _placedZoneSchedules(origin));
+            : _placedZoneSchedules(origin),
+          );
 
         });
 
@@ -13482,7 +13574,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             ),
 
-            icon: const Icon(Icons.check_rounded, size: 18),
+            icon: const AppIcon(AppIconId.confirm, size: 18),
 
             label: Text(
 
@@ -13687,7 +13779,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _commands.execute(GroupArchitectElements(storeyId: _project.activeStoreyId,
 
-        groupId: ArchitectElementId.next('group'), elementIds: ids));
+        groupId: ArchitectElementId.next('group'), elementIds: ids,
+        ),
+      );
 
       _saveBiMProjectIfAttached();
 
@@ -13697,7 +13791,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   }
 
-  void _placeDraftSegment(ArchitectModelCommand command, String id, bool chain) {
+  void _placeDraftSegment(ArchitectModelCommand command, String id, bool chain,
+  ) {
 
     final ids = {..._liveDraftChainIds, id};
 
@@ -13707,11 +13802,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         GroupArchitectElements(storeyId: _project.activeStoreyId,
 
-          groupId: ArchitectElementId.next('group'), elementIds: ids),
+          groupId: ArchitectElementId.next('group'), elementIds: ids,
+        ),
 
     ],
-      applyDraftingDefaults: true,
-    );
+      applyDraftingDefaults: true);
 
     if (chain) {
       _draftChainIds.add(id);
@@ -13731,10 +13826,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final label = String.fromCharCode(65 + (_project.sections.length % 26));
     final next = section ? _project.copyWith(sections: [..._project.sections,
       ArchitectSection(id: id, name: '${context.l10n.architectToolSection} $label-$label',
-        start: side == 1 ? draft.start : draft.end, end: side == 1 ? draft.end : draft.start),
-    ]) : _project.copyWith(elevations: [..._project.elevations,
-      ArchitectElevation(id: id, start: draft.start, end: draft.end, viewSide: side),
-    ]);
+        start: side == 1 ? draft.start : draft.end, end: side == 1 ? draft.end : draft.start,
+              ),
+    ],
+          ) : _project.copyWith(elevations: [..._project.elevations,
+      ArchitectElevation(id: id, start: draft.start, end: draft.end, viewSide: side,
+              ),
+    ],
+          );
     _viewDirectionDraft = null;
     _modelCommands.commit(next);
     setState(() {
@@ -13766,7 +13865,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         if ((end - _draftStart!).distance < .001) return;
         final existing = _project.activeStorey.cadPrimitives
             .where((p) => p.id == _polylineDraftId &&
-                p.type == CadPrimitiveType.polyline).firstOrNull;
+                p.type == CadPrimitiveType.polyline,
+            ).firstOrNull;
         final chain = continueChain ?? true;
         final id = existing?.id ?? ArchitectElementId.next('polyline');
         if (existing == null) {
@@ -13776,7 +13876,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               type: CadPrimitiveType.polyline,
               startPoint: _draftStart!, endPoint: end,
               polygon: [_draftStart!, end],
-              colorValue: 0xFF9E9E9E, lineStyle: _activeCadLineStyle),
+              colorValue: 0xFF9E9E9E, lineStyle: _activeCadLineStyle,
+              ),
           ),
       applyDraftingDefaults: true,
     );
@@ -13784,7 +13885,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _commands.execute(UpdateArchitectPolyline(
             storeyId: _project.activeStoreyId, elementId: id,
             points: [...existing.linePoints, end],
-          ));
+          ),
+          );
         }
         setState(() {
           _polylineDraftId = chain ? id : null;
@@ -13866,7 +13968,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if ((targetPoint - _draftStart!).distance < .01) return;
       setState(() {
         _viewDirectionDraft = (source: _project, tool: _activeTool,
-          start: _draftStart!, end: targetPoint);
+          start: _draftStart!, end: targetPoint,
+        );
         _draftStart = null;
         _draftEnd = null;
         _wallDirectionLocked = false;
@@ -13878,11 +13981,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       });
       // Keep both screen-space choices reachable even when the cut is drawn
       // near an edge of a phone viewport. Only the camera moves.
-      final centre = _viewport.toScreen((_viewDirectionDraft!.start + targetPoint) / 2);
+      final centre = _viewport.toScreen((_viewDirectionDraft!.start + targetPoint) / 2,
+      );
       final size = _viewport.size;
       if (size.width > 180 && size.height > 240) {
         _viewport.panBy(Offset(centre.dx.clamp(88, size.width - 88) - centre.dx,
-          centre.dy.clamp(144, size.height - 88) - centre.dy));
+          centre.dy.clamp(144, size.height - 88) - centre.dy,
+          ),
+        );
       }
       HapticFeedback.selectionClick();
       return;
@@ -14698,7 +14804,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 onTap: _cancelCutSession,
 
-                child: const Icon(Icons.close, color: Colors.white70, size: 18),
+                child: const AppIcon(
+                    AppIconId.close, color: Colors.white70, size: 18,
+                  ),
 
               ),
 
@@ -14964,9 +15072,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 padding: EdgeInsets.zero,
 
-                icon: const Icon(
-
-                  Icons.close,
+                icon: const AppIcon(
+                    AppIconId.close,
 
                   size: 16,
 
@@ -15383,7 +15490,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Widget _buildWallClearanceOverlay() => Positioned.fill(
     child: AnimatedBuilder(
-      animation: Listenable.merge([_viewport, _previewRevision, UiSettingsService.contextMenu]),
+      animation: Listenable.merge([_viewport, _previewRevision, UiSettingsService.contextMenu,
+      ]),
       builder: (context, child) {
         final clearances = _wallClearances;
         final openings = _draggingElementId == null
@@ -15395,9 +15503,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         final walls = (_elementMovePreview ?? _project).activeStorey.walls;
         final obstacles = ArchitectClearanceObstacles.forWalls(walls);
         bool intersectsWall(Rect rect) => obstacles.intersects(Rect.fromPoints(
-          _viewport.toModel(rect.topLeft), _viewport.toModel(rect.bottomRight)));
+          _viewport.toModel(rect.topLeft), _viewport.toModel(rect.bottomRight),
+          ),
+        );
         final available = Rect.fromLTRB(8, 64,
-          _viewport.size.width - 8, _viewport.size.height - 80);
+          _viewport.size.width - 8, _viewport.size.height - 80,
+        );
         final bounds = (Offset.zero & _viewport.size).deflate(8);
         final excluded = <Rect>[
           if (_radialMenuScreenPosition != null && _radialMenuItems.isNotEmpty)
@@ -15435,7 +15546,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           final segment = BimLineGeometry.visibleSegment(start, end, available);
           final rect = ArchitectClearanceBadgeLayout.place(
             preferred: segment == null ? (start + end) / 2 : (segment.$1 + segment.$2) / 2,
-            size: ArchitectClearanceBadgeLayout.openingSize(_currentScale, available),
+            size: ArchitectClearanceBadgeLayout.openingSize(_currentScale, available,
+            ),
             available: available, excluded: excluded, intersectsWall: intersectsWall,
           );
           openingRects[gap.key] = rect;
@@ -15445,8 +15557,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         return Stack(children: [
           Positioned.fill(child: IgnorePointer(child: CustomPaint(
             key: const ValueKey('architect-dynamic-dimensions'),
-            painter: ArchitectDynamicDimensionPainter(dimensions.values.toList()),
-          ))),
+            painter: ArchitectDynamicDimensionPainter(dimensions.values.toList(),
+                  ),
+                ),
+              ),
+            ),
           for (final gap in clearances)
             Positioned.fromRect(
               rect: dimensions[gap.key]!.label,
@@ -15458,7 +15573,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(4),
                     side: BorderSide(color: _activeWallClearanceKey == gap.key
-                        ? const Color(0xff006e91) : const Color(0xff78818a), width: .7),
+                        ? const Color(0xff006e91) : const Color(0xff78818a), width: .7,
+                        ),
                   ),
                   child: InkWell(
                     key: ValueKey('wall-clearance-${gap.key}'),
@@ -15473,14 +15589,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       child: FittedBox(fit: BoxFit.scaleDown, child: Text(
                         gap.atStart == null ? _project.formatLength(gap.distance)
                             : context.l10n.architectWallEndpointValue(
-                                gap.atStart! ? 1 : 2, _project.formatLength(gap.distance)),
+                                gap.atStart! ? 1 : 2, _project.formatLength(gap.distance),
+                                      ),
                         style: const TextStyle(color: Color(0xff20252a), fontSize: 12,
-                          fontWeight: FontWeight.w500),
-                      )),
-                    )),
+                          fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              )),
             ),
           for (final gap in openings)
             Positioned.fromRect(
@@ -15495,7 +15616,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     child: Material(
                       color: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3),
-                        side: const BorderSide(color: Color(0xff78818a), width: .7)),
+                        side: const BorderSide(color: Color(0xff78818a), width: .7,
+                            ),
+                          ),
                       child: InkWell(
                         onTap: () {
                           setState(() => _radialMenuScreenPosition = null);
@@ -15503,14 +15626,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         },
                         child: Center(child: Text(_project.formatLength(gap.distance),
                           style: TextStyle(color: const Color(0xff20252a), fontSize: 11,
-                            fontWeight: gap.isModularSnap ? FontWeight.w600 : FontWeight.normal))),
+                            fontWeight: gap.isModularSnap ? FontWeight.w600 : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              )),
             ),
-        ]);
+        ],
+        );
       },
     ),
   );
@@ -15732,7 +15860,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     borderRadius: BorderRadius.circular(8),
 
-                    side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                    side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
 
                   ),
 
@@ -15764,7 +15893,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                               : context.l10n.architectEdgePullHint,
 
-                          icon: Icon(
+                          icon: AppIcon.fromMaterial(
 
                             mode == ArchitectPolygonEdgeMode.move
 
@@ -15778,7 +15907,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                 ? Theme.of(context).colorScheme.primary
 
-                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                                : Theme.of(context,
+                                  ).colorScheme.onSurfaceVariant,
 
                           ),
 
@@ -15793,22 +15923,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         ),
 
                       if (_project.activeStorey.cadPrimitives
-                          .any((p) => p.id == targetId && p.isPolygon))
+                          .any((p) => p.id == targetId && p.isPolygon,
+                      ))
                       IconButton(
                         key: const ValueKey('polygon-exact-offset'),
-                        constraints: const BoxConstraints.tightFor(width: 36, height: 44),
+                        constraints: const BoxConstraints.tightFor(width: 36, height: 44,
+                          ),
                         padding: EdgeInsets.zero,
                         tooltip: context.l10n.architectPolygonExactOffsetHint,
                         isSelected: _polygonPrecisionMode,
                         color: _polygonPrecisionMode
                             ? Theme.of(context).colorScheme.primary
                             : Theme.of(context).colorScheme.onSurfaceVariant,
-                        selectedIcon: const Icon(Icons.dialpad, size: 20),
-                        icon: const Icon(Icons.dialpad_outlined, size: 20),
+                        selectedIcon: const AppIcon(
+                            AppIconId.layoutGrid, size: 20,
+                          ),
+                        icon: const AppIcon(AppIconId.layoutGrid, size: 20),
                         onPressed: _polygonDistanceOpen || _polygonEditor.active
                             ? null
                             : () => setState(() =>
-                                _polygonPrecisionMode = !_polygonPrecisionMode),
+                                _polygonPrecisionMode = !_polygonPrecisionMode,
+                                ),
                       ),
                       Expanded(
 
@@ -15832,7 +15967,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                   style: TextStyle(
 
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(context,
+                                    ).colorScheme.onSurfaceVariant,
 
                                     fontSize: 12,
 
@@ -15848,9 +15984,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                     : context.l10n.architectOffsetContourHint;
                                 if (constraints.maxWidth < 110) {
                                   return IconButton(
-                                    key: const ValueKey('polygon-edge-offset'),
+                                    key: const ValueKey('polygon-edge-offset',
+                                      ),
                                     tooltip: hint,
-                                    icon: const Icon(Icons.swap_vert, size: 20),
+                                    icon: const AppIcon(
+                                        AppIconId.swapVertical, size: 20,
+                                      ),
                                     onPressed: _polygonDistanceOpen ? null
                                         : () => _editPolygonDistance(null),
                                   );
@@ -15861,7 +16000,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                 style: TextButton.styleFrom(
 
-                                  foregroundColor: Theme.of(context).colorScheme.primary,
+                                  foregroundColor: Theme.of(context,
+                                      ).colorScheme.primary,
 
                                 ),
 
@@ -15875,7 +16015,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                   message: _selectedHatch == null
                                       ? context.l10n.architectZoneOffset
                                       : context.l10n.architectOffsetContourHint,
-                                  child: const Icon(Icons.swap_vert, size: 18),
+                                  child: const AppIcon(
+                                        AppIconId.swapVertical, size: 18,
+                                      ),
                                 ),
 
                                 label: Text(
@@ -15889,26 +16031,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                 ),
 
                               );
-                              }),
+                              },
+                              ),
 
                       ),
 
                       if (_selectedHatch != null) ...[
                         IconButton(
-                          constraints: const BoxConstraints.tightFor(width: 36, height: 44),
+                          constraints: const BoxConstraints.tightFor(width: 36, height: 44,
+                          ),
                           padding: EdgeInsets.zero,
                           key: const ValueKey('hatch-edit-new-point'),
                           tooltip: context.l10n.bimNewPoint,
-                          icon: const Icon(Icons.add_location_alt_outlined, size: 20),
+                          icon: const AppIcon(AppIconId.locationAdd, size: 20),
                           onPressed: _polygonDistanceOpen ? null
                               : () => _startNewPointSession(_selectedHatch!.id),
                         ),
                         IconButton(
-                          constraints: const BoxConstraints.tightFor(width: 36, height: 44),
+                          constraints: const BoxConstraints.tightFor(width: 36, height: 44,
+                          ),
                           padding: EdgeInsets.zero,
                           key: const ValueKey('hatch-edit-properties'),
                           tooltip: context.l10n.architectProperties,
-                          icon: const Icon(Icons.tune, size: 20),
+                          icon: const AppIcon(AppIconId.properties, size: 20),
                           onPressed: _polygonDistanceOpen ? null : _showProperties,
                         ),
                       ],
@@ -15940,9 +16085,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                               }),
 
-                        icon: Icon(
-
-                          Icons.check,
+                        icon: AppIcon(
+                          AppIconId.confirm,
 
                           size: 20,
 
@@ -15991,7 +16135,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final unit = source.units;
     // The initial preview uses exactly the value displayed by the keypad.
     final initial = double.parse(unit.toUnit(drag.distance)
-        .toStringAsFixed(source.distanceDecimals));
+        .toStringAsFixed(source.distanceDecimals),
+    );
     var meters = unit.fromUnit(initial);
     List<Offset>? candidate;
     var saved = false;
@@ -16028,13 +16173,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Material(
-                  color: Theme.of(dialogContext).colorScheme.surfaceContainerHigh,
+                  color: Theme.of(dialogContext,
+                    ).colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(padding: const EdgeInsets.all(8),
                     child: Text(drag.edge
                         ? context.l10n.architectEdgeOffsetHint
                         : context.l10n.architectVertexOffsetHint,
-                      style: const TextStyle(fontSize: 12))),
+                      style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
                 ),
                 const SizedBox(height: 6),
                 ArchitectShapeDimensionPanel(
@@ -16057,20 +16205,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       _commands.execute(UpdateArchitectPolygon(
                         storeyId: source.activeStoreyId, elementId: id,
                         polygon: candidate!, holeIndex: holeIndex,
-                      ));
+                      ),
+                        );
                       _saveBiMProjectIfAttached();
                     }
                     saved = true;
                     _polygonSelectedEdge = drag.edge
                         ? ArchitectPolygonDimensions.hitEdge(
-                            candidate!, drag.target(meters), .001)
+                            candidate!, drag.target(meters), .001,
+                            )
                         : null;
                     Navigator.of(dialogContext).pop();
                   },
                   onCancel: () => Navigator.of(dialogContext).pop(),
                 ),
               ],
-            )),
+            ),
+            ),
           ),
         ),
       );
@@ -16595,7 +16746,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _beginGeometryCommand(_commandAction ??
         (command is MirrorArchitectWalls ? ArchitectRadialAction.flip :
          command is TrimArchitectWall || command is CutArchitectWalls
-             ? ArchitectRadialAction.cut : ArchitectRadialAction.edit));
+             ? ArchitectRadialAction.cut : ArchitectRadialAction.edit),
+    );
 
     try {
 
@@ -16884,9 +17036,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _commands.commit(_project.updateActiveStorey(
 
-        activeStorey.copyWith(walls: updatedWalls),
-
-      ), applyDraftingDefaults: true);
+        activeStorey.copyWith(walls: updatedWalls)), applyDraftingDefaults: true,
+      );
 
     });
 
@@ -17382,7 +17533,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             children: [
 
-              const Icon(Icons.swap_vert, size: 18),
+              const AppIcon(AppIconId.swapVertical, size: 18),
 
               const SizedBox(width: 8),
 
@@ -17402,7 +17553,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             children: [
 
-              const Icon(Icons.vertical_align_bottom, size: 18),
+              const AppIcon(AppIconId.alignBottom, size: 18),
 
               const SizedBox(width: 8),
 
@@ -17422,7 +17573,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             children: [
 
-              const Icon(Icons.layers_outlined, size: 18),
+              const AppIcon(AppIconId.layers, size: 18),
 
               const SizedBox(width: 8),
 
@@ -17442,7 +17593,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             children: [
 
-              const Icon(Icons.swap_horiz, size: 18),
+              const AppIcon(AppIconId.swapHorizontal, size: 18),
 
               const SizedBox(width: 8),
 
@@ -17462,7 +17613,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             children: [
 
-              const Icon(Icons.delete_outline, size: 18),
+              const AppIcon(AppIconId.delete, size: 18),
 
               const SizedBox(width: 8),
 
@@ -17642,14 +17793,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final items = _buildElementRadialMenuItems(elementId);
 
-    if (_commands.isPlan && ArchitectRotation.supports(_project.activeStorey, _effectiveSelection) &&
+    if (_commands.isPlan && ArchitectRotation.supports(_project.activeStorey, _effectiveSelection,
+        ) &&
         !items.any((item) => item.action == ArchitectRadialAction.rotate)) {
-      items.add(_radialItem(action: ArchitectRadialAction.rotate, color: const Color(0xFF40C4FF)));
+      items.add(_radialItem(action: ArchitectRadialAction.rotate, color: const Color(0xFF40C4FF),
+        ),
+      );
     }
 
     if (!_is3DView && ArchitectOffset.supports(_project.activeStorey, _effectiveSelection)) {
 
-      items.add(_radialItem(action: ArchitectRadialAction.offset, color: const Color(0xFF80CBC4)));
+      items.add(_radialItem(action: ArchitectRadialAction.offset, color: const Color(0xFF80CBC4),
+        ),
+      );
 
     }
 
@@ -17661,9 +17817,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         items.addAll([
 
-          _radialItem(action: ArchitectRadialAction.ungroup, color: const Color(0xFF80CBC4)),
+          _radialItem(action: ArchitectRadialAction.ungroup, color: const Color(0xFF80CBC4),
+          ),
 
-          _radialItem(action: ArchitectRadialAction.editGroup, color: const Color(0xFF80CBC4)),
+          _radialItem(action: ArchitectRadialAction.editGroup, color: const Color(0xFF80CBC4),
+          ),
 
         ]);
 
@@ -17671,9 +17829,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           _project.activeStorey.groupableIds.containsAll(_effectiveSelection) &&
 
-          !_project.activeStorey.groups.any((g) => g.elementIds.any(_effectiveSelection.contains))) {
+          !_project.activeStorey.groups.any((g) => g.elementIds.any(_effectiveSelection.contains),
+          )) {
 
-        items.add(_radialItem(action: ArchitectRadialAction.group, color: const Color(0xFF80CBC4)));
+        items.add(_radialItem(action: ArchitectRadialAction.group, color: const Color(0xFF80CBC4),
+          ),
+        );
 
       }
 
@@ -18466,7 +18627,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       items.add(_radialItem(action: ArchitectRadialAction.cutOpening,
 
-        color: const Color(0xFF80CBC4)));
+        color: const Color(0xFF80CBC4),
+        ),
+      );
 
     }
 
@@ -18550,7 +18713,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (initialPick != null) _selectPolygonContour(initialPick);
     final holeIndex = _selectedPolygonHoleIndex;
     final source = _project.activeStorey;
-    final path = InsertArchitectElementPoint.pathOf(source, id, holeIndex: holeIndex);
+    final path = InsertArchitectElementPoint.pathOf(source, id, holeIndex: holeIndex,
+    );
     if (path == null || path.points.length < 2) {
       _cancelGeometryCommand();
       return;
@@ -18571,7 +18735,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       source, id, (path.points[0] + path.points[1]) / 2,
       atMidpoint: true, holeIndex: holeIndex,
     )!.point;
-    final hit = InsertArchitectElementPoint.locate(source, id, seed, holeIndex: holeIndex)!;
+    final hit = InsertArchitectElementPoint.locate(source, id, seed, holeIndex: holeIndex,
+    )!;
     final wall = source.walls.where((w) => w.id == id).firstOrNull;
     final edge = path.points[(hit.edge + 1) % path.points.length] - path.points[hit.edge];
     final tangent = wall?.tangentAt(hit.ratio) ?? edge / edge.distance;
@@ -18617,7 +18782,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final source = _newPointSource ?? _project.activeStorey;
     final curvedTarget = source.walls.where((w) => w.id == _newPointTargetId && w.isCurved).firstOrNull;
     if (curvedTarget != null) {
-      var hit = InsertArchitectElementPoint.locate(source, curvedTarget.id, rawModel)!;
+      var hit = InsertArchitectElementPoint.locate(source, curvedTarget.id, rawModel,
+      )!;
       String? label;
       final mid = curvedTarget.referencePointAt(.5);
       if ((hit.point - mid).distance * _currentScale <= 16) {
@@ -19208,14 +19374,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _setNewPointCandidate(Offset candidate, String? snapLabel,
-      List<(Offset, Offset)> guides) {
+      List<(Offset, Offset)> guides,
+  ) {
     final wasValid = _newPointValid;
     _newPointCandidate = candidate;
     _newPointValid = InsertArchitectElementPoint.canInsert(
       _newPointSource ?? _project.activeStorey, _newPointTargetId!, candidate,
       holeIndex: _newPointHoleIndex,
     );
-    _newPointLeaderLine = (candidate, candidate + _newPointGripOffset / _currentScale);
+    _newPointLeaderLine = (candidate, candidate + _newPointGripOffset / _currentScale,
+    );
     _activeSnapLabel = snapLabel;
     _activeMagneticGuides = guides;
     _cursorModel = candidate;
@@ -19406,7 +19574,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 onTap: _cancelNewPointSession,
 
-                child: const Icon(Icons.close, color: Colors.white70, size: 18),
+                child: const AppIcon(
+                      AppIconId.close, color: Colors.white70, size: 18,
+                    ),
 
               ),
 
@@ -19418,7 +19588,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ),
 
-    ));
+    ),
+    );
 
   }
 
@@ -19433,7 +19604,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _commands.execute(GroupArchitectElements(storeyId: _project.activeStoreyId,
 
-        groupId: ArchitectElementId.next('group'), elementIds: ids));
+        groupId: ArchitectElementId.next('group'), elementIds: ids,
+        ),
+      );
 
       setState(() {
 
@@ -19458,7 +19631,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (group == null) return;
 
-    _commands.execute(UngroupArchitectElements(storeyId: _project.activeStoreyId, groupId: group.id));
+    _commands.execute(UngroupArchitectElements(storeyId: _project.activeStoreyId, groupId: group.id,
+      ),
+    );
 
     _clearSelection(); _saveBiMProjectIfAttached();
 
@@ -19505,13 +19680,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     child: Padding(padding: const EdgeInsets.only(left: 12), child: Row(children: [
 
-      Expanded(child: Text(context.l10n.bimInsideGroup, overflow: TextOverflow.ellipsis)),
+      Expanded(child: Text(context.l10n.bimInsideGroup, overflow: TextOverflow.ellipsis,
+            ),
+          ),
 
       TextButton(key: const ValueKey('architect-group-done'), onPressed: _exitGroup,
 
-        child: Text(context.l10n.bimGroupDone)),
+        child: Text(context.l10n.bimGroupDone),
+          ),
 
-    ])),
+    ],
+      ),
+    ),
 
   );
 
@@ -19551,7 +19731,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (action == ArchitectRadialAction.rotate && _commands.isPlan &&
-        ArchitectRotation.supports(_project.activeStorey, _effectiveSelection)) {
+        ArchitectRotation.supports(_project.activeStorey, _effectiveSelection,
+        )) {
       _startRotation();
       return;
     }
@@ -20276,16 +20457,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_touchInput && invalidateGesture) {
       final ids = _touchHits(point);
       setState(() => _touchCandidates = ids.length > 1
-          ? ArchitectSelectionCandidates(ids, point) : null);
+          ? ArchitectSelectionCandidates(ids, point) : null,
+      );
       if (ids.isEmpty) return false;
       if (ids.length > 1 && _multiSelect) return true;
       return _applySelectionId(ids.first, point,
-        invalidateGesture: invalidateGesture, toggle: toggle, direct: ids.length > 1);
+        invalidateGesture: invalidateGesture, toggle: toggle, direct: ids.length > 1,
+      );
     }
     final id = _nextSelection(point, advance: invalidateGesture);
     if (id == null) return false;
     return _applySelectionId(id, point,
-      invalidateGesture: invalidateGesture, toggle: toggle);
+      invalidateGesture: invalidateGesture, toggle: toggle,
+    );
   }
 
   bool _applySelectionId(String id, Offset point, {
@@ -20357,7 +20541,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         final current=Set<String>.of(_effectiveSelection);
         final members=_commands.isPlan && _editingGroupId==null
             ? _project.activeStorey.expandGroups({id}) : {id};
-        _selectionIds..clear()..addAll(ArchitectMarqueeTool.combine(current,members,_selectionOperation));
+        _selectionIds..clear()..addAll(ArchitectMarqueeTool.combine(current,members,_selectionOperation),
+          );
       } else if (shouldMulti) {
 
         if (_selectionIds.isEmpty && _selectedElementId != null) {
@@ -20390,7 +20575,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           ..clear()
 
-          ..addAll(_commands.isPlan && _editingGroupId == null ? _project.activeStorey.expandGroups({id}) : {id});
+          ..addAll(_commands.isPlan && _editingGroupId == null ? _project.activeStorey.expandGroups({id}) : {id},
+          );
 
       }
 
@@ -20488,7 +20674,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       setState(() {
         _polygonEditId = id;
         _polygonSelectedEdge = ArchitectPolygonDimensions.hitEdge(
-          _selectedPolygon!, point, 18 / _currentScale);
+          _selectedPolygon!, point, 18 / _currentScale,
+        );
       });
     }
     return true;
@@ -20542,7 +20729,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if(overlay.bottom>0 && render is RenderBox && render.hasSize){
       final canvasBottom=render.localToGlobal(Offset.zero).dy+render.size.height;
       final panelTop=MediaQuery.sizeOf(context).height-overlay.bottom;
-      bottom=(canvasBottom-panelTop).clamp(0.0,math.max(0,render.size.height-80));
+      bottom=(canvasBottom-panelTop).clamp(0.0,math.max(0,render.size.height-80),
+      );
     }
     final next=EdgeInsets.only(right:overlay.right,bottom:bottom);
     if(next!=_propertiesDrawingInsets)setState(()=>_propertiesDrawingInsets=next);
@@ -20971,7 +21159,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     );
 
-    final route = ArchitectRoofDrainageGeometry.route(project, floor, next, pipe);
+    final route = ArchitectRoofDrainageGeometry.route(project, floor, next, pipe,
+    );
 
     if (route.status != ArchitectDownpipeStatus.ready) {
 
@@ -20987,7 +21176,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       };
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context,
+      ).showSnackBar(SnackBar(content: Text(message)));
 
       return;
 
@@ -21069,7 +21259,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _saveBiMProjectIfAttached();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(context.l10n.architectRoofAutoCreated(generated.length)),
+          content: Text(context.l10n.architectRoofAutoCreated(generated.length),
+          ),
         ),
       );
     } on ArgumentError {
@@ -21113,9 +21304,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         );
         _restoreWallType();
         _saveBiMProjectIfAttached();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.wallTypeDeleted)),
-        );
+        ScaffoldMessenger.of(context,
+        ).showSnackBar(
+          SnackBar(content: Text(l.wallTypeDeleted)));
       } on ArgumentError {
         _operationError();
       }
@@ -21808,7 +21999,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
       return;
     }
-    final result=ArchitectMarqueeTool.combine(Set<String>.of(_effectiveSelection),_marqueeHits(polygon),_activeSelectionOperation);
+    final result=ArchitectMarqueeTool.combine(Set<String>.of(_effectiveSelection),_marqueeHits(polygon),_activeSelectionOperation,
+    );
     setState(() {
       _selectionIds..clear()..addAll(result);
       _selectionBoxDown = null;
@@ -21939,7 +22131,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   tooltip: l.architectWallFlipSide,
 
-                  icon: const Icon(Icons.flip, color: Color(0xFF00E5FF)),
+                  icon: const AppIcon(
+                    AppIconId.flipHorizontal, color: Color(0xFF00E5FF),
+                  ),
 
                   onPressed: () => _executeWallEdit(
 
@@ -21986,8 +22180,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       mainAxisSize: MainAxisSize.min,
 
                       children: [
-
-                        Icon(
+                        AppIcon.fromMaterial(
 
                           switch (currentRefLine) {
 
@@ -22045,9 +22238,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         ),
 
-                        const Icon(
-
-                          Icons.arrow_drop_down,
+                        const AppIcon(
+                          AppIconId.expandMore,
 
                           size: 16,
 
@@ -22084,8 +22276,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           mainAxisSize: MainAxisSize.min,
 
                           children: [
-
-                            Icon(
+                            AppIcon.fromMaterial(
 
                               ref == currentRefLine
 
@@ -22163,9 +22354,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   tooltip: l.architectWallCut,
 
-                  icon: Icon(
-
-                    Icons.content_cut,
+                  icon: AppIcon(
+                    AppIconId.cut,
 
                     color: (_wallCutIds.isNotEmpty && !_wallCutStroke)
 
@@ -22197,9 +22387,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   tooltip: l.architectWallSplit,
 
-                  icon: Icon(
-
-                    Icons.call_split,
+                  icon: AppIcon(
+                    AppIconId.split,
 
                     color: _splitActive ? Colors.amber : Colors.white,
 
@@ -22275,9 +22464,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     tooltip: l.architectWallExtend,
 
-                    icon: Icon(
-
-                      Icons.open_in_full,
+                    icon: AppIcon(
+                      AppIconId.fullscreen,
 
                       color: _wallExtendId == wallIds.single
 
@@ -22344,9 +22532,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         tooltip: l.architectWallOvershootTooltip,
 
-                        icon: const Icon(
-
-                          Icons.auto_fix_high_rounded,
+                        icon: const AppIcon(
+                          AppIconId.auto,
 
                           color: Colors.amberAccent,
 
@@ -22667,7 +22854,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       updated = AddArchitectGroupMembers(storeyId: _project.activeStoreyId,
 
-        groupId: _editingGroupId!, elementIds: copyIds.toSet()).apply(updated);
+        groupId: _editingGroupId!, elementIds: copyIds.toSet(),
+      ).apply(updated);
 
     }
 
@@ -22700,7 +22888,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final ids = Set<String>.of(_effectiveSelection);
     if (!ArchitectRotation.supports(_project.activeStorey, ids)) return;
     final bounds = [for (final id in ids)
-      if (ArchitectSelection.bounds(_project, id) case final Rect r) r];
+      if (ArchitectSelection.bounds(_project, id) case final Rect r) r,
+    ];
     if (bounds.isEmpty) return;
     _cancelActiveDrags();
     setState(() {
@@ -22729,10 +22918,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }
         final hatch = _project.activeStorey.cadPrimitives.where((p) =>
           p.id == ids.single && p.type == CadPrimitiveType.hatch &&
-          !p.hatchPattern.isSolid && p.hatchPattern.layers.isNotEmpty).firstOrNull;
+          !p.hatchPattern.isSolid && p.hatchPattern.layers.isNotEmpty,
+            ).firstOrNull;
         if (hatch == null) return const SizedBox.shrink();
         return ArchitectHatchTransformHandle(
-          key: ValueKey((_project.activeStoreyId, hatch.id, _hatchTransformEpoch)),
+          key: ValueKey((_project.activeStoreyId, hatch.id, _hatchTransformEpoch,
+          )),
           hatch: hatch,
           toScreen: _viewport.toScreen,
           toModel: _screenToModel,
@@ -22770,7 +22961,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       source.activeStorey.copyWith(cadPrimitives: [
         for (final p in source.activeStorey.cadPrimitives)
           p.id == id ? p.copyWith(hatchAngle: angle, hatchScale: scale) : p,
-      ]),
+      ],
+      ),
     );
     _repaintPreview();
   }
@@ -22779,7 +22971,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final source = _rotationSource;
     if (source == null) return;
     _elementMovePreview = source.updateActiveStorey(
-      ArchitectRotation.apply(source.activeStorey, _rotationIds, pivot, angle));
+      ArchitectRotation.apply(source.activeStorey, _rotationIds, pivot, angle),
+    );
     _repaintPreview();
   }
 
@@ -22810,7 +23003,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final options = await showBimElementOffsetDialog(context,
 
-      unitToMeters: source.units.scaleToMeters, unitSymbol: source.units.symbol);
+      unitToMeters: source.units.scaleToMeters, unitSymbol: source.units.symbol,
+    );
 
     if (!mounted) return;
     if (options == null) { _cancelGeometryCommand(); return; }
@@ -22830,9 +23024,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _offsetGroupIdMap = options.copy && _editingGroupId == null
 
-          ? {for (final g in source.activeStorey.groups.where((g) => ids.containsAll(g.elementIds)))
+          ? {for (final g in source.activeStorey.groups.where((g) => ids.containsAll(g.elementIds),
+              ))
 
-              g.id: ArchitectElementId.next('group')} : {};
+              g.id: ArchitectElementId.next('group'),
+            } : {};
 
       _offsetSide = null;
 
@@ -22864,7 +23060,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     distance: _offsetOptions!.distance, side: side, idMap: _offsetIdMap,
 
-    groupIdMap: _offsetGroupIdMap, editingGroupId: _editingGroupId);
+    groupIdMap: _offsetGroupIdMap, editingGroupId: _editingGroupId,
+      );
 
 
 
@@ -22908,7 +23105,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (!_offsetValid || _elementMovePreview == null) {
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.bimOffsetInvalid)));
+      ScaffoldMessenger.of(context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.bimOffsetInvalid)));
 
       return;
 
@@ -22958,17 +23156,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _offsetSide != null && !_offsetValid ? context.l10n.bimOffsetInvalid : context.l10n.bimOffsetSide,
 
-        maxLines: 2, overflow: TextOverflow.ellipsis))),
+        maxLines: 2, overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
 
       if (_commandPreview == null) IconButton(key: const ValueKey('architect-offset-cancel'), tooltip: context.l10n.cancel,
 
-        icon: const Icon(Icons.close), onPressed: () {
+        icon: const AppIcon(AppIconId.close), onPressed: () {
 
           setState(_cancelActiveDrags); _repaintPreview();
 
-        }),
+        },
+            ),
 
-    ])),
+    ],
+      ),
+    ),
 
   );
 
@@ -22987,7 +23191,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         MirrorArchitectElements(storeyId: _project.activeStoreyId,
           elementIds: _mirrorSourceIds, origin: anchor, direction: direction,
           isDuplicate: _mirrorIsDuplicate, idMap: _mirrorIdMap,
-          copyGroups: _editingGroupId == null).apply(_project);
+          copyGroups: _editingGroupId == null,
+              ).apply(_project);
     }
     } on ArgumentError { _elementMovePreview = null; }
     _repaintPreview();
@@ -22998,14 +23203,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       setState(() { _mirrorAnchor = snap.point; _mirrorCurrentPoint = null; });
       HapticFeedback.selectionClick();
     } else {
-      _executeMirror(anchor: _mirrorAnchor!, direction: snap.point - _mirrorAnchor!);
+      _executeMirror(anchor: _mirrorAnchor!, direction: snap.point - _mirrorAnchor!,
+      );
     }
     _repaintPreview();
   }
 
   void _startMirrorSession({required bool isDuplicate}) {
     _beginGeometryCommand(isDuplicate
-        ? ArchitectRadialAction.mirrorCopy : ArchitectRadialAction.mirrorMove);
+        ? ArchitectRadialAction.mirrorCopy : ArchitectRadialAction.mirrorMove,
+    );
 
     if (_selectionHasAutoZones) return;
 
@@ -23114,7 +23321,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           AddArchitectGroupMembers(storeyId: _project.activeStoreyId,
 
-            groupId: _editingGroupId!, elementIds: finalIdMap.values.toSet()),
+            groupId: _editingGroupId!, elementIds: finalIdMap.values.toSet(),
+          ),
 
       ]);
 
@@ -23175,27 +23383,42 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Row(children: [
-            Icon(_mirrorIsDuplicate ? Icons.copy_all : Icons.flip, size: 18),
+            Icon(_mirrorIsDuplicate ? Icons.copy_all : Icons.flip, size: 18,
+                ),
             const SizedBox(width: 8),
             Expanded(child: Text(anchor == null ? l.architectMirrorPromptPickAnchor : l.architectMirrorPromptPickAxis,
-              maxLines: 2, overflow: TextOverflow.ellipsis)),
+              maxLines: 2, overflow: TextOverflow.ellipsis,
+                  ),
+                ),
             IconButton(key: const ValueKey('architect-mirror-pick-anchor'),
               tooltip: l.architectMirrorPickAnchor,
-              icon: const Icon(Icons.center_focus_strong),
+              icon: const AppIcon(AppIconId.fitView),
               onPressed: () { setState(() { _mirrorAnchor = null; _mirrorCurrentPoint = null;
-                _elementMovePreview = null; }); _repaintPreview(); }),
+                _elementMovePreview = null; }); _repaintPreview(); },
+                ),
             if (_commandPreview == null) IconButton(key: const ValueKey('architect-mirror-cancel-btn'),
-              tooltip: l.cancel, onPressed: _cancelMirrorSession, icon: const Icon(Icons.close)),
-          ]),
+              tooltip: l.cancel, onPressed: _cancelMirrorSession, icon: const AppIcon(AppIconId.close),
+                  ),
+          ],
+            ),
           if (anchor != null) Row(children: [
             Expanded(child: TextButton(key: const ValueKey('architect-mirror-vertical-btn'),
-              onPressed: () => _executeMirror(anchor: anchor, direction: const Offset(0, 1)),
-              child: Text(l.architectMirrorAxisVertical))),
+              onPressed: () => _executeMirror(anchor: anchor, direction: const Offset(0, 1),
+                      ),
+              child: Text(l.architectMirrorAxisVertical),
+                    ),
+                  ),
             Expanded(child: TextButton(key: const ValueKey('architect-mirror-horizontal-btn'),
-              onPressed: () => _executeMirror(anchor: anchor, direction: const Offset(1, 0)),
-              child: Text(l.architectMirrorAxisHorizontal))),
-          ]),
-        ])),
+              onPressed: () => _executeMirror(anchor: anchor, direction: const Offset(1, 0),
+                      ),
+              child: Text(l.architectMirrorAxisHorizontal),
+                    ),
+                  ),
+          ],
+              ),
+        ],
+        ),
+      ),
     );
   }
 
@@ -23451,9 +23674,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     tooltip: l.architectDimensionOverall,
 
-                    icon: Icon(
-
-                      Icons.straighten,
+                    icon: AppIcon(
+                      AppIconId.measure,
 
                       color: _dimensionShowOverall
 
@@ -23479,9 +23701,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     tooltip: l.architectDimensionDirectionHint,
 
-                    icon: Icon(
-
-                      Icons.align_horizontal_left,
+                    icon: AppIcon(
+                      AppIconId.alignLeft,
 
                       color: _dimensionChoosingDirection
 
@@ -23511,7 +23732,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     tooltip: l.architectDimensionAddWalls,
 
-                    icon: const Icon(Icons.add, color: Colors.white70),
+                    icon: const AppIcon(AppIconId.add, color: Colors.white70),
 
                     onPressed: () => setState(() {
 
@@ -23563,7 +23784,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   tooltip: l.architectPropertyOffset,
 
-                  icon: const Icon(Icons.space_bar, color: Colors.white70),
+                  icon: const AppIcon(AppIconId.space, color: Colors.white70),
 
                   onPressed: _dimensionDraft == null
 
@@ -23583,7 +23804,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       : l.architectDimensionPositionHint,
 
-                  icon: Icon(
+                  icon: AppIcon.fromMaterial(
 
                     _dimensionEditing != null ? Icons.check : Icons.open_with,
 
@@ -23763,7 +23984,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ? Theme.of(context).colorScheme.error
         : Colors.redAccent;
     Widget icon(IconData data, [Color? color]) =>
-        Icon(data, color: color ?? foreground, size: 20);
+        AppIcon.fromMaterial(data, color: color ?? foreground, size: 20);
     ArchitectSelectionAction action(
       String id,
       String label,
@@ -24790,7 +25011,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         disabledColor: Colors.white38,
 
-                        icon: const Icon(Icons.undo),
+                        icon: const AppIcon(AppIconId.undo),
 
                       ),
 
@@ -24806,7 +25027,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         disabledColor: Colors.white38,
 
-                        icon: const Icon(Icons.redo),
+                        icon: const AppIcon(AppIconId.redo),
 
                       ),
 
@@ -24816,9 +25037,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         tooltip: l10n.architectGhostStoreys,
 
-                        icon: Icon(
-
-                          Icons.layers_outlined,
+                        icon: AppIcon(
+                          AppIconId.layers,
 
                           color: _showGhostStoreys
 
@@ -24844,9 +25064,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           tooltip: l10n.architectDrawingGrid,
 
-                          icon: Icon(
-
-                            Icons.grid_4x4,
+                          icon: AppIcon(
+                            AppIconId.grid,
 
                             color: _showDrawingGrid
 
@@ -24870,9 +25089,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         tooltip: l10n.architectSettings,
 
-                        icon: const Icon(
-
-                          Icons.settings_outlined,
+                        icon: const AppIcon(
+                          AppIconId.settings,
 
                           color: Colors.white,
 
@@ -24898,9 +25116,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                               : null,
 
-                          icon: Icon(
-
-                            Icons.deselect_outlined,
+                          icon: AppIcon(
+                            AppIconId.deselect,
 
                             color:
 
@@ -24926,7 +25143,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                               : l10n.architectView3D,
 
-                          icon: Icon(
+                          icon: AppIcon.fromMaterial(
 
                             _is3DView
 
@@ -24950,9 +25167,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           tooltip: l10n.architectResetView,
 
-                          icon: const Icon(
-
-                            Icons.center_focus_strong_rounded,
+                          icon: const AppIcon(
+                            AppIconId.fitView,
 
                             color: Colors.white,
 
@@ -24976,7 +25192,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                               : l10n.architectCanvasDark,
 
-                          icon: Icon(
+                          icon: AppIcon.fromMaterial(
 
                             _canvasPalette.isDark
 
@@ -25002,9 +25218,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           tooltip: l10n.architectNewProject,
 
-                          icon: const Icon(
-
-                            Icons.add_business_rounded,
+                          icon: const AppIcon(
+                            AppIconId.newBuilding,
 
                             color: Colors.white,
 
@@ -25022,9 +25237,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           tooltip: l10n.architectDebugLogs,
 
-                          icon: const Icon(
-
-                            Icons.bug_report_rounded,
+                          icon: const AppIcon(
+                            AppIconId.bug,
 
                             color: Colors.white,
 
@@ -25042,7 +25256,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           tooltip: l10n.architectUnderlayToggle,
 
-                          icon: Icon(
+                          icon: AppIcon.fromMaterial(
 
                             _showUnderlay
 
@@ -25072,9 +25286,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           key: const ValueKey('architect-more'),
 
-                          icon: const Icon(
-
-                            Icons.more_vert_rounded,
+                          icon: const AppIcon(
+                            AppIconId.moreVertical,
 
                             color: Colors.white,
 
@@ -25152,13 +25365,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                               checked: _showDrawingGrid,
 
-                              child: Text(l10n.architectDrawingGrid),
+                              child: AppMenuLabel(
+                                icon: AppIconId.grid,
+                                child: Text(l10n.architectDrawingGrid),
 
+                            ),
                             ),
 
                             PopupMenuItem(
 
                               value: 'view',
+
+                              child: AppMenuLabel(
+                                icon: _is3DView
+                                    ? AppIconId.viewTop
+                                    : AppIconId.view3D,
 
                               child: Text(
 
@@ -25171,12 +25392,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               ),
 
                             ),
+                            ),
 
                             PopupMenuItem(
 
                               value: 'fit',
 
-                              child: Text(l10n.architectResetView),
+                              child: AppMenuLabel(
+                                icon: AppIconId.fitView,
+                                child: Text(l10n.architectResetView),
+                              ),
 
                             ),
 
@@ -25186,7 +25411,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                 value: 'deselect',
 
-                                child: Text(l10n.architectDeselect),
+                                child: AppMenuLabel(
+                                  icon: AppIconId.deselect,
+                                  child: Text(l10n.architectDeselect),
+                                ),
 
                               ),
 
@@ -25207,8 +25435,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                 child: Row(
 
                                   children: [
-
-                                    Icon(
+                                    AppIcon.fromMaterial(
 
                                       _canvasPalette.isDark
 
@@ -25248,8 +25475,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                               value: 'new',
 
-                              child: Text(l10n.architectNewProject),
+                              child: AppMenuLabel(
+                                icon: AppIconId.add,
+                                child: Text(l10n.architectNewProject),
 
+                            ),
                             ),
 
                             if (_underlaysByStorey.isNotEmpty)
@@ -25258,15 +25488,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                 value: 'underlay',
 
-                                child: Text(l10n.architectUnderlayToggle),
+                                child: AppMenuLabel(
+                                  icon: AppIconId.layers,
+                                  child: Text(l10n.architectUnderlayToggle),
 
+                              ),
                               ),
 
                             PopupMenuItem(
 
                               value: 'logs',
 
-                              child: Text(l10n.architectDebugLogs),
+                              child: AppMenuLabel(
+                                icon: AppIconId.bug,
+                                child: Text(l10n.architectDebugLogs),
+                              ),
 
                             ),
 
@@ -25547,7 +25783,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       context,
 
                       onSelectDownpipe: () => _beginDownpipePlacement(),
-                      onSelectFloorDrain: () => setState(() => _activeTool = ArchitectTool.floorDrain),
+                      onSelectFloorDrain: () => setState(() => _activeTool = ArchitectTool.floorDrain,
+                      ),
 
                       onSelectComponent: (def) {
 
@@ -25731,9 +25968,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           onClose: () => setState(
 
-                            () => _activeTool = ArchitectTool.pan,
-
-                          ),
+                            () => _activeTool = ArchitectTool.pan),
 
                         ),
 
@@ -25912,7 +26147,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           groupCount: _roofGroupCount(_selectedRoof),
                           unit: _project.units,
-                          onOpenAssemblyDialog: () => _openRoofLayersDialog(roof: _selectedRoof, initialTab: 1),
+                          onOpenAssemblyDialog: () => _openRoofLayersDialog(roof: _selectedRoof, initialTab: 1,
+                          ),
                           onApplySlope: (value) {
                             final roof = _selectedRoof;
                             if (roof != null) _applyRoofQuickValue(roof, value, slope: true);
@@ -26277,9 +26513,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                     }),
 
-                                    child: const Icon(
-
-                                      Icons.close,
+                                    child: const AppIcon(
+                                        AppIconId.close,
 
                                       color: Colors.white70,
 
@@ -26310,11 +26545,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         children: [
                           if (_touchCandidates != null && !_is3DView && !_printPreview)
                             Padding(padding: const EdgeInsets.all(8),
-                              child: _buildTouchCandidatePicker()),
+                              child: _buildTouchCandidatePicker(),
+                              ),
                           if (_showSelectionActions &&
                               (_touchCandidates == null || MediaQuery.sizeOf(context).width >= 600)) Listener(
                             onPointerDown: (_) => _dismissTouchCandidates(),
-                            child: _buildSelectionBar()),
+                            child: _buildSelectionBar(),
+                              ),
                           if (MediaQuery.sizeOf(context).width < 600 &&
                               _multiSelect && !_is3DView && _showSelectionControl)
                             Padding(
@@ -26322,7 +26559,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               child: _buildSelectControl(),
                             ),
                         ],
-                      )),
+                      ),
+                      ),
                   ],
 
                 ),
@@ -26337,8 +26575,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
               if (_multiSelect && !_is3DView && MediaQuery.sizeOf(context).width >= 600)
                 SizedBox(height:60,child:_showSelectionControl
-                  ? Padding(padding:const EdgeInsets.fromLTRB(8,4,8,4),child:_buildSelectControl())
-                  : const SizedBox.shrink()),
+                  ? Padding(padding:const EdgeInsets.fromLTRB(8,4,8,4),child:_buildSelectControl(),
+                        )
+                  : const SizedBox.shrink(),
+                ),
               // Floating Axis Property Inspector Card if an axis is selected
 
               if (!_multiSelect &&
@@ -26747,7 +26987,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (result != null) {
 
-        setState(() => _commands.commit(_project.updateActiveStorey(result.$1), applyDraftingDefaults: true));
+        setState(() => _commands.commit(_project.updateActiveStorey(result.$1), applyDraftingDefaults: true,
+          ),
+        );
 
         _saveBiMProjectIfAttached();
 
@@ -26944,9 +27186,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     ),
 
-                    child: Icon(
-
-                      Icons.close,
+                    child: AppIcon(
+                      AppIconId.close,
 
                       size: 13,
 
@@ -27042,7 +27283,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         height: 22,
 
-                        child: Icon(Icons.check, size: 15, color: Colors.white),
+                        child: AppIcon(
+                          AppIconId.confirm, size: 15, color: Colors.white,
+                        ),
 
                       ),
 
@@ -27066,7 +27309,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  Widget _build2DCanvas()=>Padding(key:_propertiesCanvasKey,padding:_propertiesDrawingInsets,child:_build2DCanvasContent());
+  Widget _build2DCanvas()=>Padding(key:_propertiesCanvasKey,padding:_propertiesDrawingInsets,child:_build2DCanvasContent(),
+  );
 
   Widget _build2DCanvasContent() => Stack(
 
@@ -27689,19 +27933,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           key: const ValueKey('architect-candidate-preview'),
           painter: ArchitectCandidateOutline(
             ArchitectSelection.outline(_project, _touchCandidates!.current),
-            _viewport.toScreen),
-        ))),
+            _viewport.toScreen,
+              ),
+            ),
+          ),
+        ),
       if (_commands.isPlan && _acceptsAnySelection && !_placingDownpipe)
         Positioned.fill(child: AnimatedBuilder(
           animation: Listenable.merge([_viewport, _modelCommands]),
           builder: (_, _) => ArchitectDownpipeHandle(
             controller: _modelCommands,
             onNavigate: (delta, factor, focal) => _viewport.navigate(
-              previousFocal: focal - delta, focal: focal, scaleFactor: factor),
+              previousFocal: focal - delta, focal: focal, scaleFactor: factor,
+              ),
             roofIds: _project.activeStorey.roofs.map((r) => r.id).toSet(),
             toScreen: (p, z) => _viewport.toScreen(p),
           ),
-        )),
+        ),
+        ),
       if (_radialMenuScreenPosition != null && _radialMenuItems.isNotEmpty)
 
         Positioned.fill(
@@ -27877,7 +28126,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 tooltip: context.l10n.cancel,
 
-                icon: const Icon(Icons.close, color: Colors.white),
+                icon: const AppIcon(AppIconId.close, color: Colors.white),
 
                 onPressed: () => setState(_cancelDrafting),
 
@@ -27895,7 +28144,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (_editingGroupId != null)
 
-        Positioned(top: _offsetOptions == null ? 8 : 64, left: 8, right: 8, child: _groupEditBanner()),
+        Positioned(top: _offsetOptions == null ? 8 : 64, left: 8, right: 8, child: _groupEditBanner(),
+        ),
 
       _buildPolygonDistanceOverlay(),
 
@@ -27914,7 +28164,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_wallCutIds.isNotEmpty && !_wallCutStroke)
 
         Positioned(top: _commandPreview == null ? 8 : null,
-          bottom: _commandPreview == null ? null : 8, left: 8, right: 64, child: _buildCutPromptBanner()),
+          bottom: _commandPreview == null ? null : 8, left: 8, right: 64, child: _buildCutPromptBanner(),
+        ),
 
       if (_splitActive)
 
@@ -28035,7 +28286,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             child: SizedBox(
                               height: 40,
                               child: ArchitectWallReferenceControl(
-                                key: const ValueKey('wall-toolbar-reference'),
+                                key: const ValueKey('wall-toolbar-reference',
+                                    ),
                                 value: _wallReference,
                                 onChanged: _setDraftWallReference,
                               ),
@@ -28061,9 +28313,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           tooltip: context.l10n.architectWallFlipSide,
 
-                          icon: Icon(
-
-                            Icons.flip,
+                          icon: AppIcon(
+                                AppIconId.flipHorizontal,
 
                             size: 20,
 
@@ -28102,7 +28353,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           style: TextButton.styleFrom(
 
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 4,
+                                ),
 
                             minimumSize: const Size(0, 40),
 
@@ -28154,7 +28406,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                 const SizedBox(width: 3),
 
-                                const Icon(Icons.straighten, size: 18),
+                                const AppIcon(AppIconId.measure, size: 18),
 
                                 if (MediaQuery.sizeOf(context).width >=
 
@@ -28192,9 +28444,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           padding: EdgeInsets.zero,
 
-                          icon: Icon(
-
-                            Icons.rounded_corner,
+                          icon: AppIcon(
+                                AppIconId.roundedCorner,
 
                             color: _wallCurved
 
@@ -28223,7 +28474,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           key: const ValueKey('wall-arc-radius'),
 
                           onPressed: () => _editWallArcDimension(
-                            dimension: ArchitectArcDimension.radius),
+                            dimension: ArchitectArcDimension.radius,
+                              ),
 
                           child: const Text('R='),
 
@@ -28237,9 +28489,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           onPressed: _commitWallArc,
 
-                          icon: const Icon(
-
-                            Icons.check,
+                          icon: const AppIcon(
+                                AppIconId.confirm,
 
                             color: Colors.cyanAccent,
 
@@ -28279,9 +28530,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           ),
 
-                          icon: Icon(
-
-                            Icons.linear_scale_rounded,
+                          icon: AppIcon(
+                                AppIconId.points,
 
                             size: 20,
 
@@ -28315,9 +28565,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           onPressed: _finishChainedWall,
 
-                          icon: const Icon(
-
-                            Icons.close,
+                          icon: const AppIcon(
+                                AppIconId.close,
 
                             color: Colors.white,
 
@@ -28336,17 +28585,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       ChoiceChip(key: const ValueKey('architect-line-mode-line'),
                         label: Text(context.l10n.architectToolCadLine),
                         selected: !_cadPolylineMode,
-                        onSelected: (_) => _setCadPolylineMode(false)),
+                        onSelected: (_) => _setCadPolylineMode(false),
+                              ),
                       const SizedBox(width: 8),
                       Tooltip(message: context.l10n.architectPolylineHint,
                         child: ChoiceChip(
-                          key: const ValueKey('architect-line-mode-polyline'),
+                          key: const ValueKey('architect-line-mode-polyline',
+                                  ),
                           showCheckmark: false,
-                          avatar: const Icon(Icons.polyline_outlined, size: 16),
-                          label: Text(context.l10n.architectToolPolyline),
+                          avatar: const AppIcon(
+                                    AppIconId.polyline, size: 16,
+                                  ),
+                          label: Text(context.l10n.architectToolPolyline,
+                                  ),
                           selected: _cadPolylineMode,
-                          onSelected: (_) => _setCadPolylineMode(true))),
-                    ])),
+                          onSelected: (_) => _setCadPolylineMode(true),
+                                ),
+                              ),
+                    ],
+                          ),
+                        ),
 
                   if (_draftGroupChoiceVisible)
 
@@ -28354,7 +28612,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       Checkbox(key: const ValueKey('architect-draft-group'), value: _groupDraftChain,
 
-                        onChanged: (v) => setState(() => _groupDraftChain = v ?? false)),
+                        onChanged: (v) => setState(() => _groupDraftChain = v ?? false,
+                                ),
+                              ),
 
                       Text(context.l10n.bimGroup),
 
@@ -28362,15 +28622,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       if (!_wallDirectionLocked)
 
-                        IconButton(key: const ValueKey('architect-draft-group-finish'),
+                        IconButton(key: const ValueKey('architect-draft-group-finish',
+                                  ),
 
                           tooltip: context.l10n.bimGroupDone,
 
-                          icon: const Icon(Icons.check), onPressed: _finishChainedWall),
+                          icon: const AppIcon(AppIconId.confirm), onPressed: _finishChainedWall,
+                                ),
 
-                    ])),
+                    ],
+                          ),
+                        ),
 
-                  ]),
+                  ],
+                  ),
 
                 ),
 
@@ -28603,17 +28868,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         Positioned.fill(child: IgnorePointer(
           ignoring: _projectionLoading,
-          child: _nativeProjectionEditor())),
+          child: _nativeProjectionEditor(),
+          ),
+        ),
 
       if (_projectionLoading || _projectionFailed)
         Positioned.fill(child: ArchitectProjectionStatus(failed: _projectionFailed,
-          onRetry: () => setState(() { _sectionLoader.invalidate(); _facadeLoader.invalidate(); _projectionSource = null; }))),
+          onRetry: () => setState(() { _sectionLoader.invalidate(); _facadeLoader.invalidate(); _projectionSource = null; }),
+          ),
+        ),
 
       if (_terrainDrafting)
 
         Positioned.fill(child: AnimatedBuilder(animation: _viewport,builder: (_, _) {
 
-          final view=_modelCommands.project.elevations.firstWhere((e)=>e.id==_commands.viewId);
+          final view=_modelCommands.project.elevations.firstWhere((e)=>e.id==_commands.viewId,
+              );
 
           return ArchitectTerrainEditor(initial:view.terrain,
 
@@ -28629,15 +28899,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
               _modelCommands.commit(original.copyWith(elevations:[for(final e in original.elevations)
 
-                if(e.id==view.id) e.copyWith(terrain:points) else e]));
+                if(e.id==view.id) e.copyWith(terrain:points) else e,
+                      ],
+                    ),
+                  );
 
               setState(()=>_terrainDrafting=false);
 
               _saveBiMProjectIfAttached();
 
-            });
-
-        })),
+            },
+              );
+            },
+          ),
+        ),
 
       if (_viewDraft != null)
 
@@ -28717,10 +28992,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             localizeSnap: _localizedSnapLabel,
             onAim: _previewMirrorSnap, onPick: _pickMirrorSnap,
             onNavigate: (delta, factor, focal) => _viewport.navigate(
-              previousFocal: focal - delta, focal: focal, scaleFactor: factor),
+              previousFocal: focal - delta, focal: focal, scaleFactor: factor,
+              ),
+            ),
           ),
-        )),
-        Positioned(bottom: 8, left: 8, right: 8, child: _buildMirrorPromptBanner()),
+        ),
+        Positioned(bottom: 8, left: 8, right: 8, child: _buildMirrorPromptBanner(),
+        ),
       ],
       if (_offsetOptions != null) ...[
         Positioned.fill(child: IgnorePointer(child: AnimatedBuilder(
@@ -28729,12 +29007,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             key: const ValueKey('architect-offset-direction'),
             painter: _offsetSide == null ? null : ArchitectOffsetDirectionPainter(
               start: _viewport.toScreen(ArchitectOffset.directionAnchor(
-                _offsetSource!.activeStorey, _offsetIds, _offsetSide!)),
+                _offsetSource!.activeStorey, _offsetIds, _offsetSide!,
+                          ),
+                        ),
               side: _viewport.toScreen(_offsetSide!),
               color: _offsetValid ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.error,
             ),
           ),
-        ))),
+        ),
+          ),
+        ),
         Positioned(bottom: 8, left: 8, right: 8, child: _offsetBanner()),
       ],
       if (_rotationSource != null)
@@ -28746,10 +29028,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             localizeSnap: _localizedSnapLabel,
             onPreview: _previewRotation, onApply: _applyRotation,
             onNavigate: (delta, factor, focal) => _viewport.navigate(
-              previousFocal: focal - delta, focal: focal, scaleFactor: factor),
+              previousFocal: focal - delta, focal: focal, scaleFactor: factor,
+              ),
             onCancel: () { setState(_cancelActiveDrags); _repaintPreview(); },
           ),
-        )),
+        ),
+        ),
       if (_viewDirectionDraft case final draft?)
         Positioned.fill(child: AnimatedBuilder(animation: _viewport,
           builder: (_, _) => ArchitectViewDirectionPicker(
@@ -28757,9 +29041,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             toScreen: _viewport.toScreen, onSelected: _commitViewDirection,
             onCancel: () { setState(() => _viewDirectionDraft = null); _repaintPreview(); },
             onNavigate: (delta, factor, focal) => _viewport.navigate(
-              previousFocal: focal - delta, focal: focal, scaleFactor: factor),
+              previousFocal: focal - delta, focal: focal, scaleFactor: factor,
+              ),
+            ),
           ),
-        )),
+        ),
       if (_commandReady)
         Positioned.fill(child: ArchitectTransformPointInput(
           key: const ValueKey('architect-command-review-input'),
@@ -28768,8 +29054,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           localizeSnap: _localizedSnapLabel,
           onAim: (_) {}, onPick: (_) {},
           onNavigate: (delta, factor, focal) => _viewport.navigate(
-            previousFocal: focal - delta, focal: focal, scaleFactor: factor),
-        )),
+            previousFocal: focal - delta, focal: focal, scaleFactor: factor,
+            ),
+          ),
+        ),
       if (_commandPreview != null)
         Positioned(top: 8, left: 8, right: 8,
           child: ArchitectCommandPreviewBar(
@@ -28777,7 +29065,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ready: _commandCanConfirm,
             onCancel: _cancelGeometryCommand,
             onConfirm: _confirmGeometryCommand,
-          )),
+          ),
+        ),
     ],
 
   );
@@ -29612,4 +29901,3 @@ class _PublicationPreviewPainter extends CustomPainter {
       old.scene != scene || old.zoom != zoom || old.translation != translation;
 
 }
-

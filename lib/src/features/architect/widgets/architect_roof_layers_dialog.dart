@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'architect_properties_shell.dart';
@@ -164,8 +165,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
-          content: Text(ok ? l.roofLibrarySaved : l.slabLibraryFailed),
-        ),
+          content: Text(ok ? l.roofLibrarySaved : l.slabLibraryFailed)),
       );
     }
   }
@@ -194,13 +194,13 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       await ArchitectRoofLibrary.delete(_assembly.id);
       await _loadLibrary();
       setState(() {
-        _assembly = ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles);
+        _assembly = ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles,
+        );
       });
       _queuePreview();
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text(l.roofLibraryDeleted)),
-      );
+        SnackBar(content: Text(l.roofLibraryDeleted)));
     }
   }
 
@@ -579,7 +579,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
                 if (widget.roof != null)
                   Tooltip(
                     message: '${l.roofUiScopeHelp}\n${l.roofUiIndependentHelp}',
-                    child: const Icon(Icons.info_outline, size: 18),
+                    child: const AppIcon(AppIconId.info, size: 18),
                   ),
               ],
             ),
@@ -670,7 +670,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
                     key: const ValueKey('roof-preview-close'),
                     tooltip: l.close,
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
+                    icon: const AppIcon(AppIconId.close),
                   ),
                 ],
               ),
@@ -694,7 +694,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
         child: TextButton.icon(
           key: const ValueKey('roof-preview'),
           onPressed: open,
-          icon: const Icon(Icons.zoom_in, size: 18),
+          icon: const AppIcon(AppIconId.zoomIn, size: 18),
           label: Text(label),
         ),
       );
@@ -863,12 +863,18 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
                 itemBuilder: (_) => [
                   PopupMenuItem(
                     value: 'library_save',
-                    child: Text(l.roofSaveLibrary),
+                    child: AppMenuLabel(
+                      icon: AppIconId.save,
+                      child: Text(l.roofSaveLibrary),
+                    ),
                   ),
                   if (_library.any((a) => a.id == _assembly.id))
                     PopupMenuItem(
                       value: 'library_delete',
-                      child: Text(l.roofDeleteLibrary),
+                      child: AppMenuLabel(
+                        icon: AppIconId.delete,
+                        child: Text(l.roofDeleteLibrary),
+                      ),
                     ),
                 ],
                 onSelected: (action) async {
@@ -935,7 +941,9 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
               ),
               if (_library.any((a) => a.id == _assembly.id))
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                  icon: const AppIcon(
+                    AppIconId.delete, color: Colors.redAccent,
+                  ),
                   tooltip: l.roofDeleteLibrary,
                   onPressed: _deleteFromLibrary,
                 ),
@@ -956,7 +964,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
             TextButton.icon(
               key: const ValueKey('roof-add-layer'),
               onPressed: () => _editLayer(),
-              icon: const Icon(Icons.add),
+              icon: const AppIcon(AppIconId.add),
               label: Text(l.slabAddLayer),
             ),
           if (_assemblyError != null)
@@ -994,21 +1002,34 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
                 key: ValueKey('roof-layer-actions-${layer.id}'),
                 tooltip: l.roofUiLayerActions,
                 itemBuilder: (_) => [
-                  PopupMenuItem(value: 'edit', child: Text(l.roofUiLayerEdit)),
+                  PopupMenuItem(value: 'edit', child: AppMenuLabel(
+                      icon: AppIconId.edit,
+                      child: Text(l.roofUiLayerEdit),
+                    ),
+                  ),
                   PopupMenuItem(
                     value: 'up',
                     enabled: index > 0,
-                    child: Text(l.wallLayerUp),
+                    child: AppMenuLabel(
+                      icon: AppIconId.up,
+                      child: Text(l.wallLayerUp),
+                    ),
                   ),
                   PopupMenuItem(
                     value: 'down',
                     enabled: index + 1 < _assembly.layers.length,
-                    child: Text(l.wallLayerDown),
+                    child: AppMenuLabel(
+                      icon: AppIconId.down,
+                      child: Text(l.wallLayerDown),
+                    ),
                   ),
                   PopupMenuItem(
                     value: 'delete',
                     enabled: _assembly.layers.length > 1,
-                    child: Text(l.delete),
+                    child: AppMenuLabel(
+                      icon: AppIconId.delete,
+                      child: Text(l.delete),
+                    ),
                   ),
                 ],
                 onSelected: (v) {

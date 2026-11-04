@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
@@ -223,8 +224,8 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                     color: const Color(0xFFFFB300).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
-                    Icons.architecture_rounded,
+                  child: const AppIcon(
+                    AppIconId.measureAngle,
                     color: Color(0xFFFFB300),
                   ),
                 ),
@@ -283,8 +284,8 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                     color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
-                    Icons.folder_zip_rounded,
+                  child: const AppIcon(
+                    AppIconId.archive,
                     color: Color(0xFF00E5FF),
                   ),
                 ),
@@ -342,8 +343,8 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                     color: const Color(0xFFAB47BC).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
-                    Icons.data_object_rounded,
+                  child: const AppIcon(
+                    AppIconId.code,
                     color: Color(0xFFAB47BC),
                   ),
                 ),
@@ -354,8 +355,8 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                subtitle: const Text(
-                  'JSON (.bim.json)',
+                subtitle: Text(
+                  context.l10n.commandUiJsonBimJson,
                   style: TextStyle(color: Colors.white54, fontSize: 12),
                 ),
                 onTap: () async {
@@ -443,7 +444,7 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.refresh_rounded),
+                  icon: const AppIcon(AppIconId.refresh),
                   label: Text(context.l10n.retry),
                   onPressed: _loadWorkspace,
                 ),

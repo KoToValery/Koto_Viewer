@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_error_handler.dart';
@@ -10,14 +12,16 @@ class GlobalCrashWidget extends StatefulWidget {
 
   const GlobalCrashWidget({
     super.key,
-    required this.details,
-  });
+    required this.details});
 
   @override
   State<GlobalCrashWidget> createState() => _GlobalCrashWidgetState();
 }
 
 class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
+  // Diagnostics can be shown before the app's localization delegates load.
+  AppLocalizations get _l10n => context.l10nOrNull ?? lookupAppLocalizations(const Locale('en'));
+
   bool _isExpanded = false;
   bool _isCopied = false;
 
@@ -93,7 +97,8 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
                   border: Border.all(color: borderColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
+                      color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06,
+                      ),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -152,12 +157,13 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
                       children: [
                         FilledButton.icon(
                           onPressed: _navigateHome,
-                          icon: const Icon(Icons.home_rounded, size: 18),
-                          label: const Text('Go to Home'),
+                          icon: const AppIcon(AppIconId.home, size: 18),
+                          label: Text(_l10n.commandUiGoToHome),
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFF2563EB),
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -165,16 +171,19 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
                         ),
                         OutlinedButton.icon(
                           onPressed: _copyToClipboard,
-                          icon: Icon(
+                          icon: AppIcon.fromMaterial(
                             _isCopied ? Icons.check_circle_rounded : Icons.copy_rounded,
                             size: 18,
                             color: _isCopied ? Colors.green : null,
                           ),
-                          label: Text(_isCopied ? 'Copied!' : 'Copy Report'),
+                          label: Text(_isCopied ? _l10n.commandUiCopied
+                                : _l10n.commandUiCopyReport,
+                          ),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: textColor,
                             side: BorderSide(color: borderColor),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -187,11 +196,12 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
                     // Secondary action: View all error logs
                     TextButton.icon(
                       onPressed: () => ErrorLogDialog.show(context),
-                      icon: const Icon(Icons.history_rounded, size: 16),
-                      label: const Text('View Error Log'),
+                      icon: const AppIcon(AppIconId.history, size: 16),
+                      label: Text(_l10n.commandUiViewErrorLog),
                       style: TextButton.styleFrom(
                         foregroundColor: const Color(0xFF2563EB),
-                        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
 
@@ -208,12 +218,14 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
                       },
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6,
+                        ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              _isExpanded ? 'Hide technical details' : 'Show technical details',
+                              _isExpanded ? _l10n.commandUiHideTechnicalDetails
+                                  : _l10n.commandUiShowTechnicalDetails,
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -221,7 +233,7 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
                               ),
                             ),
                             const SizedBox(width: 4),
-                            Icon(
+                            AppIcon.fromMaterial(
                               _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
                               size: 18,
                               color: subtextColor,

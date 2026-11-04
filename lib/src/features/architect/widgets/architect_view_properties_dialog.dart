@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -144,7 +145,7 @@ class _ViewState extends State<ArchitectViewPropertiesDialog> {
               const SizedBox(height: 16),
               if (_section != null)
                 OutlinedButton.icon(
-                  icon: const Icon(Icons.visibility_outlined),
+                  icon: const AppIcon(AppIconId.visible),
                   label: Text(l.architectSectionVisibility),
                   onPressed: () async {
                     await showArchitectSectionVisibility(
@@ -157,7 +158,7 @@ class _ViewState extends State<ArchitectViewPropertiesDialog> {
                 ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
-                icon: const Icon(Icons.flip),
+                icon: const AppIcon(AppIconId.flipHorizontal),
                 label: Text(l.architectFacadeReverse),
                 onPressed: () => setState(() {
                   _edited = true;
@@ -166,7 +167,7 @@ class _ViewState extends State<ArchitectViewPropertiesDialog> {
               ),
               if (widget.onOpenView != null)
                 TextButton.icon(
-                  icon: const Icon(Icons.open_in_new),
+                  icon: const AppIcon(AppIconId.external),
                   label: Text(l.propertiesSaveOpen),
                   onPressed: () {
                     if (_save()) {

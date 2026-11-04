@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -63,7 +64,8 @@ void main() {
         final badge = find.byKey(const ValueKey('wall-clearance-b'));
         expect(badge, findsOneWidget);
         expect(
-          find.descendant(of: badge, matching: find.text(model.project.formatLength(11.75))),
+          find.descendant(of: badge, matching: find.text(model.project.formatLength(11.75)),
+          ),
           findsOneWidget,
         );
         await gesture.up();
@@ -110,7 +112,7 @@ void main() {
                   for (final action in actions)
                     ArchitectRadialMenuItem(
                       action: action,
-                      icon: Icons.edit,
+                      icon: AppIconId.edit,
                       label: action.name,
                       color: Colors.cyan,
                     ),

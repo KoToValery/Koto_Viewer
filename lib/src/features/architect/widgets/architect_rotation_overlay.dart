@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -170,7 +171,7 @@ class _RotationState extends State<ArchitectRotationOverlay> {
                           });
                           widget.onPreview(pivot, 0);
                         },
-                        icon: const Icon(Icons.center_focus_strong),
+                        icon: const AppIcon(AppIconId.fitView),
                       ),
                     ],
                   ),

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../l10n/l10n_extensions.dart';
 import '../services/ui_settings_service.dart';
@@ -59,7 +60,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             initiallyExpanded: true,
             tilePadding: EdgeInsets.zero,
             title: Text(l.uiSettingsCategory),
-            leading: const Icon(Icons.dashboard_customize_outlined),
+            leading: const AppIcon(AppIconId.layoutCustom),
             children: [
               Align(
                 alignment: Alignment.centerLeft,
@@ -131,14 +132,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   TextButton.icon(
                     key: const ValueKey('context-menu-new'),
                     onPressed: _saving ? null : _edit,
-                    icon: const Icon(Icons.add),
+                    icon: const AppIcon(AppIconId.add),
                     label: Text(l.contextMenuSaveAs),
                   ),
                   if (custom)
                     TextButton.icon(
                       key: const ValueKey('context-menu-edit'),
                       onPressed: _saving ? null : () => _edit(existing: true),
-                      icon: const Icon(Icons.edit_outlined),
+                      icon: const AppIcon(AppIconId.edit),
                       label: Text(l.contextMenuEdit),
                     ),
                   if (custom)
@@ -152,7 +153,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                                 _settings.selectedPresetId,
                               ),
                             ),
-                      icon: const Icon(Icons.delete_outline),
+                      icon: const AppIcon(AppIconId.delete),
                     ),
                 ],
               ),
@@ -238,7 +239,7 @@ class _ContextMenuPresetEditorState extends State<ContextMenuPresetEditor> {
             children: [
               ListTile(
                 title: Text(l.contextMenuEmpty),
-                leading: const Icon(Icons.remove),
+                leading: const AppIcon(AppIconId.remove),
                 onTap: () => Navigator.pop(ctx, 'empty'),
               ),
               for (final a in BimEditAction.values)
@@ -246,7 +247,7 @@ class _ContextMenuPresetEditorState extends State<ContextMenuPresetEditor> {
                   key: ValueKey('context-menu-choose-${a.name}'),
                   leading: BimEditingSymbol(a),
                   title: Text(BimEditActions.label(a, l)),
-                  trailing: _slots[slot] == a ? const Icon(Icons.check) : null,
+                  trailing: _slots[slot] == a ? const AppIcon(AppIconId.confirm) : null,
                   onTap: () => Navigator.pop(ctx, a.name),
                 ),
             ],

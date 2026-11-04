@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -83,7 +84,7 @@ class ArchitectRoofBar extends StatelessWidget {
                         ? FilledButton.icon(
                             key: const ValueKey('roof-poly-finish-front'),
                             onPressed: onFinishPolygon,
-                            icon: const Icon(Icons.check),
+                            icon: const AppIcon(AppIconId.confirm),
                             label: Text(l.architectDimensionFinish),
                           )
                         : Text(
@@ -95,13 +96,13 @@ class ArchitectRoofBar extends StatelessWidget {
                     key: const ValueKey('roof-draft-undo'),
                     tooltip: l.undoPoint,
                     onPressed: onUndoDraftPoint,
-                    icon: const Icon(Icons.undo),
+                    icon: const AppIcon(AppIconId.undo),
                   ),
                   IconButton(
                     key: const ValueKey('roof-draft-cancel'),
                     tooltip: l.cancel,
                     onPressed: onCancelDraft,
-                    icon: const Icon(Icons.close),
+                    icon: const AppIcon(AppIconId.close),
                   ),
                 ] else if (roof == null) ...[
                   Expanded(
@@ -130,7 +131,14 @@ class ArchitectRoofBar extends StatelessWidget {
                             ),
                             value: m.name,
                             checked: tool.drawMode == m,
-                            child: Text(switch (m) {
+                            child: AppMenuLabel(
+                              icon: switch (m) {
+                                RoofDrawMode.rectangle => AppIconId.rectangle,
+                                RoofDrawMode.polygon => AppIconId.polygon,
+                                RoofDrawMode.multiPitch => AppIconId.roofHip,
+                                RoofDrawMode.mansard => AppIconId.roofMansard,
+                              },
+                              child: Text(switch (m) {
                               RoofDrawMode.rectangle => l.architectRoofDrawRect,
                               RoofDrawMode.polygon => l.architectRoofDrawPoly,
                               RoofDrawMode.multiPitch =>
@@ -138,6 +146,7 @@ class ArchitectRoofBar extends StatelessWidget {
                               RoofDrawMode.mansard =>
                                 l.architectRoofDrawMansard,
                             }),
+                            ),
                           ),
                         const PopupMenuDivider(),
                         PopupMenuItem<String>(
@@ -148,7 +157,15 @@ class ArchitectRoofBar extends StatelessWidget {
                           PopupMenuItem(
                             key: ValueKey('roof-auto-${t.name}'),
                             value: 'auto:${t.name}',
-                            child: Text(t.label(l)),
+                            child: AppMenuLabel(
+                              icon: switch (t) {
+                                AutoRoofType.gable => AppIconId.roofGable,
+                                AutoRoofType.hip => AppIconId.roofHip,
+                                AutoRoofType.shed => AppIconId.roofShed,
+                                AutoRoofType.flat => AppIconId.roofFlat,
+                              },
+                              child: Text(t.label(l)),
+                          ),
                           ),
                       ],
                       child: Padding(
@@ -158,7 +175,7 @@ class ArchitectRoofBar extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.draw_outlined, size: 18),
+                            const AppIcon(AppIconId.edit, size: 18),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
@@ -167,7 +184,7 @@ class ArchitectRoofBar extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const Icon(Icons.arrow_drop_down, size: 18),
+                            const AppIcon(AppIconId.expandMore, size: 18),
                           ],
                         ),
                       ),
@@ -177,7 +194,7 @@ class ArchitectRoofBar extends StatelessWidget {
                     child: TextButton.icon(
                       key: const ValueKey('roof-open-assembly'),
                       onPressed: onOpenAssemblyDialog ?? onOpenLayersDialog,
-                      icon: const Icon(Icons.layers_outlined, size: 18),
+                      icon: const AppIcon(AppIconId.layers, size: 18),
                       label: Text(
                         l.roofUiAssembly,
                         maxLines: 1,
@@ -227,7 +244,7 @@ class ArchitectRoofBar extends StatelessWidget {
                     child: TextButton.icon(
                       key: const ValueKey('roof-open-assembly'),
                       onPressed: onOpenAssemblyDialog ?? onOpenLayersDialog,
-                      icon: const Icon(Icons.layers_outlined, size: 18),
+                      icon: const AppIcon(AppIconId.layers, size: 18),
                       label: Text(
                         l.roofUiAssembly,
                         maxLines: 1,
@@ -244,13 +261,13 @@ class ArchitectRoofBar extends StatelessWidget {
                     key: const ValueKey('roof-set-eaves-edge'),
                     tooltip: l.architectRoofSetEavesHere,
                     onPressed: onSetSelectedEdgeAsEaves,
-                    icon: const Icon(Icons.south),
+                    icon: const AppIcon(AppIconId.down),
                   ),
                 IconButton(
                   key: const ValueKey('roof-open-layers'),
                   tooltip: l.roofUiSettings,
                   onPressed: onOpenLayersDialog,
-                  icon: const Icon(Icons.tune),
+                  icon: const AppIcon(AppIconId.properties),
                 ),
                 if (roof != null)
                   PopupMenuButton<String>(
@@ -270,20 +287,29 @@ class ArchitectRoofBar extends StatelessWidget {
                         PopupMenuItem(
                           key: const ValueKey('roof-rotate-slope'),
                           value: 'rotate',
-                          child: Text(l.architectRoofRotateSlope),
+                          child: AppMenuLabel(
+                            icon: AppIconId.rotate,
+                            child: Text(l.architectRoofRotateSlope),
+                          ),
                         ),
                       if (onFlipSlopeDirection != null)
                         PopupMenuItem(
                           key: const ValueKey('roof-flip-slope'),
                           value: 'flip',
-                          child: Text(l.architectRoofFlipSlope),
+                          child: AppMenuLabel(
+                            icon: AppIconId.flipHorizontal,
+                            child: Text(l.architectRoofFlipSlope),
+                          ),
                         ),
                       if (onToggleMansard != null)
                         CheckedPopupMenuItem(
                           key: const ValueKey('roof-toggle-mansard'),
                           value: 'mansard',
                           checked: roof.isMansard,
-                          child: Text(l.architectRoofIsMansard),
+                          child: AppMenuLabel(
+                            icon: AppIconId.roofMansard,
+                            child: Text(l.architectRoofIsMansard),
+                          ),
                         ),
                       if (roof.roofGroupId != null &&
                           onToggleSlopeLocked != null)
@@ -291,13 +317,19 @@ class ArchitectRoofBar extends StatelessWidget {
                           key: const ValueKey('roof-toggle-slope-lock'),
                           value: 'lock',
                           checked: roof.isSlopeLocked,
-                          child: Text(l.architectRoofLinkedSlopes),
+                          child: AppMenuLabel(
+                            icon: AppIconId.lock,
+                            child: Text(l.architectRoofLinkedSlopes),
+                          ),
                         ),
                       if (groupCount > 1 && onMatchRidgeHeight != null)
                         PopupMenuItem(
                           key: const ValueKey('roof-match-ridge'),
                           value: 'ridge',
-                          child: Text(l.architectRoofMatchRidge),
+                          child: AppMenuLabel(
+                            icon: AppIconId.roofGable,
+                            child: Text(l.architectRoofMatchRidge),
+                        ),
                         ),
                     ],
                   ),

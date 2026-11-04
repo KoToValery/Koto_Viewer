@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../analysis/staircase_inventory.dart';
@@ -93,7 +94,7 @@ class _StaircaseSetupDialogState extends State<StaircaseSetupDialog> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline),
+                      icon: const AppIcon(AppIconId.delete),
                       tooltip: l.delete,
                       onPressed: () => setState(
                         () => project = project.copyWith(
@@ -227,7 +228,7 @@ class _StaircaseSetupDialogState extends State<StaircaseSetupDialog> {
               ],
               if (floors.length > 1)
                 TextButton.icon(
-                  icon: const Icon(Icons.add),
+                  icon: const AppIcon(AppIconId.add),
                   label: Text(l.staircaseAdd),
                   onPressed: () => setState(() {
                     noStairs = false;

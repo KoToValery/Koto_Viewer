@@ -1,3 +1,4 @@
+import '../../support/command_icon_finders.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -149,7 +150,7 @@ void main() {
       await command();
       expect(saved.length, saves);
       expect(find.byType(AlertDialog), findsNothing);
-      await tester.tap(find.byIcon(Icons.undo_rounded).first);
+      await tester.tap(findCommandIcon(Icons.undo_rounded).first);
       await tester.pumpAndSettle();
       expect(saved.last.activeStorey.slabs, isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());

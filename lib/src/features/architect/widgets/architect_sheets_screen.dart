@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
@@ -556,19 +557,19 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
               onPressed: widget.controller.canUndo
                   ? widget.controller.undo
                   : null,
-              icon: const Icon(Icons.undo),
+              icon: const AppIcon(AppIconId.undo),
             ),
             IconButton(
               tooltip: l.architectZoneRedoAction,
               onPressed: widget.controller.canRedo
                   ? widget.controller.redo
                   : null,
-              icon: const Icon(Icons.redo),
+              icon: const AppIcon(AppIconId.redo),
             ),
             IconButton(
               tooltip: l.architectSheetAdd,
               onPressed: busy ? null : () => sheetProperties(create: true),
-              icon: const Icon(Icons.add),
+              icon: const AppIcon(AppIconId.add),
             ),
             PopupMenuButton<String>(
               enabled: !busy && s != null,
@@ -594,23 +595,38 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
               itemBuilder: (_) => [
                 PopupMenuItem(
                   value: 'properties',
-                  child: Text(l.architectSheetProperties),
+                  child: AppMenuLabel(
+                    icon: AppIconId.properties,
+                    child: Text(l.architectSheetProperties),
+                ),
                 ),
                 PopupMenuItem(
                   value: 'template',
-                  child: Text(l.architectSheetTemplate),
+                  child: AppMenuLabel(
+                    icon: AppIconId.layoutGrid,
+                    child: Text(l.architectSheetTemplate),
+                ),
                 ),
                 PopupMenuItem(
                   value: 'pdf',
-                  child: Text(l.architectSheetExport),
+                  child: AppMenuLabel(
+                    icon: AppIconId.pdf,
+                    child: Text(l.architectSheetExport),
+                ),
                 ),
                 PopupMenuItem(
                   value: 'print',
-                  child: Text(l.architectSheetPrint),
+                  child: AppMenuLabel(
+                    icon: AppIconId.print,
+                    child: Text(l.architectSheetPrint),
+                ),
                 ),
                 PopupMenuItem(
                   value: 'delete',
-                  child: Text(l.architectSheetDelete),
+                  child: AppMenuLabel(
+                    icon: AppIconId.delete,
+                    child: Text(l.architectSheetDelete),
+                  ),
                 ),
               ],
             ),
@@ -643,24 +659,24 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                     IconButton(
                       tooltip: l.architectSheetPlace,
                       onPressed: placeView,
-                      icon: const Icon(Icons.add_to_photos_outlined),
+                      icon: const AppIcon(AppIconId.imageAdd),
                     ),
                     IconButton(
                       tooltip: l.architectSheetEdit,
                       onPressed: p == null || p.locked
                           ? null
                           : placementProperties,
-                      icon: const Icon(Icons.tune),
+                      icon: const AppIcon(AppIconId.properties),
                     ),
                     IconButton(
                       tooltip: l.architectSheetVisibility,
                       onPressed: p == null ? null : visibility,
-                      icon: const Icon(Icons.layers_outlined),
+                      icon: const AppIcon(AppIconId.layers),
                     ),
                     IconButton(
                       tooltip: l.architectSheetDuplicate,
                       onPressed: p == null ? null : duplicate,
-                      icon: const Icon(Icons.copy),
+                      icon: const AppIcon(AppIconId.duplicate),
                     ),
                     IconButton(
                       tooltip: p?.locked == true
@@ -669,7 +685,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                       onPressed: p == null
                           ? null
                           : () => savePlacement(p.copyWith(locked: !p.locked)),
-                      icon: Icon(
+                      icon: AppIcon.fromMaterial(
                         p?.locked == true ? Icons.lock : Icons.lock_open,
                       ),
                     ),
@@ -680,22 +696,34 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                       itemBuilder: (_) => [
                         PopupMenuItem(
                           value: 'left',
-                          child: Text(l.architectSheetLeft),
+                          child: AppMenuLabel(
+                            icon: AppIconId.alignLeft,
+                            child: Text(l.architectSheetLeft),
+                        ),
                         ),
                         PopupMenuItem(
                           value: 'right',
-                          child: Text(l.architectSheetRight),
+                          child: AppMenuLabel(
+                            icon: AppIconId.alignRight,
+                            child: Text(l.architectSheetRight),
+                        ),
                         ),
                         PopupMenuItem(
                           value: 'top',
-                          child: Text(l.architectSheetTop),
+                          child: AppMenuLabel(
+                            icon: AppIconId.alignTop,
+                            child: Text(l.architectSheetTop),
+                        ),
                         ),
                         PopupMenuItem(
                           value: 'bottom',
-                          child: Text(l.architectSheetBottom),
+                          child: AppMenuLabel(
+                            icon: AppIconId.alignBottom,
+                            child: Text(l.architectSheetBottom),
+                        ),
                         ),
                       ],
-                      icon: const Icon(Icons.align_horizontal_left),
+                      icon: const AppIcon(AppIconId.alignLeft),
                     ),
                     IconButton(
                       tooltip: l.architectSheetDelete,
@@ -711,7 +739,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                               );
                               setState(() => selected = null);
                             },
-                      icon: const Icon(Icons.delete_outline),
+                      icon: const AppIcon(AppIconId.delete),
                     ),
                   ],
                 ),
@@ -893,7 +921,7 @@ class _SheetDialogState extends State<_SheetDialog> {
               ),
               IconButton(
                 tooltip: l.architectSheetRotation,
-                icon: const Icon(Icons.screen_rotation),
+                icon: const AppIcon(AppIconId.screenRotate),
                 onPressed: () => setState(() {
                   final w = values[4].text;
                   values[4].text = values[5].text;
@@ -1251,7 +1279,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
                       onTap: () => edit(item),
                       trailing: IconButton(
                         tooltip: l.architectSheetDelete,
-                        icon: const Icon(Icons.delete_outline),
+                        icon: const AppIcon(AppIconId.delete),
                         onPressed: () => setState(() => items.remove(item)),
                       ),
                     ),
@@ -1265,7 +1293,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
                   rect: const Rect.fromLTWH(0, 30, 180, 10),
                 ),
               ),
-              icon: const Icon(Icons.add),
+              icon: const AppIcon(AppIconId.add),
               label: Text(l.architectSheetAddCell),
             ),
           ],

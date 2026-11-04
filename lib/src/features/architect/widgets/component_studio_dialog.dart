@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -199,18 +200,22 @@ class $className extends ArchitectComponentDefinition {
                   ),
                   PopupMenuButton<bool>(
                     tooltip: l.architectComponentTemplateHint,
-                    icon: const Icon(
-                      Icons.description_outlined,
-                      color: Colors.white70,
-                    ),
+                    icon: const AppIcon(AppIconId.file,
+                      color: Colors.white70),
                     itemBuilder: (_) => [
                       PopupMenuItem(
                         value: false,
-                        child: Text(l.architectTemplateDesk),
+                        child: AppMenuLabel(
+                          icon: AppIconId.furniture,
+                          child: Text(l.architectTemplateDesk),
+                      ),
                       ),
                       PopupMenuItem(
                         value: true,
-                        child: Text(l.architectTemplateBasin),
+                        child: AppMenuLabel(
+                          icon: AppIconId.bath,
+                          child: Text(l.architectTemplateBasin),
+                        ),
                       ),
                     ],
                     onSelected: (basin) {
@@ -220,25 +225,31 @@ class $className extends ArchitectComponentDefinition {
                   ),
                   PopupMenuButton<bool>(
                     tooltip: l.architectComponentExportJsonTooltip,
-                    icon: const Icon(
-                      Icons.copy_outlined,
+                    icon: const AppIcon(
+                      AppIconId.duplicate,
                       color: Colors.white70,
                     ),
                     itemBuilder: (_) => [
                       PopupMenuItem(
                         value: false,
-                        child: Text(l.architectComponentExportJsonTooltip),
+                        child: AppMenuLabel(
+                          icon: AppIconId.file,
+                          child: Text(l.architectComponentExportJsonTooltip),
+                      ),
                       ),
                       PopupMenuItem(
                         value: true,
-                        child: Text(l.architectComponentExportDartTooltip),
+                        child: AppMenuLabel(
+                          icon: AppIconId.code,
+                          child: Text(l.architectComponentExportDartTooltip),
+                        ),
                       ),
                     ],
                     onSelected: (dart) => dart ? _exportDart() : _export(),
                   ),
                   IconButton(
                     tooltip: l.close,
-                    icon: const Icon(Icons.close, color: Colors.white70),
+                    icon: const AppIcon(AppIconId.close, color: Colors.white70),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -349,14 +360,14 @@ class $className extends ArchitectComponentDefinition {
                 children: [
                   TextButton.icon(
                     onPressed: _definition == null ? null : _resize,
-                    icon: const Icon(Icons.straighten),
+                    icon: const AppIcon(AppIconId.measure),
                     label: Text(l.architectPropertySize),
                   ),
                   const Spacer(),
                   IconButton(
                     tooltip: l.architectComponentCompileBtn,
-                    icon: const Icon(
-                      Icons.play_arrow,
+                    icon: const AppIcon(
+                      AppIconId.play,
                       color: Colors.cyanAccent,
                     ),
                     onPressed: () {
@@ -365,7 +376,7 @@ class $className extends ArchitectComponentDefinition {
                   ),
                   FilledButton.icon(
                     onPressed: _saving ? null : _save,
-                    icon: const Icon(Icons.save_outlined),
+                    icon: const AppIcon(AppIconId.save),
                     label: Text(l.save),
                   ),
                 ],

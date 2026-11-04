@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -73,7 +74,7 @@ class _NumberState extends State<ArchitectPropertyNumberField> {
       suffixIcon: widget.onClear != null
           ? IconButton(
               tooltip: context.l10n.propertiesClear,
-              icon: const Icon(Icons.clear, size: 18),
+              icon: const AppIcon(AppIconId.close, size: 18),
               onPressed: () {
                 controller.clear();
                 edited = false;
@@ -81,7 +82,7 @@ class _NumberState extends State<ArchitectPropertyNumberField> {
               },
             )
           : widget.readOnly
-          ? Icon(
+          ? AppIcon.fromMaterial(
               widget.helper == context.l10n.propertiesCalculated
                   ? Icons.functions
                   : Icons.link,

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_column.dart';
@@ -29,19 +30,19 @@ void main() {
                   items: const [
                     ArchitectRadialMenuItem(
                       action: ArchitectRadialAction.edit,
-                      icon: Icons.edit,
+                      icon: AppIconId.edit,
                       label: 'Edit',
                       color: Colors.cyan,
                     ),
                     ArchitectRadialMenuItem(
                       action: ArchitectRadialAction.move,
-                      icon: Icons.open_with,
+                      icon: AppIconId.move,
                       label: 'Move',
                       color: Colors.amber,
                     ),
                     ArchitectRadialMenuItem(
                       action: ArchitectRadialAction.delete,
-                      icon: Icons.delete,
+                      icon: AppIconId.delete,
                       label: 'Delete',
                       color: Colors.red,
                     ),

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:convert';
@@ -74,7 +75,8 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
   }
 
   void _saveDraft() {
-    if(widget.isCurrent?.call()==false){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(context.l10n.propertiesStale)));return;}
+    if(widget.isCurrent?.call()==false){ScaffoldMessenger.of(context,
+      ).showSnackBar(SnackBar(content:Text(context.l10n.propertiesStale)));return;}
     final invalid = _form.currentState!.validateGranularly();
     if (invalid.isNotEmpty) {
       final field = invalid.first;
@@ -360,7 +362,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                       onPressed: d.shape == StairShape.straight
                           ? null
                           : () => update(d.copyWith(turnLeft: !d.turnLeft)),
-                      icon: Icon(
+                      icon: AppIcon.fromMaterial(
                         d.turnLeft ? Icons.turn_left : Icons.turn_right,
                       ),
                     ),
@@ -420,7 +422,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                 ),
                 OutlinedButton.icon(
                   key: const ValueKey('stair-open-section'),
-                  icon: const Icon(Icons.view_agenda_outlined),
+                  icon: const AppIcon(AppIconId.layoutRows),
                   label: Text(l.stairSection),
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -542,7 +544,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                   child: OutlinedButton.icon(
                     key: const ValueKey('stair-fit'),
                     onPressed: fit,
-                    icon: const Icon(Icons.auto_fix_high),
+                    icon: const AppIcon(AppIconId.auto),
                     label: Text(l.stairFit),
                   ),
                 ),
@@ -865,7 +867,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
       contentPadding: EdgeInsets.zero,
       leading: Tooltip(
         message: stairStateLabel(l, check.state),
-        child: Icon(switch (check.state) {
+        child: AppIcon.fromMaterial(switch (check.state) {
           StairCheckState.pass => Icons.check_circle_outline,
           StairCheckState.error => Icons.error_outline,
           StairCheckState.advice => Icons.info_outline,

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
@@ -82,7 +83,8 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
         });
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'HpglViewer._loadPlotterFile.fs');
+      AppErrorHandler.recordError(e, stack, context: 'HpglViewer._loadPlotterFile.fs',
+      );
       try {
         await RecentFilesService.removeRecentFile(widget.filePath);
       } on Exception catch (_) {
@@ -96,7 +98,8 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'HpglViewer._loadPlotterFile.format');
+      AppErrorHandler.recordError(e, stack, context: 'HpglViewer._loadPlotterFile.format',
+      );
       try {
         await RecentFilesService.removeRecentFile(widget.filePath);
       } on Exception catch (_) {
@@ -110,7 +113,8 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
         });
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'HpglViewer._loadPlotterFile');
+      AppErrorHandler.recordError(e, stack, context: 'HpglViewer._loadPlotterFile',
+      );
       try {
         await RecentFilesService.removeRecentFile(widget.filePath);
       } on Exception catch (_) {
@@ -227,7 +231,8 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
                       color: const Color(0xFFD97706).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.architecture_rounded, color: Color(0xFFD97706)),
+                    child: const Icon(Icons.architecture_rounded, color: Color(0xFFD97706),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -236,11 +241,13 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
                       children: [
                         const Text(
                           'HPGL Plotter • Properties',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Text(
                           _fileName,
-                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
+                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -251,10 +258,14 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
               const Divider(height: 24),
               _buildInfoRow('File Name:', _fileName),
               _buildInfoRow('File Size:', formattedSize),
-              _buildInfoRow('Drawing Extents (mm):', '${widthMm.toStringAsFixed(1)} × ${heightMm.toStringAsFixed(1)} mm'),
-              _buildInfoRow('Plotter Units:', '${bounds.width.toStringAsFixed(0)} × ${bounds.height.toStringAsFixed(0)} units'),
-              _buildInfoRow('Vector Paths:', '${_document!.elements.length} strokes'),
-              _buildInfoRow('Total Vertices:', '${_document!.totalPoints} points'),
+              _buildInfoRow('Drawing Extents (mm):', '${widthMm.toStringAsFixed(1)} × ${heightMm.toStringAsFixed(1)} mm',
+              ),
+              _buildInfoRow('Plotter Units:', '${bounds.width.toStringAsFixed(0)} × ${bounds.height.toStringAsFixed(0)} units',
+              ),
+              _buildInfoRow('Vector Paths:', '${_document!.elements.length} strokes',
+              ),
+              _buildInfoRow('Total Vertices:', '${_document!.totalPoints} points',
+              ),
               _buildInfoRow('Pens Used:', '${_document!.penCount} pens'),
             ],
           ),
@@ -269,8 +280,10 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -283,17 +296,17 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
   List<Widget> _buildHpglActions(ThemeData theme) {
     return [
       IconButton(
-        icon: const Icon(Icons.fit_screen_outlined, size: 20),
+        icon: const AppIcon(AppIconId.fitView, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Fit to Screen',
+        tooltip: context.l10n.commandUiFitToScreen,
         onPressed: _document != null ? _fitToScreen : null,
       ),
       PopupMenuButton<EpsCanvasTheme>(
-        icon: const Icon(Icons.palette_outlined, size: 20),
+        icon: const AppIcon(AppIconId.palette, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Canvas Theme',
+        tooltip: context.l10n.commandUiCanvasTheme,
         onSelected: (t) => setState(() => _canvasTheme = t),
         itemBuilder: (context) => EpsCanvasTheme.values.map((t) {
           return PopupMenuItem<EpsCanvasTheme>(
@@ -310,10 +323,12 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Text(t.label),
+                Text(t.localizedLabel(context.l10n)),
                 if (_canvasTheme == t) ...[
                   const Spacer(),
-                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                  AppIcon(
+                    AppIconId.confirm, size: 18, color: theme.colorScheme.primary,
+                  ),
                 ],
               ],
             ),
@@ -321,28 +336,28 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
         }).toList(),
       ),
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _showGrid ? Icons.grid_on : Icons.grid_off,
           size: 20,
           color: _showGrid ? theme.colorScheme.primary : null,
         ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Grid',
+        tooltip: context.l10n.commandIconGrid,
         onPressed: () => setState(() => _showGrid = !_showGrid),
       ),
       IconButton(
-        icon: const Icon(Icons.info_outline, size: 20),
+        icon: const AppIcon(AppIconId.info, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Plotter Properties',
+        tooltip: context.l10n.commandUiPlotterProperties,
         onPressed: _showInfoSheet,
       ),
       IconButton(
-        icon: const Icon(Icons.share_outlined, size: 20),
+        icon: const AppIcon(AppIconId.share, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Share',
+        tooltip: context.l10n.commandIconShare,
         onPressed: _shareFile,
       ),
     ];
@@ -359,7 +374,7 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const AppIcon(AppIconId.back),
           onPressed: () => Navigator.of(context).pop(true),
         ),
         title: Text(
@@ -386,8 +401,7 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
                   child: Row(
                     children: [
                       const Spacer(),
-                      ..._buildHpglActions(theme),
-                    ],
+                      ..._buildHpglActions(theme)],
                   ),
                 ),
               ),
@@ -403,7 +417,8 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
                 children: [
                   CircularProgressIndicator(color: Color(0xFFD97706)),
                   SizedBox(height: 16),
-                  Text('Loading HPGL Plotter Drawing...', style: TextStyle(color: Colors.white70)),
+                  Text('Loading HPGL Plotter Drawing...', style: TextStyle(color: Colors.white70),
+                  ),
                 ],
               ),
             );
@@ -416,14 +431,16 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                    const Icon(Icons.error_outline, size: 48, color: Colors.redAccent,
+                    ),
                     const SizedBox(height: 16),
-                    Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+                    Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70),
+                    ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: _loadHpglFile,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
+                      icon: const AppIcon(AppIconId.refresh),
+                      label: Text(context.l10n.retry),
                     ),
                   ],
                 ),
@@ -468,7 +485,7 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
                 right: 20,
                 child: _buildFloatingButton(
                   icon: Icons.fit_screen_outlined,
-                  tooltip: 'Fit to View (Center)',
+                  tooltip: context.l10n.commandUiFitToViewCenter,
                   onTap: _fitToScreen,
                   theme: theme,
                 ),
@@ -497,7 +514,8 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
           message: tooltip,
           child: Padding(
             padding: const EdgeInsets.all(10.0),
-            child: Icon(icon, size: 20, color: theme.colorScheme.onSurface),
+            child: AppIcon.fromMaterial(icon, size: 20, color: theme.colorScheme.onSurface,
+            ),
           ),
         ),
       ),
@@ -521,14 +539,16 @@ class _HpglPainter extends CustomPainter {
     final bounds = document.boundingBox;
     const margin = 20.0;
     final scale = (bounds.width > 0 && bounds.height > 0)
-        ? math.min((size.width - 40) / bounds.width, (size.height - 40) / bounds.height)
+        ? math.min((size.width - 40) / bounds.width, (size.height - 40) / bounds.height,
+          )
         : 0.05;
 
     final docW = bounds.width * scale + margin * 2;
     final docH = bounds.height * scale + margin * 2;
 
     // Draw Background
-    canvas.drawRect(Rect.fromLTWH(0, 0, docW, docH), Paint()..color = theme.background);
+    canvas.drawRect(Rect.fromLTWH(0, 0, docW, docH), Paint()..color = theme.background,
+    );
 
     // Draw CAD Grid
     if (showGrid) {

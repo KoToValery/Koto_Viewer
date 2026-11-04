@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 import '../models/pdf_reflow_models.dart';
@@ -98,7 +100,8 @@ class _PdfReflowViewState extends State<PdfReflowView> {
             final currentSettings = widget.settings;
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,7 +112,8 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: currentSettings.theme.textColor.withValues(alpha: 0.2),
+                          color: currentSettings.theme.textColor.withValues(alpha: 0.2,
+                          ),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -136,14 +140,18 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                             Navigator.pop(context);
                             widget.onExitReflow();
                           },
-                          icon: Icon(Icons.picture_as_pdf_outlined, size: 18, color: currentSettings.theme.accentColor),
+                          icon: AppIcon(
+                            AppIconId.pdf, size: 18, color: currentSettings.theme.accentColor,
+                          ),
                           label: Text(
-                            'Original PDF',
-                            style: TextStyle(color: currentSettings.theme.accentColor, fontWeight: FontWeight.bold),
+                            context.l10n.commandUiOriginalPdf,
+                            style: TextStyle(color: currentSettings.theme.accentColor, fontWeight: FontWeight.bold,
+                            ),
                           ),
                           style: TextButton.styleFrom(
                             visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4,
+                            ),
                           ),
                         ),
                       ],
@@ -163,9 +171,9 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                         ),
                         const Spacer(),
                         IconButton(
-                          icon: const Icon(Icons.text_decrease),
+                          icon: const AppIcon(AppIconId.textDecrease),
                           color: currentSettings.theme.textColor,
-                          tooltip: 'Decrease font size',
+                          tooltip: context.l10n.commandUiDecreaseFontSize,
                           onPressed: currentSettings.fontSize > 12.0
                               ? () {
                                   final updated = currentSettings.copyWith(
@@ -177,9 +185,11 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                               : null,
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4,
+                          ),
                           decoration: BoxDecoration(
-                            color: currentSettings.theme.textColor.withValues(alpha: 0.08),
+                            color: currentSettings.theme.textColor.withValues(alpha: 0.08,
+                            ),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -192,9 +202,9 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.text_increase),
+                          icon: const AppIcon(AppIconId.textIncrease),
                           color: currentSettings.theme.textColor,
-                          tooltip: 'Increase font size',
+                          tooltip: context.l10n.commandUiIncreaseFontSize,
                           onPressed: currentSettings.fontSize < 32.0
                               ? () {
                                   final updated = currentSettings.copyWith(
@@ -228,7 +238,7 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                             children: PdfReflowFont.values.map((f) {
                               final isSelected = currentSettings.font == f;
                               return ChoiceChip(
-                                label: Text(f.label),
+                                label: Text(f.localizedLabel(context.l10n)),
                                 selected: isSelected,
                                 selectedColor: currentSettings.theme.accentColor.withValues(alpha: 0.2),
                                 labelStyle: TextStyle(
@@ -240,7 +250,8 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                                 ),
                                 onSelected: (val) {
                                   if (val) {
-                                    final updated = currentSettings.copyWith(font: f);
+                                    final updated = currentSettings.copyWith(font: f,
+                                    );
                                     widget.onSettingsChanged(updated);
                                     setSheetState(() {});
                                   }
@@ -273,7 +284,8 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                               final isSelected = currentSettings.theme == th;
                               return GestureDetector(
                                 onTap: () {
-                                  final updated = currentSettings.copyWith(theme: th);
+                                  final updated = currentSettings.copyWith(theme: th,
+                                  );
                                   widget.onSettingsChanged(updated);
                                   setSheetState(() {});
                                 },
@@ -336,21 +348,28 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                               visualDensity: VisualDensity.compact,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            segments: const [
+                            segments: [
                               ButtonSegment(
                                 value: false,
-                                label: Text('Swipe Pages', style: TextStyle(fontSize: 11.5)),
-                                icon: Icon(Icons.view_carousel_outlined, size: 15),
+                                label: Text(
+                                  context.l10n.commandUiSwipePages, style: TextStyle(fontSize: 11.5),
+                                ),
+                                icon: AppIcon(
+                                  AppIconId.layoutCarousel, size: 15,
+                                ),
                               ),
                               ButtonSegment(
                                 value: true,
-                                label: Text('Continuous', style: TextStyle(fontSize: 11.5)),
-                                icon: Icon(Icons.view_stream_outlined, size: 15),
+                                label: Text(
+                                  context.l10n.architectLineSolid, style: TextStyle(fontSize: 11.5),
+                                ),
+                                icon: AppIcon(AppIconId.layoutRows, size: 15),
                               ),
                             ],
                             selected: {currentSettings.isContinuous},
                             onSelectionChanged: (set) {
-                              final updated = currentSettings.copyWith(isContinuous: set.first);
+                              final updated = currentSettings.copyWith(isContinuous: set.first,
+                              );
                               widget.onSettingsChanged(updated);
                               setSheetState(() {});
                             },
@@ -389,9 +408,9 @@ class _PdfReflowViewState extends State<PdfReflowView> {
               heroTag: 'pdf_reflow_settings_btn',
               backgroundColor: theme.surfaceColor,
               foregroundColor: theme.accentColor,
-              tooltip: 'Reading Settings',
+              tooltip: context.l10n.commandUiReadingSettings,
               onPressed: _showSettingsSheet,
-              child: const Icon(Icons.tune, size: 18),
+              child: const AppIcon(AppIconId.properties, size: 18),
             ),
           ),
         ],
@@ -519,7 +538,8 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.auto_awesome, size: 12, color: theme.accentColor),
+                    Icon(Icons.auto_awesome, size: 12, color: theme.accentColor,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'OCR Text',
@@ -581,7 +601,8 @@ class _PdfReflowViewState extends State<PdfReflowView> {
               padding: const EdgeInsets.symmetric(vertical: 36.0),
               child: Text(
                 'Error loading page: ${snapshot.error}',
-                style: TextStyle(color: Colors.redAccent.shade200, fontSize: 13),
+                style: TextStyle(color: Colors.redAccent.shade200, fontSize: 13,
+                ),
               ),
             ),
           );
@@ -595,7 +616,8 @@ class _PdfReflowViewState extends State<PdfReflowView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.notes_rounded, size: 40, color: theme.textColor.withValues(alpha: 0.3)),
+                  Icon(Icons.notes_rounded, size: 40, color: theme.textColor.withValues(alpha: 0.3),
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     'No readable text found on Page $pageNumber.',
@@ -607,8 +629,8 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: widget.onExitReflow,
-                    icon: const Icon(Icons.picture_as_pdf, size: 16),
-                    label: const Text('View Original PDF Page'),
+                    icon: const AppIcon(AppIconId.pdf, size: 16),
+                    label: Text(context.l10n.commandUiViewOriginalPdfPage),
                   ),
                 ],
               ),

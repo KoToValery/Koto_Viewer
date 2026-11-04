@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import '../models/architect_line_symbol.dart';
 import 'architect_line_symbol_editor.dart';
@@ -132,8 +133,8 @@ class ArchitectLineStylePicker extends StatelessWidget {
                         ArchitectLineStyleSample(style: style, width: 86),
                         if (!style.isPreset && onDeleteStyle != null)
                           IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
+                            icon: const AppIcon(
+                              AppIconId.delete,
                               size: 18,
                               color: Colors.redAccent,
                             ),
@@ -142,7 +143,8 @@ class ArchitectLineStylePicker extends StatelessWidget {
                               final confirm = await showDialog<bool>(
                                 context: dialogContext,
                                 builder: (ctx) => AlertDialog(
-                                  title: Text(l.architectLineDeleteConfirmTitle),
+                                  title: Text(l.architectLineDeleteConfirmTitle,
+                                  ),
                                   content: Text(
                                     l.architectLineDeleteConfirmPrompt(
                                       style.label(l),
@@ -179,7 +181,7 @@ class ArchitectLineStylePicker extends StatelessWidget {
           actions: [
           TextButton.icon(
             key: const ValueKey('line-style-custom'),
-            icon: const Icon(Icons.tune, size: 18),
+            icon: const AppIcon(AppIconId.properties, size: 18),
             label: Text(l.architectLinePatternEditor),
             onPressed: () async {
               final style = await showDialog<ArchitectLineStyle>(
@@ -413,7 +415,7 @@ class _ArchitectLinePatternEditorState
                       IconButton(
                         key: ValueKey('line-pattern-remove-$pair'),
                         tooltip: l.architectLinePatternRemove,
-                        icon: const Icon(Icons.remove_circle_outline, size: 20),
+                        icon: const AppIcon(AppIconId.removeCircle, size: 20),
                         onPressed: _segments.length <= 2
                             ? null
                             : () => setState(
@@ -430,7 +432,7 @@ class _ArchitectLinePatternEditorState
                   onPressed: _segments.length >= 16
                       ? null
                       : () => setState(() => _segments.addAll([3, 1.5])),
-                  icon: const Icon(Icons.add, size: 18),
+                  icon: const AppIcon(AppIconId.add, size: 18),
                   label: Text(l.architectLinePatternAdd),
                 ),
               ],

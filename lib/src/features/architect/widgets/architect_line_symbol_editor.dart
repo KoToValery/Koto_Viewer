@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -178,7 +179,7 @@ class ArchitectLineSymbolEditor extends StatelessWidget {
                 TextButton.icon(
                   key: const ValueKey('line-symbol-edit-shape'),
                   onPressed: () => _draw(context),
-                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  icon: const AppIcon(AppIconId.edit, size: 18),
                   label: Text(l.architectLineSymbolDraw),
                 ),
               ListTile(

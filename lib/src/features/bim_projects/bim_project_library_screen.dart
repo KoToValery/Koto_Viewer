@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../core/l10n/l10n_extensions.dart';
 import '../architect/screens/architect_workspace_screen.dart';
@@ -138,7 +139,8 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
             underlaysByStorey: underlays?.underlaysByStorey,
             underlayFrame: BimCoordinateFrame(
               origin: underlays?.referenceControlPoint ?? Offset.zero,
-              unitsPerMeter: underlays?.cadUnitsPerMeter ?? 1),
+              unitsPerMeter: underlays?.cadUnitsPerMeter ?? 1,
+                ),
           ),
         ),
       ).then((_) => _loadProjects());
@@ -167,7 +169,9 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
         if (arch == null) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(context.l10n.exportFailed('Architectural model not found'))),
+              SnackBar(content: Text(context.l10n.exportFailed('Architectural model not found'),
+                ),
+              ),
             );
           }
           return;
@@ -181,7 +185,8 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
         if (structural == null) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(context.l10n.exportFailed('Model not found'))),
+              SnackBar(content: Text(context.l10n.exportFailed('Model not found')),
+              ),
             );
           }
           return;
@@ -196,7 +201,9 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(context.l10n.bimProjectExportSuccess(zipFile.uri.pathSegments.last)),
+            content: Text(context.l10n.bimProjectExportSuccess(zipFile.uri.pathSegments.last,
+              ),
+            ),
             backgroundColor: const Color(0xFF1E88E5),
           ),
         );
@@ -227,12 +234,14 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white60)),
+            child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white60),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(context.l10n.delete, style: const TextStyle(color: Colors.white)),
+            child: Text(context.l10n.delete, style: const TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -266,11 +275,13 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white60)),
+            child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white60),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(context.l10n.save, style: const TextStyle(color: Colors.white)),
+            child: Text(context.l10n.save, style: const TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -297,14 +308,15 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_rounded),
+            icon: const AppIcon(AppIconId.add),
             tooltip: l10n.bimProjectNew,
             onPressed: _openNewProjectWizard,
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)))
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)),
+            )
           : _projects.isEmpty
               ? _buildEmptyState(context)
               : Column(
@@ -323,7 +335,8 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                                 ),
                               )
                             : ListView.separated(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12,
+                            ),
                                 itemCount: _filteredProjects.length,
                                 separatorBuilder: (_, index) => const SizedBox(height: 12),
                                 itemBuilder: (context, index) {
@@ -340,7 +353,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
             ? const Color(0xFFCE93D8)
             : const Color(0xFF00E5FF),
         foregroundColor: Colors.black,
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _filterType == 'architectural'
               ? Icons.auto_awesome_rounded
               : Icons.add_rounded,
@@ -391,17 +404,20 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
               Text(
                 l10n.bimProjectNoProjects,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white60, fontSize: 14, height: 1.5),
+                style: const TextStyle(color: Colors.white60, fontSize: 14, height: 1.5,
+                ),
               ),
               const SizedBox(height: 28),
               ElevatedButton.icon(
-                icon: const Icon(Icons.add_rounded),
+                icon: const AppIcon(AppIconId.add),
                 label: Text(l10n.bimProjectNew),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00E5FF),
                   foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
                 onPressed: _openNewProjectWizard,
               ),
@@ -421,11 +437,14 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildFilterChip('all', l10n.bimProjectFilterAll, Icons.apps_rounded),
+            _buildFilterChip('all', l10n.bimProjectFilterAll, Icons.apps_rounded,
+            ),
             const SizedBox(width: 8),
-            _buildFilterChip('structural', l10n.bimProjectFilterStructural, Icons.apartment_rounded),
+            _buildFilterChip('structural', l10n.bimProjectFilterStructural, Icons.apartment_rounded,
+            ),
             const SizedBox(width: 8),
-            _buildFilterChip('architectural', l10n.bimProjectFilterArchitectural, Icons.architecture_rounded),
+            _buildFilterChip('architectural', l10n.bimProjectFilterArchitectural, Icons.architecture_rounded,
+            ),
           ],
         ),
       ),
@@ -455,7 +474,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            AppIcon.fromMaterial(
               icon,
               size: 16,
               color: isSelected ? color : Colors.white60,
@@ -524,7 +543,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                         color: typeColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
+                      child: AppIcon.fromMaterial(
                         typeIcon,
                         color: typeColor,
                         size: 24,
@@ -549,23 +568,29 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                           Row(
                             children: [
                               if (project.location.isNotEmpty) ...[
-                                const Icon(Icons.location_on_outlined, color: Colors.white54, size: 13),
+                                const AppIcon(
+                                  AppIconId.location, color: Colors.white54, size: 13,
+                                ),
                                 const SizedBox(width: 3),
                                 Flexible(
                                   child: Text(
                                     project.location,
-                                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                    style: const TextStyle(color: Colors.white54, fontSize: 12,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                const Text('•', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                                const Text('•', style: TextStyle(color: Colors.white38, fontSize: 12,
+                                  ),
+                                ),
                                 const SizedBox(width: 8),
                               ],
                               Text(
                                 formattedDate,
-                                style: const TextStyle(color: Colors.white38, fontSize: 12),
+                                style: const TextStyle(color: Colors.white38, fontSize: 12,
+                                ),
                               ),
                             ],
                           ),
@@ -573,9 +598,12 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                       ),
                     ),
                     PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert_rounded, color: Colors.white60),
+                      icon: const AppIcon(
+                        AppIconId.moreVertical, color: Colors.white60,
+                      ),
                       color: const Color(0xFF282832),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
+                      ),
                       onSelected: (val) {
                         switch (val) {
                           case 'export':
@@ -594,9 +622,13 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                           value: 'export',
                           child: Row(
                             children: [
-                              const Icon(Icons.folder_zip_rounded, color: Color(0xFF00E5FF), size: 18),
+                              const AppIcon(
+                                AppIconId.archive, color: Color(0xFF00E5FF), size: 18,
+                              ),
                               const SizedBox(width: 10),
-                              Text(l10n.bimProjectExportAllZip, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                              Text(l10n.bimProjectExportAllZip, style: const TextStyle(color: Colors.white, fontSize: 13,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -604,9 +636,13 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                           value: 'rename',
                           child: Row(
                             children: [
-                              const Icon(Icons.edit_rounded, color: Colors.white70, size: 18),
+                              const AppIcon(
+                                AppIconId.edit, color: Colors.white70, size: 18,
+                              ),
                               const SizedBox(width: 10),
-                              Text(l10n.bimProjectRename, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                              Text(l10n.bimProjectRename, style: const TextStyle(color: Colors.white, fontSize: 13,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -615,9 +651,13 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                           value: 'delete',
                           child: Row(
                             children: [
-                              const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                              const AppIcon(
+                                AppIconId.delete, color: Colors.redAccent, size: 18,
+                              ),
                               const SizedBox(width: 10),
-                              Text(l10n.delete, style: const TextStyle(color: Colors.redAccent, fontSize: 13)),
+                              Text(l10n.delete, style: const TextStyle(color: Colors.redAccent, fontSize: 13,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -635,7 +675,8 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                   children: [
                     // Project Type badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: typeColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
@@ -643,7 +684,8 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(typeIcon, size: 14, color: typeColor),
+                          AppIcon.fromMaterial(typeIcon, size: 14, color: typeColor,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             typeLabel,
@@ -659,7 +701,8 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
 
                     // Storeys badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
@@ -667,11 +710,14 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.layers_outlined, size: 14, color: Colors.white70),
+                          const AppIcon(
+                            AppIconId.layers, size: 14, color: Colors.white70,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             l10n.bimProjectStoreysCount(project.storeys.length),
-                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            style: const TextStyle(color: Colors.white70, fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -679,7 +725,8 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
 
                     // Status badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: isReady
                             ? const Color(0xFF00E676).withValues(alpha: 0.15)
@@ -689,7 +736,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
+                          AppIcon.fromMaterial(
                             isReady ? Icons.check_circle_rounded : Icons.info_outline_rounded,
                             size: 14,
                             color: isReady ? const Color(0xFF00E676) : const Color(0xFFFF9100),
@@ -716,21 +763,24 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        icon: const Icon(Icons.visibility_rounded, size: 16),
+                        icon: const AppIcon(AppIconId.visible, size: 16),
                         label: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
                             l10n.bimProjectOpen,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13,
+                            ),
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF00E5FF),
                           foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8,
+                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                         onPressed: () => _openProject(project),
                       ),
@@ -738,7 +788,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.architecture_rounded, size: 16),
+                        icon: const AppIcon(AppIconId.measureAngle, size: 16),
                         label: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
@@ -751,8 +801,10 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: const BorderSide(color: Colors.white24),
-                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8,
+                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                         onPressed: () => _openAlignment(project),
                       ),

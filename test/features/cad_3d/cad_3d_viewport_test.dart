@@ -1,3 +1,4 @@
+import '../../support/command_icon_finders.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -580,9 +581,9 @@ END-ISO-10303-21;
       tester.widget<Cad3DViewport>(find.byType(Cad3DViewport)).mesh,
       same(view.mesh),
     );
-    await tester.tap(find.byIcon(Icons.fullscreen_exit_rounded));
+    await tester.tap(findCommandIcon(Icons.fullscreen_exit_rounded));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.apartment_rounded));
+    await tester.tap(findCommandIcon(Icons.apartment_rounded));
     await tester.pumpAndSettle();
     final sheet = tester.widget<IfcBimSheet>(find.byType(IfcBimSheet));
     sheet.ifcModel.toggleCategory('Wall', false);

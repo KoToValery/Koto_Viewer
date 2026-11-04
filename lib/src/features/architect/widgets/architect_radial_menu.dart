@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../../../core/services/ui_settings_service.dart';
@@ -11,7 +12,7 @@ typedef ArchitectRadialAction = BimEditAction;
 
 class ArchitectRadialMenuItem {
   final ArchitectRadialAction action;
-  final IconData icon;
+  final AppIconId icon;
   final String label;
   final Color color;
   final String? tooltip;
@@ -187,8 +188,8 @@ class _ArchitectRadialMenuState extends State<ArchitectRadialMenu> {
                           : item?.tooltip ?? label,
                       color: color,
                       icon: action == null
-                          ? const Icon(
-                              Icons.add,
+                          ? const AppIcon(
+                              AppIconId.add,
                               size: 19,
                               color: Colors.white70,
                             )
@@ -214,8 +215,8 @@ class _ArchitectRadialMenuState extends State<ArchitectRadialMenu> {
                     ? l.contextMenuMore
                     : '${_page + 1}/${pages.length}',
                 tooltip: l.contextMenuPage(_page + 1, pages.length),
-                icon: const Icon(
-                  Icons.more_horiz,
+                icon: const AppIcon(
+                  AppIconId.moreHorizontal,
                   size: 19,
                   color: Colors.white,
                 ),

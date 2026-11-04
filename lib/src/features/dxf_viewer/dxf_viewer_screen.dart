@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -156,7 +157,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   Future<void> _loadStructuralProject() async {
     try {
-      final p = await StructuralPersistenceService.loadProject(documentKey: _fileName);
+      final p = await StructuralPersistenceService.loadProject(documentKey: _fileName,
+      );
       if (mounted) {
         setState(() {
           _structuralProject = p;
@@ -170,7 +172,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     super.initState();
     _fileName = widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
     _transformController.addListener(_onTransformChanged);
-    DxfDisplaySettingsService.settingsNotifier.addListener(_onDisplaySettingsChanged);
+    DxfDisplaySettingsService.settingsNotifier.addListener(_onDisplaySettingsChanged,
+    );
     _initDisplaySettings();
     _loadDxfFile();
     _loadSavedAnnotations();
@@ -185,7 +188,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = _annotations.map((a) => a.toJson()).toList();
-      await prefs.setString('dxf_annotations_$_annotationsPrefKey', jsonEncode(jsonList));
+      await prefs.setString('dxf_annotations_$_annotationsPrefKey', jsonEncode(jsonList),
+      );
     } on Exception catch (_) {
       // Ignore preference write failure
     }
@@ -220,7 +224,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     _transformSettleTimer?.cancel();
     _wheelSettleTimer?.cancel();
     _transformController.removeListener(_onTransformChanged);
-    DxfDisplaySettingsService.settingsNotifier.removeListener(_onDisplaySettingsChanged);
+    DxfDisplaySettingsService.settingsNotifier.removeListener(_onDisplaySettingsChanged,
+    );
     _transformController.dispose();
     _hudScale.dispose();
     _hudCadCoord.dispose();
@@ -329,7 +334,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         _fitToScreen();
       });
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._loadDxfFile.fs');
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._loadDxfFile.fs',
+      );
       final l10n = mounted ? AppLocalizations.of(context) : null;
       if (mounted) {
         setState(() {
@@ -338,12 +344,14 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         });
       }
       try {
-        await RecentFilesService.removeRecentFile(widget.originalFilePath ?? widget.filePath);
+        await RecentFilesService.removeRecentFile(widget.originalFilePath ?? widget.filePath,
+        );
       } on Exception catch (_) {
         // Ignore recent files cleanup failure
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._loadDxfFile.format');
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._loadDxfFile.format',
+      );
       final l10n = mounted ? AppLocalizations.of(context) : null;
       if (mounted) {
         setState(() {
@@ -352,7 +360,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         });
       }
       try {
-        await RecentFilesService.removeRecentFile(widget.originalFilePath ?? widget.filePath);
+        await RecentFilesService.removeRecentFile(widget.originalFilePath ?? widget.filePath,
+        );
       } on Exception catch (_) {
         // Ignore recent files cleanup failure
       }
@@ -366,7 +375,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         });
       }
       try {
-        await RecentFilesService.removeRecentFile(widget.originalFilePath ?? widget.filePath);
+        await RecentFilesService.removeRecentFile(widget.originalFilePath ?? widget.filePath,
+        );
       } on Exception catch (_) {
         // Ignore recent files cleanup failure
       }
@@ -533,7 +543,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
     // Only start a single finger measure pointer if we are NOT in the middle of a multi-touch sequence
     if (!_isMultiTouchGesture) {
-      _updateMeasurePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
+      _updateMeasurePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse,
+      );
     }
   }
 
@@ -543,7 +554,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       _isMultiTouchGesture = true;
     }
     if (_isMultiTouchGesture || _activePointersCount != 1) return;
-    _updateMeasurePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
+    _updateMeasurePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse,
+    );
   }
 
   void _updateMeasurePointer(Offset screenPos, {bool isMouse = false}) {
@@ -879,7 +891,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
       File effectiveBase = File(widget.filePath);
       if (widget.filePath.toLowerCase().endsWith('.dwg')) {
-        final convertedPath = await DwgConverterService.convertDwgToDxf(widget.filePath);
+        final convertedPath = await DwgConverterService.convertDwgToDxf(widget.filePath,
+        );
         effectiveBase = File(convertedPath);
       }
 
@@ -912,7 +925,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
               label: l10n.share,
               textColor: const Color(0xFF00E5FF),
               onPressed: () {
-                Share.shareXFiles([XFile(outputFile.path)], subject: outputFileName);
+                Share.shareXFiles([XFile(outputFile.path),
+                ], subject: outputFileName);
               },
             ),
           ),
@@ -949,7 +963,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     if (_document == null) return;
     try {
       final baseName = (widget.title ?? widget.filePath.split(Platform.pathSeparator).last)
-          .replaceAll(RegExp(r'\.(dxf|dwg|kcad)$', caseSensitive: false), '');
+          .replaceAll(RegExp(r'\.(dxf|dwg|kcad)$', caseSensitive: false), '',
+              );
       final suffix = _annotations.isNotEmpty ? '_annotated.kcad' : '_fast.kcad';
       final outputFileName = '$baseName$suffix';
 
@@ -976,7 +991,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             hasArrowhead: true,
             layer: 'MARKUP',
             trueColor: anno.colorValue,
-          ));
+          ),
+          );
           addedEntities.add(DxfMText(
             rawText: anno.text,
             cleanText: anno.text,
@@ -985,7 +1001,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             layer: 'MARKUP',
             trueColor: anno.colorValue,
             attachmentPoint: 1,
-          ));
+          ),
+          );
         }
 
         final allEntities = List<DxfEntity>.from(docToExport.entities)..addAll(addedEntities);
@@ -1012,14 +1029,16 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Saved fast KCAD: $outputFileName (${sizeMb.toStringAsFixed(2)} MB)'),
+            content: Text('Saved fast KCAD: $outputFileName (${sizeMb.toStringAsFixed(2)} MB)',
+            ),
             backgroundColor: const Color(0xFF1B2433),
             behavior: SnackBarBehavior.floating,
             action: SnackBarAction(
               label: 'Share',
               textColor: const Color(0xFF00E5FF),
               onPressed: () {
-                Share.shareXFiles([XFile(outputFile.path)], subject: outputFileName);
+                Share.shareXFiles([XFile(outputFile.path),
+                ], subject: outputFileName);
               },
             ),
           ),
@@ -1176,7 +1195,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       final delta = event.position - _middlePanStart!;
       final newMatrix = _middlePanMatrix!.clone();
       final translation = newMatrix.getTranslation();
-      newMatrix.setTranslationRaw(translation.x + delta.dx, translation.y + delta.dy, translation.z);
+      newMatrix.setTranslationRaw(translation.x + delta.dx, translation.y + delta.dy, translation.z,
+      );
       _transformController.value = newMatrix;
       return;
     }
@@ -1192,7 +1212,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       _middlePanMatrix = null;
       if (!_isWheelScrolling && !_isGestureActive) {
         _transformSettleTimer?.cancel();
-        _transformSettleTimer = Timer(const Duration(milliseconds: 100), _syncCanvasAfterTransform);
+        _transformSettleTimer = Timer(const Duration(milliseconds: 100), _syncCanvasAfterTransform,
+        );
       }
       return;
     }
@@ -1216,14 +1237,16 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         final currentIndex = widget.currentProjectIndex ?? 0;
         if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
             event.logicalKey == LogicalKeyboardKey.pageDown) {
-          final nextIdx = widget.projectBundle!.getNextVisibleIndex(currentIndex);
+          final nextIdx = widget.projectBundle!.getNextVisibleIndex(currentIndex,
+          );
           if (nextIdx != null && widget.onSwitchProjectItem != null) {
             widget.onSwitchProjectItem!(nextIdx);
             return;
           }
         } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
             event.logicalKey == LogicalKeyboardKey.pageUp) {
-          final prevIdx = widget.projectBundle!.getPreviousVisibleIndex(currentIndex);
+          final prevIdx = widget.projectBundle!.getPreviousVisibleIndex(currentIndex,
+          );
           if (prevIdx != null && widget.onSwitchProjectItem != null) {
             widget.onSwitchProjectItem!(prevIdx);
             return;
@@ -1242,7 +1265,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_snapEnabled ? 'Object Snap (OSNAP) ON [F3]' : 'Object Snap (OSNAP) OFF [F3]'),
+            content: Text(_snapEnabled ? 'Object Snap (OSNAP) ON [F3]' : 'Object Snap (OSNAP) OFF [F3]',
+            ),
             duration: const Duration(milliseconds: 1200),
             behavior: SnackBarBehavior.floating,
           ),
@@ -1428,8 +1452,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-      );
+        type: FileType.any);
 
       if (result == null || result.files.isEmpty) return;
 
@@ -1466,7 +1489,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             ),
           );
         }
-        final convertedDxfPath = await DwgConverterService.convertDwgToDxf(filePath);
+        final convertedDxfPath = await DwgConverterService.convertDwgToDxf(filePath,
+        );
         effectiveDxfFile = File(convertedDxfPath);
       } else {
         effectiveDxfFile = File(filePath);
@@ -1480,7 +1504,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         }
       }
 
-      final importedDoc = await DxfParser.parseFromFile(effectiveDxfFile, originalFile: originalSourceFile);
+      final importedDoc = await DxfParser.parseFromFile(effectiveDxfFile, originalFile: originalSourceFile,
+      );
       final activeCrs = CoordinateSystemService.activeSystemNotifier.value;
 
       if (!mounted) return;
@@ -1510,14 +1535,16 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         }
       }
 
-      final mergedTextStyles = Map<String, DxfTextStyle>.from(_document!.textStyles);
+      final mergedTextStyles = Map<String, DxfTextStyle>.from(_document!.textStyles,
+      );
       for (final entry in importedDoc.textStyles.entries) {
         if (!mergedTextStyles.containsKey(entry.key)) {
           mergedTextStyles[entry.key] = entry.value;
         }
       }
 
-      final mergedLineTypes = Map<String, List<double>>.from(_document!.lineTypes);
+      final mergedLineTypes = Map<String, List<double>>.from(_document!.lineTypes,
+      );
       for (final entry in importedDoc.lineTypes.entries) {
         if (!mergedLineTypes.containsKey(entry.key)) {
           mergedLineTypes[entry.key] = entry.value;
@@ -1525,7 +1552,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       }
 
       final mergedEntities = List<DxfEntity>.from(_document!.entities)..addAll(importedDoc.entities);
-      final mergedBounds = _document!.bounds.expandToInclude(importedDoc.bounds);
+      final mergedBounds = _document!.bounds.expandToInclude(importedDoc.bounds,
+      );
 
       final mergedStats = Map<String, int>.from(_document!.entityStats);
       for (final entry in importedDoc.entityStats.entries) {
@@ -1550,7 +1578,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       final l10n = context.l10n;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n.importedDxfSuccess(importedDoc.totalEntities, importedName)),
+          content: Text(l10n.importedDxfSuccess(importedDoc.totalEntities, importedName),
+          ),
           action: SnackBarAction(
             label: l10n.fitScreen,
             onPressed: _fitToScreen,
@@ -1558,7 +1587,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         ),
       );
     } on DwgConversionException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._importFile.dwg');
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._importFile.dwg',
+      );
       if (mounted) {
         final l10n = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1577,7 +1607,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         );
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._importDxf.format');
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._importDxf.format',
+      );
       if (mounted) {
         final l10n = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1631,7 +1662,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       try {
         File effectiveBase = File(widget.filePath);
         if (widget.filePath.toLowerCase().endsWith('.dwg')) {
-          final convertedPath = await DwgConverterService.convertDwgToDxf(widget.filePath);
+          final convertedPath = await DwgConverterService.convertDwgToDxf(widget.filePath,
+          );
           effectiveBase = File(convertedPath);
         }
 
@@ -1657,7 +1689,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
         fileToShare = tempOutputFile.path;
       } catch (e, stack) {
-        AppErrorHandler.recordError(e, stack, context: 'DxfViewer._shareDxf.export');
+        AppErrorHandler.recordError(e, stack, context: 'DxfViewer._shareDxf.export',
+        );
       }
     }
 
@@ -1720,7 +1753,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
               onTap: () => _switchLayout(layout),
               borderRadius: BorderRadius.circular(6),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? const Color(0xFFFF9800)
@@ -1730,7 +1764,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
+                    AppIcon.fromMaterial(
                       layout == 'Model' ? Icons.grid_4x4 : Icons.article_outlined,
                       size: 13,
                       color: isSelected
@@ -1765,28 +1799,30 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   List<Widget> _buildDxfActionButtons(ThemeData theme) {
     return [
       IconButton(
-        icon: const Icon(Icons.fit_screen_outlined, size: 20),
+        icon: const AppIcon(AppIconId.fitView, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Fit to Screen',
+        tooltip: context.l10n.commandUiFitToScreen,
         onPressed: _document != null ? _fitToScreen : null,
       ),
       IconButton(
-        icon: const Icon(Icons.add_to_photos_outlined, size: 20),
+        icon: const AppIcon(AppIconId.imageAdd, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Import',
+        tooltip: context.l10n.commandUiImport,
         onPressed: _document != null ? _importDxfFile : null,
       ),
       IconButton(
-        icon: const Icon(Icons.layers_outlined, size: 20),
+        icon: const AppIcon(AppIconId.layers, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'CAD Layers',
+        tooltip: context.l10n.cadLayersTitle,
         onPressed: _document != null ? _showLayersSheet : null,
       ),
       IconButton(
-        icon: const Icon(Icons.apartment_rounded, size: 20, color: Color(0xFF00E5FF)),
+        icon: const AppIcon(
+          AppIconId.building, size: 20, color: Color(0xFF00E5FF),
+        ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: context.l10n.structuralDesignerBim,
@@ -1809,16 +1845,16 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             : null,
       ),
       IconButton(
-        icon: Icon(
-          Icons.straighten,
+        icon: AppIcon(
+          AppIconId.measure,
           size: 20,
           color: _isMeasureMode ? const Color(0xFFFF5252) : null,
         ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: _isMeasureMode
-            ? 'Exit Measure & Markup'
-            : 'Measure Tools',
+            ? context.l10n.commandUiExitMeasureMarkup
+            : context.l10n.commandUiMeasureTools,
         onPressed: _document != null
             ? () {
                 setState(() {
@@ -1841,17 +1877,20 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       ),
       if (_annotations.isNotEmpty || _importedDxfFiles.isNotEmpty)
         IconButton(
-          icon: const Icon(Icons.save_as_outlined, size: 20, color: Color(0xFF00E5FF)),
+          icon: const AppIcon(
+            AppIconId.saveAs, size: 20, color: Color(0xFF00E5FF),
+          ),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-          tooltip: _importedDxfFiles.isNotEmpty ? 'Save Merged DXF' : 'Save Annotated DXF',
+          tooltip: _importedDxfFiles.isNotEmpty ? context.l10n.commandUiSaveMergedDxf
+              : context.l10n.commandUiSaveAnnotatedDxf,
           onPressed: _saveAsAnnotatedDxf,
         ),
       PopupMenuButton<DxfCanvasTheme>(
-        icon: const Icon(Icons.palette_outlined, size: 20),
+        icon: const AppIcon(AppIconId.palette, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Canvas Theme',
+        tooltip: context.l10n.commandUiCanvasTheme,
         initialValue: _canvasTheme,
         onSelected: (t) {
           setState(() {
@@ -1876,7 +1915,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                 Text(t.name),
                 if (t == _canvasTheme) ...[
                   const Spacer(),
-                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                  AppIcon(
+                    AppIconId.confirm, size: 18, color: theme.colorScheme.primary,
+                  ),
                 ],
               ],
             ),
@@ -1884,7 +1925,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         }).toList(),
       ),
       PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert, size: 20),
+        icon: const AppIcon(AppIconId.moreVertical, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         onSelected: (value) {
@@ -1928,23 +1969,24 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
               value: 'bim_overlay',
               child: Row(
                 children: [
-                  Icon(
+                  AppIcon.fromMaterial(
                     _showStructuralBimOverlay ? Icons.apartment_rounded : Icons.domain_disabled_rounded,
                     size: 20,
                     color: _showStructuralBimOverlay ? const Color(0xFF00E5FF) : Colors.white70,
                   ),
                   const SizedBox(width: 12),
-                  Text(_showStructuralBimOverlay ? context.l10n.hideBimOverlay : context.l10n.showBimOverlay),
+                  Text(_showStructuralBimOverlay ? context.l10n.hideBimOverlay : context.l10n.showBimOverlay,
+                  ),
                 ],
               ),
             ),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'export_kcad',
             child: Row(
               children: [
-                Icon(Icons.bolt, color: Color(0xFF00E5FF), size: 20),
+                AppIcon(AppIconId.bolt, color: Color(0xFF00E5FF), size: 20),
                 SizedBox(width: 12),
-                Text('Export as Fast KCAD'),
+                Text(context.l10n.commandUiExportAsFastKcad),
               ],
             ),
           ),
@@ -1953,19 +1995,21 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
               value: 'save_merged',
               child: Row(
                 children: [
-                  const Icon(Icons.save_as_outlined, size: 20),
+                  const AppIcon(AppIconId.saveAs, size: 20),
                   const SizedBox(width: 12),
-                  Text(_importedDxfFiles.isNotEmpty ? 'Save Merged DXF' : 'Save Annotated DXF'),
+                  Text(_importedDxfFiles.isNotEmpty ? context.l10n.commandUiSaveMergedDxf
+                        : context.l10n.commandUiSaveAnnotatedDxf,
+                  ),
                 ],
               ),
             ),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'crs',
             child: Row(
               children: [
-                Icon(Icons.public_rounded, size: 20),
+                AppIcon(AppIconId.globe, size: 20),
                 SizedBox(width: 12),
-                Text('Coordinate System'),
+                Text(context.l10n.coordinateSystem),
               ],
             ),
           ),
@@ -1973,39 +2017,42 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             value: 'grid',
             child: Row(
               children: [
-                Icon(_showGrid ? Icons.grid_on : Icons.grid_off, size: 20),
+                AppIcon.fromMaterial(_showGrid ? Icons.grid_on : Icons.grid_off, size: 20,
+                ),
                 SizedBox(width: 12),
-                Text(_showGrid ? 'Hide CAD Grid' : 'Show CAD Grid'),
+                Text(_showGrid ? context.l10n.commandUiHideCadGrid
+                      : context.l10n.commandUiShowCadGrid,
+                ),
               ],
             ),
           ),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'info',
             child: Row(
               children: [
-                Icon(Icons.info_outline, size: 20),
+                AppIcon(AppIconId.info, size: 20),
                 SizedBox(width: 12),
-                Text('Drawing Properties'),
+                Text(context.l10n.commandUiDrawingProperties),
               ],
             ),
           ),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'share',
             child: Row(
               children: [
-                Icon(Icons.share_outlined, size: 20),
+                AppIcon(AppIconId.share, size: 20),
                 SizedBox(width: 12),
-                Text('Share File'),
+                Text(context.l10n.commandUiShareFile),
               ],
             ),
           ),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'print',
             child: Row(
               children: [
-                Icon(Icons.print_outlined, size: 20),
+                AppIcon(AppIconId.print, size: 20),
                 SizedBox(width: 12),
-                Text('Print / Export'),
+                Text(context.l10n.commandUiPrintExport),
               ],
             ),
           ),
@@ -2044,7 +2091,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const AppIcon(AppIconId.back),
           onPressed: () => Navigator.of(context).pop(true),
         ),
         title: Text(
@@ -2100,7 +2147,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                        valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       const Text(
@@ -2123,7 +2171,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                        const Icon(Icons.error_outline, size: 48, color: Colors.redAccent,
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           _errorMessage!,
@@ -2133,8 +2182,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           onPressed: _loadDxfFile,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
+                          icon: const AppIcon(AppIconId.refresh),
+                          label: Text(context.l10n.retry),
                         ),
                       ],
                     ),
@@ -2161,10 +2210,12 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                         onTapUp: _isMeasureMode ? null : _handleCanvasTap,
                         onLongPressStart: _isMeasureMode
                             ? null
-                            : (details) => _handleCanvasContextTap(details.localPosition),
+                            : (details) => _handleCanvasContextTap(details.localPosition,
+                              ),
                         onSecondaryTapUp: _isMeasureMode
                             ? null
-                            : (details) => _handleCanvasContextTap(details.localPosition),
+                            : (details) => _handleCanvasContextTap(details.localPosition,
+                              ),
                         child: InteractiveViewer(
                           transformationController: _transformController,
                           panEnabled: !_isMeasureMode || _isMultiTouchGesture,
@@ -2338,7 +2389,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                           onClosePolygon: _handleCloseAreaPolygon,
                           onClear: () {
                             setState(() {
-                              _measurement = DxfMeasurement(tool: _currentMeasureTool);
+                              _measurement = DxfMeasurement(tool: _currentMeasureTool,
+                              );
                               _touchScreenPos = null;
                               _targetScreenPos = null;
                               _snappedScreenPos = null;
@@ -2375,7 +2427,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                           valueListenable: _hudScale,
                           builder: (context, scale, _) {
                             return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xCC1E293B),
                                 borderRadius: BorderRadius.circular(8),
@@ -2406,11 +2459,15 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                                       );
                                     },
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: Colors.cyanAccent.withValues(alpha: 0.18),
+                                        color: Colors.cyanAccent.withValues(alpha: 0.18,
+                                        ),
                                         borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.4), width: 0.8),
+                                        border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.4,
+                                          ), width: 0.8,
+                                        ),
                                       ),
                                       child: Text(
                                         _effectiveUnit.symbol.toUpperCase(),
@@ -2447,7 +2504,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                     right: 16,
                     child: _buildFloatingButton(
                       icon: Icons.center_focus_strong,
-                      tooltip: 'Fit to Screen',
+                      tooltip: context.l10n.commandUiFitToScreen,
                       onPressed: _fitToScreen,
                     ),
                   ),
@@ -2489,7 +2546,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       shape: const CircleBorder(side: BorderSide(color: Colors.white12)),
       elevation: 6,
       child: IconButton(
-        icon: Icon(icon, color: Colors.white, size: 20),
+        icon: AppIcon.fromMaterial(icon, color: Colors.white, size: 20),
         tooltip: tooltip,
         onPressed: onPressed,
       ),

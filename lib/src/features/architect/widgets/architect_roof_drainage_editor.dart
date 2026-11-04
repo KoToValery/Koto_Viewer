@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -51,7 +52,8 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
         ? ArchitectDownpipe(id: ArchitectElementId.next('downpipe'),
             offset: roof == null ? .3 : project == null
                 ? (ArchitectRoofDrainageGeometry.eaves(roof!).$2 - ArchitectRoofDrainageGeometry.eaves(roof!).$1).distance / 2
-                : ArchitectRoofDrainageGeometry.initialOffset(project!, roof!))
+                : ArchitectRoofDrainageGeometry.initialOffset(project!, roof!),
+          )
         : value.downpipes[index];
     final next = await showDialog<ArchitectDownpipe>(
       context: context,
@@ -78,9 +80,17 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
         if(allowInternal)Tooltip(message:l.roofGutterInternalHelp,child:DropdownButtonFormField<ArchitectGutterPosition>(
           key:ValueKey('roof-gutter-position-${value.position.name}'),initialValue:value.position,isExpanded:true,
           decoration:InputDecoration(labelText:l.roofGutterPosition),items:[
-            DropdownMenuItem(value:ArchitectGutterPosition.external,child:Text(l.roofGutterExternal)),
-            DropdownMenuItem(value:ArchitectGutterPosition.internal,child:Text(l.roofGutterInternal))],
-          onChanged:(v){if(v!=null)onChanged(value.copyWith(position:v,profile:v==ArchitectGutterPosition.internal?ArchitectGutterProfile.box:null));})),
+            DropdownMenuItem(value:ArchitectGutterPosition.external,child:Text(l.roofGutterExternal),
+                ),
+            DropdownMenuItem(value:ArchitectGutterPosition.internal,child:Text(l.roofGutterInternal),
+                ),
+              ],
+          onChanged:(v){if(v!=null)onChanged(value.copyWith(position:v,profile:v==ArchitectGutterPosition.internal?ArchitectGutterProfile.box:null,
+                    ),
+                  );
+              },
+            ),
+          ),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           title: Text(l.architectDrainageGutter),
@@ -165,7 +175,7 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
             onTap: () => _edit(context, i),
             trailing: IconButton(
               tooltip: l.delete,
-              icon: const Icon(Icons.delete_outline),
+              icon: const AppIcon(AppIconId.delete),
               onPressed: () {
                 final pipes = [...value.downpipes]..removeAt(i);
                 onChanged(value.copyWith(downpipes: pipes));
@@ -174,13 +184,13 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
           ),
         OutlinedButton.icon(
           onPressed: () => _edit(context),
-          icon: const Icon(Icons.add),
+          icon: const AppIcon(AppIconId.add),
           label: Text(l.architectDrainageAdd),
         ),
         if (onPlace != null)
           OutlinedButton.icon(
             onPressed: onPlace,
-            icon: const Icon(Icons.touch_app_outlined),
+            icon: const AppIcon(AppIconId.select),
             label: Text(l.architectDrainagePlace),
           ),
       ],

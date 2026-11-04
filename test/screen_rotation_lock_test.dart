@@ -1,3 +1,4 @@
+import 'support/command_icon_finders.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
@@ -56,13 +57,16 @@ void main() {
       expect(l10n.lockRotation, equals('Заключване на завъртането'));
       expect(l10n.unlockRotation, equals('Отключване на завъртането'));
       expect(l10n.rotationLocked, equals('Завъртането на екрана е заключено'));
-      expect(l10n.rotationUnlocked, equals('Автоматичното завъртане е възстановено'));
+      expect(l10n.rotationUnlocked, equals('Автоматичното завъртане е възстановено'),
+      );
     });
   });
 
   group('ComicViewerScreen Fullscreen & Rotation Lock Tests', () {
-    testWidgets('Toggles fullscreen and controls rotation lock in fullscreen mode', (tester) async {
-      final tempDir = Directory.systemTemp.createTempSync('comic_rotation_test');
+    testWidgets('Toggles fullscreen and controls rotation lock in fullscreen mode', (tester,
+    ) async {
+      final tempDir = Directory.systemTemp.createTempSync('comic_rotation_test',
+      );
       final filePath = createTestComic(tempDir);
 
       try {
@@ -76,9 +80,10 @@ void main() {
 
         // Wait until comic loads
         for (int i = 0; i < 40; i++) {
-          await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)));
+          await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)),
+          );
           await tester.pump();
-          if (find.byIcon(Icons.fullscreen).evaluate().isNotEmpty) {
+          if (findCommandIcon(Icons.fullscreen).evaluate().isNotEmpty) {
             break;
           }
         }
@@ -88,17 +93,17 @@ void main() {
         expect(fullscreenBtn, findsOneWidget);
 
         // Before entering fullscreen: floating exit fullscreen and rotation lock buttons should NOT be present
-        expect(find.byIcon(Icons.fullscreen_exit), findsNothing);
-        expect(find.byIcon(Icons.screen_rotation), findsNothing);
-        expect(find.byIcon(Icons.screen_lock_rotation), findsNothing);
+        expect(findCommandIcon(Icons.fullscreen_exit), findsNothing);
+        expect(findCommandIcon(Icons.screen_rotation), findsNothing);
+        expect(findCommandIcon(Icons.screen_lock_rotation), findsNothing);
 
         // Enter fullscreen via toolbar button
         await tester.tap(fullscreenBtn);
         await tester.pumpAndSettle();
 
         // Now in fullscreen: Exit Fullscreen button and Screen Rotation button are visible!
-        expect(find.byIcon(Icons.fullscreen_exit), findsOneWidget);
-        expect(find.byIcon(Icons.screen_rotation), findsOneWidget);
+        expect(findCommandIcon(Icons.fullscreen_exit), findsOneWidget);
+        expect(findCommandIcon(Icons.screen_rotation), findsOneWidget);
 
         // Tap rotation lock button to lock rotation
         final lockRotationBtn = find.byTooltip('Lock Rotation');
@@ -107,7 +112,7 @@ void main() {
         await tester.pump();
 
         // Icon should switch to screen_lock_rotation and tooltip to Unlock Rotation
-        expect(find.byIcon(Icons.screen_lock_rotation), findsOneWidget);
+        expect(findCommandIcon(Icons.screen_lock_rotation), findsOneWidget);
         expect(find.byTooltip('Unlock Rotation'), findsOneWidget);
         expect(find.text('Screen rotation locked'), findsOneWidget);
 
@@ -116,7 +121,7 @@ void main() {
         await tester.pump();
 
         // Icon should switch back to screen_rotation
-        expect(find.byIcon(Icons.screen_rotation), findsOneWidget);
+        expect(findCommandIcon(Icons.screen_rotation), findsOneWidget);
         expect(find.byTooltip('Lock Rotation'), findsOneWidget);
         expect(find.text('Auto-rotation restored'), findsOneWidget);
 
@@ -128,14 +133,15 @@ void main() {
 
         // Should return to normal view with command bar
         expect(find.byTooltip('Fullscreen'), findsOneWidget);
-        expect(find.byIcon(Icons.fullscreen_exit), findsNothing);
-        expect(find.byIcon(Icons.screen_rotation), findsNothing);
+        expect(findCommandIcon(Icons.fullscreen_exit), findsNothing);
+        expect(findCommandIcon(Icons.screen_rotation), findsNothing);
       } finally {
         tempDir.deleteSync(recursive: true);
       }
     });
 
-    testWidgets('TextViewerScreen rotation lock in fullscreen mode', (tester) async {
+    testWidgets('TextViewerScreen rotation lock in fullscreen mode', (tester,
+    ) async {
       tester.view.physicalSize = const Size(1200, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -145,7 +151,8 @@ void main() {
 
       final tempDir = Directory.systemTemp.createTempSync('text_rotation_test');
       final textFile = File('${tempDir.path}/sample.txt');
-      textFile.writeAsStringSync('Line 1: Hello World\nLine 2: Reader mode testing\nLine 3: Orientation test\n');
+      textFile.writeAsStringSync('Line 1: Hello World\nLine 2: Reader mode testing\nLine 3: Orientation test\n',
+      );
 
       try {
         await tester.pumpWidget(
@@ -158,7 +165,8 @@ void main() {
 
         // Wait until text loads
         for (int i = 0; i < 40; i++) {
-          await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)));
+          await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)),
+          );
           await tester.pump();
           if (find.textContaining('Hello World').evaluate().isNotEmpty) {
             break;
@@ -175,23 +183,23 @@ void main() {
         await tester.pump(const Duration(milliseconds: 200));
 
         // Verify rotation lock & exit buttons are visible
-        expect(find.byIcon(Icons.screen_rotation), findsOneWidget);
-        expect(find.byIcon(Icons.fullscreen_exit), findsOneWidget);
+        expect(findCommandIcon(Icons.screen_rotation), findsOneWidget);
+        expect(findCommandIcon(Icons.fullscreen_exit), findsOneWidget);
 
         // Lock rotation
         await tester.tap(find.byTooltip('Lock Rotation'));
         await tester.pump(const Duration(milliseconds: 100));
-        expect(find.byIcon(Icons.screen_lock_rotation), findsOneWidget);
+        expect(findCommandIcon(Icons.screen_lock_rotation), findsOneWidget);
 
         // Unlock rotation
         await tester.tap(find.byTooltip('Unlock Rotation'));
         await tester.pump(const Duration(milliseconds: 100));
-        expect(find.byIcon(Icons.screen_rotation), findsOneWidget);
+        expect(findCommandIcon(Icons.screen_rotation), findsOneWidget);
 
         // Exit fullscreen
         await tester.tap(find.byTooltip('Exit Fullscreen'));
         await tester.pump(const Duration(milliseconds: 200));
-        expect(find.byIcon(Icons.fullscreen_exit), findsNothing);
+        expect(findCommandIcon(Icons.fullscreen_exit), findsNothing);
       } finally {
         tempDir.deleteSync(recursive: true);
       }

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'structural_tool_groups.dart';
@@ -162,8 +163,7 @@ class ElementPaletteBar extends StatelessWidget {
           return const Color(0xFF282B34);
         }),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+          borderRadius: BorderRadius.circular(8)),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         iconTheme: const IconThemeData(color: Colors.white, size: 16),
       ),
@@ -212,31 +212,38 @@ class ElementPaletteBar extends StatelessWidget {
         : group == StructuralToolGroup.structure
         ? [StructuralDrawTool.gridAxis, StructuralDrawTool.column,
             StructuralDrawTool.shearWall, StructuralDrawTool.beam,
-            StructuralDrawTool.slab, StructuralDrawTool.slabOpening]
+            StructuralDrawTool.slab, StructuralDrawTool.slabOpening,
+          ]
         : <StructuralDrawTool>[];
     return Row(children: [
-      for (final tool in tools) _buildToolButton(tool: tool, icon: tool.icon,
+      for (final tool in tools) _buildToolButton(tool: tool, icon: tool.iconId,
         label: tool == StructuralDrawTool.slabOpening && isDrawingCirculationZone
-            ? context.l10n.staircaseZone : tool.label(context.l10n)),
+            ? context.l10n.staircaseZone : tool.label(context.l10n),
+          ),
       if (group == StructuralToolGroup.underlay && onManageUnderlays != null)
         Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: ActionChip(
-          avatar: const Icon(Icons.align_horizontal_center, size: 16),
-          label: Text(context.l10n.bimAlignmentTitle), onPressed: onManageUnderlays)),
+          avatar: const AppIcon(AppIconId.alignCenter, size: 16),
+          label: Text(context.l10n.bimAlignmentTitle), onPressed: onManageUnderlays,
+            ),
+          ),
       if (group == StructuralToolGroup.checks) ...[
         if (onOpenVerticalCapacityReport != null)
           Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: ActionChip(
-            avatar: const Icon(Icons.straighten_rounded, size: 16),
-            label: Text(context.l10n.bimSupportSpacingAction), onPressed: onOpenVerticalCapacityReport)),
+            avatar: const AppIcon(AppIconId.measure, size: 16),
+            label: Text(context.l10n.bimSupportSpacingAction), onPressed: onOpenVerticalCapacityReport,
+              ),
+            ),
         _buildCantileverAnalysisButton(context),
         _buildVerticalCapacityButton(context),
         _buildSeismicAnalysisButton(context),
       ],
-    ]);
+    ],
+    );
   }
 
   Widget _buildToolButton({
     required StructuralDrawTool tool,
-    required IconData icon,
+    required AppIconId icon,
     required String label,
   }) {
     final bool isSelected = activeTool == tool;
@@ -261,7 +268,7 @@ class ElementPaletteBar extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: color, size: 22),
+              AppIcon(icon, color: color, size: 22),
               const SizedBox(height: 2),
               Text(
                 label,
@@ -316,8 +323,8 @@ class ElementPaletteBar extends StatelessWidget {
                     fontSize: 10,
                   ),
                 ),
-                child: Icon(
-                  Icons.analytics_rounded,
+                child: AppIcon(
+                  AppIconId.analysis,
                   color: warningCount > 0 ? badgeColor : Colors.white70,
                   size: 22,
                 ),
@@ -345,7 +352,8 @@ class ElementPaletteBar extends StatelessWidget {
     final report = verticalCapacityReport;
     final int alertCount = report?.totalAlertCount ?? 0;
     final bool hasSevereSlabIssue =
-        report?.slabChecks.any((s) => !s.isDeflectionSafe && s.deflectionRatio >= 1.25) ?? false;
+        report?.slabChecks.any((s) => !s.isDeflectionSafe && s.deflectionRatio >= 1.25,
+        ) ?? false;
     final Color badgeColor = ((report?.criticalColumnsCount ?? 0) > 0 || hasSevereSlabIssue)
         ? const Color(0xFFFF1744)
         : (alertCount > 0
@@ -366,8 +374,7 @@ class ElementPaletteBar extends StatelessWidget {
             color: hasAlerts ? badgeColor.withValues(alpha: 0.18) : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: hasAlerts ? badgeColor : Colors.white24,
-            ),
+              color: hasAlerts ? badgeColor : Colors.white24),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -383,8 +390,8 @@ class ElementPaletteBar extends StatelessWidget {
                     fontSize: 10,
                   ),
                 ),
-                child: Icon(
-                  Icons.domain_rounded,
+                child: AppIcon(
+                  AppIconId.building,
                   color: hasAlerts ? badgeColor : const Color(0xFF00E5FF),
                   size: 22,
                 ),
@@ -437,8 +444,7 @@ class ElementPaletteBar extends StatelessWidget {
             color: hasAlerts ? badgeColor.withValues(alpha: 0.18) : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: hasAlerts ? badgeColor : Colors.white24,
-            ),
+              color: hasAlerts ? badgeColor : Colors.white24),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -454,8 +460,8 @@ class ElementPaletteBar extends StatelessWidget {
                     fontSize: 10,
                   ),
                 ),
-                child: Icon(
-                  Icons.waves_rounded,
+                child: AppIcon(
+                  AppIconId.seismic,
                   color: hasAlerts ? badgeColor : const Color(0xFFD500F9),
                   size: 22,
                 ),
@@ -495,7 +501,8 @@ class ElementPaletteBar extends StatelessWidget {
             child: ChoiceChip(
               label: Text(isFixedPreset
                   ? '${(currentColumnPreset.width * 100).round()}×${(currentColumnPreset.height * 100).round()} cm'
-                  : '25×30 cm'),
+                  : '25×30 cm',
+              ),
               selected: isFixedPreset,
               onSelected: (selected) {
                 if (selected) {
@@ -504,7 +511,8 @@ class ElementPaletteBar extends StatelessWidget {
                     width: 0.25,
                     height: 0.30,
                     thickness: 0.25,
-                  ));
+                  ),
+                  );
                 }
               },
               visualDensity: VisualDensity.compact,
@@ -525,7 +533,7 @@ class ElementPaletteBar extends StatelessWidget {
               ),
             ),
           IconButton.filledTonal(
-            icon: const Icon(Icons.rotate_90_degrees_ccw, size: 18),
+            icon: const AppIcon(AppIconId.rotateLeft, size: 18),
             tooltip: context.l10n.rotate90,
             onPressed: onRotateColumn,
             visualDensity: VisualDensity.compact,
@@ -533,8 +541,9 @@ class ElementPaletteBar extends StatelessWidget {
           if (onCustomColumnDimensions != null) ...[
             const SizedBox(width: 4),
             ActionChip(
-              avatar: const Icon(Icons.tune_rounded, size: 14),
-              label: Text(context.l10n.dimensionsEllipsis, style: const TextStyle(fontSize: 11)),
+              avatar: const AppIcon(AppIconId.properties, size: 14),
+              label: Text(context.l10n.dimensionsEllipsis, style: const TextStyle(fontSize: 11),
+              ),
               onPressed: onCustomColumnDimensions,
               visualDensity: VisualDensity.compact,
             ),
@@ -602,7 +611,7 @@ class ElementPaletteBar extends StatelessWidget {
             ),
           if (onRotateWall != null)
             IconButton.filledTonal(
-              icon: const Icon(Icons.rotate_90_degrees_ccw, size: 18),
+              icon: const AppIcon(AppIconId.rotateLeft, size: 18),
               tooltip: context.l10n.rotate90,
               onPressed: onRotateWall,
               visualDensity: VisualDensity.compact,
@@ -610,8 +619,9 @@ class ElementPaletteBar extends StatelessWidget {
           if (onCustomWallThickness != null) ...[
             const SizedBox(width: 4),
             ActionChip(
-              avatar: const Icon(Icons.tune_rounded, size: 14),
-              label: Text(context.l10n.customWallDimensions, style: const TextStyle(fontSize: 11)),
+              avatar: const AppIcon(AppIconId.properties, size: 14),
+              label: Text(context.l10n.customWallDimensions, style: const TextStyle(fontSize: 11),
+              ),
               onPressed: onCustomWallThickness,
               visualDensity: VisualDensity.compact,
             ),
@@ -633,24 +643,31 @@ class ElementPaletteBar extends StatelessWidget {
               color: const Color(0xFFFF5252).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: const Icon(Icons.straighten_rounded, color: Color(0xFFFF5252), size: 16),
+            child: const AppIcon(
+              AppIconId.measure, color: Color(0xFFFF5252), size: 16,
+            ),
           ),
           const SizedBox(width: 8),
           Text(
             context.l10n.toolMeasure,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12,
+            ),
           ),
           const SizedBox(width: 12),
           if (hasActiveMeasurement && onClearMeasurement != null)
             ActionChip(
-              avatar: const Icon(Icons.close_rounded, size: 14, color: Colors.white70),
-              label: Text(context.l10n.clearMeasurement, style: const TextStyle(fontSize: 11)),
+              avatar: const AppIcon(
+                AppIconId.close, size: 14, color: Colors.white70,
+              ),
+              label: Text(context.l10n.clearMeasurement, style: const TextStyle(fontSize: 11),
+              ),
               onPressed: onClearMeasurement,
               visualDensity: VisualDensity.compact,
             ),
           const SizedBox(width: 12),
           Text(context.l10n.bimMeasureGestureHint,
-              style: const TextStyle(color: Colors.white70, fontSize: 11)),
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
         ],
       ),
     );
@@ -674,7 +691,9 @@ class ElementPaletteBar extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.touch_app_rounded, color: Color(0xFF00E5FF), size: 15),
+                const AppIcon(
+                  AppIconId.select, color: Color(0xFF00E5FF), size: 15,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   context.l10n.layersTabHint,
@@ -687,8 +706,11 @@ class ElementPaletteBar extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 5),
               child: ActionChip(
-                avatar: const Icon(Icons.tune_rounded, size: 14, color: Color(0xFF00E5FF)),
-                label: Text(context.l10n.layers, style: const TextStyle(fontSize: 11)),
+                avatar: const AppIcon(
+                  AppIconId.properties, size: 14, color: Color(0xFF00E5FF),
+                ),
+                label: Text(context.l10n.layers, style: const TextStyle(fontSize: 11),
+                ),
                 onPressed: onOpenLayerManager,
                 visualDensity: VisualDensity.compact,
               ),
@@ -697,8 +719,11 @@ class ElementPaletteBar extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 5),
               child: ActionChip(
-                avatar: const Icon(Icons.filter_alt_rounded, size: 14, color: Color(0xFF00E5FF)),
-                label: Text(context.l10n.underlayFilterTitle, style: const TextStyle(fontSize: 11)),
+                avatar: const AppIcon(
+                  AppIconId.filter, size: 14, color: Color(0xFF00E5FF),
+                ),
+                label: Text(context.l10n.underlayFilterTitle, style: const TextStyle(fontSize: 11),
+                ),
                 onPressed: onOpenUnderlayFilterConfig,
                 visualDensity: VisualDensity.compact,
               ),
@@ -707,8 +732,11 @@ class ElementPaletteBar extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 5),
               child: ActionChip(
-                avatar: const Icon(Icons.visibility_rounded, size: 14, color: Colors.white70),
-                label: Text(context.l10n.showAllLayers, style: const TextStyle(fontSize: 11)),
+                avatar: const AppIcon(
+                  AppIconId.visible, size: 14, color: Colors.white70,
+                ),
+                label: Text(context.l10n.showAllLayers, style: const TextStyle(fontSize: 11),
+                ),
                 onPressed: onShowAllLayers,
                 visualDensity: VisualDensity.compact,
               ),
@@ -717,8 +745,11 @@ class ElementPaletteBar extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 5),
               child: ActionChip(
-                avatar: const Icon(Icons.filter_list_rounded, size: 14, color: Colors.white70),
-                label: Text(context.l10n.isolateStructuralLayers, style: const TextStyle(fontSize: 11)),
+                avatar: const AppIcon(
+                  AppIconId.filterList, size: 14, color: Colors.white70,
+                ),
+                label: Text(context.l10n.isolateStructuralLayers, style: const TextStyle(fontSize: 11),
+                ),
                 onPressed: onIsolateWhiteLayers,
                 visualDensity: VisualDensity.compact,
               ),
@@ -731,7 +762,8 @@ class ElementPaletteBar extends StatelessWidget {
   Widget _buildSlabOptionsBar(BuildContext context) {
     final thicknesses = [0.15, 0.18, 0.20, 0.22, 0.25, 0.30];
     final bool matchesPreset =
-        thicknesses.any((t) => (currentSlabThickness - t).abs() < 1e-3);
+        thicknesses.any((t) => (currentSlabThickness - t).abs() < 1e-3,
+    );
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -762,8 +794,9 @@ class ElementPaletteBar extends StatelessWidget {
             ),
           if (onCustomSlabThickness != null) ...[
             ActionChip(
-              avatar: const Icon(Icons.tune_rounded, size: 14),
-              label: Text(context.l10n.otherEllipsis, style: const TextStyle(fontSize: 11)),
+              avatar: const AppIcon(AppIconId.properties, size: 14),
+              label: Text(context.l10n.otherEllipsis, style: const TextStyle(fontSize: 11),
+              ),
               onPressed: onCustomSlabThickness,
               visualDensity: VisualDensity.compact,
             ),
@@ -771,8 +804,11 @@ class ElementPaletteBar extends StatelessWidget {
           ],
           if (onGenerateSlabs != null) ...[
             ActionChip(
-              avatar: const Icon(Icons.auto_awesome, size: 14, color: Color(0xFF00E5FF)),
-              label: Text(context.l10n.bimGenerateSlabs, style: const TextStyle(fontSize: 11, color: Color(0xFF00E5FF))),
+              avatar: const AppIcon(
+                AppIconId.auto, size: 14, color: Color(0xFF00E5FF),
+              ),
+              label: Text(context.l10n.bimGenerateSlabs, style: const TextStyle(fontSize: 11, color: Color(0xFF00E5FF)),
+              ),
               backgroundColor: const Color(0x2200E5FF),
               onPressed: onGenerateSlabs,
               visualDensity: VisualDensity.compact,
@@ -799,15 +835,17 @@ class ElementPaletteBar extends StatelessWidget {
             const SizedBox(width: 4),
             if (slabPointCount >= 3) ...[
               FilledButton.icon(
-                icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                icon: const AppIcon(AppIconId.checkCircle, size: 16),
                 label: Text(
                   context.l10n.closeSlab(slabPointCount),
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
+                  ),
                 ),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF00C853),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4,
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
                 onPressed: onCloseSlab,
@@ -815,14 +853,14 @@ class ElementPaletteBar extends StatelessWidget {
               const SizedBox(width: 4),
             ],
             IconButton.filledTonal(
-              icon: const Icon(Icons.undo_rounded, size: 16),
+              icon: const AppIcon(AppIconId.undo, size: 16),
               tooltip: context.l10n.undoPoint,
               onPressed: onUndoPoint,
               visualDensity: VisualDensity.compact,
             ),
             const SizedBox(width: 4),
             IconButton.filledTonal(
-              icon: const Icon(Icons.close, size: 16),
+              icon: const AppIcon(AppIconId.close, size: 16),
               tooltip: context.l10n.cancelSlab,
               onPressed: onClearSlab,
               visualDensity: VisualDensity.compact,
@@ -837,11 +875,14 @@ class ElementPaletteBar extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFF00E5FF)),
+                  const AppIcon(
+                    AppIconId.select, size: 14, color: Color(0xFF00E5FF),
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     context.l10n.slabPointByPointPrompt,
-                    style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 11),
+                    style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 11,
+                    ),
                   ),
                 ],
               ),
@@ -864,7 +905,8 @@ class ElementPaletteBar extends StatelessWidget {
 
     final bool matchesPreset = beamSizes.any((b) =>
         (currentBeamWidth - b.$1).abs() < 1e-3 &&
-        (currentBeamDepth - b.$2).abs() < 1e-3);
+        (currentBeamDepth - b.$2).abs() < 1e-3,
+    );
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -891,7 +933,8 @@ class ElementPaletteBar extends StatelessWidget {
               padding: const EdgeInsets.only(right: 5),
               child: ChoiceChip(
                 label: Text(
-                    '${(currentBeamWidth * 100).round()}×${(currentBeamDepth * 100).round()}'),
+                    '${(currentBeamWidth * 100).round()}×${(currentBeamDepth * 100).round()}',
+                ),
                 selected: true,
                 onSelected: (_) {},
                 visualDensity: VisualDensity.compact,
@@ -899,8 +942,9 @@ class ElementPaletteBar extends StatelessWidget {
             ),
           if (onCustomBeamDimensions != null)
             ActionChip(
-              avatar: const Icon(Icons.tune_rounded, size: 14),
-              label: Text(context.l10n.dimensionsEllipsis, style: const TextStyle(fontSize: 11)),
+              avatar: const AppIcon(AppIconId.properties, size: 14),
+              label: Text(context.l10n.dimensionsEllipsis, style: const TextStyle(fontSize: 11),
+              ),
               onPressed: onCustomBeamDimensions,
               visualDensity: VisualDensity.compact,
             ),
@@ -925,9 +969,11 @@ class ElementPaletteBar extends StatelessWidget {
           if (onGenerateStaircaseOpenings!=null)
             Padding(padding:const EdgeInsets.only(right:6),child:ActionChip(
               key:const ValueKey('auto-staircase-openings'),
-              avatar:const Icon(Icons.auto_awesome,size:16),
+              avatar:const AppIcon(AppIconId.auto,size:16),
               label:Text(l10n.staircaseAutoGenerate),
-              onPressed:openingPointCount==0 ? onGenerateStaircaseOpenings : null)),
+              onPressed:openingPointCount==0 ? onGenerateStaircaseOpenings : null,
+              ),
+            ),
           if(isDrawingCirculationZone) Chip(label:Text(l10n.staircaseZone))
           else for (final (key, label) in presets)
             Padding(
@@ -963,7 +1009,7 @@ class ElementPaletteBar extends StatelessWidget {
             const SizedBox(width: 4),
             if (openingPointCount >= 3 && onCloseOpening != null) ...[
               FilledButton.icon(
-                icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                icon: const AppIcon(AppIconId.checkCircle, size: 16),
                 label: Text(
                   isDrawingCirculationZone ? context.l10n.staircaseCloseZone(openingPointCount):
                     context.l10n.closeOpening(openingPointCount),
@@ -987,7 +1033,7 @@ class ElementPaletteBar extends StatelessWidget {
             ],
             if (onUndoOpeningPoint != null) ...[
               IconButton.filledTonal(
-                icon: const Icon(Icons.undo_rounded, size: 16),
+                icon: const AppIcon(AppIconId.undo, size: 16),
                 tooltip: context.l10n.undoPoint,
                 onPressed: onUndoOpeningPoint,
                 visualDensity: VisualDensity.compact,
@@ -996,7 +1042,7 @@ class ElementPaletteBar extends StatelessWidget {
             ],
             if (onClearOpening != null) ...[
               IconButton.filledTonal(
-                icon: const Icon(Icons.close, size: 16),
+                icon: const AppIcon(AppIconId.close, size: 16),
                 tooltip: isDrawingCirculationZone ? context.l10n.cancel:context.l10n.cancelOpening,
                 onPressed: onClearOpening,
                 visualDensity: VisualDensity.compact,
@@ -1012,8 +1058,8 @@ class ElementPaletteBar extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
-                    Icons.touch_app_rounded,
+                  const AppIcon(
+                    AppIconId.select,
                     size: 14,
                     color: Color(0xFFFF9800),
                   ),
@@ -1039,7 +1085,7 @@ class ElementPaletteBar extends StatelessWidget {
     final quickNames = [
       '1', '2', '3', '4', '5', '6', '7', '8',
       'А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж',
-      'A', 'B', 'C', 'D', 'E'
+      'A', 'B', 'C', 'D', 'E',
     ];
 
     return SingleChildScrollView(
@@ -1077,8 +1123,9 @@ class ElementPaletteBar extends StatelessWidget {
           if (onCustomAxisName != null) ...[
             const SizedBox(width: 4),
             ActionChip(
-              avatar: const Icon(Icons.edit_note_rounded, size: 14),
-              label: Text(l10n.nameEllipsis, style: const TextStyle(fontSize: 11)),
+              avatar: const AppIcon(AppIconId.editGroup, size: 14),
+              label: Text(l10n.nameEllipsis, style: const TextStyle(fontSize: 11),
+              ),
               onPressed: onCustomAxisName,
               visualDensity: VisualDensity.compact,
             ),
@@ -1099,7 +1146,7 @@ class ElementPaletteBar extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             IconButton.filledTonal(
-              icon: const Icon(Icons.close, size: 16),
+              icon: const AppIcon(AppIconId.close, size: 16),
               onPressed: onClearAxis,
               visualDensity: VisualDensity.compact,
             ),

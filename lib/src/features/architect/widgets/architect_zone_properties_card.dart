@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'architect_zone_apartment_controls.dart';
 import 'package:flutter/material.dart';
 import '../../bim_editing/properties/bim_distance_unit.dart';
@@ -159,8 +160,8 @@ class _ArchitectZonePropertiesCardState
                           ],
                           dropdownColor: const Color(0xFF1E2230),
                           borderRadius: BorderRadius.circular(10),
-                          icon: const Icon(
-                            Icons.arrow_drop_down_rounded,
+                          icon: const AppIcon(
+                            AppIconId.expandMore,
                             color: Colors.white70,
                             size: 20,
                           ),
@@ -170,7 +171,8 @@ class _ArchitectZonePropertiesCardState
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(cat.icon, size: 16, color: cat.color),
+                                  AppIcon.fromMaterial(cat.icon, size: 16, color: cat.color,
+                                  ),
                                   const SizedBox(width: 6),
                                   Flexible(
                                     child: Text(
@@ -208,8 +210,8 @@ class _ArchitectZonePropertiesCardState
 
               // Edit details pencil (if custom name is set)
               IconButton(
-                icon: const Icon(
-                  Icons.edit_note_rounded,
+                icon: const AppIcon(
+                  AppIconId.editGroup,
                   color: Colors.white70,
                   size: 20,
                 ),
@@ -245,8 +247,8 @@ class _ArchitectZonePropertiesCardState
               // Schedule table shortcut
               if (widget.onOpenScheduleTable != null)
                 IconButton(
-                  icon: const Icon(
-                    Icons.table_chart_rounded,
+                  icon: const AppIcon(
+                    AppIconId.schedule,
                     color: Color(0xFF38BDF8),
                     size: 19,
                   ),
@@ -259,8 +261,8 @@ class _ArchitectZonePropertiesCardState
 
               // Delete zone button
               IconButton(
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
+                icon: const AppIcon(
+                  AppIconId.delete,
                   color: Colors.redAccent,
                   size: 19,
                 ),
@@ -273,8 +275,8 @@ class _ArchitectZonePropertiesCardState
 
               // Close inspector button
               IconButton(
-                icon: const Icon(
-                  Icons.close_rounded,
+                icon: const AppIcon(
+                  AppIconId.close,
                   color: Colors.white60,
                   size: 19,
                 ),
@@ -302,8 +304,8 @@ class _ArchitectZonePropertiesCardState
                 ),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.tune_rounded,
+                    const AppIcon(
+                      AppIconId.properties,
                       color: Color(0xFF38BDF8),
                       size: 14,
                     ),
@@ -322,8 +324,8 @@ class _ArchitectZonePropertiesCardState
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(
-                      Icons.chevron_right_rounded,
+                    const AppIcon(
+                      AppIconId.chevronRight,
                       color: Colors.white38,
                       size: 16,
                     ),

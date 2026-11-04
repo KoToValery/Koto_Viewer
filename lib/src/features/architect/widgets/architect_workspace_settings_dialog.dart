@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../../../core/widgets/app_settings_screen.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -46,7 +47,8 @@ class ArchitectWorkspaceSettingsDialog extends StatefulWidget {
 
 class _ArchitectWorkspaceSettingsDialogState
     extends State<ArchitectWorkspaceSettingsDialog> {
-  late final Map<String, String> zoneOverrides = Map.of(widget.settings.zonePresets.overrides);
+  late final Map<String, String> zoneOverrides = Map.of(widget.settings.zonePresets.overrides,
+  );
 
   Widget presetField(String id, String label) => TextFormField(
     key: ValueKey('zone-preset-$id'),
@@ -116,17 +118,21 @@ class _ArchitectWorkspaceSettingsDialogState
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(key: const ValueKey('architect-settings-ui'), contentPadding: EdgeInsets.zero,
-                title: Text(l.uiSettingsCategory), leading: const Icon(Icons.dashboard_customize_outlined),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AppSettingsScreen()))),
-              if(widget.onWalls!=null)ListTile(key:const ValueKey('architect-settings-walls'),contentPadding:EdgeInsets.zero,title:Text(l.wallTypesTitle),leading:const Icon(Icons.line_weight),trailing:const Icon(Icons.chevron_right),onTap:widget.onWalls),
+                title: Text(l.uiSettingsCategory), leading: const AppIcon(AppIconId.layoutCustom),
+                trailing: const AppIcon(AppIconId.chevronRight),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
+                ),
+              ),
+              if(widget.onWalls!=null)ListTile(key:const ValueKey('architect-settings-walls'),contentPadding:EdgeInsets.zero,title:Text(l.wallTypesTitle),leading:const AppIcon(AppIconId.wall),trailing:const AppIcon(AppIconId.chevronRight),onTap:widget.onWalls,
+                ),
               ExpansionTile(
                 key: const ValueKey('architect-settings-zone-presets'),
                 tilePadding: EdgeInsets.zero,
                 title: Text(l.architectZonePresets),
                 children: [
                   for (final category in ArchitectZoneCategory.values)
-                    presetField('category.${category.name}', category.localizedName(l)),
+                    presetField('category.${category.name}', category.localizedName(l),
+                    ),
                   for (final group in <String, String>{
                     'floor': l.architectZoneFloorFinish,
                     'wall': l.architectZoneWallFinish,
@@ -251,7 +257,8 @@ class _ArchitectWorkspaceSettingsDialogState
                       children: [
                         Expanded(
                           child: Slider(
-                            key: const ValueKey('architect-settings-handle-offset'),
+                            key: const ValueKey('architect-settings-handle-offset',
+                            ),
                             value: handleOffsetLength.clamp(20.0, 120.0),
                             min: 20.0,
                             max: 120.0,
@@ -288,7 +295,8 @@ class _ArchitectWorkspaceSettingsDialogState
             context,
             ArchitectWorkspaceSettings(
               units: units,
-              zonePresets: ArchitectZonePresets(Map.unmodifiable(zoneOverrides)),
+              zonePresets: ArchitectZonePresets(Map.unmodifiable(zoneOverrides),
+              ),
               distanceDecimals: distanceDecimals,
               dimensionScale: dimensionScale,
               ghostStoreys: ghost,

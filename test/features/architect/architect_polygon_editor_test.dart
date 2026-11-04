@@ -33,8 +33,7 @@ const primitive = ArchitectCadPrimitive(
 );
 ArchitectSnapResult free(Offset point) => ArchitectSnapResult(point: point);
 Future<void> tool(WidgetTester tester, IconData icon) async {
-  await tool_ui.prepare(tester, icon);
-  await tester.tap(find.byIcon(icon));
+  await tool_ui.choose(tester, icon);
   await tester.pumpAndSettle();
 }
 

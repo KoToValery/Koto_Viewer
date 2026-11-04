@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 
@@ -296,7 +297,7 @@ class ArchitectPropertiesShellState extends State<ArchitectPropertiesShell> {
                                       : context.l10n.propertiesExpand,
                                   onPressed: () =>
                                       setState(() => expanded = !expanded),
-                                  icon: Icon(
+                                  icon: AppIcon.fromMaterial(
                                     full
                                         ? Icons.close_fullscreen
                                         : Icons.open_in_full,
@@ -307,7 +308,9 @@ class ArchitectPropertiesShellState extends State<ArchitectPropertiesShell> {
                                   key: const ValueKey('properties-close'),
                                   tooltip: context.l10n.close,
                                   onPressed: requestClose,
-                                  icon: const Icon(Icons.close, size: 20),
+                                  icon: const AppIcon(
+                                    AppIconId.close, size: 20,
+                                  ),
                                 ),
                               ],
                             ),

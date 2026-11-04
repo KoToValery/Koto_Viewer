@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../services/architect_interaction_mode.dart';
 // === SECTION: ARCHITECTURAL TOOL PALETTE BAR ===
 import 'package:flutter/material.dart';
@@ -38,6 +39,17 @@ enum ArchitectToolCategory {
     views => l.architectCategoryViews,
     annotations => l.architectCategoryAnnotations,
     drawing => l.architectCategoryDrawing,
+  };
+
+  AppIconId get iconId => switch (this) {
+    selection => AppIconId.select,
+    plan => AppIconId.zone,
+    build => AppIconId.wall,
+    structure => AppIconId.beam,
+    furnishing => AppIconId.furniture,
+    views => AppIconId.view3D,
+    annotations => AppIconId.dimension,
+    drawing => AppIconId.polyline,
   };
 
   static ArchitectToolCategory of(ArchitectTool tool) => switch (tool) {
@@ -412,7 +424,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                         PopupMenuItem(
                           value: value,
                           key: ValueKey('architect-category-${value.name}'),
-                          child: Text(value.label(l10n)),
+                          child: AppMenuLabel(
+                            icon: value.iconId,
+                            child: Text(value.label(l10n)),
+                          ),
                         ),
                     ],
                     child: Padding(
@@ -425,8 +440,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                         children: [
                           if (compactComponents &&
                               MediaQuery.sizeOf(context).width < 600)
-                            const Icon(
-                              Icons.chair_outlined,
+                            const AppIcon(
+                              AppIconId.furniture,
                               color: Colors.white70,
                               size: 20,
                             )
@@ -443,8 +458,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                 ),
                               ),
                             ),
-                          const Icon(
-                            Icons.arrow_drop_down,
+                          const AppIcon(
+                            AppIconId.expandMore,
                             color: Colors.white70,
                             size: 18,
                           ),
@@ -468,14 +483,14 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ArchitectToolCategory.selection) ...[
                                   _buildToolButton(
                                     tool: ArchitectTool.pan,
-                                    icon: Icons.pan_tool_rounded,
+                                    icon: AppIconId.pan,
                                     label: l10n.architectToolPan,
                                     iconOnly:
                                         MediaQuery.sizeOf(context).width < 600,
                                   ),
                                   _buildToolButton(
                                     tool: ArchitectTool.select,
-                                    icon: Icons.near_me_outlined,
+                                    icon: AppIconId.select,
                                     label: l10n.architectToolSelect,
                                     iconOnly:
                                         widget.onSelectAll != null &&
@@ -488,7 +503,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     _buildToolButton(
                                       tool: ArchitectTool.select,
                                       buttonKey: 'architect-multi-select',
-                                      icon: Icons.library_add_check_outlined,
+                                      icon: AppIconId.multiSelect,
                                       label: l10n.architectSelectionMulti,
                                       iconOnly:
                                           widget.onSelectAll != null &&
@@ -503,7 +518,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     _buildToolButton(
                                       tool: ArchitectTool.select,
                                       buttonKey: 'architect-select-all',
-                                      icon: Icons.select_all_rounded,
+                                      icon: AppIconId.selectAll,
                                       label: l10n.architectSelectAll,
                                       iconOnly:
                                           MediaQuery.sizeOf(context).width <
@@ -525,7 +540,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.wall,
-                                    icon: Icons.line_weight_rounded,
+                                    icon: AppIconId.wall,
                                     label: l10n.architectToolWall,
                                   ),
                                 if (category ==
@@ -534,7 +549,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.door,
-                                    icon: Icons.meeting_room_rounded,
+                                    icon: AppIconId.door,
                                     label: l10n.architectToolDoor,
                                   ),
                                 if (category ==
@@ -543,7 +558,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.window,
-                                    icon: Icons.window_rounded,
+                                    icon: AppIconId.window,
                                     label: l10n.architectToolWindow,
                                   ),
                                 if (category ==
@@ -552,7 +567,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.column,
-                                    icon: Icons.view_column_rounded,
+                                    icon: AppIconId.column,
                                     label: l10n.architectToolColumn,
                                   ),
                                 if (category ==
@@ -561,7 +576,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.beam,
-                                    icon: Icons.horizontal_rule_rounded,
+                                    icon: AppIconId.beam,
                                     label: l10n.architectToolBeam,
                                   ),
                                 if (category ==
@@ -570,7 +585,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.slab,
-                                    icon: Icons.layers_rounded,
+                                    icon: AppIconId.slab,
                                     label: l10n.architectToolSlab,
                                   ),
                                 if (category ==
@@ -578,7 +593,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     category == ArchitectToolCategory.build)
                                   _buildToolButton(
                                     tool: ArchitectTool.floorDrain,
-                                    icon: Icons.water_drop_outlined,
+                                    icon: AppIconId.floorDrain,
                                     label: l10n.architectToolFloorDrain,
                                   ),
                                 if (category ==
@@ -587,7 +602,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.roof,
-                                    icon: Icons.roofing_rounded,
+                                    icon: AppIconId.roof,
                                     label: l10n.architectToolRoof,
                                   ),
                                 if (category ==
@@ -596,7 +611,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.opening,
-                                    icon: Icons.crop_free_rounded,
+                                    icon: AppIconId.opening,
                                     label: l10n.architectToolOpening,
                                   ),
                                 if (category ==
@@ -605,7 +620,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.stair,
-                                    icon: Icons.stairs_rounded,
+                                    icon: AppIconId.stairs,
                                     label: l10n.architectToolStair,
                                   ),
                                 if (category ==
@@ -614,7 +629,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.component,
-                                    icon: Icons.chair_outlined,
+                                    icon: AppIconId.furniture,
                                     label: l10n.architectLibrary,
                                   ),
                                 if (category ==
@@ -623,12 +638,12 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     )) ...[
                                   _buildToolButton(
                                     tool: ArchitectTool.zone,
-                                    icon: Icons.space_dashboard_rounded,
+                                    icon: AppIconId.zone,
                                     label: l10n.architectToolZone,
                                   ),
                                   _buildToolButton(
                                     tool: ArchitectTool.zoneTable,
-                                    icon: Icons.table_chart_rounded,
+                                    icon: AppIconId.schedule,
                                     label: l10n.architectToolZoneTable,
                                   ),
                                 ],
@@ -638,7 +653,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.dimension,
-                                    icon: Icons.straighten_rounded,
+                                    icon: AppIconId.dimension,
                                     label: l10n.architectToolDimension,
                                   ),
                                 if (category ==
@@ -647,7 +662,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.level,
-                                    icon: Icons.change_history_rounded,
+                                    icon: AppIconId.level,
                                     label: l10n.architectToolLevel,
                                   ),
                                 if (category ==
@@ -656,7 +671,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.text,
-                                    icon: Icons.title_rounded,
+                                    icon: AppIconId.text,
                                     label: l10n.architectToolText,
                                   ),
                                 if (category ==
@@ -665,7 +680,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.cadLine,
-                                    icon: Icons.timeline_rounded,
+                                    icon: AppIconId.line,
                                     label: l10n.architectToolCadLine,
                                   ),
                                 if (category ==
@@ -674,7 +689,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.cadRect,
-                                    icon: Icons.crop_square_rounded,
+                                    icon: AppIconId.rectangle,
                                     label: l10n.architectToolCadRect,
                                   ),
                                 if (category == ArchitectToolCategory.drawing &&
@@ -685,15 +700,15 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ),
                                     tooltip: l10n.architectTerrain,
                                     onPressed: widget.onTerrain,
-                                    icon: const Icon(
-                                      Icons.landscape_outlined,
+                                    icon: const AppIcon(
+                                      AppIconId.terrain,
                                       color: Colors.white70,
                                     ),
                                   ),
                                 if (category == ArchitectToolCategory.drawing)
                                   _buildToolButton(
                                     tool: ArchitectTool.hatch,
-                                    icon: Icons.texture_rounded,
+                                    icon: AppIconId.hatch,
                                     label: l10n.architectToolHatch,
                                   ),
                                 if (category ==
@@ -702,19 +717,19 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.cadCircle,
-                                    icon: Icons.radio_button_unchecked_rounded,
+                                    icon: AppIconId.radioOff,
                                     label: l10n.architectToolCadCircle,
                                   ),
                                 if (category ==
                                     ArchitectToolCategory.views) ...[
                                   _buildToolButton(
                                     tool: ArchitectTool.section,
-                                    icon: Icons.splitscreen_outlined,
+                                    icon: AppIconId.section,
                                     label: l10n.architectToolSection,
                                   ),
                                   _buildToolButton(
                                     tool: ArchitectTool.elevation,
-                                    icon: Icons.apartment,
+                                    icon: AppIconId.elevation,
                                     label: l10n.architectToolElevation,
                                   ),
                                 ],
@@ -724,7 +739,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.axis,
-                                    icon: Icons.grid_on_rounded,
+                                    icon: AppIconId.axis,
                                     label: l10n.architectToolAxis,
                                   ),
                                 if (category ==
@@ -733,7 +748,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ))
                                   _buildToolButton(
                                     tool: ArchitectTool.measure,
-                                    icon: Icons.square_foot_rounded,
+                                    icon: AppIconId.measure,
                                     label: l10n.architectToolMeasure,
                                   ),
                               ],
@@ -751,7 +766,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
 
   Widget _buildToolButton({
     required ArchitectTool tool,
-    required IconData icon,
+    required AppIconId icon,
     required String label,
     String? buttonKey,
     bool? selected,
@@ -809,7 +824,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  AppIcon(
                     icon,
                     size: 18,
                     color: isSelected
@@ -841,70 +856,52 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   Widget _buildDrawingShortcut(BuildContext context, ArchitectTool tool) {
     final l = context.l10n;
     final (icon, label) = switch (tool) {
-      ArchitectTool.wall => (Icons.line_weight_rounded, l.architectToolWall),
-      ArchitectTool.door => (Icons.meeting_room_rounded, l.architectToolDoor),
-      ArchitectTool.window => (Icons.window_rounded, l.architectToolWindow),
-      ArchitectTool.column => (
-        Icons.view_column_rounded,
-        l.architectToolColumn,
-      ),
-      ArchitectTool.beam => (
-        Icons.horizontal_rule_rounded,
-        l.architectToolBeam,
-      ),
-      ArchitectTool.slab => (Icons.layers_rounded, l.architectToolSlab),
+      ArchitectTool.wall => (AppIconId.wall, l.architectToolWall),
+      ArchitectTool.door => (AppIconId.door, l.architectToolDoor),
+      ArchitectTool.window => (AppIconId.window, l.architectToolWindow),
+      ArchitectTool.column => (AppIconId.column,
+        l.architectToolColumn),
+      ArchitectTool.beam => (AppIconId.beam,
+        l.architectToolBeam),
+      ArchitectTool.slab => (AppIconId.slab, l.architectToolSlab),
       ArchitectTool.floorDrain => (
-        Icons.water_drop_outlined,
+        AppIconId.floorDrain,
         l.architectToolFloorDrain,
       ),
-      ArchitectTool.roof => (Icons.roofing_rounded, l.architectToolRoof),
-      ArchitectTool.opening => (
-        Icons.crop_free_rounded,
-        l.architectToolOpening,
-      ),
-      ArchitectTool.stair => (Icons.stairs_rounded, l.architectToolStair),
+      ArchitectTool.roof => (AppIconId.roof, l.architectToolRoof),
+      ArchitectTool.opening => (AppIconId.opening,
+        l.architectToolOpening),
+      ArchitectTool.stair => (AppIconId.stairs, l.architectToolStair),
       ArchitectTool.component => (
-        Icons.chair_outlined,
+        AppIconId.furniture,
         l.architectToolComponent,
       ),
-      ArchitectTool.zone => (
-        Icons.space_dashboard_rounded,
-        l.architectToolZone,
-      ),
-      ArchitectTool.zoneTable => (
-        Icons.table_chart_rounded,
-        l.architectToolZoneTable,
-      ),
+      ArchitectTool.zone => (AppIconId.zone,
+        l.architectToolZone),
+      ArchitectTool.zoneTable => (AppIconId.schedule,
+        l.architectToolZoneTable),
       ArchitectTool.dimension => (
-        Icons.straighten_rounded,
+        AppIconId.dimension,
         l.architectToolDimension,
       ),
-      ArchitectTool.level => (
-        Icons.change_history_rounded,
-        l.architectToolLevel,
+      ArchitectTool.level => (AppIconId.level,
+        l.architectToolLevel),
+      ArchitectTool.text => (AppIconId.text, l.architectToolText),
+      ArchitectTool.cadLine => (AppIconId.line, l.architectToolCadLine),
+      ArchitectTool.cadRect => (AppIconId.rectangle,
+        l.architectToolCadRect),
+      ArchitectTool.hatch => (AppIconId.hatch, l.architectToolHatch),
+      ArchitectTool.cadCircle => (AppIconId.radioOff,
+        l.architectToolCadCircle),
+      ArchitectTool.section => (AppIconId.section,
+        l.architectToolSection),
+      ArchitectTool.elevation => (
+        AppIconId.elevation, l.architectToolElevation,
       ),
-      ArchitectTool.text => (Icons.title_rounded, l.architectToolText),
-      ArchitectTool.cadLine => (Icons.timeline_rounded, l.architectToolCadLine),
-      ArchitectTool.cadRect => (
-        Icons.crop_square_rounded,
-        l.architectToolCadRect,
-      ),
-      ArchitectTool.hatch => (Icons.texture_rounded, l.architectToolHatch),
-      ArchitectTool.cadCircle => (
-        Icons.radio_button_unchecked_rounded,
-        l.architectToolCadCircle,
-      ),
-      ArchitectTool.section => (
-        Icons.splitscreen_outlined,
-        l.architectToolSection,
-      ),
-      ArchitectTool.elevation => (Icons.apartment, l.architectToolElevation),
-      ArchitectTool.axis => (Icons.grid_on_rounded, l.architectToolAxis),
-      ArchitectTool.measure => (
-        Icons.square_foot_rounded,
-        l.architectToolMeasure,
-      ),
-      _ => (Icons.edit_outlined, l.architectToolSelect),
+      ArchitectTool.axis => (AppIconId.axis, l.architectToolAxis),
+      ArchitectTool.measure => (AppIconId.measure,
+        l.architectToolMeasure),
+      _ => (AppIconId.edit, l.architectToolSelect),
     };
     return _buildToolButton(
       tool: tool,
@@ -971,7 +968,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Icon(Icons.expand_less, size: 18),
+                    const AppIcon(AppIconId.expandLess, size: 18),
                   ],
                 ),
               ),
@@ -997,20 +994,29 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               value: 'single',
               checked:
                   !widget.curvedWall && wallMode == WallDraftingMode.singleLine,
-              child: Text(l.architectWallSingle),
+              child: AppMenuLabel(
+                icon: AppIconId.line,
+                child: Text(l.architectWallSingle),
+              ),
             ),
             CheckedPopupMenuItem(
               value: 'chain',
               checked:
                   !widget.curvedWall && wallMode == WallDraftingMode.chained,
-              child: Text(l.architectWallChained),
+              child: AppMenuLabel(
+                icon: AppIconId.polyline,
+                child: Text(l.architectWallChained),
+              ),
             ),
             if (widget.onArcWallSelected != null)
               CheckedPopupMenuItem(
                 key: const ValueKey('architect-wall-arc-mode'),
                 value: 'arc',
                 checked: widget.curvedWall,
-                child: Text(l.wallArcMode),
+                child: AppMenuLabel(
+                  icon: AppIconId.arc,
+                  child: Text(l.wallArcMode),
+                ),
               ),
           ],
           child: Padding(
@@ -1019,8 +1025,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(mode, style: const TextStyle(color: Colors.white70)),
-                const Icon(
-                  Icons.arrow_drop_down,
+                const AppIcon(
+                  AppIconId.expandMore,
                   size: 18,
                   color: Colors.white70,
                 ),
@@ -1033,13 +1039,13 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
             key: const ValueKey('wall-draft-layers'),
             tooltip: l.wallNewVariant,
             onPressed: () => widget.onCreateWallVariant!(type),
-            icon: const Icon(Icons.layers_outlined),
+            icon: const AppIcon(AppIconId.layers),
           ),
         if (!widget.curvedWall && isChainingWall && onFinishChainedWall != null)
           IconButton(
             tooltip: l.architectFinishChained,
             onPressed: onFinishChainedWall,
-            icon: const Icon(Icons.check),
+            icon: const AppIcon(AppIconId.confirm),
           ),
       ],
     );
@@ -1055,8 +1061,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
         children: [
           if (onCreateFenestration != null) ...[
             ActionChip(
-              avatar: const Icon(
-                Icons.add_circle_outline_rounded,
+              avatar: const AppIcon(
+                AppIconId.addCircle,
                 size: 14,
                 color: Color(0xFF00E5FF),
               ),
@@ -1077,8 +1083,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           ],
           if (activeDoorStyle != null) ...[
             ActionChip(
-              avatar: const Icon(
-                Icons.door_front_door_rounded,
+              avatar: const AppIcon(
+                AppIconId.door,
                 size: 14,
                 color: Color(0xFF00E5FF),
               ),
@@ -1093,8 +1099,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(
-                    Icons.arrow_drop_down,
+                  const AppIcon(
+                    AppIconId.expandMore,
                     size: 14,
                     color: Colors.white70,
                   ),
@@ -1172,7 +1178,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
             ),
             selected: true,
             onSelected: (_) => onHingeSideChanged(!isHingeLeft),
-            avatar: const Icon(Icons.swap_horiz_rounded, size: 14),
+            avatar: const AppIcon(AppIconId.swapHorizontal, size: 14),
             visualDensity: VisualDensity.compact,
           ),
         ],
@@ -1190,8 +1196,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
         children: [
           if (onCreateFenestration != null) ...[
             ActionChip(
-              avatar: const Icon(
-                Icons.add_circle_outline_rounded,
+              avatar: const AppIcon(
+                AppIconId.addCircle,
                 size: 14,
                 color: Color(0xFF00E5FF),
               ),
@@ -1212,8 +1218,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           ],
           if (activeWindowStyle != null) ...[
             ActionChip(
-              avatar: const Icon(
-                Icons.window_rounded,
+              avatar: const AppIcon(
+                AppIconId.window,
                 size: 14,
                 color: Color(0xFF00E5FF),
               ),
@@ -1228,8 +1234,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(
-                    Icons.arrow_drop_down,
+                  const AppIcon(
+                    AppIconId.expandMore,
                     size: 14,
                     color: Colors.white70,
                   ),
@@ -1294,7 +1300,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
       child: Row(
         children: [
           ChoiceChip(
-            avatar: const Icon(Icons.crop_square_rounded, size: 14),
+            avatar: const AppIcon(AppIconId.rectangle, size: 14),
             label: Text(l10n.architectColumnRect),
             selected: columnShape == ColumnShape.rectangular,
             onSelected: (sel) {
@@ -1304,7 +1310,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           ),
           const SizedBox(width: 4),
           ChoiceChip(
-            avatar: const Icon(Icons.circle_outlined, size: 14),
+            avatar: const AppIcon(AppIconId.radioOff, size: 14),
             label: Text(l10n.architectColumnCircle),
             selected: columnShape == ColumnShape.circular,
             onSelected: (sel) {
@@ -1407,7 +1413,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   vertical: 6,
                 ),
               ),
-              icon: const Icon(Icons.widgets_outlined, size: 16),
+              icon: const AppIcon(AppIconId.component, size: 16),
               label: Text(
                 componentLabel(l, activeDef),
                 maxLines: 1,
@@ -1425,8 +1431,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               side: const BorderSide(color: Colors.white24),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             ),
-            icon: const Icon(
-              Icons.water_drop_outlined,
+            icon: const AppIcon(
+              AppIconId.water,
               size: 16,
               color: Color(0xFF00E5FF),
             ),
@@ -1442,7 +1448,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 '${(w * 100).round()}×${(d * 100).round()}×${(h * 100).round()} cm',
             child: TextButton.icon(
               key: const ValueKey('component-tool-size-btn'),
-              icon: const Icon(Icons.straighten, size: 18),
+              icon: const AppIcon(AppIconId.measure, size: 18),
               label: Text(l.architectPropertySize),
               style: TextButton.styleFrom(foregroundColor: Colors.white70),
               onPressed: () async {
@@ -1461,8 +1467,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           IconButton(
             key: const ValueKey("component-tool-rotate-btn"),
             tooltip: '${l.architectComponentRotateBtn} ($deg°)',
-            icon: const Icon(
-              Icons.rotate_right,
+            icon: const AppIcon(
+              AppIconId.rotate,
               size: 18,
               color: Colors.white70,
             ),
@@ -1503,14 +1509,14 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           IconButton(
             key: const ValueKey('stair-tool-properties'),
             tooltip: l.architectProperties,
-            icon: const Icon(Icons.tune, color: Colors.white70),
+            icon: const AppIcon(AppIconId.properties, color: Colors.white70),
             onPressed: widget.onStairProperties,
           ),
           Tooltip(
             message: l.stairPlaceHelp,
             child: const Padding(
               padding: EdgeInsets.all(8),
-              child: Icon(Icons.help_outline, size: 18, color: Colors.white70),
+              child: AppIcon(AppIconId.help, size: 18, color: Colors.white70),
             ),
           ),
         ],
@@ -1524,7 +1530,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     return Row(
       children: [
         ChoiceChip(
-          avatar: const Icon(Icons.crop_square_rounded, size: 14),
+          avatar: const AppIcon(AppIconId.rectangle, size: 14),
           label: Text(l10n.architectOpeningShaft),
           selected: openingType == OpeningType.shaft,
           onSelected: (sel) {
@@ -1534,7 +1540,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
         ),
         const SizedBox(width: 6),
         ChoiceChip(
-          avatar: const Icon(Icons.fullscreen_exit_rounded, size: 14),
+          avatar: const AppIcon(AppIconId.exitFullscreen, size: 14),
           label: Text(l10n.architectOpeningVoid),
           selected: openingType == OpeningType.floorVoid,
           onSelected: (sel) {
@@ -1597,10 +1603,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Row(
                   children: [
-                    Icon(
+                    AppIcon(
                       kind == FenestrationKind.door
-                          ? Icons.door_front_door_rounded
-                          : Icons.window_rounded,
+                          ? AppIconId.door
+                          : AppIconId.window,
                       color: const Color(0xFF00E5FF),
                     ),
                     const SizedBox(width: 8),
@@ -1614,7 +1620,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                     const Spacer(),
                     if (onCreateFenestration != null)
                       TextButton.icon(
-                        icon: const Icon(Icons.add, size: 16),
+                        icon: const AppIcon(AppIconId.add, size: 16),
                         label: Text(l10n.architectFenestrationCreateNew),
                         onPressed: () {
                           Navigator.pop(ctx);
@@ -1634,10 +1640,9 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                     final isSelected = activeStyle?.id == s.id;
                     return ListTile(
                       dense: true,
-                      leading: Icon(
+                      leading: AppIcon(
                         isSelected
-                            ? Icons.check_circle_rounded
-                            : Icons.circle_outlined,
+                            ? AppIconId.checkCircle : AppIconId.radioOff,
                         color: isSelected
                             ? const Color(0xFF00E5FF)
                             : Colors.white54,
@@ -1673,8 +1678,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                           ),
                           if (!s.isPreset)
                             IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
+                              icon: const AppIcon(
+                                AppIconId.delete,
                                 color: Colors.redAccent,
                                 size: 20,
                               ),
@@ -1683,7 +1688,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                 final confirm = await showDialog<bool>(
                                   context: ctx,
                                   builder: (dialogCtx) => AlertDialog(
-                                    title: Text(l10n.architectFenestrationDelete),
+                                    title: Text(l10n.architectFenestrationDelete,
+                                    ),
                                     content: Text(
                                       l10n.architectFenestrationDeleteConfirm(
                                         s.localizedName(l10n),
@@ -1747,8 +1753,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            isSection ? Icons.splitscreen_outlined : Icons.apartment,
+          AppIcon(
+            isSection ? AppIconId.section : AppIconId.building,
             color: const Color(0xFF00E5FF),
             size: 16,
           ),

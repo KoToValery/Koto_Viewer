@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../models/dxf_color_table.dart';
 import '../models/dxf_models.dart';
@@ -69,7 +71,8 @@ class DxfEntityContextSheet extends StatelessWidget {
     );
 
     // Check if any layers are currently hidden
-    final bool hasHiddenLayers = document.layers.values.any((l) => !l.isVisible);
+    final bool hasHiddenLayers = document.layers.values.any((l) => !l.isVisible,
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -106,7 +109,8 @@ class DxfEntityContextSheet extends StatelessWidget {
 
               // Layer Header Card (showing only Layer name and color)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0,
+                ),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF131A26) : const Color(0xFFF3F5F8),
                   borderRadius: BorderRadius.circular(14.0),
@@ -125,8 +129,7 @@ class DxfEntityContextSheet extends StatelessWidget {
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: Colors.white70,
-                          width: 2.0,
-                        ),
+                          width: 2.0),
                         boxShadow: [
                           BoxShadow(
                             color: layerColor.withValues(alpha: 0.4),
@@ -168,13 +171,13 @@ class DxfEntityContextSheet extends StatelessWidget {
                     ),
 
                     IconButton(
-                      icon: Icon(
-                        Icons.close,
+                      icon: AppIcon(
+                        AppIconId.close,
                         size: 20,
                         color: isDark ? Colors.white54 : Colors.black54,
                       ),
                       onPressed: () => Navigator.pop(context),
-                      tooltip: 'Close',
+                      tooltip: context.l10n.commandIconClose,
                     ),
                   ],
                 ),
@@ -279,7 +282,7 @@ class DxfEntityContextSheet extends StatelessWidget {
                 color: iconColor.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 20, color: iconColor),
+              child: AppIcon.fromMaterial(icon, size: 20, color: iconColor),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -305,8 +308,8 @@ class DxfEntityContextSheet extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(
-              Icons.chevron_right,
+            AppIcon(
+              AppIconId.chevronRight,
               size: 20,
               color: isDark ? Colors.white38 : Colors.black38,
             ),
@@ -397,7 +400,8 @@ class DxfEntityContextSheet extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: isDark ? Colors.blueGrey.shade900 : Colors.grey.shade200,
                                 borderRadius: BorderRadius.circular(4),

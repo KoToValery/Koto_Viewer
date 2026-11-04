@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 
@@ -42,13 +43,15 @@ class ArchitectCommandPreviewBar extends StatelessWidget {
               key: const ValueKey('architect-command-cancel'),
               tooltip: l.cancel,
               onPressed: onCancel,
-              icon: const Icon(Icons.close),
+              icon: const AppIcon(AppIconId.close),
             ),
             IconButton(
               key: const ValueKey('architect-command-apply'),
               tooltip: l.applyAction,
               onPressed: ready ? onConfirm : null,
-              icon: Icon(Icons.check, color: ready ? Colors.green : null),
+              icon: AppIcon(
+                AppIconId.confirm, color: ready ? Colors.green : null,
+              ),
             ),
           ],
         ),

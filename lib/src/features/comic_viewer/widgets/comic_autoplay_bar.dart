@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -92,7 +93,9 @@ class ComicAutoplayBar extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.zoom_in, size: 14, color: Colors.amberAccent),
+                        const AppIcon(
+                          AppIconId.zoomIn, size: 14, color: Colors.amberAccent,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           l10n.comicAutoplayPausedForZoom,
@@ -128,7 +131,7 @@ class ComicAutoplayBar extends StatelessWidget {
                     children: [
                       // Play / Pause Button
                       IconButton(
-                        icon: Icon(
+                        icon: AppIcon.fromMaterial(
                           isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
                           size: 26,
                         ),
@@ -144,17 +147,19 @@ class ComicAutoplayBar extends StatelessWidget {
                       // Previous Page Button (in paged mode)
                       if (!isWebtoon) ...[
                         IconButton(
-                          icon: const Icon(Icons.skip_previous_rounded, size: 20),
+                          icon: const AppIcon(
+                            AppIconId.previousTrack, size: 20,
+                          ),
                           color: Colors.white,
-                          tooltip: 'Previous Page',
+                          tooltip: context.l10n.previousPage,
                           padding: const EdgeInsets.all(4),
                           constraints: const BoxConstraints(),
                           onPressed: onPrevious,
                         ),
                         IconButton(
-                          icon: const Icon(Icons.skip_next_rounded, size: 20),
+                          icon: const AppIcon(AppIconId.nextTrack, size: 20),
                           color: Colors.white,
-                          tooltip: 'Next Page',
+                          tooltip: context.l10n.nextPage,
                           padding: const EdgeInsets.all(4),
                           constraints: const BoxConstraints(),
                           onPressed: onNext,
@@ -164,7 +169,8 @@ class ComicAutoplayBar extends StatelessWidget {
 
                       // Speed / Duration stepper chip
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white10,
                           borderRadius: BorderRadius.circular(14),
@@ -173,9 +179,9 @@ class ComicAutoplayBar extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.remove, size: 14),
+                              icon: const AppIcon(AppIconId.remove, size: 14),
                               color: Colors.white70,
-                              tooltip: 'Decrease',
+                              tooltip: context.l10n.commandUiDecrease,
                               padding: const EdgeInsets.all(3),
                               constraints: const BoxConstraints(),
                               onPressed: () {
@@ -190,11 +196,14 @@ class ComicAutoplayBar extends StatelessWidget {
                               onTap: onOpenSettings,
                               borderRadius: BorderRadius.circular(10),
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2,
+                                ),
                                 child: Text(
                                   isWebtoon
-                                      ? l10n.comicAutoplaySpeedPx(config.webtoonScrollSpeed.round())
-                                      : l10n.comicAutoplaySeconds(config.intervalSeconds.round()),
+                                      ? l10n.comicAutoplaySpeedPx(config.webtoonScrollSpeed.round(),
+                                        )
+                                      : l10n.comicAutoplaySeconds(config.intervalSeconds.round(),
+                                        ),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -204,9 +213,9 @@ class ComicAutoplayBar extends StatelessWidget {
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.add, size: 14),
+                              icon: const AppIcon(AppIconId.add, size: 14),
                               color: Colors.white70,
-                              tooltip: 'Increase',
+                              tooltip: context.l10n.commandUiIncrease,
                               padding: const EdgeInsets.all(3),
                               constraints: const BoxConstraints(),
                               onPressed: () {
@@ -225,7 +234,7 @@ class ComicAutoplayBar extends StatelessWidget {
 
                       // Loop Toggle Button
                       IconButton(
-                        icon: Icon(
+                        icon: AppIcon.fromMaterial(
                           config.loop ? Icons.repeat_one_on_rounded : Icons.repeat_rounded,
                           size: 19,
                           color: config.loop ? accentColor : Colors.white60,
@@ -238,7 +247,9 @@ class ComicAutoplayBar extends StatelessWidget {
 
                       // Settings Dialog Button
                       IconButton(
-                        icon: const Icon(Icons.tune_rounded, size: 19, color: Colors.white70),
+                        icon: const AppIcon(
+                          AppIconId.properties, size: 19, color: Colors.white70,
+                        ),
                         tooltip: l10n.comicAutoplaySettings,
                         padding: const EdgeInsets.all(4),
                         constraints: const BoxConstraints(),
@@ -247,7 +258,9 @@ class ComicAutoplayBar extends StatelessWidget {
 
                       // Stop / Close Autoplay Button
                       IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 19, color: Colors.white54),
+                        icon: const AppIcon(
+                          AppIconId.close, size: 19, color: Colors.white54,
+                        ),
                         tooltip: l10n.comicAutoplayStop,
                         padding: const EdgeInsets.all(4),
                         constraints: const BoxConstraints(),
@@ -260,7 +273,8 @@ class ComicAutoplayBar extends StatelessWidget {
 
               // Bottom Progress Bar
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20),
+                ),
                 child: ValueListenableBuilder<double>(
                   valueListenable: progressNotifier,
                   builder: (context, progress, _) {
@@ -352,7 +366,8 @@ class _ComicAutoplaySettingsSheetState extends State<ComicAutoplaySettingsSheet>
                     color: accentColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.slideshow_rounded, color: accentColor, size: 22),
+                  child: const Icon(Icons.slideshow_rounded, color: accentColor, size: 22,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -361,11 +376,13 @@ class _ComicAutoplaySettingsSheetState extends State<ComicAutoplaySettingsSheet>
                     children: [
                       Text(
                         l10n.comicAutoplaySettings,
-                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white,
+                        ),
                       ),
                       Text(
                         widget.isWebtoon ? 'Webtoon Scroll Mode' : 'Paged Reading Mode',
-                        style: const TextStyle(fontSize: 12, color: Colors.white54),
+                        style: const TextStyle(fontSize: 12, color: Colors.white54,
+                        ),
                       ),
                     ],
                   ),
@@ -382,16 +399,19 @@ class _ComicAutoplaySettingsSheetState extends State<ComicAutoplaySettingsSheet>
                 children: [
                   Text(
                     l10n.comicAutoplayPageDuration,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white,
+                    ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: accentColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      l10n.comicAutoplaySeconds(_config.intervalSeconds.round()),
+                      l10n.comicAutoplaySeconds(_config.intervalSeconds.round(),
+                      ),
                       style: const TextStyle(
                         color: accentColor,
                         fontWeight: FontWeight.bold,
@@ -444,16 +464,19 @@ class _ComicAutoplaySettingsSheetState extends State<ComicAutoplaySettingsSheet>
                 children: [
                   Text(
                     l10n.comicAutoplayScrollSpeed,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white,
+                    ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: accentColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      l10n.comicAutoplaySpeedPx(_config.webtoonScrollSpeed.round()),
+                      l10n.comicAutoplaySpeedPx(_config.webtoonScrollSpeed.round(),
+                      ),
                       style: const TextStyle(
                         color: accentColor,
                         fontWeight: FontWeight.bold,
@@ -506,10 +529,11 @@ class _ComicAutoplaySettingsSheetState extends State<ComicAutoplaySettingsSheet>
               contentPadding: EdgeInsets.zero,
               title: Text(
                 l10n.comicAutoplayLoop,
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500,
+                ),
               ),
-              subtitle: const Text(
-                'Restart from page 1 upon reaching the end',
+              subtitle: Text(
+                context.l10n.commandUiRestartFromPage1UponReachingTheEnd,
                 style: TextStyle(color: Colors.white54, fontSize: 12),
               ),
               activeThumbColor: accentColor,
@@ -523,10 +547,13 @@ class _ComicAutoplaySettingsSheetState extends State<ComicAutoplaySettingsSheet>
               contentPadding: EdgeInsets.zero,
               title: Text(
                 l10n.comicAutoplayPauseOnZoom,
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500,
+                ),
               ),
-              subtitle: const Text(
-                'Automatically suspend page turns while inspecting panels zoomed in',
+              subtitle: Text(
+                context
+                    .l10n
+                    .commandUiAutomaticallySuspendPageTurnsWhileInspectingPanelsZoomedIn,
                 style: TextStyle(color: Colors.white54, fontSize: 12),
               ),
               activeThumbColor: accentColor,
@@ -543,7 +570,8 @@ class _ComicAutoplaySettingsSheetState extends State<ComicAutoplaySettingsSheet>
               child: FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor: accentColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(l10n.ok),

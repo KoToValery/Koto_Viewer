@@ -405,8 +405,7 @@ void main() {
         );
         addTearDown(model.dispose);
         await workspace.open(tester, model);
-        await tool_ui.prepare(tester, tool.$1);
-        await tester.tap(find.byIcon(tool.$1));
+        await tool_ui.choose(tester, tool.$1);
         await tester.pumpAndSettle();
         if (tool.$2 == 'line') {
           await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
@@ -415,7 +414,8 @@ void main() {
         await workspace.wallTap(tester, const Offset(1, -.4));
         await workspace.wallTap(tester, const Offset(8.03, .03));
         if (tool.$2 == 'dimension') {
-          await tester.tap(find.byKey(const ValueKey('architect-dimension-confirm')));
+          await tester.tap(find.byKey(const ValueKey('architect-dimension-confirm')),
+          );
           await tester.pump();
         }
         if (tool.$2 == 'circle') {
@@ -604,7 +604,8 @@ void main() {
       final settingsRect = tester.getRect(
         find.byKey(const ValueKey('architect-settings')),
       );
-      expect(tester.getRect(find.byType(AppBar)).contains(settingsRect.center), isTrue);
+      expect(tester.getRect(find.byType(AppBar)).contains(settingsRect.center), isTrue,
+      );
       expect(inputRect.contains(settingsRect.center), isFalse);
       final finger =
           workspace.screen(tester, const Offset(.03, .04)) +

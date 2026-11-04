@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -67,8 +68,8 @@ class _PdfCertificateInfoDialogState extends State<PdfCertificateInfoDialog> {
           content: TextField(
             controller: passwordController,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Enter PFX password',
+            decoration: InputDecoration(
+              labelText: context.l10n.commandUiEnterPfxPassword,
               border: OutlineInputBorder(),
             ),
           ),
@@ -92,7 +93,8 @@ class _PdfCertificateInfoDialogState extends State<PdfCertificateInfoDialog> {
 
     try {
       final bytes = await File(extPath).readAsBytes();
-      final certInfo = await PdfCertificateService.readExternalCertificate(bytes, password: password);
+      final certInfo = await PdfCertificateService.readExternalCertificate(bytes, password: password,
+      );
       if (mounted) {
         setState(() {
           _isLoadingExternal = false;
@@ -101,7 +103,8 @@ class _PdfCertificateInfoDialogState extends State<PdfCertificateInfoDialog> {
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Could not read certificate or incorrect password.'),
+                content: Text('Could not read certificate or incorrect password.',
+                ),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -167,7 +170,8 @@ class _PdfCertificateInfoDialogState extends State<PdfCertificateInfoDialog> {
                       Icon(
                         Icons.shield_outlined,
                         size: 48,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.35,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -175,7 +179,8 @@ class _PdfCertificateInfoDialogState extends State<PdfCertificateInfoDialog> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 13.5,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.7,
+                          ),
                         ),
                       ),
                     ],
@@ -183,7 +188,8 @@ class _PdfCertificateInfoDialogState extends State<PdfCertificateInfoDialog> {
                 ),
               ] else ...[
                 for (int i = 0; i < _certificates.length; i++) ...[
-                  _buildCertificateCard(_certificates[i], theme, l10n, dateFormat),
+                  _buildCertificateCard(_certificates[i], theme, l10n, dateFormat,
+                  ),
                   if (i < _certificates.length - 1) const SizedBox(height: 12),
                 ],
               ],
@@ -193,14 +199,16 @@ class _PdfCertificateInfoDialogState extends State<PdfCertificateInfoDialog> {
               OutlinedButton.icon(
                 onPressed: _isLoadingExternal ? null : _pickAndInspectExternalCertificate,
                 icon: _isLoadingExternal
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.file_open_outlined, size: 18),
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const AppIcon(AppIconId.openFile, size: 18),
                 label: Text(
                   l10n.pdfCheckExternalCert,
                   style: const TextStyle(fontSize: 13),
                 ),
                 style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
@@ -253,7 +261,8 @@ class _PdfCertificateInfoDialogState extends State<PdfCertificateInfoDialog> {
               Expanded(
                 child: Text(
                   cert.displaySigner,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               Container(
@@ -276,13 +285,16 @@ class _PdfCertificateInfoDialogState extends State<PdfCertificateInfoDialog> {
           const Divider(height: 16),
 
           if (cert.issuerName != null && cert.issuerName!.isNotEmpty)
-            _buildDetailRow(l10n.pdfIssuer, cert.issuerName!, Icons.account_balance_outlined, theme),
+            _buildDetailRow(l10n.pdfIssuer, cert.issuerName!, Icons.account_balance_outlined, theme,
+            ),
 
           if (cert.organization != null && cert.organization!.isNotEmpty)
-            _buildDetailRow('Organization:', cert.organization!, Icons.business_outlined, theme),
+            _buildDetailRow('Organization:', cert.organization!, Icons.business_outlined, theme,
+            ),
 
           if (cert.signDate != null)
-            _buildDetailRow(l10n.pdfSignDate, dateFormat.format(cert.signDate!), Icons.schedule_outlined, theme),
+            _buildDetailRow(l10n.pdfSignDate, dateFormat.format(cert.signDate!), Icons.schedule_outlined, theme,
+            ),
 
           if (cert.validFrom != null && cert.validTo != null)
             _buildDetailRow(
@@ -293,28 +305,34 @@ class _PdfCertificateInfoDialogState extends State<PdfCertificateInfoDialog> {
             ),
 
           if (cert.reason != null && cert.reason!.isNotEmpty)
-            _buildDetailRow('Reason:', cert.reason!, Icons.comment_outlined, theme),
+            _buildDetailRow('Reason:', cert.reason!, Icons.comment_outlined, theme,
+            ),
 
           if (cert.location != null && cert.location!.isNotEmpty)
-            _buildDetailRow('Location:', cert.location!, Icons.place_outlined, theme),
+            _buildDetailRow('Location:', cert.location!, Icons.place_outlined, theme,
+            ),
 
           if (cert.subFilter != null && cert.subFilter!.isNotEmpty)
-            _buildDetailRow('Format:', cert.subFilter!, Icons.fingerprint_outlined, theme),
+            _buildDetailRow('Format:', cert.subFilter!, Icons.fingerprint_outlined, theme,
+            ),
 
           if (cert.serialNumber != null && cert.serialNumber!.isNotEmpty)
-            _buildDetailRow('Serial No:', cert.serialNumber!, Icons.tag_outlined, theme),
+            _buildDetailRow('Serial No:', cert.serialNumber!, Icons.tag_outlined, theme,
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value, IconData icon, ThemeData theme) {
+  Widget _buildDetailRow(String label, String value, IconData icon, ThemeData theme,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 15, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+          Icon(icon, size: 15, color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+          ),
           const SizedBox(width: 8),
           Text(
             '$label ',
@@ -327,9 +345,7 @@ class _PdfCertificateInfoDialogState extends State<PdfCertificateInfoDialog> {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 12),
-            ),
-          ),
+              style: const TextStyle(fontSize: 12))),
         ],
       ),
     );

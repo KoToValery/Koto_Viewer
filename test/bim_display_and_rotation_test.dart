@@ -1,3 +1,4 @@
+import 'support/command_icon_finders.dart';
 import 'package:kotoview/src/features/bim_editing/widgets/bim_transform_renderer.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -91,13 +92,13 @@ void main() {
     palette().onSelectTool(StructuralDrawTool.column);
     await tester.pumpAndSettle();
     expect(find.text('25×30 cm'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.rotate_90_degrees_ccw));
+    await tester.tap(findCommandIcon(Icons.rotate_90_degrees_ccw));
     await tester.pumpAndSettle();
     expect(find.text('30×25 cm'), findsOneWidget);
     palette().onSelectTool(StructuralDrawTool.shearWall);
     await tester.pumpAndSettle();
     expect(find.text('25×150 cm'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.rotate_90_degrees_ccw));
+    await tester.tap(findCommandIcon(Icons.rotate_90_degrees_ccw));
     await tester.pumpAndSettle();
     expect(find.text('150×25 cm'), findsOneWidget);
     expect(palette().currentWallLength, 1.5);
@@ -109,7 +110,7 @@ void main() {
     await tester.tapAt(origin + plan().cadToScene(const Offset(3, 5)));
     await tester.pumpAndSettle();
     expect(find.textContaining('25 x 30 cm'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.rotate_right_rounded));
+    await tester.tap(findCommandIcon(Icons.rotate_right_rounded));
     await tester.pumpAndSettle();
     expect(find.textContaining('30 x 25 cm'), findsOneWidget);
     expect(
@@ -121,7 +122,7 @@ void main() {
     await tester.tapAt(origin + plan().cadToScene(const Offset(6.75, 5)));
     await tester.pumpAndSettle();
     expect(find.textContaining('150 x 25 cm'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.rotate_right_rounded));
+    await tester.tap(findCommandIcon(Icons.rotate_right_rounded));
     await tester.pumpAndSettle();
     expect(find.textContaining('25 x 150 cm'), findsOneWidget);
     expect(plan().currentStorey.shearWalls.single.length, closeTo(1.5, 1e-8));

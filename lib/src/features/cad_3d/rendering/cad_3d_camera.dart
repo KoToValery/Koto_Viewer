@@ -1,3 +1,4 @@
+import '../../../core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/mesh_3d.dart';
@@ -14,6 +15,15 @@ enum Cad3DViewPreset {
   final IconData icon;
 
   const Cad3DViewPreset(this.icon);
+
+  AppIconId get iconId => switch (this) {
+    Cad3DViewPreset.isometric => AppIconId.view3D,
+    Cad3DViewPreset.top => AppIconId.viewTop,
+    Cad3DViewPreset.front => AppIconId.viewFront,
+    Cad3DViewPreset.right => AppIconId.viewRight,
+    Cad3DViewPreset.bottom => AppIconId.viewBottom,
+    Cad3DViewPreset.back => AppIconId.viewBack,
+  };
 }
 
 /// Primary interaction mode for 3D gestures and mouse dragging.
@@ -25,6 +35,12 @@ enum Cad3DInteractionMode {
   final IconData icon;
 
   const Cad3DInteractionMode(this.icon);
+
+  AppIconId get iconId => switch (this) {
+    Cad3DInteractionMode.orbit => AppIconId.orbit,
+    Cad3DInteractionMode.pan => AppIconId.pan,
+    Cad3DInteractionMode.fly => AppIconId.fly,
+  };
 }
 
 /// 3D Orbit & Fly (Walkthrough) Camera Controller for CAD models.

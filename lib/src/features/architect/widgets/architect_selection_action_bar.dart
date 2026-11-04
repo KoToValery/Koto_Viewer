@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 
@@ -75,8 +76,8 @@ class ArchitectSelectionActionBar extends StatelessWidget {
           key: ValueKey(id ?? 'architect-selection-overflow'),
           tooltip: context.l10n.contextMenuMore,
           padding: EdgeInsets.zero,
-          icon: Icon(
-            Icons.more_horiz,
+          icon: AppIcon(
+            AppIconId.moreHorizontal,
             color: compact ? colors.onSurface : Colors.white70,
           ),
           constraints: BoxConstraints(
@@ -97,8 +98,11 @@ class ArchitectSelectionActionBar extends StatelessWidget {
                 enabled: entry.onPressed != null,
                 child: Row(
                   children: [
-                    if (entry.icon case Icon(:final icon, :final size))
-                      Icon(icon, size: size, color: colors.onSurface)
+                    if (entry.icon case AppIcon(:final id, :final size))
+                      AppIcon(id, size: size, color: colors.onSurface)
+                    else if (entry.icon case Icon(:final icon, :final size))
+                      AppIcon.fromMaterial(icon, size: size, color: colors.onSurface,
+                      )
                     else
                       entry.icon,
                     const SizedBox(width: 12),

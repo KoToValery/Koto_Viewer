@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 // === SECTION: ARCHITECTURAL FENESTRATION EDITOR SCREEN ===
 // Table of Contents:
 // 1. STATE & CONTROLLER INITIALIZATION
@@ -22,8 +23,7 @@ import '../widgets/fenestration_editor_tabs.dart';
 enum FenestrationViewMode {
   elevation2D,
   plan2D,
-  orbit3D,
-}
+  orbit3D }
 
 class FenestrationEditorScreen extends StatefulWidget {
   final ArchitectFenestrationStyle? initialStyle;
@@ -106,8 +106,7 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
           controller: textController,
           autofocus: true,
           decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-          ),
+            border: OutlineInputBorder()),
         ),
         actions: [
           TextButton(
@@ -150,12 +149,13 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
                 Flexible(
                   child: Text(
                     _style.localizedName(context.l10n),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(Icons.edit_rounded, size: 14, color: Colors.white70),
+                const AppIcon(AppIconId.edit, size: 14, color: Colors.white70),
               ],
             ),
           ),
@@ -166,17 +166,17 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
             segments: [
               ButtonSegment(
                 value: FenestrationViewMode.elevation2D,
-                icon: const Icon(Icons.crop_square_rounded, size: 16),
+                icon: const AppIcon(AppIconId.rectangle, size: 16),
                 tooltip: l10n.architectFenestrationViewElevation,
               ),
               ButtonSegment(
                 value: FenestrationViewMode.plan2D,
-                icon: const Icon(Icons.horizontal_rule_rounded, size: 16),
+                icon: const AppIcon(AppIconId.beam, size: 16),
                 tooltip: l10n.architectFenestrationViewPlan,
               ),
               ButtonSegment(
                 value: FenestrationViewMode.orbit3D,
-                icon: const Icon(Icons.view_in_ar_rounded, size: 16),
+                icon: const AppIcon(AppIconId.view3D, size: 16),
                 tooltip: l10n.architectFenestrationView3D,
               ),
             ],
@@ -193,7 +193,7 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
 
           // Save to Library
           FilledButton.icon(
-            icon: const Icon(Icons.save_rounded, size: 16),
+            icon: const AppIcon(AppIconId.save, size: 16),
             label: Text(l10n.architectFenestrationSave),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF00E5FF),
@@ -212,9 +212,7 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
             Expanded(
               flex: 5,
               child: ClipRect(
-                child: _buildCentralViewport(),
-              ),
-            ),
+                child: _buildCentralViewport())),
 
             // Bottom Configuration Panel with Tabs & Step Navigation
             Container(
@@ -252,7 +250,9 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
                         children: [
                           if (_tabController.index > 0 && _tabController.index < 3)
                             IconButton(
-                              icon: const Icon(Icons.arrow_back_ios_rounded, size: 14),
+                              icon: const AppIcon(
+                                AppIconId.chevronLeft, size: 14,
+                              ),
                               tooltip: l10n.architectFenestrationPrevStep,
                               visualDensity: VisualDensity.compact,
                               onPressed: () => _tabController.animateTo(
@@ -261,7 +261,9 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
                             ),
                           if (_tabController.index < 2)
                             IconButton(
-                              icon: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                              icon: const AppIcon(
+                                AppIconId.chevronRight, size: 14,
+                              ),
                               tooltip: l10n.architectFenestrationNextStep,
                               visualDensity: VisualDensity.compact,
                               onPressed: () => _tabController.animateTo(
@@ -361,7 +363,8 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.crop_square_rounded, size: 16, color: Color(0xFF00E5FF)),
+            const Icon(Icons.crop_square_rounded, size: 16, color: Color(0xFF00E5FF),
+            ),
             const SizedBox(width: 6),
             Text(
               '$wCm × $hCm cm',
@@ -384,7 +387,9 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.dialpad_rounded, size: 13, color: Colors.cyanAccent),
+                    const AppIcon(
+                      AppIconId.layoutGrid, size: 13, color: Colors.cyanAccent,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       l10n.architectFenestrationExactDimension,
@@ -400,27 +405,29 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
             ),
             const SizedBox(width: 4),
             IconButton(
-              icon: const Icon(Icons.splitscreen_rounded, size: 16),
+              icon: const AppIcon(AppIconId.section, size: 16),
               tooltip: l10n.architectFenestrationAddMullion,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               onPressed: () {
-                _updateStyle(_style.splitPane(_selectedPaneId!, vertical: true));
+                _updateStyle(_style.splitPane(_selectedPaneId!, vertical: true),
+                );
               },
             ),
             IconButton(
-              icon: const Icon(Icons.table_rows_rounded, size: 16),
+              icon: const AppIcon(AppIconId.table, size: 16),
               tooltip: l10n.architectFenestrationAddTransom,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               onPressed: () {
-                _updateStyle(_style.splitPane(_selectedPaneId!, vertical: false));
+                _updateStyle(_style.splitPane(_selectedPaneId!, vertical: false),
+                );
               },
             ),
             IconButton(
-              icon: const Icon(Icons.delete_outline_rounded, size: 16),
+              icon: const AppIcon(AppIconId.delete, size: 16),
               tooltip: l10n.architectFenestrationRemoveSplit,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
@@ -488,7 +495,8 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
             LayoutBuilder(
               builder: (context, constraints) {
                 final canvasSize =
-                    Size(constraints.maxWidth, constraints.maxHeight);
+                    Size(constraints.maxWidth, constraints.maxHeight,
+                );
                 return InteractiveViewer(
                   boundaryMargin: const EdgeInsets.all(80),
                   minScale: 0.5,
@@ -528,8 +536,7 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
               Positioned(
                 top: 10,
                 left: 10,
-                child: _buildCanvasQuickHud(),
-              ),
+                child: _buildCanvasQuickHud()),
 
             // Keypad overlay if active
             if (_keypadDimensionIsWidth != null && _selectedPaneId != null)
@@ -673,7 +680,8 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
     const epsColor = Color(0xFFB0BEC5);   // EPS insulation light gray
 
     // Helper to add rectangular prism along X
-    void addPrism(double x1, double x2, double y1, double y2, double z1, double z2, Color col) {
+    void addPrism(double x1, double x2, double y1, double y2, double z1, double z2, Color col,
+    ) {
       if (x2 <= x1 + 1e-4 || z2 <= z1 + 1e-4) return;
       final b1 = Offset(x1, y1);
       final b2 = Offset(x2, y1);

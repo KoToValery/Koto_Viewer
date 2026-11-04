@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -85,8 +86,10 @@ class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
     final isCurrentHidden = currentItem?.isHidden ?? false;
     final visibleFiles = widget.projectBundle.visibleFiles;
 
-    final prevIndex = widget.projectBundle.getPreviousVisibleIndex(widget.currentIndex);
-    final nextIndex = widget.projectBundle.getNextVisibleIndex(widget.currentIndex);
+    final prevIndex = widget.projectBundle.getPreviousVisibleIndex(widget.currentIndex,
+    );
+    final nextIndex = widget.projectBundle.getNextVisibleIndex(widget.currentIndex,
+    );
 
     final String counterText;
     if (isCurrentHidden) {
@@ -99,7 +102,8 @@ class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
     final barWidget = ClipRRect(
       borderRadius: BorderRadius.circular(widget.compact ? 12 : 16),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: widget.compact ? 8 : 12, sigmaY: widget.compact ? 8 : 12),
+        filter: ImageFilter.blur(sigmaX: widget.compact ? 8 : 12, sigmaY: widget.compact ? 8 : 12,
+        ),
         child: Container(
           constraints: BoxConstraints(maxWidth: widget.compact ? 340 : 520),
           margin: EdgeInsets.symmetric(horizontal: widget.compact ? 6 : 16),
@@ -127,7 +131,9 @@ class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
             children: [
               // Previous Button (skips hidden files)
               IconButton(
-                icon: Icon(Icons.skip_previous_rounded, size: widget.compact ? 20 : 26),
+                icon: AppIcon(
+                  AppIconId.previousTrack, size: widget.compact ? 20 : 26,
+                ),
                 color: Colors.white,
                 disabledColor: Colors.white24,
                 tooltip: l10n.prevProjectItem,
@@ -172,11 +178,15 @@ class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
                         if (isCurrentHidden) ...[
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1,
+                            ),
                             decoration: BoxDecoration(
-                              color: Colors.orangeAccent.withValues(alpha: 0.25),
+                              color: Colors.orangeAccent.withValues(alpha: 0.25,
+                              ),
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.5), width: 0.8),
+                              border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.5,
+                                ), width: 0.8,
+                              ),
                             ),
                             child: Text(
                               l10n.hiddenInPresentation,
@@ -211,7 +221,9 @@ class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
 
               // Next Button (skips hidden files)
               IconButton(
-                icon: Icon(Icons.skip_next_rounded, size: widget.compact ? 20 : 26),
+                icon: AppIcon(
+                  AppIconId.nextTrack, size: widget.compact ? 20 : 26,
+                ),
                 color: Colors.white,
                 disabledColor: Colors.white24,
                 tooltip: l10n.nextProjectItem,
@@ -226,7 +238,7 @@ class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
               // Hide / Include toggle button
               if (currentItem != null) ...[
                 IconButton(
-                  icon: Icon(
+                  icon: AppIcon.fromMaterial(
                     isCurrentHidden ? Icons.visibility_off_rounded : Icons.visibility_rounded,
                     size: widget.compact ? 18 : 22,
                   ),
@@ -243,13 +255,16 @@ class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
                 Container(
                   height: widget.compact ? 18 : 24,
                   width: 1,
-                  margin: EdgeInsets.symmetric(horizontal: widget.compact ? 2 : 4),
+                  margin: EdgeInsets.symmetric(horizontal: widget.compact ? 2 : 4,
+                  ),
                   color: Colors.white24,
                 ),
                 IconButton(
-                  icon: Icon(Icons.close_rounded, size: widget.compact ? 18 : 22),
+                  icon: AppIcon(
+                    AppIconId.close, size: widget.compact ? 18 : 22,
+                  ),
                   color: Colors.white70,
-                  tooltip: 'Exit Presentation',
+                  tooltip: context.l10n.commandUiExitPresentation,
                   visualDensity: widget.compact ? VisualDensity.compact : VisualDensity.standard,
                   padding: widget.compact ? EdgeInsets.zero : const EdgeInsets.all(8),
                   constraints: widget.compact ? const BoxConstraints(minWidth: 26, minHeight: 26) : const BoxConstraints(),
@@ -277,7 +292,8 @@ class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
                 width: 1.2,
               ),
               boxShadow: const [
-                BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 2)),
+                BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 2),
+                ),
               ],
             ),
             child: Row(
@@ -306,7 +322,9 @@ class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
                   borderRadius: BorderRadius.circular(10),
                   child: const Padding(
                     padding: EdgeInsets.all(2),
-                    child: Icon(Icons.close, size: 14, color: Colors.white70),
+                    child: AppIcon(
+                      AppIconId.close, size: 14, color: Colors.white70,
+                    ),
                   ),
                 ),
               ],

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:async';
 import '../services/bim_underlay_conversion_service.dart';
 import 'dart:io';
@@ -389,7 +390,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close_rounded),
+                        icon: const AppIcon(AppIconId.close),
                         onPressed: _isCreating
                             ? null
                             : () => Navigator.of(context).pop(),
@@ -412,7 +413,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                           decoration: InputDecoration(
                             labelText: l10n.bimProjectName,
                             hintText: l10n.bimProjectNameHint,
-                            prefixIcon: const Icon(Icons.badge_outlined),
+                            prefixIcon: const AppIcon(AppIconId.tag),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -432,7 +433,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                           decoration: InputDecoration(
                             labelText: l10n.bimProjectLocation,
                             hintText: l10n.bimProjectLocationHint,
-                            prefixIcon: const Icon(Icons.location_on_outlined),
+                            prefixIcon: const AppIcon(AppIconId.location),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -454,13 +455,15 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                             // Structural Card
                             Expanded(
                               child: InkWell(
-                                onTap: () => setState(() => _selectedProjectType = BimProjectType.structural),
+                                onTap: () => setState(() => _selectedProjectType = BimProjectType.structural,
+                                ),
                                 borderRadius: BorderRadius.circular(12),
                                 child: Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: _selectedProjectType == BimProjectType.structural
-                                        ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                                        ? theme.colorScheme.primary.withValues(alpha: 0.15,
+                                          )
                                         : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
@@ -475,8 +478,8 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                     children: [
                                       Row(
                                         children: [
-                                          Icon(
-                                            Icons.apartment_rounded,
+                                          AppIcon(
+                                            AppIconId.building,
                                             size: 20,
                                             color: _selectedProjectType == BimProjectType.structural
                                                 ? theme.colorScheme.primary
@@ -518,13 +521,15 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                             // Architectural Card
                             Expanded(
                               child: InkWell(
-                                onTap: () => setState(() => _selectedProjectType = BimProjectType.architectural),
+                                onTap: () => setState(() => _selectedProjectType = BimProjectType.architectural,
+                                ),
                                 borderRadius: BorderRadius.circular(12),
                                 child: Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: _selectedProjectType == BimProjectType.architectural
-                                        ? theme.colorScheme.tertiary.withValues(alpha: 0.18)
+                                        ? theme.colorScheme.tertiary.withValues(alpha: 0.18,
+                                          )
                                         : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
@@ -539,8 +544,8 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                     children: [
                                       Row(
                                         children: [
-                                          Icon(
-                                            Icons.architecture_rounded,
+                                          AppIcon(
+                                            AppIconId.measureAngle,
                                             size: 20,
                                             color: _selectedProjectType == BimProjectType.architectural
                                                 ? theme.colorScheme.tertiary
@@ -585,10 +590,12 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.tertiary.withValues(alpha: 0.12),
+                              color: theme.colorScheme.tertiary.withValues(alpha: 0.12,
+                              ),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: theme.colorScheme.tertiary.withValues(alpha: 0.4),
+                                color: theme.colorScheme.tertiary.withValues(alpha: 0.4,
+                                ),
                               ),
                             ),
                             child: Row(
@@ -665,7 +672,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                               ),
                             ),
                             TextButton.icon(
-                              icon: const Icon(Icons.add, size: 18),
+                              icon: const AppIcon(AppIconId.add, size: 18),
                               label: Text(l10n.bimProjectAddStorey),
                               onPressed: () => _editElevation(null),
                             ),
@@ -737,8 +744,8 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                         ),
                                       ),
                                       IconButton(
-                                        icon: const Icon(
-                                          Icons.edit_outlined,
+                                        icon: const AppIcon(
+                                          AppIconId.edit,
                                           size: 20,
                                         ),
                                         tooltip: l10n.bimProjectEditElevation,
@@ -746,8 +753,8 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                       ),
                                       if (_storeys.length > 1)
                                         IconButton(
-                                          icon: const Icon(
-                                            Icons.delete_outline,
+                                          icon: const AppIcon(
+                                            AppIconId.delete,
                                             size: 20,
                                           ),
                                           tooltip: l10n.bimProjectDeleteStorey,
@@ -847,8 +854,8 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                                       ),
                                       const SizedBox(width: 8),
                                       OutlinedButton.icon(
-                                        icon: const Icon(
-                                          Icons.upload_file_rounded,
+                                        icon: const AppIcon(
+                                          AppIconId.upload,
                                           size: 16,
                                         ),
                                         label: Text(
@@ -885,7 +892,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                               color: theme.colorScheme.onPrimary,
                             ),
                           )
-                        : const Icon(Icons.check_rounded),
+                        : const AppIcon(AppIconId.confirm),
                     label: Text(
                       _isCreating
                           ? l10n.bimProjectSaving

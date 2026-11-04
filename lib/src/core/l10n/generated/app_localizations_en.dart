@@ -8825,4 +8825,1859 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get propertiesDiameter => 'Diameter';
+
+  @override
+  String get commandIconAdd => 'Add';
+
+  @override
+  String get commandIconRemove => 'Remove';
+
+  @override
+  String get commandIconClose => 'Close';
+
+  @override
+  String get commandIconConfirm => 'Confirm';
+
+  @override
+  String get commandIconAddBox => 'Add to selection';
+
+  @override
+  String get commandIconAddCircle => 'Add item';
+
+  @override
+  String get commandIconRemoveCircle => 'Remove item';
+
+  @override
+  String get commandIconCheckBox => 'Selected';
+
+  @override
+  String get commandIconCheckBoxEmpty => 'Not selected';
+
+  @override
+  String get commandIconRemoveBox => 'Subtract from selection';
+
+  @override
+  String get commandIconCheckCircle => 'Complete';
+
+  @override
+  String get commandIconRadioOn => 'Active option';
+
+  @override
+  String get commandIconRadioOff => 'Inactive option';
+
+  @override
+  String get commandIconBack => 'Back';
+
+  @override
+  String get commandIconForward => 'Forward';
+
+  @override
+  String get commandIconUp => 'Move up';
+
+  @override
+  String get commandIconDown => 'Move down';
+
+  @override
+  String get commandIconChevronLeft => 'Previous';
+
+  @override
+  String get commandIconChevronRight => 'Next';
+
+  @override
+  String get commandIconExpandLess => 'Collapse';
+
+  @override
+  String get commandIconExpandMore => 'Expand';
+
+  @override
+  String get commandIconFirstPage => 'First page';
+
+  @override
+  String get commandIconLastPage => 'Last page';
+
+  @override
+  String get commandIconOutward => 'Open externally';
+
+  @override
+  String get commandIconDiagonalDown => 'Move diagonally';
+
+  @override
+  String get commandIconMoreHorizontal => 'More commands';
+
+  @override
+  String get commandIconMoreVertical => 'More options';
+
+  @override
+  String get commandIconSearch => 'Search';
+
+  @override
+  String get commandIconSearchOff => 'Clear search';
+
+  @override
+  String get commandIconZoomIn => 'Zoom in';
+
+  @override
+  String get commandIconZoomOut => 'Zoom out';
+
+  @override
+  String get commandIconRefresh => 'Refresh';
+
+  @override
+  String get commandIconSync => 'Synchronize';
+
+  @override
+  String get commandIconSyncProblem => 'Synchronization issue';
+
+  @override
+  String get commandIconUndo => 'Undo';
+
+  @override
+  String get commandIconRedo => 'Redo';
+
+  @override
+  String get commandIconHistory => 'History';
+
+  @override
+  String get commandIconSettings => 'Settings';
+
+  @override
+  String get commandIconProperties => 'Properties';
+
+  @override
+  String get commandIconInfo => 'Information';
+
+  @override
+  String get commandIconHelp => 'Help';
+
+  @override
+  String get commandIconWarning => 'Warning';
+
+  @override
+  String get commandIconError => 'Error';
+
+  @override
+  String get commandIconFilter => 'Filter';
+
+  @override
+  String get commandIconFilterOff => 'Clear filter';
+
+  @override
+  String get commandIconFilterList => 'Filter list';
+
+  @override
+  String get commandIconSort => 'Sort';
+
+  @override
+  String get commandIconDrag => 'Reorder';
+
+  @override
+  String get commandIconClearAll => 'Clear all';
+
+  @override
+  String get commandIconBackspace => 'Erase';
+
+  @override
+  String get commandIconSelect => 'Select';
+
+  @override
+  String get commandIconSelectAll => 'Select all';
+
+  @override
+  String get commandIconDeselect => 'Clear selection';
+
+  @override
+  String get commandIconMultiSelect => 'Multiple selection';
+
+  @override
+  String get commandIconPan => 'Pan';
+
+  @override
+  String get commandIconMove => 'Move';
+
+  @override
+  String get commandIconMoveTransverse => 'Move perpendicular';
+
+  @override
+  String get commandIconDuplicate => 'Duplicate';
+
+  @override
+  String get commandIconEdit => 'Edit';
+
+  @override
+  String get commandIconRename => 'Rename';
+
+  @override
+  String get commandIconDelete => 'Delete';
+
+  @override
+  String get commandIconDeleteAll => 'Delete all';
+
+  @override
+  String get commandIconRotate => 'Rotate';
+
+  @override
+  String get commandIconRotateLeft => 'Rotate left';
+
+  @override
+  String get commandIconMirrorMove => 'Mirror and move';
+
+  @override
+  String get commandIconMirrorCopy => 'Mirror and copy';
+
+  @override
+  String get commandIconFlipHorizontal => 'Flip horizontally';
+
+  @override
+  String get commandIconFlipVertical => 'Flip vertically';
+
+  @override
+  String get commandIconSwapHorizontal => 'Swap horizontally';
+
+  @override
+  String get commandIconSwapVertical => 'Swap vertically';
+
+  @override
+  String get commandIconSplit => 'Split element';
+
+  @override
+  String get commandIconCut => 'Cut';
+
+  @override
+  String get commandIconCutOpening => 'Cut opening';
+
+  @override
+  String get commandIconOffset => 'Offset';
+
+  @override
+  String get commandIconNewPoint => 'New point';
+
+  @override
+  String get commandIconJoin => 'Join elements';
+
+  @override
+  String get commandIconStraighten => 'Straighten';
+
+  @override
+  String get commandIconGroup => 'Group';
+
+  @override
+  String get commandIconUngroup => 'Ungroup';
+
+  @override
+  String get commandIconEditGroup => 'Edit group';
+
+  @override
+  String get commandIconFile => 'File';
+
+  @override
+  String get commandIconOpenFile => 'Open file';
+
+  @override
+  String get commandIconFolder => 'Folder';
+
+  @override
+  String get commandIconOpenFolder => 'Open folder';
+
+  @override
+  String get commandIconNewFolder => 'New folder';
+
+  @override
+  String get commandIconCopyFolder => 'Copy folder';
+
+  @override
+  String get commandIconFolderOff => 'Unavailable folder';
+
+  @override
+  String get commandIconFolderFavorite => 'Favorite folder';
+
+  @override
+  String get commandIconArchive => 'Archive';
+
+  @override
+  String get commandIconSave => 'Save';
+
+  @override
+  String get commandIconSaveAs => 'Save as';
+
+  @override
+  String get commandIconDownload => 'Download';
+
+  @override
+  String get commandIconUpload => 'Upload';
+
+  @override
+  String get commandIconPrint => 'Print';
+
+  @override
+  String get commandIconShare => 'Share';
+
+  @override
+  String get commandIconLink => 'Link';
+
+  @override
+  String get commandIconUnlink => 'Unlink';
+
+  @override
+  String get commandIconExternal => 'Open in new window';
+
+  @override
+  String get commandIconThemeDark => 'Dark theme';
+
+  @override
+  String get commandIconThemeLight => 'Light theme';
+
+  @override
+  String get commandIconThemeAuto => 'Automatic theme';
+
+  @override
+  String get commandIconLanguage => 'Language';
+
+  @override
+  String get commandIconUpdate => 'Check for updates';
+
+  @override
+  String get commandIconBug => 'Diagnostics';
+
+  @override
+  String get commandIconHome => 'Home';
+
+  @override
+  String get commandIconFavorite => 'Favorite';
+
+  @override
+  String get commandIconStar => 'Starred';
+
+  @override
+  String get commandIconBookmark => 'Bookmark';
+
+  @override
+  String get commandIconBookmarkAdd => 'Add bookmark';
+
+  @override
+  String get commandIconBookmarks => 'Bookmarks';
+
+  @override
+  String get commandIconEmail => 'Email';
+
+  @override
+  String get commandIconWifi => 'Local network';
+
+  @override
+  String get commandIconWifiOff => 'Network unavailable';
+
+  @override
+  String get commandIconComputer => 'Computer';
+
+  @override
+  String get commandIconStorage => 'Storage';
+
+  @override
+  String get commandIconPayment => 'Payment';
+
+  @override
+  String get commandIconSecurity => 'Security';
+
+  @override
+  String get commandIconVerified => 'Verified';
+
+  @override
+  String get commandIconLock => 'Lock';
+
+  @override
+  String get commandIconUnlock => 'Unlock';
+
+  @override
+  String get commandIconWall => 'Wall';
+
+  @override
+  String get commandIconDoor => 'Door';
+
+  @override
+  String get commandIconWindow => 'Window';
+
+  @override
+  String get commandIconColumn => 'Column';
+
+  @override
+  String get commandIconBeam => 'Beam';
+
+  @override
+  String get commandIconSlab => 'Slab';
+
+  @override
+  String get commandIconOpening => 'Opening';
+
+  @override
+  String get commandIconRoof => 'Roof';
+
+  @override
+  String get commandIconStairs => 'Stair';
+
+  @override
+  String get commandIconAxis => 'Grid axis';
+
+  @override
+  String get commandIconSection => 'Section';
+
+  @override
+  String get commandIconElevation => 'Elevation';
+
+  @override
+  String get commandIconBuilding => 'Building';
+
+  @override
+  String get commandIconNewBuilding => 'New building';
+
+  @override
+  String get commandIconBuildingOff => 'Hide building';
+
+  @override
+  String get commandIconStoreys => 'Storeys';
+
+  @override
+  String get commandIconZone => 'Zone';
+
+  @override
+  String get commandIconSchedule => 'Schedule table';
+
+  @override
+  String get commandIconZoneSchedule => 'Zone schedule';
+
+  @override
+  String get commandIconDimension => 'Dimension';
+
+  @override
+  String get commandIconLevel => 'Level';
+
+  @override
+  String get commandIconMeasure => 'Measure distance';
+
+  @override
+  String get commandIconMeasureArea => 'Measure area';
+
+  @override
+  String get commandIconMeasureAngle => 'Measure angle';
+
+  @override
+  String get commandIconMeasureRadius => 'Measure radius';
+
+  @override
+  String get commandIconLine => 'Line';
+
+  @override
+  String get commandIconPolyline => 'Polyline';
+
+  @override
+  String get commandIconRectangle => 'Rectangle';
+
+  @override
+  String get commandIconHatch => 'Hatch';
+
+  @override
+  String get commandIconText => 'Text';
+
+  @override
+  String get commandIconTextSize => 'Text size';
+
+  @override
+  String get commandIconTextIncrease => 'Larger text';
+
+  @override
+  String get commandIconTextDecrease => 'Smaller text';
+
+  @override
+  String get commandIconAlignLeft => 'Align left';
+
+  @override
+  String get commandIconAlignCenter => 'Align center';
+
+  @override
+  String get commandIconAlignTop => 'Align top';
+
+  @override
+  String get commandIconAlignBottom => 'Align bottom';
+
+  @override
+  String get commandIconLayers => 'Layers';
+
+  @override
+  String get commandIconLayersOff => 'Hide layers';
+
+  @override
+  String get commandIconGrid => 'Grid';
+
+  @override
+  String get commandIconGridOff => 'Hide grid';
+
+  @override
+  String get commandIconTerrain => 'Terrain';
+
+  @override
+  String get commandIconFloorDrain => 'Floor drain';
+
+  @override
+  String get commandIconWater => 'Water';
+
+  @override
+  String get commandIconFoundation => 'Foundation';
+
+  @override
+  String get commandIconWallJoint => 'Wall junction';
+
+  @override
+  String get commandIconRoundedCorner => 'Round corner';
+
+  @override
+  String get commandIconLineStyle => 'Line style';
+
+  @override
+  String get commandIconLineWeight => 'Line weight';
+
+  @override
+  String get commandIconPoints => 'Points';
+
+  @override
+  String get commandIconMagnet => 'Snap';
+
+  @override
+  String get commandIconGesture => 'Freehand';
+
+  @override
+  String get commandIconComponent => 'Component library';
+
+  @override
+  String get commandIconFurniture => 'Furniture';
+
+  @override
+  String get commandIconBed => 'Bedroom';
+
+  @override
+  String get commandIconBath => 'Bathroom';
+
+  @override
+  String get commandIconKitchen => 'Kitchen';
+
+  @override
+  String get commandIconBalcony => 'Balcony';
+
+  @override
+  String get commandIconFence => 'Fence';
+
+  @override
+  String get commandIconCabin => 'Timber building';
+
+  @override
+  String get commandIconTree => 'Landscape element';
+
+  @override
+  String get commandIconAnalysis => 'Analysis';
+
+  @override
+  String get commandIconSeismic => 'Seismic analysis';
+
+  @override
+  String get commandIconBolt => 'Load';
+
+  @override
+  String get commandIconEngineering => 'Engineering';
+
+  @override
+  String get commandIconGraph => 'Model relationships';
+
+  @override
+  String get commandIconChart => 'Chart';
+
+  @override
+  String get commandIconView3D => '3D view';
+
+  @override
+  String get commandIconOrbit => 'Orbit';
+
+  @override
+  String get commandIconFly => 'Fly through';
+
+  @override
+  String get commandIconViewTop => 'Top view';
+
+  @override
+  String get commandIconViewFront => 'Front view';
+
+  @override
+  String get commandIconViewRight => 'Right view';
+
+  @override
+  String get commandIconViewBottom => 'Bottom view';
+
+  @override
+  String get commandIconViewBack => 'Back view';
+
+  @override
+  String get commandIconVisible => 'Show';
+
+  @override
+  String get commandIconHidden => 'Hide';
+
+  @override
+  String get commandIconFitView => 'Fit view';
+
+  @override
+  String get commandIconFullscreen => 'Full screen';
+
+  @override
+  String get commandIconExitFullscreen => 'Exit full screen';
+
+  @override
+  String get commandIconAspectRatio => 'Aspect ratio';
+
+  @override
+  String get commandIconPortrait => 'Portrait orientation';
+
+  @override
+  String get commandIconScreenRotate => 'Rotate screen';
+
+  @override
+  String get commandIconScreenLock => 'Lock orientation';
+
+  @override
+  String get commandIconCompare => 'Compare';
+
+  @override
+  String get commandIconCrop => 'Crop';
+
+  @override
+  String get commandIconOpacity => 'Opacity';
+
+  @override
+  String get commandIconImage => 'Image';
+
+  @override
+  String get commandIconImageAdd => 'Add image';
+
+  @override
+  String get commandIconImageFilter => 'Image effects';
+
+  @override
+  String get commandIconImageBroken => 'Image unavailable';
+
+  @override
+  String get commandIconCamera => 'Camera';
+
+  @override
+  String get commandIconPalette => 'Colors';
+
+  @override
+  String get commandIconFill => 'Fill';
+
+  @override
+  String get commandIconBrush => 'Brush';
+
+  @override
+  String get commandIconPixelated => 'Pixel rendering';
+
+  @override
+  String get commandIconSmooth => 'Smooth rendering';
+
+  @override
+  String get commandIconBook => 'Reading';
+
+  @override
+  String get commandIconLibrary => 'Library';
+
+  @override
+  String get commandIconBookClosed => 'Book';
+
+  @override
+  String get commandIconNotes => 'Notes';
+
+  @override
+  String get commandIconComment => 'Comment';
+
+  @override
+  String get commandIconList => 'List';
+
+  @override
+  String get commandIconNumberedList => 'Numbered list';
+
+  @override
+  String get commandIconChecklist => 'Checklist';
+
+  @override
+  String get commandIconWrapText => 'Wrap text';
+
+  @override
+  String get commandIconLineSpacing => 'Line spacing';
+
+  @override
+  String get commandIconTable => 'Table';
+
+  @override
+  String get commandIconPdf => 'PDF document';
+
+  @override
+  String get commandIconCode => 'Code';
+
+  @override
+  String get commandIconCodeOff => 'Hide code';
+
+  @override
+  String get commandIconFunctions => 'Formula';
+
+  @override
+  String get commandIconWatermark => 'Watermark';
+
+  @override
+  String get commandIconLayoutGrid => 'Grid layout';
+
+  @override
+  String get commandIconLayoutRows => 'Row layout';
+
+  @override
+  String get commandIconLayoutSidebar => 'Side panel';
+
+  @override
+  String get commandIconLayoutCarousel => 'Carousel view';
+
+  @override
+  String get commandIconLayoutCustom => 'Customize layout';
+
+  @override
+  String get commandIconPlay => 'Play';
+
+  @override
+  String get commandIconPlayCircle => 'Start playback';
+
+  @override
+  String get commandIconPause => 'Pause';
+
+  @override
+  String get commandIconPauseCircle => 'Pause playback';
+
+  @override
+  String get commandIconStop => 'Stop';
+
+  @override
+  String get commandIconStopCircle => 'Stop playback';
+
+  @override
+  String get commandIconNextTrack => 'Next track';
+
+  @override
+  String get commandIconPreviousTrack => 'Previous track';
+
+  @override
+  String get commandIconFastForward => 'Fast forward';
+
+  @override
+  String get commandIconFastRewind => 'Rewind';
+
+  @override
+  String get commandIconForwardTen => 'Forward ten seconds';
+
+  @override
+  String get commandIconReplayTen => 'Back ten seconds';
+
+  @override
+  String get commandIconRepeat => 'Repeat';
+
+  @override
+  String get commandIconRepeatOne => 'Repeat current';
+
+  @override
+  String get commandIconVolume => 'Sound';
+
+  @override
+  String get commandIconMute => 'Mute';
+
+  @override
+  String get commandIconVideo => 'Video';
+
+  @override
+  String get commandIconPresentation => 'Presentation';
+
+  @override
+  String get commandIconAnimation => 'Animation';
+
+  @override
+  String get commandIconMap => 'Map';
+
+  @override
+  String get commandIconLocation => 'Location';
+
+  @override
+  String get commandIconLocationAdd => 'Add location';
+
+  @override
+  String get commandIconLocationEdit => 'Edit location';
+
+  @override
+  String get commandIconLocate => 'Locate';
+
+  @override
+  String get commandIconCompass => 'Compass';
+
+  @override
+  String get commandIconGlobe => 'Coordinate system';
+
+  @override
+  String get commandIconRoute => 'Route';
+
+  @override
+  String get commandIconAlternativeRoute => 'Alternative route';
+
+  @override
+  String get commandIconTurnLeft => 'Turn left';
+
+  @override
+  String get commandIconTurnRight => 'Turn right';
+
+  @override
+  String get commandIconFlag => 'Waypoint';
+
+  @override
+  String get commandIconFinish => 'Finish';
+
+  @override
+  String get commandIconWalk => 'Walk';
+
+  @override
+  String get commandIconBicycle => 'Bicycle';
+
+  @override
+  String get commandIconTag => 'Tag';
+
+  @override
+  String get commandIconPin => 'Pin';
+
+  @override
+  String get commandIconCalendar => 'Date';
+
+  @override
+  String get commandIconMedical => 'Medical tools';
+
+  @override
+  String get commandIconFingerprint => 'Signature';
+
+  @override
+  String get commandIconAuto => 'Automatic';
+
+  @override
+  String get commandIconScience => 'Experimental tools';
+
+  @override
+  String get commandIconRocket => 'Launch';
+
+  @override
+  String get commandIconInventory => 'Presets';
+
+  @override
+  String get commandIconBalance => 'Structural checks';
+
+  @override
+  String get commandIconWeb => 'Web page';
+
+  @override
+  String get commandIconSpace => 'Space';
+
+  @override
+  String get commandIconRoadEdit => 'Edit route';
+
+  @override
+  String get commandIconLightbulb => 'Tips';
+
+  @override
+  String get commandIconGalleryTitle => 'Command icons';
+
+  @override
+  String get commandIconGallerySearch => 'Search commands';
+
+  @override
+  String get commandIconGalleryLight => 'Light';
+
+  @override
+  String get commandIconGalleryDark => 'Dark';
+
+  @override
+  String get commandIconAlignRight => 'Align right';
+
+  @override
+  String get commandIconPolygon => 'Polygon';
+
+  @override
+  String get commandIconArc => 'Arc';
+
+  @override
+  String get commandIconRoofGable => 'Gable roof';
+
+  @override
+  String get commandIconRoofHip => 'Hip roof';
+
+  @override
+  String get commandIconRoofShed => 'Shed roof';
+
+  @override
+  String get commandIconRoofFlat => 'Flat roof';
+
+  @override
+  String get commandIconRoofMansard => 'Mansard roof';
+
+  @override
+  String get commandIconSelectionContained => 'Select contained';
+
+  @override
+  String get commandIconSelectionCrossing => 'Select crossing';
+
+  @override
+  String get commandIconShadingEdges => 'Shaded edges';
+
+  @override
+  String get commandIconShadingSmooth => 'Smooth shading';
+
+  @override
+  String get commandIconShadingFlat => 'Flat shading';
+
+  @override
+  String get commandIconShadingWire => 'Wireframe';
+
+  @override
+  String get commandIconShadingXray => 'X-ray';
+
+  @override
+  String get commandUiCopyThisError => 'Copy this error';
+
+  @override
+  String get commandUiErrorCopiedToClipboard => 'Error copied to clipboard';
+
+  @override
+  String get commandUiCopied => 'Copied!';
+
+  @override
+  String get commandUiCopyAllLogs => 'Copy All Logs';
+
+  @override
+  String get commandUiGoToHome => 'Go to Home';
+
+  @override
+  String get commandUiCopyReport => 'Copy Report';
+
+  @override
+  String get commandUiViewErrorLog => 'View Error Log';
+
+  @override
+  String get commandUiHideTechnicalDetails => 'Hide technical details';
+
+  @override
+  String get commandUiShowTechnicalDetails => 'Show technical details';
+
+  @override
+  String get commandUiSearchByCountryProjectionOrEpsgCode =>
+      'Search by country, projection, or EPSG code...';
+
+  @override
+  String get commandUiSaveSelection => 'Save Selection';
+
+  @override
+  String get commandUiHex => 'HEX';
+
+  @override
+  String get commandUiJsonBimJson => 'JSON (.bim.json)';
+
+  @override
+  String get commandUiCanvasBackground => 'Canvas Background';
+
+  @override
+  String get commandUiFlipOrientation => 'Flip Orientation';
+
+  @override
+  String get commandUiFlipHorizontal => 'Flip Horizontal';
+
+  @override
+  String get commandUiFlipVertical => 'Flip Vertical';
+
+  @override
+  String get commandUiShareExport => 'Share & Export';
+
+  @override
+  String get commandUiShareOriginalCdr => 'Share Original .CDR';
+
+  @override
+  String get commandUiExportAsPngImage => 'Export as PNG Image';
+
+  @override
+  String get commandUiPrintExportPdf => 'Print / Export PDF';
+
+  @override
+  String get commandUiTryAgain => 'Try Again';
+
+  @override
+  String get commandUiSearch => 'Search...';
+
+  @override
+  String get commandUiViewAsPlainText => 'View as Plain Text';
+
+  @override
+  String get commandUiContinueAnyway => 'Continue anyway';
+
+  @override
+  String get commandUiCloseSearch => 'Close Search';
+
+  @override
+  String get commandUiDisableWordWrap => 'Disable Word Wrap';
+
+  @override
+  String get commandUiEnableWordWrap => 'Enable Word Wrap';
+
+  @override
+  String get commandUiCopyAll => 'Copy All';
+
+  @override
+  String get commandUiShowRaw => 'Show Raw';
+
+  @override
+  String get commandUiPrettyPrint => 'Pretty Print';
+
+  @override
+  String get commandUiShowSecrets => 'Show Secrets';
+
+  @override
+  String get commandUiHideSecrets => 'Hide Secrets';
+
+  @override
+  String get commandUiEnableSyntaxHighlighting => 'Enable Syntax Highlighting';
+
+  @override
+  String commandUiFontSizeValue(String value1) {
+    return 'Font Size ($value1)';
+  }
+
+  @override
+  String commandUiFontSizeValue2(String value1) {
+    return 'Font Size: $value1';
+  }
+
+  @override
+  String get commandUiReadingMode => 'Reading Mode';
+
+  @override
+  String commandUiValueTapToChange(String value1) {
+    return '$value1 (Tap to change)';
+  }
+
+  @override
+  String get commandUiRemoveBookmark => 'Remove Bookmark';
+
+  @override
+  String get commandUiAddBookmark => 'Add Bookmark';
+
+  @override
+  String get commandUiSavedBookmarks => 'Saved Bookmarks';
+
+  @override
+  String get commandUiComicInfo => 'Comic Info';
+
+  @override
+  String commandUiPageValueError(String value1) {
+    return 'Page $value1 Error';
+  }
+
+  @override
+  String get commandUiDecrease => 'Decrease';
+
+  @override
+  String get commandUiIncrease => 'Increase';
+
+  @override
+  String get commandUiRestartFromPage1UponReachingTheEnd =>
+      'Restart from page 1 upon reaching the end';
+
+  @override
+  String
+  get commandUiAutomaticallySuspendPageTurnsWhileInspectingPanelsZoomedIn =>
+      'Automatically suspend page turns while inspecting panels zoomed in';
+
+  @override
+  String commandUiErrorLoadingPageValue(String value1) {
+    return 'Error loading page $value1';
+  }
+
+  @override
+  String get commandUiToggleRawText => 'Toggle Raw Text';
+
+  @override
+  String get commandUiDelimiter => 'Delimiter';
+
+  @override
+  String get commandUiComma => 'Comma (,)';
+
+  @override
+  String get commandUiSemicolon => 'Semicolon (;)';
+
+  @override
+  String get commandUiTabT => 'Tab (\\t)';
+
+  @override
+  String get commandUiPipe => 'Pipe (|)';
+
+  @override
+  String get commandUiSearchRows => 'Search rows...';
+
+  @override
+  String get commandUiEmptyCsv => 'Empty CSV';
+
+  @override
+  String get commandUiNoMatches => 'No matches';
+
+  @override
+  String get commandUiShowingFirst1000RowsForPerformance =>
+      'Showing first 1000 rows for performance';
+
+  @override
+  String get commandUiToggleHudText => 'Toggle HUD text';
+
+  @override
+  String get commandUiShowMetadata => 'Show metadata';
+
+  @override
+  String get commandUiPanZoom => 'Pan & Zoom';
+
+  @override
+  String get commandUiWindowLevelDragDragOnScreen =>
+      'Window / Level Drag (Drag on screen)';
+
+  @override
+  String get commandUiRulerMeasurementMm => 'Ruler Measurement (mm)';
+
+  @override
+  String commandUiClearValue(String value1) {
+    return 'Clear ($value1)';
+  }
+
+  @override
+  String get commandUiSelectSeries => 'Select Series';
+
+  @override
+  String get commandUiRulerMeasurement => 'Ruler Measurement';
+
+  @override
+  String get commandUiPauseCine => 'Pause Cine';
+
+  @override
+  String get commandUiPlayCine => 'Play Cine';
+
+  @override
+  String get commandUiReset => 'Reset';
+
+  @override
+  String get commandUiSearchInDocument => 'Search in Document';
+
+  @override
+  String get commandUiCopyDocumentText => 'Copy Document Text';
+
+  @override
+  String get commandUiDocumentProperties => 'Document Properties';
+
+  @override
+  String get commandUiSearchInDocument2 => 'Search in document...';
+
+  @override
+  String get commandUiMinimizeControls => 'Minimize Controls';
+
+  @override
+  String get commandUiExitFullscreenEsc => 'Exit Fullscreen (ESC)';
+
+  @override
+  String commandUiElevationValueValueElements(String value1, String value2) {
+    return 'Elevation: $value1 • $value2 elements';
+  }
+
+  @override
+  String get commandUiIsolateStorey => 'Isolate Storey';
+
+  @override
+  String commandUiValueItems(String value1) {
+    return '$value1 items';
+  }
+
+  @override
+  String get commandUiIsolateCategory => 'Isolate Category';
+
+  @override
+  String commandUiValueElements(String value1) {
+    return '$value1 elements';
+  }
+
+  @override
+  String get commandUiIsolateLayer => 'Isolate Layer';
+
+  @override
+  String get commandUiApplyClose => 'Apply & Close';
+
+  @override
+  String get commandUiFitToScreen => 'Fit to Screen';
+
+  @override
+  String get commandUiImport => 'Import';
+
+  @override
+  String get commandUiExitMeasureMarkup => 'Exit Measure & Markup';
+
+  @override
+  String get commandUiMeasureTools => 'Measure Tools';
+
+  @override
+  String get commandUiSaveMergedDxf => 'Save Merged DXF';
+
+  @override
+  String get commandUiSaveAnnotatedDxf => 'Save Annotated DXF';
+
+  @override
+  String get commandUiCanvasTheme => 'Canvas Theme';
+
+  @override
+  String get commandUiExportAsFastKcad => 'Export as Fast KCAD';
+
+  @override
+  String get commandUiHideCadGrid => 'Hide CAD Grid';
+
+  @override
+  String get commandUiShowCadGrid => 'Show CAD Grid';
+
+  @override
+  String get commandUiDrawingProperties => 'Drawing Properties';
+
+  @override
+  String get commandUiShareFile => 'Share File';
+
+  @override
+  String get commandUiPrintExport => 'Print / Export';
+
+  @override
+  String get commandUiEnterAnnotationTextOrSelectAPresetBelow =>
+      'Enter annotation text or select a preset below...';
+
+  @override
+  String get commandUiDeleteNote => 'Delete Note';
+
+  @override
+  String get commandUiUpdateNote => 'Update Note';
+
+  @override
+  String get commandUiAddNote => 'Add Note';
+
+  @override
+  String commandUiSnapValue(String value1) {
+    return 'Snap $value1';
+  }
+
+  @override
+  String get commandUiClearMeasurement => 'Clear measurement';
+
+  @override
+  String get commandUiExitMeasurement => 'Exit measurement';
+
+  @override
+  String get commandUiTight => 'Tight';
+
+  @override
+  String get commandUiRelaxed => 'Relaxed';
+
+  @override
+  String get commandUiPages => 'Pages';
+
+  @override
+  String get commandUiScroll => 'Scroll';
+
+  @override
+  String get commandUiSearchBook => 'Search Book';
+
+  @override
+  String get commandUiPageFlipModeTapForContinuous =>
+      'Page Flip Mode (Tap for Continuous)';
+
+  @override
+  String get commandUiContinuousScrollTapForPages =>
+      'Continuous Scroll (Tap for Pages)';
+
+  @override
+  String get commandUiReadingSettings => 'Reading Settings';
+
+  @override
+  String get commandUiBookInfo => 'Book Info';
+
+  @override
+  String get commandUiSearchInBookText => 'Search in book text...';
+
+  @override
+  String get commandUiOpeningEBook => 'Opening E-Book...';
+
+  @override
+  String get commandUiNoContentFound => 'No content found';
+
+  @override
+  String get commandUiPrevChapter => 'Prev Chapter';
+
+  @override
+  String get commandUiNextChapter => 'Next Chapter';
+
+  @override
+  String commandUiChapterValue(String value1) {
+    return 'Chapter $value1';
+  }
+
+  @override
+  String get commandUiPrev => 'Prev';
+
+  @override
+  String get commandUiRotate90Clockwise => 'Rotate 90° Clockwise';
+
+  @override
+  String get commandUiFitToViewCenter => 'Fit to View (Center)';
+
+  @override
+  String get commandUiTypeHereToPreview => 'Type here to preview';
+
+  @override
+  String get commandUiFolderName => 'Folder Name';
+
+  @override
+  String get commandUiEnterFolderDisplayName => 'Enter folder display name';
+
+  @override
+  String get commandUiEnterAmountInMax20 => 'Enter amount in € (max 20€)';
+
+  @override
+  String get commandUiEG10 => 'e.g. 10';
+
+  @override
+  String get commandUiRevolut => 'Revolut';
+
+  @override
+  String get commandUiPaypal => 'PayPal';
+
+  @override
+  String get commandUiFilterByCategory => 'Filter by category';
+
+  @override
+  String get commandUiIncludeSubfoldersOn => 'Include subfolders: ON';
+
+  @override
+  String get commandUiIncludeSubfoldersOff => 'Include subfolders: OFF';
+
+  @override
+  String get commandUiRenameFolder => 'Rename Folder';
+
+  @override
+  String get commandUiRemoveFolderFromList => 'Remove Folder from list';
+
+  @override
+  String get commandUiSelectFolder => 'Select Folder';
+
+  @override
+  String get commandUiFileNoLongerExistsOnTheDevice =>
+      'File no longer exists on the device.';
+
+  @override
+  String get commandUiLicenses => 'Licenses';
+
+  @override
+  String get commandUiLogs => 'Logs';
+
+  @override
+  String get commandUiGithub => 'GitHub';
+
+  @override
+  String get commandUiCopyUrl => 'Copy URL';
+
+  @override
+  String get commandUiCloseServer => 'Close Server';
+
+  @override
+  String get commandUiStopSharing => 'Stop Sharing';
+
+  @override
+  String get commandUiAllOptions => 'All Options';
+
+  @override
+  String get commandUiPlotterProperties => 'Plotter Properties';
+
+  @override
+  String get commandUiBackgroundCheckerboard => 'Background: Checkerboard';
+
+  @override
+  String get commandUiBackgroundDark => 'Background: Dark';
+
+  @override
+  String get commandUiBackgroundLight => 'Background: Light';
+
+  @override
+  String get commandUiRenderingCrispPixelPerfect =>
+      'Rendering: Crisp (Pixel-perfect)';
+
+  @override
+  String get commandUiRenderingSmooth => 'Rendering: Smooth';
+
+  @override
+  String get commandUiSingleImageView => 'Single Image View';
+
+  @override
+  String get commandUiAllResolutionsGrid => 'All Resolutions Grid';
+
+  @override
+  String commandUiShareSizeValueValuePng(String value1, String value2) {
+    return 'Share size ($value1×$value2 PNG)';
+  }
+
+  @override
+  String get commandUiShareOriginalIcoFile => 'Share original .ico file';
+
+  @override
+  String get commandUiPrintSaveAsPdf => 'Print / Save as PDF';
+
+  @override
+  String get commandUiFlipImage => 'Flip Image';
+
+  @override
+  String get commandUiMoreActions => 'More Actions';
+
+  @override
+  String get commandUiPrintSavePdf => 'Print / Save PDF';
+
+  @override
+  String get commandUiResetViewTransforms => 'Reset View & Transforms';
+
+  @override
+  String commandUiFailedToRenderImageValue(String value1) {
+    return 'Failed to render image: $value1';
+  }
+
+  @override
+  String get commandUiBackToProject => 'Back to Project';
+
+  @override
+  String get commandUiResetZoom11 => 'Reset Zoom (1:1)';
+
+  @override
+  String get commandUiFormattedView => 'Formatted View';
+
+  @override
+  String get commandUiRawMarkdownSource => 'Raw Markdown Source';
+
+  @override
+  String get commandUiCopyMarkdown => 'Copy Markdown';
+
+  @override
+  String get commandUiMarkdownProperties => 'Markdown Properties';
+
+  @override
+  String commandUiPcbLayersValueValue(String value1, String value2) {
+    return 'PCB Layers ($value1/$value2)';
+  }
+
+  @override
+  String get commandUi1MmMeasurementGrid => '1mm Measurement Grid';
+
+  @override
+  String get commandUiTogglePadNumbers => 'Toggle Pad Numbers';
+
+  @override
+  String get commandUiBoardArchiveProperties => 'Board / Archive Properties';
+
+  @override
+  String get commandUiPcbCanvasTheme => 'PCB Canvas Theme';
+
+  @override
+  String get commandUiViewArchiveFiles => 'View Archive Files';
+
+  @override
+  String get commandUiTop => 'TOP';
+
+  @override
+  String get commandUiBottom => 'BOTTOM';
+
+  @override
+  String get commandUiAll => 'ALL';
+
+  @override
+  String get commandUiFitBoardToViewCenter => 'Fit Board to View (Center)';
+
+  @override
+  String get commandUiInteractiveZoomViewer => 'Interactive Zoom Viewer';
+
+  @override
+  String get commandUiSearchDesignatorValuePackageEGR110K =>
+      'Search designator, value, package (e.g. R1, 10k)...';
+
+  @override
+  String commandUiPackageValuevalue(String value1, String value2) {
+    return 'Package: $value1$value2';
+  }
+
+  @override
+  String get commandUiOpenIn3DCadViewer => 'Open in 3D CAD Viewer';
+
+  @override
+  String get commandUiOpenPdfSchematic => 'Open PDF Schematic';
+
+  @override
+  String get commandUiViewKicadSchematic => 'View KiCad Schematic';
+
+  @override
+  String get commandUiSearchFilesInArchive => 'Search files in archive...';
+
+  @override
+  String commandUiAllValue(String value1) {
+    return 'All ($value1)';
+  }
+
+  @override
+  String get commandUiCouldNotLoadImage => 'Could not load image';
+
+  @override
+  String get commandUiCloseEsc => 'Close (Esc)';
+
+  @override
+  String get commandUiResetZoom100 => 'Reset Zoom (100%)';
+
+  @override
+  String get commandUiPreviousImageLeftArrow => 'Previous Image (Left Arrow)';
+
+  @override
+  String get commandUiNextImageRightArrow => 'Next Image (Right Arrow)';
+
+  @override
+  String get commandUiZoomIn => 'Zoom In (+)';
+
+  @override
+  String get commandUiZoomOut => 'Zoom Out (-)';
+
+  @override
+  String get commandUiFitToView => 'Fit to View';
+
+  @override
+  String get commandUiExitReadingModeBackToOriginalPdf =>
+      'Exit Reading Mode (Back to Original PDF)';
+
+  @override
+  String get commandUiReadingModeReflowEBook =>
+      'Reading Mode (Reflow / E-Book)';
+
+  @override
+  String get commandUiToggleInvertColors => 'Toggle Invert Colors';
+
+  @override
+  String get commandUiPdfProperties => 'PDF Properties';
+
+  @override
+  String get commandUiSharePdf => 'Share PDF';
+
+  @override
+  String get commandUiPrintPdf => 'Print PDF';
+
+  @override
+  String get commandUiFitPageToScreen => 'Fit Page to Screen';
+
+  @override
+  String get commandUiEnterPfxPassword => 'Enter PFX password';
+
+  @override
+  String get commandUiOriginalPdf => 'Original PDF';
+
+  @override
+  String get commandUiDecreaseFontSize => 'Decrease font size';
+
+  @override
+  String get commandUiIncreaseFontSize => 'Increase font size';
+
+  @override
+  String get commandUiSwipePages => 'Swipe Pages';
+
+  @override
+  String get commandUiViewOriginalPdfPage => 'View Original PDF Page';
+
+  @override
+  String get commandUiGroupByCategory => 'Group by category';
+
+  @override
+  String get commandUiSearchFilesInProject => 'Search files in project...';
+
+  @override
+  String get commandUiByCategory => 'By category';
+
+  @override
+  String get commandUiMoveUp => 'Move up';
+
+  @override
+  String get commandUiMoveDown => 'Move down';
+
+  @override
+  String get commandUiExitPresentation => 'Exit Presentation';
+
+  @override
+  String get commandUiRouteDetails => 'Route Details';
+
+  @override
+  String get commandUiShareRoute => 'Share Route';
+
+  @override
+  String get commandUiMapOverlays => 'Map Overlays';
+
+  @override
+  String get commandUiFitRoute => 'Fit Route';
+
+  @override
+  String get commandUiCenterOnLocation => 'Center on Location';
+
+  @override
+  String get commandUiShowMyLocation => 'Show My Location';
+
+  @override
+  String get commandUiCalibrateCompass => 'Calibrate Compass';
+
+  @override
+  String get commandUiHikingTrailsMarkings => 'Hiking Trails & Markings';
+
+  @override
+  String get commandUiWaymarkedTrailsOfficialMountainRouteColorsCodesFromOsm =>
+      'Waymarked Trails: official mountain route colors & codes from OSM';
+
+  @override
+  String get commandUiMtbCyclingRoutes => 'MTB & Cycling Routes';
+
+  @override
+  String get commandUiWaymarkedTrailsDedicatedMountainBikeAndCyclingNetwork =>
+      'Waymarked Trails: dedicated mountain bike and cycling network';
+
+  @override
+  String get commandUiAutocadDxfSColSWallSBeamSSlabSAxis =>
+      'AutoCAD DXF (S-COL, S-WALL, S-BEAM, S-SLAB, S-AXIS)';
+
+  @override
+  String commandUiValueEntities(String value1) {
+    return '$value1 entities';
+  }
+
+  @override
+  String get commandUiWhitePageOn => 'White Page: ON';
+
+  @override
+  String get commandUiWhitePageOffTransparent =>
+      'White Page: OFF (Transparent)';
+
+  @override
+  String get commandUiFindInText => 'Find in Text';
+
+  @override
+  String get commandUiExitReadingModeCodeLogView =>
+      'Exit Reading Mode (Code/Log View)';
+
+  @override
+  String get commandUiReadingModeReflowOverflowEBook =>
+      'Reading Mode (Reflow / Overflow / E-Book)';
+
+  @override
+  String get commandUiSwitchToProportionalFont => 'Switch to Proportional Font';
+
+  @override
+  String get commandUiSwitchToMonospaceFont => 'Switch to Monospace Font';
+
+  @override
+  String get commandUiTextProperties => 'Text Properties';
+
+  @override
+  String get commandUiFindInText2 => 'Find in text...';
+
+  @override
+  String get commandUiPreviousMatch => 'Previous Match';
+
+  @override
+  String get commandUiNextMatch => 'Next Match';
+
+  @override
+  String get commandUiRawView => 'Raw View';
+
+  @override
+  String get commandUiGoBack => 'Go Back';
+
+  @override
+  String get commandUiLoopOn => 'Loop: ON';
+
+  @override
+  String get commandUiLoopOff => 'Loop: OFF';
+
+  @override
+  String get commandUiPlaybackSpeed => 'Playback Speed';
+
+  @override
+  String get commandUiUnlockOrientation => 'Unlock Orientation';
+
+  @override
+  String get commandUiLockLandscape => 'Lock Landscape';
+
+  @override
+  String get commandUiUnmute => 'Unmute';
+
+  @override
+  String commandUiWorkbookSheetsValue(String value1) {
+    return 'Workbook Sheets ($value1)';
+  }
+
+  @override
+  String commandUiSheetValue(String value1) {
+    return 'Sheet $value1';
+  }
+
+  @override
+  String get commandUiSearchInSheet => 'Search in Sheet';
+
+  @override
+  String get commandUiAllSheets => 'All Sheets';
+
+  @override
+  String get commandUiSpreadsheetProperties => 'Spreadsheet Properties';
+
+  @override
+  String get commandUiSearchInActiveSheet => 'Search in active sheet...';
+
+  @override
+  String get commandUiCopyCellText => 'Copy Cell Text';
+
+  @override
+  String get commandUiCellContentCopiedToClipboard =>
+      'Cell content copied to clipboard';
+
+  @override
+  String commandUiAllSheetsValue(String value1) {
+    return 'All Sheets ($value1)';
+  }
+
+  @override
+  String get commandOptionLightStudio => 'Light Studio';
+
+  @override
+  String get commandOptionDarkStudio => 'Dark Studio';
+
+  @override
+  String get commandOptionPureWhite => 'Pure White';
+
+  @override
+  String get commandOptionPureBlack => 'Pure Black';
+
+  @override
+  String get commandOptionDarkCad => 'Dark CAD';
+
+  @override
+  String get commandOptionTransparencyGrid => 'Transparency Grid';
+
+  @override
+  String get commandOptionFr4Green => 'FR4 Green';
+
+  @override
+  String get commandOptionMatteBlack => 'Matte Black';
+
+  @override
+  String get commandOptionArduinoBlue => 'Arduino Blue';
+
+  @override
+  String get commandOptionSparkfunRed => 'SparkFun Red';
+
+  @override
+  String get commandOptionHighContrast => 'High Contrast';
+
+  @override
+  String get commandOptionPcbLayersGerber => 'PCB Layers (Gerber)';
+
+  @override
+  String get commandOptionCncDrillHoles => 'CNC Drill Holes';
+
+  @override
+  String get commandOption3DCadModels => '3D CAD Models';
+
+  @override
+  String get commandOptionSchematicsCircuits => 'Schematics & Circuits';
+
+  @override
+  String get commandOptionImages3DRenders => 'Images & 3D Renders';
+
+  @override
+  String get commandOptionBillOfMaterialsBom => 'Bill of Materials (BOM)';
+
+  @override
+  String get commandOptionAssemblyPlacementCpl => 'Assembly & Placement (CPL)';
+
+  @override
+  String get commandOptionDocumentationDrawings => 'Documentation & Drawings';
+
+  @override
+  String get commandOptionSourceCadProject => 'Source CAD Project';
+
+  @override
+  String get commandOptionReportsNotes => 'Reports & Notes';
+
+  @override
+  String get commandOptionOtherFiles => 'Other Files';
+
+  @override
+  String get commandOptionGerbers => 'Gerbers';
+
+  @override
+  String get commandOptionPhotosRenders => 'Photos & Renders';
+
+  @override
+  String get commandOptionBomParts => 'BOM & Parts';
+
+  @override
+  String get commandOptionSchematics => 'Schematics';
+
+  @override
+  String get commandOptionDocsReports => 'Docs & Reports';
+
+  @override
+  String get commandOptionAllFiles => 'All Files';
+
+  @override
+  String get commandOptionLeftToRightWestern => 'Left to Right (Western)';
+
+  @override
+  String get commandOptionRightToLeftManga => 'Right to Left (Manga)';
+
+  @override
+  String get commandOptionVerticalScrollWebtoon => 'Vertical Scroll (Webtoon)';
+
+  @override
+  String get commandOptionLtr => 'LTR';
+
+  @override
+  String get commandOptionManga => 'Manga';
+
+  @override
+  String get commandOptionWebtoon => 'Webtoon';
+
+  @override
+  String get commandOptionLightPaper => 'Light Paper';
+
+  @override
+  String get commandOptionWarmSepia => 'Warm Sepia';
+
+  @override
+  String get commandOptionDarkCharcoal => 'Dark Charcoal';
+
+  @override
+  String get commandOptionSerifBook => 'Serif (Book)';
+
+  @override
+  String get commandOptionSansSerifModern => 'Sans-Serif (Modern)';
+
+  @override
+  String get commandOptionMonospaceClean => 'Monospace (Clean)';
+
+  @override
+  String get commandOptionPagesSwipe => 'Pages (Swipe)';
+
+  @override
+  String get commandOptionMonospace => 'Monospace';
+
+  @override
+  String get commandOptionPaginatedSwipe => 'Paginated (Swipe)';
+
+  @override
+  String get commandUiCheck => 'Check';
 }

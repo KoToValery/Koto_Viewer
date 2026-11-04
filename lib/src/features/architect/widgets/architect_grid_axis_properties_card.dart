@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. IMPORTS & DEFINITIONS
 // 2. ARCHITECT GRID AXIS PROPERTIES CARD (WIDGET)
@@ -97,8 +98,8 @@ class ArchitectGridAxisPropertiesCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   child: Padding(
                     padding: EdgeInsets.all(4.0),
-                    child: Icon(
-                      Icons.close_rounded,
+                    child: AppIcon(
+                      AppIconId.close,
                       size: 18,
                       color: scheme.onSurfaceVariant,
                     ),
@@ -168,7 +169,7 @@ class ArchitectGridAxisPropertiesCard extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: color),
+            AppIcon.fromMaterial(icon, size: 14, color: color),
             const SizedBox(width: 5),
             Text(
               label,

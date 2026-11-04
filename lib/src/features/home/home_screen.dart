@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../../core/widgets/app_settings_screen.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -1688,7 +1689,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    RecentFilesService.recentFilesNotifier.removeListener(_onRecentFilesChanged);
+    RecentFilesService.recentFilesNotifier.removeListener(_onRecentFilesChanged,
+    );
     _searchController.dispose();
     AppUpdateService.dispose();
     super.dispose();
@@ -1700,8 +1702,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _recomputeCategoryCounts() {
     final counts = <FileCategory, int>{
-      FileCategory.all: _pdfFiles.length,
-    };
+      FileCategory.all: _pdfFiles.length};
     for (final f in _pdfFiles) {
       counts[f.category] = (counts[f.category] ?? 0) + 1;
     }
@@ -1839,7 +1840,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (newMode == FileSourceMode.custom) {
       if (_customFolderPath == null || _customFolderPath!.isEmpty) {
         if (_customFolderList.isNotEmpty) {
-          await FileSourceService.setSelectedCustomFolder(_customFolderList.first);
+          await FileSourceService.setSelectedCustomFolder(_customFolderList.first,
+          );
         } else {
           final success = await _pickCustomFolder();
           if (!success) return;
@@ -1872,7 +1874,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.architectSheetCancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -1880,7 +1882,7 @@ class _HomeScreenState extends State<HomeScreen> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Remove'),
+            child: Text(context.l10n.commandIconRemove),
           ),
         ],
       ),
@@ -1903,20 +1905,20 @@ class _HomeScreenState extends State<HomeScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Folder Name',
-            hintText: 'Enter folder display name',
+          decoration: InputDecoration(
+            labelText: context.l10n.commandUiFolderName,
+            hintText: context.l10n.commandUiEnterFolderDisplayName,
           ),
           onSubmitted: (val) => Navigator.pop(context, val.trim()),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.architectSheetCancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
+            child: Text(context.l10n.commandIconSave),
           ),
         ],
       ),
@@ -1980,7 +1982,8 @@ class _HomeScreenState extends State<HomeScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Could not access the selected folder. Please try again.'),
+                content: Text('Could not access the selected folder. Please try again.',
+                ),
               ),
             );
           }
@@ -1991,12 +1994,14 @@ class _HomeScreenState extends State<HomeScreen> {
         String? displayName;
         if (AndroidSafService.isSafUri(selectedDirectory)) {
           displayName =
-              await AndroidSafService.getFolderDisplayName(selectedDirectory);
+              await AndroidSafService.getFolderDisplayName(selectedDirectory,
+          );
           if (displayName == null ||
               displayName.trim().isEmpty ||
               AndroidSafService.isOpaqueProviderId(displayName)) {
             displayName =
-                AndroidSafService.folderNameFromSafUri(selectedDirectory);
+                AndroidSafService.folderNameFromSafUri(selectedDirectory,
+            );
           }
         } else {
           final parts = selectedDirectory
@@ -2016,20 +2021,23 @@ class _HomeScreenState extends State<HomeScreen> {
         return true;
       }
     } on PlatformException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickCustomFolder.platform');
+      AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickCustomFolder.platform',
+      );
       if (mounted) {
         final l10n = context.l10n;
         ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.errorPickingFolder(e.message ?? e.toString()))));
+          context).showSnackBar(SnackBar(content: Text(l10n.errorPickingFolder(e.message ?? e.toString())),
+          ),
+        );
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickCustomFolder');
+      AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickCustomFolder',
+      );
       if (mounted) {
         final l10n = context.l10n;
         ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.errorPickingFolder(e.toString()))));
+          context).showSnackBar(SnackBar(content: Text(l10n.errorPickingFolder(e.toString()))),
+        );
       }
     }
 
@@ -2053,7 +2061,8 @@ class _HomeScreenState extends State<HomeScreen> {
         if (filePath == null && result.files.single.bytes != null) {
           final tempDir = await getTemporaryDirectory();
           final name = result.files.single.name;
-          final tempFile = File('${tempDir.path}${Platform.pathSeparator}$name');
+          final tempFile = File('${tempDir.path}${Platform.pathSeparator}$name',
+          );
           await tempFile.writeAsBytes(result.files.single.bytes!);
           filePath = tempFile.path;
         }
@@ -2064,8 +2073,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    context.l10n.pleaseSelectSupportedFile,
-                  ),
+                    context.l10n.pleaseSelectSupportedFile),
                   backgroundColor: Colors.orange,
                 ),
               );
@@ -2076,15 +2084,19 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } on PlatformException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickAndOpenFile.platform');
+      AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickAndOpenFile.platform',
+      );
       if (mounted) {
         final l10n = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.couldNotOpenFilePicker(e.message ?? e.toString()))),
+          SnackBar(content: Text(l10n.couldNotOpenFilePicker(e.message ?? e.toString()),
+            ),
+          ),
         );
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickAndOpenFile');
+      AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickAndOpenFile',
+      );
       if (mounted) {
         final l10n = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2105,8 +2117,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openFileScreen(String filePath) async {
     await FileOpenerService.openFile(
       context: context,
-      filePath: filePath,
-    );
+      filePath: filePath);
     if (mounted) {
       await _loadFiles();
     }
@@ -2129,8 +2140,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => AlertDialog(
         title: Text(l10n.deleteFileTitle),
         content: Text(
-          l10n.deleteFileConfirm(item.name),
-        ),
+          l10n.deleteFileConfirm(item.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -2170,7 +2180,8 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
       } catch (e, stack) {
-        AppErrorHandler.recordError(e, stack, context: 'HomeScreen._deleteLocalFile');
+        AppErrorHandler.recordError(e, stack, context: 'HomeScreen._deleteLocalFile',
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -2195,7 +2206,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.architectSheetCancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -2203,7 +2214,7 @@ class _HomeScreenState extends State<HomeScreen> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Clear'),
+            child: Text(context.l10n.architectSelectionClear),
           ),
         ],
       ),
@@ -2314,8 +2325,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         decimal: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'Enter amount in € (max 20€)',
-                        hintText: 'e.g. 10',
+                        labelText: context.l10n.commandUiEnterAmountInMax20,
+                        hintText: context.l10n.commandUiEG10,
                         isDense: true,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -2369,16 +2380,16 @@ class _HomeScreenState extends State<HomeScreen> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          icon: Icon(
-                            Icons.credit_card,
+                          icon: AppIcon(
+                            AppIconId.payment,
                             size: 18,
                             color: isButtonEnabled
                                 ? Colors.blueAccent
                                 : Colors.grey,
                           ),
-                          label: const FittedBox(
+                          label: FittedBox(
                             child: Text(
-                              'Revolut',
+                              context.l10n.commandUiRevolut,
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -2419,16 +2430,16 @@ class _HomeScreenState extends State<HomeScreen> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          icon: Icon(
-                            Icons.payment,
+                          icon: AppIcon(
+                            AppIconId.payment,
                             size: 18,
                             color: isButtonEnabled
                                 ? Colors.lightBlueAccent
                                 : Colors.grey,
                           ),
-                          label: const FittedBox(
+                          label: FittedBox(
                             child: Text(
-                              'PayPal',
+                              context.l10n.commandUiPaypal,
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -2459,7 +2470,7 @@ class _HomeScreenState extends State<HomeScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Close'),
+                child: Text(context.l10n.commandIconClose),
               ),
             ],
           );
@@ -2573,10 +2584,9 @@ class _HomeScreenState extends State<HomeScreen> {
           _updateFilteredFiles();
         });
       },
-      tooltip: 'Filter by category',
+      tooltip: context.l10n.commandUiFilterByCategory,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+        borderRadius: BorderRadius.circular(16)),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
@@ -2595,7 +2605,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            AppIcon.fromMaterial(
               _getCategoryIcon(_selectedCategory),
               size: 17,
               color: isCustomCategory
@@ -2618,8 +2628,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(width: 3),
-            Icon(
-              Icons.arrow_drop_down,
+            AppIcon(
+              AppIconId.expandMore,
               size: 18,
               color: theme.textTheme.bodySmall?.color,
             ),
@@ -2635,7 +2645,7 @@ class _HomeScreenState extends State<HomeScreen> {
             value: cat,
             child: Row(
               children: [
-                Icon(
+                AppIcon.fromMaterial(
                   _getCategoryIcon(cat),
                   size: 18,
                   color: isSelected
@@ -2653,7 +2663,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: isSelected
                         ? theme.colorScheme.primary.withValues(alpha: 0.15)
@@ -2673,8 +2684,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 if (isSelected) ...[
                   const SizedBox(width: 6),
-                  Icon(
-                    Icons.check,
+                  AppIcon(
+                    AppIconId.confirm,
                     size: 16,
                     color: theme.colorScheme.primary,
                   ),
@@ -2732,7 +2743,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
+                    AppIcon.fromMaterial(
                       _currentMode == FileSourceMode.recent
                           ? Icons.history_rounded
                           : (_currentMode == FileSourceMode.localFolder
@@ -2760,7 +2771,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const Icon(Icons.arrow_drop_down, size: 20),
+                              const AppIcon(AppIconId.expandMore, size: 20),
                             ],
                           ),
                           Text(
@@ -2786,17 +2797,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       value: '__recent__',
                       child: Row(
                         children: [
-                          const Icon(Icons.history_rounded, color: Colors.orange),
+                          const AppIcon(
+                            AppIconId.history, color: Colors.orange,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               l10n.recentFiles,
-                              style: const TextStyle(fontWeight: FontWeight.w600),
+                              style: const TextStyle(fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                           if (_currentMode == FileSourceMode.recent)
-                            Icon(
-                              Icons.check,
+                            AppIcon(
+                              AppIconId.confirm,
                               size: 18,
                               color: theme.colorScheme.primary,
                             ),
@@ -2811,7 +2825,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       value: '__local_folder__',
                       child: Row(
                         children: [
-                          const Icon(Icons.download_for_offline_rounded, color: Color(0xFF10B981)),
+                          const AppIcon(
+                            AppIconId.download, color: Color(0xFF10B981),
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -2839,8 +2855,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           if (_currentMode == FileSourceMode.localFolder)
-                            Icon(
-                              Icons.check,
+                            AppIcon(
+                              AppIconId.confirm,
                               size: 18,
                               color: theme.colorScheme.primary,
                             ),
@@ -2855,7 +2871,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (_customFolderList.isNotEmpty) {
                     for (final folderPath in _customFolderList) {
                       final String folderName = _getFolderName(folderPath);
-                      final String folderSubtitle = _getFolderSubtitle(folderPath);
+                      final String folderSubtitle = _getFolderSubtitle(folderPath,
+                      );
                       final isSelected =
                           _currentMode == FileSourceMode.custom &&
                           _customFolderPath == folderPath;
@@ -2865,8 +2882,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           value: folderPath,
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.folder_rounded,
+                              AppIcon(
+                                AppIconId.folder,
                                 color: isSelected
                                     ? Colors.purple
                                     : Colors.grey.shade600,
@@ -2900,8 +2917,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                               if (isSelected)
-                                Icon(
-                                  Icons.check,
+                                AppIcon(
+                                  AppIconId.confirm,
                                   size: 18,
                                   color: theme.colorScheme.primary,
                                 ),
@@ -2920,8 +2937,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       value: '__add_new__',
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.create_new_folder_outlined,
+                          const AppIcon(
+                            AppIconId.newFolder,
                             color: Colors.blue,
                           ),
                           const SizedBox(width: 12),
@@ -2943,7 +2960,7 @@ class _HomeScreenState extends State<HomeScreen> {
               IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                icon: Icon(
+                icon: AppIcon.fromMaterial(
                   _includeSubfolders
                       ? Icons.account_tree_rounded
                       : Icons.account_tree_outlined,
@@ -2953,8 +2970,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       : null,
                 ),
                 tooltip: _includeSubfolders
-                    ? 'Include subfolders: ON'
-                    : 'Include subfolders: OFF',
+                    ? context.l10n.commandUiIncludeSubfoldersOn
+                    : context.l10n.commandUiIncludeSubfoldersOff,
                 onPressed: () async {
                   final next = !_includeSubfolders;
                   await FileSourceService.setIncludeSubfolders(next);
@@ -2965,21 +2982,23 @@ class _HomeScreenState extends State<HomeScreen> {
               if (_customFolderPath != null && _customFolderPath!.isNotEmpty) ...[
                 IconButton(
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                  icon: const Icon(Icons.drive_file_rename_outline, size: 20),
-                  tooltip: 'Rename Folder',
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36,
+                  ),
+                  icon: const AppIcon(AppIconId.edit, size: 20),
+                  tooltip: context.l10n.commandUiRenameFolder,
                   onPressed: () =>
                       _showRenameFolderDialog(_customFolderPath!),
                 ),
                 IconButton(
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                  icon: Icon(
-                    Icons.delete_outline,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36,
+                  ),
+                  icon: AppIcon(
+                    AppIconId.delete,
                     size: 20,
                     color: Theme.of(context).colorScheme.error,
                   ),
-                  tooltip: 'Remove Folder from list',
+                  tooltip: context.l10n.commandUiRemoveFolderFromList,
                   onPressed: () =>
                       _confirmRemoveCustomFolder(_customFolderPath!),
                 ),
@@ -2988,8 +3007,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (_currentMode == FileSourceMode.recent && _pdfFiles.isNotEmpty)
               TextButton(
                 onPressed: _clearAllRecent,
-                child: Text(l10n.clear),
-              ),
+                child: Text(l10n.clear)),
           ],
         ),
       ),
@@ -3004,10 +3022,10 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: InputDecoration(
           hintText: '${context.l10n.search} (${_selectedCategory.localizedLabel(context)})...',
           hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-          prefixIcon: const Icon(Icons.search, size: 20),
+          prefixIcon: const AppIcon(AppIconId.search, size: 20),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear, size: 18),
+                  icon: const AppIcon(AppIconId.close, size: 18),
                   onPressed: () {
                     _searchController.clear();
                     setState(() {
@@ -3020,14 +3038,17 @@ class _HomeScreenState extends State<HomeScreen> {
           filled: true,
           fillColor: theme.colorScheme.surface,
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2)),
+            borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2),
+            ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2)),
+            borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2),
+            ),
           ),
         ),
         style: const TextStyle(fontSize: 13),
@@ -3075,25 +3096,26 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.wifi_tethering_rounded, color: Color(0xFF6366F1)),
+            icon: const AppIcon(AppIconId.wifi, color: Color(0xFF6366F1)),
             tooltip: l10n.receiveFiles,
             visualDensity: VisualDensity.compact,
             onPressed: _showReceiveFilesDialog,
           ),
           IconButton(
-            icon: const Icon(Icons.favorite, color: Color(0xFF7C3AED)),
+            icon: const AppIcon(AppIconId.favorite, color: Color(0xFF7C3AED)),
             tooltip: l10n.supportDeveloper,
             visualDensity: VisualDensity.compact,
             onPressed: _showSupportDeveloperDialog,
           ),
           IconButton(
-            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            icon: AppIcon.fromMaterial(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+            ),
             tooltip: l10n.toggleTheme,
             visualDensity: VisualDensity.compact,
             onPressed: () => widget.onToggleTheme(!widget.isDarkMode),
           ),
           IconButton(
-            icon: const Icon(Icons.apartment_rounded),
+            icon: const AppIcon(AppIconId.building),
             tooltip: l10n.bimProjects,
             visualDensity: VisualDensity.compact,
             onPressed: () {
@@ -3105,14 +3127,15 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
+            icon: const AppIcon(AppIconId.moreVertical),
             tooltip: l10n.contextMenuMore,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
             onSelected: (value) {
               if (value == 'settings') {
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AppSettingsScreen()));
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
+                );
               } else if (value == 'coords') {
                 _showCoordinateSettings();
               } else if (value == 'lang') {
@@ -3128,15 +3151,19 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             itemBuilder: (context) => [
               PopupMenuItem(value: 'settings', child: Row(children: [
-                Icon(Icons.settings_outlined, size: 20, color: theme.colorScheme.primary),
+                    AppIcon(
+                      AppIconId.settings, size: 20, color: theme.colorScheme.primary,
+                    ),
                 const SizedBox(width: 12), Text(l10n.appSettingsTitle),
-              ])),
+              ],
+                ),
+              ),
               PopupMenuItem(
                 value: 'coords',
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.public_rounded,
+                    AppIcon(
+                      AppIconId.globe,
                       size: 20,
                       color: theme.colorScheme.primary,
                     ),
@@ -3149,8 +3176,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 value: 'lang',
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.translate_rounded,
+                    AppIcon(
+                      AppIconId.language,
                       size: 20,
                       color: theme.colorScheme.primary,
                     ),
@@ -3163,8 +3190,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 value: 'update',
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.system_update_rounded,
+                    AppIcon(
+                      AppIconId.update,
                       size: 20,
                       color: theme.colorScheme.primary,
                     ),
@@ -3177,8 +3204,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 value: 'about',
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.info_outline,
+                    AppIcon(
+                      AppIconId.info,
                       size: 20,
                       color: theme.colorScheme.primary,
                     ),
@@ -3230,7 +3257,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             Expanded(
                               child: ElevatedButton.icon(
                                 onPressed: _pickAndOpenFile,
-                                icon: const Icon(Icons.folder_open_rounded),
+                                icon: const AppIcon(AppIconId.openFolder),
                                 label: Text(
                                   l10n.browseFiles,
                                   maxLines: 1,
@@ -3258,7 +3285,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             Expanded(
                               child: ElevatedButton.icon(
                                 onPressed: _showReceiveFilesDialog,
-                                icon: const Icon(Icons.cloud_upload_rounded),
+                                icon: const AppIcon(AppIconId.upload),
                                 label: Text(
                                   l10n.uploadViaWifi,
                                   maxLines: 1,
@@ -3269,7 +3296,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white.withValues(alpha: 0.18),
+                                  backgroundColor: Colors.white.withValues(alpha: 0.18,
+                                  ),
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 12,
@@ -3278,7 +3306,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                     side: BorderSide(
-                                      color: Colors.white.withValues(alpha: 0.35),
+                                      color: Colors.white.withValues(alpha: 0.35,
+                                      ),
                                     ),
                                   ),
                                   elevation: 0,
@@ -3298,7 +3327,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
                           borderRadius: BorderRadius.circular(14),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.22),
                               borderRadius: BorderRadius.circular(14),
@@ -3312,11 +3342,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(7),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                                    color: const Color(0xFF00E5FF,
+                                    ).withValues(alpha: 0.25),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: const Icon(
-                                    Icons.apartment_rounded,
+                                  child: const AppIcon(
+                                    AppIconId.building,
                                     color: Color(0xFF00E5FF),
                                     size: 20,
                                   ),
@@ -3340,15 +3371,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          color: Colors.white.withValues(alpha: 0.8),
+                                          color: Colors.white.withValues(alpha: 0.8,
+                                          ),
                                           fontSize: 11.5,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const Icon(
-                                  Icons.arrow_forward_ios_rounded,
+                                const AppIcon(
+                                  AppIconId.chevronRight,
                                   color: Colors.white70,
                                   size: 14,
                                 ),
@@ -3369,7 +3401,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           borderRadius: BorderRadius.circular(14),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
+                                horizontal: 14, vertical: 10,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.22),
                               borderRadius: BorderRadius.circular(14),
@@ -3383,12 +3416,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(7),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFFB300)
+                                    color: const Color(0xFFFFB300,
+                                    )
                                         .withValues(alpha: 0.25),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: const Icon(
-                                    Icons.architecture_rounded,
+                                  child: const AppIcon(
+                                    AppIconId.measureAngle,
                                     color: Color(0xFFFFB300),
                                     size: 20,
                                   ),
@@ -3414,15 +3448,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           color: Colors.white
-                                              .withValues(alpha: 0.8),
+                                              .withValues(alpha: 0.8,
+                                          ),
                                           fontSize: 11.5,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const Icon(
-                                  Icons.arrow_forward_ios_rounded,
+                                const AppIcon(
+                                  AppIconId.chevronRight,
                                   color: Colors.white70,
                                   size: 14,
                                 ),
@@ -3489,20 +3524,21 @@ class _HomeScreenState extends State<HomeScreen> {
                               ? 'Try searching for a different keyword or switch category.'
                               : 'Use "Browse Files" to open or view ${_selectedCategory.label} documents.',
                           textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13),
+                          style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13,
+                          ),
                         ),
                         if (_currentMode == FileSourceMode.custom && _searchQuery.isEmpty) ...[
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
                             onPressed: _pickCustomFolder,
-                            icon: const Icon(Icons.folder_open),
-                            label: const Text('Select Folder'),
+                            icon: const AppIcon(AppIconId.openFolder),
+                            label: Text(context.l10n.commandUiSelectFolder),
                           ),
                         ] else if (_currentMode == FileSourceMode.localFolder && _searchQuery.isEmpty) ...[
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
                             onPressed: _showReceiveFilesDialog,
-                            icon: const Icon(Icons.cloud_upload_rounded),
+                            icon: const AppIcon(AppIconId.upload),
                             label: Text(l10n.uploadViaWifi),
                           ),
                         ],
@@ -3535,9 +3571,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 _openFileScreen(item.path);
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
+                                  SnackBar(
                                     content: Text(
-                                      'File no longer exists on the device.',
+                                      context
+                                          .l10n
+                                          .commandUiFileNoLongerExistsOnTheDevice,
                                     ),
                                   ),
                                 );
@@ -3594,11 +3632,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                   IconButton(
-                                    icon: const Icon(
-                                      Icons.share_outlined,
+                                    icon: const AppIcon(
+                                      AppIconId.share,
                                       size: 22,
                                     ),
-                                    tooltip: 'Share',
+                                    tooltip: context.l10n.commandIconShare,
                                     onPressed: () {
                                       if (fileExists) {
                                         showModalBottomSheet(
@@ -3615,20 +3653,26 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   if (_currentMode == FileSourceMode.recent)
                                     IconButton(
-                                      icon: const Icon(Icons.close, size: 20),
+                                      icon: const AppIcon(
+                                        AppIconId.close, size: 20,
+                                      ),
                                       tooltip: l10n.removeFromRecent,
                                       onPressed: () =>
                                           _removeRecentFile(item.path),
                                     )
                                   else if (_currentMode == FileSourceMode.localFolder)
                                     IconButton(
-                                      icon: Icon(Icons.close, size: 20, color: Colors.red.shade400),
+                                      icon: AppIcon(
+                                        AppIconId.close, size: 20, color: Colors.red.shade400,
+                                      ),
                                       tooltip: l10n.deleteFileTitle,
                                       onPressed: () =>
                                           _deleteLocalFile(item),
                                     )
                                   else
-                                    const Icon(Icons.chevron_right, size: 20),
+                                    const AppIcon(
+                                      AppIconId.chevronRight, size: 20,
+                                    ),
                                 ],
                               ),
                             ),

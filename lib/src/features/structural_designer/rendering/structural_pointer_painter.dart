@@ -1,3 +1,4 @@
+import '../../../core/icons/app_icon.dart';
 import '../../bim_editing/rendering/bim_pointer_marks.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -19,6 +20,18 @@ enum StructuralDrawTool {
 
   final IconData icon;
   const StructuralDrawTool(this.icon);
+
+  AppIconId get iconId => switch (this) {
+    StructuralDrawTool.select => AppIconId.pan,
+    StructuralDrawTool.gridAxis => AppIconId.axis,
+    StructuralDrawTool.column => AppIconId.column,
+    StructuralDrawTool.shearWall => AppIconId.wall,
+    StructuralDrawTool.beam => AppIconId.beam,
+    StructuralDrawTool.slab => AppIconId.slab,
+    StructuralDrawTool.slabOpening => AppIconId.opening,
+    StructuralDrawTool.measure => AppIconId.measure,
+    StructuralDrawTool.layers => AppIconId.layers,
+  };
 
   String label(AppLocalizations l10n) {
     switch (this) {

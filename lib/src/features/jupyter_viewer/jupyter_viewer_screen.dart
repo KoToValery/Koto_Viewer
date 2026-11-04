@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -47,7 +48,8 @@ class _JupyterViewerScreenState extends State<JupyterViewerScreen> {
         _isLoading = false;
       });
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'JupyterViewer._loadNotebook.fs');
+      AppErrorHandler.recordError(e, stack, context: 'JupyterViewer._loadNotebook.fs',
+      );
       if (mounted) {
         setState(() {
           _errorMessage = e.message;
@@ -55,7 +57,8 @@ class _JupyterViewerScreenState extends State<JupyterViewerScreen> {
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'JupyterViewer._loadNotebook.format');
+      AppErrorHandler.recordError(e, stack, context: 'JupyterViewer._loadNotebook.format',
+      );
       if (mounted) {
         setState(() {
           _errorMessage = e.message;
@@ -63,7 +66,8 @@ class _JupyterViewerScreenState extends State<JupyterViewerScreen> {
         });
       }
     } on TypeError catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'JupyterViewer._loadNotebook.type');
+      AppErrorHandler.recordError(e, stack, context: 'JupyterViewer._loadNotebook.type',
+      );
       if (mounted) {
         setState(() {
           _errorMessage = e.toString();
@@ -71,7 +75,8 @@ class _JupyterViewerScreenState extends State<JupyterViewerScreen> {
         });
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'JupyterViewer._loadNotebook');
+      AppErrorHandler.recordError(e, stack, context: 'JupyterViewer._loadNotebook',
+      );
       if (mounted) {
         setState(() {
           _errorMessage = e.toString();
@@ -92,7 +97,7 @@ class _JupyterViewerScreenState extends State<JupyterViewerScreen> {
         title: Text(_fileName, style: const TextStyle(fontSize: 16)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.share),
+            icon: const AppIcon(AppIconId.share),
             onPressed: _shareFile,
           ),
         ],
@@ -100,7 +105,9 @@ class _JupyterViewerScreenState extends State<JupyterViewerScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(child: Text('Error parsing notebook:\n$_errorMessage', textAlign: TextAlign.center))
+              ? Center(child: Text('Error parsing notebook:\n$_errorMessage', textAlign: TextAlign.center,
+              ),
+            )
               : Column(
                   children: [
                     Expanded(
@@ -161,7 +168,8 @@ class _JupyterViewerScreenState extends State<JupyterViewerScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (executionCount != null)
-                Text('[$executionCount]:', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text('[$executionCount]:', style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(8),
@@ -186,7 +194,8 @@ class _JupyterViewerScreenState extends State<JupyterViewerScreen> {
         margin: const EdgeInsets.symmetric(vertical: 4),
         child: Container(
           padding: const EdgeInsets.all(12),
-          child: Text(source, style: const TextStyle(fontFamily: 'monospace', color: Colors.grey)),
+          child: Text(source, style: const TextStyle(fontFamily: 'monospace', color: Colors.grey),
+          ),
         ),
       );
     } else {
@@ -204,7 +213,8 @@ class _JupyterViewerScreenState extends State<JupyterViewerScreen> {
         padding: const EdgeInsets.all(8),
         margin: const EdgeInsets.only(top: 4),
         color: Colors.grey.withValues(alpha: 0.1),
-        child: SelectableText(text, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+        child: SelectableText(text, style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+        ),
       );
     } else if (type == 'display_data' || type == 'execute_result') {
       final data = output['data'];
@@ -229,7 +239,8 @@ class _JupyterViewerScreenState extends State<JupyterViewerScreen> {
             padding: const EdgeInsets.all(8),
             margin: const EdgeInsets.only(top: 4),
             color: Colors.grey.withValues(alpha: 0.1),
-            child: SelectableText(text, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+            child: SelectableText(text, style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
           );
         }
       }

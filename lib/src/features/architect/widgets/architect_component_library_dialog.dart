@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
@@ -160,20 +161,20 @@ class _ArchitectComponentLibraryDialogState
                   ),
                   IconButton(
                     tooltip: l.architectLibraryImportHelp,
-                    icon: const Icon(
-                      Icons.file_upload_outlined,
+                    icon: const AppIcon(
+                      AppIconId.upload,
                       color: Colors.white70,
                     ),
                     onPressed: _import,
                   ),
                   IconButton(
                     tooltip: l.architectComponentStudioTitle,
-                    icon: const Icon(Icons.code, color: Colors.white70),
+                    icon: const AppIcon(AppIconId.code, color: Colors.white70),
                     onPressed: () => ComponentStudioDialog.show(context),
                   ),
                   IconButton(
                     tooltip: l.close,
-                    icon: const Icon(Icons.close, color: Colors.white70),
+                    icon: const AppIcon(AppIconId.close, color: Colors.white70),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -186,13 +187,15 @@ class _ArchitectComponentLibraryDialogState
                 decoration: InputDecoration(
                   hintText: l.search,
                   hintStyle: const TextStyle(color: Colors.white54),
-                  prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                  prefixIcon: const AppIcon(
+                    AppIconId.search, color: Colors.white54,
+                  ),
                   suffixIcon: IconButton(
                     key: const ValueKey('component-library-preview-mode'),
                     tooltip: _show3d
                         ? l.architectComponentView2d
                         : l.architectComponentView3d,
-                    icon: Icon(
+                    icon: AppIcon.fromMaterial(
                       _show3d ? Icons.crop_square : Icons.view_in_ar,
                       color: Colors.white70,
                     ),
@@ -278,8 +281,8 @@ class _ArchitectComponentLibraryDialogState
                 _source != _Source.custom &&
                 _matches(l.architectToolFloorDrain))
               ListTile(
-                leading: const Icon(
-                  Icons.water_drop_outlined,
+                leading: const AppIcon(
+                  AppIconId.water,
                   color: Color(0xFF00E5FF),
                 ),
                 title: Text(
@@ -293,8 +296,8 @@ class _ArchitectComponentLibraryDialogState
                   l.architectFloorDrainLibraryDesc,
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
-                trailing: const Icon(
-                  Icons.arrow_forward_ios,
+                trailing: const AppIcon(
+                  AppIconId.chevronRight,
                   size: 14,
                   color: Colors.white54,
                 ),
@@ -308,10 +311,8 @@ class _ArchitectComponentLibraryDialogState
                 _source != _Source.custom &&
                 _matches(l.architectDrainageSmart))
               ListTile(
-                leading: const Icon(
-                  Icons.water_drop_outlined,
-                  color: Colors.white70,
-                ),
+                leading: const AppIcon(AppIconId.water,
+                  color: Colors.white70),
                 title: Text(
                   l.architectDrainageSmart,
                   style: const TextStyle(color: Colors.white),
@@ -361,7 +362,8 @@ class _ArchitectComponentLibraryDialogState
                                     final confirm = await showDialog<bool>(
                                       context: context,
                                       builder: (ctx) => AlertDialog(
-                                        title: Text(l.architectFenestrationDelete),
+                                        title: Text(l.architectFenestrationDelete,
+                                        ),
                                         content: Text(
                                           l.architectFenestrationDeleteConfirm(
                                             style.localizedName(l),
@@ -383,7 +385,8 @@ class _ArchitectComponentLibraryDialogState
                                       await FenestrationLibraryService.instance
                                           .deleteStyle(style.id);
                                       if (!context.mounted) return;
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(context,
+                                      ).showSnackBar(
                                         SnackBar(
                                           content: Text(
                                             l.architectFenestrationDeleteSuccess,
@@ -455,7 +458,8 @@ class _ArchitectComponentLibraryDialogState
                                     if (!context.mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text(l.architectComponentDeleted),
+                                        content: Text(l.architectComponentDeleted,
+                                        ),
                                       ),
                                     );
                                   }
@@ -498,7 +502,7 @@ class _ArchitectComponentLibraryDialogState
                       right: 0,
                       child: IconButton(
                         tooltip: context.l10n.architectComponentStudioTitle,
-                        icon: const Icon(Icons.code, size: 18),
+                        icon: const AppIcon(AppIconId.code, size: 18),
                         onPressed: onEdit,
                       ),
                     ),
@@ -508,7 +512,9 @@ class _ArchitectComponentLibraryDialogState
                       left: 0,
                       child: IconButton(
                         tooltip: context.l10n.delete,
-                        icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                        icon: const AppIcon(
+                          AppIconId.delete, size: 18, color: Colors.redAccent,
+                        ),
                         onPressed: onDelete,
                       ),
                     ),

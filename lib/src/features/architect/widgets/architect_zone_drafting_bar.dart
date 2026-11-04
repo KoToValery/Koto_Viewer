@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../bim_editing/properties/bim_distance_unit.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -187,8 +188,8 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                       isExpanded: true,
                       dropdownColor: const Color(0xFF1E2230),
                       borderRadius: BorderRadius.circular(10),
-                      icon: const Icon(
-                        Icons.arrow_drop_down_rounded,
+                      icon: const AppIcon(
+                        AppIconId.expandMore,
                         color: Colors.white70,
                         size: 18,
                       ),
@@ -198,7 +199,8 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(cat.icon, size: 15, color: cat.color),
+                              AppIcon.fromMaterial(cat.icon, size: 15, color: cat.color,
+                              ),
                               const SizedBox(width: 5),
                               Flexible(
                                 child: Text(
@@ -233,8 +235,8 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
               if (onOpenScheduleTable != null)
                 IconButton(
                   tooltip: l10n.architectZoneScheduleTitle,
-                  icon: const Icon(
-                    Icons.table_chart_rounded,
+                  icon: const AppIcon(
+                    AppIconId.schedule,
                     color: Color(0xFF38BDF8),
                     size: 19,
                   ),
@@ -248,8 +250,8 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
               if (onPlaceTable != null)
                 IconButton(
                   tooltip: l10n.architectZoneTableActionPlace,
-                  icon: const Icon(
-                    Icons.table_view_rounded,
+                  icon: const AppIcon(
+                    AppIconId.schedule,
                     color: Color(0xFF00E5FF),
                     size: 19,
                   ),
@@ -262,8 +264,8 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
               // Cancel drafting / exit
               IconButton(
                 tooltip: l10n.architectZoneCancelDraft,
-                icon: const Icon(
-                  Icons.close_rounded,
+                icon: const AppIcon(
+                  AppIconId.close,
                   color: Colors.white70,
                   size: 19,
                 ),
@@ -375,7 +377,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                 // Undo point button
                 IconButton(
                   tooltip: l10n.architectZoneUndoPoint,
-                  icon: const Icon(Icons.undo_rounded, size: 16),
+                  icon: const AppIcon(AppIconId.undo, size: 16),
                   color: tool.draftPointCount > 0
                       ? const Color(0xFFFFB74D)
                       : Colors.white24,
@@ -404,8 +406,8 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.check_circle_rounded,
+                        AppIcon(
+                          AppIconId.checkCircle,
                           size: 14,
                           color: canClose ? Colors.black : Colors.white38,
                         ),
@@ -449,7 +451,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            AppIcon.fromMaterial(
               icon,
               size: 13,
               color: isSelected ? selectedColor : Colors.white60,
@@ -485,7 +487,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: color),
+          AppIcon.fromMaterial(icon, size: 11, color: color),
           const SizedBox(width: 3),
           Text(
             label,

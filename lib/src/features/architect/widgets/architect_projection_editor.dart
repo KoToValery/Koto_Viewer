@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../services/architect_selection_candidates.dart';
 import 'architect_candidate_picker.dart';
 import 'architect_roof_pitch_editor.dart';
@@ -439,13 +440,24 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
         Offset.zero & overlay.size,
       ),
       items: [
-        PopupMenuItem(value: 'properties', child: Text(l.architectProperties)),
+        PopupMenuItem(value: 'properties', child: AppMenuLabel(
+            icon: AppIconId.properties,
+            child: Text(l.architectProperties),
+          ),
+        ),
         PopupMenuItem(
           value: 'move',
-          child: Text(l.architectRoofMoveVerticalAction),
+          child: AppMenuLabel(
+            icon: AppIconId.move,
+            child: Text(l.architectRoofMoveVerticalAction),
+          ),
         ),
         if (ref?.kind == ArchitectProjectionKind.roof)
-          PopupMenuItem(value: 'pitch', child: Text(l.architectRoofPitchEdit)),
+          PopupMenuItem(value: 'pitch', child: AppMenuLabel(
+              icon: AppIconId.measureAngle,
+              child: Text(l.architectRoofPitchEdit),
+            ),
+          ),
       ],
     );
     if (!mounted || id != hit) return;
@@ -755,20 +767,20 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                           TextButton.icon(
                             key: const ValueKey('projection-properties'),
                             onPressed: properties,
-                            icon: const Icon(Icons.tune, size: 18),
+                            icon: const AppIcon(AppIconId.properties, size: 18),
                             label: Text(l.architectProperties),
                           ),
                           IconButton(
                             key: const ValueKey('projection-move-z'),
                             tooltip: l.architectRoofMoveVerticalAction,
                             onPressed: () => moveNumber(false),
-                            icon: const Icon(Icons.swap_vert),
+                            icon: const AppIcon(AppIconId.swapVertical),
                           ),
                           if (ref.kind == ArchitectProjectionKind.roof)
                             IconButton(
                               key: const ValueKey('projection-roof-pitch'),
                               tooltip: l.architectRoofPitchEdit,
-                              icon: const Icon(Icons.rotate_right),
+                              icon: const AppIcon(AppIconId.rotate),
                               onPressed: startPitch,
                             ),
                           if (ref.kind == ArchitectProjectionKind.roof)
@@ -781,37 +793,50 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                               onPressed: () => setState(
                                 () => roofSnapEnabled = !roofSnapEnabled,
                               ),
-                              icon: const Icon(Icons.grid_off),
-                              selectedIcon: const Icon(Icons.grid_on),
+                              icon: const AppIcon(AppIconId.gridOff),
+                              selectedIcon: const AppIcon(AppIconId.grid),
                             ),
                           if (widget.elevation)
                             IconButton(
                               key: const ValueKey('projection-move-x'),
                               tooltip: l.architectProjectionHorizontal,
                               onPressed: () => moveNumber(true),
-                              icon: const Icon(Icons.swap_horiz),
+                              icon: const AppIcon(AppIconId.swapHorizontal),
                             ),
                           if (ref.isOpening && widget.elevation)
                             PopupMenuButton<String>(
                               tooltip: l.architectWallAlign,
-                              icon: const Icon(Icons.align_horizontal_left),
+                              icon: const AppIcon(AppIconId.alignLeft),
                               onSelected: align,
                               itemBuilder: (_) => [
                                 PopupMenuItem(
                                   value: 'left',
-                                  child: Text(l.architectProjectionAlignLeft),
+                                  child: AppMenuLabel(
+                                    icon: AppIconId.alignLeft,
+                                    child: Text(l.architectProjectionAlignLeft),
+                                ),
                                 ),
                                 PopupMenuItem(
                                   value: 'right',
-                                  child: Text(l.architectProjectionAlignRight),
+                                  child: AppMenuLabel(
+                                    icon: AppIconId.alignRight,
+                                    child: Text(l.architectProjectionAlignRight,
+                                    ),
+                                  ),
                                 ),
                                 PopupMenuItem(
                                   value: 'sill',
-                                  child: Text(l.architectProjectionAlignSill),
+                                  child: AppMenuLabel(
+                                    icon: AppIconId.alignBottom,
+                                    child: Text(l.architectProjectionAlignSill),
+                                ),
                                 ),
                                 PopupMenuItem(
                                   value: 'head',
-                                  child: Text(l.architectProjectionAlignHead),
+                                  child: AppMenuLabel(
+                                    icon: AppIconId.alignTop,
+                                    child: Text(l.architectProjectionAlignHead),
+                                ),
                                 ),
                               ],
                             ),
@@ -821,7 +846,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                               id = null;
                               error = null;
                             }),
-                            icon: const Icon(Icons.close),
+                            icon: const AppIcon(AppIconId.close),
                           ),
                         ],
                       ),

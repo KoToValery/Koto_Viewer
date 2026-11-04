@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
+import 'support/command_icon_finders.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -20,9 +22,11 @@ void main() {
         );
 
         expect(item.fileType, equals(KotoFileType.image),
-            reason: 'Extension .$ext should map to KotoFileType.image');
+            reason: 'Extension .$ext should map to KotoFileType.image',
+        );
         expect(item.isImage, isTrue,
-            reason: 'item.isImage should be true for .$ext');
+            reason: 'item.isImage should be true for .$ext',
+        );
       }
     });
 
@@ -54,7 +58,8 @@ void main() {
       expect(FileSourceService.isSupportedFile('animation.gif'), isTrue);
       expect(FileSourceService.isSupportedFile('bitmap.bmp'), isTrue);
       expect(FileSourceService.isSupportedFile('ICON.PNG'), isTrue);
-    });
+    },
+    );
   });
 
   group('ImageViewerScreen Widget Tests', () {
@@ -82,12 +87,15 @@ void main() {
       } catch (_) {}
     });
 
-    testWidgets('ImageViewerScreen loads and displays a PNG image', (tester) async {
+    testWidgets('ImageViewerScreen loads and displays a PNG image', (tester,
+    ) async {
       await tester.runAsync(() async {
         await tester.pumpWidget(
           MaterialApp(
-            home: ImageViewerScreen(filePath: testPngFile.path),
-          ),
+localizationsDelegates: AppLocalizations.localizationsDelegates,
+supportedLocales: AppLocalizations.supportedLocales,
+locale: const Locale('en'),
+            home: ImageViewerScreen(filePath: testPngFile.path)),
         );
 
         for (int i = 0; i < 30; i++) {
@@ -104,21 +112,24 @@ void main() {
       expect(find.byType(InteractiveViewer), findsOneWidget);
 
       // Floating zoom controls should be present
-      expect(find.byIcon(Icons.add), findsOneWidget);
-      expect(find.byIcon(Icons.remove), findsOneWidget);
-      expect(find.byIcon(Icons.fit_screen_outlined), findsOneWidget);
+      expect(findCommandIcon(Icons.add), findsOneWidget);
+      expect(findCommandIcon(Icons.remove), findsOneWidget);
+      expect(findCommandIcon(Icons.fit_screen_outlined), findsOneWidget);
 
       // Rotate and flip controls should be present
-      expect(find.byIcon(Icons.rotate_right_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.flip_rounded), findsOneWidget);
+      expect(findCommandIcon(Icons.rotate_right_rounded), findsOneWidget);
+      expect(findCommandIcon(Icons.flip_rounded), findsOneWidget);
     });
 
-    testWidgets('ImageViewerScreen opens properties bottom sheet', (tester) async {
+    testWidgets('ImageViewerScreen opens properties bottom sheet', (tester,
+    ) async {
       await tester.runAsync(() async {
         await tester.pumpWidget(
           MaterialApp(
-            home: ImageViewerScreen(filePath: testPngFile.path),
-          ),
+localizationsDelegates: AppLocalizations.localizationsDelegates,
+supportedLocales: AppLocalizations.supportedLocales,
+locale: const Locale('en'),
+            home: ImageViewerScreen(filePath: testPngFile.path)),
         );
 
         for (int i = 0; i < 30; i++) {
@@ -129,7 +140,7 @@ void main() {
       });
 
       // Tap properties button
-      final infoBtn = find.byIcon(Icons.info_outline_rounded);
+      final infoBtn = findCommandIcon(Icons.info_outline_rounded);
       expect(infoBtn, findsOneWidget);
       await tester.tap(infoBtn);
       await tester.pump();
@@ -146,8 +157,10 @@ void main() {
       await tester.runAsync(() async {
         await tester.pumpWidget(
           MaterialApp(
-            home: ImageViewerScreen(filePath: testPngFile.path),
-          ),
+localizationsDelegates: AppLocalizations.localizationsDelegates,
+supportedLocales: AppLocalizations.supportedLocales,
+locale: const Locale('en'),
+            home: ImageViewerScreen(filePath: testPngFile.path)),
         );
 
         for (int i = 0; i < 30; i++) {
@@ -158,7 +171,7 @@ void main() {
       });
 
       // 1. Rotate 90 degrees
-      final rotateBtn = find.byIcon(Icons.rotate_right_rounded);
+      final rotateBtn = findCommandIcon(Icons.rotate_right_rounded);
       expect(rotateBtn, findsOneWidget);
       await tester.tap(rotateBtn);
       await tester.pump();
@@ -175,11 +188,12 @@ void main() {
       expect(find.byTooltip('Background: Light'), findsOneWidget);
 
       // 3. Toggle crisp/pixelated rendering
-      final pixelBtn = find.byIcon(Icons.blur_linear_rounded);
+      final pixelBtn = findCommandIcon(Icons.blur_linear_rounded);
       expect(pixelBtn, findsOneWidget);
       await tester.tap(pixelBtn);
       await tester.pump();
-      expect(find.byIcon(Icons.grain_rounded), findsOneWidget);
-    });
+      expect(findCommandIcon(Icons.grain_rounded), findsOneWidget);
+    },
+    );
   });
 }

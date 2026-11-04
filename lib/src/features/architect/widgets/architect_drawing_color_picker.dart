@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -203,7 +204,7 @@ class _DrawingColorDialogState extends State<ArchitectDrawingColorDialog> {
           IconButton(
             key: const ValueKey('drawing-color-info'),
             tooltip: l.architectColorInfo,
-            icon: const Icon(Icons.info_outline, size: 20),
+            icon: const AppIcon(AppIconId.info, size: 20),
             onPressed: _info,
           ),
         ],
@@ -231,7 +232,7 @@ class _DrawingColorDialogState extends State<ArchitectDrawingColorDialog> {
               decoration: InputDecoration(
                 hintText: l.architectColorSearch,
                 isDense: true,
-                prefixIcon: const Icon(Icons.search, size: 20),
+                prefixIcon: const AppIcon(AppIconId.search, size: 20),
               ),
               onChanged: (v) => setState(() => search = v),
             ),
@@ -275,7 +276,7 @@ class _DrawingColorDialogState extends State<ArchitectDrawingColorDialog> {
                 IconButton(
                   key: const ValueKey('drawing-color-custom'),
                   tooltip: l.architectColorCustom,
-                  icon: const Icon(Icons.edit_outlined, size: 20),
+                  icon: const AppIcon(AppIconId.edit, size: 20),
                   onPressed: _custom,
                 ),
               ],
@@ -355,7 +356,7 @@ class _CustomColorDialogState extends State<ArchitectCustomColorDialog> {
                 controller: hex,
                 maxLength: 6,
                 decoration: InputDecoration(
-                  labelText: 'HEX',
+                  labelText: context.l10n.commandUiHex,
                   prefixText: '#',
                   errorText: rgb == null ? l.architectColorHexError : null,
                 ),

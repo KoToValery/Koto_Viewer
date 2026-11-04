@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -6,20 +7,19 @@ enum TextReflowTheme {
   light,
   sepia,
   dark,
-  amoled,
-}
+  amoled }
 
 extension TextReflowThemeExtension on TextReflowTheme {
-  String get label {
+  String localizedLabel(AppLocalizations l) {
     switch (this) {
       case TextReflowTheme.light:
-        return 'Light Paper';
+        return l.commandOptionLightPaper;
       case TextReflowTheme.sepia:
-        return 'Warm Sepia';
+        return l.commandOptionWarmSepia;
       case TextReflowTheme.dark:
-        return 'Dark Charcoal';
+        return l.commandOptionDarkCharcoal;
       case TextReflowTheme.amoled:
-        return 'Pure Black';
+        return l.commandOptionPureBlack;
     }
   }
 
@@ -80,18 +80,17 @@ extension TextReflowThemeExtension on TextReflowTheme {
 enum TextReflowFont {
   serif,
   sans,
-  mono,
-}
+  mono }
 
 extension TextReflowFontExtension on TextReflowFont {
-  String get label {
+  String localizedLabel(AppLocalizations l) {
     switch (this) {
       case TextReflowFont.serif:
-        return 'Serif (Book)';
+        return l.commandOptionSerifBook;
       case TextReflowFont.sans:
-        return 'Sans-Serif (Modern)';
+        return l.commandOptionSansSerifModern;
       case TextReflowFont.mono:
-        return 'Monospace (Clean)';
+        return l.commandOptionMonospaceClean;
     }
   }
 
@@ -134,16 +133,15 @@ extension TextReflowFontExtension on TextReflowFont {
 /// Reading page flow mode: paginated (swipe/tap like Kindle) or continuous vertical scroll.
 enum TextReflowMode {
   paginated,
-  continuous,
-}
+  continuous }
 
 extension TextReflowModeExtension on TextReflowMode {
-  String get label {
+  String localizedLabel(AppLocalizations l) {
     switch (this) {
       case TextReflowMode.paginated:
-        return 'Pages (Swipe)';
+        return l.commandOptionPagesSwipe;
       case TextReflowMode.continuous:
-        return 'Continuous Scroll';
+        return l.continuousScroll;
     }
   }
 }

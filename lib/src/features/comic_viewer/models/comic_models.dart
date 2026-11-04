@@ -1,21 +1,21 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
 import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 
 enum ComicFitMode {
   fitWidth,
   fitPage,
-  fitHeight,
-}
+  fitHeight }
 
 extension ComicFitModeExtension on ComicFitMode {
-  String get label {
+  String localizedLabel(AppLocalizations l) {
     switch (this) {
       case ComicFitMode.fitWidth:
-        return 'Fit Width';
+        return l.fitWidth;
       case ComicFitMode.fitPage:
-        return 'Fit Page';
+        return l.fitPage;
       case ComicFitMode.fitHeight:
-        return 'Fit Height';
+        return l.fitHeight;
     }
   }
 
@@ -38,25 +38,25 @@ enum ComicReadingMode {
 }
 
 extension ComicReadingModeExtension on ComicReadingMode {
-  String get label {
+  String localizedLabel(AppLocalizations l) {
     switch (this) {
       case ComicReadingMode.leftToRight:
-        return 'Left to Right (Western)';
+        return l.commandOptionLeftToRightWestern;
       case ComicReadingMode.rightToLeft:
-        return 'Right to Left (Manga)';
+        return l.commandOptionRightToLeftManga;
       case ComicReadingMode.verticalContinuous:
-        return 'Vertical Scroll (Webtoon)';
+        return l.commandOptionVerticalScrollWebtoon;
     }
   }
 
-  String get shortLabel {
+  String localizedShortLabel(AppLocalizations l) {
     switch (this) {
       case ComicReadingMode.leftToRight:
-        return 'LTR';
+        return l.commandOptionLtr;
       case ComicReadingMode.rightToLeft:
-        return 'Manga';
+        return l.commandOptionManga;
       case ComicReadingMode.verticalContinuous:
-        return 'Webtoon';
+        return l.commandOptionWebtoon;
     }
   }
 }
@@ -225,4 +225,3 @@ class ComicAutoplayConfig {
   @override
   int get hashCode => Object.hash(intervalSeconds, webtoonScrollSpeed, loop, pauseOnZoom);
 }
-

@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../models/dxf_models.dart';
 
@@ -47,7 +49,8 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
   @override
   void initState() {
     super.initState();
-    _textController = TextEditingController(text: widget.initialAnnotation?.text ?? '');
+    _textController = TextEditingController(text: widget.initialAnnotation?.text ?? '',
+    );
     _selectedColor = widget.initialAnnotation?.colorValue ?? _availableColors[0];
   }
 
@@ -81,7 +84,8 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
       backgroundColor: const Color(0xFF1B2433),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Color(_selectedColor).withValues(alpha: 0.8), width: 1.5),
+        side: BorderSide(color: Color(_selectedColor).withValues(alpha: 0.8), width: 1.5,
+        ),
       ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 440),
@@ -99,7 +103,8 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
                     color: Color(_selectedColor).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.arrow_outward, color: Color(_selectedColor), size: 20),
+                  child: Icon(Icons.arrow_outward, color: Color(_selectedColor), size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -123,7 +128,9 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+                  icon: const AppIcon(
+                    AppIconId.close, color: Colors.white54, size: 20,
+                  ),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -138,8 +145,11 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
               minLines: 2,
               style: const TextStyle(color: Colors.white, fontSize: 13.5),
               decoration: InputDecoration(
-                hintText: 'Enter annotation text or select a preset below...',
-                hintStyle: const TextStyle(color: Colors.white38, fontSize: 12.5),
+                hintText: context
+                    .l10n
+                    .commandUiEnterAnnotationTextOrSelectAPresetBelow,
+                hintStyle: const TextStyle(color: Colors.white38, fontSize: 12.5,
+                ),
                 filled: true,
                 fillColor: Colors.black26,
                 contentPadding: const EdgeInsets.all(12),
@@ -149,7 +159,8 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: Color(_selectedColor), width: 1.5),
+                  borderSide: BorderSide(color: Color(_selectedColor), width: 1.5,
+                  ),
                 ),
               ),
             ),
@@ -158,7 +169,8 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
             // Quick Preset Chips
             const Text(
               'Quick Presets',
-              style: TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600),
+              style: TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 6),
             Wrap(
@@ -173,7 +185,8 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
                   },
                   borderRadius: BorderRadius.circular(6),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white10,
                       borderRadius: BorderRadius.circular(6),
@@ -181,7 +194,8 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
                     ),
                     child: Text(
                       preset,
-                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                      style: const TextStyle(color: Colors.white70, fontSize: 11,
+                      ),
                     ),
                   ),
                 );
@@ -194,7 +208,8 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
               children: [
                 const Text(
                   'Color:',
-                  style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                  style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 ..._availableColors.map((colorVal) {
@@ -221,7 +236,7 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
                                 BoxShadow(
                                   color: Color(colorVal).withValues(alpha: 0.6),
                                   blurRadius: 6,
-                                )
+                                ),
                               ]
                             : null,
                       ),
@@ -237,8 +252,10 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
               children: [
                 if (isEditing && widget.onDelete != null)
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Color(0xFFFF5252)),
-                    tooltip: 'Delete Note',
+                    icon: const AppIcon(
+                      AppIconId.delete, color: Color(0xFFFF5252),
+                    ),
+                    tooltip: context.l10n.commandUiDeleteNote,
                     onPressed: () {
                       widget.onDelete!();
                       Navigator.of(context).pop();
@@ -247,18 +264,24 @@ class _DxfAnnotationDialogState extends State<DxfAnnotationDialog> {
                 const Spacer(),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+                  child: Text(
+                    context.l10n.architectSheetCancel, style: TextStyle(color: Colors.white60),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
                   onPressed: _save,
-                  icon: const Icon(Icons.check, size: 16),
-                  label: Text(isEditing ? 'Update Note' : 'Add Note'),
+                  icon: const AppIcon(AppIconId.confirm, size: 16),
+                  label: Text(isEditing ? context.l10n.commandUiUpdateNote
+                        : context.l10n.commandUiAddNote,
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(_selectedColor),
                     foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10,
+                    ),
                   ),
                 ),
               ],

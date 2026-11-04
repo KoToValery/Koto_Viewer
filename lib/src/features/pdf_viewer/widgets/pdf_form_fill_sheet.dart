@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -188,7 +189,8 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
                       color: theme.colorScheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.edit_note, color: theme.colorScheme.primary, size: 24),
+                    child: Icon(Icons.edit_note, color: theme.colorScheme.primary, size: 24,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -197,20 +199,22 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
                       children: [
                         Text(
                           l10n.pdfFormFilling,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Text(
                           l10n.pdfFormFieldsCount(_fields.length),
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const AppIcon(AppIconId.close),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -220,16 +224,19 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
             // Search filter if more than 5 fields
             if (_fields.length > 5)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4,
+                ),
                 child: TextField(
                   decoration: InputDecoration(
                     hintText: l10n.search,
-                    prefixIcon: const Icon(Icons.search, size: 20),
+                    prefixIcon: const AppIcon(AppIconId.search, size: 20),
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+                      borderSide: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                      ),
                     ),
                   ),
                   onChanged: (val) => setState(() => _searchFilter = val.trim()),
@@ -246,13 +253,16 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
                         padding: const EdgeInsets.all(24),
                         child: Text(
                           l10n.pdfNoFormFields,
-                          style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                          style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6,
+                            ),
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8,
+                      ),
                       itemCount: filteredFields.length,
                       itemBuilder: (context, index) {
                         final field = filteredFields[index];
@@ -287,7 +297,8 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
                               children: [
                                 Text(
                                   l10n.pdfFormFlatten,
-                                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                                 Text(
                                   l10n.pdfFormFlattenTooltip,
@@ -316,9 +327,11 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
                             onPressed: () => _handleSave(saveAsNewFile: true),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                            child: Text(l10n.pdfFormSaveAsCopy, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            child: Text(l10n.pdfFormSaveAsCopy, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -329,9 +342,11 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
                               backgroundColor: theme.colorScheme.primary,
                               foregroundColor: theme.colorScheme.onPrimary,
                               padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                            child: Text(l10n.pdfFormSaveOverwrite, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            child: Text(l10n.pdfFormSaveOverwrite, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ],
@@ -359,17 +374,20 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
                   Expanded(
                     child: Text(
                       field.displayName,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5,
+                      ),
                     ),
                   ),
                   if (field.readOnly)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text('Read-only', style: TextStyle(fontSize: 10)),
+                      child: const Text('Read-only', style: TextStyle(fontSize: 10),
+                      ),
                     ),
                 ],
               ),
@@ -380,8 +398,10 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
                 maxLines: field.isMultiline ? 3 : 1,
                 decoration: InputDecoration(
                   hintText: field.tooltip ?? field.name,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10,
+                  ),
                 ),
               ),
             ],
@@ -393,7 +413,9 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: CheckboxListTile(
-            title: Text(field.displayName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+            title: Text(field.displayName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5,
+              ),
+            ),
             subtitle: field.tooltip != null && field.tooltip != field.displayName ? Text(field.tooltip!) : null,
             value: isChecked,
             contentPadding: EdgeInsets.zero,
@@ -415,13 +437,15 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
             children: [
               Text(
                 field.displayName,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5,
+                ),
               ),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
                 initialValue: field.options.contains(field.value?.toString()) ? field.value?.toString() : null,
                 items: field.options
-                    .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                    .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)),
+                    )
                     .toList(),
                 onChanged: field.readOnly
                     ? null
@@ -431,8 +455,10 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
                         });
                       },
                 decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10,
+                  ),
                 ),
               ),
             ],
@@ -445,7 +471,8 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+              border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3),
+              ),
               borderRadius: BorderRadius.circular(10),
               color: theme.colorScheme.primary.withValues(alpha: 0.04),
             ),
@@ -457,10 +484,14 @@ class _PdfFormFillSheetState extends State<PdfFormFillSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(field.displayName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                      Text(field.displayName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5,
+                        ),
+                      ),
                       Text(
                         'Signature field (Page ${field.pageIndex + 1})',
-                        style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                        style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurface.withValues(alpha: 0.6,
+                          ),
+                        ),
                       ),
                     ],
                   ),

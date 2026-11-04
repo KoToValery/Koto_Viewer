@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_radial_menu.dart';
 import 'package:kotoview/src/features/bim_editing/widgets/bim_edit_actions.dart';
 import 'architect_tool_test_helper.dart' as tool_ui;
@@ -375,8 +376,10 @@ void main() {
       await editing.selectTool(tester, 'wall');
       await editing.contextHold(tester, const Offset(3, 0));
       expect(find.text('Нова точка'), findsOneWidget);
-      final menu = tester.widget<ArchitectRadialMenu>(find.byType(ArchitectRadialMenu));
-      expect(menu.items.map((item) => item.action), containsAll([BimEditAction.cut, BimEditAction.split]));
+      final menu = tester.widget<ArchitectRadialMenu>(find.byType(ArchitectRadialMenu),
+      );
+      expect(menu.items.map((item) => item.action), containsAll([BimEditAction.cut, BimEditAction.split]),
+      );
       final buttons = find.byWidgetPredicate(
         (w) =>
             w is InkWell &&
@@ -398,7 +401,8 @@ void main() {
       }
       await tester.tap(find.byKey(const ValueKey('architect-radial-newPoint')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('architect-new-point-banner')), findsOneWidget);
+      expect(find.byKey(const ValueKey('architect-new-point-banner')), findsOneWidget,
+      );
       await tester.tapAt(workspace.screen(tester, const Offset(4, 0)));
       await tester.pumpAndSettle();
       await editing.acceptGeometryCommand(tester);
@@ -420,7 +424,8 @@ void main() {
         name: 's',
         walls: [
           editing.wall('w1', Offset.zero, const Offset(10, 0)),
-          editing.wall('w2', const Offset(5, -3), const Offset(5, 3), exterior: true),
+          editing.wall('w2', const Offset(5, -3), const Offset(5, 3), exterior: true,
+          ),
         ],
       );
       final model = editing.seeded(storey);
@@ -439,7 +444,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('architect-radial-newPoint')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('architect-new-point-banner')), findsOneWidget);
+      expect(find.byKey(const ValueKey('architect-new-point-banner')), findsOneWidget,
+      );
 
       final w2 = storey.walls[1];
       final coreX = w2.coreCorners.first.dx;
@@ -460,7 +466,8 @@ void main() {
     },
   );
 
-  testWidgets('New Point icon draws central point and outer circle', (tester) async {
+  testWidgets('New Point icon draws central point and outer circle', (tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -473,7 +480,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.descendant(of: find.byType(BimEditingSymbol), matching: find.byType(CustomPaint)), findsOneWidget);
-    expect(BimEditActions.icon(BimEditAction.newPoint), Icons.adjust);
+    expect(find.descendant(of: find.byType(BimEditingSymbol), matching: find.byType(AppIcon),
+      ), findsOneWidget,
+    );
+    expect(BimEditActions.icon(BimEditAction.newPoint), AppIconId.newPoint);
   });
 }

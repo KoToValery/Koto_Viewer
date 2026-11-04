@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -117,8 +118,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   Future<void> _detectFormAndCertificates() async {
     try {
-      final formFields = await PdfFormService.extractFormFields(widget.filePath);
-      final certs = await PdfCertificateService.extractCertificates(widget.filePath);
+      final formFields = await PdfFormService.extractFormFields(widget.filePath,
+      );
+      final certs = await PdfCertificateService.extractCertificates(widget.filePath,
+      );
       if (mounted) {
         setState(() {
           _formFields = formFields;
@@ -195,7 +198,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         });
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._loadReflowSettings');
+      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._loadReflowSettings',
+      );
     }
   }
 
@@ -205,9 +209,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       await prefs.setDouble('pdf_reflow_font_size', _reflowSettings.fontSize);
       await prefs.setInt('pdf_reflow_theme', _reflowSettings.theme.index);
       await prefs.setInt('pdf_reflow_font', _reflowSettings.font.index);
-      await prefs.setBool('pdf_reflow_is_continuous', _reflowSettings.isContinuous);
+      await prefs.setBool('pdf_reflow_is_continuous', _reflowSettings.isContinuous,
+      );
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._saveReflowSettings');
+      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._saveReflowSettings',
+      );
     }
   }
 
@@ -233,7 +239,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       }
 
       // Check saved reading progress
-      final progress = await ReadingProgressService.getProgress(widget.filePath);
+      final progress = await ReadingProgressService.getProgress(widget.filePath,
+      );
       if (progress != null && progress.page > 0) {
         _savedPageToRestore = progress.page;
         _bookmarks = progress.bookmarks;
@@ -242,9 +249,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       }
       _checkBookmarkStatus();
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._loadProgressAndSaveRecent.fs');
+      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._loadProgressAndSaveRecent.fs',
+      );
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._loadProgressAndSaveRecent');
+      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._loadProgressAndSaveRecent',
+      );
     }
   }
 
@@ -284,7 +293,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         ),
       );
       if (existing.id.isNotEmpty) {
-        await ReadingProgressService.removeBookmark(widget.filePath, existing.id);
+        await ReadingProgressService.removeBookmark(widget.filePath, existing.id,
+        );
       }
       _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
       setState(() => _isCurrentBookmarked = false);
@@ -349,7 +359,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.2,
+                          ),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -357,11 +368,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           children: [
-                            Icon(Icons.bookmark, color: theme.colorScheme.primary),
+                            Icon(Icons.bookmark, color: theme.colorScheme.primary,
+                            ),
                             const SizedBox(width: 10),
                             Text(
                               'Bookmarks (${_bookmarks.length})',
-                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
@@ -373,7 +386,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                                 child: Text(
                                   'No bookmarks saved yet.\nTap the bookmark icon on any page.',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                                  style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                  ),
                                 ),
                               )
                             : ListView.separated(
@@ -385,23 +399,31 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                                   return ListTile(
                                     leading: CircleAvatar(
                                       backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
-                                      child: Icon(Icons.bookmark, color: theme.colorScheme.primary, size: 18),
+                                      child: AppIcon(
+                                        AppIconId.bookmark, color: theme.colorScheme.primary, size: 18,
+                                      ),
                                     ),
                                     title: Text(
                                       b.label,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14,
+                                      ),
                                     ),
                                     subtitle: Text(
                                       b.snippet,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
+                                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12,
+                                      ),
                                     ),
                                     trailing: IconButton(
-                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                      icon: const AppIcon(
+                                        AppIconId.delete, size: 18,
+                                      ),
                                       onPressed: () async {
-                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id);
-                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id,
+                                        );
+                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath,
+                                            );
                                         _checkBookmarkStatus();
                                         setSheetState(() {});
                                         setState(() {});
@@ -467,7 +489,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                       width: 36,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.2,
+                        ),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -478,10 +501,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDC2626).withValues(alpha: 0.12),
+                          color: const Color(0xFFDC2626,
+                          ).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.picture_as_pdf, color: Color(0xFFDC2626), size: 28),
+                        child: const Icon(Icons.picture_as_pdf, color: Color(0xFFDC2626), size: 28,
+                        ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -490,14 +515,17 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                           children: [
                             Text(
                               _fileName,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                              ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'PDF Document',
-                              style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                              style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurface.withValues(alpha: 0.6,
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -506,11 +534,15 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   ),
                   const Divider(height: 24),
                   _buildInfoRow('Total Pages:', '$_pageCount pages'),
-                  _buildInfoRow('Current Page:', 'Page $_currentPage of $_pageCount'),
+                  _buildInfoRow('Current Page:', 'Page $_currentPage of $_pageCount',
+                  ),
                   _buildInfoRow('File Size:', formattedSize),
-                  _buildInfoRow(context.l10n.viewMode, _isSinglePageMode ? context.l10n.singlePageSwipe : context.l10n.continuousScroll),
-                  _buildInfoRow('Form Fields:', _formFields.isEmpty ? 'None' : '${_formFields.length} AcroForm fields'),
-                  _buildInfoRow('Signatures:', _certificates.isEmpty ? 'None' : '${_certificates.length} digital signature(s)'),
+                  _buildInfoRow(context.l10n.viewMode, _isSinglePageMode ? context.l10n.singlePageSwipe : context.l10n.continuousScroll,
+                  ),
+                  _buildInfoRow('Form Fields:', _formFields.isEmpty ? 'None' : '${_formFields.length} AcroForm fields',
+                  ),
+                  _buildInfoRow('Signatures:', _certificates.isEmpty ? 'None' : '${_certificates.length} digital signature(s)',
+                  ),
                   _buildInfoRow('File Path:', widget.filePath),
                 ],
               ),
@@ -528,7 +560,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface.withValues(alpha: 0.7))),
+          Text(label, style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
@@ -585,7 +619,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     _checkBookmarkStatus();
   }
 
-  void _setSinglePageZoom(TransformationController controller, double newScale) {
+  void _setSinglePageZoom(TransformationController controller, double newScale,
+  ) {
     if (newScale <= 1.01) {
       controller.value = Matrix4.identity();
       setState(() {
@@ -617,7 +652,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     } else {
       if (!_pdfController.isReady) return;
       try {
-        _pdfController.goToPage(pageNumber: _currentPage, anchor: PdfPageAnchor.center);
+        _pdfController.goToPage(pageNumber: _currentPage, anchor: PdfPageAnchor.center,
+        );
       } on Exception catch (_) {
         // Ignored if controller is not ready or disposed
       }
@@ -690,7 +726,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       if (mounted) {
         final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n != null ? l10n.printError(e.message) : 'Print error: ${e.message}')),
+          SnackBar(content: Text(l10n != null ? l10n.printError(e.message) : 'Print error: ${e.message}',
+            ),
+          ),
         );
       }
     } on Exception catch (e, stack) {
@@ -698,7 +736,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       if (mounted) {
         final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n != null ? l10n.printError(e.toString()) : 'Print error: $e')),
+          SnackBar(content: Text(l10n != null ? l10n.printError(e.toString()) : 'Print error: $e',
+            ),
+          ),
         );
       }
     }
@@ -810,7 +850,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _pdfController.isReady) {
-          _pdfController.goToPage(pageNumber: _currentPage, anchor: PdfPageAnchor.center);
+          _pdfController.goToPage(pageNumber: _currentPage, anchor: PdfPageAnchor.center,
+          );
         }
       });
     }
@@ -829,7 +870,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _pdfController.isReady) {
-            _pdfController.goToPage(pageNumber: _currentPage, anchor: PdfPageAnchor.center);
+            _pdfController.goToPage(pageNumber: _currentPage, anchor: PdfPageAnchor.center,
+            );
           }
         });
       }
@@ -840,20 +882,20 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     return [
       // Reading Mode / Reflow Toggle (E-Book Experience)
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _isReflowMode ? Icons.auto_stories : Icons.auto_stories_outlined,
           size: 20,
           color: _isReflowMode ? theme.colorScheme.primary : null,
         ),
         tooltip: _isReflowMode
-            ? 'Exit Reading Mode (Back to Original PDF)'
-            : 'Reading Mode (Reflow / E-Book)',
+            ? context.l10n.commandUiExitReadingModeBackToOriginalPdf
+            : context.l10n.commandUiReadingModeReflowEBook,
         onPressed: _toggleReflowMode,
       ),
 
       // View Mode Toggle (Single Page vs Continuous Scroll)
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _isSinglePageMode ? Icons.view_carousel_outlined : Icons.view_stream_outlined,
           size: 20,
         ),
@@ -865,12 +907,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
       // Bookmark Toggle
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
           size: 20,
           color: _isCurrentBookmarked ? theme.colorScheme.primary : null,
         ),
-        tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
+        tooltip: _isCurrentBookmarked ? context.l10n.commandUiRemoveBookmark
+            : context.l10n.commandUiAddBookmark,
         onPressed: _toggleBookmark,
       ),
 
@@ -879,16 +922,17 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         icon: Badge(
           isLabelVisible: _bookmarks.isNotEmpty,
           label: Text('${_bookmarks.length}'),
-          child: const Icon(Icons.bookmarks_outlined, size: 20),
+          child: const AppIcon(AppIconId.bookmarks, size: 20),
         ),
-        tooltip: 'Saved Bookmarks',
+        tooltip: context.l10n.commandUiSavedBookmarks,
         onPressed: _showBookmarksSheet,
       ),
 
       // Invert Mode (Dark/Light)
       IconButton(
-        icon: Icon(_isDarkModeView ? Icons.light_mode : Icons.dark_mode, size: 20),
-        tooltip: 'Toggle Invert Colors',
+        icon: AppIcon.fromMaterial(_isDarkModeView ? Icons.light_mode : Icons.dark_mode, size: 20,
+        ),
+        tooltip: context.l10n.commandUiToggleInvertColors,
         onPressed: () {
           setState(() {
             _isDarkModeView = !_isDarkModeView;
@@ -898,15 +942,15 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
       // Fullscreen
       IconButton(
-        icon: const Icon(Icons.fullscreen, size: 20),
+        icon: const AppIcon(AppIconId.fullscreen, size: 20),
         tooltip: context.l10n.fullscreen,
         onPressed: _toggleFullscreen,
       ),
 
       // Info Sheet
       IconButton(
-        icon: const Icon(Icons.info_outline, size: 20),
-        tooltip: 'PDF Properties',
+        icon: const AppIcon(AppIconId.info, size: 20),
+        tooltip: context.l10n.commandUiPdfProperties,
         onPressed: _showInfoSheet,
       ),
 
@@ -916,7 +960,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           isLabelVisible: _formFields.isNotEmpty,
           label: Text('${_formFields.length}'),
           backgroundColor: theme.colorScheme.primary,
-          child: Icon(
+          child: AppIcon.fromMaterial(
             _formFields.isNotEmpty ? Icons.edit_note : Icons.edit_note_outlined,
             size: 20,
             color: _formFields.isNotEmpty ? theme.colorScheme.primary : null,
@@ -928,7 +972,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
       // Digital Certificates & Signatures
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _certificates.isNotEmpty ? Icons.verified_user : Icons.security_outlined,
           size: 20,
           color: _certificates.isNotEmpty ? Colors.green.shade600 : null,
@@ -939,15 +983,15 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
       // Share
       IconButton(
-        icon: const Icon(Icons.share_outlined, size: 20),
-        tooltip: 'Share PDF',
+        icon: const AppIcon(AppIconId.share, size: 20),
+        tooltip: context.l10n.commandUiSharePdf,
         onPressed: _sharePdf,
       ),
 
       // Print
       IconButton(
-        icon: const Icon(Icons.print_outlined, size: 20),
-        tooltip: 'Print PDF',
+        icon: const AppIcon(AppIconId.print, size: 20),
+        tooltip: context.l10n.commandUiPrintPdf,
         onPressed: _printPdf,
       ),
     ];
@@ -966,7 +1010,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               backgroundColor: theme.colorScheme.surface,
               elevation: 0.5,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
+                icon: const AppIcon(AppIconId.back),
                 onPressed: () {
                   _saveReadingProgress();
                   Navigator.of(context).pop(true);
@@ -978,7 +1022,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 children: [
                   Text(
                     _fileName,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -987,7 +1032,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                       '${context.l10n.pageIndicator(_currentPage, _pageCount)} • ${_isReflowMode ? "Reading Mode (Reflow)" : (_isSinglePageMode ? context.l10n.singlePageLabel : context.l10n.continuousLabel)}',
                       style: TextStyle(
                         fontSize: 11.5,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.65,
+                        ),
                       ),
                     ),
                 ],
@@ -1060,7 +1106,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     tooltip: _isOrientationLocked
                         ? context.l10n.unlockRotation
                         : context.l10n.lockRotation,
-                    child: Icon(
+                    child: AppIcon.fromMaterial(
                       _isOrientationLocked ? Icons.screen_lock_rotation : Icons.screen_rotation,
                       color: _isOrientationLocked
                           ? theme.colorScheme.onPrimary
@@ -1071,9 +1117,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   FloatingActionButton.small(
                     heroTag: 'exit_fullscreen_pdf',
                     onPressed: _toggleFullscreen,
-                    backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+                    backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8,
+                    ),
                     tooltip: context.l10n.exitFullscreen,
-                    child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
+                    child: AppIcon(
+                      AppIconId.exitFullscreen, color: theme.colorScheme.onSurface,
+                    ),
                   ),
                 ],
               ),
@@ -1120,21 +1169,23 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.first_page),
+                      icon: const AppIcon(AppIconId.firstPage),
                       tooltip: l10n.firstPage,
                       onPressed: _currentPage > 1 ? () => _goToPage(1) : null,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.chevron_left),
+                      icon: const AppIcon(AppIconId.chevronLeft),
                       tooltip: l10n.previousPage,
                       onPressed: _currentPage > 1 ? () => _goToPage(_currentPage - 1) : null,
                     ),
                     GestureDetector(
                       onTap: _showJumpToPageDialog,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                          color: theme.colorScheme.primary.withValues(alpha: 0.1,
+                          ),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -1147,12 +1198,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.chevron_right),
+                      icon: const AppIcon(AppIconId.chevronRight),
                       tooltip: l10n.nextPage,
                       onPressed: _currentPage < _pageCount ? () => _goToPage(_currentPage + 1) : null,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.last_page),
+                      icon: const AppIcon(AppIconId.lastPage),
                       tooltip: l10n.lastPage,
                       onPressed: _currentPage < _pageCount ? () => _goToPage(_pageCount) : null,
                     ),
@@ -1266,7 +1317,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     SnackBar(
                       duration: const Duration(seconds: 2),
                       behavior: SnackBarBehavior.floating,
-                      content: Text('Resumed at Page $restoreTo of $_pageCount'),
+                      content: Text('Resumed at Page $restoreTo of $_pageCount',
+                      ),
                     ),
                   );
                 }
@@ -1391,7 +1443,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     SnackBar(
                       duration: const Duration(seconds: 2),
                       behavior: SnackBarBehavior.floating,
-                      content: Text('Resumed at Page $restoreTo of $_pageCount'),
+                      content: Text('Resumed at Page $restoreTo of $_pageCount',
+                      ),
                     ),
                   );
                   return;
@@ -1420,7 +1473,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         heroTag: 'pdf_zoom_btn',
         onPressed: () => setState(() => _isZoomBarExpanded = true),
         backgroundColor: theme.colorScheme.surface,
-        child: Icon(Icons.zoom_in, color: theme.colorScheme.primary, size: 20),
+        child: AppIcon(
+          AppIconId.zoomIn, color: theme.colorScheme.primary, size: 20,
+        ),
       );
     }
 
@@ -1430,7 +1485,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         color: theme.colorScheme.surface.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(30),
         boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 3)),
+          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 3),
+          ),
         ],
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
@@ -1441,8 +1497,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         children: [
           // Zoom Out (-)
           IconButton(
-            icon: const Icon(Icons.remove, size: 18),
-            tooltip: 'Zoom Out (-)',
+            icon: const AppIcon(AppIconId.remove, size: 18),
+            tooltip: context.l10n.commandUiZoomOut,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
             onPressed: _zoomOut,
@@ -1467,8 +1523,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
           // Zoom In (+)
           IconButton(
-            icon: const Icon(Icons.add, size: 18),
-            tooltip: 'Zoom In (+)',
+            icon: const AppIcon(AppIconId.add, size: 18),
+            tooltip: context.l10n.commandUiZoomIn,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
             onPressed: _zoomIn,
@@ -1501,8 +1557,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
           // Fit Page Button
           IconButton(
-            icon: const Icon(Icons.fit_screen, size: 18),
-            tooltip: 'Fit Page to Screen',
+            icon: const AppIcon(AppIconId.fitView, size: 18),
+            tooltip: context.l10n.commandUiFitPageToScreen,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
             onPressed: _fitCurrentPage,
@@ -1510,8 +1566,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
           // Collapse Bar
           IconButton(
-            icon: const Icon(Icons.close, size: 16),
-            tooltip: 'Minimize Controls',
+            icon: const AppIcon(AppIconId.close, size: 16),
+            tooltip: context.l10n.commandUiMinimizeControls,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
             onPressed: () => setState(() => _isZoomBarExpanded = false),
@@ -1609,8 +1665,7 @@ class PdfSinglePageItemState extends State<PdfSinglePageItem> with SingleTickerP
     ).animate(
       CurvedAnimation(
         parent: _animController,
-        curve: Curves.easeOutCubic,
-      ),
+        curve: Curves.easeOutCubic),
     );
     _animController.forward(from: 0.0);
   }
@@ -1730,8 +1785,10 @@ class PdfSinglePageItemState extends State<PdfSinglePageItem> with SingleTickerP
               // For standard A4 (595x842 pt), 300 DPI produces ~2480x3508 pixels.
               // We target between 2400.0 and 4200.0 pixels on the longer page edge for sharp zoom up to 600%.
               final double longEdge = math.max(w, h);
-              final double targetLongEdge = math.min(4200.0, math.max(2400.0, longEdge * 4.5));
-              final double scale = (targetLongEdge / longEdge).clamp(2.0, 6.0);
+              final double targetLongEdge = math.min(4200.0, math.max(2400.0, longEdge * 4.5),
+                );
+              final double scale = (targetLongEdge / longEdge).clamp(2.0, 6.0,
+                );
               return Size(w * scale, h * scale);
             },
             decorationBuilder: (context, pageSize, page, pageImage) {
@@ -1745,7 +1802,8 @@ class PdfSinglePageItemState extends State<PdfSinglePageItem> with SingleTickerP
                         decoration: BoxDecoration(
                           color: pageImage == null ? Colors.white : Colors.transparent,
                           boxShadow: const [
-                            BoxShadow(color: Colors.black54, blurRadius: 4, offset: Offset(2, 2)),
+                            BoxShadow(color: Colors.black54, blurRadius: 4, offset: Offset(2, 2),
+                              ),
                           ],
                         ),
                       ),
@@ -1769,4 +1827,3 @@ class PdfSinglePageItemState extends State<PdfSinglePageItem> with SingleTickerP
   );
 }
 }
-

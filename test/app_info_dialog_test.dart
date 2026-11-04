@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/home/widgets/app_info_dialog.dart';
@@ -20,6 +21,9 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+localizationsDelegates: AppLocalizations.localizationsDelegates,
+supportedLocales: AppLocalizations.supportedLocales,
+locale: const Locale('en'),
             theme: ThemeData.light(),
             home: const Scaffold(body: AppInfoDialog()),
           ),
@@ -68,6 +72,9 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+localizationsDelegates: AppLocalizations.localizationsDelegates,
+supportedLocales: AppLocalizations.supportedLocales,
+locale: const Locale('en'),
             theme: ThemeData.light(),
             home: const Scaffold(body: AppInfoDialog()),
           ),
@@ -104,6 +111,9 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+localizationsDelegates: AppLocalizations.localizationsDelegates,
+supportedLocales: AppLocalizations.supportedLocales,
+locale: const Locale('en'),
             theme: ThemeData.dark(),
             home: const MediaQuery(
               data: MediaQueryData(textScaler: TextScaler.linear(1.2)),

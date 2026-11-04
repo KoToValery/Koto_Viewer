@@ -1,3 +1,4 @@
+import 'support/command_icon_finders.dart';
 import 'package:kotoview/src/features/bim_editing/widgets/bim_transform_renderer.dart';
 import 'dart:math' as math;
 import 'dart:ui';
@@ -57,18 +58,17 @@ void main() {
     expect(mirroredPts[3], const Offset(10, 5));
   });
 
-  testWidgets('StructuralDesignerScreen renders a compact element palette', (tester) async {
+  testWidgets('StructuralDesignerScreen renders a compact element palette', (tester,
+  ) async {
     final doc = DxfDocument(
       entities: [
         const DxfLine(
           layer: '0',
           p1: Offset(0, 0),
-          p2: Offset(100, 100),
-        ),
+          p2: Offset(100, 100)),
       ],
       layers: {
-        '0': DxfLayer(name: '0', isVisible: true),
-      },
+        '0': DxfLayer(name: '0', isVisible: true)},
       blocks: const {},
       headerVars: const {},
       bounds: const Rect.fromLTWH(0, 0, 100, 100),
@@ -159,7 +159,8 @@ void main() {
     expect(poly[2].dy, closeTo(3.0, 1e-4));
     expect(poly[3].dx, closeTo(0.125, 1e-4));
     expect(poly[3].dy, closeTo(0.0, 1e-4));
-  });
+  },
+  );
 
   test('CAD snapping endpoint priority over nearest on overlapping tolerance', () {
     final doc = DxfDocument(
@@ -168,12 +169,10 @@ void main() {
         const DxfLine(
           layer: '0',
           p1: Offset(0, 0),
-          p2: Offset(10, 0),
-        ),
+          p2: Offset(10, 0)),
       ],
       layers: {
-        '0': DxfLayer(name: '0', isVisible: true),
-      },
+        '0': DxfLayer(name: '0', isVisible: true)},
       blocks: const {},
       headerVars: const {},
       bounds: const Rect.fromLTWH(0, 0, 10, 10),
@@ -193,7 +192,8 @@ void main() {
     expect(snap, isNotNull);
     expect(snap!.type, DxfSnapType.endpoint);
     expect(snap.point, const Offset(0, 0));
-  });
+  },
+  );
 
   test('StructuralBeam geometry, bounds, polygon, and StoreyLevel support', () {
     final beam = StructuralBeam(
@@ -218,8 +218,7 @@ void main() {
     final level = StoreyLevel(
       id: 'storey_1',
       name: 'Етаж 1',
-      beams: [beam],
-    );
+      beams: [beam]);
     expect(level.beams.length, 1);
     expect(level.beams.first.depth, 0.50);
 
@@ -268,7 +267,8 @@ void main() {
     final slabRemoved = slabWithOpening.removeOpening(0);
     expect(slabRemoved.openings.isEmpty, isTrue);
     expect(slabRemoved.containsPoint(const Offset(3.0, 3.0)), isTrue);
-  });
+  },
+  );
 
   test('StructuralSlab cleanPolygon removes orphan (0,0), collapsed points, and collinear vertices', () {
     // Polygon with orphan (0, 0) point in middle of non-zero contour
@@ -291,7 +291,8 @@ void main() {
       const Offset(10.0, 10.0),
       const Offset(0.0, 10.0),
     ];
-    final cleanedOverlap = StructuralSlab.cleanPolygon(rawWithOverlap, minDistance: 0.05);
+    final cleanedOverlap = StructuralSlab.cleanPolygon(rawWithOverlap, minDistance: 0.05,
+      );
     expect(cleanedOverlap.length, 4);
 
     // Polygon with redundant collinear points
@@ -305,7 +306,8 @@ void main() {
     final cleanedCollinear = StructuralSlab.cleanPolygon(rawCollinear);
     expect(cleanedCollinear.length, 4);
     expect(cleanedCollinear.contains(const Offset(5.0, 0.0)), isFalse);
-  });
+  },
+  );
 
   test('StructuralSlab self-intersection detection prevents bowtie / X-crossings', () {
     // Simple convex square -> no self-intersection
@@ -325,7 +327,8 @@ void main() {
       const Offset(0.0, 5.0),
     ];
     expect(StructuralSlab.hasSelfIntersections(bowTie), isTrue);
-  });
+  },
+  );
 
   test('StructuralGridAxis.fromTwoSegments calculates centerline bisector correctly', () {
     // Two parallel horizontal wall faces 25 cm apart from X=0 to X=10:
@@ -347,7 +350,8 @@ void main() {
     expect(axis.end.dy, closeTo(2.125, 1e-4));
     // Extended beyond 0..10 by 1.0 on each end -> length = 10 + 2 = 12
     expect(axis.length, closeTo(12.0, 1e-4));
-  });
+  },
+  );
 
   test('StructuralGridAxis.intersectionWith finds perpendicular intersection', () {
     // Horizontal axis along Y = 5.0
@@ -370,7 +374,8 @@ void main() {
     expect(inter, isNotNull);
     expect(inter!.dx, closeTo(4.0, 1e-4));
     expect(inter.dy, closeTo(5.0, 1e-4));
-  });
+  },
+  );
 
   test('L-shaped column maintains center, thickness, mirror, and rotation upon move', () {
     const originalCol = StructuralColumn(
@@ -398,7 +403,8 @@ void main() {
     // Polygon vertices count is strictly 6 for L-shape
     final vertices = movedCol.polygonVertices;
     expect(vertices.length, 6);
-  });
+  },
+  );
 
   test('DxfSnapHelper with allowNearest: false skips arbitrary line points', () {
     final doc = DxfDocument(
@@ -406,12 +412,10 @@ void main() {
         const DxfLine(
           layer: '0',
           p1: Offset(0, 0),
-          p2: Offset(10, 0),
-        ),
+          p2: Offset(10, 0)),
       ],
       layers: {
-        '0': DxfLayer(name: '0', isVisible: true),
-      },
+        '0': DxfLayer(name: '0', isVisible: true)},
       blocks: const {},
       headerVars: const {},
       bounds: const Rect.fromLTWH(0, 0, 10, 0),
@@ -460,7 +464,8 @@ void main() {
     expect(fromSegments, isNotNull);
     expect(fromSegments!.bubbleAtStart, isTrue);
     expect(fromSegments.bubbleAtEnd, isTrue);
-  });
+  },
+  );
 
   testWidgets('ElementPaletteBar renders guidance banner, scrollable presets, and does not overflow on 360px screen', (tester) async {
     tester.view.physicalSize = const Size(360, 800);
@@ -476,7 +481,8 @@ void main() {
           bottomNavigationBar: ElementPaletteBar(
             activeTool: StructuralDrawTool.slab,
             onSelectTool: (_) {},
-            currentColumnPreset: const StructuralColumn(id: 'col', center: Offset.zero),
+            currentColumnPreset: const StructuralColumn(id: 'col', center: Offset.zero,
+              ),
             onUpdateColumnPreset: (_) {},
             currentWallThickness: 0.25,
             onUpdateWallThickness: (_) {},
@@ -505,13 +511,13 @@ void main() {
 
     // Verify there are no Flutter overflow errors!
     expect(tester.takeException(), isNull);
-  });
+  },
+  );
 
   test('StructuralColumn displayName and auto-increment naming', () {
     const colDefault = StructuralColumn(
       id: 'c1',
-      center: Offset(5, 5),
-    );
+      center: Offset(5, 5));
     expect(colDefault.displayName, 'К');
 
     const colNamed = StructuralColumn(
@@ -604,7 +610,8 @@ void main() {
     expect(dupAxis.end.dx, closeTo(8.0, 1e-4));
     expect(dupAxis.end.dy, closeTo(10.0, 1e-4));
     expect(dupAxis.length, closeTo(verticalAxis.length, 1e-4));
-  });
+  },
+  );
 
   test('Column offset calculation across directional vectors and auto-increment naming', () {
     const col1 = StructuralColumn(
@@ -645,7 +652,8 @@ void main() {
     expect(offMinusX.center.dx, closeTo(10.0, 1e-4));
     expect(offMinusX.center.dy, closeTo(15.0, 1e-4));
     expect(offMinusX.displayName, 'К4');
-  });
+  },
+  );
 
   testWidgets('StructuralDesignerScreen renders contextual bottom dock with actions when column is selected', (tester) async {
     final doc = DxfDocument(
@@ -653,12 +661,10 @@ void main() {
         const DxfLine(
           layer: '0',
           p1: Offset(0, 0),
-          p2: Offset(100, 100),
-        ),
+          p2: Offset(100, 100)),
       ],
       layers: {
-        '0': DxfLayer(name: '0', isVisible: true),
-      },
+        '0': DxfLayer(name: '0', isVisible: true)},
       blocks: const {},
       headerVars: const {},
       bounds: const Rect.fromLTWH(0, 0, 100, 100),
@@ -727,14 +733,15 @@ void main() {
     expect(tester.takeException(), isNull);
 
     // Tap the deselect (X) button on the dock
-    await tester.tap(find.byIcon(Icons.close_rounded).first);
+    await tester.tap(findCommandIcon(Icons.close_rounded).first);
     await tester.pumpAndSettle();
 
     // After deselecting, ElementPaletteBar returns
     expect(find.text('Колона'), findsOneWidget);
     expect(find.text('Шайба'), findsOneWidget);
     expect(find.text('Плоча'), findsOneWidget);
-  });
+  },
+  );
 
   test('StructuralGridAxis isParallelTo and alignWith geometry', () {
     const axis1 = StructuralGridAxis(
@@ -791,7 +798,8 @@ void main() {
     expect(aligned3.length, closeTo(axis1.length, 1e-4));
   });
 
-  testWidgets('Harmonize parallel grid axes when one axis handle is dragged', (tester) async {
+  testWidgets('Harmonize parallel grid axes when one axis handle is dragged', (tester,
+  ) async {
     final doc = DxfDocument(
       entities: const [],
       layers: {'0': DxfLayer(name: '0', isVisible: true)},
@@ -861,14 +869,18 @@ void main() {
 
     // Verify CustomPaint with Structural2dPainter renders the axes
     final customPaint = tester.widget<CustomPaint>(
-      find.byWidgetPredicate((w) => w is CustomPaint && w.painter is Structural2dPainter),
+      find.byWidgetPredicate((w) => w is CustomPaint && w.painter is Structural2dPainter,
+      ),
     );
     final painter = customPaint.painter as Structural2dPainter;
     expect(painter.currentStorey.gridAxes.length, 3);
 
-    final initialA = painter.currentStorey.gridAxes.firstWhere((a) => a.id == 'axis_a');
-    final initialB = painter.currentStorey.gridAxes.firstWhere((a) => a.id == 'axis_b');
-    final initialC = painter.currentStorey.gridAxes.firstWhere((a) => a.id == 'axis_c');
+    final initialA = painter.currentStorey.gridAxes.firstWhere((a) => a.id == 'axis_a',
+    );
+    final initialB = painter.currentStorey.gridAxes.firstWhere((a) => a.id == 'axis_b',
+    );
+    final initialC = painter.currentStorey.gridAxes.firstWhere((a) => a.id == 'axis_c',
+    );
 
     expect(initialA.length, closeTo(10.0, 1e-4));
     expect(initialB.length, closeTo(6.0, 1e-4));
@@ -923,7 +935,8 @@ void main() {
     expect(adoptedAxis.length, closeTo(20.0, 1e-4));
     expect(adoptedAxis.start, const Offset(-2.0, 7.0));
     expect(adoptedAxis.end, const Offset(18.0, 7.0));
-  });
+  },
+  );
 
   test('StoreyLevel computes structural elevation correctly taking floor finish into account', () {
     const storey0 = StoreyLevel(
@@ -956,8 +969,10 @@ void main() {
 
     // Custom slab finish (e.g. 8cm / 0.08m thick finish for terraces/bathrooms)
     final slabCustomFinish = slabStandard.copyWith(floorFinish: 0.08);
-    expect(storey1.structuralElevationFor(slabCustomFinish), closeTo(5.52, 1e-4));
-  });
+    expect(storey1.structuralElevationFor(slabCustomFinish), closeTo(5.52, 1e-4),
+      );
+    },
+  );
 
   test('StoreyLevel cloneToNextLevel preserves floorFinishThickness', () {
     const storey0 = StoreyLevel(
@@ -1005,9 +1020,12 @@ void main() {
     shaftH = temp;
 
     final polyRotated = makeShaftPoly(shaftW, shaftH, center);
-    expect((polyRotated[1].dx - polyRotated[0].dx).abs(), closeTo(0.60, 1e-4));
-    expect((polyRotated[2].dy - polyRotated[1].dy).abs(), closeTo(0.40, 1e-4));
-  });
+    expect((polyRotated[1].dx - polyRotated[0].dx).abs(), closeTo(0.60, 1e-4),
+      );
+    expect((polyRotated[2].dy - polyRotated[1].dy).abs(), closeTo(0.40, 1e-4),
+      );
+    },
+  );
 
   test('Slab opening rotation 90 deg CCW around its centroid', () {
     final poly = [
@@ -1074,10 +1092,14 @@ void main() {
     final movedPoly = relativeOffsets.map((r) => newCenter + r).toList();
 
     final movedSlab = slab.copyWith(openings: [movedPoly]);
-    expect(movedSlab.containsPoint(newCenter), isFalse); // Center of cutout is outside slab material
-    expect(movedSlab.containsPoint(const Offset(1.0, 1.0)), isTrue); // Rest of slab is solid
-    expect(movedSlab.containsPoint(origCenter), isTrue); // Old spot is now solid again!
-  });
+    expect(movedSlab.containsPoint(newCenter), isFalse,
+      ); // Center of cutout is outside slab material
+    expect(movedSlab.containsPoint(const Offset(1.0, 1.0)), isTrue,
+      ); // Rest of slab is solid
+    expect(movedSlab.containsPoint(origCenter), isTrue,
+      ); // Old spot is now solid again!
+  },
+  );
 
   testWidgets('ElementPaletteBar renders 3 point-by-point opening types (shaft, staircase, elevator) with closure controls', (tester) async {
     tester.view.physicalSize = const Size(800, 600);
@@ -1163,11 +1185,12 @@ void main() {
     expect(selectedPreset, equals('elevator'));
 
     // Verify undo point button
-    final undoButton = find.byIcon(Icons.undo_rounded);
+    final undoButton = findCommandIcon(Icons.undo_rounded);
     expect(undoButton, findsOneWidget);
     await tester.tap(undoButton);
     expect(undoCalled, isTrue);
-  });
+  },
+  );
 
   test('Column magnetic alignment snaps 12.5 cm modular wall-axis centers to grid intersections', () {
     // Grid intersection at (10.0, 10.0)
@@ -1207,7 +1230,8 @@ void main() {
     expect(res.markerPoint!.dx, closeTo(10.0, 1e-4));
     expect(res.markerPoint!.dy, closeTo(10.0, 1e-4));
     expect(res.guideLines.length, 2);
-  });
+  },
+  );
 
   test('Column single grid axis alignment snaps in 5 cm steps and calculates dynamic dimension line', () {
     const axisX = StructuralGridAxis(
@@ -1263,7 +1287,8 @@ void main() {
     expect(resFlush, isNotNull);
     expect(resFlush!.snappedCenter.dx, closeTo(5.0, 1e-4));
     expect(resFlush.liveDimensionText, '0.00 m');
-  });
+  },
+  );
 
   test('Shear wall snaps symmetrically along axial centerline with 1 cm steps and dynamic dimension', () {
     const axisY = StructuralGridAxis(
@@ -1296,7 +1321,8 @@ void main() {
     expect(res.snappedCenter.dy, closeTo(4.38, 1e-4));
     expect(res.liveDimensionText, '4.38 m');
     expect(res.dimensionLine, isNotNull);
-  });
+  },
+  );
 
   test('Column attaches flush to wall closure line (end cap / jamb) next to opening', () {
     // Existing shear wall from (0, 0) to (3.0, 0) with thickness 0.25m.
@@ -1346,7 +1372,8 @@ void main() {
     expect(colResCorner!.snappedCenter.dx, closeTo(3.125, 1e-3));
     expect(colResCorner.snappedCenter.dy, closeTo(0.025, 1e-3));
     expect(colResCorner.description, 'wallCap');
-  });
+  },
+  );
 
   test('Shear wall snaps flush to outer edge of angled CAD wall polyline', () {
     // Angled CAD wall segment along 45 degrees: from (0, 0) to (5.0, 5.0)
@@ -1361,8 +1388,7 @@ void main() {
         ),
       ],
       layers: {
-        'A-WALL': DxfLayer(name: 'A-WALL', isVisible: true),
-      },
+        'A-WALL': DxfLayer(name: 'A-WALL', isVisible: true)},
       blocks: const {},
       headerVars: const {},
       bounds: const Rect.fromLTWH(0, 0, 5, 5),
@@ -1433,7 +1459,8 @@ void main() {
     expect(resAxis!.snappedPoint.dx, closeTo(2.5, 1e-4));
     expect(resAxis.snappedPoint.dy, closeTo(0.0, 1e-4));
     expect(resAxis.description, 'shearWallAxis');
-  });
+  },
+  );
 
   testWidgets('StructuralDesignerScreen AppBar renders without RenderFlex overflow on narrow 360px mobile screen', (tester) async {
     final doc = DxfDocument(
@@ -1441,12 +1468,10 @@ void main() {
         const DxfLine(
           layer: '0',
           p1: Offset(0, 0),
-          p2: Offset(100, 100),
-        ),
+          p2: Offset(100, 100)),
       ],
       layers: {
-        '0': DxfLayer(name: '0', isVisible: true),
-      },
+        '0': DxfLayer(name: '0', isVisible: true)},
       blocks: const {},
       headerVars: const {},
       bounds: const Rect.fromLTWH(0, 0, 100, 100),
@@ -1474,14 +1499,15 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify AppBar renders with title, back button, actions and overflow menu
-    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
-    expect(find.byIcon(Icons.more_vert_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.view_in_ar_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.undo_rounded), findsOneWidget);
+    expect(findCommandIcon(Icons.arrow_back), findsOneWidget);
+    expect(findCommandIcon(Icons.more_vert_rounded), findsOneWidget);
+    expect(findCommandIcon(Icons.view_in_ar_rounded), findsOneWidget);
+    expect(findCommandIcon(Icons.undo_rounded), findsOneWidget);
 
     // Verify no RenderFlex overflow error was triggered
     expect(tester.takeException(), isNull);
-  });
+  },
+  );
 
   testWidgets('ElementPaletteBar displays contour guidance and cancel for staircase opening', (tester) async {
     tester.view.physicalSize = const Size(1200, 600);
@@ -1556,7 +1582,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('1 ${l10n.pointsAbbr}'), findsOneWidget);
-    final closeBtn = find.byIcon(Icons.close);
+    final closeBtn = findCommandIcon(Icons.close);
     expect(closeBtn, findsOneWidget);
 
     await tester.ensureVisible(closeBtn);
@@ -1565,7 +1591,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(cleared, isTrue);
     expect(find.text(l10n.openingPointByPointPrompt), findsOneWidget);
-  });
+  },
+  );
 
   testWidgets('StructuralPointerPainter paints rubber-band rectangle with staircase treads for 2-point staircase placement', (tester) async {
     final painter = StructuralPointerPainter(
@@ -1587,7 +1614,8 @@ void main() {
     painter.paint(canvas, const Size(800, 600));
     final picture = recorder.endRecording();
     expect(picture, isNotNull);
-  });
+  },
+  );
 
   test('Structural2dPainter repaints correctly with 2-point staircase opening preview', () async {
     final painter = Structural2dPainter(
@@ -1611,7 +1639,6 @@ void main() {
     painter.paint(canvas, const Size(800, 600));
     final picture = recorder.endRecording();
     expect(picture, isNotNull);
-  });
+  },
+  );
 }
-
-

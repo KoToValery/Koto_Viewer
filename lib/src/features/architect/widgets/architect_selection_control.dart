@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../services/architect_marquee_tool.dart';
@@ -40,7 +41,7 @@ class ArchitectSelectionControl extends StatelessWidget {
     Widget action(
       String key,
       String tooltip,
-      IconData icon,
+      AppIconId icon,
       VoidCallback? callback,
     ) => IconButton(
       key: ValueKey(key),
@@ -49,7 +50,7 @@ class ArchitectSelectionControl extends StatelessWidget {
       constraints: const BoxConstraints.tightFor(width: 44, height: 44),
       padding: EdgeInsets.zero,
       onPressed: callback,
-      icon: Icon(icon, size: 22),
+      icon: AppIcon(icon, size: 22),
     );
     String operationLabel(ArchitectSelectionOperation? value) =>
         switch (value) {
@@ -58,13 +59,12 @@ class ArchitectSelectionControl extends StatelessWidget {
           ArchitectSelectionOperation.remove => l.architectSelectRemove,
           null => l.architectSelectionMulti,
         };
-    IconData operationIcon(ArchitectSelectionOperation? value) =>
+    AppIconId operationIcon(ArchitectSelectionOperation? value) =>
         switch (value) {
-          ArchitectSelectionOperation.replace => Icons.select_all,
-          ArchitectSelectionOperation.add => Icons.add_box_outlined,
-          ArchitectSelectionOperation.remove =>
-            Icons.indeterminate_check_box_outlined,
-          null => Icons.library_add_check_outlined,
+          ArchitectSelectionOperation.replace => AppIconId.selectAll,
+          ArchitectSelectionOperation.add => AppIconId.addBox,
+          ArchitectSelectionOperation.remove => AppIconId.removeBox,
+          null => AppIconId.multiSelect,
         };
     final effectiveCount = previewCount ?? count;
     Widget countBadge() => Tooltip(
@@ -120,10 +120,15 @@ class ArchitectSelectionControl extends StatelessWidget {
                           ),
                           value: value,
                           checked: mode == value,
-                          child: Text(
+                          child: AppMenuLabel(
+                            icon: value == ArchitectSelectMode.rectangle
+                                ? AppIconId.rectangle
+                                : AppIconId.polygon,
+                            child: Text(
                             value == ArchitectSelectMode.rectangle
                                 ? l.architectSelectModeRect
                                 : l.architectSelectModePolygon,
+                            ),
                           ),
                         ),
                     ],
@@ -136,10 +141,10 @@ class ArchitectSelectionControl extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          Icon(
+                          AppIcon(
                             mode == ArchitectSelectMode.rectangle
-                                ? Icons.rectangle_outlined
-                                : Icons.polyline_rounded,
+                                ? AppIconId.rectangle
+                                : AppIconId.polyline,
                             size: 18,
                             color: colors.onSurface,
                           ),
@@ -157,8 +162,8 @@ class ArchitectSelectionControl extends StatelessWidget {
                               ),
                             ),
                           ),
-                          Icon(
-                            Icons.arrow_drop_down,
+                          AppIcon(
+                            AppIconId.expandMore,
                             size: 18,
                             color: colors.onSurface,
                           ),
@@ -208,10 +213,10 @@ class ArchitectSelectionControl extends StatelessWidget {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(
+                                    AppIcon(
                                       value == ArchitectSelectMode.rectangle
-                                          ? Icons.rectangle_outlined
-                                          : Icons.polyline_rounded,
+                                          ? AppIconId.rectangle
+                                          : AppIconId.polyline,
                                       size: 18,
                                     ),
                                     Text(
@@ -242,7 +247,7 @@ class ArchitectSelectionControl extends StatelessWidget {
                   tooltip: operationLabel(operation),
                   color: colors.surfaceContainerHigh,
                   constraints: const BoxConstraints(minWidth: 160),
-                  icon: Icon(
+                  icon: AppIcon(
                     operationIcon(operation),
                     color: colors.onSurface,
                     size: 22,
@@ -256,9 +261,12 @@ class ArchitectSelectionControl extends StatelessWidget {
                         ),
                         value: value,
                         checked: operation == value,
-                        child: Text(
+                        child: AppMenuLabel(
+                          icon: operationIcon(value),
+                          child: Text(
                           operationLabel(value),
                           style: TextStyle(color: colors.onSurface),
+                          ),
                         ),
                       ),
                   ],
@@ -271,10 +279,10 @@ class ArchitectSelectionControl extends StatelessWidget {
                       ? l.architectSelectContainedHelp
                       : l.architectSelectCrossingHelp,
                   color: colors.surfaceContainerHigh,
-                  icon: Icon(
+                  icon: AppIcon(
                     relation == ArchitectSelectionRelation.contained
-                        ? Icons.crop_free
-                        : Icons.filter_center_focus,
+                        ? AppIconId.opening
+                        : AppIconId.fitView,
                     color: colors.onSurface,
                     size: 22,
                   ),
@@ -287,12 +295,17 @@ class ArchitectSelectionControl extends StatelessWidget {
                         ),
                         value: value,
                         checked: relation == value,
-                        child: Text(
+                        child: AppMenuLabel(
+                          icon: value == ArchitectSelectionRelation.contained
+                              ? AppIconId.selectionContained
+                              : AppIconId.selectionCrossing,
+                          child: Text(
                           value == ArchitectSelectionRelation.contained
                               ? l.architectSelectContained
                               : l.architectSelectCrossing,
                           style: TextStyle(color: colors.onSurface),
                         ),
+                      ),
                       ),
                   ],
                 ),
@@ -300,7 +313,7 @@ class ArchitectSelectionControl extends StatelessWidget {
               action(
                 'architect-selection-control-clear',
                 l.architectSelectionClear,
-                Icons.deselect_outlined,
+                AppIconId.deselect,
                 count == 0 ? null : onClear,
               ),
             ] else ...[
@@ -311,10 +324,10 @@ class ArchitectSelectionControl extends StatelessWidget {
                       message: mode == ArchitectSelectMode.rectangle
                           ? l.architectSelectModeRect
                           : l.architectSelectModePolygon,
-                      child: Icon(
+                      child: AppIcon(
                         mode == ArchitectSelectMode.rectangle
-                            ? Icons.rectangle_outlined
-                            : Icons.polyline_rounded,
+                            ? AppIconId.rectangle
+                            : AppIconId.polyline,
                         color: colors.onSurface,
                         size: 20,
                       ),
@@ -336,20 +349,20 @@ class ArchitectSelectionControl extends StatelessWidget {
                 action(
                   'architect-select-undo',
                   l.undoPoint,
-                  Icons.undo_rounded,
+                  AppIconId.undo,
                   canUndo ? onUndo : null,
                 ),
               action(
                 'architect-select-cancel',
                 l.cancel,
-                Icons.close_rounded,
+                AppIconId.close,
                 onCancel,
               ),
               if (mode == ArchitectSelectMode.polygon)
                 action(
                   'architect-select-finish',
                   l.architectSelectFinish,
-                  Icons.check_circle_outline,
+                  AppIconId.checkCircle,
                   canFinish ? onFinish : null,
                 ),
             ],

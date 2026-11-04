@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../../dxf_viewer/models/dxf_color_table.dart';
@@ -114,7 +115,8 @@ class _UnderlayFilterConfigSheetState extends State<UnderlayFilterConfigSheet> {
 
     final filteredLayers = _searchQuery.isEmpty
         ? allLayers
-        : allLayers.where((l) => l.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+        : allLayers.where((l) => l.name.toLowerCase().contains(_searchQuery.toLowerCase()),
+              ).toList();
 
     return Container(
       constraints: BoxConstraints(
@@ -152,7 +154,8 @@ class _UnderlayFilterConfigSheetState extends State<UnderlayFilterConfigSheet> {
 
             // Header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0,
+              ),
               child: Row(
                 children: [
                   Container(
@@ -161,7 +164,8 @@ class _UnderlayFilterConfigSheetState extends State<UnderlayFilterConfigSheet> {
                       color: const Color(0x3300E5FF),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.filter_alt_rounded, color: Color(0xFF00E5FF), size: 22),
+                    child: const Icon(Icons.filter_alt_rounded, color: Color(0xFF00E5FF), size: 22,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -190,8 +194,8 @@ class _UnderlayFilterConfigSheetState extends State<UnderlayFilterConfigSheet> {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(
-                      Icons.close,
+                    icon: AppIcon(
+                      AppIconId.close,
                       color: widget.isDark ? Colors.white70 : Colors.black54,
                     ),
                     onPressed: () => Navigator.pop(context),
@@ -202,15 +206,19 @@ class _UnderlayFilterConfigSheetState extends State<UnderlayFilterConfigSheet> {
 
             // Quick actions bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0,
+              ),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
                 child: Row(
                   children: [
                     ActionChip(
-                      avatar: const Icon(Icons.auto_awesome_rounded, size: 14, color: Color(0xFF00E5FF)),
-                      label: Text(l10n.underlayFilterAutoReset, style: const TextStyle(fontSize: 11)),
+                      avatar: const AppIcon(
+                        AppIconId.auto, size: 14, color: Color(0xFF00E5FF),
+                      ),
+                      label: Text(l10n.underlayFilterAutoReset, style: const TextStyle(fontSize: 11),
+                      ),
                       onPressed: () {
                         widget.onResetToAuto();
                         Navigator.pop(context);
@@ -219,15 +227,17 @@ class _UnderlayFilterConfigSheetState extends State<UnderlayFilterConfigSheet> {
                     ),
                     const SizedBox(width: 6),
                     ActionChip(
-                      avatar: const Icon(Icons.select_all_rounded, size: 14),
-                      label: Text(l10n.underlayFilterSelectAll, style: const TextStyle(fontSize: 11)),
+                      avatar: const AppIcon(AppIconId.selectAll, size: 14),
+                      label: Text(l10n.underlayFilterSelectAll, style: const TextStyle(fontSize: 11),
+                      ),
                       onPressed: _selectAll,
                       visualDensity: VisualDensity.compact,
                     ),
                     const SizedBox(width: 6),
                     ActionChip(
-                      avatar: const Icon(Icons.clear_all_rounded, size: 14),
-                      label: Text(l10n.underlayFilterClearAll, style: const TextStyle(fontSize: 11)),
+                      avatar: const AppIcon(AppIconId.clearAll, size: 14),
+                      label: Text(l10n.underlayFilterClearAll, style: const TextStyle(fontSize: 11),
+                      ),
                       onPressed: _clearAll,
                       visualDensity: VisualDensity.compact,
                     ),
@@ -238,18 +248,23 @@ class _UnderlayFilterConfigSheetState extends State<UnderlayFilterConfigSheet> {
 
             // Search input
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0,
+              ),
               child: TextField(
                 controller: _searchController,
                 onChanged: (val) => setState(() => _searchQuery = val.trim()),
-                style: TextStyle(color: widget.isDark ? Colors.white : Colors.black87, fontSize: 13),
+                style: TextStyle(color: widget.isDark ? Colors.white : Colors.black87, fontSize: 13,
+                ),
                 decoration: InputDecoration(
                   hintText: l10n.searchLayers,
-                  hintStyle: TextStyle(color: widget.isDark ? Colors.white38 : Colors.black38, fontSize: 13),
-                  prefixIcon: Icon(Icons.search, size: 18, color: widget.isDark ? Colors.white54 : Colors.black54),
+                  hintStyle: TextStyle(color: widget.isDark ? Colors.white38 : Colors.black38, fontSize: 13,
+                  ),
+                  prefixIcon: AppIcon(
+                    AppIconId.search, size: 18, color: widget.isDark ? Colors.white54 : Colors.black54,
+                  ),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, size: 16),
+                          icon: const AppIcon(AppIconId.close, size: 16),
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _searchQuery = '');
@@ -258,7 +273,8 @@ class _UnderlayFilterConfigSheetState extends State<UnderlayFilterConfigSheet> {
                       : null,
                   filled: true,
                   fillColor: widget.isDark ? const Color(0xFF131A26) : const Color(0xFFF3F5F8),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
@@ -297,8 +313,7 @@ class _UnderlayFilterConfigSheetState extends State<UnderlayFilterConfigSheet> {
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: Colors.white70,
-                          width: 1.5,
-                        ),
+                          width: 1.5),
                       ),
                     ),
                     title: Text(
@@ -311,7 +326,9 @@ class _UnderlayFilterConfigSheetState extends State<UnderlayFilterConfigSheet> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     subtitle: Text(
-                      '$entityCount entities',
+                      context.l10n.commandUiValueEntities(
+                        (entityCount).toString(),
+                      ),
                       style: TextStyle(
                         color: widget.isDark ? Colors.white54 : Colors.black45,
                         fontSize: 11,

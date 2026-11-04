@@ -15826,6 +15826,3595 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Diameter'**
   String get propertiesDiameter;
+
+  /// No description provided for @commandIconAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get commandIconAdd;
+
+  /// No description provided for @commandIconRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get commandIconRemove;
+
+  /// No description provided for @commandIconClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get commandIconClose;
+
+  /// No description provided for @commandIconConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get commandIconConfirm;
+
+  /// No description provided for @commandIconAddBox.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to selection'**
+  String get commandIconAddBox;
+
+  /// No description provided for @commandIconAddCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add item'**
+  String get commandIconAddCircle;
+
+  /// No description provided for @commandIconRemoveCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove item'**
+  String get commandIconRemoveCircle;
+
+  /// No description provided for @commandIconCheckBox.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected'**
+  String get commandIconCheckBox;
+
+  /// No description provided for @commandIconCheckBoxEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Not selected'**
+  String get commandIconCheckBoxEmpty;
+
+  /// No description provided for @commandIconRemoveBox.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtract from selection'**
+  String get commandIconRemoveBox;
+
+  /// No description provided for @commandIconCheckCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete'**
+  String get commandIconCheckCircle;
+
+  /// No description provided for @commandIconRadioOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Active option'**
+  String get commandIconRadioOn;
+
+  /// No description provided for @commandIconRadioOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive option'**
+  String get commandIconRadioOff;
+
+  /// No description provided for @commandIconBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get commandIconBack;
+
+  /// No description provided for @commandIconForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get commandIconForward;
+
+  /// No description provided for @commandIconUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get commandIconUp;
+
+  /// No description provided for @commandIconDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get commandIconDown;
+
+  /// No description provided for @commandIconChevronLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get commandIconChevronLeft;
+
+  /// No description provided for @commandIconChevronRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get commandIconChevronRight;
+
+  /// No description provided for @commandIconExpandLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse'**
+  String get commandIconExpandLess;
+
+  /// No description provided for @commandIconExpandMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get commandIconExpandMore;
+
+  /// No description provided for @commandIconFirstPage.
+  ///
+  /// In en, this message translates to:
+  /// **'First page'**
+  String get commandIconFirstPage;
+
+  /// No description provided for @commandIconLastPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Last page'**
+  String get commandIconLastPage;
+
+  /// No description provided for @commandIconOutward.
+  ///
+  /// In en, this message translates to:
+  /// **'Open externally'**
+  String get commandIconOutward;
+
+  /// No description provided for @commandIconDiagonalDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move diagonally'**
+  String get commandIconDiagonalDown;
+
+  /// No description provided for @commandIconMoreHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'More commands'**
+  String get commandIconMoreHorizontal;
+
+  /// No description provided for @commandIconMoreVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'More options'**
+  String get commandIconMoreVertical;
+
+  /// No description provided for @commandIconSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get commandIconSearch;
+
+  /// No description provided for @commandIconSearchOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get commandIconSearchOff;
+
+  /// No description provided for @commandIconZoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in'**
+  String get commandIconZoomIn;
+
+  /// No description provided for @commandIconZoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom out'**
+  String get commandIconZoomOut;
+
+  /// No description provided for @commandIconRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get commandIconRefresh;
+
+  /// No description provided for @commandIconSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Synchronize'**
+  String get commandIconSync;
+
+  /// No description provided for @commandIconSyncProblem.
+  ///
+  /// In en, this message translates to:
+  /// **'Synchronization issue'**
+  String get commandIconSyncProblem;
+
+  /// No description provided for @commandIconUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get commandIconUndo;
+
+  /// No description provided for @commandIconRedo.
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get commandIconRedo;
+
+  /// No description provided for @commandIconHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get commandIconHistory;
+
+  /// No description provided for @commandIconSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get commandIconSettings;
+
+  /// No description provided for @commandIconProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'Properties'**
+  String get commandIconProperties;
+
+  /// No description provided for @commandIconInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Information'**
+  String get commandIconInfo;
+
+  /// No description provided for @commandIconHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Help'**
+  String get commandIconHelp;
+
+  /// No description provided for @commandIconWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get commandIconWarning;
+
+  /// No description provided for @commandIconError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get commandIconError;
+
+  /// No description provided for @commandIconFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter'**
+  String get commandIconFilter;
+
+  /// No description provided for @commandIconFilterOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filter'**
+  String get commandIconFilterOff;
+
+  /// No description provided for @commandIconFilterList.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter list'**
+  String get commandIconFilterList;
+
+  /// No description provided for @commandIconSort.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get commandIconSort;
+
+  /// No description provided for @commandIconDrag.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder'**
+  String get commandIconDrag;
+
+  /// No description provided for @commandIconClearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all'**
+  String get commandIconClearAll;
+
+  /// No description provided for @commandIconBackspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Erase'**
+  String get commandIconBackspace;
+
+  /// No description provided for @commandIconSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get commandIconSelect;
+
+  /// No description provided for @commandIconSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get commandIconSelectAll;
+
+  /// No description provided for @commandIconDeselect.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear selection'**
+  String get commandIconDeselect;
+
+  /// No description provided for @commandIconMultiSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple selection'**
+  String get commandIconMultiSelect;
+
+  /// No description provided for @commandIconPan.
+  ///
+  /// In en, this message translates to:
+  /// **'Pan'**
+  String get commandIconPan;
+
+  /// No description provided for @commandIconMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get commandIconMove;
+
+  /// No description provided for @commandIconMoveTransverse.
+  ///
+  /// In en, this message translates to:
+  /// **'Move perpendicular'**
+  String get commandIconMoveTransverse;
+
+  /// No description provided for @commandIconDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate'**
+  String get commandIconDuplicate;
+
+  /// No description provided for @commandIconEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get commandIconEdit;
+
+  /// No description provided for @commandIconRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get commandIconRename;
+
+  /// No description provided for @commandIconDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get commandIconDelete;
+
+  /// No description provided for @commandIconDeleteAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all'**
+  String get commandIconDeleteAll;
+
+  /// No description provided for @commandIconRotate.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate'**
+  String get commandIconRotate;
+
+  /// No description provided for @commandIconRotateLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate left'**
+  String get commandIconRotateLeft;
+
+  /// No description provided for @commandIconMirrorMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror and move'**
+  String get commandIconMirrorMove;
+
+  /// No description provided for @commandIconMirrorCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror and copy'**
+  String get commandIconMirrorCopy;
+
+  /// No description provided for @commandIconFlipHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip horizontally'**
+  String get commandIconFlipHorizontal;
+
+  /// No description provided for @commandIconFlipVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip vertically'**
+  String get commandIconFlipVertical;
+
+  /// No description provided for @commandIconSwapHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Swap horizontally'**
+  String get commandIconSwapHorizontal;
+
+  /// No description provided for @commandIconSwapVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Swap vertically'**
+  String get commandIconSwapVertical;
+
+  /// No description provided for @commandIconSplit.
+  ///
+  /// In en, this message translates to:
+  /// **'Split element'**
+  String get commandIconSplit;
+
+  /// No description provided for @commandIconCut.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut'**
+  String get commandIconCut;
+
+  /// No description provided for @commandIconCutOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut opening'**
+  String get commandIconCutOpening;
+
+  /// No description provided for @commandIconOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Offset'**
+  String get commandIconOffset;
+
+  /// No description provided for @commandIconNewPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'New point'**
+  String get commandIconNewPoint;
+
+  /// No description provided for @commandIconJoin.
+  ///
+  /// In en, this message translates to:
+  /// **'Join elements'**
+  String get commandIconJoin;
+
+  /// No description provided for @commandIconStraighten.
+  ///
+  /// In en, this message translates to:
+  /// **'Straighten'**
+  String get commandIconStraighten;
+
+  /// No description provided for @commandIconGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get commandIconGroup;
+
+  /// No description provided for @commandIconUngroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Ungroup'**
+  String get commandIconUngroup;
+
+  /// No description provided for @commandIconEditGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit group'**
+  String get commandIconEditGroup;
+
+  /// No description provided for @commandIconFile.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get commandIconFile;
+
+  /// No description provided for @commandIconOpenFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Open file'**
+  String get commandIconOpenFile;
+
+  /// No description provided for @commandIconFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get commandIconFolder;
+
+  /// No description provided for @commandIconOpenFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Open folder'**
+  String get commandIconOpenFolder;
+
+  /// No description provided for @commandIconNewFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'New folder'**
+  String get commandIconNewFolder;
+
+  /// No description provided for @commandIconCopyFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy folder'**
+  String get commandIconCopyFolder;
+
+  /// No description provided for @commandIconFolderOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable folder'**
+  String get commandIconFolderOff;
+
+  /// No description provided for @commandIconFolderFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite folder'**
+  String get commandIconFolderFavorite;
+
+  /// No description provided for @commandIconArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get commandIconArchive;
+
+  /// No description provided for @commandIconSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get commandIconSave;
+
+  /// No description provided for @commandIconSaveAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as'**
+  String get commandIconSaveAs;
+
+  /// No description provided for @commandIconDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get commandIconDownload;
+
+  /// No description provided for @commandIconUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get commandIconUpload;
+
+  /// No description provided for @commandIconPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Print'**
+  String get commandIconPrint;
+
+  /// No description provided for @commandIconShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get commandIconShare;
+
+  /// No description provided for @commandIconLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Link'**
+  String get commandIconLink;
+
+  /// No description provided for @commandIconUnlink.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink'**
+  String get commandIconUnlink;
+
+  /// No description provided for @commandIconExternal.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in new window'**
+  String get commandIconExternal;
+
+  /// No description provided for @commandIconThemeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark theme'**
+  String get commandIconThemeDark;
+
+  /// No description provided for @commandIconThemeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light theme'**
+  String get commandIconThemeLight;
+
+  /// No description provided for @commandIconThemeAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic theme'**
+  String get commandIconThemeAuto;
+
+  /// No description provided for @commandIconLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get commandIconLanguage;
+
+  /// No description provided for @commandIconUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get commandIconUpdate;
+
+  /// No description provided for @commandIconBug.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get commandIconBug;
+
+  /// No description provided for @commandIconHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get commandIconHome;
+
+  /// No description provided for @commandIconFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite'**
+  String get commandIconFavorite;
+
+  /// No description provided for @commandIconStar.
+  ///
+  /// In en, this message translates to:
+  /// **'Starred'**
+  String get commandIconStar;
+
+  /// No description provided for @commandIconBookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark'**
+  String get commandIconBookmark;
+
+  /// No description provided for @commandIconBookmarkAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add bookmark'**
+  String get commandIconBookmarkAdd;
+
+  /// No description provided for @commandIconBookmarks.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmarks'**
+  String get commandIconBookmarks;
+
+  /// No description provided for @commandIconEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get commandIconEmail;
+
+  /// No description provided for @commandIconWifi.
+  ///
+  /// In en, this message translates to:
+  /// **'Local network'**
+  String get commandIconWifi;
+
+  /// No description provided for @commandIconWifiOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Network unavailable'**
+  String get commandIconWifiOff;
+
+  /// No description provided for @commandIconComputer.
+  ///
+  /// In en, this message translates to:
+  /// **'Computer'**
+  String get commandIconComputer;
+
+  /// No description provided for @commandIconStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage'**
+  String get commandIconStorage;
+
+  /// No description provided for @commandIconPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get commandIconPayment;
+
+  /// No description provided for @commandIconSecurity.
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get commandIconSecurity;
+
+  /// No description provided for @commandIconVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get commandIconVerified;
+
+  /// No description provided for @commandIconLock.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock'**
+  String get commandIconLock;
+
+  /// No description provided for @commandIconUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get commandIconUnlock;
+
+  /// No description provided for @commandIconWall.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall'**
+  String get commandIconWall;
+
+  /// No description provided for @commandIconDoor.
+  ///
+  /// In en, this message translates to:
+  /// **'Door'**
+  String get commandIconDoor;
+
+  /// No description provided for @commandIconWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Window'**
+  String get commandIconWindow;
+
+  /// No description provided for @commandIconColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Column'**
+  String get commandIconColumn;
+
+  /// No description provided for @commandIconBeam.
+  ///
+  /// In en, this message translates to:
+  /// **'Beam'**
+  String get commandIconBeam;
+
+  /// No description provided for @commandIconSlab.
+  ///
+  /// In en, this message translates to:
+  /// **'Slab'**
+  String get commandIconSlab;
+
+  /// No description provided for @commandIconOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening'**
+  String get commandIconOpening;
+
+  /// No description provided for @commandIconRoof.
+  ///
+  /// In en, this message translates to:
+  /// **'Roof'**
+  String get commandIconRoof;
+
+  /// No description provided for @commandIconStairs.
+  ///
+  /// In en, this message translates to:
+  /// **'Stair'**
+  String get commandIconStairs;
+
+  /// No description provided for @commandIconAxis.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid axis'**
+  String get commandIconAxis;
+
+  /// No description provided for @commandIconSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Section'**
+  String get commandIconSection;
+
+  /// No description provided for @commandIconElevation.
+  ///
+  /// In en, this message translates to:
+  /// **'Elevation'**
+  String get commandIconElevation;
+
+  /// No description provided for @commandIconBuilding.
+  ///
+  /// In en, this message translates to:
+  /// **'Building'**
+  String get commandIconBuilding;
+
+  /// No description provided for @commandIconNewBuilding.
+  ///
+  /// In en, this message translates to:
+  /// **'New building'**
+  String get commandIconNewBuilding;
+
+  /// No description provided for @commandIconBuildingOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide building'**
+  String get commandIconBuildingOff;
+
+  /// No description provided for @commandIconStoreys.
+  ///
+  /// In en, this message translates to:
+  /// **'Storeys'**
+  String get commandIconStoreys;
+
+  /// No description provided for @commandIconZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone'**
+  String get commandIconZone;
+
+  /// No description provided for @commandIconSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule table'**
+  String get commandIconSchedule;
+
+  /// No description provided for @commandIconZoneSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone schedule'**
+  String get commandIconZoneSchedule;
+
+  /// No description provided for @commandIconDimension.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension'**
+  String get commandIconDimension;
+
+  /// No description provided for @commandIconLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Level'**
+  String get commandIconLevel;
+
+  /// No description provided for @commandIconMeasure.
+  ///
+  /// In en, this message translates to:
+  /// **'Measure distance'**
+  String get commandIconMeasure;
+
+  /// No description provided for @commandIconMeasureArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Measure area'**
+  String get commandIconMeasureArea;
+
+  /// No description provided for @commandIconMeasureAngle.
+  ///
+  /// In en, this message translates to:
+  /// **'Measure angle'**
+  String get commandIconMeasureAngle;
+
+  /// No description provided for @commandIconMeasureRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Measure radius'**
+  String get commandIconMeasureRadius;
+
+  /// No description provided for @commandIconLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Line'**
+  String get commandIconLine;
+
+  /// No description provided for @commandIconPolyline.
+  ///
+  /// In en, this message translates to:
+  /// **'Polyline'**
+  String get commandIconPolyline;
+
+  /// No description provided for @commandIconRectangle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rectangle'**
+  String get commandIconRectangle;
+
+  /// No description provided for @commandIconHatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Hatch'**
+  String get commandIconHatch;
+
+  /// No description provided for @commandIconText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get commandIconText;
+
+  /// No description provided for @commandIconTextSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Text size'**
+  String get commandIconTextSize;
+
+  /// No description provided for @commandIconTextIncrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Larger text'**
+  String get commandIconTextIncrease;
+
+  /// No description provided for @commandIconTextDecrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Smaller text'**
+  String get commandIconTextDecrease;
+
+  /// No description provided for @commandIconAlignLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Align left'**
+  String get commandIconAlignLeft;
+
+  /// No description provided for @commandIconAlignCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Align center'**
+  String get commandIconAlignCenter;
+
+  /// No description provided for @commandIconAlignTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Align top'**
+  String get commandIconAlignTop;
+
+  /// No description provided for @commandIconAlignBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Align bottom'**
+  String get commandIconAlignBottom;
+
+  /// No description provided for @commandIconLayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Layers'**
+  String get commandIconLayers;
+
+  /// No description provided for @commandIconLayersOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide layers'**
+  String get commandIconLayersOff;
+
+  /// No description provided for @commandIconGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid'**
+  String get commandIconGrid;
+
+  /// No description provided for @commandIconGridOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide grid'**
+  String get commandIconGridOff;
+
+  /// No description provided for @commandIconTerrain.
+  ///
+  /// In en, this message translates to:
+  /// **'Terrain'**
+  String get commandIconTerrain;
+
+  /// No description provided for @commandIconFloorDrain.
+  ///
+  /// In en, this message translates to:
+  /// **'Floor drain'**
+  String get commandIconFloorDrain;
+
+  /// No description provided for @commandIconWater.
+  ///
+  /// In en, this message translates to:
+  /// **'Water'**
+  String get commandIconWater;
+
+  /// No description provided for @commandIconFoundation.
+  ///
+  /// In en, this message translates to:
+  /// **'Foundation'**
+  String get commandIconFoundation;
+
+  /// No description provided for @commandIconWallJoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall junction'**
+  String get commandIconWallJoint;
+
+  /// No description provided for @commandIconRoundedCorner.
+  ///
+  /// In en, this message translates to:
+  /// **'Round corner'**
+  String get commandIconRoundedCorner;
+
+  /// No description provided for @commandIconLineStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Line style'**
+  String get commandIconLineStyle;
+
+  /// No description provided for @commandIconLineWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Line weight'**
+  String get commandIconLineWeight;
+
+  /// No description provided for @commandIconPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Points'**
+  String get commandIconPoints;
+
+  /// No description provided for @commandIconMagnet.
+  ///
+  /// In en, this message translates to:
+  /// **'Snap'**
+  String get commandIconMagnet;
+
+  /// No description provided for @commandIconGesture.
+  ///
+  /// In en, this message translates to:
+  /// **'Freehand'**
+  String get commandIconGesture;
+
+  /// No description provided for @commandIconComponent.
+  ///
+  /// In en, this message translates to:
+  /// **'Component library'**
+  String get commandIconComponent;
+
+  /// No description provided for @commandIconFurniture.
+  ///
+  /// In en, this message translates to:
+  /// **'Furniture'**
+  String get commandIconFurniture;
+
+  /// No description provided for @commandIconBed.
+  ///
+  /// In en, this message translates to:
+  /// **'Bedroom'**
+  String get commandIconBed;
+
+  /// No description provided for @commandIconBath.
+  ///
+  /// In en, this message translates to:
+  /// **'Bathroom'**
+  String get commandIconBath;
+
+  /// No description provided for @commandIconKitchen.
+  ///
+  /// In en, this message translates to:
+  /// **'Kitchen'**
+  String get commandIconKitchen;
+
+  /// No description provided for @commandIconBalcony.
+  ///
+  /// In en, this message translates to:
+  /// **'Balcony'**
+  String get commandIconBalcony;
+
+  /// No description provided for @commandIconFence.
+  ///
+  /// In en, this message translates to:
+  /// **'Fence'**
+  String get commandIconFence;
+
+  /// No description provided for @commandIconCabin.
+  ///
+  /// In en, this message translates to:
+  /// **'Timber building'**
+  String get commandIconCabin;
+
+  /// No description provided for @commandIconTree.
+  ///
+  /// In en, this message translates to:
+  /// **'Landscape element'**
+  String get commandIconTree;
+
+  /// No description provided for @commandIconAnalysis.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysis'**
+  String get commandIconAnalysis;
+
+  /// No description provided for @commandIconSeismic.
+  ///
+  /// In en, this message translates to:
+  /// **'Seismic analysis'**
+  String get commandIconSeismic;
+
+  /// No description provided for @commandIconBolt.
+  ///
+  /// In en, this message translates to:
+  /// **'Load'**
+  String get commandIconBolt;
+
+  /// No description provided for @commandIconEngineering.
+  ///
+  /// In en, this message translates to:
+  /// **'Engineering'**
+  String get commandIconEngineering;
+
+  /// No description provided for @commandIconGraph.
+  ///
+  /// In en, this message translates to:
+  /// **'Model relationships'**
+  String get commandIconGraph;
+
+  /// No description provided for @commandIconChart.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart'**
+  String get commandIconChart;
+
+  /// No description provided for @commandIconView3D.
+  ///
+  /// In en, this message translates to:
+  /// **'3D view'**
+  String get commandIconView3D;
+
+  /// No description provided for @commandIconOrbit.
+  ///
+  /// In en, this message translates to:
+  /// **'Orbit'**
+  String get commandIconOrbit;
+
+  /// No description provided for @commandIconFly.
+  ///
+  /// In en, this message translates to:
+  /// **'Fly through'**
+  String get commandIconFly;
+
+  /// No description provided for @commandIconViewTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Top view'**
+  String get commandIconViewTop;
+
+  /// No description provided for @commandIconViewFront.
+  ///
+  /// In en, this message translates to:
+  /// **'Front view'**
+  String get commandIconViewFront;
+
+  /// No description provided for @commandIconViewRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right view'**
+  String get commandIconViewRight;
+
+  /// No description provided for @commandIconViewBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom view'**
+  String get commandIconViewBottom;
+
+  /// No description provided for @commandIconViewBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back view'**
+  String get commandIconViewBack;
+
+  /// No description provided for @commandIconVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get commandIconVisible;
+
+  /// No description provided for @commandIconHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get commandIconHidden;
+
+  /// No description provided for @commandIconFitView.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit view'**
+  String get commandIconFitView;
+
+  /// No description provided for @commandIconFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Full screen'**
+  String get commandIconFullscreen;
+
+  /// No description provided for @commandIconExitFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit full screen'**
+  String get commandIconExitFullscreen;
+
+  /// No description provided for @commandIconAspectRatio.
+  ///
+  /// In en, this message translates to:
+  /// **'Aspect ratio'**
+  String get commandIconAspectRatio;
+
+  /// No description provided for @commandIconPortrait.
+  ///
+  /// In en, this message translates to:
+  /// **'Portrait orientation'**
+  String get commandIconPortrait;
+
+  /// No description provided for @commandIconScreenRotate.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate screen'**
+  String get commandIconScreenRotate;
+
+  /// No description provided for @commandIconScreenLock.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock orientation'**
+  String get commandIconScreenLock;
+
+  /// No description provided for @commandIconCompare.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare'**
+  String get commandIconCompare;
+
+  /// No description provided for @commandIconCrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Crop'**
+  String get commandIconCrop;
+
+  /// No description provided for @commandIconOpacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Opacity'**
+  String get commandIconOpacity;
+
+  /// No description provided for @commandIconImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get commandIconImage;
+
+  /// No description provided for @commandIconImageAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add image'**
+  String get commandIconImageAdd;
+
+  /// No description provided for @commandIconImageFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Image effects'**
+  String get commandIconImageFilter;
+
+  /// No description provided for @commandIconImageBroken.
+  ///
+  /// In en, this message translates to:
+  /// **'Image unavailable'**
+  String get commandIconImageBroken;
+
+  /// No description provided for @commandIconCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get commandIconCamera;
+
+  /// No description provided for @commandIconPalette.
+  ///
+  /// In en, this message translates to:
+  /// **'Colors'**
+  String get commandIconPalette;
+
+  /// No description provided for @commandIconFill.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill'**
+  String get commandIconFill;
+
+  /// No description provided for @commandIconBrush.
+  ///
+  /// In en, this message translates to:
+  /// **'Brush'**
+  String get commandIconBrush;
+
+  /// No description provided for @commandIconPixelated.
+  ///
+  /// In en, this message translates to:
+  /// **'Pixel rendering'**
+  String get commandIconPixelated;
+
+  /// No description provided for @commandIconSmooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Smooth rendering'**
+  String get commandIconSmooth;
+
+  /// No description provided for @commandIconBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading'**
+  String get commandIconBook;
+
+  /// No description provided for @commandIconLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Library'**
+  String get commandIconLibrary;
+
+  /// No description provided for @commandIconBookClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Book'**
+  String get commandIconBookClosed;
+
+  /// No description provided for @commandIconNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get commandIconNotes;
+
+  /// No description provided for @commandIconComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment'**
+  String get commandIconComment;
+
+  /// No description provided for @commandIconList.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get commandIconList;
+
+  /// No description provided for @commandIconNumberedList.
+  ///
+  /// In en, this message translates to:
+  /// **'Numbered list'**
+  String get commandIconNumberedList;
+
+  /// No description provided for @commandIconChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Checklist'**
+  String get commandIconChecklist;
+
+  /// No description provided for @commandIconWrapText.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrap text'**
+  String get commandIconWrapText;
+
+  /// No description provided for @commandIconLineSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Line spacing'**
+  String get commandIconLineSpacing;
+
+  /// No description provided for @commandIconTable.
+  ///
+  /// In en, this message translates to:
+  /// **'Table'**
+  String get commandIconTable;
+
+  /// No description provided for @commandIconPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF document'**
+  String get commandIconPdf;
+
+  /// No description provided for @commandIconCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get commandIconCode;
+
+  /// No description provided for @commandIconCodeOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide code'**
+  String get commandIconCodeOff;
+
+  /// No description provided for @commandIconFunctions.
+  ///
+  /// In en, this message translates to:
+  /// **'Formula'**
+  String get commandIconFunctions;
+
+  /// No description provided for @commandIconWatermark.
+  ///
+  /// In en, this message translates to:
+  /// **'Watermark'**
+  String get commandIconWatermark;
+
+  /// No description provided for @commandIconLayoutGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid layout'**
+  String get commandIconLayoutGrid;
+
+  /// No description provided for @commandIconLayoutRows.
+  ///
+  /// In en, this message translates to:
+  /// **'Row layout'**
+  String get commandIconLayoutRows;
+
+  /// No description provided for @commandIconLayoutSidebar.
+  ///
+  /// In en, this message translates to:
+  /// **'Side panel'**
+  String get commandIconLayoutSidebar;
+
+  /// No description provided for @commandIconLayoutCarousel.
+  ///
+  /// In en, this message translates to:
+  /// **'Carousel view'**
+  String get commandIconLayoutCarousel;
+
+  /// No description provided for @commandIconLayoutCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize layout'**
+  String get commandIconLayoutCustom;
+
+  /// No description provided for @commandIconPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get commandIconPlay;
+
+  /// No description provided for @commandIconPlayCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start playback'**
+  String get commandIconPlayCircle;
+
+  /// No description provided for @commandIconPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get commandIconPause;
+
+  /// No description provided for @commandIconPauseCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause playback'**
+  String get commandIconPauseCircle;
+
+  /// No description provided for @commandIconStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get commandIconStop;
+
+  /// No description provided for @commandIconStopCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop playback'**
+  String get commandIconStopCircle;
+
+  /// No description provided for @commandIconNextTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Next track'**
+  String get commandIconNextTrack;
+
+  /// No description provided for @commandIconPreviousTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous track'**
+  String get commandIconPreviousTrack;
+
+  /// No description provided for @commandIconFastForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast forward'**
+  String get commandIconFastForward;
+
+  /// No description provided for @commandIconFastRewind.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewind'**
+  String get commandIconFastRewind;
+
+  /// No description provided for @commandIconForwardTen.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward ten seconds'**
+  String get commandIconForwardTen;
+
+  /// No description provided for @commandIconReplayTen.
+  ///
+  /// In en, this message translates to:
+  /// **'Back ten seconds'**
+  String get commandIconReplayTen;
+
+  /// No description provided for @commandIconRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat'**
+  String get commandIconRepeat;
+
+  /// No description provided for @commandIconRepeatOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat current'**
+  String get commandIconRepeatOne;
+
+  /// No description provided for @commandIconVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Sound'**
+  String get commandIconVolume;
+
+  /// No description provided for @commandIconMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get commandIconMute;
+
+  /// No description provided for @commandIconVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get commandIconVideo;
+
+  /// No description provided for @commandIconPresentation.
+  ///
+  /// In en, this message translates to:
+  /// **'Presentation'**
+  String get commandIconPresentation;
+
+  /// No description provided for @commandIconAnimation.
+  ///
+  /// In en, this message translates to:
+  /// **'Animation'**
+  String get commandIconAnimation;
+
+  /// No description provided for @commandIconMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Map'**
+  String get commandIconMap;
+
+  /// No description provided for @commandIconLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get commandIconLocation;
+
+  /// No description provided for @commandIconLocationAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add location'**
+  String get commandIconLocationAdd;
+
+  /// No description provided for @commandIconLocationEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit location'**
+  String get commandIconLocationEdit;
+
+  /// No description provided for @commandIconLocate.
+  ///
+  /// In en, this message translates to:
+  /// **'Locate'**
+  String get commandIconLocate;
+
+  /// No description provided for @commandIconCompass.
+  ///
+  /// In en, this message translates to:
+  /// **'Compass'**
+  String get commandIconCompass;
+
+  /// No description provided for @commandIconGlobe.
+  ///
+  /// In en, this message translates to:
+  /// **'Coordinate system'**
+  String get commandIconGlobe;
+
+  /// No description provided for @commandIconRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Route'**
+  String get commandIconRoute;
+
+  /// No description provided for @commandIconAlternativeRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Alternative route'**
+  String get commandIconAlternativeRoute;
+
+  /// No description provided for @commandIconTurnLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn left'**
+  String get commandIconTurnLeft;
+
+  /// No description provided for @commandIconTurnRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn right'**
+  String get commandIconTurnRight;
+
+  /// No description provided for @commandIconFlag.
+  ///
+  /// In en, this message translates to:
+  /// **'Waypoint'**
+  String get commandIconFlag;
+
+  /// No description provided for @commandIconFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get commandIconFinish;
+
+  /// No description provided for @commandIconWalk.
+  ///
+  /// In en, this message translates to:
+  /// **'Walk'**
+  String get commandIconWalk;
+
+  /// No description provided for @commandIconBicycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bicycle'**
+  String get commandIconBicycle;
+
+  /// No description provided for @commandIconTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Tag'**
+  String get commandIconTag;
+
+  /// No description provided for @commandIconPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get commandIconPin;
+
+  /// No description provided for @commandIconCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get commandIconCalendar;
+
+  /// No description provided for @commandIconMedical.
+  ///
+  /// In en, this message translates to:
+  /// **'Medical tools'**
+  String get commandIconMedical;
+
+  /// No description provided for @commandIconFingerprint.
+  ///
+  /// In en, this message translates to:
+  /// **'Signature'**
+  String get commandIconFingerprint;
+
+  /// No description provided for @commandIconAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get commandIconAuto;
+
+  /// No description provided for @commandIconScience.
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental tools'**
+  String get commandIconScience;
+
+  /// No description provided for @commandIconRocket.
+  ///
+  /// In en, this message translates to:
+  /// **'Launch'**
+  String get commandIconRocket;
+
+  /// No description provided for @commandIconInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Presets'**
+  String get commandIconInventory;
+
+  /// No description provided for @commandIconBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Structural checks'**
+  String get commandIconBalance;
+
+  /// No description provided for @commandIconWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'Web page'**
+  String get commandIconWeb;
+
+  /// No description provided for @commandIconSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Space'**
+  String get commandIconSpace;
+
+  /// No description provided for @commandIconRoadEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit route'**
+  String get commandIconRoadEdit;
+
+  /// No description provided for @commandIconLightbulb.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips'**
+  String get commandIconLightbulb;
+
+  /// No description provided for @commandIconGalleryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Command icons'**
+  String get commandIconGalleryTitle;
+
+  /// No description provided for @commandIconGallerySearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search commands'**
+  String get commandIconGallerySearch;
+
+  /// No description provided for @commandIconGalleryLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get commandIconGalleryLight;
+
+  /// No description provided for @commandIconGalleryDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get commandIconGalleryDark;
+
+  /// No description provided for @commandIconAlignRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Align right'**
+  String get commandIconAlignRight;
+
+  /// No description provided for @commandIconPolygon.
+  ///
+  /// In en, this message translates to:
+  /// **'Polygon'**
+  String get commandIconPolygon;
+
+  /// No description provided for @commandIconArc.
+  ///
+  /// In en, this message translates to:
+  /// **'Arc'**
+  String get commandIconArc;
+
+  /// No description provided for @commandIconRoofGable.
+  ///
+  /// In en, this message translates to:
+  /// **'Gable roof'**
+  String get commandIconRoofGable;
+
+  /// No description provided for @commandIconRoofHip.
+  ///
+  /// In en, this message translates to:
+  /// **'Hip roof'**
+  String get commandIconRoofHip;
+
+  /// No description provided for @commandIconRoofShed.
+  ///
+  /// In en, this message translates to:
+  /// **'Shed roof'**
+  String get commandIconRoofShed;
+
+  /// No description provided for @commandIconRoofFlat.
+  ///
+  /// In en, this message translates to:
+  /// **'Flat roof'**
+  String get commandIconRoofFlat;
+
+  /// No description provided for @commandIconRoofMansard.
+  ///
+  /// In en, this message translates to:
+  /// **'Mansard roof'**
+  String get commandIconRoofMansard;
+
+  /// No description provided for @commandIconSelectionContained.
+  ///
+  /// In en, this message translates to:
+  /// **'Select contained'**
+  String get commandIconSelectionContained;
+
+  /// No description provided for @commandIconSelectionCrossing.
+  ///
+  /// In en, this message translates to:
+  /// **'Select crossing'**
+  String get commandIconSelectionCrossing;
+
+  /// No description provided for @commandIconShadingEdges.
+  ///
+  /// In en, this message translates to:
+  /// **'Shaded edges'**
+  String get commandIconShadingEdges;
+
+  /// No description provided for @commandIconShadingSmooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Smooth shading'**
+  String get commandIconShadingSmooth;
+
+  /// No description provided for @commandIconShadingFlat.
+  ///
+  /// In en, this message translates to:
+  /// **'Flat shading'**
+  String get commandIconShadingFlat;
+
+  /// No description provided for @commandIconShadingWire.
+  ///
+  /// In en, this message translates to:
+  /// **'Wireframe'**
+  String get commandIconShadingWire;
+
+  /// No description provided for @commandIconShadingXray.
+  ///
+  /// In en, this message translates to:
+  /// **'X-ray'**
+  String get commandIconShadingXray;
+
+  /// No description provided for @commandUiCopyThisError.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy this error'**
+  String get commandUiCopyThisError;
+
+  /// No description provided for @commandUiErrorCopiedToClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Error copied to clipboard'**
+  String get commandUiErrorCopiedToClipboard;
+
+  /// No description provided for @commandUiCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied!'**
+  String get commandUiCopied;
+
+  /// No description provided for @commandUiCopyAllLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy All Logs'**
+  String get commandUiCopyAllLogs;
+
+  /// No description provided for @commandUiGoToHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Home'**
+  String get commandUiGoToHome;
+
+  /// No description provided for @commandUiCopyReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Report'**
+  String get commandUiCopyReport;
+
+  /// No description provided for @commandUiViewErrorLog.
+  ///
+  /// In en, this message translates to:
+  /// **'View Error Log'**
+  String get commandUiViewErrorLog;
+
+  /// No description provided for @commandUiHideTechnicalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide technical details'**
+  String get commandUiHideTechnicalDetails;
+
+  /// No description provided for @commandUiShowTechnicalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Show technical details'**
+  String get commandUiShowTechnicalDetails;
+
+  /// No description provided for @commandUiSearchByCountryProjectionOrEpsgCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by country, projection, or EPSG code...'**
+  String get commandUiSearchByCountryProjectionOrEpsgCode;
+
+  /// No description provided for @commandUiSaveSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Selection'**
+  String get commandUiSaveSelection;
+
+  /// No description provided for @commandUiHex.
+  ///
+  /// In en, this message translates to:
+  /// **'HEX'**
+  String get commandUiHex;
+
+  /// No description provided for @commandUiJsonBimJson.
+  ///
+  /// In en, this message translates to:
+  /// **'JSON (.bim.json)'**
+  String get commandUiJsonBimJson;
+
+  /// No description provided for @commandUiCanvasBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Canvas Background'**
+  String get commandUiCanvasBackground;
+
+  /// No description provided for @commandUiFlipOrientation.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip Orientation'**
+  String get commandUiFlipOrientation;
+
+  /// No description provided for @commandUiFlipHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip Horizontal'**
+  String get commandUiFlipHorizontal;
+
+  /// No description provided for @commandUiFlipVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip Vertical'**
+  String get commandUiFlipVertical;
+
+  /// No description provided for @commandUiShareExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Share & Export'**
+  String get commandUiShareExport;
+
+  /// No description provided for @commandUiShareOriginalCdr.
+  ///
+  /// In en, this message translates to:
+  /// **'Share Original .CDR'**
+  String get commandUiShareOriginalCdr;
+
+  /// No description provided for @commandUiExportAsPngImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as PNG Image'**
+  String get commandUiExportAsPngImage;
+
+  /// No description provided for @commandUiPrintExportPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Print / Export PDF'**
+  String get commandUiPrintExportPdf;
+
+  /// No description provided for @commandUiTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try Again'**
+  String get commandUiTryAgain;
+
+  /// No description provided for @commandUiSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search...'**
+  String get commandUiSearch;
+
+  /// No description provided for @commandUiViewAsPlainText.
+  ///
+  /// In en, this message translates to:
+  /// **'View as Plain Text'**
+  String get commandUiViewAsPlainText;
+
+  /// No description provided for @commandUiContinueAnyway.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue anyway'**
+  String get commandUiContinueAnyway;
+
+  /// No description provided for @commandUiCloseSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Close Search'**
+  String get commandUiCloseSearch;
+
+  /// No description provided for @commandUiDisableWordWrap.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable Word Wrap'**
+  String get commandUiDisableWordWrap;
+
+  /// No description provided for @commandUiEnableWordWrap.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Word Wrap'**
+  String get commandUiEnableWordWrap;
+
+  /// No description provided for @commandUiCopyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy All'**
+  String get commandUiCopyAll;
+
+  /// No description provided for @commandUiShowRaw.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Raw'**
+  String get commandUiShowRaw;
+
+  /// No description provided for @commandUiPrettyPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pretty Print'**
+  String get commandUiPrettyPrint;
+
+  /// No description provided for @commandUiShowSecrets.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Secrets'**
+  String get commandUiShowSecrets;
+
+  /// No description provided for @commandUiHideSecrets.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Secrets'**
+  String get commandUiHideSecrets;
+
+  /// No description provided for @commandUiEnableSyntaxHighlighting.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Syntax Highlighting'**
+  String get commandUiEnableSyntaxHighlighting;
+
+  /// No description provided for @commandUiFontSizeValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Font Size ({value1})'**
+  String commandUiFontSizeValue(String value1);
+
+  /// No description provided for @commandUiFontSizeValue2.
+  ///
+  /// In en, this message translates to:
+  /// **'Font Size: {value1}'**
+  String commandUiFontSizeValue2(String value1);
+
+  /// No description provided for @commandUiReadingMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading Mode'**
+  String get commandUiReadingMode;
+
+  /// No description provided for @commandUiValueTapToChange.
+  ///
+  /// In en, this message translates to:
+  /// **'{value1} (Tap to change)'**
+  String commandUiValueTapToChange(String value1);
+
+  /// No description provided for @commandUiRemoveBookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Bookmark'**
+  String get commandUiRemoveBookmark;
+
+  /// No description provided for @commandUiAddBookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Bookmark'**
+  String get commandUiAddBookmark;
+
+  /// No description provided for @commandUiSavedBookmarks.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved Bookmarks'**
+  String get commandUiSavedBookmarks;
+
+  /// No description provided for @commandUiComicInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Comic Info'**
+  String get commandUiComicInfo;
+
+  /// No description provided for @commandUiPageValueError.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {value1} Error'**
+  String commandUiPageValueError(String value1);
+
+  /// No description provided for @commandUiDecrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease'**
+  String get commandUiDecrease;
+
+  /// No description provided for @commandUiIncrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase'**
+  String get commandUiIncrease;
+
+  /// No description provided for @commandUiRestartFromPage1UponReachingTheEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart from page 1 upon reaching the end'**
+  String get commandUiRestartFromPage1UponReachingTheEnd;
+
+  /// No description provided for @commandUiAutomaticallySuspendPageTurnsWhileInspectingPanelsZoomedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically suspend page turns while inspecting panels zoomed in'**
+  String
+  get commandUiAutomaticallySuspendPageTurnsWhileInspectingPanelsZoomedIn;
+
+  /// No description provided for @commandUiErrorLoadingPageValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading page {value1}'**
+  String commandUiErrorLoadingPageValue(String value1);
+
+  /// No description provided for @commandUiToggleRawText.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Raw Text'**
+  String get commandUiToggleRawText;
+
+  /// No description provided for @commandUiDelimiter.
+  ///
+  /// In en, this message translates to:
+  /// **'Delimiter'**
+  String get commandUiDelimiter;
+
+  /// No description provided for @commandUiComma.
+  ///
+  /// In en, this message translates to:
+  /// **'Comma (,)'**
+  String get commandUiComma;
+
+  /// No description provided for @commandUiSemicolon.
+  ///
+  /// In en, this message translates to:
+  /// **'Semicolon (;)'**
+  String get commandUiSemicolon;
+
+  /// No description provided for @commandUiTabT.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab (\\t)'**
+  String get commandUiTabT;
+
+  /// No description provided for @commandUiPipe.
+  ///
+  /// In en, this message translates to:
+  /// **'Pipe (|)'**
+  String get commandUiPipe;
+
+  /// No description provided for @commandUiSearchRows.
+  ///
+  /// In en, this message translates to:
+  /// **'Search rows...'**
+  String get commandUiSearchRows;
+
+  /// No description provided for @commandUiEmptyCsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty CSV'**
+  String get commandUiEmptyCsv;
+
+  /// No description provided for @commandUiNoMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches'**
+  String get commandUiNoMatches;
+
+  /// No description provided for @commandUiShowingFirst1000RowsForPerformance.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing first 1000 rows for performance'**
+  String get commandUiShowingFirst1000RowsForPerformance;
+
+  /// No description provided for @commandUiToggleHudText.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle HUD text'**
+  String get commandUiToggleHudText;
+
+  /// No description provided for @commandUiShowMetadata.
+  ///
+  /// In en, this message translates to:
+  /// **'Show metadata'**
+  String get commandUiShowMetadata;
+
+  /// No description provided for @commandUiPanZoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Pan & Zoom'**
+  String get commandUiPanZoom;
+
+  /// No description provided for @commandUiWindowLevelDragDragOnScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Window / Level Drag (Drag on screen)'**
+  String get commandUiWindowLevelDragDragOnScreen;
+
+  /// No description provided for @commandUiRulerMeasurementMm.
+  ///
+  /// In en, this message translates to:
+  /// **'Ruler Measurement (mm)'**
+  String get commandUiRulerMeasurementMm;
+
+  /// No description provided for @commandUiClearValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear ({value1})'**
+  String commandUiClearValue(String value1);
+
+  /// No description provided for @commandUiSelectSeries.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Series'**
+  String get commandUiSelectSeries;
+
+  /// No description provided for @commandUiRulerMeasurement.
+  ///
+  /// In en, this message translates to:
+  /// **'Ruler Measurement'**
+  String get commandUiRulerMeasurement;
+
+  /// No description provided for @commandUiPauseCine.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause Cine'**
+  String get commandUiPauseCine;
+
+  /// No description provided for @commandUiPlayCine.
+  ///
+  /// In en, this message translates to:
+  /// **'Play Cine'**
+  String get commandUiPlayCine;
+
+  /// No description provided for @commandUiReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get commandUiReset;
+
+  /// No description provided for @commandUiSearchInDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in Document'**
+  String get commandUiSearchInDocument;
+
+  /// No description provided for @commandUiCopyDocumentText.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Document Text'**
+  String get commandUiCopyDocumentText;
+
+  /// No description provided for @commandUiDocumentProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'Document Properties'**
+  String get commandUiDocumentProperties;
+
+  /// No description provided for @commandUiSearchInDocument2.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in document...'**
+  String get commandUiSearchInDocument2;
+
+  /// No description provided for @commandUiMinimizeControls.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimize Controls'**
+  String get commandUiMinimizeControls;
+
+  /// No description provided for @commandUiExitFullscreenEsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Fullscreen (ESC)'**
+  String get commandUiExitFullscreenEsc;
+
+  /// No description provided for @commandUiElevationValueValueElements.
+  ///
+  /// In en, this message translates to:
+  /// **'Elevation: {value1} • {value2} elements'**
+  String commandUiElevationValueValueElements(String value1, String value2);
+
+  /// No description provided for @commandUiIsolateStorey.
+  ///
+  /// In en, this message translates to:
+  /// **'Isolate Storey'**
+  String get commandUiIsolateStorey;
+
+  /// No description provided for @commandUiValueItems.
+  ///
+  /// In en, this message translates to:
+  /// **'{value1} items'**
+  String commandUiValueItems(String value1);
+
+  /// No description provided for @commandUiIsolateCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Isolate Category'**
+  String get commandUiIsolateCategory;
+
+  /// No description provided for @commandUiValueElements.
+  ///
+  /// In en, this message translates to:
+  /// **'{value1} elements'**
+  String commandUiValueElements(String value1);
+
+  /// No description provided for @commandUiIsolateLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Isolate Layer'**
+  String get commandUiIsolateLayer;
+
+  /// No description provided for @commandUiApplyClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply & Close'**
+  String get commandUiApplyClose;
+
+  /// No description provided for @commandUiFitToScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit to Screen'**
+  String get commandUiFitToScreen;
+
+  /// No description provided for @commandUiImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get commandUiImport;
+
+  /// No description provided for @commandUiExitMeasureMarkup.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Measure & Markup'**
+  String get commandUiExitMeasureMarkup;
+
+  /// No description provided for @commandUiMeasureTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Measure Tools'**
+  String get commandUiMeasureTools;
+
+  /// No description provided for @commandUiSaveMergedDxf.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Merged DXF'**
+  String get commandUiSaveMergedDxf;
+
+  /// No description provided for @commandUiSaveAnnotatedDxf.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Annotated DXF'**
+  String get commandUiSaveAnnotatedDxf;
+
+  /// No description provided for @commandUiCanvasTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Canvas Theme'**
+  String get commandUiCanvasTheme;
+
+  /// No description provided for @commandUiExportAsFastKcad.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Fast KCAD'**
+  String get commandUiExportAsFastKcad;
+
+  /// No description provided for @commandUiHideCadGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide CAD Grid'**
+  String get commandUiHideCadGrid;
+
+  /// No description provided for @commandUiShowCadGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Show CAD Grid'**
+  String get commandUiShowCadGrid;
+
+  /// No description provided for @commandUiDrawingProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'Drawing Properties'**
+  String get commandUiDrawingProperties;
+
+  /// No description provided for @commandUiShareFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Share File'**
+  String get commandUiShareFile;
+
+  /// No description provided for @commandUiPrintExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Print / Export'**
+  String get commandUiPrintExport;
+
+  /// No description provided for @commandUiEnterAnnotationTextOrSelectAPresetBelow.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter annotation text or select a preset below...'**
+  String get commandUiEnterAnnotationTextOrSelectAPresetBelow;
+
+  /// No description provided for @commandUiDeleteNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Note'**
+  String get commandUiDeleteNote;
+
+  /// No description provided for @commandUiUpdateNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Note'**
+  String get commandUiUpdateNote;
+
+  /// No description provided for @commandUiAddNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Note'**
+  String get commandUiAddNote;
+
+  /// No description provided for @commandUiSnapValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Snap {value1}'**
+  String commandUiSnapValue(String value1);
+
+  /// No description provided for @commandUiClearMeasurement.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear measurement'**
+  String get commandUiClearMeasurement;
+
+  /// No description provided for @commandUiExitMeasurement.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit measurement'**
+  String get commandUiExitMeasurement;
+
+  /// No description provided for @commandUiTight.
+  ///
+  /// In en, this message translates to:
+  /// **'Tight'**
+  String get commandUiTight;
+
+  /// No description provided for @commandUiRelaxed.
+  ///
+  /// In en, this message translates to:
+  /// **'Relaxed'**
+  String get commandUiRelaxed;
+
+  /// No description provided for @commandUiPages.
+  ///
+  /// In en, this message translates to:
+  /// **'Pages'**
+  String get commandUiPages;
+
+  /// No description provided for @commandUiScroll.
+  ///
+  /// In en, this message translates to:
+  /// **'Scroll'**
+  String get commandUiScroll;
+
+  /// No description provided for @commandUiSearchBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Book'**
+  String get commandUiSearchBook;
+
+  /// No description provided for @commandUiPageFlipModeTapForContinuous.
+  ///
+  /// In en, this message translates to:
+  /// **'Page Flip Mode (Tap for Continuous)'**
+  String get commandUiPageFlipModeTapForContinuous;
+
+  /// No description provided for @commandUiContinuousScrollTapForPages.
+  ///
+  /// In en, this message translates to:
+  /// **'Continuous Scroll (Tap for Pages)'**
+  String get commandUiContinuousScrollTapForPages;
+
+  /// No description provided for @commandUiReadingSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading Settings'**
+  String get commandUiReadingSettings;
+
+  /// No description provided for @commandUiBookInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Book Info'**
+  String get commandUiBookInfo;
+
+  /// No description provided for @commandUiSearchInBookText.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in book text...'**
+  String get commandUiSearchInBookText;
+
+  /// No description provided for @commandUiOpeningEBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening E-Book...'**
+  String get commandUiOpeningEBook;
+
+  /// No description provided for @commandUiNoContentFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No content found'**
+  String get commandUiNoContentFound;
+
+  /// No description provided for @commandUiPrevChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Prev Chapter'**
+  String get commandUiPrevChapter;
+
+  /// No description provided for @commandUiNextChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Next Chapter'**
+  String get commandUiNextChapter;
+
+  /// No description provided for @commandUiChapterValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter {value1}'**
+  String commandUiChapterValue(String value1);
+
+  /// No description provided for @commandUiPrev.
+  ///
+  /// In en, this message translates to:
+  /// **'Prev'**
+  String get commandUiPrev;
+
+  /// No description provided for @commandUiRotate90Clockwise.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate 90° Clockwise'**
+  String get commandUiRotate90Clockwise;
+
+  /// No description provided for @commandUiFitToViewCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit to View (Center)'**
+  String get commandUiFitToViewCenter;
+
+  /// No description provided for @commandUiTypeHereToPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Type here to preview'**
+  String get commandUiTypeHereToPreview;
+
+  /// No description provided for @commandUiFolderName.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder Name'**
+  String get commandUiFolderName;
+
+  /// No description provided for @commandUiEnterFolderDisplayName.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter folder display name'**
+  String get commandUiEnterFolderDisplayName;
+
+  /// No description provided for @commandUiEnterAmountInMax20.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter amount in € (max 20€)'**
+  String get commandUiEnterAmountInMax20;
+
+  /// No description provided for @commandUiEG10.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 10'**
+  String get commandUiEG10;
+
+  /// No description provided for @commandUiRevolut.
+  ///
+  /// In en, this message translates to:
+  /// **'Revolut'**
+  String get commandUiRevolut;
+
+  /// No description provided for @commandUiPaypal.
+  ///
+  /// In en, this message translates to:
+  /// **'PayPal'**
+  String get commandUiPaypal;
+
+  /// No description provided for @commandUiFilterByCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by category'**
+  String get commandUiFilterByCategory;
+
+  /// No description provided for @commandUiIncludeSubfoldersOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Include subfolders: ON'**
+  String get commandUiIncludeSubfoldersOn;
+
+  /// No description provided for @commandUiIncludeSubfoldersOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Include subfolders: OFF'**
+  String get commandUiIncludeSubfoldersOff;
+
+  /// No description provided for @commandUiRenameFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename Folder'**
+  String get commandUiRenameFolder;
+
+  /// No description provided for @commandUiRemoveFolderFromList.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Folder from list'**
+  String get commandUiRemoveFolderFromList;
+
+  /// No description provided for @commandUiSelectFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Folder'**
+  String get commandUiSelectFolder;
+
+  /// No description provided for @commandUiFileNoLongerExistsOnTheDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'File no longer exists on the device.'**
+  String get commandUiFileNoLongerExistsOnTheDevice;
+
+  /// No description provided for @commandUiLicenses.
+  ///
+  /// In en, this message translates to:
+  /// **'Licenses'**
+  String get commandUiLicenses;
+
+  /// No description provided for @commandUiLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs'**
+  String get commandUiLogs;
+
+  /// No description provided for @commandUiGithub.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub'**
+  String get commandUiGithub;
+
+  /// No description provided for @commandUiCopyUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy URL'**
+  String get commandUiCopyUrl;
+
+  /// No description provided for @commandUiCloseServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Close Server'**
+  String get commandUiCloseServer;
+
+  /// No description provided for @commandUiStopSharing.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Sharing'**
+  String get commandUiStopSharing;
+
+  /// No description provided for @commandUiAllOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'All Options'**
+  String get commandUiAllOptions;
+
+  /// No description provided for @commandUiPlotterProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'Plotter Properties'**
+  String get commandUiPlotterProperties;
+
+  /// No description provided for @commandUiBackgroundCheckerboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Background: Checkerboard'**
+  String get commandUiBackgroundCheckerboard;
+
+  /// No description provided for @commandUiBackgroundDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Background: Dark'**
+  String get commandUiBackgroundDark;
+
+  /// No description provided for @commandUiBackgroundLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Background: Light'**
+  String get commandUiBackgroundLight;
+
+  /// No description provided for @commandUiRenderingCrispPixelPerfect.
+  ///
+  /// In en, this message translates to:
+  /// **'Rendering: Crisp (Pixel-perfect)'**
+  String get commandUiRenderingCrispPixelPerfect;
+
+  /// No description provided for @commandUiRenderingSmooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Rendering: Smooth'**
+  String get commandUiRenderingSmooth;
+
+  /// No description provided for @commandUiSingleImageView.
+  ///
+  /// In en, this message translates to:
+  /// **'Single Image View'**
+  String get commandUiSingleImageView;
+
+  /// No description provided for @commandUiAllResolutionsGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'All Resolutions Grid'**
+  String get commandUiAllResolutionsGrid;
+
+  /// No description provided for @commandUiShareSizeValueValuePng.
+  ///
+  /// In en, this message translates to:
+  /// **'Share size ({value1}×{value2} PNG)'**
+  String commandUiShareSizeValueValuePng(String value1, String value2);
+
+  /// No description provided for @commandUiShareOriginalIcoFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Share original .ico file'**
+  String get commandUiShareOriginalIcoFile;
+
+  /// No description provided for @commandUiPrintSaveAsPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Print / Save as PDF'**
+  String get commandUiPrintSaveAsPdf;
+
+  /// No description provided for @commandUiFlipImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip Image'**
+  String get commandUiFlipImage;
+
+  /// No description provided for @commandUiMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More Actions'**
+  String get commandUiMoreActions;
+
+  /// No description provided for @commandUiPrintSavePdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Print / Save PDF'**
+  String get commandUiPrintSavePdf;
+
+  /// No description provided for @commandUiResetViewTransforms.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset View & Transforms'**
+  String get commandUiResetViewTransforms;
+
+  /// No description provided for @commandUiFailedToRenderImageValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to render image: {value1}'**
+  String commandUiFailedToRenderImageValue(String value1);
+
+  /// No description provided for @commandUiBackToProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Project'**
+  String get commandUiBackToProject;
+
+  /// No description provided for @commandUiResetZoom11.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Zoom (1:1)'**
+  String get commandUiResetZoom11;
+
+  /// No description provided for @commandUiFormattedView.
+  ///
+  /// In en, this message translates to:
+  /// **'Formatted View'**
+  String get commandUiFormattedView;
+
+  /// No description provided for @commandUiRawMarkdownSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw Markdown Source'**
+  String get commandUiRawMarkdownSource;
+
+  /// No description provided for @commandUiCopyMarkdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Markdown'**
+  String get commandUiCopyMarkdown;
+
+  /// No description provided for @commandUiMarkdownProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'Markdown Properties'**
+  String get commandUiMarkdownProperties;
+
+  /// No description provided for @commandUiPcbLayersValueValue.
+  ///
+  /// In en, this message translates to:
+  /// **'PCB Layers ({value1}/{value2})'**
+  String commandUiPcbLayersValueValue(String value1, String value2);
+
+  /// No description provided for @commandUi1MmMeasurementGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'1mm Measurement Grid'**
+  String get commandUi1MmMeasurementGrid;
+
+  /// No description provided for @commandUiTogglePadNumbers.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Pad Numbers'**
+  String get commandUiTogglePadNumbers;
+
+  /// No description provided for @commandUiBoardArchiveProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'Board / Archive Properties'**
+  String get commandUiBoardArchiveProperties;
+
+  /// No description provided for @commandUiPcbCanvasTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'PCB Canvas Theme'**
+  String get commandUiPcbCanvasTheme;
+
+  /// No description provided for @commandUiViewArchiveFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'View Archive Files'**
+  String get commandUiViewArchiveFiles;
+
+  /// No description provided for @commandUiTop.
+  ///
+  /// In en, this message translates to:
+  /// **'TOP'**
+  String get commandUiTop;
+
+  /// No description provided for @commandUiBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'BOTTOM'**
+  String get commandUiBottom;
+
+  /// No description provided for @commandUiAll.
+  ///
+  /// In en, this message translates to:
+  /// **'ALL'**
+  String get commandUiAll;
+
+  /// No description provided for @commandUiFitBoardToViewCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit Board to View (Center)'**
+  String get commandUiFitBoardToViewCenter;
+
+  /// No description provided for @commandUiInteractiveZoomViewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Interactive Zoom Viewer'**
+  String get commandUiInteractiveZoomViewer;
+
+  /// No description provided for @commandUiSearchDesignatorValuePackageEGR110K.
+  ///
+  /// In en, this message translates to:
+  /// **'Search designator, value, package (e.g. R1, 10k)...'**
+  String get commandUiSearchDesignatorValuePackageEGR110K;
+
+  /// No description provided for @commandUiPackageValuevalue.
+  ///
+  /// In en, this message translates to:
+  /// **'Package: {value1}{value2}'**
+  String commandUiPackageValuevalue(String value1, String value2);
+
+  /// No description provided for @commandUiOpenIn3DCadViewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in 3D CAD Viewer'**
+  String get commandUiOpenIn3DCadViewer;
+
+  /// No description provided for @commandUiOpenPdfSchematic.
+  ///
+  /// In en, this message translates to:
+  /// **'Open PDF Schematic'**
+  String get commandUiOpenPdfSchematic;
+
+  /// No description provided for @commandUiViewKicadSchematic.
+  ///
+  /// In en, this message translates to:
+  /// **'View KiCad Schematic'**
+  String get commandUiViewKicadSchematic;
+
+  /// No description provided for @commandUiSearchFilesInArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'Search files in archive...'**
+  String get commandUiSearchFilesInArchive;
+
+  /// No description provided for @commandUiAllValue.
+  ///
+  /// In en, this message translates to:
+  /// **'All ({value1})'**
+  String commandUiAllValue(String value1);
+
+  /// No description provided for @commandUiCouldNotLoadImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load image'**
+  String get commandUiCouldNotLoadImage;
+
+  /// No description provided for @commandUiCloseEsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Close (Esc)'**
+  String get commandUiCloseEsc;
+
+  /// No description provided for @commandUiResetZoom100.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Zoom (100%)'**
+  String get commandUiResetZoom100;
+
+  /// No description provided for @commandUiPreviousImageLeftArrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous Image (Left Arrow)'**
+  String get commandUiPreviousImageLeftArrow;
+
+  /// No description provided for @commandUiNextImageRightArrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Next Image (Right Arrow)'**
+  String get commandUiNextImageRightArrow;
+
+  /// No description provided for @commandUiZoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom In (+)'**
+  String get commandUiZoomIn;
+
+  /// No description provided for @commandUiZoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom Out (-)'**
+  String get commandUiZoomOut;
+
+  /// No description provided for @commandUiFitToView.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit to View'**
+  String get commandUiFitToView;
+
+  /// No description provided for @commandUiExitReadingModeBackToOriginalPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Reading Mode (Back to Original PDF)'**
+  String get commandUiExitReadingModeBackToOriginalPdf;
+
+  /// No description provided for @commandUiReadingModeReflowEBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading Mode (Reflow / E-Book)'**
+  String get commandUiReadingModeReflowEBook;
+
+  /// No description provided for @commandUiToggleInvertColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Invert Colors'**
+  String get commandUiToggleInvertColors;
+
+  /// No description provided for @commandUiPdfProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF Properties'**
+  String get commandUiPdfProperties;
+
+  /// No description provided for @commandUiSharePdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Share PDF'**
+  String get commandUiSharePdf;
+
+  /// No description provided for @commandUiPrintPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Print PDF'**
+  String get commandUiPrintPdf;
+
+  /// No description provided for @commandUiFitPageToScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit Page to Screen'**
+  String get commandUiFitPageToScreen;
+
+  /// No description provided for @commandUiEnterPfxPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter PFX password'**
+  String get commandUiEnterPfxPassword;
+
+  /// No description provided for @commandUiOriginalPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Original PDF'**
+  String get commandUiOriginalPdf;
+
+  /// No description provided for @commandUiDecreaseFontSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease font size'**
+  String get commandUiDecreaseFontSize;
+
+  /// No description provided for @commandUiIncreaseFontSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase font size'**
+  String get commandUiIncreaseFontSize;
+
+  /// No description provided for @commandUiSwipePages.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe Pages'**
+  String get commandUiSwipePages;
+
+  /// No description provided for @commandUiViewOriginalPdfPage.
+  ///
+  /// In en, this message translates to:
+  /// **'View Original PDF Page'**
+  String get commandUiViewOriginalPdfPage;
+
+  /// No description provided for @commandUiGroupByCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Group by category'**
+  String get commandUiGroupByCategory;
+
+  /// No description provided for @commandUiSearchFilesInProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Search files in project...'**
+  String get commandUiSearchFilesInProject;
+
+  /// No description provided for @commandUiByCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'By category'**
+  String get commandUiByCategory;
+
+  /// No description provided for @commandUiMoveUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get commandUiMoveUp;
+
+  /// No description provided for @commandUiMoveDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get commandUiMoveDown;
+
+  /// No description provided for @commandUiExitPresentation.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Presentation'**
+  String get commandUiExitPresentation;
+
+  /// No description provided for @commandUiRouteDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Route Details'**
+  String get commandUiRouteDetails;
+
+  /// No description provided for @commandUiShareRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Share Route'**
+  String get commandUiShareRoute;
+
+  /// No description provided for @commandUiMapOverlays.
+  ///
+  /// In en, this message translates to:
+  /// **'Map Overlays'**
+  String get commandUiMapOverlays;
+
+  /// No description provided for @commandUiFitRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit Route'**
+  String get commandUiFitRoute;
+
+  /// No description provided for @commandUiCenterOnLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Center on Location'**
+  String get commandUiCenterOnLocation;
+
+  /// No description provided for @commandUiShowMyLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Show My Location'**
+  String get commandUiShowMyLocation;
+
+  /// No description provided for @commandUiCalibrateCompass.
+  ///
+  /// In en, this message translates to:
+  /// **'Calibrate Compass'**
+  String get commandUiCalibrateCompass;
+
+  /// No description provided for @commandUiHikingTrailsMarkings.
+  ///
+  /// In en, this message translates to:
+  /// **'Hiking Trails & Markings'**
+  String get commandUiHikingTrailsMarkings;
+
+  /// No description provided for @commandUiWaymarkedTrailsOfficialMountainRouteColorsCodesFromOsm.
+  ///
+  /// In en, this message translates to:
+  /// **'Waymarked Trails: official mountain route colors & codes from OSM'**
+  String get commandUiWaymarkedTrailsOfficialMountainRouteColorsCodesFromOsm;
+
+  /// No description provided for @commandUiMtbCyclingRoutes.
+  ///
+  /// In en, this message translates to:
+  /// **'MTB & Cycling Routes'**
+  String get commandUiMtbCyclingRoutes;
+
+  /// No description provided for @commandUiWaymarkedTrailsDedicatedMountainBikeAndCyclingNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Waymarked Trails: dedicated mountain bike and cycling network'**
+  String get commandUiWaymarkedTrailsDedicatedMountainBikeAndCyclingNetwork;
+
+  /// No description provided for @commandUiAutocadDxfSColSWallSBeamSSlabSAxis.
+  ///
+  /// In en, this message translates to:
+  /// **'AutoCAD DXF (S-COL, S-WALL, S-BEAM, S-SLAB, S-AXIS)'**
+  String get commandUiAutocadDxfSColSWallSBeamSSlabSAxis;
+
+  /// No description provided for @commandUiValueEntities.
+  ///
+  /// In en, this message translates to:
+  /// **'{value1} entities'**
+  String commandUiValueEntities(String value1);
+
+  /// No description provided for @commandUiWhitePageOn.
+  ///
+  /// In en, this message translates to:
+  /// **'White Page: ON'**
+  String get commandUiWhitePageOn;
+
+  /// No description provided for @commandUiWhitePageOffTransparent.
+  ///
+  /// In en, this message translates to:
+  /// **'White Page: OFF (Transparent)'**
+  String get commandUiWhitePageOffTransparent;
+
+  /// No description provided for @commandUiFindInText.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in Text'**
+  String get commandUiFindInText;
+
+  /// No description provided for @commandUiExitReadingModeCodeLogView.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Reading Mode (Code/Log View)'**
+  String get commandUiExitReadingModeCodeLogView;
+
+  /// No description provided for @commandUiReadingModeReflowOverflowEBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading Mode (Reflow / Overflow / E-Book)'**
+  String get commandUiReadingModeReflowOverflowEBook;
+
+  /// No description provided for @commandUiSwitchToProportionalFont.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Proportional Font'**
+  String get commandUiSwitchToProportionalFont;
+
+  /// No description provided for @commandUiSwitchToMonospaceFont.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Monospace Font'**
+  String get commandUiSwitchToMonospaceFont;
+
+  /// No description provided for @commandUiTextProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'Text Properties'**
+  String get commandUiTextProperties;
+
+  /// No description provided for @commandUiFindInText2.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in text...'**
+  String get commandUiFindInText2;
+
+  /// No description provided for @commandUiPreviousMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous Match'**
+  String get commandUiPreviousMatch;
+
+  /// No description provided for @commandUiNextMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Next Match'**
+  String get commandUiNextMatch;
+
+  /// No description provided for @commandUiRawView.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw View'**
+  String get commandUiRawView;
+
+  /// No description provided for @commandUiGoBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Go Back'**
+  String get commandUiGoBack;
+
+  /// No description provided for @commandUiLoopOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Loop: ON'**
+  String get commandUiLoopOn;
+
+  /// No description provided for @commandUiLoopOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Loop: OFF'**
+  String get commandUiLoopOff;
+
+  /// No description provided for @commandUiPlaybackSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback Speed'**
+  String get commandUiPlaybackSpeed;
+
+  /// No description provided for @commandUiUnlockOrientation.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Orientation'**
+  String get commandUiUnlockOrientation;
+
+  /// No description provided for @commandUiLockLandscape.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock Landscape'**
+  String get commandUiLockLandscape;
+
+  /// No description provided for @commandUiUnmute.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get commandUiUnmute;
+
+  /// No description provided for @commandUiWorkbookSheetsValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Workbook Sheets ({value1})'**
+  String commandUiWorkbookSheetsValue(String value1);
+
+  /// No description provided for @commandUiSheetValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Sheet {value1}'**
+  String commandUiSheetValue(String value1);
+
+  /// No description provided for @commandUiSearchInSheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in Sheet'**
+  String get commandUiSearchInSheet;
+
+  /// No description provided for @commandUiAllSheets.
+  ///
+  /// In en, this message translates to:
+  /// **'All Sheets'**
+  String get commandUiAllSheets;
+
+  /// No description provided for @commandUiSpreadsheetProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'Spreadsheet Properties'**
+  String get commandUiSpreadsheetProperties;
+
+  /// No description provided for @commandUiSearchInActiveSheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in active sheet...'**
+  String get commandUiSearchInActiveSheet;
+
+  /// No description provided for @commandUiCopyCellText.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Cell Text'**
+  String get commandUiCopyCellText;
+
+  /// No description provided for @commandUiCellContentCopiedToClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Cell content copied to clipboard'**
+  String get commandUiCellContentCopiedToClipboard;
+
+  /// No description provided for @commandUiAllSheetsValue.
+  ///
+  /// In en, this message translates to:
+  /// **'All Sheets ({value1})'**
+  String commandUiAllSheetsValue(String value1);
+
+  /// No description provided for @commandOptionLightStudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Light Studio'**
+  String get commandOptionLightStudio;
+
+  /// No description provided for @commandOptionDarkStudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark Studio'**
+  String get commandOptionDarkStudio;
+
+  /// No description provided for @commandOptionPureWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'Pure White'**
+  String get commandOptionPureWhite;
+
+  /// No description provided for @commandOptionPureBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Pure Black'**
+  String get commandOptionPureBlack;
+
+  /// No description provided for @commandOptionDarkCad.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark CAD'**
+  String get commandOptionDarkCad;
+
+  /// No description provided for @commandOptionTransparencyGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Transparency Grid'**
+  String get commandOptionTransparencyGrid;
+
+  /// No description provided for @commandOptionFr4Green.
+  ///
+  /// In en, this message translates to:
+  /// **'FR4 Green'**
+  String get commandOptionFr4Green;
+
+  /// No description provided for @commandOptionMatteBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Matte Black'**
+  String get commandOptionMatteBlack;
+
+  /// No description provided for @commandOptionArduinoBlue.
+  ///
+  /// In en, this message translates to:
+  /// **'Arduino Blue'**
+  String get commandOptionArduinoBlue;
+
+  /// No description provided for @commandOptionSparkfunRed.
+  ///
+  /// In en, this message translates to:
+  /// **'SparkFun Red'**
+  String get commandOptionSparkfunRed;
+
+  /// No description provided for @commandOptionHighContrast.
+  ///
+  /// In en, this message translates to:
+  /// **'High Contrast'**
+  String get commandOptionHighContrast;
+
+  /// No description provided for @commandOptionPcbLayersGerber.
+  ///
+  /// In en, this message translates to:
+  /// **'PCB Layers (Gerber)'**
+  String get commandOptionPcbLayersGerber;
+
+  /// No description provided for @commandOptionCncDrillHoles.
+  ///
+  /// In en, this message translates to:
+  /// **'CNC Drill Holes'**
+  String get commandOptionCncDrillHoles;
+
+  /// No description provided for @commandOption3DCadModels.
+  ///
+  /// In en, this message translates to:
+  /// **'3D CAD Models'**
+  String get commandOption3DCadModels;
+
+  /// No description provided for @commandOptionSchematicsCircuits.
+  ///
+  /// In en, this message translates to:
+  /// **'Schematics & Circuits'**
+  String get commandOptionSchematicsCircuits;
+
+  /// No description provided for @commandOptionImages3DRenders.
+  ///
+  /// In en, this message translates to:
+  /// **'Images & 3D Renders'**
+  String get commandOptionImages3DRenders;
+
+  /// No description provided for @commandOptionBillOfMaterialsBom.
+  ///
+  /// In en, this message translates to:
+  /// **'Bill of Materials (BOM)'**
+  String get commandOptionBillOfMaterialsBom;
+
+  /// No description provided for @commandOptionAssemblyPlacementCpl.
+  ///
+  /// In en, this message translates to:
+  /// **'Assembly & Placement (CPL)'**
+  String get commandOptionAssemblyPlacementCpl;
+
+  /// No description provided for @commandOptionDocumentationDrawings.
+  ///
+  /// In en, this message translates to:
+  /// **'Documentation & Drawings'**
+  String get commandOptionDocumentationDrawings;
+
+  /// No description provided for @commandOptionSourceCadProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Source CAD Project'**
+  String get commandOptionSourceCadProject;
+
+  /// No description provided for @commandOptionReportsNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports & Notes'**
+  String get commandOptionReportsNotes;
+
+  /// No description provided for @commandOptionOtherFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Other Files'**
+  String get commandOptionOtherFiles;
+
+  /// No description provided for @commandOptionGerbers.
+  ///
+  /// In en, this message translates to:
+  /// **'Gerbers'**
+  String get commandOptionGerbers;
+
+  /// No description provided for @commandOptionPhotosRenders.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos & Renders'**
+  String get commandOptionPhotosRenders;
+
+  /// No description provided for @commandOptionBomParts.
+  ///
+  /// In en, this message translates to:
+  /// **'BOM & Parts'**
+  String get commandOptionBomParts;
+
+  /// No description provided for @commandOptionSchematics.
+  ///
+  /// In en, this message translates to:
+  /// **'Schematics'**
+  String get commandOptionSchematics;
+
+  /// No description provided for @commandOptionDocsReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Docs & Reports'**
+  String get commandOptionDocsReports;
+
+  /// No description provided for @commandOptionAllFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'All Files'**
+  String get commandOptionAllFiles;
+
+  /// No description provided for @commandOptionLeftToRightWestern.
+  ///
+  /// In en, this message translates to:
+  /// **'Left to Right (Western)'**
+  String get commandOptionLeftToRightWestern;
+
+  /// No description provided for @commandOptionRightToLeftManga.
+  ///
+  /// In en, this message translates to:
+  /// **'Right to Left (Manga)'**
+  String get commandOptionRightToLeftManga;
+
+  /// No description provided for @commandOptionVerticalScrollWebtoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical Scroll (Webtoon)'**
+  String get commandOptionVerticalScrollWebtoon;
+
+  /// No description provided for @commandOptionLtr.
+  ///
+  /// In en, this message translates to:
+  /// **'LTR'**
+  String get commandOptionLtr;
+
+  /// No description provided for @commandOptionManga.
+  ///
+  /// In en, this message translates to:
+  /// **'Manga'**
+  String get commandOptionManga;
+
+  /// No description provided for @commandOptionWebtoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Webtoon'**
+  String get commandOptionWebtoon;
+
+  /// No description provided for @commandOptionLightPaper.
+  ///
+  /// In en, this message translates to:
+  /// **'Light Paper'**
+  String get commandOptionLightPaper;
+
+  /// No description provided for @commandOptionWarmSepia.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm Sepia'**
+  String get commandOptionWarmSepia;
+
+  /// No description provided for @commandOptionDarkCharcoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark Charcoal'**
+  String get commandOptionDarkCharcoal;
+
+  /// No description provided for @commandOptionSerifBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Serif (Book)'**
+  String get commandOptionSerifBook;
+
+  /// No description provided for @commandOptionSansSerifModern.
+  ///
+  /// In en, this message translates to:
+  /// **'Sans-Serif (Modern)'**
+  String get commandOptionSansSerifModern;
+
+  /// No description provided for @commandOptionMonospaceClean.
+  ///
+  /// In en, this message translates to:
+  /// **'Monospace (Clean)'**
+  String get commandOptionMonospaceClean;
+
+  /// No description provided for @commandOptionPagesSwipe.
+  ///
+  /// In en, this message translates to:
+  /// **'Pages (Swipe)'**
+  String get commandOptionPagesSwipe;
+
+  /// No description provided for @commandOptionMonospace.
+  ///
+  /// In en, this message translates to:
+  /// **'Monospace'**
+  String get commandOptionMonospace;
+
+  /// No description provided for @commandOptionPaginatedSwipe.
+  ///
+  /// In en, this message translates to:
+  /// **'Paginated (Swipe)'**
+  String get commandOptionPaginatedSwipe;
+
+  /// No description provided for @commandUiCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check'**
+  String get commandUiCheck;
 }
 
 class _AppLocalizationsDelegate

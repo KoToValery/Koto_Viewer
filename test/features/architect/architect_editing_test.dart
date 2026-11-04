@@ -70,14 +70,14 @@ Future<void> selectTool(WidgetTester tester, String name) async {
     'axis' => Icons.grid_on_rounded,
     _ => throw ArgumentError(name),
   };
-  await tool_ui.prepare(tester, icon);
-  await tester.tap(find.byIcon(icon));
+  await tool_ui.choose(tester, icon);
   await tester.pumpAndSettle();
 }
 
 Future<void> ensureSelectionTool(WidgetTester tester) async {
   // Selection is explicitly chosen; drawing tools no longer acquire elements.
-  final palette = tester.widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette));
+  final palette = tester.widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette),
+  );
   if (palette.activeTool != ArchitectTool.select) {
     await tool_ui.prepare(tester, Icons.near_me_outlined);
     await tester.tap(find.byKey(const ValueKey('architect-tool-select')));
@@ -884,8 +884,7 @@ void main() {
     }
     for (final key in [
       'architect-wall-flip',
-      'architect-wall-cut',
-    ]) {
+      'architect-wall-cut']) {
       final button = find.byKey(ValueKey(key));
       final rect = tester.getRect(button);
       expect(rect.left, greaterThanOrEqualTo(0));

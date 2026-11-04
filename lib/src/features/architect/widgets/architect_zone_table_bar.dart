@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 
@@ -107,8 +108,8 @@ class ArchitectZoneTableBar extends StatelessWidget {
 
               // Action: Full Schedule Dialog
               IconButton(
-                icon: const Icon(
-                  Icons.tune_rounded,
+                icon: const AppIcon(
+                  AppIconId.properties,
                   color: Color(0xFF38BDF8),
                   size: 18,
                 ),
@@ -123,8 +124,8 @@ class ArchitectZoneTableBar extends StatelessWidget {
               // Action: Remove Table if placed
               if (isTablePlaced) ...[
                 IconButton(
-                  icon: const Icon(
-                    Icons.delete_outline_rounded,
+                  icon: const AppIcon(
+                    AppIconId.delete,
                     color: Colors.redAccent,
                     size: 18,
                   ),
@@ -142,13 +143,14 @@ class ArchitectZoneTableBar extends StatelessWidget {
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.white70,
                   backgroundColor: Colors.white10,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4,
+                  ),
                   visualDensity: VisualDensity.compact,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6),
                   ),
                 ),
-                icon: const Icon(Icons.space_dashboard_rounded, size: 14),
+                icon: const AppIcon(AppIconId.zone, size: 14),
                 label: Text(
                   l10n.architectZoneTableBackToZones,
                   style: const TextStyle(fontSize: 11),
@@ -161,8 +163,8 @@ class ArchitectZoneTableBar extends StatelessWidget {
               IconButton(
                 tooltip: l10n.close,
                 onPressed: onClose,
-                icon: const Icon(
-                  Icons.close_rounded,
+                icon: const AppIcon(
+                  AppIconId.close,
                   color: Colors.white70,
                   size: 18,
                 ),

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'bim_numeric_keypad.dart';
 import '../properties/bim_numeric_rule.dart';
@@ -133,8 +134,8 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                         ),
                       ),
                     ),
-                    Icon(
-                      Icons.dialpad,
+                    AppIcon(
+                      AppIconId.layoutGrid,
                       size: 16,
                       color: _keypad ? colors.tertiary : colors.primary,
                     ),
@@ -179,8 +180,8 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                         ),
                       ),
                       onPressed: widget.onUnlock,
-                      icon: Icon(
-                        Icons.explore_outlined,
+                      icon: AppIcon(
+                        AppIconId.compass,
                         size: 18,
                         color: colors.primary,
                       ),
@@ -266,11 +267,10 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                       ),
                     ),
                     onPressed: widget.onCancel,
-                    icon: Icon(
-                      Icons.close_rounded,
+                    icon: AppIcon(
+                      AppIconId.close,
                       color: colors.error,
                       size: 19,
-                      weight: 700,
                     ),
                   ),
                 ],

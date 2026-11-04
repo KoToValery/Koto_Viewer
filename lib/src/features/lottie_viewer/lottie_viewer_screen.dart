@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -11,8 +12,7 @@ class LottieViewerScreen extends StatefulWidget {
 
   const LottieViewerScreen({
     super.key,
-    required this.filePath,
-  });
+    required this.filePath});
 
   @override
   State<LottieViewerScreen> createState() => _LottieViewerScreenState();
@@ -52,11 +52,14 @@ class _LottieViewerScreenState extends State<LottieViewerScreen>
         }
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'LottieViewer._tryParseAnimationName.fs');
+      AppErrorHandler.recordError(e, stack, context: 'LottieViewer._tryParseAnimationName.fs',
+      );
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'LottieViewer._tryParseAnimationName.format');
+      AppErrorHandler.recordError(e, stack, context: 'LottieViewer._tryParseAnimationName.format',
+      );
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'LottieViewer._tryParseAnimationName');
+      AppErrorHandler.recordError(e, stack, context: 'LottieViewer._tryParseAnimationName',
+      );
     }
   }
 
@@ -103,7 +106,8 @@ class _LottieViewerScreenState extends State<LottieViewerScreen>
       _controller.duration = Duration(
           milliseconds:
               (_composition!.duration.inMilliseconds * (1.0 / _playbackSpeed))
-                  .round());
+                  .round(),
+      );
       if (_isPlaying) {
         if (_isLooping) {
           _controller.repeat();
@@ -121,7 +125,8 @@ class _LottieViewerScreenState extends State<LottieViewerScreen>
       final file = File(widget.filePath);
       size = file.lengthSync();
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'LottieViewer._showInfoSheet.fs');
+      AppErrorHandler.recordError(e, stack, context: 'LottieViewer._showInfoSheet.fs',
+      );
     }
     
     showModalBottomSheet(
@@ -135,7 +140,8 @@ class _LottieViewerScreenState extends State<LottieViewerScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Animation Info',
-                    style: Theme.of(context).textTheme.titleLarge),
+                    style: Theme.of(context).textTheme.titleLarge,
+                ),
                 const SizedBox(height: 16),
                 if (_animationName.isNotEmpty)
                   Text('Name: $_animationName'),
@@ -178,15 +184,16 @@ class _LottieViewerScreenState extends State<LottieViewerScreen>
         title: Text(fileName),
         actions: [
           IconButton(
-            icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+            icon: AppIcon.fromMaterial(_isPlaying ? Icons.pause : Icons.play_arrow,
+            ),
             onPressed: _isLoaded ? _togglePlayPause : null,
           ),
           IconButton(
-            icon: const Icon(Icons.info_outline),
+            icon: const AppIcon(AppIconId.info),
             onPressed: _isLoaded ? _showInfoSheet : null,
           ),
           IconButton(
-            icon: const Icon(Icons.share),
+            icon: const AppIcon(AppIconId.share),
             onPressed: () {
               Share.shareXFiles([XFile(widget.filePath)]);
             },
@@ -247,11 +254,12 @@ class _LottieViewerScreenState extends State<LottieViewerScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
-                        icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+                        icon: AppIcon.fromMaterial(_isPlaying ? Icons.pause : Icons.play_arrow,
+                        ),
                         onPressed: _isLoaded ? _togglePlayPause : null,
                       ),
                       IconButton(
-                        icon: Icon(
+                        icon: AppIcon.fromMaterial(
                           _isLooping ? Icons.repeat_on : Icons.repeat,
                           color: _isLooping
                               ? Theme.of(context).colorScheme.primary

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:convert';
 import '../models/architect_elements.dart';
 import '../models/architect_line_style.dart';
@@ -356,7 +357,7 @@ class _ArchitectElementPropertiesDialogState
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(cat.icon, size: 18, color: cat.color),
+                AppIcon.fromMaterial(cat.icon, size: 18, color: cat.color),
                 const SizedBox(width: 8),
                 Text(cat.localizedName(l)),
               ],
@@ -462,7 +463,7 @@ class _ArchitectElementPropertiesDialogState
           ),
           PopupMenuButton<String>(
             tooltip: label,
-            icon: const Icon(Icons.arrow_drop_down, size: 22),
+            icon: const AppIcon(AppIconId.expandMore, size: 22),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             onSelected: (val) {
@@ -852,7 +853,7 @@ class _ArchitectElementPropertiesDialogState
             OutlinedButton.icon(
               key: const ValueKey('architect-property-schedule-table'),
               onPressed: widget.onScheduleTable,
-              icon: const Icon(Icons.table_chart_rounded, size: 18),
+              icon: const AppIcon(AppIconId.schedule, size: 18),
               label: Text(l.architectZoneScheduleTitle),
             ),
             const SizedBox(height: 8),
@@ -861,7 +862,7 @@ class _ArchitectElementPropertiesDialogState
             OutlinedButton.icon(
               key: const ValueKey('architect-property-slab-layers'),
               onPressed: widget.onSlabLayers,
-              icon: const Icon(Icons.layers_outlined),
+              icon: const AppIcon(AppIconId.layers),
               label: Text(l.slabLayers),
             ),
           if (isZone) ...[
@@ -1190,7 +1191,8 @@ class _ArchitectElementPropertiesDialogState
                 setState(() {
                   if (_lineStyle?.id == style.id) {
                     _lineStyle = ArchitectLineStyle.solid;
-                    texts['lineStyle'] = jsonEncode(ArchitectLineStyle.solid.toJson());
+                    texts['lineStyle'] = jsonEncode(ArchitectLineStyle.solid.toJson(),
+                    );
                   }
                 });
               },
@@ -1202,7 +1204,7 @@ class _ArchitectElementPropertiesDialogState
           if (_supportsLineStyle)
             TextButton.icon(
               key: const ValueKey('architect-property-line-pattern'),
-              icon: const Icon(Icons.tune),
+              icon: const AppIcon(AppIconId.properties),
               label: Text(l.architectLinePatternEditor),
               onPressed: () async {
                 final current = _lineStyle ?? ArchitectLineStyle.presets[1];
@@ -1290,7 +1292,7 @@ class _ArchitectElementPropertiesDialogState
                     ),
                   ),
                 ),
-                const Icon(Icons.expand_more),
+                const AppIcon(AppIconId.expandMore),
               ],
             ),
           ),
@@ -1428,7 +1430,7 @@ class _ArchitectElementPropertiesDialogState
           }),
           OutlinedButton.icon(
             key: const ValueKey('architect-property-flipSide'),
-            icon: const Icon(Icons.flip),
+            icon: const AppIcon(AppIconId.flipHorizontal),
             label: Text(l.architectWallFlipSide),
             onPressed: () => setState(() {
               texts['exteriorSideMode'] = 'manual';

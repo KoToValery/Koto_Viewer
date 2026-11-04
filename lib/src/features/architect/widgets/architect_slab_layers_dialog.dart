@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:convert';
@@ -283,7 +284,7 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                 IconButton(
                   tooltip: l.slabAllUsages,
                   onPressed: () => setState(() => filter = null),
-                  icon: const Icon(Icons.filter_alt_off_outlined),
+                  icon: const AppIcon(AppIconId.filterOff),
                 ),
               ],
             ),
@@ -291,7 +292,8 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<int>(
-                    key: ValueKey('slab-presets-${filter?.name}-${library.length}'),
+                    key: ValueKey('slab-presets-${filter?.name}-${library.length}',
+                    ),
                     isExpanded: true,
                     decoration: InputDecoration(labelText: l.slabPreset),
                     items: [
@@ -311,7 +313,9 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                 ),
                 if (library.any((a) => a.id == draft.id))
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                    icon: const AppIcon(
+                      AppIconId.delete, color: Colors.redAccent,
+                    ),
                     tooltip: l.slabDeleteLibrary,
                     onPressed: () async {
                       final messenger = ScaffoldMessenger.of(context);
@@ -363,14 +367,24 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                   itemBuilder: (_) => [
                     PopupMenuItem(
                       value: 'library',
-                      child: Text(l.slabSaveLibrary),
+                      child: AppMenuLabel(
+                        icon: AppIconId.save,
+                        child: Text(l.slabSaveLibrary),
+                      ),
                     ),
                     if (library.any((a) => a.id == draft.id))
                       PopupMenuItem(
                         value: 'delete_library',
-                        child: Text(l.slabDeleteLibrary),
+                        child: AppMenuLabel(
+                          icon: AppIconId.delete,
+                          child: Text(l.slabDeleteLibrary),
                       ),
-                    PopupMenuItem(value: 'new', child: Text(l.slabNewType)),
+                      ),
+                    PopupMenuItem(value: 'new', child: AppMenuLabel(
+                        icon: AppIconId.add,
+                        child: Text(l.slabNewType),
+                      ),
+                    ),
                   ],
                   onSelected: (action) async {
                     if (action == 'new') {
@@ -566,7 +580,7 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                   setDirection = true;
                   first = null;
                 }),
-                icon: const Icon(Icons.south_east),
+                icon: const AppIcon(AppIconId.diagonalDown),
                 label: Text(
                   setDirection ? l.slabDirectionHelp : l.slabDirection,
                 ),
@@ -587,17 +601,27 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                 if (!lower)
                   PopupMenuButton<String>(
                     tooltip: l.slabFinish,
-                    icon: const Icon(Icons.texture),
+                    icon: const AppIcon(AppIconId.hatch),
                     itemBuilder: (_) => [
                       PopupMenuItem(
                         value: 'tile',
-                        child: Text(l.slabFinishTile),
+                        child: AppMenuLabel(
+                          icon: AppIconId.grid,
+                          child: Text(l.slabFinishTile),
+                      ),
                       ),
                       PopupMenuItem(
                         value: 'parquet',
-                        child: Text(l.slabFinishParquet),
+                        child: AppMenuLabel(
+                          icon: AppIconId.hatch,
+                          child: Text(l.slabFinishParquet),
                       ),
-                      PopupMenuItem(value: 'wet', child: Text(l.slabFinishWet)),
+                      ),
+                      PopupMenuItem(value: 'wet', child: AppMenuLabel(
+                          icon: AppIconId.water,
+                          child: Text(l.slabFinishWet),
+                        ),
+                      ),
                     ],
                     onSelected: (v) => change([
                       ...ArchitectSlabCatalog.finish(
@@ -616,7 +640,7 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
             TextButton.icon(
               key: const ValueKey('slab-add-layer'),
               onPressed: editLayer,
-              icon: const Icon(Icons.add),
+              icon: const AppIcon(AppIconId.add),
               label: Text(l.slabAddLayer),
             ),
             if (draft.usage == SlabUsage.ground ||
@@ -668,15 +692,23 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
           PopupMenuItem(
             value: 'up',
             enabled: index > 0,
-            child: Text(l.slabMoveUp),
+            child: AppMenuLabel(icon: AppIconId.up, child: Text(l.slabMoveUp)),
           ),
           PopupMenuItem(
             value: 'down',
             enabled: index < layers.length - 1,
-            child: Text(l.slabMoveDown),
+            child: AppMenuLabel(
+              icon: AppIconId.down,
+              child: Text(l.slabMoveDown),
           ),
-          PopupMenuItem(value: 'copy', child: Text(l.slabDuplicate)),
-          PopupMenuItem(value: 'delete', child: Text(l.delete)),
+          ),
+          PopupMenuItem(value: 'copy', child: AppMenuLabel(
+              icon: AppIconId.duplicate,
+              child: Text(l.slabDuplicate),
+            ),
+          ),
+          PopupMenuItem(value: 'delete', child: AppMenuLabel(icon: AppIconId.delete, child: Text(l.delete)),
+          ),
         ],
         onSelected: (v) {
           final next = [...layers];

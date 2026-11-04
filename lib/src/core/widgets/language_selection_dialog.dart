@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../services/locale_service.dart';
 import '../l10n/l10n_extensions.dart';
@@ -23,10 +24,12 @@ class LanguageSelectionDialog extends StatelessWidget {
       valueListenable: LocaleService.currentLocaleNotifier,
       builder: (context, currentLocale, _) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24),
+          ),
           backgroundColor: isDark ? const Color(0xFF161E2E) : Colors.white,
           titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8,
+          ),
           actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           title: Row(
             children: [
@@ -58,7 +61,8 @@ class LanguageSelectionDialog extends StatelessWidget {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: LocaleService.supportedLanguages.map((lang) {
-              final isSelected = LocaleService.isCurrentLocale(lang.languageCode);
+              final isSelected = LocaleService.isCurrentLocale(lang.languageCode,
+              );
 
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -70,10 +74,12 @@ class LanguageSelectionDialog extends StatelessWidget {
                   },
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.2 : 0.1)
+                          ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.2 : 0.1,
+                            )
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
@@ -87,8 +93,7 @@ class LanguageSelectionDialog extends StatelessWidget {
                       children: [
                         Text(
                           lang.flag,
-                          style: const TextStyle(fontSize: 22),
-                        ),
+                          style: const TextStyle(fontSize: 22)),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
@@ -115,14 +120,14 @@ class LanguageSelectionDialog extends StatelessWidget {
                           ),
                         ),
                         if (isSelected)
-                          Icon(
-                            Icons.check_circle_rounded,
+                          AppIcon(
+                            AppIconId.checkCircle,
                             color: theme.colorScheme.primary,
                             size: 22,
                           )
                         else
-                          Icon(
-                            Icons.radio_button_unchecked_rounded,
+                          AppIcon(
+                            AppIconId.radioOff,
                             color: isDark ? Colors.white30 : Colors.black26,
                             size: 22,
                           ),

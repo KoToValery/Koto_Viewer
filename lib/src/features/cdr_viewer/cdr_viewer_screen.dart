@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -79,7 +80,8 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
         });
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._loadCdrFile.fs');
+      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._loadCdrFile.fs',
+      );
       try {
         await RecentFilesService.removeRecentFile(widget.filePath);
       } on Exception catch (_) {
@@ -93,7 +95,8 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._loadCdrFile.format');
+      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._loadCdrFile.format',
+      );
       try {
         await RecentFilesService.removeRecentFile(widget.filePath);
       } on Exception catch (_) {
@@ -179,7 +182,8 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
                         children: [
                           const Text(
                             'CorelDRAW • Document Info',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                            ),
                           ),
                           Text(
                             _fileName,
@@ -195,14 +199,21 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
                   ],
                 ),
                 const Divider(height: 24),
-                _buildInfoTile('Version / Generator:', _document!.generator, Icons.computer_rounded, isDark),
+                _buildInfoTile('Version / Generator:', _document!.generator, Icons.computer_rounded, isDark,
+                ),
                 if (_document!.title != null && _document!.title!.isNotEmpty)
-                  _buildInfoTile('Title:', _document!.title!, Icons.title_rounded, isDark),
-                _buildInfoTile('Resolution:', _document!.formattedDimensions, Icons.aspect_ratio_rounded, isDark),
-                _buildInfoTile('Container Type:', _document!.isZipBased ? 'Modern ZIP Container (X4+)' : 'Legacy RIFF Container (v3–X3)', Icons.archive_outlined, isDark),
-                _buildInfoTile('Mode:', context.l10n.rasterPreview, Icons.visibility_outlined, isDark),
-                _buildInfoTile('Pages:', '${_document!.pageCount} page(s)', Icons.layers_outlined, isDark),
-                _buildInfoTile('File Size:', _document!.formattedFileSize, Icons.sd_storage_outlined, isDark),
+                  _buildInfoTile('Title:', _document!.title!, Icons.title_rounded, isDark,
+                  ),
+                _buildInfoTile('Resolution:', _document!.formattedDimensions, Icons.aspect_ratio_rounded, isDark,
+                ),
+                _buildInfoTile('Container Type:', _document!.isZipBased ? 'Modern ZIP Container (X4+)' : 'Legacy RIFF Container (v3–X3)', Icons.archive_outlined, isDark,
+                ),
+                _buildInfoTile('Mode:', context.l10n.rasterPreview, Icons.visibility_outlined, isDark,
+                ),
+                _buildInfoTile('Pages:', '${_document!.pageCount} page(s)', Icons.layers_outlined, isDark,
+                ),
+                _buildInfoTile('File Size:', _document!.formattedFileSize, Icons.sd_storage_outlined, isDark,
+                ),
                 const SizedBox(height: 12),
               ],
             ),
@@ -212,7 +223,8 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
     );
   }
 
-  Widget _buildInfoTile(String label, String value, IconData icon, bool isDark) {
+  Widget _buildInfoTile(String label, String value, IconData icon, bool isDark,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -246,9 +258,10 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
   Future<void> _shareOriginalCdr() async {
     try {
       await Share.shareXFiles(
-        [XFile(widget.filePath, name: _fileName, mimeType: 'application/vnd.corel-draw')],
-        text: _fileName,
-      );
+        [XFile(widget.filePath, name: _fileName, mimeType: 'application/vnd.corel-draw',
+        ),
+      ],
+        text: _fileName);
     } on Exception catch (_) {
       // Ignore share sheet dismiss
     }
@@ -258,24 +271,27 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
     if (_document == null) return;
     try {
       final tempDir = await getTemporaryDirectory();
-      final baseName = _fileName.replaceAll(RegExp(r'\.cdr$', caseSensitive: false), '');
+      final baseName = _fileName.replaceAll(RegExp(r'\.cdr$', caseSensitive: false), '',
+      );
       final pngPath = '${tempDir.path}${Platform.pathSeparator}${baseName}_preview.png';
       final pngFile = File(pngPath);
       await pngFile.writeAsBytes(_document!.imageBytes);
 
       await Share.shareXFiles(
-        [XFile(pngPath, name: '${baseName}_preview.png', mimeType: 'image/png')],
-        text: 'Exported from $_fileName',
-      );
+        [XFile(pngPath, name: '${baseName}_preview.png', mimeType: 'image/png'),
+      ],
+        text: 'Exported from $_fileName');
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._exportAndSharePng.fs');
+      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._exportAndSharePng.fs',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.l10n.couldNotExportPng(e.message))),
         );
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._exportAndSharePng');
+      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._exportAndSharePng',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.l10n.couldNotExportPng(e.toString()))),
@@ -292,7 +308,8 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
         name: _fileName,
       );
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._printDocument');
+      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._printDocument',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.l10n.printError(e.toString()))),
@@ -337,10 +354,10 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
   List<Widget> _buildCdrActions() {
     return [
       PopupMenuButton<CdrCanvasTheme>(
-        icon: const Icon(Icons.palette_outlined, size: 20),
+        icon: const AppIcon(AppIconId.palette, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Canvas Background',
+        tooltip: context.l10n.commandUiCanvasBackground,
         onSelected: (t) => setState(() => _canvasTheme = t),
         itemBuilder: (_) => CdrCanvasTheme.values.map((t) {
           final isSelected = _canvasTheme == t;
@@ -358,10 +375,12 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Text(t.label),
+                Text(t.localizedLabel(context.l10n)),
                 if (isSelected) ...[
                   const Spacer(),
-                  const Icon(Icons.check, size: 16, color: Color(0xFF16A34A)),
+                  const AppIcon(
+                    AppIconId.confirm, size: 16, color: Color(0xFF16A34A),
+                  ),
                 ],
               ],
             ),
@@ -369,17 +388,17 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
         }).toList(),
       ),
       IconButton(
-        icon: const Icon(Icons.rotate_right_rounded, size: 22),
+        icon: const AppIcon(AppIconId.rotate, size: 22),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Rotate 90°',
+        tooltip: context.l10n.rotateElement,
         onPressed: _rotateClockwise,
       ),
       PopupMenuButton<String>(
-        icon: const Icon(Icons.flip_rounded, size: 20),
+        icon: const AppIcon(AppIconId.flipHorizontal, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Flip Orientation',
+        tooltip: context.l10n.commandUiFlipOrientation,
         onSelected: (v) {
           setState(() {
             if (v == 'horizontal') _flipHorizontal = !_flipHorizontal;
@@ -391,12 +410,14 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
             value: 'horizontal',
             child: Row(
               children: [
-                const Icon(Icons.swap_horiz_rounded, size: 18),
+                const AppIcon(AppIconId.swapHorizontal, size: 18),
                 const SizedBox(width: 10),
-                const Text('Flip Horizontal'),
+                Text(context.l10n.commandUiFlipHorizontal),
                 if (_flipHorizontal) ...[
                   const Spacer(),
-                  const Icon(Icons.check, size: 16, color: Color(0xFF16A34A)),
+                  const AppIcon(
+                    AppIconId.confirm, size: 16, color: Color(0xFF16A34A),
+                  ),
                 ],
               ],
             ),
@@ -405,12 +426,14 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
             value: 'vertical',
             child: Row(
               children: [
-                const Icon(Icons.swap_vert_rounded, size: 18),
+                const AppIcon(AppIconId.swapVertical, size: 18),
                 const SizedBox(width: 10),
-                const Text('Flip Vertical'),
+                Text(context.l10n.commandUiFlipVertical),
                 if (_flipVertical) ...[
                   const Spacer(),
-                  const Icon(Icons.check, size: 16, color: Color(0xFF16A34A)),
+                  const AppIcon(
+                    AppIconId.confirm, size: 16, color: Color(0xFF16A34A),
+                  ),
                 ],
               ],
             ),
@@ -418,30 +441,30 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
         ],
       ),
       IconButton(
-        icon: const Icon(Icons.info_outline_rounded, size: 20),
+        icon: const AppIcon(AppIconId.info, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Properties',
+        tooltip: context.l10n.commandIconProperties,
         onPressed: _showPropertiesSheet,
       ),
       PopupMenuButton<String>(
-        icon: const Icon(Icons.share_outlined, size: 20),
+        icon: const AppIcon(AppIconId.share, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Share & Export',
+        tooltip: context.l10n.commandUiShareExport,
         onSelected: (v) {
           if (v == 'share_cdr') _shareOriginalCdr();
           if (v == 'export_png') _exportAndSharePng();
           if (v == 'print') _printDocument();
         },
-        itemBuilder: (_) => const [
+        itemBuilder: (_) => [
           PopupMenuItem(
             value: 'share_cdr',
             child: Row(
               children: [
-                Icon(Icons.file_upload_outlined, size: 18),
+                AppIcon(AppIconId.upload, size: 18),
                 SizedBox(width: 10),
-                Text('Share Original .CDR'),
+                Text(context.l10n.commandUiShareOriginalCdr),
               ],
             ),
           ),
@@ -449,9 +472,9 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
             value: 'export_png',
             child: Row(
               children: [
-                Icon(Icons.image_outlined, size: 18),
+                AppIcon(AppIconId.image, size: 18),
                 SizedBox(width: 10),
-                Text('Export as PNG Image'),
+                Text(context.l10n.commandUiExportAsPngImage),
               ],
             ),
           ),
@@ -459,9 +482,9 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
             value: 'print',
             child: Row(
               children: [
-                Icon(Icons.print_outlined, size: 18),
+                AppIcon(AppIconId.print, size: 18),
                 SizedBox(width: 10),
-                Text('Print / Export PDF'),
+                Text(context.l10n.commandUiPrintExportPdf),
               ],
             ),
           ),
@@ -549,7 +572,8 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.broken_image_rounded, size: 54, color: Colors.orange),
+              const Icon(Icons.broken_image_rounded, size: 54, color: Colors.orange,
+              ),
               const SizedBox(height: 16),
               Text(
                 _errorMessage!,
@@ -562,8 +586,8 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
                   backgroundColor: const Color(0xFF16A34A),
                   foregroundColor: Colors.white,
                 ),
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Try Again'),
+                icon: const AppIcon(AppIconId.refresh),
+                label: Text(context.l10n.commandUiTryAgain),
                 onPressed: _loadCdrFile,
               ),
             ],
@@ -667,7 +691,7 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
           message: tooltip,
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: Icon(icon, size: 20),
+            child: AppIcon.fromMaterial(icon, size: 20),
           ),
         ),
       ),
@@ -683,8 +707,7 @@ class _CheckerboardPainter extends CustomPainter {
 
   const _CheckerboardPainter({
     required this.color1,
-    required this.color2,
-  });
+    required this.color2});
 
   @override
   void paint(Canvas canvas, Size size) {

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'architect_properties_shell.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -577,7 +578,7 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                   child: Row(
                     children: [
                       Expanded(child: Text(l.wallChooseType)),
-                      const Icon(Icons.expand_more),
+                      const AppIcon(AppIconId.expandMore),
                     ],
                   ),
                 ),
@@ -654,7 +655,7 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                     TextButton.icon(
                       key: const ValueKey('wall-layer-add'),
                       onPressed: addLayer,
-                      icon: const Icon(Icons.add),
+                      icon: const AppIcon(AppIconId.add),
                       label: Text(l.wallLayerAdd),
                     ),
                   if (!system.isLog &&
@@ -664,7 +665,7 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                     TextButton.icon(
                       key: const ValueKey('wall-layer-coatings'),
                       onPressed: addCoatings,
-                      icon: const Icon(Icons.add),
+                      icon: const AppIcon(AppIconId.add),
                       label: Text(l.wallLayerCoatings),
                     ),
                   if (location == ArchitectWallLocation.interior &&
@@ -758,7 +759,7 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                         labelText: l.wallLocation,
                         suffixIcon: Tooltip(
                           message: l.wallTypeLocationHint,
-                          child: const Icon(Icons.info_outline, size: 18),
+                          child: const AppIcon(AppIconId.info, size: 18),
                         ),
                       ),
                       items: [
@@ -932,22 +933,38 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                     CheckedPopupMenuItem(
                       value: role.name,
                       checked: d.layer.role == role,
-                      child: Text(role.label(l)),
+                      child: AppMenuLabel(
+                        icon: switch (role) {
+                          ArchitectLayerRole.core => AppIconId.wall,
+                          ArchitectLayerRole.insulation => AppIconId.layers,
+                          ArchitectLayerRole.finish => AppIconId.hatch,
+                        },
+                        child: Text(role.label(l)),
+                      ),
                     ),
                   PopupMenuItem(
                     value: 'up',
                     enabled: index > 0,
-                    child: Text(l.wallLayerUp),
+                    child: AppMenuLabel(
+                      icon: AppIconId.up,
+                      child: Text(l.wallLayerUp),
+                    ),
                   ),
                   PopupMenuItem(
                     value: 'down',
                     enabled: index + 1 < drafts.length,
-                    child: Text(l.wallLayerDown),
+                    child: AppMenuLabel(
+                      icon: AppIconId.down,
+                      child: Text(l.wallLayerDown),
+                    ),
                   ),
                   PopupMenuItem(
                     value: 'delete',
                     enabled: drafts.length > 1,
-                    child: Text(l.delete),
+                    child: AppMenuLabel(
+                      icon: AppIconId.delete,
+                      child: Text(l.delete),
+                    ),
                   ),
                 ],
                 onSelected: (value) => setState(() {

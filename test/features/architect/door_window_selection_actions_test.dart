@@ -1,3 +1,4 @@
+import '../../support/command_icon_finders.dart';
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
@@ -325,7 +326,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
 
         // Select tool
-        await tester.tap(find.byIcon(Icons.near_me_outlined));
+        await tester.tap(findCommandIcon(Icons.near_me_outlined));
         await tester.pump();
 
         // Tap on door at (3.0, 0.0)
@@ -438,7 +439,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
 
         // Select tool
-        await tester.tap(find.byIcon(Icons.near_me_outlined));
+        await tester.tap(findCommandIcon(Icons.near_me_outlined));
         await tester.pump();
 
         // Tap on window at (3.0, 0.0)

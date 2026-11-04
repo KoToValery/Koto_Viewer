@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../../bim_projects/controllers/bim_viewport_controller.dart';
@@ -109,8 +110,8 @@ class ArchitectDimensionEditOverlay extends StatelessWidget {
                       : Colors.grey,
                 ),
               ),
-              child: Icon(
-                Icons.remove,
+              child: AppIcon(
+                AppIconId.remove,
                 size: 13,
                 color: handle.canRemove ? const Color(0xFFC62828) : Colors.grey,
               ),

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_section.dart';
@@ -366,7 +367,7 @@ class _PlacementState extends State<ArchitectWorkspaceViewPlacement> {
                       IconButton(
                         tooltip: l.applyAction,
                         onPressed: saveEdit,
-                        icon: const Icon(Icons.check),
+                        icon: const AppIcon(AppIconId.confirm),
                       ),
                     IconButton(
                       tooltip: l.architectViewDepth,
@@ -432,13 +433,13 @@ class _PlacementState extends State<ArchitectWorkspaceViewPlacement> {
                               );
                               widget.onDone(widget.id);
                             },
-                      icon: const Icon(Icons.straighten),
+                      icon: const AppIcon(AppIconId.measure),
                     ),
                     if (widget.onPreview == null)
                       IconButton(
                         tooltip: l.cancel,
                         onPressed: () => widget.onDone(null),
-                        icon: const Icon(Icons.close),
+                        icon: const AppIcon(AppIconId.close),
                       ),
                   ],
                 ),

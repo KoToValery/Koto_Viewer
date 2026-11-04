@@ -33,6 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Optional command icon render contact sheets.
+/scratch/command_icon_previews/
+
 # Symbolication related
 app.*.symbols
 

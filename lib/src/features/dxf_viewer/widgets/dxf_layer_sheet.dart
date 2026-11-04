@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/dxf_color_table.dart';
@@ -80,7 +81,8 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final sortedLayers = widget.document.layers.values
-        .where((l) => (_layerCounts[l.name] ?? 0) > 0 || widget.additionalLayerCounts.containsKey(l.name) || widget.document.layers.length == 1)
+        .where((l) => (_layerCounts[l.name] ?? 0) > 0 || widget.additionalLayerCounts.containsKey(l.name) || widget.document.layers.length == 1,
+            )
         .toList()
       ..sort((a, b) => a.name.compareTo(b.name));
 
@@ -139,10 +141,12 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                     children: [
                       Text(
                         context.l10n.cadLayersTitle,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
-                        context.l10n.cadLayersVisibleCount(totalVisible, sortedLayers.length),
+                        context.l10n.cadLayersVisibleCount(totalVisible, sortedLayers.length,
+                        ),
                         style: TextStyle(
                           fontSize: 12,
                           color: theme.textTheme.bodySmall?.color,
@@ -166,7 +170,8 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
           // Global Quick Bar for all layers with Dropdown
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.25,
+            ),
             child: Row(
               children: [
                 Icon(
@@ -206,7 +211,9 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                           color: theme.colorScheme.primary,
                         ),
                       ),
-                      icon: Icon(Icons.arrow_drop_down, size: 18, color: theme.colorScheme.primary),
+                      icon: AppIcon(
+                        AppIconId.expandMore, size: 18, color: theme.colorScheme.primary,
+                      ),
                       isDense: true,
                       dropdownColor: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(8),
@@ -222,11 +229,13 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                         ..._standardLineweights.map((w) => DropdownMenuItem<double?>(
                           value: w,
                           child: _buildDropdownItemRow(
-                            label: context.l10n.cadLayersMm(w.toStringAsFixed(2)),
+                            label: context.l10n.cadLayersMm(w.toStringAsFixed(2),
+                              ),
                             thickness: _thicknessFor(w),
                             theme: theme,
                           ),
-                        )),
+                        ),
+                        ),
                       ],
                       onChanged: (val) {
                         _setAllLineweight(val);
@@ -257,13 +266,15 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                 final count = _layerCounts[layer.name] ?? 0;
 
                             final effLw = layer.effectiveLineweight;
-                            final selectedLineweight = _resolveLineweight(layer.customLineweight);
+                            final selectedLineweight = _resolveLineweight(layer.customLineweight,
+                );
                             if (layer.customLineweight != null && layer.customLineweight != selectedLineweight) {
                               layer.customLineweight = selectedLineweight;
                             }
 
                             return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8,
+                  ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
@@ -275,7 +286,8 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                                       color: color,
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                        color: theme.colorScheme.outline.withValues(alpha: 0.4),
+                                        color: theme.colorScheme.outline.withValues(alpha: 0.4,
+                            ),
                                         width: 1.5,
                                       ),
                                       boxShadow: [
@@ -327,12 +339,14 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                                             const SizedBox(width: 4),
                                             Container(
                                               height: 27,
-                                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                                              padding: const EdgeInsets.symmetric(horizontal: 8,
+                                  ),
                                               decoration: BoxDecoration(
                                                 color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
                                                 borderRadius: BorderRadius.circular(6),
                                                 border: Border.all(
-                                                  color: theme.dividerColor.withValues(alpha: 0.3),
+                                                  color: theme.dividerColor.withValues(alpha: 0.3,
+                                      ),
                                                   width: 0.8,
                                                 ),
                                               ),
@@ -340,7 +354,9 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                                                 child: DropdownButton<double?>(
                                                   value: selectedLineweight,
                                                   isDense: true,
-                                                  icon: Icon(Icons.arrow_drop_down, size: 17, color: theme.colorScheme.primary),
+                                                  icon: AppIcon(
+                                        AppIconId.expandMore, size: 17, color: theme.colorScheme.primary,
+                                      ),
                                                   dropdownColor: theme.colorScheme.surface,
                                                   borderRadius: BorderRadius.circular(8),
                                                   items: _buildLineweightDropdownItems(
@@ -436,7 +452,8 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
         value: null,
         child: _buildDropdownItemRow(
           label: (effectiveLineweight != null && effectiveLineweight > 0)
-              ? l10n.cadLayersOriginalWithMm(effectiveLineweight.toStringAsFixed(2))
+              ? l10n.cadLayersOriginalWithMm(effectiveLineweight.toStringAsFixed(2),
+                )
               : l10n.cadLayersOriginal,
           thickness: (effectiveLineweight != null && effectiveLineweight > 0)
               ? (effectiveLineweight * 9.5).clamp(0.8, 4.0)
@@ -451,7 +468,8 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
           thickness: _thicknessFor(w),
           theme: theme,
         ),
-      )),
+      ),
+      ),
     ];
 
     if (selectedValue != null && !_standardLineweights.any((w) => (w - selectedValue).abs() < 0.001)) {
@@ -489,8 +507,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
         const SizedBox(width: 8),
         Text(
           label,
-          style: const TextStyle(fontSize: 12),
-        ),
+          style: const TextStyle(fontSize: 12)),
       ],
     );
   }

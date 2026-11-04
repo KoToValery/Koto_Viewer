@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -89,7 +90,7 @@ Future<void> showArchitectSectionVisibility(
               Expanded(child: Text(l.architectSectionVisibility)),
               Tooltip(
                 message: l.architectSectionVisibilityHelp,
-                child: const Icon(Icons.info_outline, size: 20),
+                child: const AppIcon(AppIconId.info, size: 20),
               ),
             ],
           ),

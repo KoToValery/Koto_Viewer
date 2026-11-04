@@ -1,3 +1,4 @@
+import '../../support/command_icon_finders.dart';
 import 'architect_tool_test_helper.dart' as tool_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -187,7 +188,7 @@ void main() {
       addTearDown(model.dispose);
       await workspace.open(tester, model);
       final old = model.project;
-      await tester.tap(find.byIcon(Icons.near_me_outlined));
+      await tester.tap(findCommandIcon(Icons.near_me_outlined));
       await tester.pumpAndSettle();
       await editing.hold(tester, Offset.zero);
       expect(workspace.overlay(tester).selectedElementId, 'c');
@@ -233,8 +234,7 @@ void main() {
       final model = workspace.commands();
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tool_ui.prepare(tester, entry.value);
-      await tester.tap(find.byIcon(entry.value));
+      await tool_ui.choose(tester, entry.value);
       await tester.pumpAndSettle();
       final old = model.project;
       final finger = workspace.screen(tester, const Offset(1, 1));

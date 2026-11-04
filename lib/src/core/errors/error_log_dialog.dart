@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -19,6 +21,9 @@ class ErrorLogDialog extends StatefulWidget {
 }
 
 class _ErrorLogDialogState extends State<ErrorLogDialog> {
+  // Diagnostics can be shown before the app's localization delegates load.
+  AppLocalizations get _l10n => context.l10nOrNull ?? lookupAppLocalizations(const Locale('en'));
+
   final DateFormat _timeFormat = DateFormat('HH:mm:ss');
   int? _expandedIndex;
   bool _copied = false;
@@ -104,7 +109,7 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded),
+                    icon: const AppIcon(AppIconId.close),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -138,7 +143,8 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                             const SizedBox(height: 4),
                             Text(
                               'All modules and viewers are operating normally.',
-                              style: TextStyle(fontSize: 13, color: subtextColor),
+                              style: TextStyle(fontSize: 13, color: subtextColor,
+                              ),
                             ),
                           ],
                         ),
@@ -176,10 +182,13 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(6),
+                                          color: const Color(0xFFEF4444,
+                                          ).withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(6,
+                                          ),
                                         ),
                                         child: Text(
                                           '#${errorIndex + 1}',
@@ -198,10 +207,14 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                                             Row(
                                               children: [
                                                 Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1,
+                                                      ),
                                                   decoration: BoxDecoration(
-                                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                                                    borderRadius: BorderRadius.circular(4),
+                                                    color: isDark ? const Color(0xFF334155,
+                                                          ) : const Color(0xFFE2E8F0,
+                                                          ),
+                                                    borderRadius: BorderRadius.circular(4,
+                                                        ),
                                                   ),
                                                   child: Text(
                                                     record.errorContext,
@@ -214,8 +227,10 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                                                 ),
                                                 const Spacer(),
                                                 Text(
-                                                  _timeFormat.format(record.timestamp),
-                                                  style: TextStyle(fontSize: 11, color: subtextColor),
+                                                  _timeFormat.format(record.timestamp,
+                                                  ),
+                                                  style: TextStyle(fontSize: 11, color: subtextColor,
+                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -234,7 +249,7 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                                         ),
                                       ),
                                       const SizedBox(width: 4),
-                                      Icon(
+                                      AppIcon.fromMaterial(
                                         isItemExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                                         size: 18,
                                         color: subtextColor,
@@ -262,14 +277,26 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                                             ),
                                           ),
                                           IconButton(
-                                            icon: const Icon(Icons.copy_rounded, size: 16),
-                                            tooltip: 'Copy this error',
+                                            icon: const AppIcon(
+                                              AppIconId.duplicate, size: 16,
+                                            ),
+                                            tooltip: context
+                                                .l10n
+                                                .commandUiCopyThisError,
                                             onPressed: () {
-                                              Clipboard.setData(ClipboardData(text: record.toFormattedString()));
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('Error copied to clipboard'),
-                                                  duration: Duration(seconds: 1),
+                                              Clipboard.setData(ClipboardData(text: record.toFormattedString(),
+                                                ),
+                                              );
+                                              ScaffoldMessenger.of(context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    context
+                                                        .l10n
+                                                        .commandUiErrorCopiedToClipboard,
+                                                  ),
+                                                  duration: Duration(seconds: 1,
+                                                  ),
                                                 ),
                                               );
                                             },
@@ -278,11 +305,13 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                                       ),
                                       Container(
                                         width: double.infinity,
-                                        constraints: const BoxConstraints(maxHeight: 180),
+                                        constraints: const BoxConstraints(maxHeight: 180,
+                                        ),
                                         padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
                                           color: isDark ? const Color(0xFF020617) : const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(8,
+                                          ),
                                         ),
                                         child: SingleChildScrollView(
                                           child: SelectableText(
@@ -315,8 +344,8 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                   if (errors.isNotEmpty) ...[
                     OutlinedButton.icon(
                       onPressed: _clearLogs,
-                      icon: const Icon(Icons.delete_sweep_outlined, size: 16),
-                      label: const Text('Clear'),
+                      icon: const AppIcon(AppIconId.deleteAll, size: 16),
+                      label: Text(_l10n.architectSelectionClear),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFEF4444),
                         side: const BorderSide(color: Color(0xFFFCA5A5)),
@@ -327,11 +356,13 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                   const Spacer(),
                   FilledButton.icon(
                     onPressed: errors.isEmpty ? null : _copyAll,
-                    icon: Icon(
+                    icon: AppIcon.fromMaterial(
                       _copied ? Icons.check_rounded : Icons.copy_all_rounded,
                       size: 16,
                     ),
-                    label: Text(_copied ? 'Copied!' : 'Copy All Logs'),
+                    label: Text(_copied ? _l10n.commandUiCopied
+                          : _l10n.commandUiCopyAllLogs,
+                    ),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
                     ),

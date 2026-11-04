@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -304,8 +305,8 @@ class _PitchState extends State<ArchitectRoofPitchEditor> {
                             ? l.snapEnabledTooltip
                             : l.snapDisabledTooltip,
                         isSelected: snapEnabled,
-                        icon: const Icon(Icons.grid_off),
-                        selectedIcon: const Icon(Icons.grid_on),
+                        icon: const AppIcon(AppIconId.gridOff),
+                        selectedIcon: const AppIcon(AppIconId.grid),
                         onPressed: () {
                           setState(() {
                             snapEnabled = !snapEnabled;
@@ -317,7 +318,7 @@ class _PitchState extends State<ArchitectRoofPitchEditor> {
                       ),
                       IconButton(
                         tooltip: l.architectRoofPitchAxis,
-                        icon: const Icon(Icons.restart_alt),
+                        icon: const AppIcon(AppIconId.refresh),
                         onPressed: () => setState(() {
                           pivot =
                               (widget.roof.eavesEdge.$1 +
@@ -339,7 +340,7 @@ class _PitchState extends State<ArchitectRoofPitchEditor> {
                       IconButton(
                         tooltip: l.cancel,
                         onPressed: widget.onCancel,
-                        icon: const Icon(Icons.close),
+                        icon: const AppIcon(AppIconId.close),
                       ),
                       IconButton(
                         key: const ValueKey('roof-pitch-confirm'),
@@ -347,8 +348,8 @@ class _PitchState extends State<ArchitectRoofPitchEditor> {
                         onPressed: invalid
                             ? null
                             : () => widget.onApply(preview),
-                        icon: const Icon(
-                          Icons.check_circle,
+                        icon: const AppIcon(
+                          AppIconId.checkCircle,
                           color: Colors.green,
                         ),
                       ),

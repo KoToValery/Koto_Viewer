@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -226,7 +227,7 @@ class _ArchitectCandidatePickerState extends State<ArchitectCandidatePicker> {
                           key: const ValueKey('architect-candidate-close'),
                           tooltip: l.close,
                           onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close),
+                          icon: const AppIcon(AppIconId.close),
                         ),
                       ],
                     ),
@@ -256,7 +257,7 @@ class _ArchitectCandidatePickerState extends State<ArchitectCandidatePicker> {
                               ? null
                               : Text(item.storey!),
                           trailing: widget.onApply == null
-                              ? (i == index ? const Icon(Icons.check) : null)
+                              ? (i == index ? const AppIcon(AppIconId.confirm) : null)
                               : Checkbox(
                                   semanticLabel: l.architectPickItem(
                                     item.label,
@@ -300,7 +301,7 @@ class _ArchitectCandidatePickerState extends State<ArchitectCandidatePicker> {
             constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             onPressed: () =>
                 widget.onIndex((widget.index - 1) % widget.labels.length),
-            icon: const Icon(Icons.chevron_left),
+            icon: const AppIcon(AppIconId.chevronLeft),
           ),
           Expanded(
             child: TextButton(
@@ -340,7 +341,7 @@ class _ArchitectCandidatePickerState extends State<ArchitectCandidatePicker> {
             constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             onPressed: () =>
                 widget.onIndex((widget.index + 1) % widget.labels.length),
-            icon: const Icon(Icons.chevron_right),
+            icon: const AppIcon(AppIconId.chevronRight),
           ),
           if (widget.onApply != null)
             IconButton(
@@ -348,7 +349,7 @@ class _ArchitectCandidatePickerState extends State<ArchitectCandidatePicker> {
               tooltip: remove ? l.architectPickRemove : l.architectPickAdd,
               constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               onPressed: widget.onApply,
-              icon: Icon(remove ? Icons.remove : Icons.add),
+              icon: AppIcon.fromMaterial(remove ? Icons.remove : Icons.add),
             ),
           if (widget.trailing != null) widget.trailing!,
         ],

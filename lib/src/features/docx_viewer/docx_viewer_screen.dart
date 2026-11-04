@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -151,7 +152,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
       final doc = DocxParser.parse(bytes);
 
       // Restore saved reading progress
-      final progress = await ReadingProgressService.getProgress(widget.filePath);
+      final progress = await ReadingProgressService.getProgress(widget.filePath,
+      );
       int restoredPage = 0;
       if (progress != null && doc.pages.isNotEmpty) {
         restoredPage = (progress.page - 1).clamp(0, doc.pages.length - 1);
@@ -178,7 +180,9 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                 SnackBar(
                   duration: const Duration(seconds: 2),
                   behavior: SnackBarBehavior.floating,
-                  content: Text(context.l10n.resumedAtPage(restoredPage + 1, doc.pages.length)),
+                  content: Text(context.l10n.resumedAtPage(restoredPage + 1, doc.pages.length,
+                    ),
+                  ),
                 ),
               );
             }
@@ -186,7 +190,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         }
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DocxViewer._loadDocument.fs');
+      AppErrorHandler.recordError(e, stack, context: 'DocxViewer._loadDocument.fs',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
@@ -195,7 +200,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         });
       }
     } on ArchiveException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DocxViewer._loadDocument.archive');
+      AppErrorHandler.recordError(e, stack, context: 'DocxViewer._loadDocument.archive',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
@@ -204,7 +210,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DocxViewer._loadDocument.format');
+      AppErrorHandler.recordError(e, stack, context: 'DocxViewer._loadDocument.format',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
@@ -213,10 +220,12 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         });
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DocxViewer._loadDocument');
+      AppErrorHandler.recordError(e, stack, context: 'DocxViewer._loadDocument',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
-        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '',
+        );
         setState(() {
           _errorMessage = context.l10n.errorReadingWordDocument(cleanMsg);
           _isLoading = false;
@@ -262,7 +271,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         ),
       );
       if (existing.id.isNotEmpty) {
-        await ReadingProgressService.removeBookmark(widget.filePath, existing.id);
+        await ReadingProgressService.removeBookmark(widget.filePath, existing.id,
+        );
       }
       _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
       setState(() => _isCurrentBookmarked = false);
@@ -327,7 +337,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.2,
+                          ),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -335,11 +346,13 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           children: [
-                            Icon(Icons.bookmark, color: theme.colorScheme.primary),
+                            Icon(Icons.bookmark, color: theme.colorScheme.primary,
+                            ),
                             const SizedBox(width: 10),
                             Text(
                               'Bookmarks (${_bookmarks.length})',
-                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
@@ -351,7 +364,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                                 child: Text(
                                   'No bookmarks saved yet.\nTap the bookmark icon on any page.',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                                  style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                  ),
                                 ),
                               )
                             : ListView.separated(
@@ -363,23 +377,31 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                                   return ListTile(
                                     leading: CircleAvatar(
                                       backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
-                                      child: Icon(Icons.bookmark, color: theme.colorScheme.primary, size: 18),
+                                      child: AppIcon(
+                                        AppIconId.bookmark, color: theme.colorScheme.primary, size: 18,
+                                      ),
                                     ),
                                     title: Text(
                                       b.label,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14,
+                                      ),
                                     ),
                                     subtitle: Text(
                                       b.snippet,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
+                                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12,
+                                      ),
                                     ),
                                     trailing: IconButton(
-                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                      icon: const AppIcon(
+                                        AppIconId.delete, size: 18,
+                                      ),
                                       onPressed: () async {
-                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id);
-                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id,
+                                        );
+                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath,
+                                            );
                                         _checkBookmarkStatus();
                                         setSheetState(() {});
                                         setState(() {});
@@ -540,10 +562,12 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2B579A).withValues(alpha: 0.15),
+                          color: const Color(0xFF2B579A,
+                          ).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.article_rounded, color: Color(0xFF2B579A)),
+                        child: const Icon(Icons.article_rounded, color: Color(0xFF2B579A),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -552,11 +576,13 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                           children: [
                             const Text(
                               'Word Document • Properties',
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                              ),
                             ),
                             Text(
                               _fileName,
-                              style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
+                              style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
@@ -568,10 +594,12 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                   _buildInfoRow('File Name:', _fileName),
                   _buildInfoRow('File Size:', formattedSize),
                   _buildInfoRow('Page Format:', paperStr),
-                  _buildInfoRow('Pages / Sheets:', '${_document!.pages.length}'),
+                  _buildInfoRow('Pages / Sheets:', '${_document!.pages.length}',
+                  ),
                   _buildInfoRow('Paragraphs:', '${_document!.paragraphCount}'),
                   _buildInfoRow('Tables:', '${_document!.tableCount}'),
-                  _buildInfoRow('Estimated Words:', '${_document!.wordCount} words'),
+                  _buildInfoRow('Estimated Words:', '${_document!.wordCount} words',
+                  ),
                 ],
               ),
             ),
@@ -587,8 +615,10 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -608,7 +638,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     }
     Clipboard.setData(ClipboardData(text: buffer.toString()));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Document text copied to clipboard'), duration: Duration(seconds: 1)),
+      const SnackBar(content: Text('Document text copied to clipboard'), duration: Duration(seconds: 1),
+      ),
     );
   }
 
@@ -620,7 +651,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     return [
       // View Mode Toggle (Single Page vs Continuous Scroll)
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _isSinglePageMode ? Icons.view_carousel_outlined : Icons.view_stream_outlined,
           size: 20,
         ),
@@ -633,17 +664,20 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
           });
           if (_isSinglePageMode) {
             _docxPageController.dispose();
-            _docxPageController = PageController(initialPage: _currentPageIndex);
+            _docxPageController = PageController(initialPage: _currentPageIndex,
+            );
           }
         },
       ),
 
       // Search Action
       IconButton(
-        icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+        icon: AppIcon.fromMaterial(_isSearchOpen ? Icons.close : Icons.search, size: 20,
+        ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: _isSearchOpen ? 'Close Search' : 'Search in Document',
+        tooltip: _isSearchOpen ? context.l10n.commandUiCloseSearch
+            : context.l10n.commandUiSearchInDocument,
         onPressed: () {
           setState(() {
             _isSearchOpen = !_isSearchOpen;
@@ -657,29 +691,30 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
       // Bookmark Toggle
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
           size: 20,
           color: _isCurrentBookmarked ? theme.colorScheme.primary : null,
         ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
+        tooltip: _isCurrentBookmarked ? context.l10n.commandUiRemoveBookmark
+            : context.l10n.commandUiAddBookmark,
         onPressed: _toggleBookmark,
       ),
 
       // Bookmarks List
       IconButton(
-        icon: const Icon(Icons.bookmarks_outlined, size: 20),
+        icon: const AppIcon(AppIconId.bookmarks, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Saved Bookmarks',
+        tooltip: context.l10n.commandUiSavedBookmarks,
         onPressed: _showBookmarksSheet,
       ),
 
       // Fullscreen Toggle
       IconButton(
-        icon: const Icon(Icons.fullscreen, size: 20),
+        icon: const AppIcon(AppIconId.fullscreen, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: context.l10n.fullscreen,
@@ -688,28 +723,28 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
       // Copy All
       IconButton(
-        icon: const Icon(Icons.copy_all_outlined, size: 20),
+        icon: const AppIcon(AppIconId.duplicate, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Copy Document Text',
+        tooltip: context.l10n.commandUiCopyDocumentText,
         onPressed: _copyAllText,
       ),
 
       // Info / Properties
       IconButton(
-        icon: const Icon(Icons.info_outline, size: 20),
+        icon: const AppIcon(AppIconId.info, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Document Properties',
+        tooltip: context.l10n.commandUiDocumentProperties,
         onPressed: _showInfoSheet,
       ),
 
       // Share
       IconButton(
-        icon: const Icon(Icons.share_outlined, size: 20),
+        icon: const AppIcon(AppIconId.share, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Share',
+        tooltip: context.l10n.commandIconShare,
         onPressed: _shareFile,
       ),
     ];
@@ -744,7 +779,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
               backgroundColor: theme.colorScheme.surface,
               elevation: 0.5,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
+                icon: const AppIcon(AppIconId.back),
                 onPressed: () {
                   _saveReadingProgress();
                   Navigator.of(context).pop(true);
@@ -757,10 +792,10 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                       autofocus: true,
                       style: const TextStyle(fontSize: 15),
                       decoration: InputDecoration(
-                        hintText: 'Search in document...',
+                        hintText: context.l10n.commandUiSearchInDocument2,
                         border: InputBorder.none,
                         suffixIcon: IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
+                          icon: const AppIcon(AppIconId.close, size: 18),
                           onPressed: () {
                             _searchController.clear();
                             _onSearchChanged('');
@@ -774,7 +809,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                       children: [
                         Text(
                           _fileName,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -832,14 +868,15 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                        const Icon(Icons.error_outline, size: 48, color: Colors.redAccent,
+                    ),
                         const SizedBox(height: 16),
                         Text(_errorMessage!, textAlign: TextAlign.center),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           onPressed: _loadDocxFile,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
+                          icon: const AppIcon(AppIconId.refresh),
+                          label: Text(context.l10n.retry),
                         ),
                       ],
                     ),
@@ -847,7 +884,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                 )
               : LayoutBuilder(
                   builder: (context, constraints) {
-                    final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+                    final viewportSize = Size(constraints.maxWidth, constraints.maxHeight,
+                );
                     _calculateInitialFit(viewportSize);
 
                     final docSheetW = (_document != null ? _document!.pageSettings.widthPt * _zoomScale : 595.0) + 32.0;
@@ -885,7 +923,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                                     onLeftTap: () {
                                       if (_currentPageIndex > 0 && _docxPageController.hasClients) {
                                         _docxPageController.previousPage(
-                                          duration: const Duration(milliseconds: 220),
+                                          duration: const Duration(milliseconds: 220,
+                                      ),
                                           curve: Curves.easeOutCubic,
                                         );
                                       }
@@ -893,13 +932,15 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                                     onRightTap: () {
                                       if (_document != null && _currentPageIndex < _document!.pages.length - 1 && _docxPageController.hasClients) {
                                         _docxPageController.nextPage(
-                                          duration: const Duration(milliseconds: 220),
+                                          duration: const Duration(milliseconds: 220,
+                                      ),
                                           curve: Curves.easeOutCubic,
                                         );
                                       }
                                     },
                                     onCenterTap: _toggleFullscreen,
-                                    child: _buildDocxSinglePageWidget(index, theme, isDark),
+                                    child: _buildDocxSinglePageWidget(index, theme, isDark,
+                                ),
                                   );
                                 },
                               )
@@ -910,7 +951,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                                   if (_continuousTransformationController.value.getMaxScaleOnAxis() > 1.05) {
                                     _continuousTransformationController.value = Matrix4.identity();
                                   } else {
-                                    final pos = _continuousDoubleTapDetails?.localPosition ?? Offset(viewportSize.width / 2, viewportSize.height / 2);
+                                    final pos = _continuousDoubleTapDetails?.localPosition ?? Offset(viewportSize.width / 2, viewportSize.height / 2,
+                                    );
                                     const scale = 1.75;
                                     final matrix = Matrix4.identity();
                                     matrix.setEntry(0, 0, scale);
@@ -927,12 +969,14 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                                   minScale: 0.5,
                                   maxScale: 4.0,
                                   constrained: false,
-                                  boundaryMargin: const EdgeInsets.symmetric(vertical: 100, horizontal: 80),
+                                  boundaryMargin: const EdgeInsets.symmetric(vertical: 100, horizontal: 80,
+                              ),
                                   child: SizedBox(
                                     width: math.max(viewportSize.width, docSheetW),
                                     child: Center(
                                       child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 90),
+                                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 90,
+                                    ),
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.center,
                                           children: _buildPages(theme, isDark),
@@ -950,11 +994,13 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                             left: 0,
                             right: 0,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6,
+                          ),
                               color: const Color(0xFFFFB74D).withValues(alpha: 0.2),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.search, size: 16, color: Color(0xFFF57C00)),
+                                  const Icon(Icons.search, size: 16, color: Color(0xFFF57C00),
+                              ),
                                   const SizedBox(width: 8),
                                   Text(
                                     'Found $_searchMatchCount ${_searchMatchCount == 1 ? "match" : "matches"} for "$_searchQuery"',
@@ -991,17 +1037,19 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                                         decoration: BoxDecoration(
                                           color: _isOrientationLocked
                                               ? theme.colorScheme.primary
-                                              : (isDark ? Colors.black87 : Colors.white.withValues(alpha: 0.9)),
+                                              : (isDark ? Colors.black87 : Colors.white.withValues(alpha: 0.9,
+                                                  )),
                                           shape: BoxShape.circle,
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.25),
+                                              color: Colors.black.withValues(alpha: 0.25,
+                                          ),
                                               blurRadius: 8,
                                               offset: const Offset(0, 2),
                                             ),
                                           ],
                                         ),
-                                        child: Icon(
+                                        child: AppIcon.fromMaterial(
                                           _isOrientationLocked ? Icons.screen_lock_rotation : Icons.screen_rotation,
                                           size: 22,
                                           color: _isOrientationLocked
@@ -1023,18 +1071,20 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: (isDark ? Colors.black87 : Colors.white.withValues(alpha: 0.9)),
+                                          color: (isDark ? Colors.black87 : Colors.white.withValues(alpha: 0.9,
+                                            )),
                                           shape: BoxShape.circle,
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.25),
+                                              color: Colors.black.withValues(alpha: 0.25,
+                                          ),
                                               blurRadius: 8,
                                               offset: const Offset(0, 2),
                                             ),
                                           ],
                                         ),
-                                        child: Icon(
-                                          Icons.fullscreen_exit,
+                                        child: AppIcon(
+                                      AppIconId.exitFullscreen,
                                           size: 22,
                                           color: theme.colorScheme.onSurface,
                                         ),
@@ -1134,7 +1184,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     );
   }
 
-  List<Widget> _buildPageBlocks(List<DocxBlock> blocks, ThemeData theme, bool isDark) {
+  List<Widget> _buildPageBlocks(List<DocxBlock> blocks, ThemeData theme, bool isDark,
+  ) {
     if (blocks.isEmpty) {
       return [const Text('Page is empty.')];
     }
@@ -1185,15 +1236,15 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
               height: logo.imageRect!.height * scaleRatio,
               child: Image.memory(
                 logo.imageBytes!,
-                fit: BoxFit.fill,
-              ),
+                fit: BoxFit.fill),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildHeaderBoxWidget(DocxHeaderBox headerBox, ThemeData theme, bool isDark) {
+  Widget _buildHeaderBoxWidget(DocxHeaderBox headerBox, ThemeData theme, bool isDark,
+  ) {
     final textColor = isDark ? Colors.white70 : const Color(0xFF1E293B);
 
     return Padding(
@@ -1229,7 +1280,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                   children: [
                     if (headerBox.headerLines.isNotEmpty)
                       Padding(
-                        padding: EdgeInsets.symmetric(vertical: 1.5 * _zoomScale),
+                        padding: EdgeInsets.symmetric(vertical: 1.5 * _zoomScale,
+                        ),
                         child: Text(
                           headerBox.headerLines.first,
                           style: TextStyle(
@@ -1244,14 +1296,16 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                     if (headerBox.hasDivider) ...[
                       SizedBox(height: 2.0 * _zoomScale),
                       Container(
-                        height: (headerBox.dividerHeightPt * _zoomScale).clamp(0.5, 3.0),
+                        height: (headerBox.dividerHeightPt * _zoomScale).clamp(0.5, 3.0,
+                        ),
                         color: headerBox.dividerColor,
                       ),
                       SizedBox(height: 3.0 * _zoomScale),
                     ],
                     if (headerBox.headerLines.length > 1)
                       ...headerBox.headerLines.skip(1).map((line) => Padding(
-                            padding: EdgeInsets.symmetric(vertical: 1.5 * _zoomScale),
+                            padding: EdgeInsets.symmetric(vertical: 1.5 * _zoomScale,
+                              ),
                             child: Text(
                               line,
                               style: TextStyle(
@@ -1261,7 +1315,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                                 letterSpacing: 0.2,
                               ),
                             ),
-                          )),
+                          ),
+                          ),
                   ],
                 ),
               ),
@@ -1354,7 +1409,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
             0,
             WidgetSpan(
               child: SizedBox(
-                width: (paragraph.indentFirstLine * _zoomScale).clamp(0.0, 200.0),
+                width: (paragraph.indentFirstLine * _zoomScale).clamp(0.0, 200.0,
+                ),
               ),
             ),
           );
@@ -1421,7 +1477,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     if (paragraph.indentLeft > 0 || paragraph.indentRight > 0) {
       double paddingLeft = paragraph.indentLeft;
       if (paragraph.isBullet) {
-        paddingLeft = math.max(0.0, paddingLeft - 18.0); // Subtract hanging indent so bullet aligns correctly
+        paddingLeft = math.max(0.0, paddingLeft - 18.0,
+        ); // Subtract hanging indent so bullet aligns correctly
       }
       content = Padding(
         padding: EdgeInsets.only(
@@ -1440,7 +1497,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
           content,
           if (paragraph.runs.isNotEmpty) SizedBox(height: 2.0 * _zoomScale),
           Container(
-            height: (paragraph.bottomBorder!.width * _zoomScale).clamp(0.5, 4.0),
+            height: (paragraph.bottomBorder!.width * _zoomScale).clamp(0.5, 4.0,
+            ),
             color: paragraph.bottomBorder!.color,
           ),
         ],
@@ -1465,7 +1523,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     );
   }
 
-  Widget _buildTabbedParagraph(DocxParagraph paragraph, ThemeData theme, bool isDark) {
+  Widget _buildTabbedParagraph(DocxParagraph paragraph, ThemeData theme, bool isDark,
+  ) {
     final List<List<DocxRun>> segments = [[]];
     for (final run in paragraph.runs) {
       if (run.isTab) {
@@ -1490,7 +1549,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     final secondRuns = segments.sublist(1).expand((s) => s).toList();
 
     if (paragraph.tabPositions.isNotEmpty) {
-      final tabPos = (paragraph.tabPositions.first * _zoomScale).clamp(30.0, 400.0);
+      final tabPos = (paragraph.tabPositions.first * _zoomScale).clamp(30.0, 400.0,
+      );
       return SizedBox(
         width: double.infinity,
         child: Row(
@@ -1594,7 +1654,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     final defaultBorderColor = isDark ? const Color(0xFF555555) : const Color(0xFF94A3B8);
 
     final TableBorder? tableBorder = (table.borders != null && table.borders!.hasAnyBorder)
-        ? table.borders!.toTableBorder(defaultColor: defaultBorderColor, zoomScale: _zoomScale)
+        ? table.borders!.toTableBorder(defaultColor: defaultBorderColor, zoomScale: _zoomScale,
+          )
         : null;
 
     final maxContentWidth = settings.contentWidthPt * _zoomScale;
@@ -1603,7 +1664,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     // Determine exact or proportional table width
     double tableWidth;
     if (table.totalWidthPt != null && table.totalWidthPt! > 0) {
-      tableWidth = (table.totalWidthPt! * _zoomScale).clamp(100.0, maxContentWidth);
+      tableWidth = (table.totalWidthPt! * _zoomScale).clamp(100.0, maxContentWidth,
+      );
     } else if (totalGrid > 0) {
       tableWidth = (totalGrid * _zoomScale).clamp(100.0, maxContentWidth);
     } else {
@@ -1637,7 +1699,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                 )
               : null,
           children: row.cells.map((cell) {
-            final cellPadding = (cell.padding ?? const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.5)) *
+            final cellPadding = (cell.padding ?? const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.5,
+                    )) *
                 _zoomScale;
 
             BoxDecoration? cellDecoration;
@@ -1680,7 +1743,9 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: cell.paragraphs
-                    .map((p) => _buildParagraphWidget(p, theme, isDark, isInsideCell: true))
+                    .map((p) => _buildParagraphWidget(p, theme, isDark, isInsideCell: true,
+                      ),
+                    )
                     .toList(),
               ),
             );
@@ -1691,8 +1756,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
     Widget result = SizedBox(
       width: tableWidth,
-      child: tableWidget,
-    );
+      child: tableWidget);
 
     // Table Alignment
     if (table.alignment == TextAlign.center) {
@@ -1715,7 +1779,9 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         heroTag: 'docx_zoom_btn',
         onPressed: () => setState(() => _isZoomBarExpanded = true),
         backgroundColor: theme.colorScheme.surface,
-        child: Icon(Icons.zoom_in, color: theme.colorScheme.primary, size: 20),
+        child: AppIcon(
+          AppIconId.zoomIn, color: theme.colorScheme.primary, size: 20,
+        ),
       );
     }
 
@@ -1725,7 +1791,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         color: theme.colorScheme.surface.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(30),
         boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 3)),
+          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 3),
+          ),
         ],
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
@@ -1736,7 +1803,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         children: [
           // Zoom Out
           IconButton(
-            icon: const Icon(Icons.remove, size: 18),
+            icon: const AppIcon(AppIconId.remove, size: 18),
             tooltip: l10n.zoomOut,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
@@ -1771,7 +1838,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
           // Zoom In
           IconButton(
-            icon: const Icon(Icons.add, size: 18),
+            icon: const AppIcon(AppIconId.add, size: 18),
             tooltip: l10n.zoomIn,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
@@ -1813,7 +1880,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
           // Fit to Screen (Fit Page)
           IconButton(
-            icon: const Icon(Icons.fit_screen, size: 18),
+            icon: const AppIcon(AppIconId.fitView, size: 18),
             tooltip: l10n.fitPage,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
@@ -1822,7 +1889,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
           // Fit Width
           IconButton(
-            icon: const Icon(Icons.swap_horiz, size: 18),
+            icon: const AppIcon(AppIconId.swapHorizontal, size: 18),
             tooltip: l10n.fitWidth,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
@@ -1831,8 +1898,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
           // Collapse Bar
           IconButton(
-            icon: const Icon(Icons.close, size: 16),
-            tooltip: 'Minimize Controls',
+            icon: const AppIcon(AppIconId.close, size: 16),
+            tooltip: context.l10n.commandUiMinimizeControls,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
             onPressed: () => setState(() => _isZoomBarExpanded = false),
@@ -1968,8 +2035,8 @@ class DocxSinglePageItemState extends State<DocxSinglePageItem> with SingleTicke
       end: target,
     ).animate(CurvedAnimation(
       parent: _animController,
-      curve: Curves.easeOutCubic,
-    ));
+      curve: Curves.easeOutCubic),
+        );
     _animController.forward(from: 0.0);
   }
 
@@ -1988,8 +2055,10 @@ class DocxSinglePageItemState extends State<DocxSinglePageItem> with SingleTicke
       matrix.setEntry(0, 0, targetScale);
       matrix.setEntry(1, 1, targetScale);
 
-      final targetDx = (tapPos.dx * (1 - targetScale)).clamp(size.width * (1 - targetScale), 0.0);
-      final targetDy = (tapPos.dy * (1 - targetScale)).clamp(size.height * (1 - targetScale), 0.0);
+      final targetDx = (tapPos.dx * (1 - targetScale)).clamp(size.width * (1 - targetScale), 0.0,
+      );
+      final targetDy = (tapPos.dy * (1 - targetScale)).clamp(size.height * (1 - targetScale), 0.0,
+      );
 
       matrix.setEntry(0, 3, targetDx);
       matrix.setEntry(1, 3, targetDy);
@@ -2029,8 +2098,7 @@ class _DocxLogoCustomPainter extends CustomPainter {
 
   _DocxLogoCustomPainter({
     required this.vectorPaths,
-    required this.scale,
-  });
+    required this.scale});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2074,4 +2142,3 @@ class _DocxLogoCustomPainter extends CustomPainter {
     return oldDelegate.scale != scale || oldDelegate.vectorPaths != vectorPaths;
   }
 }
-

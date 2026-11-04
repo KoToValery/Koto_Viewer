@@ -31,7 +31,9 @@ final toolsByIcon = {
 };
 
 Future<void> prepare(WidgetTester tester, IconData icon) async {
-  if (find.byIcon(icon).evaluate().isEmpty) {
+  final tool = toolsByIcon[icon]!;
+  final control = find.byKey(ValueKey('architect-tool-${tool.name}'));
+  if (control.evaluate().isEmpty) {
     final category = ArchitectToolCategory.of(toolsByIcon[icon]!);
     await tester.tap(find.byKey(const ValueKey('architect-tool-category')));
     await tester.pumpAndSettle();
@@ -40,12 +42,13 @@ Future<void> prepare(WidgetTester tester, IconData icon) async {
     );
     await tester.pumpAndSettle();
   }
-  await tester.ensureVisible(find.byIcon(icon));
+  await tester.ensureVisible(control);
 }
 
 Future<void> choose(WidgetTester tester, IconData icon) async {
   await prepare(tester, icon);
-  await tester.tap(find.byIcon(icon));
+  await tester.tap(find.byKey(ValueKey('architect-tool-${toolsByIcon[icon]!.name}')),
+  );
 }
 
 Future<void> selectionAction(WidgetTester tester, String key) async {

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 
@@ -20,7 +21,7 @@ class ArchitectProjectionStatus extends StatelessWidget {
                 Text(l.architectProjectionLoadFailed),
                 TextButton.icon(
                   onPressed: onRetry,
-                  icon: const Icon(Icons.refresh),
+                  icon: const AppIcon(AppIconId.refresh),
                   label: Text(l.retry),
                 ),
               ],

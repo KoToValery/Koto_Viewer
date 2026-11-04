@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../rendering/architect_hatch_geometry.dart';
 import '../services/architect_section_junctions.dart';
 import '../services/architect_projection_loader.dart';
@@ -267,7 +268,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
           value: 'move_vertical',
           child: Row(
             children: [
-              const Icon(Icons.swap_vert, size: 18),
+              const AppIcon(AppIconId.swapVertical, size: 18),
               const SizedBox(width: 8),
               Text(l.architectRoofMoveVerticalAction),
             ],
@@ -277,7 +278,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
           value: 'snap_walls',
           child: Row(
             children: [
-              const Icon(Icons.vertical_align_bottom, size: 18),
+              const AppIcon(AppIconId.alignBottom, size: 18),
               const SizedBox(width: 8),
               Text(l.architectRoofSnapToWallsAction),
             ],
@@ -287,7 +288,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
           value: 'properties',
           child: Row(
             children: [
-              const Icon(Icons.layers_outlined, size: 18),
+              const AppIcon(AppIconId.layers, size: 18),
               const SizedBox(width: 8),
               Text(l.architectRoofPropertiesAction),
             ],
@@ -297,7 +298,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
           value: 'flip_slope',
           child: Row(
             children: [
-              const Icon(Icons.swap_horiz, size: 18),
+              const AppIcon(AppIconId.swapHorizontal, size: 18),
               const SizedBox(width: 8),
               Text(l.architectRoofFlipSlope),
             ],
@@ -307,7 +308,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
           value: 'delete',
           child: Row(
             children: [
-              const Icon(Icons.delete_outline, size: 18),
+              const AppIcon(AppIconId.delete, size: 18),
               const SizedBox(width: 8),
               Text(l.delete),
             ],
@@ -607,14 +608,14 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
           IconButton(
             tooltip: l.architectZoneUndoAction,
             onPressed: widget.controller.canUndo ? historyAction : null,
-            icon: const Icon(Icons.undo),
+            icon: const AppIcon(AppIconId.undo),
           ),
           IconButton(
             tooltip: l.architectZoneRedoAction,
             onPressed: widget.controller.canRedo
                 ? () => historyAction(redo: true)
                 : null,
-            icon: const Icon(Icons.redo),
+            icon: const AppIcon(AppIconId.redo),
           ),
           PopupMenuButton<String>(
             onSelected: (action) {
@@ -668,29 +669,52 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
               }
             },
             itemBuilder: (_) => [
-              PopupMenuItem(value: 'new', child: Text(l.buildingSectionNew)),
+              PopupMenuItem(value: 'new', child: AppMenuLabel(
+                  icon: AppIconId.add,
+                  child: Text(l.buildingSectionNew),
+                ),
+              ),
               PopupMenuItem(
                 value: 'visibility',
                 key: const ValueKey('architect-section-visibility'),
-                child: Text(l.architectViewVisibility),
+                child: AppMenuLabel(
+                  icon: AppIconId.visible,
+                  child: Text(l.architectViewVisibility),
+                ),
               ),
               if (value != null) ...[
                 PopupMenuItem(
                   value: 'flip',
-                  child: Text(l.architectFacadeReverse),
+                  child: AppMenuLabel(
+                    icon: AppIconId.flipHorizontal,
+                    child: Text(l.architectFacadeReverse),
                 ),
-                PopupMenuItem(value: 'cut', child: Text(l.buildingSectionCut)),
+                ),
+                PopupMenuItem(value: 'cut', child: AppMenuLabel(
+                    icon: AppIconId.section,
+                    child: Text(l.buildingSectionCut),
+                  ),
+                ),
                 PopupMenuItem(
                   value: 'depth',
-                  child: Text(l.architectViewDepth),
+                  child: AppMenuLabel(
+                    icon: AppIconId.dimension,
+                    child: Text(l.architectViewDepth),
+                ),
                 ),
                 PopupMenuItem(
                   value: 'name',
-                  child: Text(l.architectPropertyName),
+                  child: AppMenuLabel(
+                    icon: AppIconId.rename,
+                    child: Text(l.architectPropertyName),
+                ),
                 ),
                 PopupMenuItem(
                   value: 'delete',
-                  child: Text(l.slabSectionDelete),
+                  child: AppMenuLabel(
+                    icon: AppIconId.delete,
+                    child: Text(l.slabSectionDelete),
+                  ),
                 ),
               ],
             ],
@@ -774,36 +798,36 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                       placingDetail = true;
                       editingCut = false;
                     }),
-                    icon: const Icon(Icons.format_list_numbered),
+                    icon: const AppIcon(AppIconId.numberedList),
                     label: Text(l.slabDetail),
                   ),
                   IconButton(
                     tooltip: l.stairSectionReset,
                     onPressed: () => transform.value = Matrix4.identity(),
-                    icon: const Icon(Icons.fit_screen),
+                    icon: const AppIcon(AppIconId.fitView),
                   ),
                   if (selectedRoofId != null) ...[
                     TextButton.icon(
                       key: const ValueKey('section-roof-snap-walls'),
                       onPressed: () => _snapRoofToWalls(selectedRoofId!),
-                      icon: const Icon(Icons.vertical_align_bottom, size: 18),
+                      icon: const AppIcon(AppIconId.alignBottom, size: 18),
                       label: Text(l.architectRoofSnapToWallsAction),
                     ),
                     TextButton.icon(
                       key: const ValueKey('section-roof-properties'),
                       onPressed: () => _openRoofProperties(selectedRoofId!),
-                      icon: const Icon(Icons.layers_outlined, size: 18),
+                      icon: const AppIcon(AppIconId.layers, size: 18),
                       label: Text(l.architectRoofPropertiesAction),
                     ),
                     IconButton(
                       tooltip: l.architectRoofFlipSlope,
                       onPressed: () => _flipRoofSlope(selectedRoofId!),
-                      icon: const Icon(Icons.swap_horiz, size: 18),
+                      icon: const AppIcon(AppIconId.swapHorizontal, size: 18),
                     ),
                     IconButton(
                       tooltip: l.delete,
                       onPressed: () => _deleteRoof(selectedRoofId!),
-                      icon: const Icon(Icons.delete_outline, size: 18),
+                      icon: const AppIcon(AppIconId.delete, size: 18),
                     ),
                   ],
                   if (selectedDetail != null)
@@ -852,19 +876,31 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
                       itemBuilder: (_) => [
                         PopupMenuItem(
                           value: 'move',
-                          child: Text(l.slabDetailMove),
+                          child: AppMenuLabel(
+                            icon: AppIconId.move,
+                            child: Text(l.slabDetailMove),
+                        ),
                         ),
                         PopupMenuItem(
                           value: 'flip',
-                          child: Text(l.slabDetailSide),
+                          child: AppMenuLabel(
+                            icon: AppIconId.flipHorizontal,
+                            child: Text(l.slabDetailSide),
+                        ),
                         ),
                         PopupMenuItem(
                           value: 'reattach',
-                          child: Text(l.slabDetailReattach),
+                          child: AppMenuLabel(
+                            icon: AppIconId.link,
+                            child: Text(l.slabDetailReattach),
+                        ),
                         ),
                         PopupMenuItem(
                           value: 'delete',
-                          child: Text(l.slabDetailRemove),
+                          child: AppMenuLabel(
+                            icon: AppIconId.delete,
+                            child: Text(l.slabDetailRemove),
+                          ),
                         ),
                       ],
                     ),

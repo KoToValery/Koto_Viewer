@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -133,7 +134,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
       );
 
       // Restore saved reading progress
-      final progress = await ReadingProgressService.getProgress(widget.filePath);
+      final progress = await ReadingProgressService.getProgress(widget.filePath,
+      );
       int restoredPage = 0;
       if (progress != null) {
         restoredPage = (progress.page - 1).clamp(0, comic.pageCount - 1);
@@ -163,7 +165,9 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                 SnackBar(
                   duration: const Duration(seconds: 2),
                   behavior: SnackBarBehavior.floating,
-                  content: Text(context.l10n.resumedAtPage(restoredPage + 1, comic.pageCount)),
+                  content: Text(context.l10n.resumedAtPage(restoredPage + 1, comic.pageCount,
+                    ),
+                  ),
                 ),
               );
             }
@@ -202,7 +206,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
       AppErrorHandler.recordError(e, stack, context: 'ComicViewer.load');
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
-        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '',
+        );
         setState(() {
           _errorMessage = cleanMsg;
           _isLoading = false;
@@ -248,7 +253,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
         ),
       );
       if (existing.id.isNotEmpty) {
-        await ReadingProgressService.removeBookmark(widget.filePath, existing.id);
+        await ReadingProgressService.removeBookmark(widget.filePath, existing.id,
+        );
       }
       _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
       setState(() => _isCurrentBookmarked = false);
@@ -320,7 +326,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           children: [
-                            const Icon(Icons.bookmark, color: Color(0xFFE11D48)),
+                            const Icon(Icons.bookmark, color: Color(0xFFE11D48),
+                            ),
                             const SizedBox(width: 10),
                             Text(
                               'Bookmarks (${_bookmarks.length})',
@@ -346,29 +353,39 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                             : ListView.separated(
                                 controller: scrollController,
                                 itemCount: _bookmarks.length,
-                                separatorBuilder: (context, index) => const Divider(height: 1, color: Colors.white10),
+                                separatorBuilder: (context, index) => const Divider(height: 1, color: Colors.white10,
+                                    ),
                                 itemBuilder: (context, index) {
                                   final b = _bookmarks[index];
                                   return ListTile(
                                     leading: CircleAvatar(
-                                      backgroundColor: const Color(0xFFE11D48).withValues(alpha: 0.2),
-                                      child: const Icon(Icons.bookmark, color: Color(0xFFE11D48), size: 18),
+                                      backgroundColor: const Color(0xFFE11D48,
+                                      ).withValues(alpha: 0.2),
+                                      child: const AppIcon(
+                                        AppIconId.bookmark, color: Color(0xFFE11D48), size: 18,
+                                      ),
                                     ),
                                     title: Text(
                                       b.label,
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14,
+                                      ),
                                     ),
                                     subtitle: Text(
                                       b.snippet,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(color: Colors.white60, fontSize: 12),
+                                      style: const TextStyle(color: Colors.white60, fontSize: 12,
+                                      ),
                                     ),
                                     trailing: IconButton(
-                                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.white54),
+                                      icon: const AppIcon(
+                                        AppIconId.delete, size: 18, color: Colors.white54,
+                                      ),
                                       onPressed: () async {
-                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id);
-                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id,
+                                        );
+                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath,
+                                            );
                                         _checkBookmarkStatus();
                                         setSheetState(() {});
                                         setState(() {});
@@ -515,19 +532,24 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
         });
       }
     } catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'ComicViewer.loadAutoplayConfig');
+      AppErrorHandler.recordError(e, stack, context: 'ComicViewer.loadAutoplayConfig',
+      );
     }
   }
 
   Future<void> _saveAutoplayConfig(ComicAutoplayConfig config) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble('koto_comic_autoplay_interval', config.intervalSeconds);
-      await prefs.setDouble('koto_comic_autoplay_webtoon_speed', config.webtoonScrollSpeed);
+      await prefs.setDouble('koto_comic_autoplay_interval', config.intervalSeconds,
+      );
+      await prefs.setDouble('koto_comic_autoplay_webtoon_speed', config.webtoonScrollSpeed,
+      );
       await prefs.setBool('koto_comic_autoplay_loop', config.loop);
-      await prefs.setBool('koto_comic_autoplay_pause_on_zoom', config.pauseOnZoom);
+      await prefs.setBool('koto_comic_autoplay_pause_on_zoom', config.pauseOnZoom,
+      );
     } catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'ComicViewer.saveAutoplayConfig');
+      AppErrorHandler.recordError(e, stack, context: 'ComicViewer.saveAutoplayConfig',
+      );
     }
   }
 
@@ -669,7 +691,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
           if (maxScroll > 0) {
             final targetOffset = nextOffset.clamp(0.0, maxScroll);
             _webtoonScrollController.jumpTo(targetOffset);
-            _autoplayProgressNotifier.value = (targetOffset / maxScroll).clamp(0.0, 1.0);
+            _autoplayProgressNotifier.value = (targetOffset / maxScroll).clamp(0.0, 1.0,
+            );
             if (_comic != null && _comic!.pageCount > 0) {
               final pageFraction = targetOffset / maxScroll;
               final estimatedPage =
@@ -775,7 +798,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     const itemWidth = 64.0;
     final targetOffset = (index * itemWidth) - 100.0;
     _thumbnailScrollController.animateTo(
-      targetOffset.clamp(0.0, _thumbnailScrollController.position.maxScrollExtent),
+      targetOffset.clamp(0.0, _thumbnailScrollController.position.maxScrollExtent,
+      ),
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
     );
@@ -918,7 +942,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                       color: const Color(0xFFE11D48).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.auto_stories_rounded, color: Color(0xFFE11D48)),
+                    child: const Icon(Icons.auto_stories_rounded, color: Color(0xFFE11D48),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -927,13 +952,15 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                       children: [
                         Text(
                           meta.title,
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                          ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           _fileName,
-                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
+                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -957,14 +984,17 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
               if (meta.genre != null && meta.genre!.isNotEmpty)
                 _buildInfoRow('Genre:', meta.genre!),
               if (meta.year != null)
-                _buildInfoRow('Published:', '${meta.year}${meta.month != null ? "/${meta.month}" : ""}'),
+                _buildInfoRow('Published:', '${meta.year}${meta.month != null ? "/${meta.month}" : ""}',
+                ),
               if (meta.summary != null && meta.summary!.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                const Text('Summary:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const Text('Summary:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   meta.summary!,
-                  style: TextStyle(fontSize: 12.5, color: theme.textTheme.bodyMedium?.color),
+                  style: TextStyle(fontSize: 12.5, color: theme.textTheme.bodyMedium?.color,
+                  ),
                   maxLines: 4,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -982,7 +1012,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
@@ -1006,7 +1037,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
       padding: const EdgeInsets.only(right: 8.0),
       child: TextButton.icon(
         onPressed: _toggleAutoplay,
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _isAutoplayActive
               ? (_isAutoplayPaused ? Icons.play_arrow_rounded : Icons.pause_rounded)
               : Icons.play_circle_fill,
@@ -1046,8 +1077,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     return [
       // Reading Mode Menu
       PopupMenuButton<ComicReadingMode>(
-        icon: const Icon(Icons.menu_book_rounded, size: 20),
-        tooltip: 'Reading Mode',
+        icon: const AppIcon(AppIconId.book, size: 20),
+        tooltip: context.l10n.commandUiReadingMode,
         onSelected: (mode) {
           setState(() {
             _readingMode = mode;
@@ -1058,7 +1089,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
             value: mode,
             child: Row(
               children: [
-                Icon(
+                AppIcon.fromMaterial(
                   mode == ComicReadingMode.verticalContinuous
                       ? Icons.view_headline_rounded
                       : mode == ComicReadingMode.rightToLeft
@@ -1070,13 +1101,15 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    mode.label,
+                    mode.localizedLabel(context.l10n),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (_readingMode == mode) ...[
                   const SizedBox(width: 8),
-                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                  AppIcon(
+                    AppIconId.confirm, size: 18, color: theme.colorScheme.primary,
+                  ),
                 ],
               ],
             ),
@@ -1086,7 +1119,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
 
       // Fit Mode toggle
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _fitMode == ComicFitMode.fitWidth
               ? Icons.fit_screen
               : _fitMode == ComicFitMode.fitPage
@@ -1094,13 +1127,15 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                   : Icons.swap_vert,
           size: 20,
         ),
-        tooltip: '${_fitMode.label} (Tap to change)',
+        tooltip: context.l10n.commandUiValueTapToChange(
+          (_fitMode.localizedLabel(context.l10n)).toString(),
+        ),
         onPressed: _cycleFitMode,
       ),
 
       // Autoplay Toggle
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _isAutoplayActive
               ? (_isAutoplayPaused ? Icons.play_arrow_rounded : Icons.pause_circle_filled)
               : Icons.play_circle_outline,
@@ -1115,47 +1150,48 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
 
       // Jump to Page
       IconButton(
-        icon: const Icon(Icons.pin_outlined, size: 20),
-        tooltip: 'Jump to Page',
+        icon: const AppIcon(AppIconId.pin, size: 20),
+        tooltip: context.l10n.jumpToPage,
         onPressed: _showJumpToPageDialog,
       ),
 
       // Bookmark Toggle
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
           size: 20,
           color: _isCurrentBookmarked ? const Color(0xFFE11D48) : null,
         ),
-        tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
+        tooltip: _isCurrentBookmarked ? context.l10n.commandUiRemoveBookmark
+            : context.l10n.commandUiAddBookmark,
         onPressed: _toggleBookmark,
       ),
 
       // View Bookmarks
       IconButton(
-        icon: const Icon(Icons.bookmarks_outlined, size: 20),
-        tooltip: 'Saved Bookmarks',
+        icon: const AppIcon(AppIconId.bookmarks, size: 20),
+        tooltip: context.l10n.commandUiSavedBookmarks,
         onPressed: _showBookmarksSheet,
       ),
 
       // Fullscreen
       IconButton(
-        icon: const Icon(Icons.fullscreen, size: 20),
+        icon: const AppIcon(AppIconId.fullscreen, size: 20),
         tooltip: context.l10n.fullscreen,
         onPressed: _toggleControls,
       ),
 
       // Info
       IconButton(
-        icon: const Icon(Icons.info_outline, size: 20),
-        tooltip: 'Comic Info',
+        icon: const AppIcon(AppIconId.info, size: 20),
+        tooltip: context.l10n.commandUiComicInfo,
         onPressed: _showInfoSheet,
       ),
 
       // Share
       IconButton(
-        icon: const Icon(Icons.share_outlined, size: 20),
-        tooltip: 'Share',
+        icon: const AppIcon(AppIconId.share, size: 20),
+        tooltip: context.l10n.commandIconShare,
         onPressed: _shareFile,
       ),
     ];
@@ -1210,7 +1246,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                 foregroundColor: Colors.white,
                 elevation: 0,
                 leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
+                  icon: const AppIcon(AppIconId.back),
                   onPressed: () {
                     _saveReadingProgress();
                     if (_errorMessage != null) {
@@ -1225,14 +1261,16 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                   children: [
                     Text(
                       _comic?.title ?? _fileName,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
+                        ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (_comic != null)
                       Text(
-                        'Page ${_currentPageIndex + 1} of ${_comic!.pageCount} • ${_readingMode.shortLabel}',
-                        style: const TextStyle(fontSize: 11.5, color: Colors.white70),
+                        'Page ${_currentPageIndex + 1} of ${_comic!.pageCount} • ${_readingMode.localizedShortLabel(context.l10n)}',
+                        style: const TextStyle(fontSize: 11.5, color: Colors.white70,
+                          ),
                       ),
                   ],
                 ),
@@ -1270,21 +1308,25 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                      const Icon(Icons.error_outline, size: 48, color: Colors.redAccent,
+                        ),
                       const SizedBox(height: 16),
-                      Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+                      Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70),
+                        ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
                         onPressed: _loadComic,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Retry'),
+                        icon: const AppIcon(AppIconId.refresh),
+                        label: Text(context.l10n.retry),
                       ),
                     ],
                   ),
                 ),
               )
             : _comic == null || _comic!.pages.isEmpty
-                ? const Center(child: Text('No pages found', style: TextStyle(color: Colors.white70)))
+                ? const Center(child: Text('No pages found', style: TextStyle(color: Colors.white70),
+                  ),
+                )
                 : Stack(
                     children: [
                       // Main Reader Surface
@@ -1305,7 +1347,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                                 value: progress.clamp(0.0, 1.0),
                                 minHeight: 3.5,
                                 backgroundColor: Colors.transparent,
-                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFE11D48)),
+                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFE11D48),
+                              ),
                               );
                             },
                           ),
@@ -1315,20 +1358,22 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                           bottom: 16,
                           right: 16,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4,
+                          ),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.80),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(color: Colors.white24, width: 1),
                               boxShadow: const [
-                                BoxShadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 2)),
+                                BoxShadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 2),
+                              ),
                               ],
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: Icon(
+                                  icon: AppIcon.fromMaterial(
                                     _isAutoplayPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
                                     size: 20,
                                     color: const Color(0xFFE11D48),
@@ -1343,11 +1388,14 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                                   _readingMode == ComicReadingMode.verticalContinuous
                                       ? '${_autoplayConfig.webtoonScrollSpeed.round()} px/s'
                                       : '${_autoplayConfig.intervalSeconds.round()}s',
-                                  style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600),
+                                  style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600,
+                                ),
                                 ),
                                 const SizedBox(width: 6),
                                 IconButton(
-                                  icon: const Icon(Icons.close_rounded, size: 16, color: Colors.white54),
+                                  icon: const AppIcon(
+                                  AppIconId.close, size: 16, color: Colors.white54,
+                                ),
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
                                   onPressed: _stopAutoplay,
@@ -1374,7 +1422,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                                       : Colors.black54,
                                   shape: const CircleBorder(),
                                   child: IconButton(
-                                    icon: Icon(
+                                    icon: AppIcon.fromMaterial(
                                       _isOrientationLocked
                                           ? Icons.screen_lock_rotation
                                           : Icons.screen_rotation,
@@ -1393,7 +1441,9 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                                   color: Colors.black54,
                                   shape: const CircleBorder(),
                                   child: IconButton(
-                                    icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
+                                    icon: const AppIcon(
+                                    AppIconId.exitFullscreen, color: Colors.white,
+                                  ),
                                     tooltip: context.l10n.exitFullscreen,
                                     onPressed: _toggleControls,
                                   ),
@@ -1430,17 +1480,20 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                                 _autoplayProgressNotifier.value = 0.0;
                               },
                               onToggleLoop: () {
-                                final newConfig = _autoplayConfig.copyWith(loop: !_autoplayConfig.loop);
+                                final newConfig = _autoplayConfig.copyWith(loop: !_autoplayConfig.loop,
+                              );
                                 setState(() => _autoplayConfig = newConfig);
                                 _saveAutoplayConfig(newConfig);
                               },
                               onIntervalChanged: (val) {
-                                final newConfig = _autoplayConfig.copyWith(intervalSeconds: val);
+                                final newConfig = _autoplayConfig.copyWith(intervalSeconds: val,
+                              );
                                 setState(() => _autoplayConfig = newConfig);
                                 _saveAutoplayConfig(newConfig);
                               },
                               onScrollSpeedChanged: (val) {
-                                final newConfig = _autoplayConfig.copyWith(webtoonScrollSpeed: val);
+                                final newConfig = _autoplayConfig.copyWith(webtoonScrollSpeed: val,
+                              );
                                 setState(() => _autoplayConfig = newConfig);
                                 _saveAutoplayConfig(newConfig);
                               },
@@ -1495,7 +1548,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white70),
+          icon: const AppIcon(AppIconId.close, color: Colors.white70),
           tooltip: l10n.cancel,
           onPressed: () => Navigator.of(context).pop(false),
         ),
@@ -1552,7 +1605,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                 if (formattedSize.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white12,
                       borderRadius: BorderRadius.circular(12),
@@ -1576,7 +1630,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                   children: [
                     Text(
                       _totalPagesCount > 0
-                          ? l10n.pageIndicator(_loadedPagesCount, _totalPagesCount)
+                          ? l10n.pageIndicator(_loadedPagesCount, _totalPagesCount,
+                            )
                           : l10n.loadingComic,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.7),
@@ -1603,7 +1658,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                     value: _loadingProgress > 0 ? _loadingProgress.clamp(0.0, 1.0) : null,
                     minHeight: 8,
                     backgroundColor: Colors.white12,
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFE11D48)),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFE11D48),
+                    ),
                   ),
                 ),
 
@@ -1710,7 +1766,11 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                 height: 200,
                 color: Colors.black26,
                 child: Center(
-                  child: Text('Page ${index + 1} Error', style: const TextStyle(color: Colors.white70)),
+                  child: Text(
+                    context.l10n.commandUiPageValueError(
+                      (index + 1).toString(),
+                    ), style: const TextStyle(color: Colors.white70),
+                  ),
                 ),
               ),
             );
@@ -1749,7 +1809,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
               children: [
                 Text(
                   '${_currentPageIndex + 1}',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13,
+                    ),
                 ),
                 Expanded(
                   child: Slider(
@@ -1798,8 +1859,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                       clipBehavior: Clip.antiAlias,
                       child: Image.memory(
                         page.bytes,
-                        fit: BoxFit.cover,
-                      ),
+                        fit: BoxFit.cover),
                     ),
                   );
                 },

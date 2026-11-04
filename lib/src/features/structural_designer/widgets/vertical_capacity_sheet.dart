@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/vertical_capacity_models.dart';
@@ -75,7 +76,8 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.domain_rounded,
-                      color: Color(0xFF00E5FF), size: 22),
+                      color: Color(0xFF00E5FF), size: 22,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -103,7 +105,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white70),
+                  icon: const AppIcon(AppIconId.close, color: Colors.white70),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -158,16 +160,19 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
               indicatorColor: const Color(0xFF00E5FF),
               labelColor: const Color(0xFF00E5FF),
               unselectedLabelColor: Colors.white60,
-              labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold,
+              ),
               unselectedLabelStyle: const TextStyle(fontSize: 12),
               tabs: [
                 Tab(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.view_column_rounded, size: 16),
+                      const AppIcon(AppIconId.column, size: 16),
                       const SizedBox(width: 4),
-                      Text(context.l10n.verticalTabColumns(report.columnChecks.length)),
+                      Text(context.l10n.verticalTabColumns(report.columnChecks.length,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -175,9 +180,10 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.layers_rounded, size: 16),
+                      const AppIcon(AppIconId.layers, size: 16),
                       const SizedBox(width: 4),
-                      Text(context.l10n.verticalTabSlabs(report.slabChecks.length)),
+                      Text(context.l10n.verticalTabSlabs(report.slabChecks.length),
+                      ),
                     ],
                   ),
                 ),
@@ -185,7 +191,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.foundation_rounded, size: 16),
+                      const AppIcon(AppIconId.foundation, size: 16),
                       const SizedBox(width: 4),
                       Text(context.l10n.verticalTabFoundations),
                     ],
@@ -330,7 +336,8 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                         col.numStoreysAbove == 1 ? context.l10n.verticalStoreySingle : context.l10n.verticalStoreyPlural,
                         col.tributaryAreaM2.toStringAsFixed(1),
                       ),
-                      style: const TextStyle(color: Colors.white60, fontSize: 11),
+                      style: const TextStyle(color: Colors.white60, fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -441,12 +448,14 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
               decoration: BoxDecoration(
                 color: const Color(0xFFFF9100).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFF9100).withValues(alpha: 0.4)),
+                border: Border.all(color: const Color(0xFFFF9100).withValues(alpha: 0.4),
+                ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.shield_outlined, size: 16, color: Color(0xFFFF9100)),
+                  const Icon(Icons.shield_outlined, size: 16, color: Color(0xFFFF9100),
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -555,15 +564,14 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: color.withValues(alpha: 0.6),
-              width: 1.2,
-            ),
+              width: 1.2),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.layers_rounded, color: color, size: 20),
+                  AppIcon(AppIconId.layers, color: color, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -579,7 +587,8 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(6),
@@ -640,7 +649,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
+                    AppIcon.fromMaterial(
                       isSafe ? Icons.check_circle_outline : Icons.warning_amber_rounded,
                       size: 16,
                       color: color,
@@ -666,7 +675,8 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
     );
   }
 
-  Widget _buildFoundationsTab(BuildContext context, VerticalCapacityReport report) {
+  Widget _buildFoundationsTab(BuildContext context, VerticalCapacityReport report,
+  ) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
@@ -684,7 +694,9 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.foundation_rounded, color: Color(0xFF00E5FF), size: 22),
+                    const AppIcon(
+                      AppIconId.foundation, color: Color(0xFF00E5FF), size: 22,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       context.l10n.verticalFoundationsEvaluation,
@@ -700,17 +712,20 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                 _buildInfoLine(context.l10n.verticalTotalBaseLoadNed,
                     report.totalVerticalLoadBaseKn.isFinite
                         ? '${report.totalVerticalLoadBaseKn.toStringAsFixed(1)} kN'
-                        : '—'),
+                        : '—',
+                ),
                 const SizedBox(height: 6),
                 _buildInfoLine(context.l10n.verticalFootprintArea,
                     report.footprintAreaM2.isFinite
                         ? '${report.footprintAreaM2.toStringAsFixed(1)} m²'
-                        : '—'),
+                        : '—',
+                ),
                 const SizedBox(height: 6),
                 _buildInfoLine(context.l10n.verticalMeanBasePressure,
                     report.basePressureKpa.isFinite
                         ? '${report.basePressureKpa.toStringAsFixed(1)} kPa (${(report.basePressureKpa / 100).toStringAsFixed(2)} kg/cm²)'
-                        : '—'),
+                        : '—',
+                ),
                 const SizedBox(height: 14),
 
                 Container(
@@ -718,21 +733,28 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                   decoration: BoxDecoration(
                     color: const Color(0xFF00E5FF).withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.25)),
+                    border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.info_outline, size: 16, color: Color(0xFF00E5FF)),
+                      const AppIcon(
+                        AppIconId.info, size: 16, color: Color(0xFF00E5FF),
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           (report.basePressureKpa.isFinite && report.basePressureKpa <= 200)
-                              ? context.l10n.verticalBasePressureSafeText(report.basePressureKpa.toStringAsFixed(0))
+                              ? context.l10n.verticalBasePressureSafeText(report.basePressureKpa.toStringAsFixed(0),
+                                )
                               : (report.basePressureKpa.isFinite
-                                  ? context.l10n.verticalBasePressureHighText(report.basePressureKpa.toStringAsFixed(0))
+                                  ? context.l10n.verticalBasePressureHighText(report.basePressureKpa.toStringAsFixed(0,
+                                        ),
+                                      )
                                   : '—'),
-                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                          style: const TextStyle(color: Colors.white70, fontSize: 11,
+                          ),
                         ),
                       ),
                     ],
@@ -780,7 +802,8 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
-          child: Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          child: Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
         ),
         Text(
           value,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/icons/app_icon.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../rendering/structural_pointer_painter.dart';
 
@@ -80,13 +81,27 @@ class _StructuralToolGroupsState extends State<StructuralToolGroups> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: Text(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppIcon(switch (value) {
+                          StructuralToolGroup.underlay => AppIconId.layers,
+                          StructuralToolGroup.structure => AppIconId.beam,
+                          StructuralToolGroup.checks => AppIconId.balance,
+                        }, size: 14),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
                       labels[value.index],
                       maxLines: 1,
-                      style: const TextStyle(
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

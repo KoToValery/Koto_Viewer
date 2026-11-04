@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'dart:async';
@@ -514,7 +515,7 @@ class _Cad3DViewportState extends State<Cad3DViewport>
                               Cad3DInteractionMode.pan => l10n.cad3dPan,
                               Cad3DInteractionMode.fly => l10n.cad3dWalk,
                             },
-                            icon: Icon(mode.icon),
+                            icon: AppIcon(mode.iconId),
                             color: _controller.mode == mode
                                 ? const Color(0xFF38BDF8)
                                 : (widget.theme.isDark
@@ -525,7 +526,7 @@ class _Cad3DViewportState extends State<Cad3DViewport>
                         IconButton(
                           key: const ValueKey('cad-3d-reset'),
                           tooltip: l10n.centerView,
-                          icon: const Icon(Icons.fit_screen),
+                          icon: const AppIcon(AppIconId.fitView),
                           onPressed: _controller.reset,
                         ),
                       ],

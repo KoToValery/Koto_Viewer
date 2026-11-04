@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_zone.dart';
@@ -47,7 +48,7 @@ Future<void> showArchitectApartmentRooms(
                         final room = rooms[index];
                         return ListTile(
                           key: ValueKey('apartment-room-${room.id}'),
-                          leading: const Icon(Icons.meeting_room_outlined),
+                          leading: const AppIcon(AppIconId.door),
                           title: Text(
                             '${room.number} · ${room.name}',
                             maxLines: 2,

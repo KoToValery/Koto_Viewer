@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -56,7 +58,8 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
         throw Exception('Failed to start server');
       }
     } on SocketException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'LocalNetworkShareDialog._startServer.socket');
+      AppErrorHandler.recordError(e, stack, context: 'LocalNetworkShareDialog._startServer.socket',
+      );
       if (mounted) {
         setState(() {
           _hasError = true;
@@ -65,7 +68,8 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
         });
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'LocalNetworkShareDialog._startServer');
+      AppErrorHandler.recordError(e, stack, context: 'LocalNetworkShareDialog._startServer',
+      );
       if (mounted) {
         setState(() {
           _hasError = true;
@@ -148,7 +152,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, size: 22),
+                  icon: const AppIcon(AppIconId.close, size: 22),
                   onPressed: () => Navigator.of(context).pop(),
                   splashRadius: 22,
                 ),
@@ -226,9 +230,9 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text(
-              'Try Again',
+            icon: const AppIcon(AppIconId.refresh, size: 18),
+            label: Text(
+              context.l10n.commandUiTryAgain,
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
@@ -368,9 +372,9 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.copy_outlined, size: 19),
+                icon: const AppIcon(AppIconId.duplicate, size: 19),
                 onPressed: () => _copyToClipboard(displayUrl, 'URL'),
-                tooltip: 'Copy URL',
+                tooltip: context.l10n.commandUiCopyUrl,
                 padding: const EdgeInsets.all(6),
                 constraints: const BoxConstraints(),
                 splashRadius: 18,
@@ -384,9 +388,9 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: _stopServer,
-            icon: const Icon(Icons.stop_circle_outlined, size: 18),
-            label: const Text(
-              'Stop Sharing',
+            icon: const AppIcon(AppIconId.stopCircle, size: 18),
+            label: Text(
+              context.l10n.commandUiStopSharing,
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             style: ElevatedButton.styleFrom(

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -84,7 +85,8 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
         throw Exception('Failed to start server');
       }
     } on SocketException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'LocalNetworkReceiveDialog._startServer.socket');
+      AppErrorHandler.recordError(e, stack, context: 'LocalNetworkReceiveDialog._startServer.socket',
+      );
       if (mounted) {
         setState(() {
           _hasError = true;
@@ -93,7 +95,8 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
         });
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'LocalNetworkReceiveDialog._startServer');
+      AppErrorHandler.recordError(e, stack, context: 'LocalNetworkReceiveDialog._startServer',
+      );
       if (mounted) {
         setState(() {
           _hasError = true;
@@ -126,8 +129,7 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
     Navigator.of(context).pop();
     await FileOpenerService.openFile(
       context: context,
-      filePath: file.path,
-    );
+      filePath: file.path);
   }
 
   String _formatFileSize(int bytes) {
@@ -236,8 +238,7 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
                           style: TextStyle(
                             fontSize: 11.5,
                             color: theme.textTheme.bodyMedium?.color?.withValues(
-                              alpha: 0.65,
-                            ),
+                              alpha: 0.65),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -246,7 +247,7 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, size: 22),
+                    icon: const AppIcon(AppIconId.close, size: 22),
                     onPressed: () => Navigator.of(context).pop(),
                     splashRadius: 22,
                   ),
@@ -259,15 +260,18 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
                   margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                    border: Border.all(color: const Color(0xFF10B981), width: 1.2),
+                    border: Border.all(color: const Color(0xFF10B981), width: 1.2,
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
+                      const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -289,7 +293,9 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
                         borderRadius: BorderRadius.circular(12),
                         child: const Padding(
                           padding: EdgeInsets.all(4),
-                          child: Icon(Icons.close, size: 16, color: Color(0xFF047857)),
+                          child: AppIcon(
+                            AppIconId.close, size: 16, color: Color(0xFF047857),
+                          ),
                         ),
                       ),
                     ],
@@ -341,7 +347,8 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         children: [
-          const Icon(Icons.wifi_off_rounded, size: 54, color: Color(0xFFEF4444)),
+          const Icon(Icons.wifi_off_rounded, size: 54, color: Color(0xFFEF4444),
+          ),
           const SizedBox(height: 14),
           const Text(
             'Cannot start Wi-Fi receiver',
@@ -367,9 +374,9 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text(
-              'Try Again',
+            icon: const AppIcon(AppIconId.refresh, size: 18),
+            label: Text(
+              context.l10n.commandUiTryAgain,
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
@@ -436,7 +443,8 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
             children: [
               const Row(
                 children: [
-                  Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF6366F1)),
+                  Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF6366F1),
+                  ),
                   SizedBox(width: 6),
                   Text(
                     'How to upload:',
@@ -489,9 +497,9 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.copy_rounded, size: 18),
+                icon: const AppIcon(AppIconId.duplicate, size: 18),
                 onPressed: () => _copyToClipboard(displayUrl, 'Server URL'),
-                tooltip: 'Copy URL',
+                tooltip: context.l10n.commandUiCopyUrl,
                 padding: const EdgeInsets.all(6),
                 constraints: const BoxConstraints(),
               ),
@@ -527,7 +535,8 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
                 final color = _colorForFile(file.path);
 
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(10),
@@ -603,9 +612,10 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
           width: double.infinity,
           child: OutlinedButton.icon(
             onPressed: _stopServer,
-            icon: const Icon(Icons.stop_circle_outlined, size: 18),
+            icon: const AppIcon(AppIconId.stopCircle, size: 18),
             label: Text(
-              _receivedFiles.isEmpty ? 'Close Server' : 'Done',
+              _receivedFiles.isEmpty ? context.l10n.commandUiCloseServer
+                  : context.l10n.propertiesDone,
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             style: OutlinedButton.styleFrom(

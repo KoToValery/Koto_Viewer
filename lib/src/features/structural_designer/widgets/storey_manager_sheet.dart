@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/structural_element.dart';
@@ -71,7 +72,7 @@ class StoreyManagerSheet extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white70),
+                  icon: const AppIcon(AppIconId.close, color: Colors.white70),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -92,7 +93,8 @@ class StoreyManagerSheet extends StatelessWidget {
                   Row(
                     children: [
                       const Icon(Icons.visibility_rounded,
-                          size: 16, color: Color(0xFFFFB300)),
+                          size: 16, color: Color(0xFFFFB300),
+                        ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -116,12 +118,12 @@ class StoreyManagerSheet extends StatelessWidget {
                       ButtonSegment(
                         value: GhostStoreyMode.below,
                         label: Text(context.l10n.traceRefBelow),
-                        icon: const Icon(Icons.arrow_downward, size: 16),
+                        icon: const AppIcon(AppIconId.down, size: 16),
                       ),
                       ButtonSegment(
                         value: GhostStoreyMode.above,
                         label: Text(context.l10n.traceRefAbove),
-                        icon: const Icon(Icons.arrow_upward, size: 16),
+                        icon: const AppIcon(AppIconId.up, size: 16),
                       ),
                     ],
                     selected: {project.ghostMode},
@@ -197,14 +199,17 @@ class StoreyManagerSheet extends StatelessWidget {
                           storey.shearWalls.length,
                         ),
                         style: const TextStyle(
-                            color: Colors.white60, fontSize: 11),
+                            color: Colors.white60, fontSize: 11,
+                          ),
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.edit_road_rounded,
-                                size: 18, color: Colors.white70),
+                            icon: const AppIcon(
+                                AppIconId.roadEdit,
+                                size: 18, color: Colors.white70,
+                              ),
                             tooltip: context.l10n.changeHeightH,
                             onPressed: () => _showEditHeightDialog(
                               context,
@@ -214,8 +219,10 @@ class StoreyManagerSheet extends StatelessWidget {
                           ),
                           if (project.storeys.length > 1)
                             IconButton(
-                              icon: const Icon(Icons.delete_outline,
-                                  size: 18, color: Colors.redAccent),
+                              icon: const AppIcon(
+                                  AppIconId.delete,
+                                  size: 18, color: Colors.redAccent,
+                                ),
                               tooltip: context.l10n.deleteStorey,
                               onPressed: () => onDeleteStorey(storeyIdx),
                             ),
@@ -238,7 +245,7 @@ class StoreyManagerSheet extends StatelessWidget {
                   Navigator.of(context).pop();
                   onManageStoreys!();
                 },
-                icon: const Icon(Icons.tune_rounded, size: 18),
+                icon: const AppIcon(AppIconId.properties, size: 18),
                 label: Text(context.l10n.bimProjectManageStoreys),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00E5FF),
@@ -257,7 +264,7 @@ class StoreyManagerSheet extends StatelessWidget {
                         onAddStorey!();
                         Navigator.of(context).pop();
                       },
-                      icon: const Icon(Icons.add, size: 18),
+                      icon: const AppIcon(AppIconId.add, size: 18),
                       label: Text(context.l10n.newStorey),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF333333),
@@ -272,12 +279,13 @@ class StoreyManagerSheet extends StatelessWidget {
                         onDuplicateCurrentStorey!();
                         Navigator.of(context).pop();
                       },
-                      icon: const Icon(Icons.copy_all_rounded, size: 18),
+                      icon: const AppIcon(AppIconId.duplicate, size: 18),
                       label: Text(context.l10n.duplicateTypical),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00E5FF),
                         foregroundColor: Colors.black,
-                        textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                        textStyle: const TextStyle(fontWeight: FontWeight.bold,
+                          ),
                       ),
                     ),
                   ),
@@ -290,10 +298,13 @@ class StoreyManagerSheet extends StatelessWidget {
                   Navigator.of(context).pop();
                   onSyncColumns!();
                 },
-                icon: const Icon(Icons.sync_alt_rounded, size: 18, color: Color(0xFF00E5FF)),
+                icon: const AppIcon(
+                    AppIconId.swapHorizontal, size: 18, color: Color(0xFF00E5FF),
+                  ),
                 label: Text(
                   context.l10n.syncColumnsAcrossStoreys,
-                  style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold,
+                    ),
                 ),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0x6600E5FF)),
@@ -309,14 +320,16 @@ class StoreyManagerSheet extends StatelessWidget {
   }
 
   void _showEditHeightDialog(
-      BuildContext context, double currentH, ValueChanged<double> onSave) {
+      BuildContext context, double currentH, ValueChanged<double> onSave,
+  ) {
     final controller = TextEditingController(text: currentH.toStringAsFixed(2));
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF222222),
         title: Text(context.l10n.storeyClearHeight,
-            style: const TextStyle(color: Colors.white, fontSize: 16)),
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+        ),
         content: TextField(
           controller: controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),

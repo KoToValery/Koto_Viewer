@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -59,7 +60,8 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
         });
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._loadMarkdownFile.fs');
+      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._loadMarkdownFile.fs',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
@@ -68,7 +70,8 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._loadMarkdownFile.format');
+      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._loadMarkdownFile.format',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
@@ -77,10 +80,12 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
         });
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._loadMarkdownFile');
+      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._loadMarkdownFile',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
-        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '',
+        );
         setState(() {
           _errorMessage = context.l10n.errorLoadingMarkdown(cleanMsg);
           _isLoading = false;
@@ -97,11 +102,14 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._handleLinkTap.uri');
+      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._handleLinkTap.uri',
+      );
     } on PlatformException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._handleLinkTap.platform');
+      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._handleLinkTap.platform',
+      );
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._handleLinkTap');
+      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._handleLinkTap',
+      );
     }
   }
 
@@ -113,7 +121,8 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
 
     final linesCount = _markdownContent.split(RegExp(r'\r?\n')).length;
     final wordCount = _markdownContent.trim().isEmpty ? 0 : _markdownContent.trim().split(RegExp(r'\s+')).length;
-    final headingsCount = RegExp(r'^#{1,6}\s', multiLine: true).allMatches(_markdownContent).length;
+    final headingsCount = RegExp(r'^#{1,6}\s', multiLine: true,
+    ).allMatches(_markdownContent).length;
 
     showModalBottomSheet(
       context: context,
@@ -147,7 +156,8 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
                       color: const Color(0xFF4338CA).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.menu_book_rounded, color: Color(0xFF4338CA)),
+                    child: const Icon(Icons.menu_book_rounded, color: Color(0xFF4338CA),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -156,11 +166,13 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
                       children: [
                         const Text(
                           'Markdown Document • Properties',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Text(
                           _fileName,
-                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
+                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -187,8 +199,10 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -197,7 +211,8 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
   void _copyContent() {
     Clipboard.setData(ClipboardData(text: _markdownContent));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Markdown copied to clipboard'), duration: Duration(seconds: 1)),
+      const SnackBar(content: Text('Markdown copied to clipboard'), duration: Duration(seconds: 1),
+      ),
     );
   }
 
@@ -209,37 +224,39 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
     return [
       // Raw Source Toggle
       IconButton(
-        icon: Icon(_showRawSource ? Icons.visibility : Icons.code, size: 20),
+        icon: AppIcon.fromMaterial(_showRawSource ? Icons.visibility : Icons.code, size: 20,
+        ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: _showRawSource ? 'Formatted View' : 'Raw Markdown Source',
+        tooltip: _showRawSource ? context.l10n.commandUiFormattedView
+            : context.l10n.commandUiRawMarkdownSource,
         onPressed: () => setState(() => _showRawSource = !_showRawSource),
       ),
 
       // Copy Content
       IconButton(
-        icon: const Icon(Icons.copy_outlined, size: 20),
+        icon: const AppIcon(AppIconId.duplicate, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Copy Markdown',
+        tooltip: context.l10n.commandUiCopyMarkdown,
         onPressed: _copyContent,
       ),
 
       // Info / Properties
       IconButton(
-        icon: const Icon(Icons.info_outline, size: 20),
+        icon: const AppIcon(AppIconId.info, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Markdown Properties',
+        tooltip: context.l10n.commandUiMarkdownProperties,
         onPressed: _showInfoSheet,
       ),
 
       // Share
       IconButton(
-        icon: const Icon(Icons.share_outlined, size: 20),
+        icon: const AppIcon(AppIconId.share, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Share',
+        tooltip: context.l10n.commandIconShare,
         onPressed: _shareFile,
       ),
     ];
@@ -257,7 +274,7 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const AppIcon(AppIconId.back),
           onPressed: () => Navigator.of(context).pop(true),
         ),
         title: Text(
@@ -284,8 +301,7 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
                   child: Row(
                     children: [
                       const Spacer(),
-                      ..._buildMarkdownActions(),
-                    ],
+                      ..._buildMarkdownActions()],
                   ),
                 ),
               ),
@@ -308,14 +324,15 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                        const Icon(Icons.error_outline, size: 48, color: Colors.redAccent,
+                    ),
                         const SizedBox(height: 16),
                         Text(_errorMessage!, textAlign: TextAlign.center),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           onPressed: _loadMarkdownFile,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
+                          icon: const AppIcon(AppIconId.refresh),
+                          label: Text(context.l10n.retry),
                         ),
                       ],
                     ),
@@ -335,9 +352,12 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
                       onTapLink: _handleLinkTap,
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                       styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
-                        h1: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, height: 1.4),
-                        h2: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, height: 1.4),
-                        h3: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold, height: 1.4),
+                        h1: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, height: 1.4,
+                ),
+                        h2: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, height: 1.4,
+                ),
+                        h3: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold, height: 1.4,
+                ),
                         p: const TextStyle(fontSize: 14.5, height: 1.6),
                         code: GoogleFonts.firaCode(
                           fontSize: 13,
@@ -356,7 +376,8 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
                           color: theme.colorScheme.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(6),
                           border: Border(
-                            left: BorderSide(color: theme.colorScheme.primary, width: 4),
+                            left: BorderSide(color: theme.colorScheme.primary, width: 4,
+                    ),
                           ),
                         ),
                         tableBorder: TableBorder.all(
