@@ -1,26 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'architect_properties_shell.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_component_definition.dart';
 import '../models/component_dimensions.dart';
 
 class ComponentDimensionsDialog extends StatefulWidget {
+  final ValueChanged<Map<String, dynamic>>? onPreview;
+  final bool Function()? isCurrent;
   final ArchitectComponentDefinition definition;
   final Map<String, dynamic> parameters;
   const ComponentDimensionsDialog({
     super.key,
     required this.definition,
     required this.parameters,
+    this.onPreview,
+    this.isCurrent,
   });
 
   static Future<Map<String, dynamic>?> show(
     BuildContext context,
     ArchitectComponentDefinition definition,
-    Map<String, dynamic> parameters,
-  ) => showDialog<Map<String, dynamic>>(
+    Map<String, dynamic> parameters, {
+    ValueChanged<Map<String, dynamic>>? onPreview,
+    bool Function()? isCurrent,
+    ValueChanged<double>? onDockWidth,
+    ValueChanged<EdgeInsets>? onInsets,
+  }) => showArchitectProperties<Map<String, dynamic>>(
     context: context,
+    onDockWidth: onDockWidth,
+    onInsets: onInsets,
     builder: (_) => ComponentDimensionsDialog(
       definition: definition,
       parameters: parameters,
+      onPreview: onPreview,
+      isCurrent: isCurrent,
     ),
   );
 
@@ -34,6 +49,8 @@ class _ComponentDimensionsDialogState extends State<ComponentDimensionsDialog> {
   late Map<String, dynamic> _values;
   final _controllers = <String, TextEditingController>{};
   bool _locked = false;
+  late final Map<String, dynamic> _baseline;
+  Timer? _timer;
   final Set<String> _invalidAxes = {};
   bool _geometryError = false;
 
@@ -45,6 +62,7 @@ class _ComponentDimensionsDialogState extends State<ComponentDimensionsDialog> {
       ...widget.definition.defaultParameters,
       ...widget.parameters,
     };
+    _baseline = Map.of(_values);
     for (final axis in axes) {
       _controllers[axis] = TextEditingController(text: _text(axis));
     }
@@ -80,8 +98,24 @@ class _ComponentDimensionsDialogState extends State<ComponentDimensionsDialog> {
     }
   }
 
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _timer?.cancel();
+    _timer = Timer(const Duration(milliseconds: 200), () {
+      if (mounted && _invalidAxes.isEmpty) {
+        try {
+          widget.definition.resolveGeometry(_values);
+          widget.onPreview?.call(Map.of(_values));
+        } catch (_) {
+          /* Invalid geometry is kept in the form. */
+        }
+      }
+    });
+  }
+
   void _apply() {
-    if (_invalidAxes.isNotEmpty) return;
+    if (_invalidAxes.isNotEmpty || widget.isCurrent?.call() == false) return;
     try {
       widget.definition.resolveGeometry(_values);
       Navigator.of(context).pop(_values);
@@ -92,6 +126,7 @@ class _ComponentDimensionsDialogState extends State<ComponentDimensionsDialog> {
 
   @override
   void dispose() {
+    _timer?.cancel();
     for (final controller in _controllers.values) {
       controller.dispose();
     }
@@ -106,8 +141,10 @@ class _ComponentDimensionsDialogState extends State<ComponentDimensionsDialog> {
       l.architectPropertyDepth,
       l.architectPropertyHeight,
     ];
-    return AlertDialog(
-      title: Text(l.architectPropertySize),
+    return ArchitectPropertiesDialog(
+      title: Text(l.architectToolComponent),
+      isDirty: () => _invalidAxes.isNotEmpty || !mapEquals(_baseline, _values),
+      onSave: _apply,
       content: SingleChildScrollView(
         child: SizedBox(
           width: 300,
@@ -150,10 +187,12 @@ class _ComponentDimensionsDialogState extends State<ComponentDimensionsDialog> {
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(l.architectVisibleInSection),
-                value: (_values['visibleInSection'] as bool?) ??
+                value:
+                    (_values['visibleInSection'] as bool?) ??
                     widget.definition.defaultVisibleInSection,
-                onChanged: (value) =>
-                    setState(() => _values['visibleInSection'] = value ?? false),
+                onChanged: (value) => setState(
+                  () => _values['visibleInSection'] = value ?? false,
+                ),
               ),
               TextButton(
                 onPressed: () => setState(() {

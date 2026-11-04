@@ -4364,7 +4364,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectSelectConnected => 'Connected';
 
   @override
-  String get architectSelectSimilar => 'All of type';
+  String get architectSelectSimilar => 'By type';
+
+  @override
+  String get architectSelectSimilarHelp =>
+      'Select all elements in the selected categories on the active storey.';
 
   @override
   String get architectContextMenu => 'Menu';
@@ -8661,5 +8665,91 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap to select; use arrows for overlaps. Hold for actions.';
 
   @override
-  String get architectSelectAll => 'Select all';
+  String get architectSelectAll => 'By type';
+
+  @override
+  String get propertiesBasic => 'Basic';
+
+  @override
+  String get propertiesMore => 'More';
+
+  @override
+  String get propertiesExpand => 'Expand';
+
+  @override
+  String get propertiesCollapse => 'Collapse';
+
+  @override
+  String get propertiesUnsaved => 'Unsaved changes';
+
+  @override
+  String get propertiesUnsavedHelp =>
+      'Save your changes or discard them before closing.';
+
+  @override
+  String get propertiesStay => 'Stay';
+
+  @override
+  String get propertiesDiscard => 'Discard';
+
+  @override
+  String get propertiesInvalid => 'Check the highlighted fields.';
+
+  @override
+  String get propertiesStale =>
+      'The document changed. Reopen properties to edit the current version.';
+
+  @override
+  String get propertiesAutomaticValue => 'Automatic';
+
+  @override
+  String get propertiesCalculated => 'Calculated';
+
+  @override
+  String propertiesSelection(String name, int count) {
+    return '$name ($count)';
+  }
+
+  @override
+  String get propertiesGeometry => 'Geometry';
+
+  @override
+  String get propertiesAppearance => 'Appearance';
+
+  @override
+  String get propertiesManual => 'Manual';
+
+  @override
+  String get propertiesClear => 'Clear value';
+
+  @override
+  String get propertiesDone => 'Done';
+
+  @override
+  String get propertiesSource => 'Source';
+
+  @override
+  String get propertiesScopeSelected => 'Selected elements';
+
+  @override
+  String get propertiesRadius => 'Radius';
+
+  @override
+  String get propertiesTextHeight => 'Text height';
+
+  @override
+  String get propertiesSaveOpen => 'Save and open';
+
+  @override
+  String get propertiesSlope => 'Slope';
+
+  @override
+  String get propertiesBaseOffset => 'Base offset';
+
+  @override
+  String get propertiesMixedCompositionHelp =>
+      'Choose a type to replace the selected compositions.';
+
+  @override
+  String get propertiesDiameter => 'Diameter';
 }

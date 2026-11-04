@@ -506,7 +506,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                       iconOnly:
                                           MediaQuery.sizeOf(context).width <
                                           600,
-                                      tooltip: l10n.architectSelectSimilar,
+                                      tooltip: l10n.architectSelectSimilarHelp,
                                       selected: false,
                                       onPressed: widget.onSelectAll,
                                     ),

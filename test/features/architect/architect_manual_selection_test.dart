@@ -127,7 +127,10 @@ void main() {
         {'other', 'wall'},
         {'other'},
       ]) {
-        await tester.tapAt(workspace.screen(tester, Offset.zero), kind: PointerDeviceKind.mouse);
+        await tester.tapAt(
+          workspace.screen(tester, Offset.zero),
+          kind: PointerDeviceKind.mouse,
+        );
         await tester.pumpAndSettle();
         expect(workspace.overlay(tester).selectedElementIds, expected);
       }
@@ -216,7 +219,8 @@ void main() {
         find.byKey(const ValueKey('architect-rotation-preset-90')),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('architect-rotation-apply')));
+      expect(model.undoCount, 0);
+      await editing.acceptGeometryCommand(tester);
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.columns.map((c) => c.rotationDeg), [
         90,

@@ -4382,7 +4382,11 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectSelectConnected => 'Свързани';
 
   @override
-  String get architectSelectSimilar => 'Всички от типа';
+  String get architectSelectSimilar => 'По тип';
+
+  @override
+  String get architectSelectSimilarHelp =>
+      'Избира всички елементи от избраните категории в активния етаж.';
 
   @override
   String get architectContextMenu => 'Меню';
@@ -8692,5 +8696,91 @@ class AppLocalizationsBg extends AppLocalizations {
       'Тап за избор; стрелки при застъпване. Задръж за меню.';
 
   @override
-  String get architectSelectAll => 'Всички';
+  String get architectSelectAll => 'По тип';
+
+  @override
+  String get propertiesBasic => 'Основни';
+
+  @override
+  String get propertiesMore => 'Още';
+
+  @override
+  String get propertiesExpand => 'Разгъни';
+
+  @override
+  String get propertiesCollapse => 'Свий';
+
+  @override
+  String get propertiesUnsaved => 'Незаписани промени';
+
+  @override
+  String get propertiesUnsavedHelp =>
+      'Запазете промените или ги отхвърлете преди затваряне.';
+
+  @override
+  String get propertiesStay => 'Остани';
+
+  @override
+  String get propertiesDiscard => 'Отхвърли';
+
+  @override
+  String get propertiesInvalid => 'Проверете отбелязаните полета.';
+
+  @override
+  String get propertiesStale =>
+      'Документът е променен. Отворете свойствата отново за актуалната версия.';
+
+  @override
+  String get propertiesAutomaticValue => 'Автоматично';
+
+  @override
+  String get propertiesCalculated => 'Изчислено';
+
+  @override
+  String propertiesSelection(String name, int count) {
+    return '$name ($count)';
+  }
+
+  @override
+  String get propertiesGeometry => 'Геометрия';
+
+  @override
+  String get propertiesAppearance => 'Представяне';
+
+  @override
+  String get propertiesManual => 'Ръчно';
+
+  @override
+  String get propertiesClear => 'Изчисти стойността';
+
+  @override
+  String get propertiesDone => 'Готово';
+
+  @override
+  String get propertiesSource => 'Източник';
+
+  @override
+  String get propertiesScopeSelected => 'Избраните елементи';
+
+  @override
+  String get propertiesRadius => 'Радиус';
+
+  @override
+  String get propertiesTextHeight => 'Височина на текста';
+
+  @override
+  String get propertiesSaveOpen => 'Запази и отвори';
+
+  @override
+  String get propertiesSlope => 'Наклон';
+
+  @override
+  String get propertiesBaseOffset => 'Основа';
+
+  @override
+  String get propertiesMixedCompositionHelp =>
+      'Изберете тип за замяна на избраните състави.';
+
+  @override
+  String get propertiesDiameter => 'Диаметър';
 }

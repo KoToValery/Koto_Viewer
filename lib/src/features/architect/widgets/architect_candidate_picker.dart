@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../rendering/architect_2d_painter.dart' show ArchitectTool;
-import '../services/architect_selection.dart';
 import '../services/architect_selection_candidates.dart';
 
 class ArchitectCandidateLabel {
@@ -44,23 +43,25 @@ List<ArchitectCandidateLabel> architectCandidateLabels(
     _ => l.architectToolSelect,
   };
   final labels = <String, ArchitectCandidateLabel>{};
-  final json = project.toJson();
+  final wanted = ids.toSet();
   for (final storey
       in includeStorey ? project.storeys : [project.activeStorey]) {
     final kinds = ArchitectSelectionCandidates.tools(
       project.copyWith(activeStoreyId: storey.id),
     );
-    final records = {
-      for (final e in ArchitectSelection.records(json, storey.id)) e['id']: e,
-    };
-    for (final id in ids.where(kinds.containsKey)) {
-      if (labels.containsKey(id)) continue;
-      final record = records[id];
+    void add(String id, Map<String, dynamic> Function() serialize) {
+      if (!wanted.contains(id) ||
+          labels.containsKey(id) ||
+          !kinds.containsKey(id)) {
+        return;
+      }
+      // Only serialize the requested record, never the complete BIM project.
+      final record = serialize();
       final name =
-          (record?['name'] ??
-                  record?['text'] ??
-                  record?['label'] ??
-                  record?['specId'])
+          (record['name'] ??
+                  record['text'] ??
+                  record['label'] ??
+                  record['specId'])
               as String?;
       final label = name == null || name.trim().isEmpty
           ? type(kinds[id])
@@ -71,6 +72,65 @@ List<ArchitectCandidateLabel> architectCandidateLabels(
         includeStorey ? storey.name : null,
       );
     }
+
+    for (final wall in storey.walls) {
+      add(wall.id, wall.toJson);
+      for (final door in wall.doors) {
+        add(door.id, door.toJson);
+      }
+      for (final window in wall.windows) {
+        add(window.id, window.toJson);
+      }
+    }
+    for (final e in storey.columns) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.beams) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.slabs) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.roofs) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.openings) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.stairs) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.dimensions) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.elevationMarkers) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.annotations) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.cadPrimitives) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.components) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.floorDrains) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.zones) {
+      add(e.id, e.toJson);
+    }
+    for (final e in project.gridAxes) {
+      add(e.id, e.toJson);
+    }
+    for (final e in project.sections) {
+      add(e.id, e.toJson);
+    }
+    for (final e in project.elevations) {
+      add(e.id, e.toJson);
+    }
+    if (labels.length == wanted.length) break;
   }
   return [
     for (final id in ids)
@@ -87,6 +147,7 @@ class ArchitectCandidatePicker extends StatefulWidget {
   final VoidCallback? onApply;
   final bool Function(String) isSelected;
   final bool Function(String) willRemove;
+  final Widget? trailing;
   const ArchitectCandidatePicker({
     super.key,
     required this.labels,
@@ -95,6 +156,7 @@ class ArchitectCandidatePicker extends StatefulWidget {
     this.onApply,
     required this.isSelected,
     required this.willRemove,
+    this.trailing,
   });
 
   @override
@@ -245,14 +307,30 @@ class _ArchitectCandidatePickerState extends State<ArchitectCandidatePicker> {
               key: const ValueKey('architect-candidate-list'),
               style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
               onPressed: _showList,
-              child: Text(
-                l.architectPickPosition(
+              child: Semantics(
+                label: l.architectPickPosition(
                   item.label,
                   widget.index + 1,
                   widget.labels.length,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                excludeSemantics: true,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${widget.index + 1}/${widget.labels.length}',
+                      key: const ValueKey('architect-candidate-position'),
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -272,6 +350,7 @@ class _ArchitectCandidatePickerState extends State<ArchitectCandidatePicker> {
               onPressed: widget.onApply,
               icon: Icon(remove ? Icons.remove : Icons.add),
             ),
+          if (widget.trailing != null) widget.trailing!,
         ],
       ),
     );

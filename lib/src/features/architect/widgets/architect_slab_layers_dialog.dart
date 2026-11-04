@@ -1,4 +1,7 @@
 import 'dart:math' as math;
+import 'dart:async';
+import 'dart:convert';
+import 'architect_properties_shell.dart';
 import '../services/architect_section_junctions.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -11,6 +14,8 @@ import '../services/architect_slab_geometry.dart';
 import 'architect_slab_labels.dart';
 
 class ArchitectSlabLayersDialog extends StatefulWidget {
+  final ValueChanged<ArchitectProject>? onPreview;
+  final bool Function()? isCurrent;
   final ArchitectProject project;
   final ArchitectSlab slab;
   final bool Function(ArchitectProject) onApply;
@@ -19,6 +24,8 @@ class ArchitectSlabLayersDialog extends StatefulWidget {
     required this.project,
     required this.slab,
     required this.onApply,
+    this.onPreview,
+    this.isCurrent,
   });
   @override
   State<ArchitectSlabLayersDialog> createState() => _SlabLayersState();
@@ -61,11 +68,12 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
             ),
           ).below,
         );
-    onlyThis = original == null;
+    onlyThis = true;
     direction = widget.slab.slopeDirection;
     thickness = TextEditingController(text: '${widget.slab.thickness * 1000}');
     offset = TextEditingController(text: '${widget.slab.coreTopOffset * 1000}');
     name = TextEditingController(text: draft.customName);
+    _baseline = _fingerprint;
     _loadLibrary();
   }
 
@@ -76,6 +84,7 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
 
   @override
   void dispose() {
+    _previewTimer?.cancel();
     thickness.dispose();
     offset.dispose();
     name.dispose();
@@ -98,7 +107,7 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
     final shared = widget.project.slabAssemblies.any((a) => a.id == value.id);
     if (shared) {
       draft = value;
-      onlyThis = false;
+      onlyThis = true;
     } else {
       draft = value.copyWith(
         id: onlyThis ? ArchitectElementId.next('assembly') : draft.id,
@@ -154,22 +163,63 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
     }
   }
 
-  void save() {
-    if (!valid()) return;
-    final a = named.copyWith(
-      id: onlyThis ? ArchitectElementId.next('assembly') : draft.id,
+  late String _baseline;
+  Timer? _previewTimer;
+  late final _instanceId = ArchitectElementId.next('assembly');
+  String get _fingerprint => jsonEncode([
+    named.toJson(),
+    thickness.text,
+    offset.text,
+    direction,
+    onlyThis,
+  ]);
+  ArchitectProject _candidate() {
+    named.validate();
+    final t = number(thickness.text), o = number(offset.text);
+    if (t == null ||
+        t <= 0 ||
+        o == null ||
+        (draft.hasSlope && direction == null)) {
+      throw ArgumentError('Invalid slab');
+    }
+    return ArchitectSlabAssemblies.assign(
+      widget.project,
+      storey.id,
+      widget.slab.id,
+      named.copyWith(id: onlyThis ? _instanceId : draft.id),
+      onlyThis: onlyThis,
+      thickness: t / 1000,
+      coreTopOffset: o / 1000,
+      direction: direction,
     );
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _previewTimer?.cancel();
+    _previewTimer = Timer(const Duration(milliseconds: 200), () {
+      if (mounted && widget.onPreview != null) {
+        try {
+          widget.onPreview!(
+            _fingerprint == _baseline ? widget.project : _candidate(),
+          );
+        } on ArgumentError {
+          /* Incomplete input. */
+        }
+      }
+    });
+  }
+
+  void save() {
+    if(_fingerprint==_baseline){Navigator.pop(context);return;}
+    if (!valid()) return;
+    if (widget.isCurrent?.call() == false) {
+      setState(() => error = context.l10n.propertiesStale);
+      return;
+    }
     try {
-      final project = ArchitectSlabAssemblies.assign(
-        widget.project,
-        storey.id,
-        widget.slab.id,
-        a,
-        onlyThis: onlyThis,
-        thickness: number(thickness.text)! / 1000,
-        coreTopOffset: number(offset.text)! / 1000,
-        direction: direction,
-      );
+      final project = _candidate();
       if (widget.onApply(project)) Navigator.pop(context);
     } on ArgumentError {
       setState(() => error = context.l10n.slabInvalid);
@@ -204,362 +254,310 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
       ...widget.project.slabAssemblies,
       ...library,
     ].where((a) => filter == null || a.usage == filter).toList();
-    return Dialog(
-      insetPadding: const EdgeInsets.all(12),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 850),
+    return ArchitectPropertiesShell(
+      title: l.architectToolSlab,
+      subtitle: storey.name,
+      initiallyExpanded: true,
+      onSave: save,
+      isDirty: () => _fingerprint != _baseline,
+      content: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<SlabUsage>(
+                    key: ValueKey('slab-filter-${filter?.name}'),
+                    initialValue: filter,
+                    isExpanded: true,
+                    decoration: InputDecoration(labelText: l.slabAllUsages),
+                    items: [
+                      for (final u in SlabUsage.values)
+                        DropdownMenuItem(value: u, child: Text(u.label(l))),
+                    ],
+                    onChanged: (u) => setState(() => filter = u),
+                  ),
+                ),
+                IconButton(
+                  tooltip: l.slabAllUsages,
+                  onPressed: () => setState(() => filter = null),
+                  icon: const Icon(Icons.filter_alt_off_outlined),
+                ),
+              ],
+            ),
+            DropdownButtonFormField<int>(
+              key: ValueKey('slab-presets-${filter?.name}-${library.length}'),
+              isExpanded: true,
+              decoration: InputDecoration(labelText: l.slabPreset),
+              items: [
+                for (var i = 0; i < options.length; i++)
+                  DropdownMenuItem(
+                    value: i,
+                    child: Text(
+                      options[i].label(l),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (i) {
+                if (i != null) load(options[i]);
+              },
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l.roofUiAssembly,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  tooltip: l.propertiesMore,
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'library',
+                      child: Text(l.slabSaveLibrary),
+                    ),
+                    PopupMenuItem(value: 'new', child: Text(l.slabNewType)),
+                  ],
+                  onSelected: (action) async {
+                    if (action == 'new') {
+                      setState(() {
+                        onlyThis = true;
+                        draft = named.copyWith(
+                          id: ArchitectElementId.next('assembly'),
+                        );
+                      });
+                      return;
+                    }
+                    if (!valid()) return;
+                    final ok = await ArchitectSlabLibrary.save(named);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          ok ? l.slabLibrarySaved : l.slabLibraryFailed,
+                        ),
+                      ),
+                    );
+                    _loadLibrary();
+                  },
+                ),
+              ],
+            ),
+            TextField(
+              onChanged: (_) => setState(() {}),
+              controller: name,
+              decoration: InputDecoration(
+                labelText: l.architectPropertyName,
+                hintText: draft.usage.label(l),
+                floatingLabelBehavior: FloatingLabelBehavior.always,
+              ),
+            ),
+            if (widget.slab.assemblyId != null ||
+                widget.project.slabAssemblies.any((a) => a.id == draft.id)) ...[
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(l.slabOnlyThis),
+                value: onlyThis,
+                onChanged: (v) => setState(() => onlyThis = v),
+              ),
+              if (!onlyThis)
+                Text(
+                  l.slabSharedHelp,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const ValueKey('slab-core-thickness'),
+                    controller: thickness,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: '${l.slabCore} (mm)',
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    key: const ValueKey('slab-core-offset'),
+                    controller: offset,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: '${l.slabCoreOffset} (mm)',
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(
+              height: 115,
               child: Row(
                 children: [
+                  SizedBox(
+                    width: 70,
+                    child: CustomPaint(
+                      size: Size.infinite,
+                      painter: _StackPreview(surfaces, p),
+                    ),
+                  ),
                   Expanded(
-                    child: Text(
-                      l.slabLayers,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: l.slabPresetHelp,
-                    onPressed: () => showDialog<void>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        content: Text(l.slabPresetHelp),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: Text(l.close),
-                          ),
-                        ],
-                      ),
-                    ),
-                    icon: const Icon(Icons.help_outline),
-                  ),
-                  IconButton(
-                    tooltip: l.close,
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<SlabUsage>(
-                            key: ValueKey('slab-filter-${filter?.name}'),
-                            initialValue: filter,
-                            isExpanded: true,
-                            decoration: InputDecoration(
-                              labelText: l.slabAllUsages,
-                            ),
-                            items: [
-                              for (final u in SlabUsage.values)
-                                DropdownMenuItem(
-                                  value: u,
-                                  child: Text(u.label(l)),
-                                ),
-                            ],
-                            onChanged: (u) => setState(() => filter = u),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: l.slabAllUsages,
-                          onPressed: () => setState(() => filter = null),
-                          icon: const Icon(Icons.filter_alt_off_outlined),
-                        ),
-                      ],
-                    ),
-                    DropdownButtonFormField<int>(
-                      key: ValueKey(
-                        'slab-presets-${filter?.name}-${library.length}',
-                      ),
-                      isExpanded: true,
-                      decoration: InputDecoration(labelText: l.slabPreset),
-                      items: [
-                        for (var i = 0; i < options.length; i++)
-                          DropdownMenuItem(
-                            value: i,
-                            child: Text(
-                              options[i].label(l),
-                              overflow: TextOverflow.ellipsis,
+                    child: LayoutBuilder(
+                      builder: (_, c) {
+                        final bounds =
+                            (Path()..addPolygon(previewSlab.polygon, true))
+                                .getBounds()
+                                .inflate(.3);
+                        final scale = math.min(
+                          c.maxWidth / math.max(bounds.width, .1),
+                          115 / math.max(bounds.height, .1),
+                        );
+                        return GestureDetector(
+                          key: const ValueKey('slab-slope-plan'),
+                          onTapUp: !setDirection
+                              ? null
+                              : (d) {
+                                  final point =
+                                      bounds.center +
+                                      (d.localPosition -
+                                              Offset(c.maxWidth / 2, 57.5)) /
+                                          scale;
+                                  setState(() {
+                                    if (first == null) {
+                                      first = point;
+                                    } else if ((point - first!).distance >
+                                        .001) {
+                                      final v = point - first!;
+                                      direction = math.atan2(v.dy, v.dx);
+                                      first = null;
+                                      setDirection = false;
+                                      error = null;
+                                    }
+                                  });
+                                },
+                          child: CustomPaint(
+                            size: Size(c.maxWidth, 115),
+                            painter: _SlabPlanPreview(
+                              previewSlab,
+                              bounds.center,
+                              scale,
+                              first,
+                              direction,
                             ),
                           ),
-                      ],
-                      onChanged: (i) {
-                        if (i != null) load(options[i]);
+                        );
                       },
                     ),
-                    TextField(
-                      controller: name,
-                      decoration: InputDecoration(
-                        labelText: l.architectPropertyName,
-                        hintText: draft.usage.label(l),
-                        floatingLabelBehavior: FloatingLabelBehavior.always,
-                      ),
-                    ),
-                    if (widget.slab.assemblyId != null ||
-                        widget.project.slabAssemblies.any(
-                          (a) => a.id == draft.id,
-                        )) ...[
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        title: Text(l.slabOnlyThis),
-                        value: onlyThis,
-                        onChanged: (v) => setState(() => onlyThis = v),
-                      ),
-                      if (!onlyThis)
-                        Text(
-                          l.slabSharedHelp,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                    ],
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            key: const ValueKey('slab-core-thickness'),
-                            controller: thickness,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: InputDecoration(
-                              labelText: '${l.slabCore} (mm)',
-                            ),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            key: const ValueKey('slab-core-offset'),
-                            controller: offset,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                              signed: true,
-                            ),
-                            decoration: InputDecoration(
-                              labelText: '${l.slabCoreOffset} (mm)',
-                            ),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(
-                      height: 115,
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 70,
-                            child: CustomPaint(
-                              size: Size.infinite,
-                              painter: _StackPreview(surfaces, p),
-                            ),
-                          ),
-                          Expanded(
-                            child: LayoutBuilder(
-                              builder: (_, c) {
-                                final bounds =
-                                    (Path()..addPolygon(
-                                          previewSlab.polygon,
-                                          true,
-                                        ))
-                                        .getBounds()
-                                        .inflate(.3);
-                                final scale = math.min(
-                                  c.maxWidth / math.max(bounds.width, .1),
-                                  115 / math.max(bounds.height, .1),
-                                );
-                                return GestureDetector(
-                                  key: const ValueKey('slab-slope-plan'),
-                                  onTapUp: !setDirection
-                                      ? null
-                                      : (d) {
-                                          final point =
-                                              bounds.center +
-                                              (d.localPosition -
-                                                      Offset(
-                                                        c.maxWidth / 2,
-                                                        57.5,
-                                                      )) /
-                                                  scale;
-                                          setState(() {
-                                            if (first == null) {
-                                              first = point;
-                                            } else if ((point - first!)
-                                                    .distance >
-                                                .001) {
-                                              final v = point - first!;
-                                              direction = math.atan2(
-                                                v.dy,
-                                                v.dx,
-                                              );
-                                              first = null;
-                                              setDirection = false;
-                                              error = null;
-                                            }
-                                          });
-                                        },
-                                  child: CustomPaint(
-                                    size: Size(c.maxWidth, 115),
-                                    painter: _SlabPlanPreview(
-                                      previewSlab,
-                                      bounds.center,
-                                      scale,
-                                      first,
-                                      direction,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      '${l.slabAbove}: ${widget.project.formatLength(surfaces.first.topAt(p) - storey.elevation - previewSlab.coreTopOffset)} · '
-                      '${l.slabBelow}: ${widget.project.formatLength(draft.lowerThickness)}',
-                    ),
-                    Text(
-                      '${l.slabFinishedLevel}: ${surfaces.first.topAt(p).toStringAsFixed(3)} m · '
-                      '${l.slabBottomLevel}: ${surfaces.last.bottomAt(p).toStringAsFixed(3)} m',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    if (draft.hasSlope)
-                      TextButton.icon(
-                        onPressed: () => setState(() {
-                          setDirection = true;
-                          first = null;
-                        }),
-                        icon: const Icon(Icons.south_east),
-                        label: Text(
-                          setDirection ? l.slabDirectionHelp : l.slabDirection,
-                        ),
-                      ),
-                    Wrap(
-                      spacing: 6,
-                      children: [
-                        ChoiceChip(
-                          label: Text(l.slabAbove),
-                          selected: !lower,
-                          onSelected: (_) => setState(() => lower = false),
-                        ),
-                        ChoiceChip(
-                          label: Text(l.slabBelow),
-                          selected: lower,
-                          onSelected: (_) => setState(() => lower = true),
-                        ),
-                        if (!lower)
-                          PopupMenuButton<String>(
-                            tooltip: l.slabFinish,
-                            icon: const Icon(Icons.texture),
-                            itemBuilder: (_) => [
-                              PopupMenuItem(
-                                value: 'tile',
-                                child: Text(l.slabFinishTile),
-                              ),
-                              PopupMenuItem(
-                                value: 'parquet',
-                                child: Text(l.slabFinishParquet),
-                              ),
-                              PopupMenuItem(
-                                value: 'wet',
-                                child: Text(l.slabFinishWet),
-                              ),
-                            ],
-                            onSelected: (v) => change([
-                              ...ArchitectSlabCatalog.finish(
-                                parquet: v == 'parquet',
-                                wet: v == 'wet',
-                              ),
-                              ...layers.where(
-                                (x) =>
-                                    !x.finishPackage &&
-                                    x.role != SlabLayerRole.finish,
-                              ),
-                            ]),
-                          ),
-                      ],
-                    ),
-                    for (var i = 0; i < layers.length; i++) _row(i),
-                    TextButton.icon(
-                      key: const ValueKey('slab-add-layer'),
-                      onPressed: editLayer,
-                      icon: const Icon(Icons.add),
-                      label: Text(l.slabAddLayer),
-                    ),
-                    if (draft.usage == SlabUsage.ground ||
-                        draft.usage == SlabUsage.foundation)
-                      Text(
-                        l.slabNaturalGround,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    if (error != null)
-                      Text(
-                        error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                alignment: WrapAlignment.end,
-                children: [
-                  TextButton.icon(
-                    onPressed: () async {
-                      if (!valid()) return;
-                      final ok = await ArchitectSlabLibrary.save(named);
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            ok ? l.slabLibrarySaved : l.slabLibraryFailed,
-                          ),
-                        ),
-                      );
-                      _loadLibrary();
-                    },
-                    icon: const Icon(Icons.bookmark_add_outlined),
-                    label: Text(l.slabSaveLibrary),
-                  ),
-                  TextButton(
-                    onPressed: () => setState(() {
-                      onlyThis = true;
-                      draft = named.copyWith(
-                        id: ArchitectElementId.next('assembly'),
-                      );
-                    }),
-                    child: Text(l.slabNewType),
-                  ),
-                  FilledButton(
-                    key: const ValueKey('slab-layers-save'),
-                    onPressed: save,
-                    child: Text(l.save),
                   ),
                 ],
               ),
             ),
+            Text(
+              '${l.slabAbove}: ${widget.project.formatLength(surfaces.first.topAt(p) - storey.elevation - previewSlab.coreTopOffset)} · '
+              '${l.slabBelow}: ${widget.project.formatLength(draft.lowerThickness)}',
+            ),
+            Text(
+              '${l.slabFinishedLevel}: ${surfaces.first.topAt(p).toStringAsFixed(3)} m · '
+              '${l.slabBottomLevel}: ${surfaces.last.bottomAt(p).toStringAsFixed(3)} m',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (draft.hasSlope)
+              TextButton.icon(
+                onPressed: () => setState(() {
+                  setDirection = true;
+                  first = null;
+                }),
+                icon: const Icon(Icons.south_east),
+                label: Text(
+                  setDirection ? l.slabDirectionHelp : l.slabDirection,
+                ),
+              ),
+            Wrap(
+              spacing: 6,
+              children: [
+                ChoiceChip(
+                  label: Text(l.slabAbove),
+                  selected: !lower,
+                  onSelected: (_) => setState(() => lower = false),
+                ),
+                ChoiceChip(
+                  label: Text(l.slabBelow),
+                  selected: lower,
+                  onSelected: (_) => setState(() => lower = true),
+                ),
+                if (!lower)
+                  PopupMenuButton<String>(
+                    tooltip: l.slabFinish,
+                    icon: const Icon(Icons.texture),
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: 'tile',
+                        child: Text(l.slabFinishTile),
+                      ),
+                      PopupMenuItem(
+                        value: 'parquet',
+                        child: Text(l.slabFinishParquet),
+                      ),
+                      PopupMenuItem(value: 'wet', child: Text(l.slabFinishWet)),
+                    ],
+                    onSelected: (v) => change([
+                      ...ArchitectSlabCatalog.finish(
+                        parquet: v == 'parquet',
+                        wet: v == 'wet',
+                      ),
+                      ...layers.where(
+                        (x) =>
+                            !x.finishPackage && x.role != SlabLayerRole.finish,
+                      ),
+                    ]),
+                  ),
+              ],
+            ),
+            for (var i = 0; i < layers.length; i++) _row(i),
+            TextButton.icon(
+              key: const ValueKey('slab-add-layer'),
+              onPressed: editLayer,
+              icon: const Icon(Icons.add),
+              label: Text(l.slabAddLayer),
+            ),
+            if (draft.usage == SlabUsage.ground ||
+                draft.usage == SlabUsage.foundation)
+              Text(
+                l.slabNaturalGround,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            if (error != null)
+              Text(
+                error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
           ],
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.cancel),
+        ),
+        FilledButton(
+          key: const ValueKey('slab-layers-save'),
+          onPressed: save,
+          child: Text(l.save),
+        ),
+      ],
     );
   }
 

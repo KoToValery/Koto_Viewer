@@ -16,6 +16,7 @@ import 'package:kotoview/src/features/architect/services/architect_workspace_vie
 import 'architect_editing_test.dart' as editing;
 import 'architect_element_group_test.dart' as groups;
 import 'architect_workspace_interaction_test.dart' as workspace;
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'package:kotoview/src/features/bim_editing/widgets/bim_edit_actions.dart';
 
 const interior = ArchitectWall(
@@ -202,10 +203,10 @@ void main() {
           await workspace.wallTap(tester, const Offset(2, -1));
           await tester.pumpAndSettle();
           Future<void> mirror() async {
-            await tester.tap(
-              find.byKey(const ValueKey('architect-selection-mirror-copy')),
+            await tool_ui.selectionAction(
+              tester,
+              'architect-selection-mirror-copy',
             );
-            await tester.pumpAndSettle();
             expect(
               tester
                   .widget<IconButton>(

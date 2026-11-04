@@ -1429,7 +1429,8 @@
   "architectMoveStop": "Спри",
   "architectMoveHelp": "Премести: свободно, напречно или с точен отстъп със знак.",
   "architectSelectConnected": "Свързани",
-  "architectSelectSimilar": "Всички от типа",
+  "architectSelectSimilar": "По тип",
+  "architectSelectSimilarHelp": "Избира всички елементи от избраните категории в активния етаж.",
   "architectContextMenu": "Меню",
   "architectSelectionCount": "{count} елемента",
   "architectSelectionWallsCount": "{count, plural, one{1 стена} other{{count} стени}}",
@@ -2896,5 +2897,43 @@
   "architectPickPosition": "{label} · {index}/{count}",
   "@architectPickPosition": {"placeholders": {"label": {"type": "String"}, "index": {"type": "int"}, "count": {"type": "int"}}},
   "architectTouchSelectionHelp": "Тап за избор; стрелки при застъпване. Задръж за меню.",
-  "architectSelectAll": "Всички"
+  "architectSelectAll": "По тип",
+  "properties3d": "3D Свойства",
+  "propertiesBasic": "Основни",
+  "propertiesMore": "Още",
+  "propertiesExpand": "Разгъни",
+  "propertiesCollapse": "Свий",
+  "propertiesUnsaved": "Незаписани промени",
+  "propertiesUnsavedHelp": "Запазете промените или ги отхвърлете преди затваряне.",
+  "propertiesStay": "Остани",
+  "propertiesDiscard": "Отхвърли",
+  "propertiesInvalid": "Проверете отбелязаните полета.",
+  "propertiesStale": "Документът е променен. Отворете свойствата отново за актуалната версия.",
+  "propertiesAutomaticValue": "Автоматично",
+  "propertiesCalculated": "Изчислено",
+  "propertiesSelection": "{name} ({count})",
+  "propertiesGeometry": "Геометрия",
+  "propertiesAppearance": "Представяне",
+  "propertiesManual": "Ръчно",
+  "propertiesClear": "Изчисти стойността",
+  "propertiesDone": "Готово",
+  "propertiesSource": "Източник",
+  "propertiesScopeSelected": "Избраните елементи",
+  "@propertiesSelection": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "propertiesRadius": "Радиус",
+  "propertiesTextHeight": "Височина на текста",
+  "propertiesSaveOpen": "Запази и отвори",
+  "propertiesSlope": "Наклон",
+  "propertiesBaseOffset": "Основа",
+  "propertiesMixedCompositionHelp": "Изберете тип за замяна на избраните състави.",
+  "propertiesDiameter": "Диаметър"
 }

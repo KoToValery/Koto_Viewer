@@ -48,6 +48,17 @@ Future<void> choose(WidgetTester tester, IconData icon) async {
   await tester.tap(find.byIcon(icon));
 }
 
+Future<void> selectionAction(WidgetTester tester, String key) async {
+  final action = find.byKey(ValueKey(key));
+  if (action.evaluate().isEmpty) {
+    await tester.tap(find.byKey(const ValueKey('architect-selection-more')));
+    await tester.pumpAndSettle();
+  }
+  await tester.ensureVisible(action);
+  await tester.tap(action);
+  await tester.pumpAndSettle();
+}
+
 Future<void> chooseMulti(
   WidgetTester tester, {
   ArchitectSelectionOperation? operation,

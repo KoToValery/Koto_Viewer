@@ -7,6 +7,7 @@ import '../widgets/architect_projection_status.dart';
 import '../services/architect_drafting_seed.dart';
 import '../widgets/architect_selection_control.dart';
 import '../widgets/architect_selection_move_button.dart';
+import '../widgets/architect_selection_action_bar.dart';
 import '../widgets/architect_command_preview_bar.dart';
 import '../services/architect_command_preview.dart';
 import '../../bim_editing/commands/bim_edit_history.dart';
@@ -71,7 +72,6 @@ import '../widgets/architect_wall_arc_dimension_dialog.dart';
 import '../widgets/architect_wall_arc_dimension_overlay.dart';
 import '../services/architect_wall_arc_editing.dart';
 
-import '../widgets/architect_wall_plinth_dialog.dart';
 
 import '../services/architect_wall_compositions.dart';
 
@@ -238,6 +238,7 @@ import '../rendering/architect_wall_exterior_painter.dart';
 import '../rendering/architect_wall_network.dart';
 
 import '../widgets/architect_element_properties_dialog.dart';
+import '../widgets/architect_properties_shell.dart';
 
 import '../widgets/architect_radial_menu.dart';
 
@@ -1168,9 +1169,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  ArchitectProject? _propertiesModelPreview;
+
   ArchitectProject get _projectionModelProject {
 
-    final base = _withDrawingScale(_modelCommands.project);
+    final base = _withDrawingScale(_propertiesModelPreview ?? _modelCommands.project);
 
     if (_selectedSectionRoofId == null ||
 
@@ -1443,6 +1446,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           <String, Path>{};
 
       return ArchitectProjectionEditor(
+                          onPropertiesPreview: (next) {
+                            if (identical(_propertiesModelPreview, next)) return;
+                            _propertiesModelPreview = next;
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) setState(() {});
+                            });
+                          },
 
         key: ValueKey('workspace-editor:$_workspaceViewKey'),
 
@@ -1865,6 +1875,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       onApply: _multiSelect ? _applyTouchCandidate : null,
       isSelected: _candidateSelected,
       willRemove: _candidateWillRemove,
+      trailing: MediaQuery.sizeOf(context).width < 600 && _showSelectionActions
+          ? _buildSelectionBar(menuOnly: true) : null,
     );
   }
 
@@ -4709,6 +4721,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       polygon: polygon,
       includeComponents: _showFurnitureLayer,
       relation: _selectionRelation,
+      drawingViewKey: _workspaceViewKey,
     );
     final editingGroup = _editingGroup;
     if (editingGroup != null) return hits.intersection(editingGroup.elementIds);
@@ -20774,86 +20787,138 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  void _showStairProperties({ArchitectStair? stair, bool create = false}) {
+  final _propertiesCanvasKey=GlobalKey();
+  EdgeInsets _propertiesDrawingInsets=EdgeInsets.zero;
+  void _insetProperties(EdgeInsets overlay){
+    if(!mounted)return;
+    final render=_propertiesCanvasKey.currentContext?.findRenderObject();
+    var bottom=0.0;
+    if(overlay.bottom>0 && render is RenderBox && render.hasSize){
+      final canvasBottom=render.localToGlobal(Offset.zero).dy+render.size.height;
+      final panelTop=MediaQuery.sizeOf(context).height-overlay.bottom;
+      bottom=(canvasBottom-panelTop).clamp(0.0,math.max(0,render.size.height-80));
+    }
+    final next=EdgeInsets.only(right:overlay.right,bottom:bottom);
+    if(next!=_propertiesDrawingInsets)setState(()=>_propertiesDrawingInsets=next);
+  }
 
+  void _setPropertiesPreview(ArchitectProject? next) {
+    if (identical(_commands.editPreview, next)) return;
+    _commands.editPreview = next;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {});
+        _repaintPreview();
+      }
+    });
+  }
+
+  void _showSlabProperties(ArchitectSlab slab) {
+    final original = _commands.documentProject,
+        document = _modelCommands.project;
+    showArchitectProperties<void>(
+      context: context,
+      onInsets: _insetProperties,
+      builder: (_) => ArchitectSlabLayersDialog(
+        project: original,
+        slab: slab,
+        isCurrent: () => identical(document, _modelCommands.project),
+        onPreview: (next) {
+          if (identical(document, _modelCommands.project)) {
+            _setPropertiesPreview(_modelCommands.prepare(next));
+          }
+        },
+        onApply: (next) {
+          if (!identical(document, _modelCommands.project)) return false;
+          _commands.editPreview = null;
+          _commands.commit(next);
+          _saveBiMProjectIfAttached();
+          return true;
+        },
+      ),
+    ).whenComplete(() => _setPropertiesPreview(null));
+  }
+
+  void _showStairProperties({ArchitectStair? stair, bool create = false}) {
     final defaults = stair == null;
 
     final initial = stair ?? _stairAt(Offset.zero, const Offset(1, 0));
 
-    showDialog<void>(
-
+    final document = _modelCommands.project;
+    final original = _commands.documentProject;
+    showArchitectProperties<void>(
       context: context,
+      onInsets: _insetProperties,
 
       builder: (_) => ArchitectStairPropertiesDialog(
-
-        project: _project,
+        isCurrent: () => identical(document, _modelCommands.project),
+        project: original,
+        onPreview: defaults
+            ? null
+            : (next) {
+                if (identical(document, _modelCommands.project)) {
+                  try {
+                    _setPropertiesPreview(
+                      _modelCommands.prepare(
+                        PutArchitectStair(
+                          storeyId: original.activeStoreyId,
+                          stair: next,
+                          create: create,
+                        ).apply(original),
+                      ),
+                    );
+                  } on ArgumentError {
+                    /* Keep the last valid preview. */
+                  }
+                }
+              },
 
         stair: initial,
 
         onApply: (next) {
+          if (!identical(document, _modelCommands.project)) return false;
+          _commands.editPreview = null;
 
           try {
-
             if (defaults) {
-
               _elementTool.setStairParams(
-
                 width: next.width,
 
                 design: next.design,
-
               );
-
             } else {
-
               _commands.execute(
-
                 PutArchitectStair(
-
                   storeyId: _project.activeStoreyId,
 
                   stair: next,
 
                   create: create,
-
                 ),
-
               );
 
               if (create) {
-
                 setState(() {
-
                   _draftStart = null;
 
                   _wallArcEnd = null;
 
                   _draftEnd = null;
-
                 });
-
               }
 
               _saveBiMProjectIfAttached();
-
             }
 
             return true;
-
           } on ArgumentError {
-
             _operationError();
 
             return false;
-
           }
-
         },
-
       ),
-
-    );
-
+    ).whenComplete(() => _setPropertiesPreview(null));
   }
 
 
@@ -20921,32 +20986,39 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }) async {
     var pickDownpipe = false;
     final original = _project;
-    final target = roof ?? _selectedRoof ??
+    final document = _modelCommands.project;
+    final target =
+        roof ??
+        _selectedRoof ??
         (_selectedSectionRoofId == null
             ? null
             : ArchitectBuildingSection.findRoofById(
                 _modelCommands.project,
                 _selectedSectionRoofId!,
               )?.roof);
-    await showDialog<void>(
+    await showArchitectProperties<void>(
       context: context,
+      onInsets: _insetProperties,
       builder: (_) => ArchitectRoofLayersDialog(
+        isCurrent: () => identical(document, _modelCommands.project),
         initialTab: initialTab,
         initialAssembly: target?.assembly ?? _roofTool.activeAssembly,
         initialSlopeDegrees: target?.slopeDegrees ?? _roofTool.slopeDegrees,
         initialEavesOverhang: target?.eavesOverhang ?? _roofTool.eavesOverhang,
         initialEavesCut: target?.eavesCut ?? _roofTool.eavesCut,
         initialDrainage: target?.drainage ?? _roofTool.drainage,
-        initialBaseElevationOffset: target?.baseElevationOffset ??
-            _roofTool.baseElevationOffset ?? _project.activeStorey.height,
+        initialBaseElevationOffset:
+            target?.baseElevationOffset ??
+            _roofTool.baseElevationOffset ??
+            _project.activeStorey.height,
         initialAttachToWalls: target?.attachToWalls ?? _roofTool.attachToWalls,
         initialManualSupportDistance: target == null
             ? _roofTool.manualSupportDistance
             : target.manualSupportDistance,
-        initialIsMansard: target?.isMansard ??
-            _roofTool.drawMode == RoofDrawMode.mansard,
-        initialUpperSlopeDegrees: target?.upperSlopeDegrees ??
-            _roofTool.upperSlopeDegrees,
+        initialIsMansard:
+            target?.isMansard ?? _roofTool.drawMode == RoofDrawMode.mansard,
+        initialUpperSlopeDegrees:
+            target?.upperSlopeDegrees ?? _roofTool.upperSlopeDegrees,
         initialBreakDistance: target == null
             ? _roofTool.breakDistance
             : target.breakDistance,
@@ -20954,12 +21026,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         project: original,
         roof: target,
         canPickDownpipe: target != null,
+        onPreview: target == null
+            ? null
+            : (result) {
+                if (identical(document, _modelCommands.project) &&
+                    _commands.isPlan) {
+                  _setPropertiesPreview(
+                    _modelCommands.prepare(
+                      ApplyArchitectRoofSettings(
+                        storeyId: target.storeyId,
+                        roofId: target.id,
+                        settings: result,
+                      ).apply(document),
+                    ),
+                  );
+                }
+              },
         onTryApply: (result) {
-          if (!identical(original, _project)) {
+          if (!identical(document, _modelCommands.project)) {
             _operationError();
             return false;
           }
           try {
+            _commands.editPreview = null;
             if (target != null && result.changes.isNotEmpty) {
               _modelCommands.execute(
                 ApplyArchitectRoofSettings(
@@ -20982,6 +21071,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         },
       ),
     );
+    _setPropertiesPreview(null);
     if (mounted && pickDownpipe && target != null) {
       _beginDownpipePlacement(target.id);
     }
@@ -21318,122 +21408,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  void _editWallPlinth(
-
-    Set<String> ids,
-
-    Map<String, double> values,
-
-    Map<String, String> texts,
-
-  ) {
-
-    final original = _project;
-
-    ArchitectProject seeded;
-
-    try {
-
-      seeded = SetArchitectElementProperties(
-
-        storeyId: original.activeStoreyId,
-
-        elementIds: ids,
-
-        values: values,
-
-        textValues: texts,
-
-      ).apply(original);
-
-    } on ArgumentError {
-
-      _operationError();
-
-      return;
-
-    }
-
-    final walls = seeded.activeStorey.walls
-
-        .where((w) => ids.contains(w.id))
-
-        .toList();
-
-    if (walls.length != ids.length || walls.isEmpty) return;
-
-    showDialog<void>(
-
-      context: context,
-
-      builder: (_) => ArchitectWallPlinthDialog(
-
-        project: seeded,
-
-        values: walls.map((w) => w.plinth).toList(),
-
-        onApply: (patch) {
-
-          if (!identical(original, _project)) {
-
-            _operationError();
-
-            return false;
-
-          }
-
-          if (patch.isEmpty && values.isEmpty && texts.isEmpty) return true;
-
-          try {
-
-            _commands.executeBatch([
-
-              SetArchitectElementProperties(
-
-                storeyId: original.activeStoreyId,
-
-                elementIds: ids,
-
-                values: values,
-
-                textValues: texts,
-
-              ),
-
-              SetArchitectWallPlinth(
-
-                storeyId: original.activeStoreyId,
-
-                wallIds: ids,
-
-                patch: patch,
-
-              ),
-
-            ]);
-
-            _saveBiMProjectIfAttached();
-
-            return true;
-
-          } on ArgumentError {
-
-            _operationError();
-
-            return false;
-
-          }
-
-        },
-
-      ),
-
-    );
-
-  }
-
-
-
   void _editWallLayers(
 
     Set<String> ids, {
@@ -21612,74 +21586,46 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   Future<void> _showComponentDimensions(
-
     ArchitectComponentInstance component,
-
   ) async {
-
     final definition = ComponentLibraryService.instance.findDefinition(
-
       component.definitionId,
-
     );
-
     if (definition == null || component.isLocked) return;
-
-    final storeyId = _project.activeStoreyId;
-
+    final original = _commands.documentProject,
+        document = _modelCommands.project;
+    ArchitectProject candidate(Map<String, dynamic> values) =>
+        original.updateActiveStorey(
+          original.activeStorey.copyWith(
+            components: [
+              for (final item in original.activeStorey.components)
+                item.id == component.id
+                    ? item.copyWith(parameters: values)
+                    : item,
+            ],
+          ),
+        );
     final values = await ComponentDimensionsDialog.show(
-
       context,
-
       definition,
-
       component.parameters,
-
+      onInsets: _insetProperties,
+      isCurrent: () => identical(document, _modelCommands.project),
+      onPreview: (values) {
+        if (identical(document, _modelCommands.project)) {
+          _setPropertiesPreview(candidate(values));
+        }
+      },
     );
-
-    if (!mounted || values == null) return;
-
-    final storey = _project.storeys.where((s) => s.id == storeyId).firstOrNull;
-
-    if (storey == null || !storey.components.any((c) => c.id == component.id)) {
-
+    _setPropertiesPreview(null);
+    if (!mounted ||
+        values == null ||
+        !identical(document, _modelCommands.project)) {
       return;
-
     }
-
-    final updated = storey.copyWith(
-
-      components: [
-
-        for (final item in storey.components)
-
-          item.id == component.id ? item.copyWith(parameters: values) : item,
-
-      ],
-
-    );
-
-    _commands.commit(
-
-      _project.copyWith(
-
-        storeys: [
-
-          for (final item in _project.storeys)
-
-            item.id == storeyId ? updated : item,
-
-        ],
-
-      ),
-
-    );
-
+    _commands.commit(candidate(values));
     _saveBiMProjectIfAttached();
-
   }
-
-
 
   void _showProperties() {
     _discardGeometryCommand();
@@ -21689,239 +21635,97 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (ids.isEmpty) return;
 
     if (ids.length == 1) {
-      final sec = _project.sections.where((s) => ids.contains(s.id)).firstOrNull;
+      final sec = _project.sections
+          .where((s) => ids.contains(s.id))
+          .firstOrNull;
       if (sec != null) {
         _showSectionElevationProperties(sec.id);
         return;
       }
-      final elv = _project.elevations.where((e) => ids.contains(e.id)).firstOrNull;
+      final elv = _project.elevations
+          .where((e) => ids.contains(e.id))
+          .firstOrNull;
       if (elv != null) {
         _showSectionElevationProperties(elv.id);
         return;
       }
-      final component = _project.activeStorey.components.where((c) => ids.contains(c.id)).firstOrNull;
+      final component = _project.activeStorey.components
+          .where((c) => ids.contains(c.id))
+          .firstOrNull;
 
       if (component != null) {
-
         _showComponentDimensions(component);
 
         return;
-
       }
 
       final stairs = _project.activeStorey.stairs.where(
-
         (s) => ids.contains(s.id),
-
       );
 
       if (stairs.isNotEmpty) {
-
         _showStairProperties(stair: stairs.first);
 
         return;
-
       }
 
       final roofs = _project.activeStorey.roofs.where(
-
         (r) => ids.contains(r.id),
-
       );
 
       if (roofs.isNotEmpty) {
-
         _openRoofLayersDialog(roof: roofs.first);
 
         return;
-
       }
-
     }
 
-    showDialog<void>(
+    if (ids.length == 1) {
+      final slab = _project.activeStorey.slabs
+          .where((s) => ids.contains(s.id))
+          .firstOrNull;
+      if (slab != null) {
+        _showSlabProperties(slab);
+        return;
+      }
+    }
+    final original = _commands.documentProject;
+    final document = _modelCommands.project;
+    void preview(ArchitectProject? next) {
+      _commands.editPreview = next;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {});
+          _repaintPreview();
+        }
+      });
+    }
 
+    showArchitectProperties<void>(
       context: context,
-
+      onInsets: _insetProperties,
       builder: (_) => ArchitectElementPropertiesDialog(
-
-        project: _project,
-
+        project: original,
         elementIds: ids,
-
-        onScheduleTable: ids.any((id) => _project.activeStorey.zones.any((z) => z.id == id))
-
-            ? () {
-
-                Navigator.pop(context);
-
-                _showRoomScheduleDialog();
-
-              }
-
-            : null,
-
-        onWallPlinth:
-
-            _selectedWallIds.length == ids.length &&
-
-                _project.activeStorey.walls
-
-                    .where((w) => ids.contains(w.id))
-
-                    .every((w) => w.isExterior)
-
-            ? (values, texts) => _editWallPlinth(ids, values, texts)
-
-            : null,
-
-        onWallLayers: _selectedWallIds.length == ids.length
-
-            ? (values, texts) =>
-
-                  _editWallLayers(ids, values: values, texts: texts)
-
-            : null,
-
-        onSlabLayers:
-
-            ids.length == 1 &&
-
-                _project.activeStorey.slabs.any((s) => ids.contains(s.id))
-
-            ? () {
-
-                Navigator.pop(context);
-
-                final slab = _project.activeStorey.slabs.firstWhere(
-
-                  (s) => ids.contains(s.id),
-
-                );
-
-                showDialog<void>(
-
-                  context: context,
-
-                  builder: (_) => ArchitectSlabLayersDialog(
-
-                    project: _project,
-
-                    slab: slab,
-
-                    onApply: (next) {
-
-                      _commands.commit(next);
-
-                      return true;
-
-                    },
-
-                  ),
-
-                );
-
-              }
-
-            : null,
-
-        onStraighten:
-
-            ids.length == 1 &&
-
-                _selectedWallIds.length == 1 &&
-
-                !_project.activeStorey.walls
-
-                    .firstWhere((w) => w.id == ids.single)
-
-                    .isCurved
-
-            ? (values, texts) {
-
-                try {
-
-                  final edited = SetArchitectElementProperties(
-
-                    storeyId: _project.activeStoreyId,
-
-                    elementIds: ids,
-
-                    values: values,
-
-                    textValues: texts,
-
-                  ).apply(_project);
-
-                  final wall = edited.activeStorey.walls.firstWhere(
-
-                    (w) => w.id == ids.single,
-
-                  );
-
-                  final command = _straightenWallCommand(edited, wall);
-
-                  _cancelActiveDrags();
-
-                  _beginGeometryCommand(ArchitectRadialAction.straighten);
-                  _commands.commit(command?.apply(edited) ?? edited);
-
-                  _saveBiMProjectIfAttached();
-
-                  return true;
-
-                } on ArgumentError {
-
-                  _operationError();
-
-                  return false;
-
-                }
-
-              }
-
-            : null,
-
-        onApply: (values, texts) {
-
+        isCurrent: () => identical(document, _modelCommands.project),
+        prepare: _commands.isPlan ? _modelCommands.prepare : null,
+        onPreview: preview,
+        onApplyProject: (next) {
+          if (!identical(document, _modelCommands.project)) return false;
+          _commands.editPreview = null;
           try {
-
-            _commands.execute(
-
-              SetArchitectElementProperties(
-
-                storeyId: _project.activeStoreyId,
-
-                elementIds: ids,
-
-                values: values,
-
-                textValues: texts,
-
-              ),
-
-            );
-
+            _commands.commit(next);
             _saveBiMProjectIfAttached();
-
             return true;
-
           } on ArgumentError {
-
             _operationError();
-
             return false;
-
           }
-
         },
-
+        onApply: (_, _) => false,
       ),
-
     );
-
   }
-
 
 
   Set<String> get _selectedWallIds {
@@ -23644,6 +23448,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _showSectionElevationProperties(String id) {
     showArchitectViewPropertiesDialog(
       context: context,
+      onPreview: _setPropertiesPreview,
+      onInsets: _insetProperties,
       project: _project,
       viewId: id,
       controller: _modelCommands,
@@ -24103,1004 +23909,512 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     setState(() {});
   }
 
-  Widget _buildSelectionBar() {
+  void _performLinearSelectionAction(String action, Set<String> segmentIds) {
+    if (action == 'cut') {
+      _startCutSession(Set.of(segmentIds));
+    } else if (action == 'splitStroke') {
+      _startSplitSession(wallIds: Set.of(segmentIds));
+    } else if (action == 'mirror') {
+      _executeWallEdit(
+        MirrorArchitectWalls(
+          storeyId: _project.activeStoreyId,
+          wallIds: segmentIds,
+        ),
+      );
+    } else if (action == 'mirrorMove') {
+      _startMirrorSession(isDuplicate: false);
+    } else if (action == 'mirrorCopy') {
+      _startMirrorSession(isDuplicate: true);
+    } else if (action == 'join') {
+      _beginGeometryCommand(ArchitectRadialAction.join);
+      try {
+        _commands.execute(
+          _linearCommand(
+            JoinArchitectWalls(
+              storeyId: _project.activeStoreyId,
+              wallIds: segmentIds,
+            ),
+          ),
+        );
+        _saveBiMProjectIfAttached();
+      } on ArgumentError {
+        _operationError();
+      }
+    } else if (action == 'extend') {
+      setState(() => _wallExtendId = segmentIds.single);
+    } else if (action == 'length') {
+      _editWallLength();
+    } else if (action == 'point') {
+      _startNewPointSession(segmentIds.single);
+    }
+  }
+
+  Widget _buildSelectionBar({bool menuOnly = false}) {
     if (_commandReady ||
-        (_commandPreview != null && _commandAction != ArchitectRadialAction.move)) {
+        (_commandPreview != null &&
+            _commandAction != ArchitectRadialAction.move)) {
       return const SizedBox.shrink();
     }
     final l = context.l10n;
     final ids = _effectiveSelection;
-
     final wallIds = _selectedWallIds;
-
     final lineIds = _selectedLineIds;
-
     final segmentIds = lineIds.isNotEmpty ? lineIds : wallIds;
+    final storey = _project.activeStorey;
+    final compact = MediaQuery.sizeOf(context).width < 600;
+    final foreground = compact
+        ? Theme.of(context).colorScheme.onSurface
+        : Colors.white70;
+    final accent = compact
+        ? Theme.of(context).colorScheme.primary
+        : Colors.cyanAccent;
+    final danger = compact
+        ? Theme.of(context).colorScheme.error
+        : Colors.redAccent;
+    Widget icon(IconData data, [Color? color]) =>
+        Icon(data, color: color ?? foreground, size: 20);
+    ArchitectSelectionAction action(
+      String id,
+      String label,
+      IconData symbol,
+      VoidCallback callback, {
+      bool primary = false,
+      Color? color,
+      String? commandId,
+      Widget? graphic,
+      String? tooltip,
+      double desktopWidth = 26,
+    }) => ArchitectSelectionAction(
+      id: id,
+      label: label,
+      icon: graphic ?? icon(symbol, color),
+      tooltip: tooltip,
+      onPressed: callback,
+      primary: primary,
+      commandId: commandId,
+      desktopWidth: desktopWidth,
+    );
+    ArchitectSelectionAction linear(
+      String id,
+      String label,
+      IconData symbol,
+      String command, {
+      String? commandId,
+    }) => action(
+      id,
+      label,
+      symbol,
+      () => _performLinearSelectionAction(command, segmentIds),
+      commandId: commandId,
+    );
 
-    final dimension = ids.length == 1
-        ? _project.activeStorey.dimensions
-              .where((d) => ids.contains(d.id))
-              .firstOrNull
-        : null;
-    final selectedSection = ids.length == 1
-        ? _project.sections.where((s) => ids.contains(s.id)).firstOrNull
-        : null;
-    final selectedElevation = ids.length == 1
-        ? _project.elevations.where((e) => ids.contains(e.id)).firstOrNull
-        : null;
-
-        final selectedDoors = _project.activeStorey.walls
+    final doors = storey.walls
         .expand((w) => w.doors)
         .where((d) => ids.contains(d.id))
         .toList();
-    final selectedWindows = _project.activeStorey.walls
+    final windows = storey.walls
         .expand((w) => w.windows)
         .where((w) => ids.contains(w.id))
         .toList();
+    final onlyDoors = doors.isNotEmpty && doors.length == ids.length;
+    final onlyWindows = windows.isNotEmpty && windows.length == ids.length;
+    final generic = !onlyDoors && !onlyWindows;
+    final dimension = ids.length == 1
+        ? storey.dimensions.where((d) => ids.contains(d.id)).firstOrNull
+        : null;
+    final section = ids.length == 1
+        ? _project.sections.where((s) => ids.contains(s.id)).firstOrNull
+        : null;
+    final elevation = ids.length == 1
+        ? _project.elevations.where((e) => ids.contains(e.id)).firstOrNull
+        : null;
+    final supportsTransverse =
+        generic &&
+        ids.length == 1 &&
+        segmentIds.length == 1 &&
+        _selectedLinearElement?.isCurved == false;
+    final actions = <ArchitectSelectionAction>[];
 
-    final isDoorSelection = selectedDoors.isNotEmpty && selectedDoors.length == ids.length;
-    final isWindowSelection = selectedWindows.isNotEmpty && selectedWindows.length == ids.length;
-
-    void clear() => _clearSelection();
-
-    if (isDoorSelection) {
-      return Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF1E1E26),
-          border: Border(top: BorderSide(color: Colors.white12, width: 1.0)),
+    if (onlyDoors) {
+      final doorIds = doors.map((d) => d.id).toSet();
+      actions.addAll([
+        action(
+          'architect-door-flip-swing',
+          l.architectDoorFlipSwing,
+          Icons.swap_vert,
+          () => _flipDoorsSwing(doorIds),
+          color: accent,
+          desktopWidth: 32,
         ),
-        child: Material(
-          key: const ValueKey('architect-selection-bar'),
-          color: Colors.transparent,
-          child: IconButtonTheme(
-            data: const IconButtonThemeData(
-              style: ButtonStyle(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    key: const ValueKey('architect-door-flip-swing'),
-                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
-                    padding: EdgeInsets.zero,
-                    tooltip: l.architectDoorFlipSwing,
-                    icon: const Icon(
-                      Icons.swap_vert,
-                      color: Color(0xFF40C4FF),
-                      size: 20,
-                    ),
-                    onPressed: () => _flipDoorsSwing(selectedDoors.map((d) => d.id).toSet()),
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-door-flip-hinge'),
-                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
-                    padding: EdgeInsets.zero,
-                    tooltip: l.architectDoorFlipHinge,
-                    icon: const Icon(
-                      Icons.swap_horiz,
-                      color: Color(0xFF40C4FF),
-                      size: 20,
-                    ),
-                    onPressed: () => _flipDoorsHinge(selectedDoors.map((d) => d.id).toSet()),
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-selection-move'),
-                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
-                    padding: EdgeInsets.zero,
-                    tooltip: l.architectSelectionMove,
-                    icon: Icon(
-                      Icons.open_with,
-                      size: 18,
-                      color: _moveSelection ? Colors.amber : Colors.white70,
-                    ),
-                    onPressed: () => _setSelectionMove(_moveSelection
-                        ? ArchitectSelectionMoveAction.stop
-                        : ArchitectSelectionMoveAction.free),
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-selection-properties'),
-                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
-                    padding: EdgeInsets.zero,
-                    tooltip: l.architectProperties,
-                    icon: const Icon(Icons.tune, color: Colors.white70, size: 18),
-                    onPressed: () {
-                      setState(() => _radialMenuScreenPosition = null);
-                      _showProperties();
-                    },
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-selection-delete'),
-                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
-                    padding: EdgeInsets.zero,
-                    tooltip: l.delete,
-                    icon: const Icon(
-                      Icons.delete_outline,
-                      color: Colors.redAccent,
-                      size: 18,
-                    ),
-                    onPressed: _deleteSelection,
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-clear-selection'),
-                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
-                    padding: EdgeInsets.zero,
-                    tooltip: l.close,
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.redAccent,
-                      size: 18,
-                      weight: 800,
-                    ),
-                    onPressed: clear,
-                  ),
-                ],
-              ),
-            ),
-          ),
+        action(
+          'architect-door-flip-hinge',
+          l.architectDoorFlipHinge,
+          Icons.swap_horiz,
+          () => _flipDoorsHinge(doorIds),
+          color: accent,
+          desktopWidth: 32,
+        ),
+      ]);
+    } else if (onlyWindows) {
+      actions.add(
+        action(
+          'architect-window-flip-side',
+          l.architectWindowFlipSide,
+          Icons.flip,
+          () => _flipWindowsSide(windows.map((w) => w.id).toSet()),
+          color: accent,
+          desktopWidth: 32,
         ),
       );
-    }
-
-    if (isWindowSelection) {
-      return Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF1E1E26),
-          border: Border(top: BorderSide(color: Colors.white12, width: 1.0)),
-        ),
-        child: Material(
-          key: const ValueKey('architect-selection-bar'),
-          color: Colors.transparent,
-          child: IconButtonTheme(
-            data: const IconButtonThemeData(
-              style: ButtonStyle(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    key: const ValueKey('architect-window-flip-side'),
-                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
-                    padding: EdgeInsets.zero,
-                    tooltip: l.architectWindowFlipSide,
-                    icon: const Icon(
-                      Icons.flip,
-                      color: Color(0xFF40C4FF),
-                      size: 20,
-                    ),
-                    onPressed: () => _flipWindowsSide(selectedWindows.map((w) => w.id).toSet()),
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-selection-move'),
-                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
-                    padding: EdgeInsets.zero,
-                    tooltip: l.architectSelectionMove,
-                    icon: Icon(
-                      Icons.open_with,
-                      size: 18,
-                      color: _moveSelection ? Colors.amber : Colors.white70,
-                    ),
-                    onPressed: () => _setSelectionMove(_moveSelection
-                        ? ArchitectSelectionMoveAction.stop
-                        : ArchitectSelectionMoveAction.free),
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-selection-properties'),
-                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
-                    padding: EdgeInsets.zero,
-                    tooltip: l.architectProperties,
-                    icon: const Icon(Icons.tune, color: Colors.white70, size: 18),
-                    onPressed: () {
-                      setState(() => _radialMenuScreenPosition = null);
-                      _showProperties();
-                    },
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-selection-delete'),
-                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
-                    padding: EdgeInsets.zero,
-                    tooltip: l.delete,
-                    icon: const Icon(
-                      Icons.delete_outline,
-                      color: Colors.redAccent,
-                      size: 18,
-                    ),
-                    onPressed: _deleteSelection,
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-clear-selection'),
-                    constraints: const BoxConstraints.tightFor(width: 32, height: 40),
-                    padding: EdgeInsets.zero,
-                    tooltip: l.close,
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.redAccent,
-                      size: 18,
-                      weight: 800,
-                    ),
-                    onPressed: clear,
-                  ),
-                ],
-              ),
+    } else {
+      if (section != null) {
+        actions.addAll([
+          action(
+            'architect-section-open-view',
+            l.architectOpenView,
+            Icons.visibility_outlined,
+            () => _openSectionOrElevationView(section.id),
+            color: accent,
+          ),
+          action(
+            'architect-section-flip',
+            l.architectRadialFlip,
+            Icons.flip,
+            () => _flipSection(section.id),
+          ),
+          action(
+            'architect-section-properties',
+            l.architectProperties,
+            Icons.tune,
+            () => _showSectionElevationProperties(section.id),
+          ),
+        ]);
+      }
+      if (elevation != null) {
+        actions.addAll([
+          action(
+            'architect-elevation-open-view',
+            l.architectOpenView,
+            Icons.visibility_outlined,
+            () => _openSectionOrElevationView(elevation.id),
+            color: accent,
+          ),
+          action(
+            'architect-elevation-flip',
+            l.architectRadialFlip,
+            Icons.flip,
+            () => _flipElevation(elevation.id),
+          ),
+          action(
+            'architect-elevation-properties',
+            l.architectProperties,
+            Icons.tune,
+            () => _showSectionElevationProperties(elevation.id),
+          ),
+        ]);
+      }
+      if (dimension != null) {
+        actions.addAll([
+          action(
+            'architect-dimension-new-point',
+            l.architectDimensionNewPoint,
+            Icons.add_location_alt_outlined,
+            () {
+              _addWallsToDimension(dimension);
+              setState(() {
+                _dimensionAllowPoint = true;
+                _dimensionPlacing = false;
+              });
+            },
+            color: accent,
+            graphic: BimEditingSymbol(
+              BimEditAction.newPoint,
+              color: accent,
+              size: 18,
             ),
           ),
+          action(
+            'architect-dimension-add-walls',
+            l.architectDimensionEditPoints,
+            Icons.edit_location_alt_outlined,
+            () => _addWallsToDimension(dimension),
+          ),
+        ]);
+      }
+      if (_multiSelect && segmentIds.isNotEmpty) {
+        actions.add(
+          action(
+            'architect-select-connected',
+            l.architectSelectConnected,
+            Icons.hub_outlined,
+            _selectConnectedWalls,
+            color: accent,
+          ),
+        );
+      }
+      if (wallIds.length == 1) {
+        final wall = storey.walls
+            .where((w) => wallIds.contains(w.id))
+            .firstOrNull;
+        final overshoot = wall == null
+            ? null
+            : ArchitectWallOvershootDetector.detectForWall(
+                wall,
+                storey.walls,
+              ).firstOrNull;
+        if (overshoot != null) {
+          actions.add(
+            action(
+              'architect-selection-trim-overshoot',
+              l.architectWallOvershootTooltip,
+              Icons.auto_fix_high_rounded,
+              () => _handleTrimOvershoot(overshoot),
+              color: accent,
+            ),
+          );
+        }
+      }
+      if (_multiSelect) {
+        actions.add(
+          action(
+            'architect-select-similar',
+            l.architectSelectSimilar,
+            Icons.select_all_rounded,
+            _selectSimilarElements,
+            color: accent,
+            tooltip: l.architectSelectSimilarHelp,
+          ),
+        );
+      }
+    }
+
+    if (!generic || !_selectionHasAutoZones) {
+      actions.add(
+        ArchitectSelectionAction(
+          id: 'architect-selection-move',
+          label: l.architectSelectionMove,
+          icon: icon(Icons.open_with, _moveSelection ? Colors.amber : null),
+          primary: true,
+          onPressed: () => _setSelectionMove(
+            _moveSelection
+                ? ArchitectSelectionMoveAction.stop
+                : ArchitectSelectionMoveAction.free,
+          ),
+          button: ArchitectSelectionMoveButton(
+            active: _moveSelection,
+            transverse: _transverseMove,
+            supportsTransverse: supportsTransverse,
+            onSelected: _setSelectionMove,
+          ),
+          children: supportsTransverse
+              ? [
+                  action(
+                    'architect-move-free',
+                    l.architectMoveFree,
+                    Icons.open_with,
+                    () => _setSelectionMove(ArchitectSelectionMoveAction.free),
+                  ),
+                  action(
+                    'architect-move-transverse',
+                    l.architectMoveTransverse,
+                    Icons.swap_vert,
+                    () => _setSelectionMove(
+                      ArchitectSelectionMoveAction.transverse,
+                    ),
+                  ),
+                  action(
+                    'architect-move-offset',
+                    l.architectMoveOffset,
+                    Icons.straighten,
+                    () =>
+                        _setSelectionMove(ArchitectSelectionMoveAction.offset),
+                  ),
+                  if (_moveSelection)
+                    action(
+                      'architect-move-stop',
+                      l.architectMoveStop,
+                      Icons.stop,
+                      () =>
+                          _setSelectionMove(ArchitectSelectionMoveAction.stop),
+                    ),
+                ]
+              : const [],
         ),
       );
+      if (generic) {
+        actions.addAll([
+          action(
+            'architect-selection-mirror-move',
+            l.architectMirrorMove,
+            Icons.flip,
+            () => _startMirrorSession(isDuplicate: false),
+            color: accent,
+            commandId: 'mirrorMove',
+            tooltip: l.architectMirrorMoveTooltip,
+          ),
+          action(
+            'architect-selection-mirror-copy',
+            l.architectMirrorCopy,
+            Icons.copy_all,
+            () => _startMirrorSession(isDuplicate: true),
+            color: accent,
+            commandId: 'mirrorCopy',
+            tooltip: l.architectMirrorCopyTooltip,
+          ),
+        ]);
+      }
     }
-
-    return Container(
-
-      decoration: const BoxDecoration(
-
-        color: Color(0xFF1E1E26),
-
-        border: Border(top: BorderSide(color: Colors.white12, width: 1.0)),
-
+    actions.add(
+      action(
+        'architect-selection-properties',
+        l.architectProperties,
+        Icons.tune,
+        () {
+          setState(() => _radialMenuScreenPosition = null);
+          _showProperties();
+        },
+        primary: true,
       ),
-
-      child: Material(
-
-        key: const ValueKey('architect-selection-bar'),
-
-        color: Colors.transparent,
-
-        child: IconButtonTheme(
-
-          data: const IconButtonThemeData(
-
-            style: ButtonStyle(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-
-          ),
-
-          child: SingleChildScrollView(
-
-            scrollDirection: Axis.horizontal,
-
-            child: Row(
-
-              mainAxisSize: MainAxisSize.min,
-
-              children: [
-                if (selectedSection != null) ...[
-                  IconButton(
-                    key: const ValueKey('architect-section-open-view'),
-                    tooltip: l.architectOpenView,
-                    icon: const Icon(
-                      Icons.visibility_outlined,
-                      color: Colors.cyanAccent,
-                      size: 18,
-                    ),
-                    onPressed: () => _openSectionOrElevationView(selectedSection.id),
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-section-flip'),
-                    tooltip: l.architectRadialFlip,
-                    icon: const Icon(
-                      Icons.flip,
-                      color: Colors.white70,
-                      size: 18,
-                    ),
-                    onPressed: () => _flipSection(selectedSection.id),
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-section-properties'),
-                    tooltip: l.architectProperties,
-                    icon: const Icon(
-                      Icons.tune,
-                      color: Colors.white70,
-                      size: 18,
-                    ),
-                    onPressed: () => _showSectionElevationProperties(selectedSection.id),
-                  ),
-                ],
-                if (selectedElevation != null) ...[
-                  IconButton(
-                    key: const ValueKey('architect-elevation-open-view'),
-                    tooltip: l.architectOpenView,
-                    icon: const Icon(
-                      Icons.visibility_outlined,
-                      color: Colors.cyanAccent,
-                      size: 18,
-                    ),
-                    onPressed: () => _openSectionOrElevationView(selectedElevation.id),
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-elevation-flip'),
-                    tooltip: l.architectRadialFlip,
-                    icon: const Icon(
-                      Icons.flip,
-                      color: Colors.white70,
-                      size: 18,
-                    ),
-                    onPressed: () => _flipElevation(selectedElevation.id),
-                  ),
-                  IconButton(
-                    key: const ValueKey('architect-elevation-properties'),
-                    tooltip: l.architectProperties,
-                    icon: const Icon(
-                      Icons.tune,
-                      color: Colors.white70,
-                      size: 18,
-                    ),
-                    onPressed: () => _showSectionElevationProperties(selectedElevation.id),
-                  ),
-                ],
-                if (dimension != null) ...[
-
-                  IconButton(
-
-                    key: const ValueKey('architect-dimension-new-point'),
-
-                    tooltip: l.architectDimensionNewPoint,
-
-                    icon: const BimEditingSymbol(
-
-                      BimEditAction.newPoint,
-
-                      color: Colors.cyanAccent,
-
-                      size: 18,
-
-                    ),
-
-                    onPressed: () {
-
-                      _addWallsToDimension(dimension);
-
-                      setState(() {
-
-                        _dimensionAllowPoint = true;
-
-                        _dimensionPlacing = false;
-
-                      });
-
-                    },
-
-                  ),
-
-                  IconButton(
-
-                    key: const ValueKey('architect-dimension-add-walls'),
-
-                    tooltip: l.architectDimensionEditPoints,
-
-                    icon: const Icon(
-
-                      Icons.edit_location_alt_outlined,
-
-                      color: Colors.white70,
-
-                      size: 18,
-
-                    ),
-
-                    onPressed: () => _addWallsToDimension(dimension),
-
-                  ),
-
-                ],
-
-                if (_multiSelect && segmentIds.isNotEmpty)
-
-                  IconButton(
-
-                    key: const ValueKey('architect-select-connected'),
-
-                    constraints: const BoxConstraints.tightFor(
-
-                      width: 26,
-
-                      height: 40,
-
-                    ),
-
-                    padding: EdgeInsets.zero,
-
-                    tooltip: l.architectSelectConnected,
-
-                    icon: const Icon(
-
-                      Icons.hub_outlined,
-
-                      color: Colors.cyanAccent,
-
-                      size: 18,
-
-                    ),
-
-                    onPressed: _selectConnectedWalls,
-
-                  ),
-
-                if (wallIds.length == 1)
-
-                  () {
-
-                    final wall = _project.activeStorey.walls
-
-                        .where((w) => w.id == wallIds.first)
-
-                        .firstOrNull;
-
-                    final overshoot = wall != null
-
-                        ? ArchitectWallOvershootDetector.detectForWall(
-
-                            wall,
-
-                            _project.activeStorey.walls,
-
-                          ).firstOrNull
-
-                        : null;
-
-                    if (overshoot != null) {
-
-                      return IconButton(
-
-                        key: const ValueKey(
-
-                          'architect-selection-trim-overshoot',
-
-                        ),
-
-                        constraints: const BoxConstraints.tightFor(
-
-                          width: 26,
-
-                          height: 40,
-
-                        ),
-
-                        padding: EdgeInsets.zero,
-
-                        tooltip: l.architectWallOvershootTooltip,
-
-                        icon: const Icon(
-
-                          Icons.auto_fix_high_rounded,
-
-                          color: Colors.amberAccent,
-
-                          size: 18,
-
-                        ),
-
-                        onPressed: () => _handleTrimOvershoot(overshoot),
-
-                      );
-
-                    }
-
-                    return const SizedBox.shrink();
-
-                  }(),
-
-                if (_multiSelect) IconButton(
-
-                  key: const ValueKey('architect-select-similar'),
-
-                  constraints: const BoxConstraints.tightFor(
-
-                    width: 26,
-
-                    height: 40,
-
-                  ),
-
-                  padding: EdgeInsets.zero,
-
-                  tooltip: l.architectSelectSimilar,
-
-                  icon: const Icon(
-
-                    Icons.select_all_rounded,
-
-                    color: Colors.cyanAccent,
-
-                    size: 18,
-
-                  ),
-
-                  onPressed: _selectSimilarElements,
-
-                ),
-
-                if (!_selectionHasAutoZones)
-                  ArchitectSelectionMoveButton(
-                    active: _moveSelection,
-                    transverse: _transverseMove,
-                    supportsTransverse: ids.length == 1 &&
-                        segmentIds.length == 1 &&
-                        _selectedLinearElement?.isCurved == false,
-                    onSelected: _setSelectionMove,
-                  ),
-
-                if (!_selectionHasAutoZones)
-
-                  IconButton(
-
-                    constraints: const BoxConstraints.tightFor(
-
-                      width: 26,
-
-                      height: 40,
-
-                    ),
-
-                    padding: EdgeInsets.zero,
-
-                    key: const ValueKey('architect-selection-mirror-move'),
-
-                    tooltip: l.architectMirrorMoveTooltip,
-
-                    icon: const Icon(
-
-                      Icons.flip,
-
-                      color: Color(0xFF00E5FF),
-
-                      size: 18,
-
-                    ),
-
-                    onPressed: () => _startMirrorSession(isDuplicate: false),
-
-                  ),
-
-                if (!_selectionHasAutoZones)
-
-                  IconButton(
-
-                    constraints: const BoxConstraints.tightFor(
-
-                      width: 26,
-
-                      height: 40,
-
-                    ),
-
-                    padding: EdgeInsets.zero,
-
-                    key: const ValueKey('architect-selection-mirror-copy'),
-
-                    tooltip: l.architectMirrorCopyTooltip,
-
-                    icon: const Icon(
-
-                      Icons.copy_all,
-
-                      color: Color(0xFFFFB300),
-
-                      size: 18,
-
-                    ),
-
-                    onPressed: () => _startMirrorSession(isDuplicate: true),
-
-                  ),
-
-                IconButton(
-
-                  constraints: const BoxConstraints.tightFor(
-
-                    width: 26,
-
-                    height: 40,
-
-                  ),
-
-                  padding: EdgeInsets.zero,
-
-                  key: const ValueKey('architect-selection-properties'),
-
-                  tooltip: l.architectProperties,
-
-                  icon: const Icon(Icons.tune, color: Colors.white70, size: 18),
-
-                  onPressed: () {
-
-                    setState(() => _radialMenuScreenPosition = null);
-
-                    _showProperties();
-
-                  },
-
-                ),
-
-                if (wallIds.isNotEmpty)
-
-                  IconButton(
-
-                    key: const ValueKey('wall-detach'),
-
-                    constraints: const BoxConstraints.tightFor(
-
-                      width: 26,
-
-                      height: 40,
-
-                    ),
-
-                    padding: EdgeInsets.zero,
-
-                    tooltip:
-
-                        _project.activeStorey.walls
-
-                            .where((w) => wallIds.contains(w.id))
-
-                            .every((w) => w.isDetached)
-
-                        ? l.architectWallAttach
-
-                        : l.architectWallDetach,
-
-                    icon: Icon(
-
-                      Icons.link_off,
-
-                      color:
-
-                          _project.activeStorey.walls
-
-                              .where((w) => wallIds.contains(w.id))
-
-                              .every((w) => w.isDetached)
-
-                          ? Colors.amber
-
-                          : Colors.white70,
-
-                    ),
-
-                    onPressed: () => _executeWallEdit(
-
-                      SetArchitectWallConnection(
-
-                        storeyId: _project.activeStoreyId,
-
-                        wallIds: wallIds,
-
-                        connected: _project.activeStorey.walls
-
-                            .where((w) => wallIds.contains(w.id))
-
-                            .every((w) => w.isDetached),
-
-                      ),
-
-                    ),
-
-                  ),
-
-                if (ids.length == 1 &&
-
-                    InsertArchitectElementPoint.pathOf(
-
-                          _project.activeStorey,
-
-                          ids.single,
-
-                        ) !=
-
-                        null)
-
-                  IconButton(
-
-                    key: const ValueKey('architect-selection-new-point'),
-
-                    constraints: const BoxConstraints.tightFor(
-
-                      width: 26,
-
-                      height: 40,
-
-                    ),
-
-                    padding: EdgeInsets.zero,
-
-                    tooltip: l.bimNewPoint,
-
-                    icon: const BimEditingSymbol(
-
-                      BimEditAction.newPoint,
-
-                      color: Color(0xFF80CBC4),
-
-                      size: 18,
-
-                    ),
-
-                    onPressed: () {
-
-                      _cancelActiveDrags();
-
-                      _startNewPointSession(ids.single);
-
-                    },
-
-                  ),
-
-                if (segmentIds.isNotEmpty)
-
-                  PopupMenuButton<String>(
-
-                    key: const ValueKey('architect-wall-actions'),
-
-                    padding: EdgeInsets.zero,
-
-                    icon: const Icon(Icons.more_horiz, color: Colors.white70),
-
-                    onSelected: (action) {
-
-                      if (action == 'cut') {
-
-                        _startCutSession(Set.of(segmentIds));
-
-                      } else if (action == 'splitStroke') {
-
-                        _startSplitSession(wallIds: Set.of(segmentIds));
-
-                      } else if (action == 'mirror') {
-
-                        _executeWallEdit(
-
-                          MirrorArchitectWalls(
-
-                            storeyId: _project.activeStoreyId,
-
-                            wallIds: segmentIds,
-
-                          ),
-
-                        );
-
-                      } else if (action == 'mirrorMove') {
-
-                        _startMirrorSession(isDuplicate: false);
-
-                      } else if (action == 'mirrorCopy') {
-
-                        _startMirrorSession(isDuplicate: true);
-
-                      } else if (action == 'join') {
-                        _beginGeometryCommand(ArchitectRadialAction.join);
-
-                        try {
-
-                          _commands.execute(
-
-                            _linearCommand(
-
-                              JoinArchitectWalls(
-
-                                storeyId: _project.activeStoreyId,
-
-                                wallIds: segmentIds,
-
-                              ),
-
-                            ),
-
-                          );
-
-                          _saveBiMProjectIfAttached();
-
-                        } on ArgumentError {
-
-                          _operationError();
-
-                        }
-
-                      } else if (action == 'extend') {
-
-                        setState(() => _wallExtendId = segmentIds.single);
-
-                      } else if (action == 'length') {
-
-                        _editWallLength();
-
-                      } else if (action == 'point') {
-
-                        _startNewPointSession(segmentIds.single);
-
-                      }
-
-                    },
-
-                    itemBuilder: (_) => [
-
-                      PopupMenuItem(
-
-                        key: const ValueKey('wall-cut'),
-
-                        value: 'cut',
-
-                        child: Row(
-
-                          children: [
-
-                            const Icon(Icons.content_cut, size: 18),
-
-                            const SizedBox(width: 8),
-
-                            Text(l.architectWallCut),
-
-                          ],
-
-                        ),
-
-                      ),
-
-                      PopupMenuItem(
-
-                        key: const ValueKey('wall-split-stroke'),
-
-                        value: 'splitStroke',
-
-                        child: Text(l.architectWallSplit),
-
-                      ),
-
-                      PopupMenuItem(
-
-                        key: const ValueKey('wall-mirror-move'),
-
-                        value: 'mirrorMove',
-
-                        child: Text(l.architectMirrorMove),
-
-                      ),
-
-                      PopupMenuItem(
-
-                        key: const ValueKey('wall-mirror-copy'),
-
-                        value: 'mirrorCopy',
-
-                        child: Text(l.architectMirrorCopy),
-
-                      ),
-
-                      if (lineIds.isEmpty)
-
-                        PopupMenuItem(
-
-                          key: const ValueKey('wall-mirror'),
-
-                          value: 'mirror',
-
-                          child: Text(l.architectWallMirror),
-
-                        ),
-
-                      if (segmentIds.length == 1 && !_multiSelect) ...[
-
-                        PopupMenuItem(
-
-                          value: 'length',
-
-                          child: Text(_selectedLinearElement?.isCurved == true
-                            ? l.wallArc : l.architectWallLength),
-
-                        ),
-
-                        PopupMenuItem(
-
-                          value: 'point',
-
-                          child: Text(l.bimNewPoint),
-
-                        ),
-
-                        PopupMenuItem(
-
-                          key: const ValueKey('wall-extend'),
-
-                          value: 'extend',
-
-                          child: Text(l.architectWallExtend),
-
-                        ),
-
-                      ],
-
-                      if (segmentIds.length >= 2)
-
-                        PopupMenuItem(
-
-                          key: const ValueKey('wall-join'),
-
-                          value: 'join',
-
-                          child: Text(l.architectWallJoin),
-
-                        ),
-
-                    ],
-
-                  ),
-
-                IconButton(
-
-                  constraints: const BoxConstraints.tightFor(
-
-                    width: 26,
-
-                    height: 40,
-
-                  ),
-
-                  padding: EdgeInsets.zero,
-
-                  tooltip: l.delete,
-
-                  icon: const Icon(
-
-                    Icons.delete_outline,
-
-                    color: Colors.redAccent,
-
-                    size: 18,
-
-                  ),
-
-                  onPressed: _deleteSelection,
-
-                ),
-
-                IconButton(
-
-                  constraints: const BoxConstraints.tightFor(
-
-                    width: 26,
-
-                    height: 40,
-
-                  ),
-
-                  padding: EdgeInsets.zero,
-
-                  key: const ValueKey('architect-clear-selection'),
-
-                  tooltip: l.close,
-
-                  icon: const Icon(
-
-                    Icons.close,
-
-                    color: Colors.redAccent,
-
-                    size: 18,
-
-                    weight: 800,
-
-                  ),
-
-                  onPressed: clear,
-
-                ),
-
-              ],
-
-            ),
-
-          ),
-
-        ),
-
-      ),
-
     );
 
+    if (generic) {
+      if (wallIds.isNotEmpty) {
+        final detached = storey.walls
+            .where((w) => wallIds.contains(w.id))
+            .every((w) => w.isDetached);
+        actions.add(
+          action(
+            'wall-detach',
+            detached ? l.architectWallAttach : l.architectWallDetach,
+            Icons.link_off,
+            () => _executeWallEdit(
+              SetArchitectWallConnection(
+                storeyId: _project.activeStoreyId,
+                wallIds: wallIds,
+                connected: detached,
+              ),
+            ),
+            color: detached ? Colors.amber : null,
+          ),
+        );
+      }
+      if (ids.length == 1 &&
+          InsertArchitectElementPoint.pathOf(storey, ids.single) != null) {
+        actions.add(
+          action(
+            'architect-selection-new-point',
+            l.bimNewPoint,
+            Icons.add_circle_outline,
+            () {
+              _cancelActiveDrags();
+              _startNewPointSession(ids.single);
+            },
+            color: accent,
+            commandId: 'newPoint',
+            graphic: BimEditingSymbol(
+              BimEditAction.newPoint,
+              color: accent,
+              size: 18,
+            ),
+          ),
+        );
+      }
+      if (segmentIds.isNotEmpty) {
+        actions.add(
+          ArchitectSelectionAction(
+            id: 'architect-wall-actions',
+            label: l.contextMenuMore,
+            icon: icon(Icons.more_horiz),
+            children: [
+              linear('wall-cut', l.architectWallCut, Icons.content_cut, 'cut'),
+              linear(
+                'wall-split-stroke',
+                l.architectWallSplit,
+                Icons.call_split,
+                'splitStroke',
+              ),
+              linear(
+                'wall-mirror-move',
+                l.architectMirrorMove,
+                Icons.flip,
+                'mirrorMove',
+                commandId: 'mirrorMove',
+              ),
+              linear(
+                'wall-mirror-copy',
+                l.architectMirrorCopy,
+                Icons.copy_all,
+                'mirrorCopy',
+                commandId: 'mirrorCopy',
+              ),
+              if (lineIds.isEmpty)
+                linear(
+                  'wall-mirror',
+                  l.architectWallMirror,
+                  Icons.swap_horiz,
+                  'mirror',
+                ),
+              if (segmentIds.length == 1 && !_multiSelect) ...[
+                linear(
+                  'wall-length',
+                  _selectedLinearElement?.isCurved == true
+                      ? l.wallArc
+                      : l.architectWallLength,
+                  Icons.straighten,
+                  'length',
+                ),
+                linear(
+                  'wall-point',
+                  l.bimNewPoint,
+                  Icons.add_circle_outline,
+                  'point',
+                  commandId: 'newPoint',
+                ),
+                linear(
+                  'wall-extend',
+                  l.architectWallExtend,
+                  Icons.open_in_full,
+                  'extend',
+                ),
+              ],
+              if (segmentIds.length >= 2)
+                linear(
+                  'wall-join',
+                  l.architectWallJoin,
+                  Icons.join_inner,
+                  'join',
+                ),
+            ],
+          ),
+        );
+      }
+    }
+    actions.addAll([
+      action(
+        'architect-selection-delete',
+        l.delete,
+        Icons.delete_outline,
+        _deleteSelection,
+        primary: true,
+        color: danger,
+      ),
+      action(
+        'architect-clear-selection',
+        l.architectSelectionClear,
+        Icons.close,
+        _clearSelection,
+        primary: true,
+      ),
+    ]);
+    return ArchitectSelectionActionBar(
+      actions: actions,
+      count: ids.length,
+      menuOnly: menuOnly,
+      showClear: !_showSelectionControl,
+      showCount: !_showSelectionControl,
+      onAction: _dismissTouchCandidates,
+    );
   }
-
-
 
   bool _tryStartElementDrag(Offset point) {
 
@@ -27195,16 +26509,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ),
 
-                    if (_showSelectionActions || (_touchCandidates != null && !_is3DView && !_printPreview))
+                    if (_showSelectionActions ||
+                        (_touchCandidates != null && !_is3DView && !_printPreview) ||
+                        (MediaQuery.sizeOf(context).width < 600 &&
+                            _multiSelect && !_is3DView && _showSelectionControl))
                       Positioned(bottom: 0, left: 0, right: 0, child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (_touchCandidates != null && !_is3DView && !_printPreview)
                             Padding(padding: const EdgeInsets.all(8),
                               child: _buildTouchCandidatePicker()),
-                          if (_showSelectionActions) Listener(
+                          if (_showSelectionActions &&
+                              (_touchCandidates == null || MediaQuery.sizeOf(context).width >= 600)) Listener(
                             onPointerDown: (_) => _dismissTouchCandidates(),
                             child: _buildSelectionBar()),
+                          if (MediaQuery.sizeOf(context).width < 600 &&
+                              _multiSelect && !_is3DView && _showSelectionControl)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                              child: _buildSelectControl(),
+                            ),
                         ],
                       )),
                   ],
@@ -27219,7 +26543,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-              if (_multiSelect && !_is3DView)
+              if (_multiSelect && !_is3DView && MediaQuery.sizeOf(context).width >= 600)
                 SizedBox(height:60,child:_showSelectionControl
                   ? Padding(padding:const EdgeInsets.fromLTRB(8,4,8,4),child:_buildSelectControl())
                   : const SizedBox.shrink()),
@@ -27950,7 +27274,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  Widget _build2DCanvas() => Stack(
+  Widget _build2DCanvas()=>Padding(key:_propertiesCanvasKey,padding:_propertiesDrawingInsets,child:_build2DCanvasContent());
+
+  Widget _build2DCanvasContent() => Stack(
 
     children: [
 

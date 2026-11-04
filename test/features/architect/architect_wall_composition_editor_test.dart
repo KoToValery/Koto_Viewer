@@ -6,6 +6,8 @@ import 'package:kotoview/src/features/architect/models/architect_wall_type.dart'
 import 'package:kotoview/src/features/architect/widgets/architect_wall_composition_editor.dart';
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
 import 'architect_editing_test.dart' as editing;
+import 'architect_workspace_interaction_test.dart' as workspace;
+import 'architect_tool_test_helper.dart' as tools;
 import 'architect_wall_compositions_test.dart' as data;
 
 void main() {
@@ -150,33 +152,41 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await editing.contextHold(tester, const Offset(2, 0));
-      await tester.tap(find.byKey(const ValueKey('architect-wall-thickness')));
+      await tools.choose(tester, Icons.near_me_outlined);
+      await workspace.wallTap(tester, const Offset(2, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('architect-selection-properties')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('properties-tab-1')));
       await tester.pumpAndSettle();
       final eps = find.byKey(const ValueKey('wall-layer-thickness-eps'));
       await tester.ensureVisible(eps);
       await tester.enterText(eps, '15');
-      await tester.tap(find.byKey(const ValueKey('wall-composition-save')));
+      await tester.tap(find.byKey(const ValueKey('architect-properties-save')));
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.walls.first.insulationThickness, .15);
       expect(model.project.activeStorey.walls.last.insulationThickness, .12);
       expect(model.undoCount, 1);
-      await editing.contextHold(tester, const Offset(2, 0));
-      await tester.tap(find.text('Properties'));
+      await workspace.wallTap(tester, const Offset(2, 0));
       await tester.pumpAndSettle();
-      final plinth = find.byKey(
-        const ValueKey('architect-property-wall-plinth'),
+      await tester.tap(
+        find.byKey(const ValueKey('architect-selection-properties')),
       );
-      await tester.ensureVisible(plinth);
-      await tester.tap(plinth);
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('properties-tab-1')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('wall-plinth-enabled')),
+      );
       await tester.tap(find.byKey(const ValueKey('wall-plinth-enabled')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('wall-plinth-height')),
         '65',
       );
-      await tester.tap(find.byKey(const ValueKey('wall-plinth-save')));
+      await tester.tap(find.byKey(const ValueKey('architect-properties-save')));
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.walls.first.plinth.height, .65);
       expect(model.project.activeStorey.walls.first.plinth.enabled, isTrue);

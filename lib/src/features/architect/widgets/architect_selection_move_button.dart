@@ -21,15 +21,23 @@ class ArchitectSelectionMoveButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    final compact = MediaQuery.sizeOf(context).width < 600;
     final icon = Icon(
       active && transverse ? Icons.swap_vert : Icons.open_with,
       size: 18,
-      color: active ? Colors.amber : Colors.white70,
+      color: active
+          ? Colors.amber
+          : compact
+          ? Theme.of(context).colorScheme.onSurface
+          : Colors.white70,
     );
     if (!supportsTransverse) {
       return IconButton(
         key: const ValueKey('architect-selection-move'),
-        constraints: const BoxConstraints.tightFor(width: 26, height: 40),
+        constraints: BoxConstraints.tightFor(
+          width: compact ? 44 : 26,
+          height: compact ? 44 : 40,
+        ),
         padding: EdgeInsets.zero,
         tooltip: l.architectSelectionMove,
         icon: icon,
@@ -70,7 +78,11 @@ class ArchitectSelectionMoveButton extends StatelessWidget {
             child: Text(l.architectMoveStop),
           ),
       ],
-      child: SizedBox(width: 26, height: 40, child: Center(child: icon)),
+      child: SizedBox(
+        width: compact ? 44 : 26,
+        height: compact ? 44 : 40,
+        child: Center(child: icon),
+      ),
     );
   }
 }

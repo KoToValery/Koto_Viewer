@@ -7640,8 +7640,14 @@ abstract class AppLocalizations {
   /// Select all elements of the same type
   ///
   /// In en, this message translates to:
-  /// **'All of type'**
+  /// **'By type'**
   String get architectSelectSimilar;
+
+  /// Explains the category and active-storey scope of selection expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Select all elements in the selected categories on the active storey.'**
+  String get architectSelectSimilarHelp;
 
   /// Smart context menu button
   ///
@@ -15530,8 +15536,170 @@ abstract class AppLocalizations {
   /// No description provided for @architectSelectAll.
   ///
   /// In en, this message translates to:
-  /// **'Select all'**
+  /// **'By type'**
   String get architectSelectAll;
+
+  /// No description provided for @propertiesBasic.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic'**
+  String get propertiesBasic;
+
+  /// No description provided for @propertiesMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get propertiesMore;
+
+  /// No description provided for @propertiesExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get propertiesExpand;
+
+  /// No description provided for @propertiesCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse'**
+  String get propertiesCollapse;
+
+  /// No description provided for @propertiesUnsaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsaved changes'**
+  String get propertiesUnsaved;
+
+  /// No description provided for @propertiesUnsavedHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Save your changes or discard them before closing.'**
+  String get propertiesUnsavedHelp;
+
+  /// No description provided for @propertiesStay.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay'**
+  String get propertiesStay;
+
+  /// No description provided for @propertiesDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get propertiesDiscard;
+
+  /// No description provided for @propertiesInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the highlighted fields.'**
+  String get propertiesInvalid;
+
+  /// No description provided for @propertiesStale.
+  ///
+  /// In en, this message translates to:
+  /// **'The document changed. Reopen properties to edit the current version.'**
+  String get propertiesStale;
+
+  /// No description provided for @propertiesAutomaticValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get propertiesAutomaticValue;
+
+  /// No description provided for @propertiesCalculated.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculated'**
+  String get propertiesCalculated;
+
+  /// No description provided for @propertiesSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} ({count})'**
+  String propertiesSelection(String name, int count);
+
+  /// No description provided for @propertiesGeometry.
+  ///
+  /// In en, this message translates to:
+  /// **'Geometry'**
+  String get propertiesGeometry;
+
+  /// No description provided for @propertiesAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get propertiesAppearance;
+
+  /// No description provided for @propertiesManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get propertiesManual;
+
+  /// No description provided for @propertiesClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear value'**
+  String get propertiesClear;
+
+  /// No description provided for @propertiesDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get propertiesDone;
+
+  /// No description provided for @propertiesSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get propertiesSource;
+
+  /// No description provided for @propertiesScopeSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected elements'**
+  String get propertiesScopeSelected;
+
+  /// No description provided for @propertiesRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Radius'**
+  String get propertiesRadius;
+
+  /// No description provided for @propertiesTextHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Text height'**
+  String get propertiesTextHeight;
+
+  /// No description provided for @propertiesSaveOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Save and open'**
+  String get propertiesSaveOpen;
+
+  /// No description provided for @propertiesSlope.
+  ///
+  /// In en, this message translates to:
+  /// **'Slope'**
+  String get propertiesSlope;
+
+  /// No description provided for @propertiesBaseOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Base offset'**
+  String get propertiesBaseOffset;
+
+  /// No description provided for @propertiesMixedCompositionHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a type to replace the selected compositions.'**
+  String get propertiesMixedCompositionHelp;
+
+  /// No description provided for @propertiesDiameter.
+  ///
+  /// In en, this message translates to:
+  /// **'Diameter'**
+  String get propertiesDiameter;
 }
 
 class _AppLocalizationsDelegate

@@ -12,6 +12,7 @@ import 'package:kotoview/src/features/architect/models/architect_window.dart';
 import 'package:kotoview/src/features/architect/services/architect_element_tool.dart';
 import 'package:kotoview/src/features/architect/services/architect_selection.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_element_properties_dialog.dart';
+import 'architect_editing_test.dart' as editing;
 
 void main() {
   group('ArchitectWindow model tests', () {
@@ -57,11 +58,7 @@ void main() {
         createdAt: now,
         updatedAt: now,
         storeys: [
-          ArchitectStorey(
-            id: 'storey-1',
-            name: 'Storey 1',
-            walls: [wall],
-          ),
+          ArchitectStorey(id: 'storey-1', name: 'Storey 1', walls: [wall]),
         ],
         activeStoreyId: 'storey-1',
       );
@@ -77,59 +74,58 @@ void main() {
       expect(updatedWin.isFlipped, isTrue);
     });
 
-    test('SetArchitectElementProperties can flip door openInward and isHingeLeft', () {
-      final now = DateTime.now();
-      const door = ArchitectDoor(
-        id: 'door-1',
-        wallId: 'wall-1',
-        offsetRatio: 0.5,
-        openInward: true,
-        isHingeLeft: true,
-        specId: "1'",
-        uuid: 'UUID-DOOR-1',
-      );
-      final wall = ArchitectWall(
-        id: 'wall-1',
-        startPoint: const Offset(0, 0),
-        endPoint: const Offset(5, 0),
-        doors: const [door],
-      );
-      final project = ArchitectProject(
-        id: 'proj-1',
-        name: 'Test Project',
-        createdAt: now,
-        updatedAt: now,
-        storeys: [
-          ArchitectStorey(
-            id: 'storey-1',
-            name: 'Storey 1',
-            walls: [wall],
-          ),
-        ],
-        activeStoreyId: 'storey-1',
-      );
+    test(
+      'SetArchitectElementProperties can flip door openInward and isHingeLeft',
+      () {
+        final now = DateTime.now();
+        const door = ArchitectDoor(
+          id: 'door-1',
+          wallId: 'wall-1',
+          offsetRatio: 0.5,
+          openInward: true,
+          isHingeLeft: true,
+          specId: "1'",
+          uuid: 'UUID-DOOR-1',
+        );
+        final wall = ArchitectWall(
+          id: 'wall-1',
+          startPoint: const Offset(0, 0),
+          endPoint: const Offset(5, 0),
+          doors: const [door],
+        );
+        final project = ArchitectProject(
+          id: 'proj-1',
+          name: 'Test Project',
+          createdAt: now,
+          updatedAt: now,
+          storeys: [
+            ArchitectStorey(id: 'storey-1', name: 'Storey 1', walls: [wall]),
+          ],
+          activeStoreyId: 'storey-1',
+        );
 
-      // Flip swing outward
-      final cmdSwing = SetArchitectElementProperties(
-        storeyId: 'storey-1',
-        elementIds: {'door-1'},
-        textValues: {'openInward': 'false'},
-      );
-      final updated1 = cmdSwing.apply(project);
-      final updatedDoor1 = updated1.activeStorey.walls.first.doors.first;
-      expect(updatedDoor1.openInward, isFalse);
+        // Flip swing outward
+        final cmdSwing = SetArchitectElementProperties(
+          storeyId: 'storey-1',
+          elementIds: {'door-1'},
+          textValues: {'openInward': 'false'},
+        );
+        final updated1 = cmdSwing.apply(project);
+        final updatedDoor1 = updated1.activeStorey.walls.first.doors.first;
+        expect(updatedDoor1.openInward, isFalse);
 
-      // Flip hinge right
-      final cmdHinge = SetArchitectElementProperties(
-        storeyId: 'storey-1',
-        elementIds: {'door-1'},
-        textValues: {'isHingeLeft': 'false'},
-      );
-      final updated2 = cmdHinge.apply(project);
-      final updatedDoor2 = updated2.activeStorey.walls.first.doors.first;
-      expect(updatedDoor2.isHingeLeft, isFalse);
-      expect(updatedDoor2.specId, equals('1'));
-    });
+        // Flip hinge right
+        final cmdHinge = SetArchitectElementProperties(
+          storeyId: 'storey-1',
+          elementIds: {'door-1'},
+          textValues: {'isHingeLeft': 'false'},
+        );
+        final updated2 = cmdHinge.apply(project);
+        final updatedDoor2 = updated2.activeStorey.walls.first.doors.first;
+        expect(updatedDoor2.isHingeLeft, isFalse);
+        expect(updatedDoor2.specId, equals('1'));
+      },
+    );
   });
 
   group('ArchitectElementTool.flipElementById', () {
@@ -188,7 +184,9 @@ void main() {
   });
 
   group('ArchitectElementPropertiesDialog for Window', () {
-    testWidgets('renders window flip switch and toggling updates property', (tester) async {
+    testWidgets('renders window flip switch and toggling updates property', (
+      tester,
+    ) async {
       const win = ArchitectWindow(
         id: 'win-1',
         wallId: 'wall-1',
@@ -209,11 +207,7 @@ void main() {
         createdAt: now,
         updatedAt: now,
         storeys: [
-          ArchitectStorey(
-            id: 'storey-1',
-            name: 'Storey 1',
-            walls: [wall],
-          ),
+          ArchitectStorey(id: 'storey-1', name: 'Storey 1', walls: [wall]),
         ],
         activeStoreyId: 'storey-1',
       );
@@ -238,16 +232,24 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final switchFinder = find.byKey(const ValueKey('architect-property-window-flip'));
+      final switchFinder = find.byKey(
+        const ValueKey('architect-property-window-flip'),
+      );
       expect(switchFinder, findsOneWidget);
 
-      final switchWidget = find.descendant(of: switchFinder, matching: find.byType(Switch));
+      final switchWidget = find.descendant(
+        of: switchFinder,
+        matching: find.byType(Checkbox),
+      );
       expect(switchWidget, findsOneWidget);
 
+      await tester.ensureVisible(switchWidget);
       await tester.tap(switchWidget);
       await tester.pumpAndSettle();
 
-      final saveButton = find.text('Save');
+      final saveButton = find.byKey(
+        const ValueKey('architect-properties-save'),
+      );
       expect(saveButton, findsOneWidget);
       await tester.tap(saveButton);
       await tester.pumpAndSettle();
@@ -264,174 +266,224 @@ void main() {
         .whereType<Architect2dPainter>()
         .firstWhere((e) => e.layer == ArchitectPaintLayer.interaction);
 
-    BimViewportController camera(WidgetTester tester) => overlay(tester).viewport!;
+    BimViewportController camera(WidgetTester tester) =>
+        overlay(tester).viewport!;
 
     Offset screen(WidgetTester tester, Offset point) =>
-        tester.getTopLeft(find.byKey(const ValueKey('architect-viewport-input'))) +
+        tester.getTopLeft(
+          find.byKey(const ValueKey('architect-viewport-input')),
+        ) +
         camera(tester).toScreen(point);
 
-    testWidgets('Selecting a door shows door quick action buttons and toggles swing/hinge', (tester) async {
-      tester.view.physicalSize = const Size(1200, 800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+    testWidgets(
+      'Selecting a door shows door quick action buttons and toggles swing/hinge',
+      (tester) async {
+        tester.view.physicalSize = const Size(1200, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      const door = ArchitectDoor(
-        id: 'door-1',
-        wallId: 'wall-1',
-        offsetRatio: 0.5,
-        width: 1.0,
-        height: 2.0,
-        isHingeLeft: true,
-        openInward: true,
-        uuid: 'UUID-DOOR-1',
-      );
-      final wall = ArchitectWall(
-        id: 'wall-1',
-        startPoint: const Offset(0, 0),
-        endPoint: const Offset(6, 0),
-        thickness: 0.25,
-        doors: const [door],
-      );
-      final project = ArchitectProject(
-        id: 'proj-1',
-        name: 'Workspace Test',
-        createdAt: DateTime(2026),
-        updatedAt: DateTime(2026),
-        activeStoreyId: 'storey-1',
-        storeys: [
-          ArchitectStorey(
-            id: 'storey-1',
-            name: 'Floor',
-            walls: [wall],
+        const door = ArchitectDoor(
+          id: 'door-1',
+          wallId: 'wall-1',
+          offsetRatio: 0.5,
+          width: 1.0,
+          height: 2.0,
+          isHingeLeft: true,
+          openInward: true,
+          uuid: 'UUID-DOOR-1',
+        );
+        final wall = ArchitectWall(
+          id: 'wall-1',
+          startPoint: const Offset(0, 0),
+          endPoint: const Offset(6, 0),
+          thickness: 0.25,
+          doors: const [door],
+        );
+        final project = ArchitectProject(
+          id: 'proj-1',
+          name: 'Workspace Test',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+          activeStoreyId: 'storey-1',
+          storeys: [
+            ArchitectStorey(id: 'storey-1', name: 'Floor', walls: [wall]),
+          ],
+        );
+
+        final commands = ArchitectCommandController(project);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: ArchitectWorkspaceScreen(commandController: commands),
           ),
-        ],
-      );
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
 
-      final commands = ArchitectCommandController(project);
+        // Select tool
+        await tester.tap(find.byIcon(Icons.near_me_outlined));
+        await tester.pump();
 
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: ArchitectWorkspaceScreen(
-            commandController: commands,
+        // Tap on door at (3.0, 0.0)
+        await tester.tapAt(screen(tester, const Offset(3.0, 0.0)));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        // Verify specialized door selection bar appears
+        expect(
+          find.byKey(const ValueKey('architect-selection-bar')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-door-flip-swing')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-door-flip-hinge')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-selection-move')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-selection-properties')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-selection-delete')),
+          findsOneWidget,
+        );
+
+        // Tap flip swing
+        await tester.tap(
+          find.byKey(const ValueKey('architect-door-flip-swing')),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(
+          commands.project.activeStorey.walls.first.doors.first.openInward,
+          isTrue,
+        );
+        await editing.acceptGeometryCommand(tester);
+
+        final doorAfterSwing =
+            commands.project.activeStorey.walls.first.doors.first;
+        expect(doorAfterSwing.openInward, isFalse);
+
+        // Tap flip hinge
+        await tester.tap(
+          find.byKey(const ValueKey('architect-door-flip-hinge')),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        await editing.acceptGeometryCommand(tester);
+
+        final doorAfterHinge =
+            commands.project.activeStorey.walls.first.doors.first;
+        expect(doorAfterHinge.isHingeLeft, isFalse);
+      },
+    );
+
+    testWidgets(
+      'Selecting a window shows window flip button and toggles isFlipped',
+      (tester) async {
+        tester.view.physicalSize = const Size(1200, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        const win = ArchitectWindow(
+          id: 'win-1',
+          wallId: 'wall-1',
+          offsetRatio: 0.5,
+          width: 1.2,
+          height: 1.4,
+          isFlipped: false,
+          uuid: 'UUID-WIN-1',
+        );
+        final wall = ArchitectWall(
+          id: 'wall-1',
+          startPoint: const Offset(0, 0),
+          endPoint: const Offset(6, 0),
+          thickness: 0.25,
+          windows: const [win],
+        );
+        final project = ArchitectProject(
+          id: 'proj-1',
+          name: 'Workspace Test',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+          activeStoreyId: 'storey-1',
+          storeys: [
+            ArchitectStorey(id: 'storey-1', name: 'Floor', walls: [wall]),
+          ],
+        );
+
+        final commands = ArchitectCommandController(project);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: ArchitectWorkspaceScreen(commandController: commands),
           ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
 
-      // Select tool
-      await tester.tap(find.byIcon(Icons.near_me_outlined));
-      await tester.pump();
+        // Select tool
+        await tester.tap(find.byIcon(Icons.near_me_outlined));
+        await tester.pump();
 
-      // Tap on door at (3.0, 0.0)
-      await tester.tapAt(screen(tester, const Offset(3.0, 0.0)));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+        // Tap on window at (3.0, 0.0)
+        await tester.tapAt(screen(tester, const Offset(3.0, 0.0)));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
 
-      // Verify specialized door selection bar appears
-      expect(find.byKey(const ValueKey('architect-selection-bar')), findsOneWidget);
-      expect(find.byKey(const ValueKey('architect-door-flip-swing')), findsOneWidget);
-      expect(find.byKey(const ValueKey('architect-door-flip-hinge')), findsOneWidget);
-      expect(find.byKey(const ValueKey('architect-selection-move')), findsOneWidget);
-      expect(find.byKey(const ValueKey('architect-selection-properties')), findsOneWidget);
-      expect(find.byKey(const ValueKey('architect-selection-delete')), findsOneWidget);
+        // Verify specialized window selection bar appears
+        expect(
+          find.byKey(const ValueKey('architect-selection-bar')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-window-flip-side')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-selection-move')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-selection-properties')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-selection-delete')),
+          findsOneWidget,
+        );
 
-      // Tap flip swing
-      await tester.tap(find.byKey(const ValueKey('architect-door-flip-swing')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+        // Tap flip side
+        await tester.tap(
+          find.byKey(const ValueKey('architect-window-flip-side')),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(
+          commands.project.activeStorey.walls.first.windows.first.isFlipped,
+          isFalse,
+        );
+        await editing.acceptGeometryCommand(tester);
 
-      final doorAfterSwing = commands.project.activeStorey.walls.first.doors.first;
-      expect(doorAfterSwing.openInward, isFalse);
-
-      // Tap flip hinge
-      await tester.tap(find.byKey(const ValueKey('architect-door-flip-hinge')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      final doorAfterHinge = commands.project.activeStorey.walls.first.doors.first;
-      expect(doorAfterHinge.isHingeLeft, isFalse);
-    });
-
-    testWidgets('Selecting a window shows window flip button and toggles isFlipped', (tester) async {
-      tester.view.physicalSize = const Size(1200, 800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-
-      const win = ArchitectWindow(
-        id: 'win-1',
-        wallId: 'wall-1',
-        offsetRatio: 0.5,
-        width: 1.2,
-        height: 1.4,
-        isFlipped: false,
-        uuid: 'UUID-WIN-1',
-      );
-      final wall = ArchitectWall(
-        id: 'wall-1',
-        startPoint: const Offset(0, 0),
-        endPoint: const Offset(6, 0),
-        thickness: 0.25,
-        windows: const [win],
-      );
-      final project = ArchitectProject(
-        id: 'proj-1',
-        name: 'Workspace Test',
-        createdAt: DateTime(2026),
-        updatedAt: DateTime(2026),
-        activeStoreyId: 'storey-1',
-        storeys: [
-          ArchitectStorey(
-            id: 'storey-1',
-            name: 'Floor',
-            walls: [wall],
-          ),
-        ],
-      );
-
-      final commands = ArchitectCommandController(project);
-
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: ArchitectWorkspaceScreen(
-            commandController: commands,
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      // Select tool
-      await tester.tap(find.byIcon(Icons.near_me_outlined));
-      await tester.pump();
-
-      // Tap on window at (3.0, 0.0)
-      await tester.tapAt(screen(tester, const Offset(3.0, 0.0)));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      // Verify specialized window selection bar appears
-      expect(find.byKey(const ValueKey('architect-selection-bar')), findsOneWidget);
-      expect(find.byKey(const ValueKey('architect-window-flip-side')), findsOneWidget);
-      expect(find.byKey(const ValueKey('architect-selection-move')), findsOneWidget);
-      expect(find.byKey(const ValueKey('architect-selection-properties')), findsOneWidget);
-      expect(find.byKey(const ValueKey('architect-selection-delete')), findsOneWidget);
-
-      // Tap flip side
-      await tester.tap(find.byKey(const ValueKey('architect-window-flip-side')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      final winAfterFlip = commands.project.activeStorey.walls.first.windows.first;
-      expect(winAfterFlip.isFlipped, isTrue);
-    });
+        final winAfterFlip =
+            commands.project.activeStorey.walls.first.windows.first;
+        expect(winAfterFlip.isFlipped, isTrue);
+      },
+    );
   });
 }

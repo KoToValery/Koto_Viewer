@@ -220,7 +220,10 @@ void main() {
       final model = editing.seeded(scene);
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tools.chooseMulti(tester, operation: ArchitectSelectionOperation.replace);
+      await tools.chooseMulti(
+        tester,
+        operation: ArchitectSelectionOperation.replace,
+      );
       workspace.camera(tester).fit(const Rect.fromLTWH(-5, -5, 15, 12));
       await tester.pumpAndSettle();
       await tester.tapAt(workspace.screen(tester, const Offset(-1, -1)));
@@ -253,7 +256,10 @@ void main() {
       final model = editing.seeded(scene);
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tools.chooseMulti(tester, operation: ArchitectSelectionOperation.replace);
+      await tools.chooseMulti(
+        tester,
+        operation: ArchitectSelectionOperation.replace,
+      );
       workspace.camera(tester).fit(const Rect.fromLTWH(-5, -5, 15, 12));
       await tester.pumpAndSettle();
       final before = workspace.camera(tester).translation;
@@ -282,53 +288,66 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-  testWidgets('Hand pans the canvas without selecting on a drag or starting a box', (
-    tester,
-  ) async {
-    final model = editing.seeded(scene);
-    addTearDown(model.dispose);
-    await workspace.open(tester, model);
-      await tools.chooseMulti(tester, operation: ArchitectSelectionOperation.replace);
-    workspace.camera(tester).fit(const Rect.fromLTWH(-5, -5, 15, 12));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('architect-tool-pan')));
-    await tester.pumpAndSettle();
-    final before = workspace.camera(tester).translation;
-    final g = await tester.startGesture(
-      workspace.screen(tester, const Offset(2, 1)),
-    );
-    await g.moveBy(const Offset(60, 35));
-    await g.up();
-    await tester.pumpAndSettle();
-    expect(workspace.camera(tester).translation, before + const Offset(60, 35));
-    expect(workspace.overlay(tester).selectedElementIds, isEmpty);
-    expect(workspace.overlay(tester).marqueePoints, isEmpty);
-    expect(
-      find.byKey(const ValueKey('architect-selection-controls')),
-      findsNothing,
-    );
-    await tools.chooseMulti(tester, operation: ArchitectSelectionOperation.replace);
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))
-          .activeTool,
-      ArchitectTool.select,
-    );
-    expect(
-      find.byKey(const ValueKey('architect-selection-controls')),
-      findsOneWidget,
-    );
-    expect(model.canUndo, isFalse);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'Hand pans the canvas without selecting on a drag or starting a box',
+    (tester) async {
+      final model = editing.seeded(scene);
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      await tools.chooseMulti(
+        tester,
+        operation: ArchitectSelectionOperation.replace,
+      );
+      workspace.camera(tester).fit(const Rect.fromLTWH(-5, -5, 15, 12));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('architect-tool-pan')));
+      await tester.pumpAndSettle();
+      final before = workspace.camera(tester).translation;
+      final g = await tester.startGesture(
+        workspace.screen(tester, const Offset(2, 1)),
+      );
+      await g.moveBy(const Offset(60, 35));
+      await g.up();
+      await tester.pumpAndSettle();
+      expect(
+        workspace.camera(tester).translation,
+        before + const Offset(60, 35),
+      );
+      expect(workspace.overlay(tester).selectedElementIds, isEmpty);
+      expect(workspace.overlay(tester).marqueePoints, isEmpty);
+      expect(
+        find.byKey(const ValueKey('architect-selection-controls')),
+        findsNothing,
+      );
+      await tools.chooseMulti(
+        tester,
+        operation: ArchitectSelectionOperation.replace,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))
+            .activeTool,
+        ArchitectTool.select,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-selection-controls')),
+        findsOneWidget,
+      );
+      expect(model.canUndo, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('Pinch cancels an unfinished box without committing selection', (
     tester,
   ) async {
     final model = editing.seeded(scene);
     addTearDown(model.dispose);
     await workspace.open(tester, model);
-      await tools.chooseMulti(tester, operation: ArchitectSelectionOperation.replace);
+    await tools.chooseMulti(
+      tester,
+      operation: ArchitectSelectionOperation.replace,
+    );
     workspace.camera(tester).fit(const Rect.fromLTWH(-5, -5, 15, 12));
     await tester.pumpAndSettle();
     final first = await tester.startGesture(
@@ -405,7 +424,10 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
-          await tools.chooseMulti(tester, operation: ArchitectSelectionOperation.replace);
+          await tools.chooseMulti(
+            tester,
+            operation: ArchitectSelectionOperation.replace,
+          );
           workspace.camera(tester).fit(const Rect.fromLTWH(-1, -1, 10, 8));
           await tester.pumpAndSettle();
           await tester.tapAt(workspace.screen(tester, const Offset(2, 1)));
@@ -446,8 +468,18 @@ void main() {
               image.dispose();
             });
           }
-          await tester.tap(find.text(l.architectSelectModePolygon));
+          await tester.tap(
+            find.byKey(const ValueKey('architect-selection-shape')),
+          );
           await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('architect-selection-mode-polygon')),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<ArchitectSelectionControl>(controls).mode,
+            ArchitectSelectMode.polygon,
+          );
           for (final point in [
             const Offset(-.5, -.5),
             const Offset(4, -.5),

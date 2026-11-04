@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:async';
+import 'architect_properties_shell.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -23,13 +25,16 @@ class ArchitectRoofLayersDialog extends StatefulWidget {
       initialBreakDistance;
   final bool initialAttachToWalls, initialIsMansard, canPickDownpipe;
   final ArchitectRoofDrainage initialDrainage;
+  final bool Function()? isCurrent;
   final ArchitectProject? project;
   final ArchitectRoofPlane? roof;
   final ValueChanged<ArchitectRoofLayersResult>? onApply;
   final bool Function(ArchitectRoofLayersResult)? onTryApply;
+  final ValueChanged<ArchitectRoofLayersResult>? onPreview;
   final int initialTab;
   const ArchitectRoofLayersDialog({
     super.key,
+    this.isCurrent,
     required this.initialAssembly,
     required this.initialSlopeDegrees,
     required this.initialEavesOverhang,
@@ -45,6 +50,7 @@ class ArchitectRoofLayersDialog extends StatefulWidget {
     this.onApply,
     this.onTryApply,
     this.initialTab = 0,
+    this.onPreview,
     this.initialIsMansard = false,
     this.initialUpperSlopeDegrees = 25,
     this.initialBreakDistance,
@@ -99,6 +105,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
 
   @override
   void dispose() {
+    _previewTimer?.cancel();
     _tabs.dispose();
     for (final c in _detailControllers.values) {
       c.dispose();
@@ -355,7 +362,47 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
     return result;
   }
 
+  ArchitectRoofLayersResult _result({bool pickDownpipe = false}) =>
+      ArchitectRoofLayersResult(
+        assembly: _assembly,
+        slopeDegrees: _slopeDegrees,
+        eavesOverhang: _eavesOverhang,
+        eavesCut: _eavesCut,
+        baseElevationOffset: _baseElevationOffset,
+        attachToWalls: _attachToWalls,
+        manualSupportDistance: _manualSupport ? _supportDistance : null,
+        drainage: _drainage,
+        pickDownpipe: pickDownpipe,
+        upperSlopeDegrees: _upperSlope,
+        breakDistance: _breakDistance,
+        applyToGroup: _applyGroup,
+        saveForNewRoofs: widget.roof == null || _saveDefaults,
+        changes: _changes(),
+      );
+  Timer? _previewTimer;
+  bool _touched = false;
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _touched = true;
+    _queuePreview();
+  }
+
+  void _queuePreview() {
+    _previewTimer?.cancel();
+    _previewTimer = Timer(const Duration(milliseconds: 200), () {
+      if (mounted && widget.onPreview != null && _assemblyError == null) {
+        try {
+          widget.onPreview!(_result());
+        } on ArgumentError {
+          /* Last valid drawing remains visible. */
+        }
+      }
+    });
+  }
+
   void _save({bool pickDownpipe = false}) {
+    if(widget.isCurrent?.call()==false){setState(()=>_error=context.l10n.propertiesStale);return;}
     final invalid = _form.currentState!.validateGranularly();
     if (invalid.isNotEmpty) {
       final field = invalid.first;
@@ -383,22 +430,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       setState(() => _error = _assemblyError);
       return;
     }
-    final result = ArchitectRoofLayersResult(
-      assembly: _assembly,
-      slopeDegrees: _slopeDegrees,
-      eavesOverhang: _eavesOverhang,
-      eavesCut: _eavesCut,
-      baseElevationOffset: _baseElevationOffset,
-      attachToWalls: _attachToWalls,
-      manualSupportDistance: _manualSupport ? _supportDistance : null,
-      drainage: _drainage,
-      pickDownpipe: pickDownpipe,
-      upperSlopeDegrees: _upperSlope,
-      breakDistance: _breakDistance,
-      applyToGroup: _applyGroup,
-      saveForNewRoofs: widget.roof == null || _saveDefaults,
-      changes: _changes(),
-    );
+    final result = _result(pickDownpipe: pickDownpipe);
     if (widget.onTryApply != null) {
       if (!widget.onTryApply!(result)) {
         setState(() => _error = context.l10n.roofUiNumericInvalid);
@@ -418,24 +450,6 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    l.architectToolRoof,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                IconButton(
-                  tooltip: l.close,
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -502,30 +516,27 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: Row(
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(l.cancel),
-                ),
-                const Spacer(),
-                FilledButton(
-                  key: const ValueKey('roof-layers-apply'),
-                  onPressed: _save,
-                  child: Text(l.save),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
-    if (MediaQuery.sizeOf(context).width < 600) {
-      return Dialog.fullscreen(child: SafeArea(child: body));
-    }
-    return Dialog(child: SizedBox(width: 640, height: 800, child: body));
+    return ArchitectPropertiesShell(
+      title: l.architectToolRoof,
+      initiallyExpanded: true,
+      onSave: _save,
+      isDirty: () => _touched || _changes().isNotEmpty,
+      content: body,
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.cancel),
+        ),
+        FilledButton(
+          key: const ValueKey('roof-layers-apply'),
+          onPressed: _save,
+          child: Text(l.save),
+        ),
+      ],
+    );
   }
 
   Widget _construction() => ArchitectRoofConstructionPreview(

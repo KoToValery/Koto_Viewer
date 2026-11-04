@@ -36,6 +36,7 @@ class ArchitectSelectionControl extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final l = context.l10n;
+    final compact = MediaQuery.sizeOf(context).width < 600;
     Widget action(
       String key,
       String tooltip,
@@ -72,13 +73,19 @@ class ArchitectSelectionControl extends StatelessWidget {
           : l.architectSelectPreviewCount(effectiveCount),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Text(
-          '$effectiveCount',
-          key: const ValueKey('architect-selection-control-count'),
-          style: TextStyle(
-            color: colors.onSurface,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: compact ? 40 : double.infinity),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '$effectiveCount',
+              key: const ValueKey('architect-selection-control-count'),
+              style: TextStyle(
+                color: colors.onSurface,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
           ),
         ),
       ),
@@ -96,72 +103,138 @@ class ArchitectSelectionControl extends StatelessWidget {
         child: Row(
           children: [
             if (!drafting) ...[
-              Expanded(
-                child: Row(
-                  children: [
-                    for (final value in ArchitectSelectMode.values)
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2),
-                          child: Tooltip(
-                            message: value == ArchitectSelectMode.rectangle
-                                ? l.architectSelectRectangleHint
-                                : l.architectSelectPolygonHint,
-                            child: TextButton(
-                              key: ValueKey(
-                                'architect-selection-mode-${value.name}',
+              if (compact)
+                Expanded(
+                  child: PopupMenuButton<ArchitectSelectMode>(
+                    key: const ValueKey('architect-selection-shape'),
+                    initialValue: mode,
+                    tooltip: mode == ArchitectSelectMode.rectangle
+                        ? l.architectSelectRectangleHint
+                        : l.architectSelectPolygonHint,
+                    onSelected: onMode,
+                    itemBuilder: (_) => [
+                      for (final value in ArchitectSelectMode.values)
+                        CheckedPopupMenuItem(
+                          key: ValueKey(
+                            'architect-selection-mode-${value.name}',
+                          ),
+                          value: value,
+                          checked: mode == value,
+                          child: Text(
+                            value == ArchitectSelectMode.rectangle
+                                ? l.architectSelectModeRect
+                                : l.architectSelectModePolygon,
+                          ),
+                        ),
+                    ],
+                    child: Container(
+                      height: 44,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: colors.outline),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            mode == ArchitectSelectMode.rectangle
+                                ? Icons.rectangle_outlined
+                                : Icons.polyline_rounded,
+                            size: 18,
+                            color: colors.onSurface,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              mode == ArchitectSelectMode.rectangle
+                                  ? l.architectSelectModeRect
+                                  : l.architectSelectModePolygon,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: colors.onSurface,
+                                fontSize: 12,
                               ),
-                              style: TextButton.styleFrom(
-                                foregroundColor: colors.onSurface,
-                                backgroundColor: mode == value
-                                    ? colors.surfaceContainerHighest
-                                    : colors.surfaceContainerHigh,
-                                minimumSize: const Size(44, 44),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 2,
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_drop_down,
+                            size: 18,
+                            color: colors.onSurface,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: Row(
+                    children: [
+                      for (final value in ArchitectSelectMode.values)
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            child: Tooltip(
+                              message: value == ArchitectSelectMode.rectangle
+                                  ? l.architectSelectRectangleHint
+                                  : l.architectSelectPolygonHint,
+                              child: TextButton(
+                                key: ValueKey(
+                                  'architect-selection-mode-${value.name}',
                                 ),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  side: BorderSide(
-                                    color: mode == value
-                                        ? colors.onSurface
-                                        : colors.outline,
-                                    width: mode == value ? 2 : 1,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: colors.onSurface,
+                                  backgroundColor: mode == value
+                                      ? colors.surfaceContainerHighest
+                                      : colors.surfaceContainerHigh,
+                                  minimumSize: const Size(44, 44),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 2,
                                   ),
-                                ),
-                              ),
-                              onPressed: () => onMode(value),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    value == ArchitectSelectMode.rectangle
-                                        ? Icons.rectangle_outlined
-                                        : Icons.polyline_rounded,
-                                    size: 18,
-                                  ),
-                                  Text(
-                                    value == ArchitectSelectMode.rectangle
-                                        ? l.architectSelectModeRect
-                                        : l.architectSelectModePolygon,
-                                    maxLines: 1,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: mode == value
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    side: BorderSide(
+                                      color: mode == value
+                                          ? colors.onSurface
+                                          : colors.outline,
+                                      width: mode == value ? 2 : 1,
                                     ),
                                   ),
-                                ],
+                                ),
+                                onPressed: () => onMode(value),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      value == ArchitectSelectMode.rectangle
+                                          ? Icons.rectangle_outlined
+                                          : Icons.polyline_rounded,
+                                      size: 18,
+                                    ),
+                                    Text(
+                                      value == ArchitectSelectMode.rectangle
+                                          ? l.architectSelectModeRect
+                                          : l.architectSelectModePolygon,
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: mode == value
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
               if (onOperation != null)
                 PopupMenuButton<ArchitectSelectionOperation>(
                   key: const ValueKey('architect-selection-operation'),

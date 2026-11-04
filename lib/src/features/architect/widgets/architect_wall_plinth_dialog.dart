@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'architect_properties_shell.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
@@ -76,7 +77,7 @@ class _PlinthState extends State<ArchitectWallPlinthDialog> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return AlertDialog(
+    return ArchitectPropertiesDialog(
       title: Text(l.wallPlinth),
       content: SizedBox(
         width: 360,

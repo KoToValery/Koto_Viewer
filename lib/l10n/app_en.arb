@@ -3216,7 +3216,9 @@
   "@architectSelectConnected": {
     "description": "Select connected chain of elements"
   },
-  "architectSelectSimilar": "All of type",
+  "architectSelectSimilar": "By type",
+  "architectSelectSimilarHelp": "Select all elements in the selected categories on the active storey.",
+  "@architectSelectSimilarHelp": { "description": "Explains the category and active-storey scope of selection expansion" },
   "@architectSelectSimilar": {
     "description": "Select all elements of the same type"
   },
@@ -5080,5 +5082,46 @@
   "architectPickPosition": "{label} · {index}/{count}",
   "@architectPickPosition": {"placeholders": {"label": {"type": "String"}, "index": {"type": "int"}, "count": {"type": "int"}}},
   "architectTouchSelectionHelp": "Tap to select; use arrows for overlaps. Hold for actions.",
-  "architectSelectAll": "Select all"
+  "architectSelectAll": "By type",
+  "properties3d": "3D Properties",
+  "@properties3d": {
+    "description": "Tooltip for 3D model properties button"
+  },
+  "propertiesBasic": "Basic",
+  "propertiesMore": "More",
+  "propertiesExpand": "Expand",
+  "propertiesCollapse": "Collapse",
+  "propertiesUnsaved": "Unsaved changes",
+  "propertiesUnsavedHelp": "Save your changes or discard them before closing.",
+  "propertiesStay": "Stay",
+  "propertiesDiscard": "Discard",
+  "propertiesInvalid": "Check the highlighted fields.",
+  "propertiesStale": "The document changed. Reopen properties to edit the current version.",
+  "propertiesAutomaticValue": "Automatic",
+  "propertiesCalculated": "Calculated",
+  "propertiesSelection": "{name} ({count})",
+  "propertiesGeometry": "Geometry",
+  "propertiesAppearance": "Appearance",
+  "propertiesManual": "Manual",
+  "propertiesClear": "Clear value",
+  "propertiesDone": "Done",
+  "propertiesSource": "Source",
+  "propertiesScopeSelected": "Selected elements",
+  "@propertiesSelection": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "propertiesRadius": "Radius",
+  "propertiesTextHeight": "Text height",
+  "propertiesSaveOpen": "Save and open",
+  "propertiesSlope": "Slope",
+  "propertiesBaseOffset": "Base offset",
+  "propertiesMixedCompositionHelp": "Choose a type to replace the selected compositions.",
+  "propertiesDiameter": "Diameter"
 }

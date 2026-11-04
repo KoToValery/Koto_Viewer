@@ -11,6 +11,7 @@ import 'package:kotoview/src/features/architect/screens/architect_workspace_scre
 import 'architect_command_confirmation_test.dart' as scene;
 import 'architect_editing_test.dart' as editing;
 import 'architect_workspace_interaction_test.dart' as workspace;
+import 'architect_tool_test_helper.dart' as tool_ui;
 
 void main() {
   testWidgets('Visual review of command controls on a Bulgarian phone', (
@@ -60,10 +61,7 @@ void main() {
     await editing.ensureSelectionTool(tester);
     await workspace.wallTap(tester, const Offset(2, -1));
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('architect-selection-mirror-copy')),
-    );
-    await tester.pumpAndSettle();
+    await tool_ui.selectionAction(tester, 'architect-selection-mirror-copy');
     await tester.tapAt(workspace.screen(tester, Offset.zero));
     await tester.pumpAndSettle();
     Future<void> screenshot(String name) async {

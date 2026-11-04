@@ -17,14 +17,27 @@ import '../services/fenestration_library_service.dart';
 import '../models/architect_door.dart';
 import '../services/architect_selection.dart';
 import '../models/architect_zone.dart';
-import 'architect_wall_drafting_panel.dart';
+import 'dart:async';
+import '../services/architect_properties_session.dart';
+import '../services/architect_wall_compositions.dart';
+import 'architect_properties_shell.dart';
+import 'architect_property_number_field.dart';
+import 'architect_properties_plan_preview.dart';
+import 'architect_wall_composition_editor.dart';
+import 'architect_wall_type_label.dart';
+import 'architect_wall_type_picker.dart';
 
 class ArchitectElementPropertiesDialog extends StatefulWidget {
+  final bool Function(ArchitectProject)? onApplyProject;
+  final void Function(ArchitectProject?)? onPreview;
+  final ArchitectProject Function(ArchitectProject)? prepare;
+  final bool Function()? isCurrent;
   final ArchitectProject project;
   final Set<String> elementIds;
   final VoidCallback? onSlabLayers;
   final VoidCallback? onScheduleTable;
-  final void Function(Map<String,double>,Map<String,String>)? onWallLayers,onWallPlinth;
+  final void Function(Map<String, double>, Map<String, String>)? onWallLayers,
+      onWallPlinth;
   final bool Function(Map<String, double>, Map<String, String>)? onStraighten;
   final bool Function(Map<String, double>, Map<String, String>) onApply;
   const ArchitectElementPropertiesDialog({
@@ -32,6 +45,10 @@ class ArchitectElementPropertiesDialog extends StatefulWidget {
     required this.project,
     required this.elementIds,
     required this.onApply,
+    this.onApplyProject,
+    this.onPreview,
+    this.prepare,
+    this.isCurrent,
     this.onSlabLayers,
     this.onScheduleTable,
     this.onWallLayers,
@@ -59,8 +76,11 @@ class _ArchitectElementPropertiesDialogState
   ArchitectHatchPattern? _hatchPattern;
   ArchitectDrawingColor? _hatchColor;
   bool? _hatchBorder;
-  bool get _supportsHatch => widget.elementIds.every((id) =>
-    widget.project.activeStorey.cadPrimitives.any((p) => p.id == id && p.type == CadPrimitiveType.hatch));
+  bool get _supportsHatch => widget.elementIds.every(
+    (id) => widget.project.activeStorey.cadPrimitives.any(
+      (p) => p.id == id && p.type == CadPrimitiveType.hatch,
+    ),
+  );
   bool get _supportsLineStyle => widget.elementIds.every(
     (id) => widget.project.activeStorey.cadPrimitives.any(
       (p) => p.id == id && p.type != CadPrimitiveType.circle,
@@ -83,7 +103,9 @@ class _ArchitectElementPropertiesDialogState
         ArchitectSelection.record(widget.project, id),
     ];
     if (_supportsHatch) {
-      final hatches = widget.project.activeStorey.cadPrimitives.where((p) => widget.elementIds.contains(p.id)).toList();
+      final hatches = widget.project.activeStorey.cadPrimitives
+          .where((p) => widget.elementIds.contains(p.id))
+          .toList();
       final patterns = hatches.map((p) => p.hatchPattern).toSet();
       if (patterns.length == 1) _hatchPattern = patterns.single;
       final colors = hatches.map((p) => p.drawingColor).toSet();
@@ -116,12 +138,16 @@ class _ArchitectElementPropertiesDialogState
               ? entry.value
               : null,
     };
-    final isDoor = records.isNotEmpty &&
-        records.every((e) =>
-            e.containsKey('offsetRatio') && e.containsKey('isHingeLeft'));
-    final isWindow = records.isNotEmpty &&
-        records.every((e) =>
-            e.containsKey('offsetRatio') && e.containsKey('panesCount'));
+    final isDoor =
+        records.isNotEmpty &&
+        records.every(
+          (e) => e.containsKey('offsetRatio') && e.containsKey('isHingeLeft'),
+        );
+    final isWindow =
+        records.isNotEmpty &&
+        records.every(
+          (e) => e.containsKey('offsetRatio') && e.containsKey('panesCount'),
+        );
     if (isDoor || isWindow) {
       final styleIds = records.map((e) => e['styleId'] as String?).toSet();
       if (styleIds.length == 1 && styleIds.first != null) {
@@ -129,13 +155,18 @@ class _ArchitectElementPropertiesDialogState
       }
     }
     if (isWindow) {
-      final flips = records.map((e) => e['isFlipped'] as bool? ?? false).toSet();
+      final flips = records
+          .map((e) => e['isFlipped'] as bool? ?? false)
+          .toSet();
       if (flips.length == 1) {
         texts['isFlipped'] = '${flips.first}';
       }
     }
-    final isZone = records.isNotEmpty &&
-        records.every((e) => e.containsKey('category') && e.containsKey('floorFinish'));
+    final isZone =
+        records.isNotEmpty &&
+        records.every(
+          (e) => e.containsKey('category') && e.containsKey('floorFinish'),
+        );
     if (isZone) {
       final categories = records.map((e) => e['category'] as String?).toSet();
       if (categories.length == 1 && categories.first != null) {
@@ -149,31 +180,54 @@ class _ArchitectElementPropertiesDialogState
       if (names.length == 1 && names.first != null) {
         texts['name'] = names.first!;
       }
-      final floorFinishes = records.map((e) => e['floorFinish'] as String?).toSet();
+      final floorFinishes = records
+          .map((e) => e['floorFinish'] as String?)
+          .toSet();
       if (floorFinishes.length == 1 && floorFinishes.first != null) {
         texts['floorFinish'] = floorFinishes.first!;
       }
-      final wallFinishes = records.map((e) => e['wallFinish'] as String?).toSet();
+      final wallFinishes = records
+          .map((e) => e['wallFinish'] as String?)
+          .toSet();
       if (wallFinishes.length == 1 && wallFinishes.first != null) {
         texts['wallFinish'] = wallFinishes.first!;
       }
-      final ceilingFinishes = records.map((e) => e['ceilingFinish'] as String?).toSet();
+      final ceilingFinishes = records
+          .map((e) => e['ceilingFinish'] as String?)
+          .toSet();
       if (ceilingFinishes.length == 1 && ceilingFinishes.first != null) {
         texts['ceilingFinish'] = ceilingFinishes.first!;
       }
-      final autoBoundaries = records.map((e) => e['isAutoBoundary'] as bool?).toSet();
+      final autoBoundaries = records
+          .map((e) => e['isAutoBoundary'] as bool?)
+          .toSet();
       if (autoBoundaries.length == 1 && autoBoundaries.first != null) {
         texts['isAutoBoundary'] = '${autoBoundaries.first!}';
       }
+    }
+    _initialTexts = Map.of(texts);
+    if (records.every((e) => e.containsKey('floorFinish'))) {
+      fields['targetArea'] =
+          (records.map((e) => e['targetArea']).toSet().length == 1
+                  ? records.first['targetArea'] as num?
+                  : null)
+              ?.toDouble();
     }
   }
 
   String label(String key) {
     final l = context.l10n;
     return switch (key) {
-      'arcRadius' => 'R=',
+      'arcRadius' => l.propertiesRadius,
       'height' => l.architectPropertyHeight,
-      'width' => l.architectPropertyWidth,
+      'width' =>
+        widget.elementIds.every(
+              (id) => widget.project.activeStorey.columns.any(
+                (c) => c.id == id && c.shape.name == 'circular',
+              ),
+            )
+            ? l.propertiesDiameter
+            : l.architectPropertyWidth,
       'depth' => l.architectPropertyDepth,
       'thickness' =>
         records.every((e) => e.containsKey('referenceLine'))
@@ -182,22 +236,30 @@ class _ArchitectElementPropertiesDialogState
       'strokeWidth' => l.architectStrokeWeight,
       'coreThickness' => l.architectWallCoreThickness,
       'insulationThicknessOverride' => l.architectPropertyThickness,
-      'rotationDeg' => l.architectPropertyAngle,
+      'rotationDeg' || 'angle' => l.architectPropertyAngle,
+      'slopePercent' => l.propertiesSlope,
       'hatchAngle' => l.architectPropertyAngle,
       'hatchScale' => l.architectHatchScale,
       'stepCount' => l.architectPropertySteps,
       'sillHeight' => l.architectPropertySill,
       'elevation' => l.architectToolLevel,
       'offsetDistance' => l.architectPropertyOffset,
-      'baseOffset' => l.architectPropertyBaseOffset,
+      'baseOffset' => l.propertiesBaseOffset,
       'clearHeight' => l.architectZoneClearHeight,
       'targetArea' => l.architectZoneTargetArea,
+      'fontSize' => l.propertiesTextHeight,
       _ => l.architectPropertySize,
     };
   }
 
   // Legacy stroke weights are shown as paper mm, independently of model units.
-  bool metric(String key) => !{'strokeWidth', 'rotationDeg', 'stepCount', 'hatchScale', 'hatchAngle'}.contains(key);
+  bool metric(String key) => !{
+    'strokeWidth',
+    'rotationDeg',
+    'stepCount',
+    'hatchScale',
+    'hatchAngle',
+  }.contains(key);
   double? fieldValue(String key) {
     if (key == 'height' &&
         records.every((e) => e.containsKey('referenceLine')) &&
@@ -218,61 +280,16 @@ class _ArchitectElementPropertiesDialogState
     return values[key] ?? fields[key];
   }
 
-  Future<void> editNumber(String key) async {
-    final unit = metric(key)
-        ? widget.project.units.symbol
-        : key == 'strokeWidth' ? 'mm'
-        : key == 'rotationDeg' || key == 'hatchAngle'
-        ? '°'
-        : '';
-    final value = fieldValue(key) ?? 0;
-    var draft = key == 'strokeWidth' ? value / ArchitectCadPrimitive.strokeUnitsPerPaperMm
-        : metric(key) ? widget.project.units.toUnit(value) : value;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => Dialog(
-        child: SizedBox(
-          width: 250,
-          child: ArchitectWallDraftingPanel(
-            length: draft,
-            unit: unit,
-            decimals: metric(key) ? widget.project.distanceDecimals : key == 'strokeWidth' ? 3 : key == 'stepCount' ? 0 : 2,
-            title: label(key),
-            endLabel: context.l10n.save,
-            keypadInitiallyOpen: true,
-            showContinue: false,
-            showDirection: false,
-            minimumLength:
-                {'elevation', 'rotationDeg', 'hatchAngle', 'offsetDistance', 'baseOffset'}.contains(key)
-                ? -double.infinity
-                : {'sillHeight', 'insulationThicknessOverride'}.contains(key)
-                ? 0
-                : .001,
-            onLength: (v) => draft = v,
-            onEnd: () {
-              setState(
-                () => values[key] = key == 'strokeWidth'
-                    ? draft * ArchitectCadPrimitive.strokeUnitsPerPaperMm
-                    : metric(key) ? widget.project.units.fromUnit(draft) : draft,
-              );
-              Navigator.pop(ctx);
-            },
-            onContinue: () {},
-            onUnlock: () {},
-            onCancel: () => Navigator.pop(ctx),
-          ),
-        ),
-      ),
-    );
-  }
-
   bool get followsHeight =>
       texts['followStoreyHeight'] == 'true' ||
       (!texts.containsKey('followStoreyHeight') &&
           records.every((e) => e['followStoreyHeight'] == true));
   bool get normalWalls =>
       records.every((e) => !ArchitectWall.fromJson(e).isParapet);
-  Widget _zoneMetricsBanner(ArchitectZone zone, AppLocalizations l) => Container(
+  Widget _zoneMetricsBanner(
+    ArchitectZone zone,
+    AppLocalizations l,
+  ) => Container(
     margin: const EdgeInsets.only(bottom: 12),
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     decoration: BoxDecoration(
@@ -320,23 +337,17 @@ class _ArchitectElementPropertiesDialogState
   );
 
   Widget _zoneCategoryField(AppLocalizations l) {
-    final currentCatName = texts['category'] ??
-        (records.map((e) => e['category']).toSet().length == 1
-            ? records.first['category'] as String? ?? 'custom'
-            : 'custom');
-    final currentCat = ArchitectZoneCategory.values.firstWhere(
-      (c) => c.name == currentCatName,
-      orElse: () => ArchitectZoneCategory.custom,
-    );
     return DropdownButtonFormField<String>(
-      key: ValueKey('architect-property-category-$currentCatName'),
+      key: ValueKey(
+        'architect-property-category-${texts['category'] ?? _common('category')}',
+      ),
       isExpanded: true,
       decoration: InputDecoration(
         labelText: l.architectZoneCategory,
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       ),
-      initialValue: currentCat.name,
+      initialValue: texts['category'] ?? _common('category') as String?,
       items: [
         for (final cat in ArchitectZoneCategory.values)
           DropdownMenuItem(
@@ -359,9 +370,12 @@ class _ArchitectElementPropertiesDialogState
               (c) => c.name == val,
               orElse: () => ArchitectZoneCategory.custom,
             );
-            final currentName = texts['name'] ?? (records.first['name'] as String? ?? '');
+            final currentName =
+                texts['name'] ?? (records.first['name'] as String? ?? '');
             if (currentName.isEmpty ||
-                ArchitectZoneCategory.values.any((c) => c.localizedName(l) == currentName)) {
+                ArchitectZoneCategory.values.any(
+                  (c) => c.localizedName(l) == currentName,
+                )) {
               texts['name'] = newCat.localizedName(l);
             }
           });
@@ -371,11 +385,13 @@ class _ArchitectElementPropertiesDialogState
   }
 
   Widget _zoneNumberAndNameFields(AppLocalizations l) {
-    final currentNumber = texts['number'] ??
+    final currentNumber =
+        texts['number'] ??
         (records.map((e) => e['number']).toSet().length == 1
             ? records.first['number'] as String? ?? '1'
-            : '1');
-    final currentName = texts['name'] ??
+            : '');
+    final currentName =
+        texts['name'] ??
         (records.map((e) => e['name']).toSet().length == 1
             ? records.first['name'] as String? ?? ''
             : '');
@@ -390,9 +406,12 @@ class _ArchitectElementPropertiesDialogState
             decoration: InputDecoration(
               labelText: l.architectZoneNumberPrompt,
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 10,
+              ),
             ),
-            onChanged: (v) => texts['number'] = v,
+            onChanged: (v) => setState(() => texts['number'] = v),
           ),
         ),
         const SizedBox(width: 10),
@@ -403,9 +422,12 @@ class _ArchitectElementPropertiesDialogState
             decoration: InputDecoration(
               labelText: l.architectZoneName,
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 10,
+              ),
             ),
-            onChanged: (v) => texts['name'] = v,
+            onChanged: (v) => setState(() => texts['name'] = v),
           ),
         ),
       ],
@@ -413,7 +435,8 @@ class _ArchitectElementPropertiesDialogState
   }
 
   Widget _zoneFinishField(String key, String label, List<String> presets) {
-    final current = texts[key] ??
+    final current =
+        texts[key] ??
         (records.map((e) => e[key]).toSet().length == 1
             ? records.first[key] as String? ?? ''
             : '');
@@ -428,9 +451,12 @@ class _ArchitectElementPropertiesDialogState
               decoration: InputDecoration(
                 labelText: label,
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
               ),
-              onChanged: (v) => texts[key] = v,
+              onChanged: (v) => setState(() => texts[key] = v),
             ),
           ),
           PopupMenuButton<String>(
@@ -455,10 +481,11 @@ class _ArchitectElementPropertiesDialogState
     final isAuto = texts['isAutoBoundary'] == 'false'
         ? false
         : (texts['isAutoBoundary'] == 'true'
-            ? true
-            : (records.first['isAutoBoundary'] as bool? ?? true));
+              ? true
+              : (_common('isAutoBoundary') as bool?));
     return CheckboxListTile(
       key: const ValueKey('architect-property-isAutoBoundary'),
+      tristate: true,
       dense: true,
       contentPadding: EdgeInsets.zero,
       title: Text(l.architectZoneBoundaryAuto),
@@ -475,24 +502,37 @@ class _ArchitectElementPropertiesDialogState
     );
   }
 
-  Widget numberField(String key, bool walls) => ListTile(
-    key: ValueKey('architect-property-$key'),
-    dense: true,
-    contentPadding: EdgeInsets.zero,
-    title: Text(label(key)),
-    trailing: Text(
-      fieldValue(key) == null
-          ? '—'
-          : metric(key)
-          ? widget.project.formatLength(fieldValue(key)!)
-          : key == 'strokeWidth' ? '${(fieldValue(key)! / ArchitectCadPrimitive.strokeUnitsPerPaperMm).toStringAsFixed(3)} mm'
-          : fieldValue(key)!.toStringAsFixed(key == 'stepCount' ? 0 : 1),
+  Widget numberField(String key, bool walls) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: ArchitectPropertyNumberField(
+      key: ValueKey('architect-property-$key'),
+      descriptor: ArchitectPropertyDescriptor.of(key),
+      project: widget.project,
+      label: label(key),
+      value: fieldValue(key),
+      onClear: key == 'targetArea'
+          ? () => setState(() {
+              values.remove(key);
+              _cleared.add(key);
+              fields[key] = null;
+            })
+          : null,
+      readOnly:
+          walls && (key == 'thickness' || (key == 'height' && followsHeight)),
+      helper: walls && key == 'thickness'
+          ? context.l10n.propertiesCalculated
+          : walls && key == 'height' && followsHeight
+          ? context.l10n.architectWallFollowStorey
+          : null,
+      onChanged: (value) => setState(() {
+        if (value == fields[key]) {
+          values.remove(key);
+        } else {
+          _cleared.remove(key);
+          values[key] = value;
+        }
+      }),
     ),
-    onTap:
-        (walls && key == 'thickness') ||
-            (walls && key == 'height' && followsHeight)
-        ? null
-        : () => editNumber(key),
   );
 
   Widget materialField(String key) {
@@ -522,625 +562,1034 @@ class _ArchitectElementPropertiesDialogState
     );
   }
 
+  final _form = GlobalKey<FormState>();
+  final _shell = GlobalKey<ArchitectPropertiesShellState>();
+  final _compositionHandle = ArchitectPropertiesEditorHandle();
+  late final Map<String, String> _initialTexts;
+  Timer? _timer;
+  int _tab = 0;
+  int _typeVersion = 0;
+  String? _error;
+  ArchitectWallType? _composition;
+  ArchitectWallPlinthPatch? _region;
+  bool _compositionChanged = false;
+  bool _flipMixed = false;
+  late final _session = ArchitectPropertiesSession(widget.project);
+  late ArchitectProject _draft = widget.project;
+  final _cleared = <String>{};
+  final _textControllers = <String, TextEditingController>{};
+  Object? _common(String key) {
+    final all = records.map((e) => e[key]).toSet();
+    return all.length == 1 ? all.single : null;
+  }
+
+  Map<String, String> get _patch => {
+    for (final e in texts.entries)
+      if (e.value != (_initialTexts[e.key] ?? '${_common(e.key) ?? ''}'))
+        e.key: e.value,
+  };
+  bool _inputDirty = false;
+  bool get _dirty =>
+      _flipMixed ||
+      (_compositionHandle.isDirty?.call() ?? false) ||
+      _inputDirty ||
+      _cleared.isNotEmpty ||
+      values.isNotEmpty ||
+      _patch.isNotEmpty ||
+      _composition != null;
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _timer?.cancel();
+    _timer = Timer(const Duration(milliseconds: 200), () {
+      if (mounted) _preview();
+    });
+  }
+
+  ArchitectProject _candidate() {
+    var next = SetArchitectElementProperties(
+      storeyId: widget.project.activeStoreyId,
+      elementIds: widget.elementIds,
+      values: values,
+      clearValues: _cleared,
+      textValues: _patch,
+    ).apply(widget.project);
+    if (_composition != null) {
+      next = SetArchitectWallComposition(
+        type: _composition!,
+        storeyId: widget.project.activeStoreyId,
+        wallIds: widget.elementIds,
+        plinthPatch: _region,
+        preserveComposition: !_compositionChanged,
+      ).apply(next);
+    }
+    if (_flipMixed) {
+      for (final wall in widget.project.activeStorey.walls.where(
+        (w) => widget.elementIds.contains(w.id),
+      )) {
+        next = SetArchitectElementProperties(
+          storeyId: widget.project.activeStoreyId,
+          elementIds: {wall.id},
+          textValues: {
+            'exteriorSideMode': 'manual',
+            'exteriorSide': wall.exteriorSide == WallExteriorSide.right
+                ? 'left'
+                : 'right',
+          },
+        ).apply(next);
+      }
+    }
+    return widget.prepare?.call(next) ?? next;
+  }
+
+  bool _preview({bool notify = true}) {
+    try {
+      if (widget.isCurrent?.call() == false) throw StateError('stale');
+      _session.stage('properties', (_) => _candidate());
+      _draft = _session.preview;
+      if (notify) widget.onPreview?.call(_draft);
+      super.setState(() => _error = null);
+      return true;
+    } on ArgumentError {
+      super.setState(() => _error = context.l10n.propertiesInvalid);
+      return false;
+    } on StateError {
+      super.setState(() => _error = context.l10n.propertiesStale);
+      return false;
+    }
+  }
+
+  void _save() {
+    _timer?.cancel();
+    if (!_dirty) {
+      Navigator.pop(context);
+      return;
+    }
+    final invalid = _form.currentState!.validateGranularly();
+    if (invalid.isNotEmpty) {
+      _shell.currentState?.expand();
+      setState(() => _error = context.l10n.propertiesInvalid);
+      final field = invalid.first;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (field.mounted) Scrollable.ensureVisible(field.context);
+      });
+      return;
+    }
+    if (_compositionHandle.validate != null &&
+        !_compositionHandle.validate!()) {
+      setState(() {
+        _tab = 1;
+        _error = context.l10n.propertiesInvalid;
+      });
+      _shell.currentState?.expand();
+      return;
+    }
+    if (!_preview(notify: false)) return;
+    if (!_dirty ||
+        (widget.onApplyProject?.call(_draft) ??
+            widget.onApply(values, _patch))) {
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _session.dispose();
+    for (final c in _textControllers.values) {
+      c.dispose();
+    }
+    widget.onPreview?.call(null);
+    super.dispose();
+  }
+
+  Widget _textField(String key, String label) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: TextFormField(
+      key: ValueKey('architect-property-$key'),
+      controller: _textControllers.putIfAbsent(
+        key,
+        () => TextEditingController(
+          text: texts[key] ?? _common(key)?.toString() ?? '',
+        ),
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: _common(key) == null ? context.l10n.wallMixedValue : null,
+      ),
+      onChanged: (v) => setState(() => texts[key] = v),
+    ),
+  );
+  Widget _scroll(List<Widget> children) => SingleChildScrollView(
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    ),
+  );
+  ArchitectWallType _wallType() {
+    final w = widget.project.activeStorey.walls.firstWhere(
+      (w) => widget.elementIds.contains(w.id),
+    );
+    return ArchitectWallType(
+      id: 'properties-${w.id}',
+      name: '',
+      isCatalogType: false,
+      layers: w.resolvedLayers,
+      system: w.system,
+      totalThickness: w.thickness,
+      parapetFinish: w.parapetFinish,
+      usage: w.isParapet
+          ? WallUsage.parapet
+          : w.isExterior
+          ? WallUsage.exterior
+          : WallUsage.interior,
+      location: w.isExterior
+          ? ArchitectWallLocation.exterior
+          : ArchitectWallLocation.interior,
+    );
+  }
+
+  Future<void> _pickType() async {
+    final result = await showArchitectWallTypePicker(
+      context,
+      types: [
+        ...ArchitectWallType.standardCatalog(includeSpecial: true),
+        ...widget.project.wallTypes.where((t) => t.isCatalogType),
+      ].where((t) => t.isParapet == _wallType().isParapet).toList(),
+      activeType: _composition ?? _wallType(),
+      unit: widget.project.units,
+      projectId: widget.project.id,
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _typeVersion++;
+        _composition = result.type;
+        _compositionChanged = true;
+      });
+    }
+  }
+
+  Widget _choice(String key, String label, Map<String, String> options) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: DropdownButtonFormField<String>(
+          key: ValueKey('architect-property-$key'),
+          isExpanded: true,
+          initialValue: texts[key] ?? _common(key)?.toString(),
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: context.l10n.wallMixedValue,
+          ),
+          items: [
+            for (final e in options.entries)
+              DropdownMenuItem(value: e.key, child: Text(e.value)),
+          ],
+          onChanged: (v) {
+            if (v != null) setState(() => texts[key] = v);
+          },
+        ),
+      );
+  String _title(AppLocalizations l) {
+    final s = widget.project.activeStorey, ids = widget.elementIds;
+    final name = ids.every((id) => s.walls.any((e) => e.id == id))
+        ? l.architectToolWall
+        : ids.every((id) => s.walls.any((w) => w.doors.any((e) => e.id == id)))
+        ? l.architectToolDoor
+        : ids.every(
+            (id) => s.walls.any((w) => w.windows.any((e) => e.id == id)),
+          )
+        ? l.architectToolWindow
+        : ids.every((id) => s.columns.any((e) => e.id == id))
+        ? l.architectToolColumn
+        : ids.every((id) => s.beams.any((e) => e.id == id))
+        ? l.architectToolBeam
+        : ids.every((id) => s.slabs.any((e) => e.id == id))
+        ? l.architectToolSlab
+        : ids.every((id) => s.zones.any((e) => e.id == id))
+        ? l.architectToolZone
+        : ids.every((id) => s.floorDrains.any((e) => e.id == id))
+        ? l.architectToolFloorDrain
+        : ids.every((id) => s.openings.any((e) => e.id == id))
+        ? l.architectToolOpening
+        : ids.every((id) => s.annotations.any((e) => e.id == id))
+        ? l.architectToolText
+        : ids.every((id) => s.dimensions.any((e) => e.id == id))
+        ? l.architectToolDimension
+        : ids.every((id) => s.elevationMarkers.any((e) => e.id == id))
+        ? l.architectToolLevel
+        : ids.every((id) => widget.project.gridAxes.any((e) => e.id == id))
+        ? l.architectToolAxis
+        : ids.every(
+            (id) => s.cadPrimitives.any(
+              (e) => e.id == id && e.type == CadPrimitiveType.hatch,
+            ),
+          )
+        ? l.architectToolHatch
+        : l.architectProperties;
+    return ids.length == 1 ? name : l.propertiesSelection(name, ids.length);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    final walls = records.every((e) => e.containsKey('referenceLine'));
-    final isDoor =
-        records.isNotEmpty &&
-        records.every(
-          (e) => e.containsKey('offsetRatio') && e.containsKey('isHingeLeft'),
-        );
-    final isWindow =
-        records.isNotEmpty &&
-        records.every(
-          (e) => e.containsKey('offsetRatio') && e.containsKey('panesCount'),
-        );
-    final isZone = records.isNotEmpty &&
-        records.every((e) => e.containsKey('category') && e.containsKey('floorFinish'));
-    return AlertDialog(
-      title: Text(l.architectProperties),
-      content: SizedBox(
-        width: isZone ? 310 : 270,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (widget.onScheduleTable != null) ...[
-                OutlinedButton.icon(
-                  key: const ValueKey('architect-property-schedule-table'),
-                  onPressed: widget.onScheduleTable,
-                  icon: const Icon(Icons.table_chart_rounded, size: 18),
-                  label: Text(l.architectZoneScheduleTitle),
+    final walls = widget.elementIds.every(
+      (id) => widget.project.activeStorey.walls.any((w) => w.id == id),
+    );
+    final isDoor = records.every(
+      (e) => e.containsKey('offsetRatio') && e.containsKey('isHingeLeft'),
+    );
+    final isWindow = records.every(
+      (e) => e.containsKey('offsetRatio') && e.containsKey('panesCount'),
+    );
+    final isZone = records.every((e) => e.containsKey('floorFinish'));
+    final pages = <Widget>[];
+    if (!walls) {
+      pages.add(
+        _scroll([
+          if (widget.onScheduleTable != null) ...[
+            OutlinedButton.icon(
+              key: const ValueKey('architect-property-schedule-table'),
+              onPressed: widget.onScheduleTable,
+              icon: const Icon(Icons.table_chart_rounded, size: 18),
+              label: Text(l.architectZoneScheduleTitle),
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (widget.onSlabLayers != null)
+            OutlinedButton.icon(
+              key: const ValueKey('architect-property-slab-layers'),
+              onPressed: widget.onSlabLayers,
+              icon: const Icon(Icons.layers_outlined),
+              label: Text(l.slabLayers),
+            ),
+          if (isZone) ...[
+            if (widget.elementIds.length == 1) ...[
+              Builder(
+                builder: (_) {
+                  final zone = widget.project.activeStorey.zones
+                      .where((z) => widget.elementIds.contains(z.id))
+                      .firstOrNull;
+                  return zone != null
+                      ? _zoneMetricsBanner(zone, l)
+                      : const SizedBox.shrink();
+                },
+              ),
+            ],
+            _zoneNumberAndNameFields(l),
+            const SizedBox(height: 8),
+            _zoneCategoryField(l),
+            const SizedBox(height: 4),
+            numberField('clearHeight', false),
+            if (fields.containsKey('targetArea'))
+              numberField('targetArea', false),
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(
+                l.architectZoneFinishes,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 8),
-              ],
-              if (widget.onSlabLayers != null)
-                OutlinedButton.icon(
-                  key: const ValueKey('architect-property-slab-layers'),
-                  onPressed: widget.onSlabLayers,
-                  icon: const Icon(Icons.layers_outlined),
-                  label: Text(l.slabLayers),
-                ),
-              if (isZone) ...[
-                if (widget.elementIds.length == 1) ...[
-                  Builder(
-                    builder: (_) {
-                      final zone = widget.project.activeStorey.zones
-                          .where((z) => widget.elementIds.contains(z.id))
-                          .firstOrNull;
-                      return zone != null
-                          ? _zoneMetricsBanner(zone, l)
-                          : const SizedBox.shrink();
-                    },
-                  ),
-                ],
-                _zoneNumberAndNameFields(l),
-                const SizedBox(height: 8),
-                _zoneCategoryField(l),
-                const SizedBox(height: 4),
-                numberField('clearHeight', false),
-                if (fields.containsKey('targetArea'))
-                  numberField('targetArea', false),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Text(
-                    l.architectZoneFinishes,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                _zoneFinishField(
-                  'floorFinish',
-                  l.architectZoneFloorFinish,
-                  ArchitectZone.standardFloorFinishes(l),
-                ),
-                _zoneFinishField(
-                  'wallFinish',
-                  l.architectZoneWallFinish,
-                  ArchitectZone.standardWallFinishes(l),
-                ),
-                _zoneFinishField(
-                  'ceilingFinish',
-                  l.architectZoneCeilingFinish,
-                  ArchitectZone.standardCeilingFinishes(l),
-                ),
-                const SizedBox(height: 4),
-                _zoneBoundaryModeSwitch(l),
-              ],
-              if (isDoor || isWindow) ...[
-                DropdownButtonFormField<String>(
-                  key: const ValueKey('architect-property-styleId'),
-                  isExpanded: true,
-                  decoration: InputDecoration(
-                    labelText: l.architectFenestrationStyle,
-                  ),
-                  initialValue: FenestrationLibraryService.instance
-                          .getStylesForKind(isDoor
-                              ? FenestrationKind.door
-                              : FenestrationKind.window)
-                          .any((s) =>
-                              s.id ==
-                              (texts['styleId'] ?? records.first['styleId']))
-                      ? (texts['styleId'] ??
-                          records.first['styleId'] as String?)
-                      : null,
-                  items: [
-                    for (final s in FenestrationLibraryService.instance
-                        .getStylesForKind(isDoor
+              ),
+            ),
+            const SizedBox(height: 4),
+            _zoneFinishField(
+              'floorFinish',
+              l.architectZoneFloorFinish,
+              ArchitectZone.standardFloorFinishes(l),
+            ),
+            _zoneFinishField(
+              'wallFinish',
+              l.architectZoneWallFinish,
+              ArchitectZone.standardWallFinishes(l),
+            ),
+            _zoneFinishField(
+              'ceilingFinish',
+              l.architectZoneCeilingFinish,
+              ArchitectZone.standardCeilingFinishes(l),
+            ),
+            const SizedBox(height: 4),
+            _zoneBoundaryModeSwitch(l),
+          ],
+          if (isDoor || isWindow) ...[
+            DropdownButtonFormField<String>(
+              key: const ValueKey('architect-property-styleId'),
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: l.architectFenestrationStyle,
+              ),
+              initialValue:
+                  FenestrationLibraryService.instance
+                      .getStylesForKind(
+                        isDoor
                             ? FenestrationKind.door
-                            : FenestrationKind.window))
-                      DropdownMenuItem(
-                        value: s.id,
-                        child: Text(
-                          s.name,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        texts['styleId'] = val;
-                        final s =
-                            FenestrationLibraryService.instance.getStyleById(val);
-                        if (s != null) {
-                          values['width'] = s.defaultWidth;
-                          values['height'] = s.defaultHeight;
-                          values['sillHeight'] = s.defaultSillHeight;
-                        }
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 8),
-              ],
-              if (isDoor) ...[
-                ListTile(
-                  key: const ValueKey('architect-property-specId'),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(l.architectDoorSpecId),
-                  trailing: Text(
-                    texts['specId'] ?? (records.first['specId'] as String? ?? '1'),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                            : FenestrationKind.window,
+                      )
+                      .any(
+                        (s) => s.id == (texts['styleId'] ?? _common('styleId')),
+                      )
+                  ? (texts['styleId'] ?? _common('styleId') as String?)
+                  : null,
+              items: [
+                for (final s
+                    in FenestrationLibraryService.instance.getStylesForKind(
+                      isDoor ? FenestrationKind.door : FenestrationKind.window,
+                    ))
+                  DropdownMenuItem(
+                    value: s.id,
+                    child: Text(
+                      s.localizedName(l),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  onTap: () async {
-                    final controller = TextEditingController(
-                      text: texts['specId'] ??
-                          (records.first['specId'] as String? ?? '1'),
+              ],
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    texts['styleId'] = val;
+                    final s = FenestrationLibraryService.instance.getStyleById(
+                      val,
                     );
-                    final res = await showDialog<String>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: Text(l.architectDoorSpecId),
-                        content: TextField(
-                          controller: controller,
-                          autofocus: true,
-                          decoration: InputDecoration(
-                            labelText: l.architectDoorSpecId,
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: Text(l.cancel),
-                          ),
-                          ElevatedButton(
-                            onPressed: () =>
-                                Navigator.pop(ctx, controller.text.trim()),
-                            child: Text(l.save),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (res != null && res.isNotEmpty) {
-                      setState(() => texts['specId'] = res);
+                    if (s != null) {
+                      values['width'] = s.defaultWidth;
+                      values['height'] = s.defaultHeight;
+                      values['sillHeight'] = s.defaultSillHeight;
                     }
-                  },
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      l.architectDoorHingeSide,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    SegmentedButton<bool>(
-                      expandedInsets: EdgeInsets.zero,
-                      style: const ButtonStyle(
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      segments: [
-                        ButtonSegment(
-                          value: true,
-                          label: Text(
-                            l.architectDoorHingeLeft,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        ButtonSegment(
-                          value: false,
-                          label: Text(
-                            l.architectDoorHingeRight,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                      selected: {
-                        texts['isHingeLeft'] == 'false'
-                            ? false
-                            : (texts['isHingeLeft'] == 'true'
-                                ? true
-                                : (records.first['isHingeLeft'] as bool? ?? true)),
-                      },
-                      onSelectionChanged: (sel) {
-                        setState(() {
-                          final isLeft = sel.first;
-                          texts['isHingeLeft'] = '$isLeft';
-                          final currentSpec = texts['specId'] ?? (records.first['specId'] as String?);
-                          if (currentSpec != null && currentSpec.isNotEmpty) {
-                            final base = ArchitectDoor.extractBaseNumber(currentSpec);
-                            if (base != null) {
-                              texts['specId'] = ArchitectDoor.formatSpecId(baseNumber: base, isHingeLeft: isLeft);
-                            }
-                          }
-                        });
-                      },
-                      showSelectedIcon: false,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      l.architectDoorSwingDirection,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    SegmentedButton<bool>(
-                      expandedInsets: EdgeInsets.zero,
-                      style: const ButtonStyle(
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      segments: [
-                        ButtonSegment(
-                          value: true,
-                          label: Text(
-                            l.architectDoorSwingIn,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        ButtonSegment(
-                          value: false,
-                          label: Text(
-                            l.architectDoorSwingOut,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                      selected: {
-                        texts['openInward'] == 'false'
-                            ? false
-                            : (texts['openInward'] == 'true'
-                                ? true
-                                : (records.first['openInward'] as bool? ?? true)),
-                      },
-                      onSelectionChanged: (sel) {
-                        setState(() => texts['openInward'] = '${sel.first}');
-                      },
-                      showSelectedIcon: false,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-              ],
-              if (isWindow) ...[
-                ListTile(
-                  key: const ValueKey('architect-property-window-flip'),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(l.architectWindowFlipSide),
-                  trailing: Switch(
-                    value: texts['isFlipped'] == 'true' ||
-                        (texts['isFlipped'] == null &&
-                            (records.first['isFlipped'] as bool? ?? false)),
-                    onChanged: (val) {
-                      setState(() => texts['isFlipped'] = '$val');
-                    },
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+          if ((isDoor || isWindow) && widget.elementIds.length == 1)
+            ArchitectPropertiesPlanPreview(
+              project: _draft,
+              elementId: widget.elementIds.single,
+            ),
+          if (isDoor) ...[
+            _textField('specId', l.architectDoorSpecId),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  l.architectDoorHingeSide,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 8),
-              ],
-              if (records.every((e) =>
-                  e.containsKey('referenceLine') ||
-                  e.containsKey('shape') ||
-                  (e.containsKey('depth') && e.containsKey('width')))) ...[
-                DropdownButtonFormField<String>(
-                  key: const ValueKey('architect-property-cutDisplayMode'),
-                  isExpanded: true,
-                  decoration: InputDecoration(
-                    labelText: l.architectPropertyCutDisplay,
+                const SizedBox(height: 4),
+                SegmentedButton<bool>(
+                  expandedInsets: EdgeInsets.zero,
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  initialValue: texts['cutDisplayMode'] ??
-                      (records.map((e) => e['cutDisplayMode'] as String? ?? 'auto').toSet().length == 1
-                          ? (records.first['cutDisplayMode'] as String? ?? 'auto')
-                          : null),
-                  items: [
-                    for (final mode in ArchitectCutDisplayMode.values)
-                      DropdownMenuItem(
-                        value: mode.name,
-                        child: Text(switch (mode) {
-                          ArchitectCutDisplayMode.auto => l.architectCutDisplayAuto,
-                          ArchitectCutDisplayMode.projected => l.architectCutDisplayProjected,
-                          ArchitectCutDisplayMode.cut => l.architectCutDisplayCut,
-                          ArchitectCutDisplayMode.overhead => l.architectCutDisplayOverhead,
-                        }),
+                  segments: [
+                    ButtonSegment(
+                      value: true,
+                      label: Text(
+                        l.architectDoorHingeLeft,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                    ),
+                    ButtonSegment(
+                      value: false,
+                      label: Text(
+                        l.architectDoorHingeRight,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
-                  onChanged: (v) {
-                    if (v != null) setState(() => texts['cutDisplayMode'] = v);
+                  emptySelectionAllowed: true,
+                  selected: {
+                    if (texts.containsKey('isHingeLeft'))
+                      texts['isHingeLeft'] == 'true'
+                    else if (_common('isHingeLeft') != null)
+                      _common('isHingeLeft') as bool,
                   },
-                ),
-                const SizedBox(height: 8),
-              ],
-              if (_supportsHatch) ...[
-                ArchitectHatchPicker(key: const ValueKey('architect-property-hatch'), value: _hatchPattern,
-                  colorValue: _hatchColor?.argb,
-                  customPatterns: widget.project.hatchPatterns, lineStyles: widget.project.lineStyles,
-                  onChanged: (pattern) => setState(() {
-                    _hatchPattern = pattern; texts['hatchPattern'] = jsonEncode(pattern.toJson());
-                  })),
-                ArchitectDrawingColorPicker(key: const ValueKey('architect-property-hatch-color'), value: _hatchColor,
-                  onChanged: (color) => setState(() {
-                    _hatchColor = color; texts['drawingColor'] = jsonEncode(color.toJson());
-                  })),
-                CheckboxListTile(key: const ValueKey('architect-property-hatch-border'),
-                  contentPadding: EdgeInsets.zero, dense: true, tristate: true,
-                  title: Text(l.architectHatchBorder), value: _hatchBorder,
-                  onChanged: (v) => setState(() {
-                    _hatchBorder = v ?? false; texts['hatchBorder'] = '${v ?? false}';
-                  })),
-              ],
-              if (_supportsLineStyle)
-                ArchitectLineStylePicker(
-                  key: const ValueKey('architect-property-line-style'),
-                  value: _lineStyle,
-                  customStyles: widget.project.lineStyles,
-                  onChanged: (style) => setState(() {
-                    _lineStyle = style;
-                    texts['lineStyle'] = jsonEncode(style.toJson());
-                  }),
-                ),
-              if (_supportsLineStyle)
-                TextButton.icon(
-                  key: const ValueKey('architect-property-line-pattern'),
-                  icon: const Icon(Icons.tune),
-                  label: Text(l.architectLinePatternEditor),
-                  onPressed: () async {
-                    final current = _lineStyle ?? ArchitectLineStyle.presets[1];
-                    final edited = await showDialog<ArchitectLineStyle>(
-                      context: context,
-                      builder: (_) => ArchitectLinePatternEditor(initial:
-                        current.isPreset ? ArchitectLineStyle(
-                          id: 'custom-${DateTime.now().microsecondsSinceEpoch}',
-                          name: current.label(l),
-                          segmentsMm: current.isSolid ? const [3, 1.5] : current.segmentsMm,
-                          symbol: current.symbol,
-                        ) : current),
-                    );
-                    if (edited != null && mounted) {
-                      setState(() {
-                        _lineStyle = edited;
-                        texts['lineStyle'] = jsonEncode(edited.toJson());
-                      });
-                    }
-                  },
-                ),
-              if (!walls && !isZone)
-                for (final key in fields.keys) numberField(key, false),
-              if (walls) ...[
-                if(widget.onWallPlinth!=null)OutlinedButton.icon(key:const ValueKey('architect-property-wall-plinth'),icon:const Icon(Icons.border_bottom),label:Text(l.wallPlinth),onPressed:(){Navigator.pop(context);widget.onWallPlinth!(values,texts);}),
-                if(widget.onWallLayers!=null)OutlinedButton.icon(key:const ValueKey('architect-property-wall-layers'),icon:const Icon(Icons.layers_outlined),label:Text(l.wallCompositionAction),onPressed:(){Navigator.pop(context);widget.onWallLayers!(values,texts);}),
-                if (widget.onStraighten != null)
-                  OutlinedButton.icon(
-                    key: const ValueKey('architect-property-straighten'),
-                    icon: const Icon(Icons.square_foot),
-                    label: Text(l.architectWallStraighten),
-                    onPressed: () {
-                      if (widget.onStraighten!(values, texts)) Navigator.pop(context);
-                    },
-                  ),
-                if(fields.containsKey('arcRadius'))numberField('arcRadius',false),
-                numberField('baseOffset', false),
-                if (records.length == 1 &&
-                    (records.first['system'] as Map?)?['kind'] ==
-                        'sandwichPanels')
-                  ExpansionTile(
-                    key: const ValueKey('wall-panel-supports'),
-                    tilePadding: EdgeInsets.zero,
-                    title: Text(l.wallColumnSupports),
-                    children: [
-                      TextFormField(
-                        key: const ValueKey('wall-panel-offset'),
-                        initialValue: widget.project.units
-                            .toUnit(
-                              (panelPlacement['mountingOffset'] as num?)
-                                      ?.toDouble() ??
-                                  0,
-                            )
-                            .toString(),
-                        decoration: InputDecoration(
-                          labelText: l.wallMountingOffset,
-                          suffixText: widget.project.units.symbol,
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
-                        onChanged: (text) {
-                          final value = double.tryParse(
-                            text.replaceAll(',', '.'),
+                  onSelectionChanged: (sel) {
+                    setState(() {
+                      if (sel.isEmpty) return;
+                      final isLeft = sel.first;
+                      texts['isHingeLeft'] = '$isLeft';
+                      final currentSpec =
+                          texts['specId'] ?? (_common('specId') as String?);
+                      if (currentSpec != null && currentSpec.isNotEmpty) {
+                        final base = ArchitectDoor.extractBaseNumber(
+                          currentSpec,
+                        );
+                        if (base != null) {
+                          texts['specId'] = ArchitectDoor.formatSpecId(
+                            baseNumber: base,
+                            isHingeLeft: isLeft,
                           );
-                          if (value != null && value.isFinite) {
-                            updatePanelPlacement({
-                              'mountingOffset': widget.project.units.fromUnit(
-                                value,
-                              ),
-                            });
-                          }
-                        },
+                        }
+                      }
+                    });
+                  },
+                  showSelectedIcon: false,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  l.architectDoorSwingDirection,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                SegmentedButton<bool>(
+                  expandedInsets: EdgeInsets.zero,
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  segments: [
+                    ButtonSegment(
+                      value: true,
+                      label: Text(
+                        l.architectDoorSwingIn,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      for (final column in widget.project.activeStorey.columns)
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(column.label),
-                          value: (panelPlacement['columnIds'] as List? ?? [])
-                              .contains(column.id),
-                          onChanged: (value) {
-                            final ids = Set<String>.from(
-                              panelPlacement['columnIds'] as List? ?? [],
-                            );
-                            if (value == true) {
-                              ids.add(column.id);
-                            } else {
-                              ids.remove(column.id);
-                            }
-                            updatePanelPlacement({'columnIds': ids.toList()});
-                          },
-                        ),
-                      if ((panelPlacement['columnIds'] as List? ?? []).any(
-                        (id) => !widget.project.activeStorey.columns.any(
-                          (c) => c.id == id,
-                        ),
-                      )) ...[
-                        Text(l.wallMissingSupports),
-                        TextButton(
-                          key: const ValueKey('wall-panel-remove-missing'),
-                          onPressed: () => updatePanelPlacement({
-                            'columnIds': [
-                              for (final id in panelPlacement['columnIds'] as List? ?? [])
-                                if (widget.project.activeStorey.columns.any((c) => c.id == id)) id,
-                            ],
-                          }),
-                          child: Text(l.wallRemoveMissingSupports),
-                        ),
-                      ],
-                    ],
-                  ),
-                numberField('height', true),
-                if (normalWalls) ...[
-                  Tooltip(
-                    message: l.wallLocationAutoHelp,
-                    child: DropdownButtonFormField<String>(
-                      key: const ValueKey('architect-property-location'),
-                      decoration: InputDecoration(labelText: l.wallLocation),
-                      initialValue: records.map((e) => e['locationMode'] == 'manual'
-                          ? e['location'] as String? ?? 'interior' : 'automatic').toSet().length == 1
-                          ? records.first['locationMode'] == 'manual'
-                            ? records.first['location'] as String? ?? 'interior' : 'automatic'
-                          : null,
-                      items: [
-                        DropdownMenuItem(value: 'automatic', child: Text(l.wallAutomatic)),
-                        DropdownMenuItem(value: 'exterior', child: Text(l.wallExterior)),
-                        DropdownMenuItem(value: 'interior', child: Text(l.wallInterior)),
-                      ],
-                      onChanged: (v) => setState(() {
-                        if (v == null) return;
-                        texts['locationMode'] = v == 'automatic' ? 'automatic' : 'manual';
-                        if (v == 'automatic') { texts.remove('location'); }
-                        else { texts['location'] = v; }
-                      }),
                     ),
-                  ),
-                  Tooltip(
-                    message: l.wallSideAutoHelp,
-                    child: DropdownButtonFormField<String>(
-                      key: ValueKey('architect-property-sideMode-${texts['exteriorSideMode'] ?? ''}'),
-                      decoration: InputDecoration(labelText: l.wallExteriorSideLabel),
-                      initialValue: texts['exteriorSideMode'] ??
-                          (records.map((e) => e['exteriorSideMode'] ?? 'automatic').toSet().length == 1
-                            ? records.first['exteriorSideMode'] as String? ?? 'automatic' : null),
-                      items: [
-                        DropdownMenuItem(value: 'automatic', child: Text(l.wallAutomatic)),
-                        DropdownMenuItem(value: 'manual', child: Text(l.wallManual)),
-                      ],
-                      onChanged: (v) => setState(() {
-                        if (v != null) texts['exteriorSideMode'] = v;
-                      }),
+                    ButtonSegment(
+                      value: false,
+                      label: Text(
+                        l.architectDoorSwingOut,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
-                if (normalWalls)
-                  CheckboxListTile(
-                    key: const ValueKey(
-                      'architect-property-followStoreyHeight',
-                    ),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(l.architectWallFollowStorey),
-                    value: followsHeight,
-                    onChanged: (value) => setState(() {
-                      texts['followStoreyHeight'] = '$value';
-                      if (value == true) values.remove('height');
+                  ],
+                  emptySelectionAllowed: true,
+                  selected: {
+                    if (texts.containsKey('openInward'))
+                      texts['openInward'] == 'true'
+                    else if (_common('openInward') != null)
+                      _common('openInward') as bool,
+                  },
+                  onSelectionChanged: (sel) {
+                    if (sel.isNotEmpty) {
+                      setState(() => texts['openInward'] = '${sel.first}');
+                    }
+                  },
+                  showSelectedIcon: false,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (isWindow) ...[
+            ListTile(
+              key: const ValueKey('architect-property-window-flip'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(l.architectWindowFlipSide),
+              trailing: Checkbox(
+                tristate: true,
+                value: texts.containsKey('isFlipped')
+                    ? texts['isFlipped'] == 'true'
+                    : _common('isFlipped') as bool?,
+                onChanged: (val) {
+                  setState(() => texts['isFlipped'] = '${val ?? false}');
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (records.every(
+            (e) =>
+                widget.project.activeStorey.columns.any(
+                  (c) => c.id == e['id'],
+                ) ||
+                widget.project.activeStorey.beams.any((b) => b.id == e['id']),
+          )) ...[
+            DropdownButtonFormField<String>(
+              key: const ValueKey('architect-property-cutDisplayMode'),
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: l.architectPropertyCutDisplay,
+              ),
+              initialValue:
+                  texts['cutDisplayMode'] ??
+                  (records
+                              .map(
+                                (e) => e['cutDisplayMode'] as String? ?? 'auto',
+                              )
+                              .toSet()
+                              .length ==
+                          1
+                      ? (records.first['cutDisplayMode'] as String? ?? 'auto')
+                      : null),
+              items: [
+                for (final mode in ArchitectCutDisplayMode.values)
+                  DropdownMenuItem(
+                    value: mode.name,
+                    child: Text(switch (mode) {
+                      ArchitectCutDisplayMode.auto => l.architectCutDisplayAuto,
+                      ArchitectCutDisplayMode.projected =>
+                        l.architectCutDisplayProjected,
+                      ArchitectCutDisplayMode.cut => l.architectCutDisplayCut,
+                      ArchitectCutDisplayMode.overhead =>
+                        l.architectCutDisplayOverhead,
                     }),
                   ),
-                if(!records.any((e)=>(e['layers'] as List? ?? []).isNotEmpty))...[
+              ],
+              onChanged: (v) {
+                if (v != null) setState(() => texts['cutDisplayMode'] = v);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (_supportsHatch) ...[
+            ArchitectHatchPicker(
+              key: const ValueKey('architect-property-hatch'),
+              value: _hatchPattern,
+              colorValue: _hatchColor?.argb,
+              customPatterns: widget.project.hatchPatterns,
+              lineStyles: widget.project.lineStyles,
+              onChanged: (pattern) => setState(() {
+                _hatchPattern = pattern;
+                texts['hatchPattern'] = jsonEncode(pattern.toJson());
+              }),
+            ),
+            ArchitectDrawingColorPicker(
+              key: const ValueKey('architect-property-hatch-color'),
+              value: _hatchColor,
+              onChanged: (color) => setState(() {
+                _hatchColor = color;
+                texts['drawingColor'] = jsonEncode(color.toJson());
+              }),
+            ),
+            CheckboxListTile(
+              key: const ValueKey('architect-property-hatch-border'),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              tristate: true,
+              title: Text(l.architectHatchBorder),
+              value: _hatchBorder,
+              onChanged: (v) => setState(() {
+                _hatchBorder = v ?? false;
+                texts['hatchBorder'] = '${v ?? false}';
+              }),
+            ),
+          ],
+          if (_supportsLineStyle)
+            ArchitectLineStylePicker(
+              key: const ValueKey('architect-property-line-style'),
+              value: _lineStyle,
+              customStyles: widget.project.lineStyles,
+              onChanged: (style) => setState(() {
+                _lineStyle = style;
+                texts['lineStyle'] = jsonEncode(style.toJson());
+              }),
+            ),
+          if (_supportsLineStyle)
+            TextButton.icon(
+              key: const ValueKey('architect-property-line-pattern'),
+              icon: const Icon(Icons.tune),
+              label: Text(l.architectLinePatternEditor),
+              onPressed: () async {
+                final current = _lineStyle ?? ArchitectLineStyle.presets[1];
+                final edited = await showDialog<ArchitectLineStyle>(
+                  context: context,
+                  builder: (_) => ArchitectLinePatternEditor(
+                    initial: current.isPreset
+                        ? ArchitectLineStyle(
+                            id: 'custom-${DateTime.now().microsecondsSinceEpoch}',
+                            name: current.label(l),
+                            segmentsMm: current.isSolid
+                                ? const [3, 1.5]
+                                : current.segmentsMm,
+                            symbol: current.symbol,
+                          )
+                        : current,
+                  ),
+                );
+                if (edited != null && mounted) {
+                  setState(() {
+                    _lineStyle = edited;
+                    texts['lineStyle'] = jsonEncode(edited.toJson());
+                  });
+                }
+              },
+            ),
+          if (!walls && !isZone)
+            for (final key in [
+              'width',
+              'height',
+              'depth',
+              'thickness',
+              'sillHeight',
+              'baseOffset',
+              'rotationDeg',
+              'size',
+              'angle',
+              'slopePercent',
+              'strokeWidth',
+              'hatchScale',
+              'hatchAngle',
+              'fontSize',
+              'elevation',
+              'offsetDistance',
+              'stepCount',
+            ].where(fields.containsKey))
+              if (!(key == 'depth' &&
+                  widget.elementIds.every(
+                    (id) => widget.project.activeStorey.columns.any(
+                      (c) => c.id == id && c.shape.name == 'circular',
+                    ),
+                  )))
+                numberField(key, false),
+          if (!isZone)
+            for (final key in ['name', 'label', 'text', 'customText'])
+              if (records.every((e) => e.containsKey(key)))
+                TextFormField(
+                  key: ValueKey('$key-${texts[key] ?? records.first[key]}'),
+                  initialValue:
+                      texts[key] ??
+                      (records.map((e) => e[key]).toSet().length == 1
+                          ? records.first[key] as String? ?? ''
+                          : ''),
+                  decoration: InputDecoration(
+                    labelText: key == 'text' || key == 'customText'
+                        ? l.architectToolText
+                        : l.architectPropertyName,
+                  ),
+                  onChanged: (v) => texts[key] = v,
+                ),
+        ]),
+      );
+    } else {
+      pages.add(
+        _scroll([
+          OutlinedButton(
+            onPressed: _pickType,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    (_composition ?? _wallType()).catalogLabel(
+                      l,
+                      widget.project.units,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.expand_more),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (normalWalls)
+            CheckboxListTile(
+              key: const ValueKey('architect-property-followStoreyHeight'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(l.architectWallFollowStorey),
+              tristate: true,
+              value: texts.containsKey('followStoreyHeight')
+                  ? texts['followStoreyHeight'] == 'true'
+                  : _common('followStoreyHeight') as bool?,
+              onChanged: (v) => setState(() {
+                texts['followStoreyHeight'] = '${v ?? false}';
+                if (v == true) values.remove('height');
+              }),
+            ),
+          numberField('height', true),
+          numberField('baseOffset', false),
+          if (fields.containsKey('arcRadius')) numberField('arcRadius', false),
+          if (normalWalls)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: DropdownButtonFormField<String>(
+                key: const ValueKey('architect-property-location'),
+                isExpanded: true,
+                initialValue: texts['locationMode'] == 'automatic'
+                    ? 'automatic'
+                    : texts['location'] ??
+                          (records
+                                      .map(
+                                        (e) => e['locationMode'] == 'manual'
+                                            ? e['location']
+                                            : 'automatic',
+                                      )
+                                      .toSet()
+                                      .length ==
+                                  1
+                              ? (records.first['locationMode'] == 'manual'
+                                    ? records.first['location'] as String
+                                    : 'automatic')
+                              : null),
+                decoration: InputDecoration(
+                  labelText: l.wallLocation,
+                  hintText: l.wallMixedValue,
+                ),
+                items: [
+                  for (final e in {
+                    'automatic': l.wallAutomatic,
+                    'exterior': l.wallExterior,
+                    'interior': l.wallInterior,
+                  }.entries)
+                    DropdownMenuItem(value: e.key, child: Text(e.value)),
+                ],
+                onChanged: (v) => setState(() {
+                  if (v == null) return;
+                  texts['locationMode'] = v == 'automatic'
+                      ? 'automatic'
+                      : 'manual';
+                  if (v == 'automatic') {
+                    texts.remove('location');
+                  } else {
+                    texts['location'] = v;
+                  }
+                }),
+              ),
+            ),
+        ]),
+      );
+      final compositions = widget.project.activeStorey.walls
+          .where((w) => widget.elementIds.contains(w.id))
+          .map(
+            (w) => jsonEncode([
+              w.system.toJson(),
+              w.resolvedLayers.map((l) => l.toJson()..remove('id')).toList(),
+            ]),
+          )
+          .toSet();
+      pages.add(
+        compositions.length > 1 && _composition == null
+            ? _scroll([
+                Text(l.wallMixedValue),
+                const SizedBox(height: 8),
+                Text(l.propertiesMixedCompositionHelp),
+                TextButton(onPressed: _pickType, child: Text(l.wallChooseType)),
+              ])
+            : widget.onApplyProject != null
+            ? ArchitectWallCompositionEditor(
+                key: ValueKey('composition-$_typeVersion'),
+                embedded: true,
+                editorHandle: _compositionHandle,
+                project: widget.project,
+                type: _composition ?? _wallType(),
+                allowTypeSelection: true,
+                plinth: widget.project.activeStorey.walls
+                    .firstWhere((w) => widget.elementIds.contains(w.id))
+                    .plinth,
+                plinths: widget.project.activeStorey.walls
+                    .where((w) => widget.elementIds.contains(w.id))
+                    .map((w) => w.plinth)
+                    .toList(),
+                onDraftChanged: (type, region, changed) {
+                  if (!changed && (region == null || region.isEmpty)) return;
+                  setState(() {
+                    _composition = type;
+                    _region = region;
+                    _compositionChanged = changed;
+                  });
+                },
+                onApply: (type, region, changed) {
+                  setState(() {
+                    _composition = type;
+                    _region = region;
+                    _compositionChanged = changed;
+                  });
+                  return false;
+                },
+              )
+            : _scroll([
                 materialField('coreMaterial'),
+                const SizedBox(height: 16),
                 numberField('coreThickness', true),
                 materialField('insulationMaterial'),
+                const SizedBox(height: 16),
                 numberField('insulationThicknessOverride', true),
                 numberField('thickness', true),
-                ],
-                IconButton(
-                  key: const ValueKey('architect-property-flipSide'),
-                  tooltip: l.architectWallFlipSide,
-                  icon: Icon(
-                    Icons.flip,
-                    color: texts.containsKey('exteriorSide')
-                        ? (Theme.of(context).brightness == Brightness.dark
-                            ? const Color(0xFF00E5FF)
-                            : Theme.of(context).colorScheme.primary)
-                        : Theme.of(context).colorScheme.onSurface,
-                  ),
-                  onPressed: () => setState(() {
-                    texts['exteriorSideMode'] = 'manual';
-                    texts['exteriorSide'] =
-                        (texts['exteriorSide'] ??
-                                records.first['exteriorSide']) ==
-                            'right'
-                        ? 'left'
-                        : 'right';
-                  }),
-                ),
-                DropdownButtonFormField<String>(
-                  key: const ValueKey('architect-property-referenceLine'),
+              ]),
+      );
+      pages.add(
+        _scroll([
+          _choice('exteriorSideMode', l.wallExteriorSideLabel, {
+            'automatic': l.wallAutomatic,
+            'manual': l.wallManual,
+          }),
+          OutlinedButton.icon(
+            key: const ValueKey('architect-property-flipSide'),
+            icon: const Icon(Icons.flip),
+            label: Text(l.architectWallFlipSide),
+            onPressed: () => setState(() {
+              texts['exteriorSideMode'] = 'manual';
+              if (_common('exteriorSide') == null) {
+                _flipMixed = !_flipMixed;
+                return;
+              }
+              texts['exteriorSide'] =
+                  (texts['exteriorSide'] ?? _common('exteriorSide')) == 'right'
+                  ? 'left'
+                  : 'right';
+            }),
+          ),
+          const SizedBox(height: 16),
+          _choice('referenceLine', l.architectWallLeadingLine, {
+            'center': l.architectWallReferenceCenter,
+            'inner': l.architectWallReferenceInner,
+            'outer': l.architectWallReferenceOuter,
+          }),
+          _choice('cutDisplayMode', l.architectPropertyCutDisplay, {
+            'auto': l.architectCutDisplayAuto,
+            'projected': l.architectCutDisplayProjected,
+            'cut': l.architectCutDisplayCut,
+            'overhead': l.architectCutDisplayOverhead,
+          }),
+          if (records.length == 1 &&
+              (records.first['system'] as Map?)?['kind'] == 'sandwichPanels')
+            ExpansionTile(
+              key: const ValueKey('wall-panel-supports'),
+              tilePadding: EdgeInsets.zero,
+              title: Text(l.wallColumnSupports),
+              children: [
+                TextFormField(
+                  key: const ValueKey('wall-panel-offset'),
+                  initialValue: widget.project.units
+                      .toUnit(
+                        (panelPlacement['mountingOffset'] as num?)
+                                ?.toDouble() ??
+                            0,
+                      )
+                      .toString(),
                   decoration: InputDecoration(
-                    labelText: l.architectWallLeadingLine,
+                    labelText: l.wallMountingOffset,
+                    suffixText: widget.project.units.symbol,
                   ),
-                  initialValue: records.map(reference).toSet().length == 1
-                      ? reference(records.first)
-                      : null,
-                  items: [
-                    for (final r in [
-                      WallReferenceLine.center,
-                      WallReferenceLine.inner,
-                      WallReferenceLine.outer,
-                    ])
-                      DropdownMenuItem(
-                        value: r.name,
-                        child: Text(switch (r) {
-                          WallReferenceLine.center =>
-                            l.architectWallReferenceCenter,
-                          WallReferenceLine.inner =>
-                            l.architectWallReferenceInner,
-                          _ => l.architectWallReferenceOuter,
-                        }),
-                      ),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) texts['referenceLine'] = v;
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                    signed: true,
+                  ),
+                  onChanged: (text) {
+                    final value = double.tryParse(text.replaceAll(',', '.'));
+                    if (value != null && value.isFinite) {
+                      updatePanelPlacement({
+                        'mountingOffset': widget.project.units.fromUnit(value),
+                      });
+                    }
                   },
                 ),
+                for (final column in widget.project.activeStorey.columns)
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(column.label),
+                    value: (panelPlacement['columnIds'] as List? ?? [])
+                        .contains(column.id),
+                    onChanged: (value) {
+                      final ids = Set<String>.from(
+                        panelPlacement['columnIds'] as List? ?? [],
+                      );
+                      if (value == true) {
+                        ids.add(column.id);
+                      } else {
+                        ids.remove(column.id);
+                      }
+                      updatePanelPlacement({'columnIds': ids.toList()});
+                    },
+                  ),
+                if ((panelPlacement['columnIds'] as List? ?? []).any(
+                  (id) => !widget.project.activeStorey.columns.any(
+                    (c) => c.id == id,
+                  ),
+                )) ...[
+                  Text(l.wallMissingSupports),
+                  TextButton(
+                    key: const ValueKey('wall-panel-remove-missing'),
+                    onPressed: () => updatePanelPlacement({
+                      'columnIds': [
+                        for (final id
+                            in panelPlacement['columnIds'] as List? ?? [])
+                          if (widget.project.activeStorey.columns.any(
+                            (c) => c.id == id,
+                          ))
+                            id,
+                      ],
+                    }),
+                    child: Text(l.wallRemoveMissingSupports),
+                  ),
+                ],
               ],
-              if (!isZone)
-                for (final key in [
-                  'name',
-                  'label',
-                  'text',
-                  'specId',
-                  'customText',
-                ])
-                  if (records.every((e) => e.containsKey(key)))
-                    TextFormField(
-                      key: ValueKey('$key-${texts[key] ?? records.first[key]}'),
-                      initialValue:
-                          texts[key] ??
-                          (records.map((e) => e[key]).toSet().length == 1
-                              ? records.first[key] as String? ?? ''
-                              : ''),
-                      decoration: InputDecoration(
-                        labelText: key == 'text' || key == 'customText'
-                            ? l.architectToolText
-                            : l.architectPropertyName,
+            ),
+        ]),
+      );
+    }
+    return ArchitectPropertiesShell(
+      key: _shell,
+      title: _title(l),
+      subtitle: widget.project.activeStorey.name,
+      isDirty: () => _dirty,
+      onSave: _save,
+      navigation: walls
+          ? SizedBox(
+              height:
+                  48 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
+              child: Row(
+                children: [
+                  for (var i = 0; i < 3; i++)
+                    Expanded(
+                      child: TextButton(
+                        key: ValueKey('properties-tab-$i'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: _tab == i
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                          shape: const RoundedRectangleBorder(),
+                        ),
+                        onPressed: () => setState(() {
+                          _tab = i;
+                          if (i > 0) _shell.currentState?.expand();
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                width: 2,
+                                color: _tab == i
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Colors.transparent,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            [
+                              l.propertiesBasic,
+                              l.roofUiAssembly,
+                              l.propertiesMore,
+                            ][i],
+                          ),
+                        ),
                       ),
-                      onChanged: (v) => texts[key] = v,
                     ),
-            ],
-          ),
+                ],
+              ),
+            )
+          : null,
+      content: Form(
+        key: _form,
+        onChanged: () => _inputDirty = true,
+        child: Column(
+          children: [
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            Expanded(
+              child: IndexedStack(index: _tab, children: pages),
+            ),
+          ],
         ),
       ),
       actions: [
@@ -1150,9 +1599,7 @@ class _ArchitectElementPropertiesDialogState
         ),
         FilledButton(
           key: const ValueKey('architect-properties-save'),
-          onPressed: () {
-            if (widget.onApply(values, texts)) Navigator.pop(context);
-          },
+          onPressed: _save,
           child: Text(l.save),
         ),
       ],
