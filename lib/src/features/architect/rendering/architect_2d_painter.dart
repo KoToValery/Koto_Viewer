@@ -1231,6 +1231,7 @@ class Architect2dPainter extends CustomPainter {
 
       for (final door in wall.doors) {
         door.paint2D(
+          cutPlaneHeight: project.activeStorey.cutPlaneHeight,
           palette: palette,
           canvas: canvas,
           wallGeometryProvided:wall.isCurved || wall.system.isSpecial,
@@ -1247,6 +1248,7 @@ class Architect2dPainter extends CustomPainter {
       }
       for (final window in wall.windows) {
         window.paint2D(
+          cutPlaneHeight: project.activeStorey.cutPlaneHeight,
           palette: palette,
           canvas: canvas,
           wallGeometryProvided:wall.isCurved || wall.system.isSpecial,
@@ -1321,6 +1323,7 @@ class Architect2dPainter extends CustomPainter {
           .firstOrNull;
       if (hostWall != null) {
         doorPreview!.paint2D(
+          cutPlaneHeight: project.activeStorey.cutPlaneHeight,
           palette: palette,
           canvas: canvas,
           wallStart: hostWall.openingAxis(doorPreview!.offsetRatio).$1,
@@ -1341,6 +1344,7 @@ class Architect2dPainter extends CustomPainter {
           .firstOrNull;
       if (hostWall != null) {
         windowPreview!.paint2D(
+          cutPlaneHeight: project.activeStorey.cutPlaneHeight,
           palette: palette,
           canvas: canvas,
           wallStart: hostWall.openingAxis(windowPreview!.offsetRatio).$1,

@@ -3826,6 +3826,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectZoneTableActionPlace => 'Place Table';
 
   @override
+  String get architectZoneTableConfirmPlacement => 'Confirm placement';
+
+  @override
+  String get architectZoneTableCancelPlacement => 'Cancel placement';
+
+  @override
+  String get architectZoneTablePendingHint =>
+      'Tap to reposition, or confirm placement with the checkmark';
+
+  @override
+  String get architectZoneContextMenu => 'Room Options';
+
+  @override
+  String get architectZoneEditContour => 'Edit Contour';
+
+  @override
+  String get architectZonePresetsDialogTitle => 'Default Room Types';
+
+  @override
+  String get architectZonePresetsDialogSubtitle =>
+      'Default name and finishes for each room category';
+
+  @override
+  String get architectZonePresetsResetCategory => 'Reset Category Defaults';
+
+  @override
+  String get architectZonePresetsResetAll => 'Reset All Defaults';
+
+  @override
+  String get architectZonePresetsSaved => 'Room type presets saved';
+
+  @override
+  String get architectZonePresetsTooltip =>
+      'Predefine room types and default finishes';
+
+  @override
   String get architectZoneFloorLaminate => 'Laminate';
 
   @override
@@ -10747,4 +10783,78 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectPolylineClosed => 'Closed contour';
+
+  @override
+  String get architectFenestrationLeafShort => 'Leaf';
+
+  @override
+  String get architectFenestrationDetailsShort => 'Details';
+
+  @override
+  String get architectFenestrationTemplates => 'Templates';
+
+  @override
+  String get architectFenestrationElevationShort => 'Elevation';
+
+  @override
+  String get architectFenestrationPlanShort => 'Plan';
+
+  @override
+  String get architectFenestrationTransom => 'Transom';
+
+  @override
+  String get architectFenestrationTransomHeight => 'Transom height';
+
+  @override
+  String get architectFenestrationDoorBodyHeight => 'Door height';
+
+  @override
+  String get architectFenestrationTotalHeight => 'Overall height';
+
+  @override
+  String get architectFenestrationName => 'Name';
+
+  @override
+  String get architectFenestrationNewWindow => 'New window';
+
+  @override
+  String get architectFenestrationNewDoor => 'New door';
+
+  @override
+  String get architectFenestrationDiscardTitle => 'Unsaved changes';
+
+  @override
+  String get architectFenestrationDiscardMessage =>
+      'Your model changes have not been saved.';
+
+  @override
+  String get architectFenestrationDiscard => 'Discard';
+
+  @override
+  String get architectFenestrationKeepEditing => 'Keep editing';
+
+  @override
+  String get architectFenestrationSaveError =>
+      'Could not save the model. Try again.';
+
+  @override
+  String get architectFenestrationRedo => 'Redo';
+
+  @override
+  String get architectFenestrationEdit => 'Edit model';
+
+  @override
+  String get architectFenestrationInvalidSize => 'Invalid size';
+
+  @override
+  String get architectFenestrationInfill => 'Infill';
+
+  @override
+  String get architectFenestrationProfileDepth => 'Frame depth';
+
+  @override
+  String get architectFenestrationProfileFace => 'Frame face width';
+
+  @override
+  String get architectFenestration3DShort => '3D';
 }

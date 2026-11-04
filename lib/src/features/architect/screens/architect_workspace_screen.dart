@@ -285,6 +285,7 @@ import '../widgets/architect_zone_drafting_bar.dart';
 import '../widgets/architect_zone_schedule_dialog.dart';
 
 import '../widgets/architect_zone_table_bar.dart';
+import '../widgets/architect_zone_presets_dialog.dart';
 
 import '../rendering/architect_zone_painter_helper.dart';
 
@@ -3283,6 +3284,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  Future<void> _saveZonePresets(ArchitectZonePresets presets) async {
+    _zonePresets = presets;
+    await _saveWorkspacePreferences();
+  }
+
   Future<void> _saveWorkspacePreferences() async {
 
     try {
@@ -3693,6 +3699,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _zoneTableDragOffset;
 
   Offset? _zoneTablePreviewOrigin;
+  Offset? _pendingZoneTableOrigin;
+  Offset? _originalZoneTableOrigin;
 
 
 
@@ -6667,6 +6675,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   }
 
+  Offset _modelToScreen(Offset modelPos) {
+    return _viewport.toScreen(modelPos);
+  }
+
 
 
   double get _currentScale => _viewport.scale;
@@ -6752,31 +6764,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   ArchitectZone _applyZoneFinishPresets(ArchitectZone zone) {
-
     final l = context.l10n;
-
-    String overrideFor(String kind, String resolved) {
-
-      final defaults = const ArchitectZonePresets().finishes(kind, l);
-
-      final index = defaults.indexOf(resolved);
-
-      return index < 0 ? '' : _zonePresets.overrides['$kind.$index'] ?? '';
-
-    }
-
-
-
+    final cat = zone.category;
+    final presetFloor = _zonePresets.defaultFloorFinish(cat, l);
+    final presetWall = _zonePresets.defaultWallFinish(cat, l);
+    final presetCeiling = _zonePresets.defaultCeilingFinish(cat, l);
     return zone.copyWith(
-
-      floorFinish: overrideFor('floor', zone.resolvedFloorFinish(l)),
-
-      wallFinish: overrideFor('wall', zone.resolvedWallFinish(l)),
-
-      ceilingFinish: overrideFor('ceiling', zone.resolvedCeilingFinish(l)),
-
+      floorFinish: zone.floorFinish.isNotEmpty ? zone.floorFinish : presetFloor,
+      wallFinish: zone.wallFinish.isNotEmpty ? zone.wallFinish : presetWall,
+      ceilingFinish: zone.ceilingFinish.isNotEmpty ? zone.ceilingFinish : presetCeiling,
     );
-
   }
 
 
@@ -12377,44 +12374,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     // 3. In Zone Table tool: Place or reposition schedule table
-
     if (_activeTool == ArchitectTool.zoneTable) {
-
       final updatedStorey = _placedZoneSchedules(rawModel);
-
       setState(() {
-
-        _commands.commit(_project.updateActiveStorey(updatedStorey), applyDraftingDefaults: true,
-        );
-
+        _pendingZoneTableOrigin = rawModel;
+        _zoneTablePreviewOrigin = rawModel;
+        _project = _project.updateActiveStorey(updatedStorey);
         _isZoneTableSelected = true;
-
         _selectedZoneId = null;
-
         _selectedElementId = null;
-
         _selectionIds.clear();
-
       });
-
-      _saveBiMProjectIfAttached();
-
-      HapticFeedback.mediumImpact();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-
-        SnackBar(
-
-          content: Text(context.l10n.architectZoneTablePlaced),
-
-          duration: const Duration(seconds: 1),
-
-        ),
-
-      );
-
+      HapticFeedback.lightImpact();
       return;
-
     }
 
 
@@ -13391,76 +13363,102 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _showRoomScheduleDialog() {
-
     ArchitectZoneScheduleDialog.show(
-
       presets: _zonePresets,
-
       context: context,
-
       storey: _project.activeStorey,
-
       units: _project.units,
-
       initialApartmentId: _selectedZone?.isApartment == true ? _selectedZoneId : _selectedZone?.apartmentId,
-
       onZoneUpdated: _updateZone,
-
+      onPresetsChanged: (newPresets) {
+        setState(() => _zonePresets = newPresets);
+        _saveZonePresets(newPresets);
+      },
       onTableOriginChanged: (origin) {
-
         setState(() {
-
           _project = _project.updateActiveStorey(origin == null
-
             ? _project.activeStorey.copyWith(clearZoneScheduleOrigin: true)
-
             : _placedZoneSchedules(origin),
           );
-
         });
-
         _saveBiMProjectIfAttached();
-
       },
-
     );
-
   }
 
+  void _showZonePresetsDialog([ArchitectZoneCategory? initialCategory]) {
+    ArchitectZonePresetsDialog.show(
+      context: context,
+      presets: _zonePresets,
+      initialCategory: initialCategory,
+      onSave: (newPresets) {
+        setState(() => _zonePresets = newPresets);
+        _saveZonePresets(newPresets);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.architectZonePresetsSaved),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      },
+    );
+  }
 
+  void _confirmZoneTablePlacement() {
+    final origin = _pendingZoneTableOrigin ?? _project.activeStorey.zoneScheduleOrigin;
+    if (origin == null) return;
+    final updatedStorey = _placedZoneSchedules(origin);
+    setState(() {
+      _commands.commit(
+        _project.updateActiveStorey(updatedStorey),
+        applyDraftingDefaults: true,
+      );
+      _pendingZoneTableOrigin = null;
+      _zoneTablePreviewOrigin = null;
+      _originalZoneTableOrigin = origin;
+      _isZoneTableSelected = true;
+    });
+    _saveBiMProjectIfAttached();
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.architectZoneTablePlaced),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _cancelZoneTablePlacement() {
+    setState(() {
+      if (_originalZoneTableOrigin != null) {
+        final restoredStorey = _placedZoneSchedules(_originalZoneTableOrigin!);
+        _project = _project.updateActiveStorey(restoredStorey);
+      } else {
+        _project = _project.updateActiveStorey(
+          _project.activeStorey.copyWith(clearZoneScheduleOrigin: true),
+        );
+      }
+      _pendingZoneTableOrigin = null;
+      _zoneTablePreviewOrigin = null;
+      _isZoneTableSelected = false;
+      _activeTool = ArchitectTool.zone;
+    });
+    HapticFeedback.lightImpact();
+  }
 
   void _removeZoneScheduleTable() {
-
     setState(() {
-
       final updatedStorey = _project.activeStorey.copyWith(
-
         clearZoneScheduleOrigin: true,
-
       );
-
       _project = _project.updateActiveStorey(updatedStorey);
-
       _isZoneTableSelected = false;
-
+      _pendingZoneTableOrigin = null;
+      _originalZoneTableOrigin = null;
+      _zoneTablePreviewOrigin = null;
     });
-
     _saveBiMProjectIfAttached();
-
     HapticFeedback.mediumImpact();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-
-      SnackBar(
-
-        content: Text(context.l10n.architectZoneTableRemoved),
-
-        duration: const Duration(seconds: 1),
-
-      ),
-
-    );
-
   }
 
 
@@ -17241,6 +17239,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       MaterialPageRoute(
 
         builder: (_) => FenestrationEditorScreen(
+          createNew: true,
 
           initialKind: kind,
 
@@ -17506,7 +17505,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _onContextHold(Offset screenPoint) {
     _dismissTouchCandidates();
     if (_marqueeTool.isDrafting) return false;
-    if (!_acceptsAnySelection) return false;
+    if (!_acceptsAnySelection && _activeTool != ArchitectTool.zone) return false;
 
     if (!_selectionContextActive &&
 
@@ -17542,6 +17541,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final raw = _screenToModel(screenPoint);
 
+    // Context menu for room zones / functional areas
+    final hitZone = _findZoneAt(raw);
+    if (_activeTool == ArchitectTool.zone) {
+      if (hitZone != null) {
+        setState(() {
+          _selectedZoneId = hitZone.id;
+          _selectedElementId = null;
+          _selectionIds
+            ..clear()
+            ..add(hitZone.id);
+          _zoneTool.startEditingZone(hitZone);
+        });
+        unawaited(_showZoneContextMenu(screenPoint, hitZone));
+        return true;
+      }
+    }
+
+
     final candidates = _selectionCandidates(raw);
 
     final ok =
@@ -17561,6 +17578,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _effectiveSelection.firstOrNull;
 
       if (id != null) {
+        final zone = _project.activeStorey.zones.where((z) => z.id == id).firstOrNull;
+        if (zone != null) {
+          unawaited(_showZoneContextMenu(screenPoint, zone));
+          return true;
+        }
 
         setState(() {
 
@@ -17631,6 +17653,178 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
 
+
+  Future<void> _showZoneContextMenu(
+    Offset localPoint,
+    ArchitectZone zone,
+  ) async {
+    final l = context.l10n;
+    final box = context.findRenderObject() as RenderBox?;
+    final globalPos = box?.localToGlobal(localPoint) ?? localPoint;
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPos.dx,
+        globalPos.dy,
+        globalPos.dx,
+        globalPos.dy,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'properties',
+          child: Row(
+            children: [
+              const AppIcon(
+                AppIconId.properties,
+                size: 18,
+                color: Color(0xFFB388FF),
+              ),
+              const SizedBox(width: 8),
+              Text(l.architectProperties),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'schedule',
+          child: Row(
+            children: [
+              const AppIcon(
+                AppIconId.schedule,
+                size: 18,
+                color: Color(0xFF38BDF8),
+              ),
+              const SizedBox(width: 8),
+              Text(l.architectZoneScheduleTitle),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'edit',
+          child: Row(
+            children: [
+              const AppIcon(
+                AppIconId.edit,
+                size: 18,
+                color: Color(0xFF00E5FF),
+              ),
+              const SizedBox(width: 8),
+              Text(l.architectZoneEditContour),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'move',
+          child: Row(
+            children: [
+              const AppIcon(
+                AppIconId.move,
+                size: 18,
+                color: Color(0xFFFFB300),
+              ),
+              const SizedBox(width: 8),
+              Text(l.architectSelectionMove),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'duplicate',
+          child: Row(
+            children: [
+              const AppIcon(
+                AppIconId.duplicate,
+                size: 18,
+                color: Color(0xFF64FFDA),
+              ),
+              const SizedBox(width: 8),
+              Text(l.duplicateElement),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'presets',
+          child: Row(
+            children: [
+              const AppIcon(
+                AppIconId.settings,
+                size: 18,
+                color: Color(0xFF80CBC4),
+              ),
+              const SizedBox(width: 8),
+              Text(l.architectZonePresetsDialogTitle),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              const AppIcon(
+                AppIconId.delete,
+                size: 18,
+                color: Color(0xFFFF5252),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                l.delete,
+                style: const TextStyle(color: Color(0xFFFF5252)),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'properties':
+        _showProperties();
+        break;
+      case 'schedule':
+        _showRoomScheduleDialog();
+        break;
+      case 'edit':
+        setState(() {
+          _activeTool = ArchitectTool.zone;
+          _selectedZoneId = zone.id;
+          _selectionIds
+            ..clear()
+            ..add(zone.id);
+          _zoneTool.startEditingZone(zone);
+        });
+        break;
+      case 'move':
+        setState(() {
+          _selectedZoneId = zone.id;
+          _selectionIds
+            ..clear()
+            ..add(zone.id);
+          _moveSelection = true;
+        });
+        break;
+      case 'duplicate':
+        setState(() {
+          _selectedZoneId = zone.id;
+          _selectionIds
+            ..clear()
+            ..add(zone.id);
+        });
+        _beginGeometryCommand(ArchitectRadialAction.duplicate);
+        break;
+      case 'presets':
+        _showZonePresetsDialog(zone.category);
+        break;
+      case 'delete':
+        setState(() {
+          _selectedZoneId = zone.id;
+          _selectionIds
+            ..clear()
+            ..add(zone.id);
+        });
+        _deleteSelection();
+        break;
+    }
+  }
 
   Future<void> _showSectionRoofContextMenu(
 
@@ -24446,6 +24640,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ),
     );
 
+    final selectedZone = ids.length == 1
+        ? storey.zones.where((z) => ids.contains(z.id)).firstOrNull
+        : null;
+    if (selectedZone != null) {
+      actions.add(
+        action(
+          'architect-zone-schedule',
+          l.architectZoneScheduleTitle,
+          Icons.table_chart_rounded,
+          _showRoomScheduleDialog,
+          color: const Color(0xFF38BDF8),
+        ),
+      );
+      actions.add(
+        action(
+          'architect-zone-presets',
+          l.architectZonePresetsDialogTitle,
+          Icons.tune_rounded,
+          () => _showZonePresetsDialog(selectedZone.category),
+          color: const Color(0xFF80CBC4),
+        ),
+      );
+    }
+
     if (generic) {
       if (wallIds.isNotEmpty) {
         final detached = storey.walls
@@ -26082,10 +26300,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           }),
 
                           onOpenScheduleTable: _showRoomScheduleDialog,
+                          onOpenPresets: () => _showZonePresetsDialog(_activeZoneCategory),
 
                           onPlaceTable: () => setState(
 
-                            () => _activeTool = ArchitectTool.zoneTable,
+                            () {
+                              _originalZoneTableOrigin = _project.activeStorey.zoneScheduleOrigin;
+                              _pendingZoneTableOrigin = null;
+                              _activeTool = ArchitectTool.zoneTable;
+                            },
 
                           ),
 
@@ -26094,42 +26317,107 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       ),
 
                     if (_activeTool == ArchitectTool.zoneTable &&
-
                         !_is3DView &&
-
                         _radialMenuScreenPosition == null &&
-
-                        _newPointTargetId == null)
-
+                        _newPointTargetId == null) ...[
                       Positioned(
-
-                        top: 10,
-
+                        bottom: 12,
                         left: 0,
-
                         right: 0,
-
                         child: ArchitectZoneTableBar(
-
                           isTablePlaced:
-
                               _project.activeStorey.zoneScheduleOrigin != null,
-
-                          onBackToZones: () =>
-
-                              setState(() => _activeTool = ArchitectTool.zone),
-
+                          hasPendingPlacement: _pendingZoneTableOrigin != null,
+                          onConfirmPlacement: _confirmZoneTablePlacement,
+                          onCancelPlacement: _cancelZoneTablePlacement,
+                          onBackToZones: () => setState(() {
+                            if (_pendingZoneTableOrigin != null) {
+                              _cancelZoneTablePlacement();
+                            } else {
+                              _activeTool = ArchitectTool.zone;
+                            }
+                          }),
                           onOpenScheduleDialog: _showRoomScheduleDialog,
-
                           onRemoveTable: _removeZoneScheduleTable,
-
-                          onClose: () => setState(
-
-                            () => _activeTool = ArchitectTool.pan),
-
+                          onClose: () => setState(() {
+                            if (_pendingZoneTableOrigin != null) {
+                              _cancelZoneTablePlacement();
+                            } else {
+                              _activeTool = ArchitectTool.pan;
+                            }
+                          }),
                         ),
-
                       ),
+                      if (_pendingZoneTableOrigin != null) ...[
+                        () {
+                          final screenPos =
+                              _modelToScreen(_pendingZoneTableOrigin!);
+                          final screenW = MediaQuery.sizeOf(context).width;
+                          final left = math.max(
+                            12.0,
+                            math.min(screenW - 120.0, screenPos.dx),
+                          );
+                          final top = math.max(60.0, screenPos.dy - 44.0);
+                          return Positioned(
+                            left: left,
+                            top: top,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xEE161A26),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: const Color(0xFF00E676),
+                                  width: 1.5,
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x66000000),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const AppIcon(
+                                      AppIconId.confirm,
+                                      color: Color(0xFF00E676),
+                                      size: 18,
+                                    ),
+                                    tooltip:
+                                        l10n.architectZoneTableConfirmPlacement,
+                                    onPressed: _confirmZoneTablePlacement,
+                                    padding: const EdgeInsets.all(4),
+                                    constraints: const BoxConstraints(),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  const SizedBox(width: 2),
+                                  IconButton(
+                                    icon: const AppIcon(
+                                      AppIconId.close,
+                                      color: Colors.redAccent,
+                                      size: 18,
+                                    ),
+                                    tooltip:
+                                        l10n.architectZoneTableCancelPlacement,
+                                    onPressed: _cancelZoneTablePlacement,
+                                    padding: const EdgeInsets.all(4),
+                                    constraints: const BoxConstraints(),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }(),
+                      ],
+                    ],
 
                     if (_activeTool == ArchitectTool.axis && !_is3DView)
 

@@ -36,8 +36,9 @@ class FenestrationStep1FrameGridTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final panes = style.rootSubdivision.collectPanes();
-    final selectedPane = panes.where((p) => p.id == selectedPaneId).firstOrNull ??
+    final panes = style.panes;
+    final selectedPane =
+        panes.where((p) => p.id == selectedPaneId).firstOrNull ??
         panes.firstOrNull;
     final currentRect = selectedPane != null
         ? style.getPaneRect(selectedPane.id)
@@ -101,7 +102,8 @@ class FenestrationStep1FrameGridTab extends StatelessWidget {
             max: 1.50,
             divisions: 15,
             label: '${(style.defaultSillHeight * 100).round()} cm',
-            onChanged: (val) => onChanged(style.copyWith(defaultSillHeight: val)),
+            onChanged: (val) =>
+                onChanged(style.copyWith(defaultSillHeight: val)),
           ),
 
           const Divider(height: 24),
@@ -141,7 +143,8 @@ class FenestrationStep1FrameGridTab extends StatelessWidget {
                 label: Text(l10n.architectFenestrationAddTransom),
                 onPressed: () {
                   if (selectedPane != null) {
-                    onChanged(style.splitPane(selectedPane.id, vertical: false),
+                    onChanged(
+                      style.splitPane(selectedPane.id, vertical: false),
                     );
                   } else {
                     final newSub = style.rootSubdivision.split(
@@ -159,9 +162,10 @@ class FenestrationStep1FrameGridTab extends StatelessWidget {
                   if (selectedPane != null && style.rootSubdivision.isSplit) {
                     onChanged(style.collapsePane(selectedPane.id));
                   } else {
-                    onChanged(style.copyWith(
-                      rootSubdivision: style.rootSubdivision.collapse(),
-                    ),
+                    onChanged(
+                      style.copyWith(
+                        rootSubdivision: style.rootSubdivision.collapse(),
+                      ),
                     );
                   }
                 },
@@ -177,7 +181,9 @@ class FenestrationStep1FrameGridTab extends StatelessWidget {
               children: [
                 Text(
                   '${l10n.architectFenestrationSelectedLeaf}:',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -267,7 +273,10 @@ class FenestrationStep1FrameGridTab extends StatelessWidget {
                     max: style.defaultWidth,
                     onChanged: (val) {
                       onChanged(
-                        style.setPaneMetricDimension(selectedPane.id, val, true,
+                        style.setPaneMetricDimension(
+                          selectedPane.id,
+                          val,
+                          true,
                         ),
                       );
                     },
@@ -284,7 +293,10 @@ class FenestrationStep1FrameGridTab extends StatelessWidget {
                     max: style.defaultHeight,
                     onChanged: (val) {
                       onChanged(
-                        style.setPaneMetricDimension(selectedPane.id, val, false,
+                        style.setPaneMetricDimension(
+                          selectedPane.id,
+                          val,
+                          false,
                         ),
                       );
                     },
@@ -321,8 +333,9 @@ class FenestrationStep2OperabilityTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final panes = style.rootSubdivision.collectPanes();
-    final selectedPane = panes.where((p) => p.id == selectedPaneId).firstOrNull ??
+    final panes = style.panes;
+    final selectedPane =
+        panes.where((p) => p.id == selectedPaneId).firstOrNull ??
         panes.firstOrNull;
 
     return SingleChildScrollView(
@@ -423,7 +436,9 @@ class FenestrationStep2OperabilityTab extends StatelessWidget {
             if (selectedPane.isOpenable) ...[
               Text(
                 '${l10n.architectFenestrationSashProfile}: ${(selectedPane.sashProfileWidth * 1000).round()} mm',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
                 ),
               ),
               Slider(
@@ -458,8 +473,7 @@ class FenestrationStep2OperabilityTab extends StatelessWidget {
       onSelected: (sel) {
         if (sel) {
           final updatedPane = pane.copyWith(paneType: type);
-          final updatedTree = style.rootSubdivision.updatePane(updatedPane);
-          onChanged(style.copyWith(rootSubdivision: updatedTree));
+          onChanged(style.updatePane(updatedPane));
         }
       },
       visualDensity: VisualDensity.compact,
@@ -489,8 +503,9 @@ class FenestrationStep3InfillMuntinsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final panes = style.rootSubdivision.collectPanes();
-    final selectedPane = panes.where((p) => p.id == selectedPaneId).firstOrNull ??
+    final panes = style.panes;
+    final selectedPane =
+        panes.where((p) => p.id == selectedPaneId).firstOrNull ??
         panes.firstOrNull;
 
     final isSolid = selectedPane?.isSolidPanel ?? false;
@@ -548,7 +563,7 @@ class FenestrationStep3InfillMuntinsTab extends StatelessWidget {
                   onSelected: (sel) {
                     if (sel && isSolid) {
                       final updated = selectedPane.copyWith(
-                        paneType: PaneType.fixedGlazing,
+                        infill: FenestrationInfill.glazing,
                       );
                       onChanged(style.updatePane(updated));
                     }
@@ -562,7 +577,7 @@ class FenestrationStep3InfillMuntinsTab extends StatelessWidget {
                   onSelected: (sel) {
                     if (sel && !isSolid) {
                       final updated = selectedPane.copyWith(
-                        paneType: PaneType.solidPanel,
+                        infill: FenestrationInfill.solid,
                       );
                       onChanged(style.updatePane(updated));
                     }
@@ -646,8 +661,7 @@ class FenestrationStep3InfillMuntinsTab extends StatelessWidget {
               divisions: 6,
               label: '${selectedPane.muntinCols}',
               onChanged: (val) {
-                final updated = selectedPane.copyWith(
-                  muntinCols: val.round());
+                final updated = selectedPane.copyWith(muntinCols: val.round());
                 onChanged(style.updatePane(updated));
               },
             ),
@@ -664,8 +678,7 @@ class FenestrationStep3InfillMuntinsTab extends StatelessWidget {
               divisions: 6,
               label: '${selectedPane.muntinRows}',
               onChanged: (val) {
-                final updated = selectedPane.copyWith(
-                  muntinRows: val.round());
+                final updated = selectedPane.copyWith(muntinRows: val.round());
                 onChanged(style.updatePane(updated));
               },
             ),
@@ -682,8 +695,7 @@ class FenestrationStep3InfillMuntinsTab extends StatelessWidget {
               divisions: 17,
               label: '${(selectedPane.muntinWidth * 1000).round()} mm',
               onChanged: (val) {
-                final updated = selectedPane.copyWith(
-                  muntinWidth: val);
+                final updated = selectedPane.copyWith(muntinWidth: val);
                 onChanged(style.updatePane(updated));
               },
             ),
@@ -766,8 +778,8 @@ class FenestrationCasingTab extends StatelessWidget {
             CheckboxListTile(
               title: Text(l10n.architectFenestrationIncludeBottomCasing),
               value: style.includeBottomCasing,
-              onChanged: (val) => onChanged(
-                style.copyWith(includeBottomCasing: val ?? false)),
+              onChanged: (val) =>
+                  onChanged(style.copyWith(includeBottomCasing: val ?? false)),
               contentPadding: EdgeInsets.zero,
             ),
 
@@ -798,7 +810,8 @@ class FenestrationCasingTab extends StatelessWidget {
   Widget _buildColorCircle(Color color) {
     final isSelected = style.casingColorValue == color.toARGB32();
     return GestureDetector(
-      onTap: () => onChanged(style.copyWith(casingColorValue: color.toARGB32())),
+      onTap: () =>
+          onChanged(style.copyWith(casingColorValue: color.toARGB32())),
       child: Container(
         width: 34,
         height: 34,
@@ -883,9 +896,7 @@ class FenestrationProfileTab extends StatelessWidget {
 class FenestrationPresetsTab extends StatelessWidget {
   final ValueChanged<ArchitectFenestrationStyle> onSelectPreset;
 
-  const FenestrationPresetsTab({
-    super.key,
-    required this.onSelectPreset});
+  const FenestrationPresetsTab({super.key, required this.onSelectPreset});
 
   @override
   Widget build(BuildContext context) {
@@ -905,7 +916,9 @@ class FenestrationPresetsTab extends StatelessWidget {
                 : Icons.door_front_door_rounded,
             color: const Color(0xFF00E5FF),
           ),
-          title: Text(p.localizedName(l10n), style: const TextStyle(fontWeight: FontWeight.bold),
+          title: Text(
+            p.localizedName(l10n),
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           subtitle: Text(
             '${(p.defaultWidth * 100).round()}x${(p.defaultHeight * 100).round()} cm'

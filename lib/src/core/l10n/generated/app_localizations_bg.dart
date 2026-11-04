@@ -3843,6 +3843,44 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneTableActionPlace => 'Постави таблица';
 
   @override
+  String get architectZoneTableConfirmPlacement => 'Потвърди поставянето';
+
+  @override
+  String get architectZoneTableCancelPlacement => 'Откажи поставянето';
+
+  @override
+  String get architectZoneTablePendingHint =>
+      'Докоснете за преместване, или потвърдете със зеленото тикче';
+
+  @override
+  String get architectZoneContextMenu => 'Опции за помещението';
+
+  @override
+  String get architectZoneEditContour => 'Редактирай контур';
+
+  @override
+  String get architectZonePresetsDialogTitle =>
+      'Видове помещения по подразбиране';
+
+  @override
+  String get architectZonePresetsDialogSubtitle =>
+      'Име и настилки по подразбиране за всяка категория';
+
+  @override
+  String get architectZonePresetsResetCategory =>
+      'Възстанови стандартните за категорията';
+
+  @override
+  String get architectZonePresetsResetAll => 'Възстанови всички стандартни';
+
+  @override
+  String get architectZonePresetsSaved => 'Видовете помещения са запазени';
+
+  @override
+  String get architectZonePresetsTooltip =>
+      'Предефиниране на видове помещения и настилки';
+
+  @override
   String get architectZoneFloorLaminate => 'Ламинат';
 
   @override
@@ -10791,4 +10829,79 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectPolylineClosed => 'Затворен контур';
+
+  @override
+  String get architectFenestrationLeafShort => 'Крило';
+
+  @override
+  String get architectFenestrationDetailsShort => 'Детайли';
+
+  @override
+  String get architectFenestrationTemplates => 'Шаблони';
+
+  @override
+  String get architectFenestrationElevationShort => 'Фасада';
+
+  @override
+  String get architectFenestrationPlanShort => 'План';
+
+  @override
+  String get architectFenestrationTransom => 'Горен прозорец';
+
+  @override
+  String get architectFenestrationTransomHeight =>
+      'Височина на горния прозорец';
+
+  @override
+  String get architectFenestrationDoorBodyHeight => 'Височина на вратата';
+
+  @override
+  String get architectFenestrationTotalHeight => 'Общ отвор';
+
+  @override
+  String get architectFenestrationName => 'Име';
+
+  @override
+  String get architectFenestrationNewWindow => 'Нов прозорец';
+
+  @override
+  String get architectFenestrationNewDoor => 'Нова врата';
+
+  @override
+  String get architectFenestrationDiscardTitle => 'Незапазени промени';
+
+  @override
+  String get architectFenestrationDiscardMessage =>
+      'Промените в модела не са запазени.';
+
+  @override
+  String get architectFenestrationDiscard => 'Отхвърли';
+
+  @override
+  String get architectFenestrationKeepEditing => 'Продължи';
+
+  @override
+  String get architectFenestrationSaveError =>
+      'Моделът не беше запазен. Опитайте отново.';
+
+  @override
+  String get architectFenestrationRedo => 'Повтори';
+
+  @override
+  String get architectFenestrationEdit => 'Редактирай модела';
+
+  @override
+  String get architectFenestrationInvalidSize => 'Невалиден размер';
+
+  @override
+  String get architectFenestrationInfill => 'Пълнеж';
+
+  @override
+  String get architectFenestrationProfileDepth => 'Дълбочина на касата';
+
+  @override
+  String get architectFenestrationProfileFace => 'Ширина на касата';
+
+  @override
+  String get architectFenestration3DShort => '3D';
 }

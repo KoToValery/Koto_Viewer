@@ -14,9 +14,12 @@ import '../../../core/l10n/l10n_extensions.dart';
 
 /// Floating architectural HUD bar displayed when the Zone Table tool is active.
 /// Guides the user to click on the drawing to place or reposition the compact room table,
-/// or remove it from the active storey.
+/// confirm or cancel the placed position, or remove it from the active storey.
 class ArchitectZoneTableBar extends StatelessWidget {
   final bool isTablePlaced;
+  final bool hasPendingPlacement;
+  final VoidCallback? onConfirmPlacement;
+  final VoidCallback? onCancelPlacement;
   final VoidCallback onBackToZones;
   final VoidCallback onOpenScheduleDialog;
   final VoidCallback onRemoveTable;
@@ -25,6 +28,9 @@ class ArchitectZoneTableBar extends StatelessWidget {
   const ArchitectZoneTableBar({
     super.key,
     required this.isTablePlaced,
+    this.hasPendingPlacement = false,
+    this.onConfirmPlacement,
+    this.onCancelPlacement,
     required this.onBackToZones,
     required this.onOpenScheduleDialog,
     required this.onRemoveTable,
@@ -42,7 +48,9 @@ class ArchitectZoneTableBar extends StatelessWidget {
         color: const Color(0xEE161A26),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
+          color: (hasPendingPlacement || isTablePlaced)
+              ? const Color(0xFF00E676).withValues(alpha: 0.6)
+              : const Color(0xFF00E5FF).withValues(alpha: 0.4),
           width: 1.2,
         ),
         boxShadow: const [
@@ -62,12 +70,16 @@ class ArchitectZoneTableBar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
-                  color: const Color(0x3300E5FF),
+                  color: (hasPendingPlacement || isTablePlaced)
+                      ? const Color(0x3300E676)
+                      : const Color(0x3300E5FF),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.table_chart_rounded,
-                  color: Color(0xFF00E5FF),
+                  color: (hasPendingPlacement || isTablePlaced)
+                      ? const Color(0xFF00E676)
+                      : const Color(0xFF00E5FF),
                   size: 18,
                 ),
               ),
@@ -88,11 +100,13 @@ class ArchitectZoneTableBar extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      isTablePlaced
-                          ? l10n.architectZoneTableBarMoveHint
-                          : l10n.architectZoneTableBarHint,
+                      hasPendingPlacement
+                          ? l10n.architectZoneTablePendingHint
+                          : (isTablePlaced
+                              ? l10n.architectZoneTableBarMoveHint
+                              : l10n.architectZoneTableBarHint),
                       style: TextStyle(
-                        color: isTablePlaced
+                        color: (hasPendingPlacement || isTablePlaced)
                             ? const Color(0xFF00E676)
                             : const Color(0xFF00E5FF),
                         fontSize: 11,
@@ -105,6 +119,36 @@ class ArchitectZoneTableBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
+
+              // Pending placement confirmation actions (Green checkmark and Red X)
+              if (hasPendingPlacement) ...[
+                IconButton(
+                  icon: const AppIcon(
+                    AppIconId.confirm,
+                    color: Color(0xFF00E676),
+                    size: 22,
+                  ),
+                  tooltip: l10n.architectZoneTableConfirmPlacement,
+                  onPressed: onConfirmPlacement,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const AppIcon(
+                    AppIconId.close,
+                    color: Colors.redAccent,
+                    size: 22,
+                  ),
+                  tooltip: l10n.architectZoneTableCancelPlacement,
+                  onPressed: onCancelPlacement,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 6),
+              ],
 
               // Action: Full Schedule Dialog
               IconButton(
@@ -121,8 +165,8 @@ class ArchitectZoneTableBar extends StatelessWidget {
               ),
               const SizedBox(width: 4),
 
-              // Action: Remove Table if placed
-              if (isTablePlaced) ...[
+              // Action: Remove Table if placed and not currently in pending confirm
+              if (isTablePlaced && !hasPendingPlacement) ...[
                 IconButton(
                   icon: const AppIcon(
                     AppIconId.delete,
@@ -143,7 +187,9 @@ class ArchitectZoneTableBar extends StatelessWidget {
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.white70,
                   backgroundColor: Colors.white10,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
                   visualDensity: VisualDensity.compact,
                   shape: RoundedRectangleBorder(

@@ -14,6 +14,7 @@ import '../rendering/fenestration_3d_builder.dart';
 class ArchitectDoor {
   final String id;
   final String wallId;
+
   /// Normalized position along the host wall baseline [0.0 .. 1.0].
   final double offsetRatio;
   final double width; // in meters (default 0.90 m = 90 cm)
@@ -67,18 +68,16 @@ class ArchitectDoor {
     double halfWallThickness,
   ) {
     final sign = openInward ? 1.0 : -1.0;
-    final hinge = (isHingeLeft
-            ? left + u * frameThickness
-            : right - u * frameThickness) +
+    final hinge =
+        (isHingeLeft ? left + u * frameThickness : right - u * frameThickness) +
         n * (sign * halfWallThickness);
     final angle = openAngleDeg * math.pi / 180;
-    final rotation = math.atan2(u.dy, u.dx) +
-        (isHingeLeft
-            ? sign * angle
-            : math.pi - sign * angle);
+    final rotation =
+        math.atan2(u.dy, u.dx) +
+        (isHingeLeft ? sign * angle : math.pi - sign * angle);
     final direction = Offset(math.cos(rotation), math.sin(rotation));
-    final normal = Offset(-direction.dy, direction.dx) *
-        (sign * (isHingeLeft ? -1 : 1));
+    final normal =
+        Offset(-direction.dy, direction.dx) * (sign * (isHingeLeft ? -1 : 1));
     return (hinge: hinge, direction: direction, normal: normal);
   }
 
@@ -120,7 +119,11 @@ class ArchitectDoor {
     required double sillHeight,
     required bool isHingeLeft,
   }) {
-    final targetKey = sizeKey(width: width, height: height, sillHeight: sillHeight);
+    final targetKey = sizeKey(
+      width: width,
+      height: height,
+      sillHeight: sillHeight,
+    );
     int? matchedBase;
     int maxBase = 0;
 
@@ -161,63 +164,63 @@ class ArchitectDoor {
     String? uuid,
     String? styleId,
     ArchitectFenestrationStyle? style,
-  }) =>
-      ArchitectDoor(
-        id: id ?? this.id,
-        wallId: wallId ?? this.wallId,
-        offsetRatio: offsetRatio ?? this.offsetRatio,
-        width: width ?? this.width,
-        height: height ?? this.height,
-        sillHeight: sillHeight ?? this.sillHeight,
-        frameThickness: frameThickness ?? this.frameThickness,
-        leafThickness: leafThickness ?? this.leafThickness,
-        isHingeLeft: isHingeLeft ?? this.isHingeLeft,
-        openInward: openInward ?? this.openInward,
-        openAngleDeg: openAngleDeg ?? this.openAngleDeg,
-        specId: specId ?? this.specId,
-        uuid: uuid ?? this.uuid,
-        styleId: styleId ?? this.styleId,
-        style: style ?? this.style,
-      );
+  }) => ArchitectDoor(
+    id: id ?? this.id,
+    wallId: wallId ?? this.wallId,
+    offsetRatio: offsetRatio ?? this.offsetRatio,
+    width: width ?? this.width,
+    height: height ?? this.height,
+    sillHeight: sillHeight ?? this.sillHeight,
+    frameThickness: frameThickness ?? this.frameThickness,
+    leafThickness: leafThickness ?? this.leafThickness,
+    isHingeLeft: isHingeLeft ?? this.isHingeLeft,
+    openInward: openInward ?? this.openInward,
+    openAngleDeg: openAngleDeg ?? this.openAngleDeg,
+    specId: specId ?? this.specId,
+    uuid: uuid ?? this.uuid,
+    styleId: styleId ?? this.styleId,
+    style: style ?? this.style,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'wallId': wallId,
-        'offsetRatio': offsetRatio,
-        'width': width,
-        'height': height,
-        'sillHeight': sillHeight,
-        'frameThickness': frameThickness,
-        'leafThickness': leafThickness,
-        'isHingeLeft': isHingeLeft,
-        'openInward': openInward,
-        'openAngleDeg': openAngleDeg,
-        'specId': specId,
-        'uuid': uuid,
-        if (styleId != null) 'styleId': styleId,
-        if (style != null) 'style': style!.toJson(),
-      };
+    'id': id,
+    'wallId': wallId,
+    'offsetRatio': offsetRatio,
+    'width': width,
+    'height': height,
+    'sillHeight': sillHeight,
+    'frameThickness': frameThickness,
+    'leafThickness': leafThickness,
+    'isHingeLeft': isHingeLeft,
+    'openInward': openInward,
+    'openAngleDeg': openAngleDeg,
+    'specId': specId,
+    'uuid': uuid,
+    if (styleId != null) 'styleId': styleId,
+    if (style != null) 'style': style!.toJson(),
+  };
 
   factory ArchitectDoor.fromJson(Map<String, dynamic> json) => ArchitectDoor(
-        id: json['id'] as String,
-        wallId: json['wallId'] as String,
-        offsetRatio: (json['offsetRatio'] as num).toDouble(),
-        width: (json['width'] as num?)?.toDouble() ?? 0.90,
-        height: (json['height'] as num?)?.toDouble() ?? 2.00,
-        sillHeight: (json['sillHeight'] as num?)?.toDouble() ?? 0.0,
-        frameThickness: (json['frameThickness'] as num?)?.toDouble() ?? 0.04,
-        leafThickness: (json['leafThickness'] as num?)?.toDouble() ?? 0.04,
-        isHingeLeft: json['isHingeLeft'] as bool? ?? true,
-        openInward: json['openInward'] as bool? ?? true,
-        openAngleDeg: (json['openAngleDeg'] as num?)?.toDouble() ?? 90.0,
-        specId: json['specId'] as String? ?? '1',
-        uuid: json['uuid'] as String? ?? json['id'] as String,
-        styleId: json['styleId'] as String?,
-        style: json['style'] != null
-            ? ArchitectFenestrationStyle.fromJson(
-                json['style'] as Map<String, dynamic>)
-            : null,
-      );
+    id: json['id'] as String,
+    wallId: json['wallId'] as String,
+    offsetRatio: (json['offsetRatio'] as num).toDouble(),
+    width: (json['width'] as num?)?.toDouble() ?? 0.90,
+    height: (json['height'] as num?)?.toDouble() ?? 2.00,
+    sillHeight: (json['sillHeight'] as num?)?.toDouble() ?? 0.0,
+    frameThickness: (json['frameThickness'] as num?)?.toDouble() ?? 0.04,
+    leafThickness: (json['leafThickness'] as num?)?.toDouble() ?? 0.04,
+    isHingeLeft: json['isHingeLeft'] as bool? ?? true,
+    openInward: json['openInward'] as bool? ?? true,
+    openAngleDeg: (json['openAngleDeg'] as num?)?.toDouble() ?? 90.0,
+    specId: json['specId'] as String? ?? '1',
+    uuid: json['uuid'] as String? ?? json['id'] as String,
+    styleId: json['styleId'] as String?,
+    style: json['style'] != null
+        ? ArchitectFenestrationStyle.fromJson(
+            json['style'] as Map<String, dynamic>,
+          )
+        : null,
+  );
 
   // ===========================================================================
   // 2D ARCHITECTURAL CANVAS RENDERING (DIRECT FROM door.dxf STANDARD)
@@ -234,6 +237,8 @@ class ArchitectDoor {
     required double wallThickness,
     required double zoomScale,
     bool isSelected = false,
+    double cutPlaneHeight = 1.20,
+    bool showAnnotations = true,
     bool wallGeometryProvided = false,
     double coreThickness = 0.25,
     double insulationThickness = 0.0,
@@ -257,45 +262,117 @@ class ArchitectDoor {
     final pLeftBase = centerPos - u * halfW;
     final pRightBase = centerPos + u * halfW;
 
+    final effectiveStyle = resolvedStyle;
+    if (effectiveStyle != null) {
+      effectiveStyle.paintPlan2D(
+        canvas: canvas,
+        palette: palette,
+        wallStart: wallStart,
+        wallEnd: wallEnd,
+        wallThickness: wallThickness,
+        coreThickness: coreThickness,
+        insulationThickness: insulationThickness,
+        coreCenterShift: coreCenterShift,
+        exteriorSign: exteriorSign,
+        offsetRatio: offsetRatio,
+        elementWidth: width,
+        elementHeight: height,
+        elementSillHeight: sillHeight,
+        zoomScale: zoomScale,
+        isSelected: isSelected,
+        wallGeometryProvided: wallGeometryProvided,
+        showDimensions: false,
+        cutPlaneHeight: cutPlaneHeight,
+        isHingeLeft: isHingeLeft,
+        openInward: openInward,
+        openAngleDeg: openAngleDeg,
+        leafThickness: leafThickness,
+      );
+      if (showAnnotations) {
+        ArchitectOpeningPlanPainter.paint(
+          canvas: canvas,
+          elementId: id,
+          centerPos: centerPos,
+          normal: n,
+          wallThickness: wallThickness,
+          width: width,
+          height: height,
+          sillHeight: sillHeight,
+          specId: specId,
+          zoomScale: zoomScale,
+          palette: palette,
+          isSelected: isSelected,
+        );
+      }
+      return;
+    }
+
     // Paints
     final cutMaskPaint = Paint()
       ..color = palette.background
       ..style = PaintingStyle.fill;
 
     final frameStrokePaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF263238))
+      ..color = isSelected
+          ? const Color(0xFF00E5FF)
+          : palette.foreground(const Color(0xFF263238))
       ..strokeWidth = (isSelected ? 1.6 : 1.0) / zoomScale
       ..style = PaintingStyle.stroke;
 
     final wallCutEdgePaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black87)
+      ..color = isSelected
+          ? const Color(0xFF00E5FF)
+          : palette.foreground(Colors.black87)
       ..strokeWidth = (isSelected ? 1.6 : 1.0) / zoomScale
       ..style = PaintingStyle.stroke;
 
     final leafStrokePaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF37474F))
+      ..color = isSelected
+          ? const Color(0xFF00E5FF)
+          : palette.foreground(const Color(0xFF37474F))
       ..strokeWidth = (isSelected ? 1.6 : 1.0) / zoomScale
       ..style = PaintingStyle.stroke;
 
     final swingArcPaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black87)
+      ..color = isSelected
+          ? const Color(0xFF00E5FF)
+          : palette.foreground(Colors.black87)
       ..strokeWidth = (isSelected ? 1.2 : 0.8) / zoomScale
       ..style = PaintingStyle.stroke;
 
     // 1. Cut rough wall opening through wall body (mask background)
     final openingPath = Path()
-      ..moveTo(pLeftBase.dx - n.dx * (halfThick + 0.002), pLeftBase.dy - n.dy * (halfThick + 0.002))
-      ..lineTo(pRightBase.dx - n.dx * (halfThick + 0.002), pRightBase.dy - n.dy * (halfThick + 0.002))
-      ..lineTo(pRightBase.dx + n.dx * (halfThick + 0.002), pRightBase.dy + n.dy * (halfThick + 0.002))
-      ..lineTo(pLeftBase.dx + n.dx * (halfThick + 0.002), pLeftBase.dy + n.dy * (halfThick + 0.002))
+      ..moveTo(
+        pLeftBase.dx - n.dx * (halfThick + 0.002),
+        pLeftBase.dy - n.dy * (halfThick + 0.002),
+      )
+      ..lineTo(
+        pRightBase.dx - n.dx * (halfThick + 0.002),
+        pRightBase.dy - n.dy * (halfThick + 0.002),
+      )
+      ..lineTo(
+        pRightBase.dx + n.dx * (halfThick + 0.002),
+        pRightBase.dy + n.dy * (halfThick + 0.002),
+      )
+      ..lineTo(
+        pLeftBase.dx + n.dx * (halfThick + 0.002),
+        pLeftBase.dy + n.dy * (halfThick + 0.002),
+      )
       ..close();
-    if(!wallGeometryProvided)canvas.drawPath(openingPath, cutMaskPaint);
+    if (!wallGeometryProvided) canvas.drawPath(openingPath, cutMaskPaint);
 
     // 2. Wall jamb cut lines (Линии на зида при светлия отвор)
-    if(!wallGeometryProvided) {
-    canvas.drawLine(pLeftBase - n * halfThick, pLeftBase + n * halfThick, wallCutEdgePaint);
-    canvas.drawLine(pRightBase - n * halfThick, pRightBase + n * halfThick, wallCutEdgePaint);
-
+    if (!wallGeometryProvided) {
+      canvas.drawLine(
+        pLeftBase - n * halfThick,
+        pLeftBase + n * halfThick,
+        wallCutEdgePaint,
+      );
+      canvas.drawLine(
+        pRightBase - n * halfThick,
+        pRightBase + n * halfThick,
+        wallCutEdgePaint,
+      );
     }
     // 3. Draw 2 Door Frame Jambs (Каси: frameThickness x wallThickness, matching door.dxf New_ramka)
     // Transparent interior, thin stroke outline only (no solid hatch)
@@ -344,7 +421,8 @@ class ArchitectDoor {
 
     // 6. Dashed Swing Arc (matching door.dxf New_otvarqemost)
     final startAngle = isHingeLeft ? baseAngle : baseAngle + math.pi;
-    final sweepAngle = (isHingeLeft ? 1.0 : -1.0) * (openInward ? angleRad : -angleRad);
+    final sweepAngle =
+        (isHingeLeft ? 1.0 : -1.0) * (openInward ? angleRad : -angleRad);
     final totalSweep = sweepAngle.abs();
     if (totalSweep > 1e-4) {
       const stepAngle = 0.08; // ~4.5 degrees
@@ -364,20 +442,22 @@ class ArchitectDoor {
       }
     }
 
-    ArchitectOpeningPlanPainter.paint(
-      elementId: id,
-      canvas: canvas,
-      centerPos: centerPos,
-      normal: n,
-      wallThickness: wallThickness,
-      width: width,
-      height: height,
-      sillHeight: sillHeight,
-      specId: specId,
-      zoomScale: zoomScale,
-      palette: palette,
-      isSelected: isSelected,
-    );
+    if (showAnnotations) {
+      ArchitectOpeningPlanPainter.paint(
+        elementId: id,
+        canvas: canvas,
+        centerPos: centerPos,
+        normal: n,
+        wallThickness: wallThickness,
+        width: width,
+        height: height,
+        sillHeight: sillHeight,
+        specId: specId,
+        zoomScale: zoomScale,
+        palette: palette,
+        isSelected: isSelected,
+      );
+    }
   }
 
   /// Returns whether [point] hits any part of this door's 2D representation:
@@ -405,6 +485,29 @@ class ArchitectDoor {
     final dOpening = _distToSegment(point, pLeftBase, pRightBase);
     if (dOpening <= halfThick + tolerance) return true;
 
+    final styleLeaves = resolvedStyle?.doorPlanLeaves(
+      center: centerPos,
+      direction: u,
+      normal: n,
+      width: width,
+      height: height,
+      wallThickness: wallThickness,
+      isHingeLeft: isHingeLeft,
+      openInward: openInward,
+      openAngleDeg: openAngleDeg,
+    );
+    if (styleLeaves != null) {
+      for (final leaf in styleLeaves) {
+        if (_distToSegment(
+              point,
+              leaf.hinge,
+              leaf.hinge + leaf.direction * leaf.length,
+            ) <=
+            tolerance + leafThickness) {
+          return true;
+        }
+      }
+    }
     // Use the exact leaf and jamb dimensions that are drawn.
     final leaf = _leafGeometry(pLeftBase, pRightBase, u, n, halfThick);
     final hingePos = leaf.hinge;
@@ -547,8 +650,13 @@ class ArchitectDoor {
     addPrism(pRight - u * frameThickness, pRight, zBottom, zTop, frameColor);
 
     // 3. Top Head Jamb / Lintel (4cm)
-    addPrism(pLeft + u * frameThickness, pRight - u * frameThickness,
-        zTop - frameThickness, zTop, frameColor);
+    addPrism(
+      pLeft + u * frameThickness,
+      pRight - u * frameThickness,
+      zTop - frameThickness,
+      zTop,
+      frameColor,
+    );
 
     if (detailLevel != FenestrationElevationDetail.full3D) {
       if (sillHeight > 0) {
@@ -582,12 +690,14 @@ class ArchitectDoor {
     final lzMin = zBottom + 0.01;
     final lzMax = zTop - frameThickness - 0.01;
 
-    tris.addAll(ArchitectPathSolid.extrude(
-      Path()..addPolygon([lp1, lp2, lp3, lp4], true),
-      lzMin,
-      lzMax,
-      leafColor,
-    ));
+    tris.addAll(
+      ArchitectPathSolid.extrude(
+        Path()..addPolygon([lp1, lp2, lp3, lp4], true),
+        lzMin,
+        lzMax,
+        leafColor,
+      ),
+    );
 
     // 5. 3D Lever Handle on Door Leaf
     final handleStation = leafStart + leafU * (clearWidth - 0.08);
@@ -601,15 +711,47 @@ class ArchitectDoor {
     final hv2 = Vector3(hp1.dx, hp1.dy, zHandle - 0.012);
     final hv3 = Vector3(hp1.dx, hp1.dy, zHandle + 0.012);
     final hv4 = Vector3(handleRoot.dx, handleRoot.dy, zHandle + 0.012);
-    tris.add(Triangle3D(v0: hv1, v1: hv2, v2: hv3, color: handleColor, isDoubleSided: true));
-    tris.add(Triangle3D(v0: hv1, v1: hv3, v2: hv4, color: handleColor, isDoubleSided: true));
+    tris.add(
+      Triangle3D(
+        v0: hv1,
+        v1: hv2,
+        v2: hv3,
+        color: handleColor,
+        isDoubleSided: true,
+      ),
+    );
+    tris.add(
+      Triangle3D(
+        v0: hv1,
+        v1: hv3,
+        v2: hv4,
+        color: handleColor,
+        isDoubleSided: true,
+      ),
+    );
 
     final hlv1 = Vector3(hp1.dx, hp1.dy, zHandle - 0.012);
     final hlv2 = Vector3(hp2.dx, hp2.dy, zHandle - 0.012);
     final hlv3 = Vector3(hp2.dx, hp2.dy, zHandle + 0.012);
     final hlv4 = Vector3(hp1.dx, hp1.dy, zHandle + 0.012);
-    tris.add(Triangle3D(v0: hlv1, v1: hlv2, v2: hlv3, color: handleColor, isDoubleSided: true));
-    tris.add(Triangle3D(v0: hlv1, v1: hlv3, v2: hlv4, color: handleColor, isDoubleSided: true));
+    tris.add(
+      Triangle3D(
+        v0: hlv1,
+        v1: hlv2,
+        v2: hlv3,
+        color: handleColor,
+        isDoubleSided: true,
+      ),
+    );
+    tris.add(
+      Triangle3D(
+        v0: hlv1,
+        v1: hlv3,
+        v2: hlv4,
+        color: handleColor,
+        isDoubleSided: true,
+      ),
+    );
 
     // 6. 3D Barrel Hinges visible from the interior side
     final hingeCenter = hingePos + n * (swingSign * 0.012);
@@ -644,18 +786,22 @@ class ArchitectDoor {
       for (var i = 0; i < segs; i++) {
         final pA = pts[i];
         final pB = pts[(i + 1) % segs];
-        tris.add(Triangle3D(
-          v0: cT,
-          v1: Vector3(pA.dx, pA.dy, zHMax),
-          v2: Vector3(pB.dx, pB.dy, zHMax),
-          color: capCol,
-        ));
-        tris.add(Triangle3D(
-          v0: cB,
-          v1: Vector3(pB.dx, pB.dy, zHMin),
-          v2: Vector3(pA.dx, pA.dy, zHMin),
-          color: capCol,
-        ));
+        tris.add(
+          Triangle3D(
+            v0: cT,
+            v1: Vector3(pA.dx, pA.dy, zHMax),
+            v2: Vector3(pB.dx, pB.dy, zHMax),
+            color: capCol,
+          ),
+        );
+        tris.add(
+          Triangle3D(
+            v0: cB,
+            v1: Vector3(pB.dx, pB.dy, zHMin),
+            v2: Vector3(pA.dx, pA.dy, zHMin),
+            color: capCol,
+          ),
+        );
       }
 
       // Mounting leaf plates
@@ -666,8 +812,24 @@ class ArchitectDoor {
       final mv2 = Vector3(mp2.dx, mp2.dy, zHMin + 0.01);
       final mv3 = Vector3(mp2.dx, mp2.dy, zHMax - 0.01);
       final mv4 = Vector3(mp1.dx, mp1.dy, zHMax - 0.01);
-      tris.add(Triangle3D(v0: mv1, v1: mv2, v2: mv3, color: barrelCol, isDoubleSided: true));
-      tris.add(Triangle3D(v0: mv1, v1: mv3, v2: mv4, color: barrelCol, isDoubleSided: true));
+      tris.add(
+        Triangle3D(
+          v0: mv1,
+          v1: mv2,
+          v2: mv3,
+          color: barrelCol,
+          isDoubleSided: true,
+        ),
+      );
+      tris.add(
+        Triangle3D(
+          v0: mv1,
+          v1: mv3,
+          v2: mv4,
+          color: barrelCol,
+          isDoubleSided: true,
+        ),
+      );
     }
 
     addHingeBarrel(zTop - 0.22);
@@ -676,7 +838,13 @@ class ArchitectDoor {
 
     // 7. Sill Block (if sill > 0)
     if (sillHeight > 0) {
-      addPrism(pLeft, pRight, storeyElevation, zBottom, const Color(0xFF78909C));
+      addPrism(
+        pLeft,
+        pRight,
+        storeyElevation,
+        zBottom,
+        const Color(0xFF78909C),
+      );
     }
 
     return tris;

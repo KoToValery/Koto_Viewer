@@ -16,6 +16,7 @@ import '../models/architect_zone.dart';
 import '../models/architect_zone_presets.dart';
 import '../models/architect_fenestration_style.dart';
 import '../services/fenestration_library_service.dart';
+import 'fenestration_preview.dart';
 import '../rendering/architect_2d_painter.dart';
 
 import "../services/component_library_service.dart";
@@ -859,48 +860,39 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
       ArchitectTool.wall => (AppIconId.wall, l.architectToolWall),
       ArchitectTool.door => (AppIconId.door, l.architectToolDoor),
       ArchitectTool.window => (AppIconId.window, l.architectToolWindow),
-      ArchitectTool.column => (AppIconId.column,
-        l.architectToolColumn),
-      ArchitectTool.beam => (AppIconId.beam,
-        l.architectToolBeam),
+      ArchitectTool.column => (AppIconId.column, l.architectToolColumn),
+      ArchitectTool.beam => (AppIconId.beam, l.architectToolBeam),
       ArchitectTool.slab => (AppIconId.slab, l.architectToolSlab),
       ArchitectTool.floorDrain => (
         AppIconId.floorDrain,
         l.architectToolFloorDrain,
       ),
       ArchitectTool.roof => (AppIconId.roof, l.architectToolRoof),
-      ArchitectTool.opening => (AppIconId.opening,
-        l.architectToolOpening),
+      ArchitectTool.opening => (AppIconId.opening, l.architectToolOpening),
       ArchitectTool.stair => (AppIconId.stairs, l.architectToolStair),
       ArchitectTool.component => (
         AppIconId.furniture,
         l.architectToolComponent,
       ),
-      ArchitectTool.zone => (AppIconId.zone,
-        l.architectToolZone),
-      ArchitectTool.zoneTable => (AppIconId.schedule,
-        l.architectToolZoneTable),
+      ArchitectTool.zone => (AppIconId.zone, l.architectToolZone),
+      ArchitectTool.zoneTable => (AppIconId.schedule, l.architectToolZoneTable),
       ArchitectTool.dimension => (
         AppIconId.dimension,
         l.architectToolDimension,
       ),
-      ArchitectTool.level => (AppIconId.level,
-        l.architectToolLevel),
+      ArchitectTool.level => (AppIconId.level, l.architectToolLevel),
       ArchitectTool.text => (AppIconId.text, l.architectToolText),
       ArchitectTool.cadLine => (AppIconId.line, l.architectToolCadLine),
-      ArchitectTool.cadRect => (AppIconId.rectangle,
-        l.architectToolCadRect),
+      ArchitectTool.cadRect => (AppIconId.rectangle, l.architectToolCadRect),
       ArchitectTool.hatch => (AppIconId.hatch, l.architectToolHatch),
-      ArchitectTool.cadCircle => (AppIconId.radioOff,
-        l.architectToolCadCircle),
-      ArchitectTool.section => (AppIconId.section,
-        l.architectToolSection),
+      ArchitectTool.cadCircle => (AppIconId.radioOff, l.architectToolCadCircle),
+      ArchitectTool.section => (AppIconId.section, l.architectToolSection),
       ArchitectTool.elevation => (
-        AppIconId.elevation, l.architectToolElevation,
+        AppIconId.elevation,
+        l.architectToolElevation,
       ),
       ArchitectTool.axis => (AppIconId.axis, l.architectToolAxis),
-      ArchitectTool.measure => (AppIconId.measure,
-        l.architectToolMeasure),
+      ArchitectTool.measure => (AppIconId.measure, l.architectToolMeasure),
       _ => (AppIconId.edit, l.architectToolSelect),
     };
     return _buildToolButton(
@@ -1640,12 +1632,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                     final isSelected = activeStyle?.id == s.id;
                     return ListTile(
                       dense: true,
-                      leading: AppIcon(
-                        isSelected
-                            ? AppIconId.checkCircle : AppIconId.radioOff,
-                        color: isSelected
-                            ? const Color(0xFF00E5FF)
-                            : Colors.white54,
+                      leading: SizedBox(
+                        width: 60,
+                        height: 60,
+                        child: FenestrationPreview(style: s),
                       ),
                       title: Text(
                         s.localizedName(l10n),
@@ -1688,7 +1678,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                 final confirm = await showDialog<bool>(
                                   context: ctx,
                                   builder: (dialogCtx) => AlertDialog(
-                                    title: Text(l10n.architectFenestrationDelete,
+                                    title: Text(
+                                      l10n.architectFenestrationDelete,
                                     ),
                                     content: Text(
                                       l10n.architectFenestrationDeleteConfirm(
@@ -1697,11 +1688,13 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                     ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.pop(dialogCtx, false),
+                                        onPressed: () =>
+                                            Navigator.pop(dialogCtx, false),
                                         child: Text(l10n.cancel),
                                       ),
                                       FilledButton(
-                                        onPressed: () => Navigator.pop(dialogCtx, true),
+                                        onPressed: () =>
+                                            Navigator.pop(dialogCtx, true),
                                         child: Text(l10n.delete),
                                       ),
                                     ],

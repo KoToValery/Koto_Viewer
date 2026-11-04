@@ -14,6 +14,8 @@ import '../services/fenestration_library_service.dart';
 import 'architect_component_labels.dart';
 import 'component_studio_dialog.dart';
 import 'component_preview_painters.dart';
+import 'fenestration_preview.dart';
+import '../screens/fenestration_editor_screen.dart';
 
 /// One tap selects an object at its catalog size. Editing is a separate action.
 class ArchitectComponentLibraryDialog extends StatefulWidget {
@@ -57,7 +59,8 @@ class _ArchitectComponentLibraryDialogState
   ArchitectComponentCategory? _category;
   _Source _source = _Source.all;
   String _search = '';
-  bool _show3d = false;
+  FenestrationPreviewMode _previewMode = FenestrationPreviewMode.elevation;
+  bool get _show3d => _previewMode == FenestrationPreviewMode.threeD;
 
   @override
   void initState() {
@@ -188,23 +191,41 @@ class _ArchitectComponentLibraryDialogState
                   hintText: l.search,
                   hintStyle: const TextStyle(color: Colors.white54),
                   prefixIcon: const AppIcon(
-                    AppIconId.search, color: Colors.white54,
-                  ),
-                  suffixIcon: IconButton(
-                    key: const ValueKey('component-library-preview-mode'),
-                    tooltip: _show3d
-                        ? l.architectComponentView2d
-                        : l.architectComponentView3d,
-                    icon: AppIcon.fromMaterial(
-                      _show3d ? Icons.crop_square : Icons.view_in_ar,
-                      color: Colors.white70,
-                    ),
-                    onPressed: () => setState(() => _show3d = !_show3d),
+                    AppIconId.search,
+                    color: Colors.white54,
                   ),
                   isDense: true,
                   border: const OutlineInputBorder(),
                 ),
                 onChanged: (value) => setState(() => _search = value),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: SegmentedButton<FenestrationPreviewMode>(
+                expandedInsets: EdgeInsets.zero,
+                showSelectedIcon: false,
+                style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                segments: [
+                  ButtonSegment(
+                    value: FenestrationPreviewMode.elevation,
+                    label: Text(l.architectFenestrationElevationShort),
+                  ),
+                  ButtonSegment(
+                    value: FenestrationPreviewMode.plan,
+                    label: Text(l.architectFenestrationPlanShort),
+                  ),
+                  ButtonSegment(
+                    value: FenestrationPreviewMode.threeD,
+                    label: Text(
+                      l.architectFenestration3DShort,
+                      key: const ValueKey('component-library-preview-mode'),
+                    ),
+                  ),
+                ],
+                selected: {_previewMode},
+                onSelectionChanged: (v) =>
+                    setState(() => _previewMode = v.first),
               ),
             ),
             Padding(
@@ -311,8 +332,7 @@ class _ArchitectComponentLibraryDialogState
                 _source != _Source.custom &&
                 _matches(l.architectDrainageSmart))
               ListTile(
-                leading: const AppIcon(AppIconId.water,
-                  color: Colors.white70),
+                leading: const AppIcon(AppIconId.water, color: Colors.white70),
                 title: Text(
                   l.architectDrainageSmart,
                   style: const TextStyle(color: Colors.white),
@@ -346,23 +366,32 @@ class _ArchitectComponentLibraryDialogState
                           return _card(
                             style.localizedName(l),
                             '${(style.defaultWidth * 100).round()}×${(style.defaultHeight * 100).round()} cm',
-                            Icon(
-                              style.kind == FenestrationKind.door
-                                  ? Icons.meeting_room_outlined
-                                  : Icons.window,
-                              size: 48,
-                              color: Colors.blueGrey,
+                            FenestrationPreview(
+                              style: style,
+                              mode: _previewMode,
                             ),
                             () {
                               widget.onSelectFenestration?.call(style);
                               Navigator.of(context).pop();
                             },
+                            onEdit: () =>
+                                Navigator.push<ArchitectFenestrationStyle>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => FenestrationEditorScreen(
+                                      initialStyle: style,
+                                    ),
+                                  ),
+                                ),
+                            editTooltip: l.architectFenestrationEdit,
+                            editIcon: Icons.edit_outlined,
                             onDelete: isCustomStyle
                                 ? () async {
                                     final confirm = await showDialog<bool>(
                                       context: context,
                                       builder: (ctx) => AlertDialog(
-                                        title: Text(l.architectFenestrationDelete,
+                                        title: Text(
+                                          l.architectFenestrationDelete,
                                         ),
                                         content: Text(
                                           l.architectFenestrationDeleteConfirm(
@@ -371,11 +400,13 @@ class _ArchitectComponentLibraryDialogState
                                         ),
                                         actions: [
                                           TextButton(
-                                            onPressed: () => Navigator.pop(ctx, false),
+                                            onPressed: () =>
+                                                Navigator.pop(ctx, false),
                                             child: Text(l.cancel),
                                           ),
                                           FilledButton(
-                                            onPressed: () => Navigator.pop(ctx, true),
+                                            onPressed: () =>
+                                                Navigator.pop(ctx, true),
                                             child: Text(l.delete),
                                           ),
                                         ],
@@ -385,7 +416,8 @@ class _ArchitectComponentLibraryDialogState
                                       await FenestrationLibraryService.instance
                                           .deleteStyle(style.id);
                                       if (!context.mounted) return;
-                                      ScaffoldMessenger.of(context,
+                                      ScaffoldMessenger.of(
+                                        context,
                                       ).showSnackBar(
                                         SnackBar(
                                           content: Text(
@@ -443,11 +475,13 @@ class _ArchitectComponentLibraryDialogState
                                       ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(ctx, false),
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, false),
                                           child: Text(l.cancel),
                                         ),
                                         FilledButton(
-                                          onPressed: () => Navigator.pop(ctx, true),
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, true),
                                           child: Text(l.delete),
                                         ),
                                       ],
@@ -458,7 +492,8 @@ class _ArchitectComponentLibraryDialogState
                                     if (!context.mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text(l.architectComponentDeleted,
+                                        content: Text(
+                                          l.architectComponentDeleted,
                                         ),
                                       ),
                                     );
@@ -482,6 +517,8 @@ class _ArchitectComponentLibraryDialogState
     VoidCallback select, {
     VoidCallback? onEdit,
     VoidCallback? onDelete,
+    String? editTooltip,
+    IconData? editIcon,
   }) => Card(
     color: const Color(0xFF2A2A38),
     clipBehavior: Clip.antiAlias,
@@ -501,8 +538,12 @@ class _ArchitectComponentLibraryDialogState
                       top: 0,
                       right: 0,
                       child: IconButton(
-                        tooltip: context.l10n.architectComponentStudioTitle,
-                        icon: const AppIcon(AppIconId.code, size: 18),
+                        tooltip:
+                            editTooltip ??
+                            context.l10n.architectComponentStudioTitle,
+                        icon: editIcon == null
+                            ? const AppIcon(AppIconId.code, size: 18)
+                            : Icon(editIcon, size: 18),
                         onPressed: onEdit,
                       ),
                     ),
@@ -513,7 +554,9 @@ class _ArchitectComponentLibraryDialogState
                       child: IconButton(
                         tooltip: context.l10n.delete,
                         icon: const AppIcon(
-                          AppIconId.delete, size: 18, color: Colors.redAccent,
+                          AppIconId.delete,
+                          size: 18,
+                          color: Colors.redAccent,
                         ),
                         onPressed: onDelete,
                       ),

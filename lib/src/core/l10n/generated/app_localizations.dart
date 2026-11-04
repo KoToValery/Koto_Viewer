@@ -6635,6 +6635,72 @@ abstract class AppLocalizations {
   /// **'Place Table'**
   String get architectZoneTableActionPlace;
 
+  /// Tooltip to confirm room schedule table placement
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm placement'**
+  String get architectZoneTableConfirmPlacement;
+
+  /// Tooltip to cancel room schedule table placement
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel placement'**
+  String get architectZoneTableCancelPlacement;
+
+  /// Hint shown while room schedule table placement is pending
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to reposition, or confirm placement with the checkmark'**
+  String get architectZoneTablePendingHint;
+
+  /// Title for room zone context menu
+  ///
+  /// In en, this message translates to:
+  /// **'Room Options'**
+  String get architectZoneContextMenu;
+
+  /// Menu action to edit room zone contour
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Contour'**
+  String get architectZoneEditContour;
+
+  /// Title for predefined room types dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Default Room Types'**
+  String get architectZonePresetsDialogTitle;
+
+  /// Subtitle for predefined room types dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Default name and finishes for each room category'**
+  String get architectZonePresetsDialogSubtitle;
+
+  /// Button to reset current category to built-in defaults
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Category Defaults'**
+  String get architectZonePresetsResetCategory;
+
+  /// Button to reset all room categories to built-in defaults
+  ///
+  /// In en, this message translates to:
+  /// **'Reset All Defaults'**
+  String get architectZonePresetsResetAll;
+
+  /// Snackbar message when room type presets are saved
+  ///
+  /// In en, this message translates to:
+  /// **'Room type presets saved'**
+  String get architectZonePresetsSaved;
+
+  /// Tooltip for predefine room types action
+  ///
+  /// In en, this message translates to:
+  /// **'Predefine room types and default finishes'**
+  String get architectZonePresetsTooltip;
+
   /// Laminate floor finish preset
   ///
   /// In en, this message translates to:
@@ -19547,6 +19613,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Closed contour'**
   String get architectPolylineClosed;
+
+  /// No description provided for @architectFenestrationLeafShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Leaf'**
+  String get architectFenestrationLeafShort;
+
+  /// No description provided for @architectFenestrationDetailsShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get architectFenestrationDetailsShort;
+
+  /// No description provided for @architectFenestrationTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Templates'**
+  String get architectFenestrationTemplates;
+
+  /// No description provided for @architectFenestrationElevationShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Elevation'**
+  String get architectFenestrationElevationShort;
+
+  /// No description provided for @architectFenestrationPlanShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan'**
+  String get architectFenestrationPlanShort;
+
+  /// No description provided for @architectFenestrationTransom.
+  ///
+  /// In en, this message translates to:
+  /// **'Transom'**
+  String get architectFenestrationTransom;
+
+  /// No description provided for @architectFenestrationTransomHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Transom height'**
+  String get architectFenestrationTransomHeight;
+
+  /// No description provided for @architectFenestrationDoorBodyHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Door height'**
+  String get architectFenestrationDoorBodyHeight;
+
+  /// No description provided for @architectFenestrationTotalHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Overall height'**
+  String get architectFenestrationTotalHeight;
+
+  /// No description provided for @architectFenestrationName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get architectFenestrationName;
+
+  /// No description provided for @architectFenestrationNewWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'New window'**
+  String get architectFenestrationNewWindow;
+
+  /// No description provided for @architectFenestrationNewDoor.
+  ///
+  /// In en, this message translates to:
+  /// **'New door'**
+  String get architectFenestrationNewDoor;
+
+  /// No description provided for @architectFenestrationDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsaved changes'**
+  String get architectFenestrationDiscardTitle;
+
+  /// No description provided for @architectFenestrationDiscardMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your model changes have not been saved.'**
+  String get architectFenestrationDiscardMessage;
+
+  /// No description provided for @architectFenestrationDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get architectFenestrationDiscard;
+
+  /// No description provided for @architectFenestrationKeepEditing.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get architectFenestrationKeepEditing;
+
+  /// No description provided for @architectFenestrationSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the model. Try again.'**
+  String get architectFenestrationSaveError;
+
+  /// No description provided for @architectFenestrationRedo.
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get architectFenestrationRedo;
+
+  /// No description provided for @architectFenestrationEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit model'**
+  String get architectFenestrationEdit;
+
+  /// No description provided for @architectFenestrationInvalidSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid size'**
+  String get architectFenestrationInvalidSize;
+
+  /// No description provided for @architectFenestrationInfill.
+  ///
+  /// In en, this message translates to:
+  /// **'Infill'**
+  String get architectFenestrationInfill;
+
+  /// No description provided for @architectFenestrationProfileDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame depth'**
+  String get architectFenestrationProfileDepth;
+
+  /// No description provided for @architectFenestrationProfileFace.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame face width'**
+  String get architectFenestrationProfileFace;
+
+  /// No description provided for @architectFenestration3DShort.
+  ///
+  /// In en, this message translates to:
+  /// **'3D'**
+  String get architectFenestration3DShort;
 }
 
 class _AppLocalizationsDelegate

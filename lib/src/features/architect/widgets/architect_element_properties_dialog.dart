@@ -408,14 +408,22 @@ class _ArchitectElementPropertiesDialogState
         (records.map((e) => e['name']).toSet().length == 1
             ? records.first['name'] as String? ?? ''
             : '');
+    final numberController = _textControllers.putIfAbsent(
+      'number',
+      () => TextEditingController(text: currentNumber),
+    );
+    final nameController = _textControllers.putIfAbsent(
+      'name',
+      () => TextEditingController(text: currentName),
+    );
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: 75,
           child: TextFormField(
-            key: ValueKey('architect-property-number-$currentNumber'),
-            initialValue: currentNumber,
+            key: ValueKey('architect-property-number-${_initialText("number")}'),
+            controller: numberController,
             decoration: InputDecoration(
               labelText: l.architectZoneNumberPrompt,
               isDense: true,
@@ -424,14 +432,21 @@ class _ArchitectElementPropertiesDialogState
                 vertical: 10,
               ),
             ),
-            onChanged: (v) => setState(() => texts['number'] = v),
+            onChanged: (v) {
+              texts['number'] = v;
+              _inputDirty = true;
+              _timer?.cancel();
+              _timer = Timer(const Duration(milliseconds: 300), () {
+                if (mounted) _preview();
+              });
+            },
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: TextFormField(
-            key: ValueKey('architect-property-name-$currentName'),
-            initialValue: currentName,
+            key: ValueKey('architect-property-name-${_initialText("name")}'),
+            controller: nameController,
             decoration: InputDecoration(
               labelText: l.architectZoneName,
               isDense: true,
@@ -440,7 +455,14 @@ class _ArchitectElementPropertiesDialogState
                 vertical: 10,
               ),
             ),
-            onChanged: (v) => setState(() => texts['name'] = v),
+            onChanged: (v) {
+              texts['name'] = v;
+              _inputDirty = true;
+              _timer?.cancel();
+              _timer = Timer(const Duration(milliseconds: 300), () {
+                if (mounted) _preview();
+              });
+            },
           ),
         ),
       ],
@@ -453,14 +475,18 @@ class _ArchitectElementPropertiesDialogState
         (records.map((e) => e[key]).toSet().length == 1
             ? records.first[key] as String? ?? ''
             : '');
+    final controller = _textControllers.putIfAbsent(
+      key,
+      () => TextEditingController(text: current),
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
           Expanded(
             child: TextFormField(
-              key: ValueKey('architect-property-$key-$current'),
-              initialValue: current,
+              key: ValueKey('architect-property-$key-${_initialText(key)}'),
+              controller: controller,
               decoration: InputDecoration(
                 labelText: label,
                 isDense: true,
@@ -469,7 +495,14 @@ class _ArchitectElementPropertiesDialogState
                   vertical: 8,
                 ),
               ),
-              onChanged: (v) => setState(() => texts[key] = v),
+              onChanged: (v) {
+                texts[key] = v;
+                _inputDirty = true;
+                _timer?.cancel();
+                _timer = Timer(const Duration(milliseconds: 300), () {
+                  if (mounted) _preview();
+                });
+              },
             ),
           ),
           PopupMenuButton<String>(
@@ -478,7 +511,11 @@ class _ArchitectElementPropertiesDialogState
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             onSelected: (val) {
-              setState(() => texts[key] = val);
+              controller.text = val;
+              texts[key] = val;
+              _inputDirty = true;
+              setState(() {});
+              _preview();
             },
             itemBuilder: (_) => [
               for (final preset in presets.toSet())
@@ -561,7 +598,7 @@ class _ArchitectElementPropertiesDialogState
         : WallInsulationMaterial.values.map((m) => (m.name, m.label(l)));
     final names = records.map((e) => e[key]).toSet();
     return DropdownButtonFormField<String>(
-      key: ValueKey('architect-property-$key'),
+      key: ValueKey('architect-property-$key-${_initialText(key)}'),
       isExpanded: true,
       initialValue:
           texts[key] ?? (names.length == 1 ? names.first as String? : null),
@@ -584,6 +621,7 @@ class _ArchitectElementPropertiesDialogState
   final _shell = GlobalKey<ArchitectPropertiesShellState>();
   final _compositionHandle = ArchitectPropertiesEditorHandle();
   late final Map<String, String> _initialTexts;
+  String _initialText(String key) => _initialTexts[key] ?? (_common(key)?.toString() ?? "");
   Timer? _timer;
   int _tab = 0;
   int _typeVersion = 0;
@@ -596,7 +634,7 @@ class _ArchitectElementPropertiesDialogState
   late ArchitectProject _draft = widget.project;
   final _cleared = <String>{};
   final _textControllers = <String, TextEditingController>{};
-  Object? _common(String key) {
+    Object? _common(String key) {
     final all = records.map((e) => e[key]).toSet();
     return all.length == 1 ? all.single : null;
   }
@@ -744,7 +782,7 @@ class _ArchitectElementPropertiesDialogState
   Widget _textField(String key, String label) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: TextFormField(
-      key: ValueKey('architect-property-$key'),
+      key: ValueKey('architect-property-$key-${_initialText(key)}'),
       controller: _textControllers.putIfAbsent(
         key,
         () => TextEditingController(
@@ -755,7 +793,14 @@ class _ArchitectElementPropertiesDialogState
         labelText: label,
         hintText: _common(key) == null ? context.l10n.wallMixedValue : null,
       ),
-      onChanged: (v) => setState(() => texts[key] = v),
+      onChanged: (v) {
+        texts[key] = v;
+        _inputDirty = true;
+        _timer?.cancel();
+        _timer = Timer(const Duration(milliseconds: 300), () {
+          if (mounted) _preview();
+        });
+      },
     ),
   );
   Widget _scroll(List<Widget> children) => SingleChildScrollView(
@@ -812,7 +857,7 @@ class _ArchitectElementPropertiesDialogState
       Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: DropdownButtonFormField<String>(
-          key: ValueKey('architect-property-$key'),
+          key: ValueKey('architect-property-$key-${_initialText(key)}'),
           isExpanded: true,
           initialValue: texts[key] ?? _common(key)?.toString(),
           decoration: InputDecoration(
@@ -1493,12 +1538,16 @@ class _ArchitectElementPropertiesDialogState
             for (final key in ['name', 'label', 'text', 'customText'])
               if (records.every((e) => e.containsKey(key)))
                 TextFormField(
-                  key: ValueKey('$key-${texts[key] ?? records.first[key]}'),
-                  initialValue:
-                      texts[key] ??
-                      (records.map((e) => e[key]).toSet().length == 1
-                          ? records.first[key] as String? ?? ''
-                          : ''),
+                  key: ValueKey('architect-property-$key-${_initialText(key)}'),
+                  controller: _textControllers.putIfAbsent(
+                    key,
+                    () => TextEditingController(
+                      text: texts[key] ??
+                          (records.map((e) => e[key]).toSet().length == 1
+                              ? records.first[key] as String? ?? ''
+                              : ''),
+                    ),
+                  ),
                   decoration: InputDecoration(
                     labelText: key == 'text' || key == 'customText'
                         ? l.architectToolText
@@ -1506,7 +1555,14 @@ class _ArchitectElementPropertiesDialogState
                   ),
                   minLines: key == 'text' ? 3 : 1,
                   maxLines: key == 'text' ? null : 1,
-                  onChanged: (v) => setState(() => texts[key] = v),
+                  onChanged: (v) {
+                    texts[key] = v;
+                    _inputDirty = true;
+                    _timer?.cancel();
+                    _timer = Timer(const Duration(milliseconds: 300), () {
+                      if (mounted) _preview();
+                    });
+                  },
                 ),
         ]),
       );

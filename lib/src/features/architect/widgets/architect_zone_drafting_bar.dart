@@ -36,6 +36,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback? onOpenScheduleTable;
   final VoidCallback? onPlaceTable;
+  final VoidCallback? onOpenPresets;
 
   const ArchitectZoneDraftingBar({
     super.key,
@@ -50,6 +51,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
     required this.onCancel,
     this.onOpenScheduleTable,
     this.onPlaceTable,
+    this.onOpenPresets,
   });
 
   @override
@@ -230,6 +232,21 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
               ),
 
               const SizedBox(width: 4),
+
+              // Predefine Room Types presets action
+              if (onOpenPresets != null)
+                IconButton(
+                  tooltip: l10n.architectZonePresetsTooltip,
+                  icon: const AppIcon(
+                    AppIconId.settings,
+                    color: Color(0xFF80CBC4),
+                    size: 19,
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onOpenPresets,
+                ),
 
               // Open Schedule Dialog action
               if (onOpenScheduleTable != null)
