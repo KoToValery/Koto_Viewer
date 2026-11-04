@@ -81,7 +81,7 @@ void main() {
       Offset(0, 2.0),
     ];
 
-    test('Calculates fall correctly based on slope percentage and distance', () {
+    test('Envelope uses planar interpolation between graded boundary vertices', () {
       final drain = ArchitectFloorDrain(
         id: 'drain_test',
         polygon: bathroomPoly,
@@ -94,13 +94,17 @@ void main() {
       // Point at edge of grate (dist = 0.10 from center)
       final pOnGrate = const Offset(1.10, 1.0);
       expect(ArchitectFloorDrainGeometry.distanceToGrate(drain, pOnGrate), closeTo(0.0, 1e-6));
-      expect(ArchitectFloorDrainGeometry.fall(drain, pOnGrate), closeTo(0.0, 1e-6));
+      // The finite grate collar meets the same plane used by the mesh.
+      expect(ArchitectFloorDrainGeometry.fall(drain, pOnGrate),
+          closeTo((math.sqrt(2) - .1) * .02 * .1, 1e-6));
 
       // Point 1.0 m away from center -> 0.90 m from grate edge
       final pAway = const Offset(2.0, 1.0);
       expect(ArchitectFloorDrainGeometry.distanceToGrate(drain, pAway), closeTo(0.90, 1e-6));
-      // fall = 0.90 * 2.0 / 100 = 0.018 m (18 mm)
-      expect(ArchitectFloorDrainGeometry.fall(drain, pAway), closeTo(0.018, 1e-6));
+      // The side is a straight level line between equally high corners.
+      // A radial cone would bow down and disagree with the planar mesh.
+      final edgeHeight = (math.sqrt(2) - .10) * .02;
+      expect(ArchitectFloorDrainGeometry.fall(drain, pAway), closeTo(edgeHeight, 1e-6));
     });
 
     test('Downhill slope direction vectors point directly towards drain', () {

@@ -621,86 +621,90 @@ class ArchitectStairMesh {
       project: project,
     )) {
       final points = simplify(path.base);
+      if (points.length < 2) continue;
       Vector3 at(Vector3 p, double z) => Vector3(p.x, p.y, p.z + z);
       if (path.wallMounted) {
-        for (var i = 0; i < points.length - 1; i++) {
+        result.add(_rail(points, d.handrailHeight, .022));
+      } else {
+        result.add(_rail(points, d.guardHeight, .024));
+        if (d.guardHeight - d.handrailHeight > .05) {
+          result.add(_rail(points, d.handrailHeight, .02));
+        }
+      }
+      for (final member in ArchitectStairRailings.members(path)) {
+        final p = member.point;
+        if (!path.wallMounted) {
           result.add(
             cylinder(
-              at(points[i], d.handrailHeight),
-              at(points[i + 1], d.handrailHeight),
-              .022,
+              postFoot(p),
+              at(p, d.guardHeight - .024),
+              member.post ? .018 : .006,
             ),
           );
-        }
-      } else {
-        for (var i = 0; i < points.length - 1; i++) {
-          final a = points[i], b = points[i + 1];
-          result.add(
-            cylinder(at(a, d.guardHeight), at(b, d.guardHeight), .024),
-          );
-          result.add(
-            cylinder(at(a, d.handrailHeight), at(b, d.handrailHeight), .02),
-          );
-        }
-      }
-      var distance = 0.0, nextPost = 0.0;
-      for (var i = 0; i < points.length - 1; i++) {
-        final a = points[i], b = points[i + 1];
-        final length = math.sqrt(
-          math.pow(a.x - b.x, 2) + math.pow(a.y - b.y, 2),
-        );
-        if (length < 1e-8) continue;
-        while (nextPost <= distance + length + 1e-8) {
-          final t = ((nextPost - distance) / length).clamp(0.0, 1.0);
-          final p = a + (b - a) * t;
-          if (!path.wallMounted) {
-            result.add(cylinder(postFoot(p), at(p, d.guardHeight), .012));
-          } else {
-            var nearest = Offset.zero, nearestDistance = double.infinity;
-            for (final (a, b) in stair.plan.nosings) {
-              final mid = (a + b) / 2,
-                  distance = (mid - Offset(p.x, p.y)).distance;
-              if (distance < nearestDistance) {
-                nearestDistance = distance;
-                nearest = mid;
-              }
-            }
-            final away = Offset(p.x, p.y) - nearest;
-            if (away.distance > .001) {
-              final q =
-                  p +
-                  Vector3(
-                    away.dx / away.distance * .045,
-                    away.dy / away.distance * .045,
-                    0,
-                  );
-              result.add(
-                cylinder(
-                  at(p, d.handrailHeight),
-                  at(q, d.handrailHeight),
-                  .007,
-                ),
-              );
+        } else {
+          var nearest = Offset.zero, nearestDistance = double.infinity;
+          for (final (a, b) in stair.plan.nosings) {
+            final mid = (a + b) / 2,
+                distance = (mid - Offset(p.x, p.y)).distance;
+            if (distance < nearestDistance) {
+              nearestDistance = distance;
+              nearest = mid;
             }
           }
-          nextPost += path.wallMounted ? .9 : .1;
+          final away = Offset(p.x, p.y) - nearest;
+          if (away.distance > .001) {
+            final q =
+                p +
+                Vector3(
+                  away.dx / away.distance * .045,
+                  away.dy / away.distance * .045,
+                  0,
+                );
+            result.add(
+              cylinder(at(p, d.handrailHeight), at(q, d.handrailHeight), .007),
+            );
+          }
         }
-        distance += length;
-      }
-      if (!path.wallMounted) {
-        result.add(
-          cylinder(
-            postFoot(points.first),
-            at(points.first, d.guardHeight),
-            .02,
-          ),
-        );
-        result.add(
-          cylinder(postFoot(points.last), at(points.last, d.guardHeight), .02),
-        );
       }
     }
     return result;
+  }
+
+  /// One tube with shared rings at bends: no capped pieces or open joints at
+  /// landing corners. The same surface is used by 3D and section/elevation cuts.
+  static StairSolid _rail(List<Vector3> base, double height, double radius) {
+    const count = 10;
+    final rings = <List<Vector3>>[];
+    for (var i = 0; i < base.length; i++) {
+      final before = i == 0 ? base[1] - base[0] : base[i] - base[i - 1];
+      final after = i == base.length - 1 ? before : base[i + 1] - base[i];
+      final tangent = (before.normalized() + after.normalized()).normalized();
+      final u = tangent.cross(const Vector3(0, 0, 1)).normalized();
+      final v = tangent.cross(u).normalized();
+      final centre = base[i] + Vector3(0, 0, height);
+      rings.add([
+        for (var j = 0; j < count; j++)
+          centre +
+              u * (radius * math.cos(2 * math.pi * j / count)) +
+              v * (radius * math.sin(2 * math.pi * j / count)),
+      ]);
+    }
+    final triangles = <Triangle3D>[];
+    void face(Vector3 a, Vector3 b, Vector3 c) => triangles.add(
+      Triangle3D(v0: a, v1: b, v2: c, color: metalColor, isDoubleSided: true),
+    );
+    for (var i = 1; i < rings.length; i++) {
+      for (var j = 0; j < count; j++) {
+        final k = (j + 1) % count;
+        face(rings[i - 1][j], rings[i - 1][k], rings[i][k]);
+        face(rings[i - 1][j], rings[i][k], rings[i][j]);
+      }
+    }
+    for (var j = 1; j < count - 1; j++) {
+      face(rings.first[0], rings.first[j + 1], rings.first[j]);
+      face(rings.last[0], rings.last[j], rings.last[j + 1]);
+    }
+    return StairSolid(StairSolidMaterial.metal, triangles);
   }
 
   static List<Vector3> simplify(List<Vector3> points) {

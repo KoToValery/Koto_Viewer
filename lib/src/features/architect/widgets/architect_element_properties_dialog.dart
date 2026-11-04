@@ -1,3 +1,4 @@
+import '../services/architect_floor_drain_geometry.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:convert';
 import '../models/architect_elements.dart';
@@ -32,6 +33,8 @@ import 'architect_wall_type_picker.dart';
 class ArchitectElementPropertiesDialog extends StatefulWidget {
   final bool Function(ArchitectProject)? onApplyProject;
   final void Function(ArchitectProject?)? onPreview;
+  final String? viewKey;
+  final int? drawingScale;
   final ArchitectProject Function(ArchitectProject)? prepare;
   final bool Function()? isCurrent;
   final ArchitectProject project;
@@ -50,6 +53,8 @@ class ArchitectElementPropertiesDialog extends StatefulWidget {
     this.onApplyProject,
     this.onPreview,
     this.prepare,
+    this.viewKey,
+    this.drawingScale,
     this.isCurrent,
     this.onSlabLayers,
     this.onScheduleTable,
@@ -205,6 +210,12 @@ class _ArchitectElementPropertiesDialogState
           .toSet();
       if (autoBoundaries.length == 1 && autoBoundaries.first != null) {
         texts['isAutoBoundary'] = '${autoBoundaries.first!}';
+      }
+    }
+    if (_isText) fields.remove('fontSize');
+    if (_isLevel) {
+      for (final key in ['levelUnits', 'levelDecimals']) {
+        if (records.every((e) => e[key] == null)) texts[key] = 'inherit';
       }
     }
     _initialTexts = Map.of(texts);
@@ -509,7 +520,12 @@ class _ArchitectElementPropertiesDialogState
     child: ArchitectPropertyNumberField(
       key: ValueKey('architect-property-$key'),
       descriptor: ArchitectPropertyDescriptor.of(key),
-      project: widget.project,
+      project: key == 'elevation' && _isLevel
+          ? widget.project.copyWith(
+              units: _levelUnit,
+              distanceDecimals: _levelDigits,
+            )
+          : widget.project,
       label: label(key),
       value: fieldValue(key),
       onClear: key == 'targetArea'
@@ -595,6 +611,10 @@ class _ArchitectElementPropertiesDialogState
       _flipMixed ||
       (_compositionHandle.isDirty?.call() ?? false) ||
       _inputDirty ||
+      _paperTextMm != null ||
+      _resetTextSize ||
+      _projectLevelUnits != null ||
+      _projectLevelDecimals != null ||
       _cleared.isNotEmpty ||
       values.isNotEmpty ||
       _patch.isNotEmpty ||
@@ -641,6 +661,22 @@ class _ArchitectElementPropertiesDialogState
         ).apply(next);
       }
     }
+    if (_paperTextMm != null || _resetTextSize) {
+      final sizes = Map<String, double>.of(next.document.overrideMm);
+      for (final id in widget.elementIds) {
+        final key = '$_viewKey/$id/ordinary/$_scale';
+        if (_resetTextSize) {
+          sizes.remove(key);
+        } else {
+          sizes[key] = _paperTextMm!;
+        }
+      }
+      next = next.copyWith(document: next.document.copyWith(overrideMm: sizes));
+    }
+    next = next.copyWith(
+      levelUnits: _projectLevelUnits,
+      levelDecimals: _projectLevelDecimals,
+    );
     return widget.prepare?.call(next) ?? next;
   }
 
@@ -792,6 +828,159 @@ class _ArchitectElementPropertiesDialogState
           },
         ),
       );
+  bool get _isText => widget.elementIds.every(
+    (id) => widget.project.activeStorey.annotations.any((a) => a.id == id),
+  );
+  bool get _isLevel => widget.elementIds.every(
+    (id) => widget.project.activeStorey.elevationMarkers.any((a) => a.id == id),
+  );
+  double? _paperTextMm;
+  bool _resetTextSize = false;
+  ArchitectUnit? _projectLevelUnits;
+  int? _projectLevelDecimals;
+  String get _viewKey =>
+      widget.viewKey ?? 'plan:${widget.project.activeStoreyId}';
+  int get _scale =>
+      widget.drawingScale ??
+      widget.project.document.viewScales[_viewKey] ??
+      widget.project.dimensionScale.denominator;
+  ArchitectUnit get _levelUnit =>
+      ArchitectUnit.values
+          .where(
+            (u) => u.name == (texts['levelUnits'] ?? _common('levelUnits')),
+          )
+          .firstOrNull ??
+      _projectLevelUnits ??
+      widget.project.levelUnits;
+  int get _levelDigits =>
+      int.tryParse(
+        texts['levelDecimals'] ?? '${_common('levelDecimals') ?? ''}',
+      ) ??
+      _projectLevelDecimals ??
+      widget.project.levelDecimals;
+
+  List<Widget> _textFields(AppLocalizations l) {
+    final heights = [
+      for (final id in widget.elementIds)
+        widget.project.document.textMm(
+          _viewKey,
+          id,
+          ArchitectAnnotationRole.ordinary,
+          _scale,
+        ),
+    ].toSet();
+    return [
+      TextFormField(
+        key: ValueKey('architect-property-paper-text-$_resetTextSize'),
+        initialValue: _resetTextSize
+            ? null
+            : (heights.length == 1 ? heights.single.toStringAsFixed(2) : ''),
+        decoration: InputDecoration(
+          labelText: l.architectTextPaperHeight,
+          hintText: l.wallMixedValue,
+        ),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        validator: (v) =>
+            _resetTextSize || v == null || v.isEmpty && heights.length != 1
+            ? null
+            : double.tryParse(v.replaceAll(',', '.'))?.isFinite == true &&
+                  (double.tryParse(v.replaceAll(',', '.')) ?? 0) > 0
+            ? null
+            : l.propertiesInvalid,
+        onChanged: (v) => setState(() {
+          _paperTextMm = double.tryParse(v.replaceAll(',', '.'));
+          _resetTextSize = false;
+          _inputDirty = true;
+        }),
+      ),
+      Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: TextButton(
+          onPressed: () => setState(() {
+            _paperTextMm = null;
+            _resetTextSize = true;
+          }),
+          child: Text(l.architectAnnotationReset),
+        ),
+      ),
+      _choice('alignment', l.architectTextAlignment, {
+        'left': l.architectTextLeft,
+        'center': l.architectTextCenter,
+        'right': l.architectTextRight,
+      }),
+      _choice('fontWeight', l.architectTextWeight, {
+        '400': l.architectTextRegular,
+        '600': l.architectTextSemibold,
+        '700': l.architectTextBold,
+        if (_common('fontWeight') != null &&
+            ![400, 600, 700].contains(_common('fontWeight')))
+          '${_common('fontWeight')}': '${_common('fontWeight')}',
+      }),
+      CheckboxListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(l.architectTextItalic),
+        value: (texts['italic'] ?? '${_common('italic')}') == 'true',
+        onChanged: (v) => setState(() => texts['italic'] = '$v'),
+      ),
+      CheckboxListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(l.architectTextUnderline),
+        value: (texts['underline'] ?? '${_common('underline')}') == 'true',
+        onChanged: (v) => setState(() => texts['underline'] = '$v'),
+      ),
+      ArchitectDrawingColorPicker(
+        value: ArchitectDrawingColor(
+          int.tryParse(texts['textColor'] ?? '') ??
+              (_common('colorValue') as num?)?.toInt() ??
+              0xFF212121,
+        ),
+        onChanged: (v) => setState(() => texts['textColor'] = '${v.argb}'),
+      ),
+    ];
+  }
+
+  List<Widget> _levelFields(AppLocalizations l) => [
+    _choice('symbol', l.architectLevelSymbol, {
+      'automatic': l.wallAutomatic,
+      'plan': l.architectLevelPlan,
+      'elevation': l.architectLevelElevation,
+    }),
+    _choice('levelUnits', l.architectLevelFormat, {
+      'inherit': l.architectInheritProject,
+      for (final u in ArchitectUnit.values) u.name: u.symbol,
+    }),
+    _choice('levelDecimals', l.architectPrecision, {
+      'inherit': l.architectInheritProject,
+      for (var i = 0; i <= 4; i++) '$i': '$i',
+    }),
+    ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      title: Text(l.architectInheritProject),
+      children: [
+        DropdownButtonFormField<ArchitectUnit>(
+          key: const ValueKey('architect-project-level-units'),
+          initialValue: _projectLevelUnits ?? widget.project.levelUnits,
+          decoration: InputDecoration(labelText: l.architectLevelFormat),
+          items: [
+            for (final u in ArchitectUnit.values)
+              DropdownMenuItem(value: u, child: Text(u.symbol)),
+          ],
+          onChanged: (u) => setState(() => _projectLevelUnits = u),
+        ),
+        DropdownButtonFormField<int>(
+          key: const ValueKey('architect-project-level-decimals'),
+          initialValue: _projectLevelDecimals ?? widget.project.levelDecimals,
+          decoration: InputDecoration(labelText: l.architectPrecision),
+          items: [
+            for (var i = 0; i <= 4; i++)
+              DropdownMenuItem(value: i, child: Text('$i')),
+          ],
+          onChanged: (n) => setState(() => _projectLevelDecimals = n),
+        ),
+      ],
+    ),
+  ];
+
   String _title(AppLocalizations l) {
     final s = widget.project.activeStorey, ids = widget.elementIds;
     final name = ids.every((id) => s.walls.any((e) => e.id == id))
@@ -849,6 +1038,47 @@ class _ArchitectElementPropertiesDialogState
     if (!walls) {
       pages.add(
         _scroll([
+          if (_isText) ..._textFields(l),
+          if (_isLevel) ..._levelFields(l),
+          if (widget.elementIds.every(
+            (id) => widget.project.activeStorey.cadPrimitives.any(
+              (p) => p.id == id && p.type == CadPrimitiveType.polyline,
+            ),
+          ))
+            CheckboxListTile(
+              key: const ValueKey('architect-property-closed'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(l.architectPolylineClosed),
+              value: (texts['closed'] ?? '${_common('closed')}') == 'true',
+              onChanged: (v) => setState(() => texts['closed'] = '$v'),
+            ),
+          for (final drain in widget.project.activeStorey.floorDrains.where(
+            (d) => widget.elementIds.contains(d.id),
+          ))
+            for (final issue in ArchitectFloorDrainGeometry.field(
+              drain,
+              widget.project.activeStorey.walls,
+            ).issues)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, size: 18),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(switch (issue) {
+                        ArchitectDrainIssue.outsideFloor =>
+                          l.architectDrainOutsideFloor,
+                        ArchitectDrainIssue.nearDoor =>
+                          l.architectDrainNearDoor,
+                        ArchitectDrainIssue.invalidSurface =>
+                          l.architectDrainInvalidSurface,
+                      }),
+                    ),
+                  ],
+                ),
+              ),
           if (widget.onScheduleTable != null) ...[
             OutlinedButton.icon(
               key: const ValueKey('architect-property-schedule-table'),
@@ -1191,7 +1421,8 @@ class _ArchitectElementPropertiesDialogState
                 setState(() {
                   if (_lineStyle?.id == style.id) {
                     _lineStyle = ArchitectLineStyle.solid;
-                    texts['lineStyle'] = jsonEncode(ArchitectLineStyle.solid.toJson(),
+                    texts['lineStyle'] = jsonEncode(
+                      ArchitectLineStyle.solid.toJson(),
                     );
                   }
                 });
@@ -1273,7 +1504,9 @@ class _ArchitectElementPropertiesDialogState
                         ? l.architectToolText
                         : l.architectPropertyName,
                   ),
-                  onChanged: (v) => texts[key] = v,
+                  minLines: key == 'text' ? 3 : 1,
+                  maxLines: key == 'text' ? null : 1,
+                  onChanged: (v) => setState(() => texts[key] = v),
                 ),
         ]),
       );

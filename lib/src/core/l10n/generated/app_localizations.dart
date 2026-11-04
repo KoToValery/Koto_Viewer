@@ -7112,7 +7112,7 @@ abstract class AppLocalizations {
   /// Level mark elevation label
   ///
   /// In en, this message translates to:
-  /// **'Elevation'**
+  /// **'Elevation / section'**
   String get architectLevelElevation;
 
   /// Annotation text label
@@ -9374,7 +9374,7 @@ abstract class AppLocalizations {
   /// No description provided for @stairPlaceHelp.
   ///
   /// In en, this message translates to:
-  /// **'Place the first riser, then point the ascent direction. Length and steps are calculated from the floor levels.'**
+  /// **'Pick the outer corner of the first step, then point the ascent direction. Length and steps are calculated from the floor levels.'**
   String get stairPlaceHelp;
 
   /// No description provided for @stairCode.
@@ -19415,6 +19415,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Check'**
   String get commandUiCheck;
+
+  /// No description provided for @architectColumnClearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Column clearance'**
+  String get architectColumnClearance;
+
+  /// No description provided for @architectLevelFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Level units'**
+  String get architectLevelFormat;
+
+  /// No description provided for @architectLevelSymbol.
+  ///
+  /// In en, this message translates to:
+  /// **'Symbol'**
+  String get architectLevelSymbol;
+
+  /// No description provided for @architectLevelPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan'**
+  String get architectLevelPlan;
+
+  /// No description provided for @architectInheritProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Use project setting'**
+  String get architectInheritProject;
+
+  /// No description provided for @architectPrecision.
+  ///
+  /// In en, this message translates to:
+  /// **'Decimal places'**
+  String get architectPrecision;
+
+  /// No description provided for @architectTextPaperHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Text height (mm on paper)'**
+  String get architectTextPaperHeight;
+
+  /// No description provided for @architectTextAlignment.
+  ///
+  /// In en, this message translates to:
+  /// **'Alignment'**
+  String get architectTextAlignment;
+
+  /// No description provided for @architectTextLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get architectTextLeft;
+
+  /// No description provided for @architectTextCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Centre'**
+  String get architectTextCenter;
+
+  /// No description provided for @architectTextRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get architectTextRight;
+
+  /// No description provided for @architectTextWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight'**
+  String get architectTextWeight;
+
+  /// No description provided for @architectTextRegular.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular'**
+  String get architectTextRegular;
+
+  /// No description provided for @architectTextSemibold.
+  ///
+  /// In en, this message translates to:
+  /// **'Semibold'**
+  String get architectTextSemibold;
+
+  /// No description provided for @architectTextBold.
+  ///
+  /// In en, this message translates to:
+  /// **'Bold'**
+  String get architectTextBold;
+
+  /// No description provided for @architectTextItalic.
+  ///
+  /// In en, this message translates to:
+  /// **'Italic'**
+  String get architectTextItalic;
+
+  /// No description provided for @architectTextUnderline.
+  ///
+  /// In en, this message translates to:
+  /// **'Underline'**
+  String get architectTextUnderline;
+
+  /// No description provided for @architectPolylineClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close contour'**
+  String get architectPolylineClose;
+
+  /// No description provided for @architectPolylineOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open contour'**
+  String get architectPolylineOpen;
+
+  /// No description provided for @architectPolylineEdge.
+  ///
+  /// In en, this message translates to:
+  /// **'Move segment'**
+  String get architectPolylineEdge;
+
+  /// No description provided for @architectDrainInvalidSurface.
+  ///
+  /// In en, this message translates to:
+  /// **'The floor cannot drain continuously to this grate. Adjust the contour or drain position.'**
+  String get architectDrainInvalidSurface;
+
+  /// No description provided for @architectPolylineClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed contour'**
+  String get architectPolylineClosed;
 }
 
 class _AppLocalizationsDelegate

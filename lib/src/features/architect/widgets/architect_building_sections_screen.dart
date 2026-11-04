@@ -1509,8 +1509,8 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
           ..strokeWidth = .5,
       );
       text(
-        ArchitectTextScope.current?.length(floor.elevation) ??
-            floor.elevationLabel,
+        ArchitectTextScope.current?.level(floor.elevation) ??
+            drawing.project.formatLevel(floor.elevation),
         a + const Offset(2, -2),
         math.max(9, drawing.textHeight * scale),
         color,

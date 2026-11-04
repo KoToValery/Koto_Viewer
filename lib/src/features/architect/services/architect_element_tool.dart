@@ -1,3 +1,4 @@
+import '../rendering/architect_annotation_layout.dart';
 import '../models/architect_contour.dart';
 import '../rendering/architect_special_wall_geometry.dart';
 import 'architect_roof_drainage_geometry.dart';
@@ -95,7 +96,11 @@ class ArchitectElementTool extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setStairParams({double? width, int? steps, ArchitectStairDesign? design}) {
+  void setStairParams({
+    double? width,
+    int? steps,
+    ArchitectStairDesign? design,
+  }) {
     if (width != null) stairWidth = width;
     if (steps != null) stairSteps = steps;
     if (design != null) stairDesign = design;
@@ -306,10 +311,10 @@ class ArchitectElementTool extends ChangeNotifier {
   }) {
     if ((end - start).distance < 0.40) return null;
     final now = ArchitectElementId.next('element');
-    final newStair = ArchitectStair(
+    final newStair = ArchitectStair.fromCorner(
       id: 'stair_$now',
-      startPoint: start,
-      endPoint: end,
+      corner: start,
+      directionPoint: end,
       width: stairWidth,
       stepCount: stairSteps,
     );
@@ -476,8 +481,9 @@ class ArchitectElementTool extends ChangeNotifier {
       cadPrimitives: storey.cadPrimitives
           .where(
             (p) => switch (tool) {
-              ArchitectTool.cadLine => p.type == CadPrimitiveType.line ||
-                  p.type == CadPrimitiveType.polyline,
+              ArchitectTool.cadLine =>
+                p.type == CadPrimitiveType.line ||
+                    p.type == CadPrimitiveType.polyline,
               ArchitectTool.cadRect => p.type == CadPrimitiveType.rect,
               ArchitectTool.cadCircle => p.type == CadPrimitiveType.circle,
               ArchitectTool.hatch => p.type == CadPrimitiveType.hatch,
@@ -494,7 +500,10 @@ class ArchitectElementTool extends ChangeNotifier {
       dimensionStorey: storey,
       annotationProject: annotationProject,
       drawingViewKey: drawingViewKey,
-    ).where((id) => tool == ArchitectTool.wall || !scoped.walls.any((w) => w.id == id));
+    ).where(
+      (id) =>
+          tool == ArchitectTool.wall || !scoped.walls.any((w) => w.id == id),
+    );
   }
 
   String? hitTestForTool(
@@ -505,16 +514,15 @@ class ArchitectElementTool extends ChangeNotifier {
     List<StructuralGridAxis> gridAxes = const [],
     ArchitectProject? annotationProject,
     String? drawingViewKey,
-  }) =>
-      hitTestElementsForTool(
-        storey,
-        point,
-        scale,
-        tool,
-        gridAxes: gridAxes,
-        annotationProject: annotationProject,
-        drawingViewKey: drawingViewKey,
-      ).firstOrNull;
+  }) => hitTestElementsForTool(
+    storey,
+    point,
+    scale,
+    tool,
+    gridAxes: gridAxes,
+    annotationProject: annotationProject,
+    drawingViewKey: drawingViewKey,
+  ).firstOrNull;
 
   String? hitTestElement(
     ArchitectStorey storey,
@@ -645,7 +653,14 @@ class ArchitectElementTool extends ChangeNotifier {
 
     // Check Annotations
     for (final ann in storey.annotations) {
-      if ((point - ann.position).distance <= 0.60 + tolerance) {
+      if (ArchitectAnnotationLayout.outline(
+            ann,
+            project: annotationProject,
+          ).contains(point) ||
+          ArchitectAnnotationLayout.outline(
+            ann,
+            project: annotationProject,
+          ).getBounds().inflate(tolerance).contains(point)) {
         yield ann.id;
       }
     }
@@ -656,7 +671,8 @@ class ArchitectElementTool extends ChangeNotifier {
           prim.type == CadPrimitiveType.polyline) {
         final points = prim.linePoints;
         for (var i = 1; i < points.length; i++) {
-          if (_pointToSegmentDistance(point, points[i - 1], points[i]) <= tolerance) {
+          if (_pointToSegmentDistance(point, points[i - 1], points[i]) <=
+              tolerance) {
             yield prim.id;
             break;
           }
@@ -667,8 +683,12 @@ class ArchitectElementTool extends ChangeNotifier {
         if (path.contains(point)) yield prim.id;
         for (final ring in [points, ...prim.holes]) {
           for (var i = 0; i < ring.length; i++) {
-            if (_pointToSegmentDistance(point, ring[i],
-                  ring[(i + 1) % ring.length]) <= tolerance) {
+            if (_pointToSegmentDistance(
+                  point,
+                  ring[i],
+                  ring[(i + 1) % ring.length],
+                ) <=
+                tolerance) {
               yield prim.id;
             }
           }
@@ -685,26 +705,38 @@ class ArchitectElementTool extends ChangeNotifier {
       if (ArchitectSpecialWallGeometry.containsPlanPoint(
         wall,
         storey.walls,
-        point)) {
+        point,
+      )) {
         yield wall.id;
       }
     }
 
     // Check Roofs
-    final roofJunctions = ArchitectRoofJunctions.of(storey, project: annotationProject);
+    final roofJunctions = ArchitectRoofJunctions.of(
+      storey,
+      project: annotationProject,
+    );
     for (final roof in storey.roofs.reversed) {
       if (roofJunctions.footprint(roof).contains(point) ||
           _hitsInnerContour(roof.holes, point, tolerance) ||
-          (annotationProject != null && ArchitectRoofDrainageGeometry.build(annotationProject, storey, roof)
-            .planPath(roof.drainage.gutterWidth, tolerance: tolerance).contains(point))) {
+          (annotationProject != null &&
+              ArchitectRoofDrainageGeometry.build(
+                    annotationProject,
+                    storey,
+                    roof,
+                  )
+                  .planPath(roof.drainage.gutterWidth, tolerance: tolerance)
+                  .contains(point))) {
         yield roof.id;
       }
     }
 
     // Check Floor Drains: the grate or the outline, never the whole room.
     for (final drain in storey.floorDrains) {
-      if (ArchitectFloorDrainGeometry.distanceToGrate(drain, point) <= tolerance ||
-          ArchitectFloorDrainGeometry.boundaryDistance(drain, point) <= tolerance ||
+      if (ArchitectFloorDrainGeometry.distanceToGrate(drain, point) <=
+              tolerance ||
+          ArchitectFloorDrainGeometry.boundaryDistance(drain, point) <=
+              tolerance ||
           _hitsInnerContour(drain.holes, point, tolerance)) {
         yield drain.id;
       }
@@ -712,7 +744,8 @@ class ArchitectElementTool extends ChangeNotifier {
 
     // Check Slabs
     for (final slab in storey.slabs) {
-      if (slab.containsPoint(point) || _hitsInnerContour(slab.holes, point, tolerance)) {
+      if (slab.containsPoint(point) ||
+          _hitsInnerContour(slab.holes, point, tolerance)) {
         yield slab.id;
       }
     }
@@ -722,10 +755,20 @@ class ArchitectElementTool extends ChangeNotifier {
   // 13. ELEMENT DELETION
   // ===========================================================================
 
-  static bool _hitsInnerContour(List<List<Offset>> holes, Offset point, double tolerance) {
+  static bool _hitsInnerContour(
+    List<List<Offset>> holes,
+    Offset point,
+    double tolerance,
+  ) {
     for (final ring in holes) {
       for (var i = 0; i < ring.length; i++) {
-        if (_pointToSegmentDistance(point, ring[i], ring[(i + 1) % ring.length]) <= tolerance) return true;
+        if (_pointToSegmentDistance(
+              point,
+              ring[i],
+              ring[(i + 1) % ring.length],
+            ) <=
+            tolerance)
+          return true;
       }
     }
     return false;
@@ -771,6 +814,37 @@ class ArchitectElementTool extends ChangeNotifier {
   }) {
     final newId = ArchitectElementId.next('copy');
 
+    final annotation = storey.annotations
+        .where((a) => a.id == elementId)
+        .firstOrNull;
+    if (annotation != null) {
+      return (
+        storey.copyWith(
+          annotations: [
+            ...storey.annotations,
+            annotation.copyWith(
+              id: newId,
+              position: annotation.position + offset,
+            ),
+          ],
+        ),
+        newId,
+      );
+    }
+    final marker = storey.elevationMarkers
+        .where((a) => a.id == elementId)
+        .firstOrNull;
+    if (marker != null) {
+      return (
+        storey.copyWith(
+          elevationMarkers: [
+            ...storey.elevationMarkers,
+            marker.copyWith(id: newId, position: marker.position + offset),
+          ],
+        ),
+        newId,
+      );
+    }
     // 1. Column
     final colIndex = storey.columns.indexWhere((c) => c.id == elementId);
     if (colIndex != -1) {
@@ -853,7 +927,11 @@ class ArchitectElementTool extends ChangeNotifier {
     if (zoneIndex != -1) {
       final zone = storey.zones[zoneIndex];
       final newZone = const ArchitectZoneEditingAdapter().translate(
-        zone.copyWith(id: newId, isAutoBoundary: false, clearScheduleOrigin: true),
+        zone.copyWith(
+          id: newId,
+          isAutoBoundary: false,
+          clearScheduleOrigin: true,
+        ),
         offset,
       );
       return (storey.copyWith(zones: [...storey.zones, newZone]), newId);
@@ -874,6 +952,16 @@ class ArchitectElementTool extends ChangeNotifier {
   }
 
   ArchitectStorey rotateElementById(ArchitectStorey storey, String elementId) {
+    if (storey.annotations.any((a) => a.id == elementId)) {
+      return storey.copyWith(
+        annotations: [
+          for (final a in storey.annotations)
+            a.id == elementId
+                ? a.copyWith(rotationDeg: (a.rotationDeg + 90) % 360)
+                : a,
+        ],
+      );
+    }
     // 1. Column (rotate 90 degrees)
     final colIndex = storey.columns.indexWhere((c) => c.id == elementId);
     if (colIndex != -1) {
@@ -926,8 +1014,13 @@ class ArchitectElementTool extends ChangeNotifier {
         final newSlabs = List<ArchitectSlab>.from(storey.slabs);
         newSlabs[slabIndex] = slab.copyWith(
           polygon: rotatedPoly,
-          holes: ArchitectContour.transform(slab.holes, (p) { final d = p - center; return center + Offset(-d.dy, d.dx); }),
-          slopeDirection: slab.slopeDirection == null ? null : slab.slopeDirection! + math.pi / 2,
+          holes: ArchitectContour.transform(slab.holes, (p) {
+            final d = p - center;
+            return center + Offset(-d.dy, d.dx);
+          }),
+          slopeDirection: slab.slopeDirection == null
+              ? null
+              : slab.slopeDirection! + math.pi / 2,
         );
         return storey.copyWith(slabs: newSlabs);
       }
@@ -944,7 +1037,13 @@ class ArchitectElementTool extends ChangeNotifier {
           return center + Offset(-rel.dy, rel.dx);
         }).toList();
         final newRoofs = List<ArchitectRoofPlane>.from(storey.roofs);
-        newRoofs[roofIndex] = roof.copyWith(points: rotatedPts, holes: ArchitectContour.transform(roof.holes, (p) { final d = p - center; return center + Offset(-d.dy, d.dx); }));
+        newRoofs[roofIndex] = roof.copyWith(
+          points: rotatedPts,
+          holes: ArchitectContour.transform(roof.holes, (p) {
+            final d = p - center;
+            return center + Offset(-d.dy, d.dx);
+          }),
+        );
         return storey.copyWith(roofs: newRoofs);
       }
     }
@@ -958,8 +1057,14 @@ class ArchitectElementTool extends ChangeNotifier {
       final perp = Offset(-delta.dy, delta.dx) / 2;
       final newCad = List<ArchitectCadPrimitive>.from(storey.cadPrimitives);
       newCad[cadIndex] = prim.copyWith(
-        holes: ArchitectContour.transform(prim.holes, (p) { final d = p - mid; return mid + Offset(-d.dy, d.dx); }),
-        polygon: prim.polygon?.map((p) { final d = p - mid; return mid + Offset(-d.dy, d.dx); }).toList(),
+        holes: ArchitectContour.transform(prim.holes, (p) {
+          final d = p - mid;
+          return mid + Offset(-d.dy, d.dx);
+        }),
+        polygon: prim.polygon?.map((p) {
+          final d = p - mid;
+          return mid + Offset(-d.dy, d.dx);
+        }).toList(),
         startPoint: mid - perp,
         endPoint: mid + perp,
       );
@@ -1006,9 +1111,18 @@ class ArchitectElementTool extends ChangeNotifier {
       newWalls[wallIndex] = wall.copyWith(
         startPoint: wall.endPoint,
         endPoint: wall.startPoint,
-        arcBulge:-wall.arcBulge,
-        doors:[for(final d in wall.doors)d.copyWith(offsetRatio:1-d.offsetRatio,isHingeLeft:!d.isHingeLeft)],
-        windows:[for(final w in wall.windows)w.copyWith(offsetRatio:1-w.offsetRatio)],
+        arcBulge: -wall.arcBulge,
+        doors: [
+          for (final d in wall.doors)
+            d.copyWith(
+              offsetRatio: 1 - d.offsetRatio,
+              isHingeLeft: !d.isHingeLeft,
+            ),
+        ],
+        windows: [
+          for (final w in wall.windows)
+            w.copyWith(offsetRatio: 1 - w.offsetRatio),
+        ],
       );
       return storey.copyWith(walls: newWalls);
     }
@@ -1021,6 +1135,7 @@ class ArchitectElementTool extends ChangeNotifier {
     Set<String> elementIds, {
     Offset offset = const Offset(0.5, 0.5),
     bool copyGroups = true,
+    Map<String, String>? copiedIds,
   }) {
     var currentStorey = storey;
     final newIds = <String>[];
@@ -1035,11 +1150,20 @@ class ArchitectElementTool extends ChangeNotifier {
         currentStorey = updated;
         newIds.add(copyId);
         copied[id] = copyId;
+        copiedIds?[id] = copyId;
       }
     }
     if (copyGroups) {
-      currentStorey = currentStorey.copyWith(groups: [...currentStorey.groups,
-        ...ArchitectElementGroup.copies(storey.groups, copied, () => ArchitectElementId.next('group'))]);
+      currentStorey = currentStorey.copyWith(
+        groups: [
+          ...currentStorey.groups,
+          ...ArchitectElementGroup.copies(
+            storey.groups,
+            copied,
+            () => ArchitectElementId.next('group'),
+          ),
+        ],
+      );
     }
     return (currentStorey, newIds);
   }
@@ -1050,8 +1174,18 @@ class ArchitectElementTool extends ChangeNotifier {
     Offset? origin,
   }) {
     if (origin != null) {
-      final (first, _) = mirrorElementsByIds(storey, elementIds, origin: origin, direction: const Offset(1, 0));
-      return mirrorElementsByIds(first, elementIds, origin: origin, direction: const Offset(1, 1)).$1;
+      final (first, _) = mirrorElementsByIds(
+        storey,
+        elementIds,
+        origin: origin,
+        direction: const Offset(1, 0),
+      );
+      return mirrorElementsByIds(
+        first,
+        elementIds,
+        origin: origin,
+        direction: const Offset(1, 1),
+      ).$1;
     }
     var currentStorey = storey;
     for (final id in elementIds) {
@@ -1080,8 +1214,9 @@ class ArchitectElementTool extends ChangeNotifier {
     String? newId,
   }) {
     if (direction.distanceSquared < 1e-12) return (storey, null);
-    final targetId =
-        isDuplicate ? (newId ?? ArchitectElementId.next('mirror')) : elementId;
+    final targetId = isDuplicate
+        ? (newId ?? ArchitectElementId.next('mirror'))
+        : elementId;
 
     // 1. Column
     final colIndex = storey.columns.indexWhere((c) => c.id == elementId);
@@ -1195,7 +1330,10 @@ class ArchitectElementTool extends ChangeNotifier {
       final newSlab = slab.copyWith(
         id: targetId,
         polygon: newPoly,
-        holes: ArchitectContour.transform(slab.holes, (p) => BimTransform2D.mirror(p, origin, direction)),
+        holes: ArchitectContour.transform(
+          slab.holes,
+          (p) => BimTransform2D.mirror(p, origin, direction),
+        ),
         slopeDirection: newSlope,
       );
       if (isDuplicate) {
@@ -1223,12 +1361,21 @@ class ArchitectElementTool extends ChangeNotifier {
       final newRoof = roof.copyWith(
         id: targetId,
         points: newPoints,
-        holes: ArchitectContour.transform(roof.holes, (p) => BimTransform2D.mirror(p, origin, direction)),
+        holes: ArchitectContour.transform(
+          roof.holes,
+          (p) => BimTransform2D.mirror(p, origin, direction),
+        ),
         eavesEdgeIndex: safeEaves,
-        drainage: roof.drainage.copyWith(downpipes: [
-          for (final pipe in roof.drainage.downpipes) pipe.copyWith(
-            offset: pipe.offset <= eavesLength ? eavesLength - pipe.offset : pipe.offset),
-        ]),
+        drainage: roof.drainage.copyWith(
+          downpipes: [
+            for (final pipe in roof.drainage.downpipes)
+              pipe.copyWith(
+                offset: pipe.offset <= eavesLength
+                    ? eavesLength - pipe.offset
+                    : pipe.offset,
+              ),
+          ],
+        ),
       );
       if (isDuplicate) {
         return (storey.copyWith(roofs: [...storey.roofs, newRoof]), targetId);
@@ -1248,7 +1395,11 @@ class ArchitectElementTool extends ChangeNotifier {
         for (final p in zone.polygon)
           BimTransform2D.mirror(p, origin, direction),
       ].reversed.toList();
-      final newZone = zone.copyWith(id: targetId, polygon: newPoly, clearScheduleOrigin: isDuplicate);
+      final newZone = zone.copyWith(
+        id: targetId,
+        polygon: newPoly,
+        clearScheduleOrigin: isDuplicate,
+      );
       if (isDuplicate) {
         return (storey.copyWith(zones: [...storey.zones, newZone]), targetId);
       } else {
@@ -1266,10 +1417,7 @@ class ArchitectElementTool extends ChangeNotifier {
         for (final p in opening.boundary)
           BimTransform2D.mirror(p, origin, direction),
       ].reversed.toList();
-      final newOpening = opening.copyWith(
-        id: targetId,
-        boundary: newBoundary,
-      );
+      final newOpening = opening.copyWith(id: targetId, boundary: newBoundary);
       if (isDuplicate) {
         return (
           storey.copyWith(openings: [...storey.openings, newOpening]),
@@ -1292,7 +1440,10 @@ class ArchitectElementTool extends ChangeNotifier {
         endPoint: BimTransform2D.mirror(stair.endPoint, origin, direction),
       );
       if (isDuplicate) {
-        return (storey.copyWith(stairs: [...storey.stairs, newStair]), targetId);
+        return (
+          storey.copyWith(stairs: [...storey.stairs, newStair]),
+          targetId,
+        );
       } else {
         final stairs = List<ArchitectStair>.from(storey.stairs);
         stairs[stairIndex] = newStair;
@@ -1332,6 +1483,10 @@ class ArchitectElementTool extends ChangeNotifier {
       final newAnn = ann.copyWith(
         id: targetId,
         position: BimTransform2D.mirror(ann.position, origin, direction),
+        rotationDeg:
+            (2 * math.atan2(direction.dy, direction.dx) * 180 / math.pi -
+                ann.rotationDeg) %
+            360,
       );
       if (isDuplicate) {
         return (
@@ -1377,22 +1532,32 @@ class ArchitectElementTool extends ChangeNotifier {
       final prim = storey.cadPrimitives[cadIndex];
       final hatchRadians = prim.hatchAngle * math.pi / 180;
       final hatchDirection = BimTransform2D.mirror(
-        Offset(math.cos(hatchRadians), math.sin(hatchRadians)), Offset.zero, direction);
+        Offset(math.cos(hatchRadians), math.sin(hatchRadians)),
+        Offset.zero,
+        direction,
+      );
       final newPrim = prim.copyWith(
         id: targetId,
-        holes: ArchitectContour.transform(prim.holes, (p) => BimTransform2D.mirror(p, origin, direction)),
+        holes: ArchitectContour.transform(
+          prim.holes,
+          (p) => BimTransform2D.mirror(p, origin, direction),
+        ),
         startPoint: BimTransform2D.mirror(prim.startPoint, origin, direction),
         endPoint: BimTransform2D.mirror(prim.endPoint, origin, direction),
-        hatchAngle: math.atan2(hatchDirection.dy, hatchDirection.dx) * 180 / math.pi,
+        hatchAngle:
+            math.atan2(hatchDirection.dy, hatchDirection.dx) * 180 / math.pi,
         polygon: prim.type == CadPrimitiveType.polyline
-            ? [for (final p in prim.linePoints)
-                BimTransform2D.mirror(p, origin, direction)]
+            ? [
+                for (final p in prim.linePoints)
+                  BimTransform2D.mirror(p, origin, direction),
+              ]
             : prim.isPolygon || prim.polygon != null
-                ? [
-                    for (final p in prim.isPolygon ? prim.polygonCorners : prim.polygon!)
-                      BimTransform2D.mirror(p, origin, direction),
-                  ].reversed.toList()
-                : null,
+            ? [
+                for (final p
+                    in prim.isPolygon ? prim.polygonCorners : prim.polygon!)
+                  BimTransform2D.mirror(p, origin, direction),
+              ].reversed.toList()
+            : null,
       );
       if (isDuplicate) {
         return (
@@ -1417,6 +1582,7 @@ class ArchitectElementTool extends ChangeNotifier {
     bool isDuplicate = false,
     bool copyGroups = true,
     Map<String, String>? idMap,
+    Map<String, String>? copiedIds,
   }) {
     var currentStorey = storey;
     final affectedIds = <String>[];
@@ -1434,13 +1600,23 @@ class ArchitectElementTool extends ChangeNotifier {
         currentStorey = updated;
         affectedIds.add(affectedId);
         copied[id] = affectedId;
+        copiedIds?[id] = affectedId;
       }
     }
     if (isDuplicate && copyGroups) {
       var groupIndex = 0;
-      currentStorey = currentStorey.copyWith(groups: [...currentStorey.groups,
-        ...ArchitectElementGroup.copies(storey.groups, copied, () => idMap != null && affectedIds.isNotEmpty
-            ? '${affectedIds.first}_group_${groupIndex++}' : ArchitectElementId.next('group'))]);
+      currentStorey = currentStorey.copyWith(
+        groups: [
+          ...currentStorey.groups,
+          ...ArchitectElementGroup.copies(
+            storey.groups,
+            copied,
+            () => idMap != null && affectedIds.isNotEmpty
+                ? '${affectedIds.first}_group_${groupIndex++}'
+                : ArchitectElementId.next('group'),
+          ),
+        ],
+      );
     }
     return (currentStorey, affectedIds);
   }
@@ -1460,8 +1636,9 @@ class ArchitectElementTool extends ChangeNotifier {
     ArchitectStorey storey,
     String startWallId,
   ) {
-    final startWall =
-        storey.walls.where((w) => w.id == startWallId).firstOrNull;
+    final startWall = storey.walls
+        .where((w) => w.id == startWallId)
+        .firstOrNull;
     if (startWall == null) return {startWallId};
 
     final result = <String>{startWallId};

@@ -1,3 +1,4 @@
+import '../services/architect_drain_surface.dart';
 // === SECTION: ARCHITECTURAL FLOOR DRAIN 3D MESH BUILDER ===
 // Table of Contents:
 // 1. MATERIAL & HELPERS
@@ -9,7 +10,6 @@ import 'dart:ui';
 import '../../cad_3d/models/mesh_3d.dart';
 import '../models/architect_floor_drain.dart';
 import '../models/architect_project.dart';
-import '../services/architect_floor_drain_geometry.dart';
 
 class ArchitectFloorDrainMesh {
   ArchitectFloorDrainMesh._();
@@ -50,63 +50,31 @@ class ArchitectFloorDrainMesh {
     ArchitectFloorDrain drain,
     double baseElevation,
   ) {
-    final poly = drain.polygon;
-    final drainCenter = drain.position;
-    final zBottom = baseElevation - 0.05; // 5 cm screed depth
-
-    void addTri(Vector3 a, Vector3 b, Vector3 c, Color color) {
-      triangles.add(
-        Triangle3D(
-          v0: a,
-          v1: b,
-          v2: c,
-          color: color,
-          isDoubleSided: true,
-        ),
+    final surface = ArchitectDrainSurface.of(drain);
+    final bottom = baseElevation - .05;
+    void tri(Vector3 a, Vector3 b, Vector3 c, Color color) => triangles.add(
+      Triangle3D(v0: a, v1: b, v2: c, color: color, isDoubleSided: true),
+    );
+    Vector3 at(Offset p, double z) => Vector3(p.dx, p.dy, z);
+    for (final t in surface.triangles) {
+      tri(
+        at(t.a, baseElevation + t.za),
+        at(t.b, baseElevation + t.zb),
+        at(t.c, baseElevation + t.zc),
+        _tileColor,
       );
-    }
-
-    // Top sloping surface: fan from drain axis to each perimeter segment
-    for (var i = 0; i < poly.length; i++) {
-      final p1 = poly[i];
-      final p2 = poly[(i + 1) % poly.length];
-
-      final z1 = baseElevation + ArchitectFloorDrainGeometry.fall(drain, p1);
-      final z2 = baseElevation + ArchitectFloorDrainGeometry.fall(drain, p2);
-
-      final n1 = ArchitectFloorDrainGeometry.nearestOnAxis(drain, p1);
-      final n2 = ArchitectFloorDrainGeometry.nearestOnAxis(drain, p2);
-
-      final vTop1 = Vector3(p1.dx, p1.dy, z1);
-      final vTop2 = Vector3(p2.dx, p2.dy, z2);
-      final vGrate1 = Vector3(n1.dx, n1.dy, baseElevation);
-      final vGrate2 = Vector3(n2.dx, n2.dy, baseElevation);
-
-      if ((n1 - n2).distanceSquared < 1e-6) {
-        addTri(vGrate1, vTop1, vTop2, _tileColor);
-      } else {
-        addTri(vGrate1, vTop1, vTop2, _tileColor);
-        addTri(vGrate1, vTop2, vGrate2, _tileColor);
-      }
-
-      // Perimeter skirts
-      final vBot1 = Vector3(p1.dx, p1.dy, zBottom);
-      final vBot2 = Vector3(p2.dx, p2.dy, zBottom);
-      addTri(vBot1, vBot2, vTop2, const Color(0xFFCFD8DC));
-      addTri(vBot1, vTop2, vTop1, const Color(0xFFCFD8DC));
-    }
-
-    // Bottom cap
-    final centerBot = Vector3(drainCenter.dx, drainCenter.dy, zBottom);
-    for (var i = 0; i < poly.length; i++) {
-      final p1 = poly[i];
-      final p2 = poly[(i + 1) % poly.length];
-      addTri(
-        centerBot,
-        Vector3(p2.dx, p2.dy, zBottom),
-        Vector3(p1.dx, p1.dy, zBottom),
+      tri(
+        at(t.c, bottom),
+        at(t.b, bottom),
+        at(t.a, bottom),
         const Color(0xFF90A4AE),
       );
+    }
+    for (final (a, b) in surface.boundary) {
+      final za = baseElevation + (surface.heightAt(a) ?? 0),
+          zb = baseElevation + (surface.heightAt(b) ?? 0);
+      tri(at(a, bottom), at(b, bottom), at(b, zb), const Color(0xFFCFD8DC));
+      tri(at(a, bottom), at(b, zb), at(a, za), const Color(0xFFCFD8DC));
     }
   }
 
@@ -154,23 +122,55 @@ class ArchitectFloorDrainMesh {
       final a0 = i * 2.0 * math.pi / segments;
       final a1 = (i + 1) * 2.0 * math.pi / segments;
 
-      final pOut0 = Vector3(c.dx + math.cos(a0) * r, c.dy + math.sin(a0) * r, zTop);
-      final pOut1 = Vector3(c.dx + math.cos(a1) * r, c.dy + math.sin(a1) * r, zTop);
-      final pIn0 = Vector3(c.dx + math.cos(a0) * innerR, c.dy + math.sin(a0) * innerR, zTop);
-      final pIn1 = Vector3(c.dx + math.cos(a1) * innerR, c.dy + math.sin(a1) * innerR, zTop);
+      final pOut0 = Vector3(
+        c.dx + math.cos(a0) * r,
+        c.dy + math.sin(a0) * r,
+        zTop,
+      );
+      final pOut1 = Vector3(
+        c.dx + math.cos(a1) * r,
+        c.dy + math.sin(a1) * r,
+        zTop,
+      );
+      final pIn0 = Vector3(
+        c.dx + math.cos(a0) * innerR,
+        c.dy + math.sin(a0) * innerR,
+        zTop,
+      );
+      final pIn1 = Vector3(
+        c.dx + math.cos(a1) * innerR,
+        c.dy + math.sin(a1) * innerR,
+        zTop,
+      );
 
       // Outer rim
       quad(pIn0, pIn1, pOut1, pOut0);
 
       // Radial grate slots: alternate solid spoke / slot
       if (i % 2 == 0) {
-        final pTrap0 = Vector3(c.dx + math.cos(a0) * trapR, c.dy + math.sin(a0) * trapR, zTop);
-        final pTrap1 = Vector3(c.dx + math.cos(a1) * trapR, c.dy + math.sin(a1) * trapR, zTop);
+        final pTrap0 = Vector3(
+          c.dx + math.cos(a0) * trapR,
+          c.dy + math.sin(a0) * trapR,
+          zTop,
+        );
+        final pTrap1 = Vector3(
+          c.dx + math.cos(a1) * trapR,
+          c.dy + math.sin(a1) * trapR,
+          zTop,
+        );
         quad(pTrap0, pTrap1, pIn1, pIn0);
       } else {
         // Recessed slot to trap depth
-        final pTrap0 = Vector3(c.dx + math.cos(a0) * trapR, c.dy + math.sin(a0) * trapR, zTrap);
-        final pTrap1 = Vector3(c.dx + math.cos(a1) * trapR, c.dy + math.sin(a1) * trapR, zTrap);
+        final pTrap0 = Vector3(
+          c.dx + math.cos(a0) * trapR,
+          c.dy + math.sin(a0) * trapR,
+          zTrap,
+        );
+        final pTrap1 = Vector3(
+          c.dx + math.cos(a1) * trapR,
+          c.dy + math.sin(a1) * trapR,
+          zTrap,
+        );
         quad(pTrap0, pTrap1, pIn1, pIn0);
       }
     }

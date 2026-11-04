@@ -171,6 +171,8 @@ class ArchitectFloorDrainBar extends StatelessWidget {
                     message: [
                       if (issues.contains(ArchitectDrainIssue.outsideFloor))
                         l.architectDrainOutsideFloor,
+                      if (issues.contains(ArchitectDrainIssue.invalidSurface))
+                        l.architectDrainInvalidSurface,
                       if (issues.contains(ArchitectDrainIssue.nearDoor))
                         l.architectDrainNearDoor,
                     ].join('\n'),

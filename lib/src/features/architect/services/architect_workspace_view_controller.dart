@@ -100,6 +100,9 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
     final original = source.project;
     source.commit(
       original.copyWith(
+        document: next.document,
+        levelUnits: next.levelUnits,
+        levelDecimals: next.levelDecimals,
         lineStyles: next.lineStyles,
         hatchPatterns: next.hatchPatterns,
         elevations: [

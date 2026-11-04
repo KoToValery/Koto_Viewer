@@ -1,3 +1,4 @@
+import 'architect_drain_surface.dart';
 import 'architect_stair_floor_contact.dart';
 import '../models/architect_hatch_pattern.dart';
 import '../models/architect_wall_type.dart';
@@ -1035,6 +1036,28 @@ class ArchitectBuildingSection {
       }
 
       for (final drain in floor.floorDrains) {
+        final surface=ArchitectDrainSurface.of(drain);
+        final base=floor.elevation+floor.floorFinishThickness;
+        final finish=Path();
+        for(final (a,b,za,zb) in surface.section(cut.start,cut.end)) {
+          double station(Offset p) => (p-cut.start).dx*cut.axis.dx+(p-cut.start).dy*cut.axis.dy;
+          final sa=station(a),sb=station(b);
+          final patch=Path()..addPolygon([Offset(sa,base+za),Offset(sb,base+zb),Offset(sb,base-.05),Offset(sa,base-.05)],true);
+          finish.addPath(patch,Offset.zero);
+        }
+        if (!finish.getBounds().isEmpty) {
+          final clean=Path.combine(PathOperation.union,finish,Path());
+          for(var i=0;i<regions.length;i++) {
+            final r=regions[i];
+            if(!r.slab || r.roof) continue;
+            regions[i]=ArchitectSectionRegion(r.sourceId,r.material,
+              Path.combine(PathOperation.difference,r.path,clean),slab:r.slab,roof:r.roof,
+              timberCrossSectionPolygon:r.timberCrossSectionPolygon,customFillColor:r.customFillColor,
+              hatchPattern:r.hatchPattern,drawHatch:r.drawHatch,mergeOutline:r.mergeOutline);
+          }
+          regions.add(ArchitectSectionRegion(drain.id,SlabMaterial.tile,clean,slab:true));
+        }
+
         final sProj =
             (drain.position - cut.start).dx * cut.axis.dx +
             (drain.position - cut.start).dy * cut.axis.dy;
@@ -1047,8 +1070,7 @@ class ArchitectBuildingSection {
         );
         if (sProj >= -drain.halfWidth &&
             sProj <= cut.length + drain.halfWidth &&
-            (distToAxis <= drain.halfWidth + 0.08 ||
-                drain.containsPoint(ptOnCut))) {
+            distToAxis <= drain.halfWidth + 0.001) {
           final grateW = (drain.halfWidth * 2.0).clamp(0.08, 0.30);
           final sDrain = sProj
               .clamp(grateW / 2, math.max(grateW / 2, cut.length - grateW / 2))

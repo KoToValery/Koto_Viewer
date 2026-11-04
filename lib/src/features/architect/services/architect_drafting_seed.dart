@@ -49,7 +49,19 @@ class ArchitectDraftingSeed {
         }
       }
     }
-    return changed ? ArchitectProject.fromJson(json) : next;
+    var result = changed ? ArchitectProject.fromJson(json) : next;
+    if (tool == ArchitectTool.text && values['id'] is String) {
+      final copies = <String, String>{};
+      for (final (kind, record) in _records(json)) {
+        if (kind == tool && !existing.contains(record['id'])) {
+          copies[values['id'] as String] = record['id'] as String;
+          result = result.copyWith(
+            document: result.document.copyElementOverrides(copies),
+          );
+        }
+      }
+    }
+    return result;
   }
 
   // Only properties not already supplied by the live tool's controls belong here.
@@ -86,8 +98,16 @@ class ArchitectDraftingSeed {
       'customColorValue',
     },
     ArchitectTool.dimension: {},
-    ArchitectTool.level: {},
-    ArchitectTool.text: {'fontSize'},
+    ArchitectTool.level: {'symbol', 'levelUnits', 'levelDecimals'},
+    ArchitectTool.text: {
+      'fontSize',
+      'rotationDeg',
+      'alignment',
+      'fontWeight',
+      'italic',
+      'underline',
+      'colorValue',
+    },
     ArchitectTool.cadLine: {'colorValue', 'colorPresetId', 'strokeWidth'},
     ArchitectTool.cadRect: {'colorValue', 'colorPresetId', 'strokeWidth'},
     ArchitectTool.cadCircle: {'colorValue', 'colorPresetId', 'strokeWidth'},

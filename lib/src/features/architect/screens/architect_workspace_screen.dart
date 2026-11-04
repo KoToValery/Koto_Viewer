@@ -1,3 +1,4 @@
+import '../services/architect_column_clearance.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../services/architect_selection_candidates.dart';
 import '../widgets/architect_candidate_picker.dart';
@@ -1389,7 +1390,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       units: _project.units,
 
-      decimals: _project.distanceDecimals,
+      decimals: _project.distanceDecimals, levelUnits: _project.levelUnits, levelDecimals: _project.levelDecimals,
 
     );
 
@@ -4581,6 +4582,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _cadPolylineMode = false;
   String? _polylineDraftId;
   int? _polylineVertexIndex;
+  bool _polylineEdgeDrag = false;
 
   ArchitectCadPrimitive? get _selectedPolyline => _effectiveSelection.length == 1
       ? _project.activeStorey.cadPrimitives.where((p) =>
@@ -6154,7 +6156,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (copyId == null) return;
 
-    var draft = _project.updateActiveStorey(floor);
+    var draft = _project.updateActiveStorey(floor).copyWith(document:_project.document.copyElementOverrides({id:copyId}));
 
     if (_editingGroupId != null) {
 
@@ -7344,23 +7346,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     final polyline = _selectedPolyline;
-    if (polyline != null && !_mirrorActive && _offsetOptions == null &&
+    if (polyline != null && !polyline.isClosedPolyline && !_moveSelection && !_mirrorActive && _offsetOptions == null &&
         !_splitActive && _newPointTargetId == null) {
       final points = polyline.linePoints;
-      final hit = ArchitectPolylineEditing.hit(
+      final edgeHit = ArchitectPolylineEditing.hitEdge(points,rawModel,_currentScale,_handleOffsetLength);
+      final hit = edgeHit ?? ArchitectPolylineEditing.hit(
           points, rawModel, _currentScale, _handleOffsetLength,
       );
       if (hit != null) {
         final (index, isOffset) = hit;
-        final point = points[index];
-        final handle = isOffset ? ArchitectPolylineEditing.handle(
-            points, index, _currentScale, _handleOffsetLength,
-              ) : point;
+        _polylineEdgeDrag=edgeHit!=null;
+        final point = _polylineEdgeDrag ? (points[index]+points[index+1])/2 : points[index];
+        final handle = !isOffset ? point : _polylineEdgeDrag
+          ? ArchitectPolylineEditing.edgeHandle(points,index,_currentScale,_handleOffsetLength)
+          : ArchitectPolylineEditing.handle(points,index,_currentScale,_handleOffsetLength);
         _polylineVertexIndex = index;
-        _wallDragStart = index == 0;
+        _wallDragStart = !_polylineEdgeDrag && index == 0;
         _wallEndpointOriginal = ArchitectWall(id: polyline.id,
-          startPoint: points[index == 0 ? 0 : index - 1],
-          endPoint: points[index == 0 ? 1 : index], thickness: .001,
+          startPoint: _polylineEdgeDrag ? points[index] : points[index == 0 ? 0 : index - 1],
+          endPoint: _polylineEdgeDrag ? point : points[index == 0 ? 1 : index], thickness: .001,
         );
         _wallEndpointIsOffset = isOffset;
         _wallEndpointDisplacement = handle - point;
@@ -9370,9 +9374,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _elementMovePreview = polylineIndex != null && polyline != null
             ? UpdateArchitectPolyline(
                 storeyId: _project.activeStoreyId, elementId: original.id,
-                points: ArchitectPolylineEditing.moveVertex(
-                    polyline.linePoints, polylineIndex, snap.point,
-                ),
+                points: _polylineEdgeDrag ? ArchitectPolylineEditing.moveEdge(polyline.linePoints,polylineIndex,
+                  snap.point-(polyline.linePoints[polylineIndex]+polyline.linePoints[polylineIndex+1])/2)
+                  : ArchitectPolylineEditing.moveVertex(polyline.linePoints,polylineIndex,snap.point),
               ).apply(_elementMoveOriginal!)
             : _linearCommand(
 
@@ -10656,6 +10660,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _wallEndpointOriginal = null;
 
     _polylineVertexIndex = null;
+    _polylineEdgeDrag = false;
 
     _wallSnapProject = null;
 
@@ -15493,7 +15498,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       animation: Listenable.merge([_viewport, _previewRevision, UiSettingsService.contextMenu,
       ]),
       builder: (context, child) {
-        final clearances = _wallClearances;
+        final columnGaps = _commands.isPlan && _effectiveSelection.length == 1
+            ? ArchitectColumnClearance.forColumn(_elementMovePreview ?? _project, _effectiveSelection.single) : const <ArchitectColumnClearance>[];
+        final clearances = [..._wallClearances, for(final gap in columnGaps)
+          ArchitectWallClearance(wallId:gap.columnId,neighborId:gap.key,side:1,distance:gap.distance,start:gap.start,end:gap.end)];
         final openings = _draggingElementId == null
             ? _selectedOpeningClearances : const <ArchitectOpeningClearance>[];
         if ((clearances.isEmpty && openings.isEmpty) ||
@@ -15566,7 +15574,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             Positioned.fromRect(
               rect: dimensions[gap.key]!.label,
               child: IgnorePointer(ignoring: ignore, child: Tooltip(
-                message: gap.atStart == null ? context.l10n.architectWallClearance
+                message: gap.key.startsWith('column:') ? context.l10n.architectColumnClearance : gap.atStart == null ? context.l10n.architectWallClearance
                     : context.l10n.architectWallEndpointClearance,
                 child: Material(
                   color: Colors.white,
@@ -16530,7 +16538,138 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  Future<void> _editPolylineSegment(ArchitectCadPrimitive path) async {
+    var index = 0;
+    final input = TextEditingController(text: '0');
+    final form = GlobalKey<FormState>();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.l10n.architectPolylineEdge),
+        content: Form(
+          key: form,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<int>(
+                initialValue: 0,
+                items: [
+                  for (var i = 0; i + 1 < path.linePoints.length; i++)
+                    DropdownMenuItem(value: i, child: Text('${i + 1}')),
+                ],
+                onChanged: (v) => index = v ?? 0,
+              ),
+              TextFormField(
+                controller: input,
+                decoration: InputDecoration(
+                  labelText: context.l10n.architectPropertyOffset,
+                  suffixText: _project.units.symbol,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
+                validator: (v) =>
+                    double.tryParse((v ?? '').replaceAll(',', '.'))?.isFinite ==
+                        true
+                    ? null
+                    : context.l10n.propertiesInvalid,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (!form.currentState!.validate()) return;
+              final points = path.linePoints,
+                  v = points[index + 1] - points[index];
+              final amount = _project.units.fromUnit(
+                double.parse(input.text.replaceAll(',', '.')),
+              );
+              try {
+                _commands.execute(
+                  UpdateArchitectPolyline(
+                    storeyId: _project.activeStoreyId,
+                    elementId: path.id,
+                    points: ArchitectPolylineEditing.moveEdge(
+                      points,
+                      index,
+                      Offset(-v.dy, v.dx) / v.distance * amount,
+                    ),
+                  ),
+                );
+                _saveBiMProjectIfAttached();
+                Navigator.pop(ctx);
+                setState(() {});
+              } on ArgumentError {
+                _operationError();
+              }
+            },
+            child: Text(context.l10n.save),
+          ),
+        ],
+      ),
+    );
+    input.dispose();
+  }
+
+  Future<void> _editColumnClearance(ArchitectWallClearance gap) async {
+    var distance = gap.distance;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.l10n.architectColumnClearance),
+        content: SizedBox(
+          width: 220,
+          child: ArchitectWallDraftingPanel(
+            title: context.l10n.architectColumnClearance,
+            endLabel: context.l10n.save,
+            keypadInitiallyOpen: true,
+            showContinue: false,
+            showDirection: false,
+            onContinue: () {},
+            onUnlock: () {},
+            length: _project.units.toUnit(distance),
+            unit: _project.units.symbol,
+            decimals: _project.distanceDecimals,
+            minimumLength: 0,
+            onLength: (v) => distance = _project.units.fromUnit(v),
+            onEnd: () {
+              try {
+                _commands.execute(
+                  SetArchitectColumnClearance(
+                    storeyId: _project.activeStoreyId,
+                    columnId: gap.wallId,
+                    key: gap.key,
+                    distance: distance,
+                  ),
+                );
+                _saveBiMProjectIfAttached();
+                Navigator.pop(ctx);
+                setState(() {});
+              } on ArgumentError {
+                _operationError();
+              }
+            },
+            onCancel: () => Navigator.pop(ctx),
+          ),
+        ),
+      ),
+    );
+    if (mounted) setState(() => _activeWallClearanceKey = null);
+  }
+
   void _editWallClearance(ArchitectWallClearance gap) {
+    if (gap.key.startsWith('column:')) {
+      _editColumnClearance(gap);
+      return;
+    }
+
 
     if (gap.atStart != null) {
 
@@ -18162,7 +18301,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    if (isCol || isBeam) {
+    if (storey.annotations.any((a) => a.id == elementId)) {
+      for (final action in [ArchitectRadialAction.edit,ArchitectRadialAction.move,
+        ArchitectRadialAction.rotate,ArchitectRadialAction.duplicate,
+        ArchitectRadialAction.properties,ArchitectRadialAction.mirrorMove,ArchitectRadialAction.mirrorCopy]) {
+        items.add(_radialItem(action:action,color:const Color(0xFF00E5FF)));
+      }
+    } else if (isCol || isBeam) {
 
       items.add(
 
@@ -19901,6 +20046,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
       case ArchitectRadialAction.edit:
+        if (_project.activeStorey.annotations.any((a) => a.id == id) || _project.activeStorey.elevationMarkers.any((a) => a.id == id)) {
+          _showProperties();
+          break;
+        }
         if (pick != null) _selectPolygonContour(pick);
 
 
@@ -20689,18 +20838,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   ArchitectStair _stairAt(Offset start, Offset end, {String id = 'preview'}) {
-
-    final delta = end - start;
-
-    final endPoint = delta.distance < .001 ? start + const Offset(1, 0) : end;
-
-    return ArchitectStair(
+    return ArchitectStair.fromCorner(
 
       id: id,
 
-      startPoint: start,
+      corner: start,
 
-      endPoint: endPoint,
+      directionPoint: end,
 
       width: _elementTool.stairWidth,
 
@@ -21687,6 +21831,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       context: context,
       onInsets: _insetProperties,
       builder: (_) => ArchitectElementPropertiesDialog(
+        viewKey: _workspaceViewKey, drawingScale: _publicationScale,
         project: original,
         elementIds: ids,
         isCurrent: () => identical(document, _modelCommands.project),
@@ -22834,6 +22979,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (ids.isEmpty) return;
 
+    final copiedIds=<String,String>{};
     final (nextStorey, copyIds) = _elementTool.duplicateElementsByIds(
 
       _project.activeStorey,
@@ -22842,13 +22988,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       offset: const Offset(0.5, 0.5),
 
-      copyGroups: _editingGroupId == null,
+      copyGroups: _editingGroupId == null,copiedIds:copiedIds,
 
     );
 
     if (copyIds.isEmpty) return;
 
-    var updated = _project.updateActiveStorey(nextStorey);
+    var updated = _project.updateActiveStorey(nextStorey).copyWith(document:_project.document.copyElementOverrides(copiedIds));
 
     if (_editingGroupId != null) {
 
@@ -24046,6 +24192,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         segmentIds.length == 1 &&
         _selectedLinearElement?.isCurved == false;
     final actions = <ArchitectSelectionAction>[];
+    final path=_selectedPolyline;
+    if(path!=null) {
+      actions.add(action('architect-polyline-toggle',path.isClosedPolyline?l.architectPolylineOpen:l.architectPolylineClose,Icons.polyline,(){
+        try {
+          _commands.execute(UpdateArchitectPolyline(storeyId:_project.activeStoreyId,elementId:path.id,points:path.linePoints,closed:!path.isClosedPolyline));
+          _saveBiMProjectIfAttached();setState((){});
+        } on ArgumentError {_operationError();}
+      }));
+      if(!path.isClosedPolyline)actions.add(action('architect-polyline-edge',l.architectPolylineEdge,Icons.straighten,()=>_editPolylineSegment(path)));
+    }
+
 
     if (onlyDoors) {
       final doorIds = doors.map((d) => d.id).toSet();
@@ -24535,7 +24692,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           controller: controller,
 
-          autofocus: true,
+          autofocus: true, minLines: 3, maxLines: null,
 
           style: const TextStyle(color: Colors.white),
 
@@ -24595,7 +24752,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       setState(() {
 
-        _project = _project.updateActiveStorey(updatedStorey);
+        _commands.commit(_project.updateActiveStorey(updatedStorey), applyDraftingDefaults: true);
 
       });
 
@@ -27368,6 +27525,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             : null,
 
+        onSecondaryTap: _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null
+            ? _onContextHold : null,
         onContextHold: _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null
 
             ? _onContextHold

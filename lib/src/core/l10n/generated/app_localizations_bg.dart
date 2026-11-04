@@ -4093,7 +4093,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectOpeningVoid => 'Плоча';
 
   @override
-  String get architectLevelElevation => 'Кота';
+  String get architectLevelElevation => 'Фасада / разрез';
 
   @override
   String get architectAnnotationText => 'Текст';
@@ -5384,7 +5384,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get stairPlaceHelp =>
-      'Посочи първия подстъп, после посоката на изкачване. Дължината и стъпалата се изчисляват от котите.';
+      'Посочи външния ъгъл на първото стъпало, после посоката на изкачване. Дължината и стъпалата се изчисляват от котите.';
 
   @override
   String get stairCode => 'Нормативна база';
@@ -10724,4 +10724,71 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get commandUiCheck => 'Проверка';
+
+  @override
+  String get architectColumnClearance => 'Разстояние от колона';
+
+  @override
+  String get architectLevelFormat => 'Единици за коти';
+
+  @override
+  String get architectLevelSymbol => 'Символ';
+
+  @override
+  String get architectLevelPlan => 'План';
+
+  @override
+  String get architectInheritProject => 'От проекта';
+
+  @override
+  String get architectPrecision => 'Десетични знаци';
+
+  @override
+  String get architectTextPaperHeight => 'Височина на текста (mm на листа)';
+
+  @override
+  String get architectTextAlignment => 'Подравняване';
+
+  @override
+  String get architectTextLeft => 'Ляво';
+
+  @override
+  String get architectTextCenter => 'Центрирано';
+
+  @override
+  String get architectTextRight => 'Дясно';
+
+  @override
+  String get architectTextWeight => 'Дебелина';
+
+  @override
+  String get architectTextRegular => 'Нормален';
+
+  @override
+  String get architectTextSemibold => 'Полуполучер';
+
+  @override
+  String get architectTextBold => 'Получер';
+
+  @override
+  String get architectTextItalic => 'Курсив';
+
+  @override
+  String get architectTextUnderline => 'Подчертан';
+
+  @override
+  String get architectPolylineClose => 'Затвори контура';
+
+  @override
+  String get architectPolylineOpen => 'Отвори контура';
+
+  @override
+  String get architectPolylineEdge => 'Премести сегмент';
+
+  @override
+  String get architectDrainInvalidSurface =>
+      'Подът не може да се оттича непрекъснато към тази решетка. Промени контура или положението на сифона.';
+
+  @override
+  String get architectPolylineClosed => 'Затворен контур';
 }

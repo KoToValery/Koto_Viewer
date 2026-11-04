@@ -16,6 +16,62 @@ class ArchitectPolylineEditing {
     return result;
   }
 
+  /// Translate a segment's shared vertices atomically. Adjacent segments reuse
+  /// those vertices and can never detach as a side effect of a drag.
+  static List<Offset> moveEdge(List<Offset> points, int index, Offset delta) {
+    if (index < 0 || index + 1 >= points.length)
+      throw ArgumentError('Missing segment');
+    var result = moveVertex(points, index, points[index] + delta);
+    result = moveVertex(result, index + 1, points[index + 1] + delta);
+    return result;
+  }
+
+  static Offset edgeHandle(
+    List<Offset> points,
+    int index,
+    double scale,
+    double offsetLengthPx,
+  ) {
+    final a = points[index], b = points[index + 1], v = b - a;
+    return (a + b) / 2 +
+        (v.distance < 1e-10 ? Offset.zero : Offset(-v.dy, v.dx) / v.distance) *
+            (offsetLengthPx / scale);
+  }
+
+  static (int, bool)? hitEdge(
+    List<Offset> points,
+    Offset point,
+    double scale,
+    double offsetLengthPx,
+  ) {
+    if (points.any((p) => (p - point).distance < 18 / scale)) return null;
+    var best = 12 / scale;
+    (int, bool)? result;
+    for (var i = 0; i + 1 < points.length; i++) {
+      final a = points[i], v = points[i + 1] - a;
+      if (v.distanceSquared < 1e-10) continue;
+      final t =
+          (((point - a).dx * v.dx + (point - a).dy * v.dy) / v.distanceSquared)
+              .clamp(0.0, 1.0);
+      final distance = (point - a - v * t).distance;
+      if (distance < best) {
+        best = distance;
+        result = (i, false);
+      }
+    }
+    if (result != null || offsetLengthPx <= 0) return result;
+    best = 18 / scale;
+    for (var i = 0; i + 1 < points.length; i++) {
+      final distance =
+          (point - edgeHandle(points, i, scale, offsetLengthPx)).distance;
+      if (distance < best) {
+        best = distance;
+        result = (i, true);
+      }
+    }
+    return result;
+  }
+
   static Offset handle(
     List<Offset> points,
     int index,

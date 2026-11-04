@@ -1,3 +1,4 @@
+import '../rendering/architect_annotation_layout.dart';
 import 'dart:math' as math;
 import 'package:flutter/painting.dart';
 
@@ -319,6 +320,8 @@ class ArchitectMarqueeTool {
         1,
         units: project.units,
         decimals: project.distanceDecimals,
+        levelUnits: project.levelUnits,
+        levelDecimals: project.levelDecimals,
       );
       Rect textBounds(
         String id,
@@ -352,21 +355,17 @@ class ArchitectMarqueeTool {
       );
       for (final annotation in storey.annotations) {
         if (region(
-          Path()..addRect(
-            textBounds(
-              annotation.id,
-              annotation.text,
-              annotation.position,
-              weight: FontWeight.w600,
-            ),
-          ),
-        )) {
+          scope.run(() => ArchitectAnnotationLayout.outline(annotation)),
+        ))
           selected.add(annotation.id);
-        }
       }
       for (final marker in storey.elevationMarkers) {
         final p = marker.position;
-        final label = scope.length(marker.elevation);
+        final label = scope.level(
+          marker.elevation,
+          units: marker.units,
+          decimals: marker.decimals,
+        );
         final path = Path()
           ..moveTo(p.dx, p.dy)
           ..lineTo(p.dx - .2, p.dy + .3)

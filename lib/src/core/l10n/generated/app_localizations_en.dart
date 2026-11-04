@@ -4076,7 +4076,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectOpeningVoid => 'Slab';
 
   @override
-  String get architectLevelElevation => 'Elevation';
+  String get architectLevelElevation => 'Elevation / section';
 
   @override
   String get architectAnnotationText => 'Text';
@@ -5359,7 +5359,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stairPlaceHelp =>
-      'Place the first riser, then point the ascent direction. Length and steps are calculated from the floor levels.';
+      'Pick the outer corner of the first step, then point the ascent direction. Length and steps are calculated from the floor levels.';
 
   @override
   String get stairCode => 'Regulations';
@@ -10680,4 +10680,71 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commandUiCheck => 'Check';
+
+  @override
+  String get architectColumnClearance => 'Column clearance';
+
+  @override
+  String get architectLevelFormat => 'Level units';
+
+  @override
+  String get architectLevelSymbol => 'Symbol';
+
+  @override
+  String get architectLevelPlan => 'Plan';
+
+  @override
+  String get architectInheritProject => 'Use project setting';
+
+  @override
+  String get architectPrecision => 'Decimal places';
+
+  @override
+  String get architectTextPaperHeight => 'Text height (mm on paper)';
+
+  @override
+  String get architectTextAlignment => 'Alignment';
+
+  @override
+  String get architectTextLeft => 'Left';
+
+  @override
+  String get architectTextCenter => 'Centre';
+
+  @override
+  String get architectTextRight => 'Right';
+
+  @override
+  String get architectTextWeight => 'Weight';
+
+  @override
+  String get architectTextRegular => 'Regular';
+
+  @override
+  String get architectTextSemibold => 'Semibold';
+
+  @override
+  String get architectTextBold => 'Bold';
+
+  @override
+  String get architectTextItalic => 'Italic';
+
+  @override
+  String get architectTextUnderline => 'Underline';
+
+  @override
+  String get architectPolylineClose => 'Close contour';
+
+  @override
+  String get architectPolylineOpen => 'Open contour';
+
+  @override
+  String get architectPolylineEdge => 'Move segment';
+
+  @override
+  String get architectDrainInvalidSurface =>
+      'The floor cannot drain continuously to this grate. Adjust the contour or drain position.';
+
+  @override
+  String get architectPolylineClosed => 'Closed contour';
 }

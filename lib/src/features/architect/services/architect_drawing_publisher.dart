@@ -60,6 +60,8 @@ class ArchitectDrawingPublisher {
       8000 / denominator,
       units: p.units,
       decimals: p.distanceDecimals,
+      levelUnits: p.levelUnits,
+      levelDecimals: p.levelDecimals,
       publication: true,
     );
     final ids = <String>{};

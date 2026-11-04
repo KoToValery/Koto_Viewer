@@ -318,25 +318,18 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text(l.stairHeightManual).last);
         await tester.pumpAndSettle();
-        Future<void> enter(String field, List<String> keys) async {
+        Future<void> enter(String field, String value) async {
           final tile = find.byKey(ValueKey('stair-$field'));
           await tester.ensureVisible(tile);
-          await tester.tap(tile);
-          await tester.pumpAndSettle();
-          for (final key in keys) {
-            await tester.tap(
-              key == '±'
-                  ? find.text('±')
-                  : find.byKey(ValueKey('wall-key-$key')),
-            );
-            await tester.pump();
-          }
-          await tester.tap(find.byKey(const ValueKey('wall-end')));
+          await tester.enterText(
+            find.descendant(of: tile, matching: find.byType(TextFormField)),
+            value,
+          );
           await tester.pumpAndSettle();
         }
 
-        await enter('rise', ['1', '.', '6']);
-        await enter('start-offset', ['0', '.', '3', '±']);
+        await enter('rise', '1.6');
+        await enter('start-offset', '-0.3');
         expect(tester.takeException(), isNull);
         await tester.tap(find.byKey(const ValueKey('stair-save')));
         await tester.pumpAndSettle();

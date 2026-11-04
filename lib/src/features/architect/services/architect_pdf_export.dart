@@ -62,12 +62,18 @@ class ArchitectPdfExport {
               );
             case ArchitectVectorText():
               final isBold = op.weight.value >= 600;
-              final key = '${op.size}/$isBold';
+              final key = '${op.size}/$isBold/${op.fontStyle}/${op.decoration}';
               final font = fonts.putIfAbsent(
                 key,
                 () => PdfTrueTypeFont(
                   isBold ? bold : regular,
                   op.size * pointsPerMm,
+                  multiStyle: [
+                    if (isBold) PdfFontStyle.bold,
+                    if (op.fontStyle == FontStyle.italic) PdfFontStyle.italic,
+                    if (op.decoration.contains(TextDecoration.underline))
+                      PdfFontStyle.underline,
+                  ],
                 ),
               );
               graphics.translateTransform(

@@ -135,16 +135,23 @@ class OffsetArchitectElements extends ArchitectModelCommand {
       ArchitectModelCommand.newId(project, id);
     }
     var next = ArchitectOffset.apply(
-      storey, elementIds, distance: distance, side: side, idMap: idMap,
-      groupIdMap: groupIdMap, editingGroupId: editingGroupId,
+      storey,
+      elementIds,
+      distance: distance,
+      side: side,
+      idMap: idMap,
+      groupIdMap: groupIdMap,
+      editingGroupId: editingGroupId,
     );
     if (idMap.isEmpty && storey.walls.any((w) => elementIds.contains(w.id))) {
-      next = next.copyWith(zones: [
-        for (final zone in next.zones)
-          zone.isAutoBoundary
-              ? ArchitectRoomDetector.automaticZone(zone, next.walls) ?? zone
-              : zone,
-      ]);
+      next = next.copyWith(
+        zones: [
+          for (final zone in next.zones)
+            zone.isAutoBoundary
+                ? ArchitectRoomDetector.automaticZone(zone, next.walls) ?? zone
+                : zone,
+        ],
+      );
     }
     return ArchitectModelCommand.replace(project, next);
   }
@@ -153,45 +160,87 @@ class OffsetArchitectElements extends ArchitectModelCommand {
 class GroupArchitectElements extends ArchitectModelCommand {
   final String storeyId, groupId;
   final Set<String> elementIds;
-  const GroupArchitectElements({required this.storeyId, required this.groupId, required this.elementIds});
+  const GroupArchitectElements({
+    required this.storeyId,
+    required this.groupId,
+    required this.elementIds,
+  });
   @override
   ArchitectProject apply(ArchitectProject project) {
     final s = ArchitectModelCommand.storey(project, storeyId);
-    if (elementIds.length < 2 || !s.groupableIds.containsAll(elementIds) ||
+    if (elementIds.length < 2 ||
+        !s.groupableIds.containsAll(elementIds) ||
         s.groups.any((g) => g.elementIds.any(elementIds.contains))) {
-      throw ArgumentError('Groups require at least two ungrouped editable elements on one storey');
+      throw ArgumentError(
+        'Groups require at least two ungrouped editable elements on one storey',
+      );
     }
     ArchitectModelCommand.newId(project, groupId);
-    return ArchitectModelCommand.replace(project, s.copyWith(groups: [
-      ...s.groups, ArchitectElementGroup(id: groupId, elementIds: Set.unmodifiable(elementIds)),
-    ]));
+    return ArchitectModelCommand.replace(
+      project,
+      s.copyWith(
+        groups: [
+          ...s.groups,
+          ArchitectElementGroup(
+            id: groupId,
+            elementIds: Set.unmodifiable(elementIds),
+          ),
+        ],
+      ),
+    );
   }
 }
 
 class UngroupArchitectElements extends ArchitectModelCommand {
   final String storeyId, groupId;
-  const UngroupArchitectElements({required this.storeyId, required this.groupId});
+  const UngroupArchitectElements({
+    required this.storeyId,
+    required this.groupId,
+  });
   @override
   ArchitectProject apply(ArchitectProject project) {
     final s = ArchitectModelCommand.storey(project, storeyId);
-    if (!s.groups.any((g) => g.id == groupId)) throw ArgumentError('Unknown group');
-    return ArchitectModelCommand.replace(project, s.copyWith(groups: s.groups.where((g) => g.id != groupId).toList()));
+    if (!s.groups.any((g) => g.id == groupId))
+      throw ArgumentError('Unknown group');
+    return ArchitectModelCommand.replace(
+      project,
+      s.copyWith(groups: s.groups.where((g) => g.id != groupId).toList()),
+    );
   }
 }
 
 class AddArchitectGroupMembers extends ArchitectModelCommand {
   final String storeyId, groupId;
   final Set<String> elementIds;
-  const AddArchitectGroupMembers({required this.storeyId, required this.groupId, required this.elementIds});
+  const AddArchitectGroupMembers({
+    required this.storeyId,
+    required this.groupId,
+    required this.elementIds,
+  });
   @override
   ArchitectProject apply(ArchitectProject project) {
     final s = ArchitectModelCommand.storey(project, storeyId);
-    if (!s.groups.any((g) => g.id == groupId) || !s.groupableIds.containsAll(elementIds) ||
-        s.groups.any((g) => g.id != groupId && g.elementIds.any(elementIds.contains))) {
+    if (!s.groups.any((g) => g.id == groupId) ||
+        !s.groupableIds.containsAll(elementIds) ||
+        s.groups.any(
+          (g) => g.id != groupId && g.elementIds.any(elementIds.contains),
+        )) {
       throw ArgumentError('Invalid group members');
     }
-    return ArchitectModelCommand.replace(project, s.copyWith(groups: [for (final g in s.groups)
-      g.id == groupId ? ArchitectElementGroup(id: g.id, elementIds: {...g.elementIds, ...elementIds}) : g]));
+    return ArchitectModelCommand.replace(
+      project,
+      s.copyWith(
+        groups: [
+          for (final g in s.groups)
+            g.id == groupId
+                ? ArchitectElementGroup(
+                    id: g.id,
+                    elementIds: {...g.elementIds, ...elementIds},
+                  )
+                : g,
+        ],
+      ),
+    );
   }
 }
 
@@ -201,11 +250,13 @@ class CreateArchitectWall extends ArchitectModelCommand {
   const CreateArchitectWall({required this.storeyId, required this.wall});
   @override
   ArchitectProject apply(ArchitectProject project) {
-    if(wall.layers.isNotEmpty) {
+    if (wall.layers.isNotEmpty) {
       ArchitectMaterialLayer.validate(wall.layers);
-      final total=wall.system.additionalDepth +
-          wall.layers.fold(0.0,(v,l)=>v+l.thickness);
-      if((wall.thickness-total).abs()>1e-8)throw ArgumentError('Wall thickness differs from composition');
+      final total =
+          wall.system.additionalDepth +
+          wall.layers.fold(0.0, (v, l) => v + l.thickness);
+      if ((wall.thickness - total).abs() > 1e-8)
+        throw ArgumentError('Wall thickness differs from composition');
     }
     wall.plinth.validate();
     wall.validateGeometry();
@@ -241,12 +292,13 @@ class UpdateArchitectWall extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     final s = ArchitectModelCommand.storey(project, storeyId);
     final previous = s.walls.firstWhere((w) => w.id == wall.id);
-    if(wall.layers.isNotEmpty) {
+    if (wall.layers.isNotEmpty) {
       ArchitectMaterialLayer.validate(wall.layers);
-      final total=
+      final total =
           wall.system.additionalDepth +
-          wall.layers.fold(0.0,(v,l)=>v+l.thickness);
-      if((wall.thickness-total).abs()>1e-8)throw ArgumentError('Wall thickness differs from composition');
+          wall.layers.fold(0.0, (v, l) => v + l.thickness);
+      if ((wall.thickness - total).abs() > 1e-8)
+        throw ArgumentError('Wall thickness differs from composition');
     }
     wall.plinth.validate();
     wall.validateGeometry();
@@ -356,14 +408,15 @@ class SplitArchitectWall extends ArchitectModelCommand {
       ...wall.doors.map((d) => (d.offsetRatio, d.width)),
       ...wall.windows.map((w) => (w.offsetRatio, w.width)),
     ]) {
-      if ((opening.$1 - ratio).abs() * wall.length < wall.openingArcSpan(opening.$2) / 2 + .001) {
+      if ((opening.$1 - ratio).abs() * wall.length <
+          wall.openingArcSpan(opening.$2) / 2 + .001) {
         throw ArgumentError('Cannot split through an opening');
       }
     }
     final point = wall.referencePointAt(ratio);
     final first = wall.copyWith(
       endPoint: point,
-      arcBulge:wall.isCurved?math.tan(math.atan(wall.arcBulge)*ratio):0,
+      arcBulge: wall.isCurved ? math.tan(math.atan(wall.arcBulge) * ratio) : 0,
       connectEnd: !detachCut,
       doors: [
         for (final d in wall.doors)
@@ -379,7 +432,9 @@ class SplitArchitectWall extends ArchitectModelCommand {
     final second = wall.copyWith(
       id: newWallId,
       startPoint: point,
-      arcBulge:wall.isCurved?math.tan(math.atan(wall.arcBulge)*(1-ratio)):0,
+      arcBulge: wall.isCurved
+          ? math.tan(math.atan(wall.arcBulge) * (1 - ratio))
+          : 0,
       connectStart: !detachCut,
       doors: [
         for (final d in wall.doors)
@@ -405,8 +460,15 @@ class SplitArchitectWall extends ArchitectModelCommand {
           for (final w in s.walls)
             if (w.id == wallId) ...[first, second] else w,
         ],
-        groups: [for (final g in s.groups) g.elementIds.contains(wallId)
-          ? ArchitectElementGroup(id: g.id, elementIds: {...g.elementIds, newWallId}) : g],
+        groups: [
+          for (final g in s.groups)
+            g.elementIds.contains(wallId)
+                ? ArchitectElementGroup(
+                    id: g.id,
+                    elementIds: {...g.elementIds, newWallId},
+                  )
+                : g,
+        ],
       ),
     );
   }
@@ -547,7 +609,8 @@ class TrimArchitectWall extends ArchitectModelCommand {
       for (final cut in [span.from, span.to]) {
         if (cut > 0 &&
             cut < 1 &&
-            (cut - opening.$1).abs() * wall.length < wall.openingArcSpan(opening.$2) / 2 + .001) {
+            (cut - opening.$1).abs() * wall.length <
+                wall.openingArcSpan(opening.$2) / 2 + .001) {
           throw ArgumentError('Cannot cut through an opening');
         }
       }
@@ -556,7 +619,9 @@ class TrimArchitectWall extends ArchitectModelCommand {
       id: id,
       startPoint: wall.referencePointAt(from),
       endPoint: wall.referencePointAt(to),
-      arcBulge:wall.isCurved?math.tan(math.atan(wall.arcBulge)*(to-from)):0,
+      arcBulge: wall.isCurved
+          ? math.tan(math.atan(wall.arcBulge) * (to - from))
+          : 0,
       connectStart: from == 0 ? wall.connectStart : true,
       connectEnd: to == 1 ? wall.connectEnd : true,
       doors: [
@@ -588,10 +653,18 @@ class TrimArchitectWall extends ArchitectModelCommand {
     return ArchitectModelCommand.replace(
       project,
       storey.copyWith(
-        groups: [for (final g in storey.groups) g.elementIds.contains(wall.id)
-          ? ArchitectElementGroup(id: g.id, elementIds: {
-            ...g.elementIds.where((id) => id != wall.id), ...retained.map((w) => w.id),
-          }) : g],
+        groups: [
+          for (final g in storey.groups)
+            g.elementIds.contains(wall.id)
+                ? ArchitectElementGroup(
+                    id: g.id,
+                    elementIds: {
+                      ...g.elementIds.where((id) => id != wall.id),
+                      ...retained.map((w) => w.id),
+                    },
+                  )
+                : g,
+        ],
         walls: [
           for (final w in storey.walls)
             if (w.id == wall.id) ...retained else w,
@@ -852,10 +925,12 @@ class MirrorArchitectWalls extends ArchitectModelCommand {
       storey.copyWith(
         walls: [
           for (final w in storey.walls)
-            wallIds.contains(w.id) ? w.mirroredAroundCore().copyWith(
-              exteriorSideMode: WallResolutionMode.manual,
-              exteriorResolved: true,
-            ) : w,
+            wallIds.contains(w.id)
+                ? w.mirroredAroundCore().copyWith(
+                    exteriorSideMode: WallResolutionMode.manual,
+                    exteriorResolved: true,
+                  )
+                : w,
         ],
       ),
     );
@@ -889,6 +964,7 @@ class MirrorArchitectElements extends ArchitectModelCommand {
       throw ArgumentError('Invalid mirror axis');
     }
     final storey = ArchitectModelCommand.storey(project, storeyId);
+    final copies = <String, String>{};
     final (nextStorey, _) = ArchitectElementTool().mirrorElementsByIds(
       storey,
       elementIds,
@@ -897,6 +973,7 @@ class MirrorArchitectElements extends ArchitectModelCommand {
       isDuplicate: isDuplicate,
       copyGroups: copyGroups,
       idMap: idMap,
+      copiedIds: isDuplicate ? copies : null,
     );
     var axes = project.gridAxes;
     if (axes.any((a) => elementIds.contains(a.id))) {
@@ -919,10 +996,9 @@ class MirrorArchitectElements extends ArchitectModelCommand {
             a,
       ];
     }
-    return ArchitectModelCommand.replace(
-      project,
-      nextStorey,
-    ).copyWithGridAxes(axes);
+    return ArchitectModelCommand.replace(project, nextStorey)
+        .copyWithGridAxes(axes)
+        .copyWith(document: project.document.copyElementOverrides(copies));
   }
 }
 
@@ -1150,7 +1226,8 @@ class MoveArchitectElement extends ArchitectModelCommand {
             ? el.copyWith(start: el.start + delta, end: el.end + delta)
             : el,
     ];
-    final foundAny = found ||
+    final foundAny =
+        found ||
         project.sections.any((s) => matches(s.id)) ||
         project.elevations.any((el) => matches(el.id));
     if (!foundAny) throw ArgumentError('Unknown movable element: $elementId');
@@ -1492,9 +1569,11 @@ ArchitectWall _wallOpeningsAfterEdit(ArchitectWall old, ArchitectWall next) {
       ((next.endPoint - old.endPoint) - translation).distance < 1e-8;
   if (translated) return next;
   double ratio(double oldRatio, double width) {
-    final point=old.referencePointAt(oldRatio);
+    final point = old.referencePointAt(oldRatio);
     final d = point - next.startPoint;
-    final along = next.isCurved ? next.arc!.parameter(point)*next.length : d.dx * next.unitVector.dx + d.dy * next.unitVector.dy;
+    final along = next.isCurved
+        ? next.arc!.parameter(point) * next.length
+        : d.dx * next.unitVector.dx + d.dy * next.unitVector.dy;
     if (along - width / 2 < -1e-8 || along + width / 2 > next.length + 1e-8) {
       throw ArgumentError('Opening would leave its host');
     }
@@ -1529,9 +1608,15 @@ class ExtendArchitectWall extends ArchitectModelCommand {
     final wall = s.walls.firstWhere((w) => w.id == wallId);
     final delta = target - wall.startPoint;
     final along = delta.dx * wall.unitVector.dx + delta.dy * wall.unitVector.dy;
-    final point = wall.isCurved ? wall.arc!.pointAt(wall.arc!.parameter(target)) : wall.startPoint + wall.unitVector * along;
-    final atStart = (point-wall.startPoint).distance<(point-wall.endPoint).distance;
-    final next = wall.withExtendedEnds(start:atStart?point:null,end:atStart?null:point);
+    final point = wall.isCurved
+        ? wall.arc!.pointAt(wall.arc!.parameter(target))
+        : wall.startPoint + wall.unitVector * along;
+    final atStart =
+        (point - wall.startPoint).distance < (point - wall.endPoint).distance;
+    final next = wall.withExtendedEnds(
+      start: atStart ? point : null,
+      end: atStart ? null : point,
+    );
     final updated = UpdateArchitectWall(
       storeyId: storeyId,
       wall: next,
@@ -1565,7 +1650,9 @@ class JoinArchitectWalls extends ArchitectModelCommand {
     final targets = <(String, bool), Offset>{};
     void extend(ArchitectWall wall, Offset point) {
       final d = point - wall.startPoint;
-      final along = wall.isCurved?wall.arc!.parameter(point)*wall.length:d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
+      final along = wall.isCurved
+          ? wall.arc!.parameter(point) * wall.length
+          : d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
       final atStart = along < wall.length / 2;
       final end = atStart ? wall.startPoint : wall.endPoint;
       if ((point - end).distance < 1e-8) return;
@@ -1580,11 +1667,17 @@ class JoinArchitectWalls extends ArchitectModelCommand {
     for (var i = 0; i < walls.length; i++) {
       final a = walls[i];
       for (final b in walls.skip(i + 1)) {
-        if(a.isCurved||b.isCurved) {
+        if (a.isCurved || b.isCurved) {
           final points = a.intersections(b, finite: false).toList();
-          double score(Offset p)=>math.min((p-a.startPoint).distance,(p-a.endPoint).distance)+math.min((p-b.startPoint).distance,(p-b.endPoint).distance);
-          points.sort((p,q)=>score(p).compareTo(score(q)));
-          if(points.isNotEmpty){compatible=true;extend(a,points.first);extend(b,points.first);}
+          double score(Offset p) =>
+              math.min((p - a.startPoint).distance, (p - a.endPoint).distance) +
+              math.min((p - b.startPoint).distance, (p - b.endPoint).distance);
+          points.sort((p, q) => score(p).compareTo(score(q)));
+          if (points.isNotEmpty) {
+            compatible = true;
+            extend(a, points.first);
+            extend(b, points.first);
+          }
           continue;
         }
 
@@ -1626,13 +1719,12 @@ class JoinArchitectWalls extends ArchitectModelCommand {
     }
     var result = project;
     for (final wall in walls) {
-      final next = wall.withExtendedEnds(
-        start: targets[(wall.id, true)],
-        end: targets[(wall.id, false)],
-      ).copyWith(
-        connectStart: true,
-        connectEnd: true,
-      );
+      final next = wall
+          .withExtendedEnds(
+            start: targets[(wall.id, true)],
+            end: targets[(wall.id, false)],
+          )
+          .copyWith(connectStart: true, connectEnd: true);
       result = UpdateArchitectWall(
         storeyId: storeyId,
         wall: next,
@@ -1691,10 +1783,16 @@ class SetArchitectWallDimensions extends ArchitectModelCommand {
 class CutArchitectContourOpening extends ArchitectModelCommand {
   final String storeyId, elementId;
   final List<Offset> polygon;
-  const CutArchitectContourOpening({required this.storeyId,
-    required this.elementId, required this.polygon});
+  const CutArchitectContourOpening({
+    required this.storeyId,
+    required this.elementId,
+    required this.polygon,
+  });
 
-  static (List<Offset>, List<List<Offset>>)? target(ArchitectStorey s, String id) {
+  static (List<Offset>, List<List<Offset>>)? target(
+    ArchitectStorey s,
+    String id,
+  ) {
     for (final drain in s.floorDrains) {
       if (drain.id == id) return (drain.polygon, drain.holes);
     }
@@ -1715,15 +1813,32 @@ class CutArchitectContourOpening extends ArchitectModelCommand {
     final s = ArchitectModelCommand.storey(project, storeyId);
     final host = target(s, elementId);
     if (host == null || !ArchitectContour.canAdd(host.$1, host.$2, polygon)) {
-      throw ArgumentError('Opening must be strictly inside the host, without overlapping another opening');
+      throw ArgumentError(
+        'Opening must be strictly inside the host, without overlapping another opening',
+      );
     }
     final holes = [...host.$2, List<Offset>.unmodifiable(polygon)];
-    return ArchitectModelCommand.replace(project, s.copyWith(
-      floorDrains: [for (final p in s.floorDrains) p.id == elementId ? p.copyWith(holes: holes) : p],
-      slabs: [for (final p in s.slabs) p.id == elementId ? p.copyWith(holes: holes) : p],
-      roofs: [for (final p in s.roofs) p.id == elementId ? p.copyWith(holes: holes) : p],
-      cadPrimitives: [for (final p in s.cadPrimitives) p.id == elementId ? p.copyWith(holes: holes) : p],
-    ));
+    return ArchitectModelCommand.replace(
+      project,
+      s.copyWith(
+        floorDrains: [
+          for (final p in s.floorDrains)
+            p.id == elementId ? p.copyWith(holes: holes) : p,
+        ],
+        slabs: [
+          for (final p in s.slabs)
+            p.id == elementId ? p.copyWith(holes: holes) : p,
+        ],
+        roofs: [
+          for (final p in s.roofs)
+            p.id == elementId ? p.copyWith(holes: holes) : p,
+        ],
+        cadPrimitives: [
+          for (final p in s.cadPrimitives)
+            p.id == elementId ? p.copyWith(holes: holes) : p,
+        ],
+      ),
+    );
   }
 }
 
@@ -1750,20 +1865,30 @@ class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
     if ((primitive.type != CadPrimitiveType.polyline &&
             (primitive.endPoint - primitive.startPoint).distance < .001) ||
         (primitive.isPolygon &&
-            !ArchitectContour.valid(primitive.polygonCorners, primitive.holes))) {
+            !ArchitectContour.valid(
+              primitive.polygonCorners,
+              primitive.holes,
+            ))) {
       throw ArgumentError('Invalid CAD shape');
     }
     final floor = ArchitectModelCommand.storey(project, storeyId);
     if (primitive.type == CadPrimitiveType.hatch) {
-        primitive.drawingColor.validate();
+      primitive.drawingColor.validate();
       primitive.hatchPattern.validate();
-      if (!primitive.hatchScale.isFinite || primitive.hatchScale < .1 || primitive.hatchScale > 20 ||
-          !primitive.hatchAngle.isFinite || primitive.hatchAngle.abs() > 180) {
+      if (!primitive.hatchScale.isFinite ||
+          primitive.hatchScale < .1 ||
+          primitive.hatchScale > 20 ||
+          !primitive.hatchAngle.isFinite ||
+          primitive.hatchAngle.abs() > 180) {
         throw ArgumentError('Invalid hatch transform');
       }
       if (!primitive.hatchPattern.isPreset &&
-          !project.hatchPatterns.any((p) => p.id == primitive.hatchPattern.id)) {
-        project = project.copyWith(hatchPatterns: [...project.hatchPatterns, primitive.hatchPattern]);
+          !project.hatchPatterns.any(
+            (p) => p.id == primitive.hatchPattern.id,
+          )) {
+        project = project.copyWith(
+          hatchPatterns: [...project.hatchPatterns, primitive.hatchPattern],
+        );
       }
     }
     return ArchitectModelCommand.replace(
@@ -1778,32 +1903,51 @@ class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
   }
 }
 
-/// Replace one open CAD path atomically, preserving its appearance and identity.
+/// Replace one connected CAD path atomically, preserving appearance and identity.
 class UpdateArchitectPolyline extends ArchitectModelCommand {
   const UpdateArchitectPolyline({
     required this.storeyId,
     required this.elementId,
     required this.points,
+    this.closed,
   });
   final String storeyId, elementId;
   final List<Offset> points;
-
+  final bool? closed;
   @override
   ArchitectProject apply(ArchitectProject project) {
-    ArchitectCadPrimitive.validatePolyline(points);
     final floor = ArchitectModelCommand.storey(project, storeyId);
-    if (!floor.cadPrimitives.any((p) =>
-        p.id == elementId && p.type == CadPrimitiveType.polyline)) {
-      throw ArgumentError('Polyline not found');
-    }
-    return ArchitectModelCommand.replace(project, floor.copyWith(
-      cadPrimitives: [for (final p in floor.cadPrimitives)
-        if (p.id == elementId) p.copyWith(
-          polygon: List.unmodifiable(points),
-          startPoint: points.first,
-          endPoint: points.last,
-        ) else p],
-    ));
+    final old = floor.cadPrimitives
+        .where((p) => p.id == elementId && p.type == CadPrimitiveType.polyline)
+        .firstOrNull;
+    if (old == null) throw ArgumentError('Polyline not found');
+    final close =
+        closed ??
+        (old.isClosedPolyline ||
+            points.length > 3 && points.first == points.last);
+    final vertices = List<Offset>.of(points);
+    if (vertices.length > 2 && vertices.first == vertices.last)
+      vertices.removeLast();
+    if (close && !ArchitectPolygonGeometry.valid(vertices))
+      throw ArgumentError('Invalid closed contour');
+    if (close) vertices.add(vertices.first);
+    ArchitectCadPrimitive.validatePolyline(vertices);
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(
+        cadPrimitives: [
+          for (final p in floor.cadPrimitives)
+            p.id == elementId
+                ? p.copyWith(
+                    polygon: List.unmodifiable(vertices),
+                    startPoint: vertices.first,
+                    endPoint: vertices.last,
+                    closed: close,
+                  )
+                : p,
+        ],
+      ),
+    );
   }
 }
 
@@ -1814,7 +1958,10 @@ class CreateArchitectRoofPlane extends ArchitectModelCommand {
   @override
   ArchitectProject apply(ArchitectProject project) {
     roof.drainage.validate();
-    roof.assembly.panels?.validate(slope:roof.slopeDegrees,mansard:roof.isMansard);
+    roof.assembly.panels?.validate(
+      slope: roof.slopeDegrees,
+      mansard: roof.isMansard,
+    );
     if (!ArchitectContour.valid(roof.points, roof.holes)) {
       throw ArgumentError('Invalid roof contour');
     }
@@ -1834,7 +1981,10 @@ class UpdateArchitectRoofPlane extends ArchitectModelCommand {
   @override
   ArchitectProject apply(ArchitectProject project) {
     roof.drainage.validate();
-    roof.assembly.panels?.validate(slope:roof.slopeDegrees,mansard:roof.isMansard);
+    roof.assembly.panels?.validate(
+      slope: roof.slopeDegrees,
+      mansard: roof.isMansard,
+    );
     if (!ArchitectContour.valid(roof.points, roof.holes)) {
       throw ArgumentError('Invalid roof contour');
     }
@@ -1856,7 +2006,10 @@ class ReplaceStoreyRoofs extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     for (final roof in roofs) {
       roof.drainage.validate();
-      roof.assembly.panels?.validate(slope:roof.slopeDegrees,mansard:roof.isMansard);
+      roof.assembly.panels?.validate(
+        slope: roof.slopeDegrees,
+        mansard: roof.isMansard,
+      );
     }
     final floor = ArchitectModelCommand.storey(project, storeyId);
     return ArchitectModelCommand.replace(project, floor.copyWith(roofs: roofs));
@@ -1883,6 +2036,7 @@ class DeleteArchitectRoofPlane extends ArchitectModelCommand {
 class UpdateArchitectPolygon extends ArchitectModelCommand {
   final String storeyId, elementId;
   final List<Offset> polygon;
+
   /// Null edits the outer boundary; otherwise edits one persistent inner ring.
   final int? holeIndex;
   const UpdateArchitectPolygon({
@@ -1911,12 +2065,27 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
       if (!ArchitectContour.valid(host.$1, holes)) {
         throw ArgumentError('Opening would cross its host or another opening');
       }
-      return ArchitectModelCommand.replace(project, floor.copyWith(
-        floorDrains: [for (final p in floor.floorDrains) p.id == elementId ? p.copyWith(holes: holes) : p],
-        slabs: [for (final p in floor.slabs) p.id == elementId ? p.copyWith(holes: holes) : p],
-        roofs: [for (final p in floor.roofs) p.id == elementId ? p.copyWith(holes: holes) : p],
-        cadPrimitives: [for (final p in floor.cadPrimitives) p.id == elementId ? p.copyWith(holes: holes) : p],
-      ));
+      return ArchitectModelCommand.replace(
+        project,
+        floor.copyWith(
+          floorDrains: [
+            for (final p in floor.floorDrains)
+              p.id == elementId ? p.copyWith(holes: holes) : p,
+          ],
+          slabs: [
+            for (final p in floor.slabs)
+              p.id == elementId ? p.copyWith(holes: holes) : p,
+          ],
+          roofs: [
+            for (final p in floor.roofs)
+              p.id == elementId ? p.copyWith(holes: holes) : p,
+          ],
+          cadPrimitives: [
+            for (final p in floor.cadPrimitives)
+              p.id == elementId ? p.copyWith(holes: holes) : p,
+          ],
+        ),
+      );
     }
     if (floor.zones.any((z) => z.id == elementId && z.isAutoBoundary)) {
       throw ArgumentError('Automatic zone boundaries are controlled by walls');
@@ -1965,9 +2134,15 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
           for (final p in floor.cadPrimitives)
             p.id == elementId
                 ? p.copyWith(
-                    polygon: points,
-                    startPoint: bounds.topLeft,
-                    endPoint: bounds.bottomRight,
+                    polygon: p.isClosedPolyline
+                        ? [...points, points.first]
+                        : points,
+                    startPoint: p.isClosedPolyline
+                        ? points.first
+                        : bounds.topLeft,
+                    endPoint: p.isClosedPolyline
+                        ? points.first
+                        : bounds.bottomRight,
                   )
                 : p,
         ],
@@ -2018,7 +2193,11 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     }
     final path = pathOf(storey, id, holeIndex: holeIndex);
     if (path == null) return null;
-    final hit = BimLineGeometry.insertion(path.points, pick, closed: path.closed);
+    final hit = BimLineGeometry.insertion(
+      path.points,
+      pick,
+      closed: path.closed,
+    );
     if (hit == null) return null;
     final a = path.points[hit.edge];
     final b = path.points[(hit.edge + 1) % path.points.length];
@@ -2038,7 +2217,8 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
   }) {
     final hit = locate(storey, id, point, holeIndex: holeIndex);
     final path = pathOf(storey, id, holeIndex: holeIndex);
-    if (hit == null || path == null ||
+    if (hit == null ||
+        path == null ||
         path.points.any((p) => (p - hit.point).distance < .001)) {
       return false;
     }
@@ -2070,7 +2250,8 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
   }) {
     if (holeIndex != null) {
       final host = CutArchitectContourOpening.target(storey, id);
-      if (host == null || holeIndex < 0 || holeIndex >= host.$2.length) return null;
+      if (host == null || holeIndex < 0 || holeIndex >= host.$2.length)
+        return null;
       return (points: host.$2[holeIndex], closed: true, width: 0);
     }
     for (final w in storey.walls) {
@@ -2094,9 +2275,7 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     for (final p in storey.cadPrimitives) {
       if (p.id != id || p.type == CadPrimitiveType.circle) continue;
       return (
-        points: p.isPolygon
-            ? p.polygonCorners
-            : p.linePoints,
+        points: p.isPolygon ? p.polygonCorners : p.linePoints,
         closed: p.isPolygon,
         width: 0,
       );
@@ -2108,7 +2287,8 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
       if (r.id == id) return (points: r.points, closed: true, width: 0);
     }
     for (final z in storey.zones) {
-      if (z.id == id && !z.isAutoBoundary) return (points: z.polygon, closed: true, width: 0);
+      if (z.id == id && !z.isAutoBoundary)
+        return (points: z.polygon, closed: true, width: 0);
     }
     for (final o in storey.openings) {
       if (o.id == id) return (points: o.boundary, closed: true, width: 0);
@@ -2129,8 +2309,13 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     if (path == null) throw ArgumentError('Element has no editable path');
     // The pick identifies the segment; midpoint insertion ignores its distance
     // along that segment and works equally for open paths and closing edges.
-    final hit = locate(storey, elementId, point,
-        atMidpoint: atMidpoint, holeIndex: holeIndex);
+    final hit = locate(
+      storey,
+      elementId,
+      point,
+      atMidpoint: atMidpoint,
+      holeIndex: holeIndex,
+    );
     if (hit == null) throw ArgumentError('Element has no editable segment');
     final insertion = hit.point;
     if (!canInsert(storey, elementId, insertion, holeIndex: holeIndex)) {
@@ -2146,8 +2331,9 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
         holeIndex: holeIndex,
       ).apply(project);
     }
-    if (storey.cadPrimitives.any((p) =>
-        p.id == elementId && p.type == CadPrimitiveType.polyline)) {
+    if (storey.cadPrimitives.any(
+      (p) => p.id == elementId && p.type == CadPrimitiveType.polyline,
+    )) {
       return UpdateArchitectPolyline(
         storeyId: storeyId,
         elementId: elementId,
@@ -2176,15 +2362,27 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
         storeyId: storeyId,
         wallId: elementId,
         newWallId: newElementId,
-        ratio: wall.isCurved ? hit.ratio : BimLineGeometry.parameter(
-          insertion, wall.startPoint, wall.endPoint),
+        ratio: wall.isCurved
+            ? hit.ratio
+            : BimLineGeometry.parameter(
+                insertion,
+                wall.startPoint,
+                wall.endPoint,
+              ),
       ).apply(project);
     }
     return ArchitectModelCommand.replace(
       project,
       storey.copyWith(
-        groups: [for (final g in storey.groups) g.elementIds.contains(elementId)
-          ? ArchitectElementGroup(id: g.id, elementIds: {...g.elementIds, newElementId}) : g],
+        groups: [
+          for (final g in storey.groups)
+            g.elementIds.contains(elementId)
+                ? ArchitectElementGroup(
+                    id: g.id,
+                    elementIds: {...g.elementIds, newElementId},
+                  )
+                : g,
+        ],
         beams: [
           for (final b in storey.beams)
             if (b.id == elementId) ...[
@@ -2213,7 +2411,9 @@ class ArchitectCommandController
     : super(
         ArchitectRoofPlacement.resolve(
           ArchitectPanelSupports.resolve(
-            ArchitectSlabAssemblies.resolve(ArchitectStairRules.resolve(project)),
+            ArchitectSlabAssemblies.resolve(
+              ArchitectStairRules.resolve(project),
+            ),
           ),
         ),
         historyLimit: historyLimit,
@@ -2224,14 +2424,23 @@ class ArchitectCommandController
   Set<String> exteriorReviewWallIds = const {};
 
   @override
-  void undo() { exteriorReviewWallIds = const {}; super.undo(); }
+  void undo() {
+    exteriorReviewWallIds = const {};
+    super.undo();
+  }
+
   @override
-  void redo() { exteriorReviewWallIds = const {}; super.redo(); }
+  void redo() {
+    exteriorReviewWallIds = const {};
+    super.redo();
+  }
 
   @override
   void restore(ArchitectProject next) {
     exteriorReviewWallIds = const {};
-    super.restore(ArchitectRoofPlacement.resolve(ArchitectSlabAssemblies.resolve(next)));
+    super.restore(
+      ArchitectRoofPlacement.resolve(ArchitectSlabAssemblies.resolve(next)),
+    );
   }
 
   @override
@@ -2325,7 +2534,10 @@ class ArchitectCommandController
         current.units == snapshot.units &&
         current.distanceDecimals == snapshot.distanceDecimals &&
         current.dimensionScale == snapshot.dimensionScale &&
-        bimValuesEqual(current.document.viewScales, snapshot.document.viewScales)) {
+        bimValuesEqual(
+          current.document.viewScales,
+          snapshot.document.viewScales,
+        )) {
       return snapshot;
     }
     return snapshot.copyWith(
@@ -2333,11 +2545,12 @@ class ArchitectCommandController
       units: current.units,
       distanceDecimals: current.distanceDecimals,
       dimensionScale: current.dimensionScale,
-      document: snapshot.document.copyWith(viewScales: current.document.viewScales),
+      document: snapshot.document.copyWith(
+        viewScales: current.document.viewScales,
+      ),
     );
   }
 }
-
 
 class UpdateArchitectSection extends ArchitectModelCommand {
   final String sectionId;

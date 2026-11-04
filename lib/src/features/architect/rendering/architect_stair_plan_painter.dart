@@ -1,5 +1,3 @@
-import 'architect_hatch_geometry.dart';
-import '../models/architect_hatch_pattern.dart';
 import 'architect_vector_scene.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -39,17 +37,19 @@ class ArchitectStairPlanPainter {
   }) {
     architectDrawingSources(canvas, {stair.id}, 'stair');
     final plan = stair.plan, d = stair.design;
-    final points=plan.walkingLine;
-    Path? labelMask;
+    final points = plan.walkingLine;
     VoidCallback? paintLabel;
     if (d != null &&
         d.showLabel &&
         labels &&
         l10n != null &&
-        (ArchitectTextScope.current != null || dimensionScale.textHeight * scale >= 5)) {
+        (ArchitectTextScope.current != null ||
+            dimensionScale.textHeight * scale >= 5)) {
       final scope = ArchitectTextScope.current;
       final labelScale = scope == null ? 1 / scale : 1.0;
-      final text = ArchitectTextPainter(elementId: stair.id, modelScale: labelScale,
+      final text = ArchitectTextPainter(
+        elementId: stair.id,
+        modelScale: labelScale,
         textDirection: TextDirection.ltr,
         textAlign: TextAlign.center,
         text: TextSpan(
@@ -67,27 +67,37 @@ class ArchitectStairPlanPainter {
       var longest = 0.0;
       for (var i = 1; i < points.length; i++) {
         final length = (points[i] - points[i - 1]).distance;
-        if (length > longest) { longest = length; a = points[i - 1]; b = points[i]; }
+        if (length > longest) {
+          longest = length;
+          a = points[i - 1];
+          b = points[i];
+        }
       }
       var angle = math.atan2((b - a).dy, (b - a).dx);
       if (angle > math.pi / 2) angle -= math.pi;
       if (angle < -math.pi / 2) angle += math.pi;
       final at = (a + b) / 2;
-      final fit=longest>0?math.min(1.0,longest*.85/math.max(.001,text.width*labelScale)):1.0;
+      final fit = longest > 0
+          ? math.min(
+              1.0,
+              longest * .85 / math.max(.001, text.width * labelScale),
+            )
+          : 1.0;
 
-      final gap = scope == null ? 3.0 : ArchitectDrawingScale(scope.denominator).paperToModel(.5) / labelScale;
-      final offset=Offset(-text.width/2,-text.height-gap);
-      final matrix=Matrix4.identity()..translateByDouble(at.dx,at.dy,0,1)
-        ..rotateZ(angle)..scaleByDouble(labelScale*fit,labelScale*fit,1,1);
-      labelMask=(Path()..addRect(Rect.fromLTWH(offset.dx-gap/2,offset.dy-gap/2,
-        text.width+gap,text.height+gap))).transform(matrix.storage);
-      paintLabel=() {
-        canvas.save();canvas.translate(at.dx,at.dy);canvas.rotate(angle);
-        canvas.scale(labelScale*fit);text.paint(canvas,offset);canvas.restore();
+      final gap = scope == null
+          ? 3.0
+          : ArchitectDrawingScale(scope.denominator).paperToModel(.5) /
+                labelScale;
+      final offset = Offset(-text.width / 2, -text.height - gap);
+      paintLabel = () {
+        canvas.save();
+        canvas.translate(at.dx, at.dy);
+        canvas.rotate(angle);
+        canvas.scale(labelScale * fit);
+        text.paint(canvas, offset);
+        canvas.restore();
       };
     }
-    final labelOutside=labelMask==null?null:Path.combine(PathOperation.difference,
-      Path()..addRect(plan.bounds.inflate(5)),labelMask);
     final geometry = ArchitectStairGeometry.of(stair);
     final cut = geometry.cut(cutHeight ?? double.infinity);
     final overheadClip = d?.shape == StairShape.spiralOverlap
@@ -113,20 +123,9 @@ class ArchitectStairPlanPainter {
       ..strokeWidth = .8 / scale
       ..style = PaintingStyle.stroke;
     if (!cut.below.getBounds().isEmpty) {
-      final pattern=ArchitectHatchPattern.presets.firstWhere((p)=>p.id==switch(d?.construction) {
-        StairConstruction.steel=>'metal',StairConstruction.timber=>'wood',_=>'concrete'});
-      canvas.save(); canvas.clipPath(cut.below);
-      if(labelOutside!=null) canvas.clipPath(labelOutside);
-      canvas.drawPath(ArchitectHatchGeometry.path(boundary:cut.below,pattern:pattern,
-        unitsPerMm:ArchitectTextScope.current==null ? 3/scale :
-          ArchitectTextScope.current!.denominator/1000),
-        Paint()..color=color.withValues(alpha:.6)..strokeWidth=.6/scale..style=PaintingStyle.stroke);
-      canvas.restore();
       canvas.drawPath(cut.below, stroke);
     }
     overhead(cut.above, thin);
-    canvas.save();
-    if(labelOutside!=null) canvas.clipPath(labelOutside);
     for (var i = 0; i < plan.nosings.length; i++) {
       final (a, b) = plan.nosings[i];
       final path = Path()
@@ -140,7 +139,6 @@ class ArchitectStairPlanPainter {
         canvas.drawPath(path, thin);
       }
     }
-    canvas.restore();
     if (points.length >= 2) {
       // The ascent symbol stays continuous and readable over the dashed steps.
       final path = Path()..moveTo(points.first.dx, points.first.dy);
@@ -172,18 +170,17 @@ class ArchitectStairPlanPainter {
         project: project,
       )) {
         final base = ArchitectStairMesh.simplify(path.base);
-        for (var i = 0; i < base.length - 1; i++) {
-          final p = base[i], q = base[i + 1];
-          final a = Offset(p.x, p.y), b = Offset(q.x, q.y), v = b - a;
-          if (v.distance < 1e-8) continue;
-          final offsets = path.wallMounted
-              ? [Offset.zero]
-              : [Offset.zero, Offset(-v.dy, v.dx) / v.distance * .025];
-          for (final offset in offsets) {
+        if (base.length < 2) continue;
+        for (final offset in path.wallMounted ? [0.0] : [-.024, .024]) {
+          final outline = ArchitectStairRailings.planOffset(base, offset);
+          for (var i = 0; i < base.length - 1; i++) {
+            final p = base[i], q = base[i + 1];
+            final a = outline[i], b = outline[i + 1], v = b - a;
+            if (v.distance < 1e-8) continue;
             void segment(Offset start, Offset end, bool above) {
               final line = Path()
-                ..moveTo(start.dx + offset.dx, start.dy + offset.dy)
-                ..lineTo(end.dx + offset.dx, end.dy + offset.dy);
+                ..moveTo(start.dx, start.dy)
+                ..lineTo(end.dx, end.dy);
               if (above) {
                 overhead(line, thin);
               } else {
@@ -199,6 +196,15 @@ class ArchitectStairPlanPainter {
             } else {
               segment(a, b, (p.z + q.z) / 2 > height + 1e-8);
             }
+          }
+        }
+        if (!path.wallMounted && .036 * scale >= 2) {
+          for (final member in ArchitectStairRailings.members(
+            path,
+          ).where((m) => m.post)) {
+            final p = member.point;
+            if (p.z > (cutHeight ?? double.infinity) + 1e-8) continue;
+            canvas.drawCircle(Offset(p.x, p.y), .018, thin);
           }
         }
       }
@@ -237,6 +243,118 @@ class ArchitectStairPlanPainter {
         canvas.drawLine(start, end, stroke..strokeWidth = 1.5 / scale);
       }
     }
+    if (labels && d != null) {
+      _landingLevels(
+        canvas,
+        stair,
+        geometry,
+        scale,
+        color,
+        storey,
+        project,
+        dimensionScale,
+      );
+    }
     paintLabel?.call();
+  }
+
+  static void _landingLevels(
+    Canvas canvas,
+    ArchitectStair stair,
+    ArchitectStairGeometry geometry,
+    double scale,
+    Color color,
+    ArchitectStorey? storey,
+    ArchitectProject? project,
+    ArchitectDimensionScale dimensionScale,
+  ) {
+    final scope = ArchitectTextScope.current;
+    if (scope == null && dimensionScale.textHeight * scale < 5) return;
+    final paper = ArchitectDrawingScale(
+      scope?.denominator ?? dimensionScale.denominator,
+    );
+    final size = paper.paperToModel(.8);
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = .8 / scale
+      ..style = PaintingStyle.stroke;
+    for (var i = 0; i < geometry.landings.length; i++) {
+      final landing = geometry.landings[i];
+      final elevation =
+          (storey?.elevation ?? 0) +
+          stair.design!.startOffset +
+          landing.elevation;
+      final label =
+          scope?.level(elevation) ??
+          project?.formatLevel(elevation) ??
+          formatArchitectLevel(elevation);
+      final modelScale = scope == null ? 1 / scale : 1.0;
+      final text = ArchitectTextPainter(
+        elementId: stair.id,
+        role: ArchitectAnnotationRole.dimension,
+        modelScale: modelScale,
+        textDirection: TextDirection.ltr,
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            color: color,
+            fontFamily: 'Roboto',
+            fontSize: math.min(dimensionScale.textHeight * scale, 20.0),
+          ),
+        ),
+      )..layout();
+      final centre =
+          landing.polygon.reduce((a, b) => a + b) /
+          landing.polygon.length.toDouble();
+      final flight = geometry.flights[i];
+      var angle = math.atan2(flight.axis.dy, flight.axis.dx);
+      if (angle > math.pi / 2) angle -= math.pi;
+      if (angle < -math.pi / 2) angle += math.pi;
+      // Fit the complete unmasked symbol inside the landing, including long
+      // elevations in centimetres and larger publication text settings.
+      final axis = Offset(math.cos(angle), math.sin(angle));
+      final normal = Offset(-axis.dy, axis.dx);
+      final local =
+          (Path()..addPolygon([
+                for (final p in landing.polygon)
+                  Offset(
+                    ArchitectStairGeometry.dot(p - centre, axis),
+                    ArchitectStairGeometry.dot(p - centre, normal),
+                  ),
+              ], true))
+              .getBounds();
+      final textHeight = text.height * modelScale;
+      final content = Rect.fromLTRB(
+        -size * 1.4,
+        -math.max(size * 1.4, textHeight / 2),
+        size * 2 + text.width * modelScale,
+        math.max(size * 1.4, textHeight / 2),
+      );
+      final margin = math.min(.08, math.min(local.width, local.height) * .1);
+      final available = local.deflate(margin);
+      final fit = math.min(
+        1.0,
+        math.min(
+          available.width / content.width,
+          available.height / content.height,
+        ),
+      );
+      final up = math.min(
+        size * 2,
+        math.max(0.0, (available.height - content.height * fit) / 2),
+      );
+      canvas.save();
+      canvas.translate(centre.dx, centre.dy);
+      canvas.rotate(angle);
+      canvas.translate(-content.center.dx * fit, -up);
+      canvas.scale(fit);
+      canvas.drawCircle(Offset.zero, size, paint);
+      canvas.drawLine(Offset(-size * 1.4, 0), Offset(size * 1.4, 0), paint);
+      canvas.drawLine(Offset(0, -size * 1.4), Offset(0, size * 1.4), paint);
+      canvas.translate(size * 2, -textHeight / 2);
+      canvas.scale(modelScale);
+      text.paint(canvas, Offset.zero);
+      canvas.restore();
+    }
   }
 }

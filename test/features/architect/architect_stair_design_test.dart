@@ -56,6 +56,10 @@ void main() {
     await tester.tapAt(workspace.screen(tester, Offset.zero));
     await tester.pumpAndSettle();
     expect(workspace.overlay(tester).stairPreview, isNotNull);
+    expect(
+      workspace.overlay(tester).stairPreview!.placementCorner.distance,
+      lessThan(1e-6),
+    );
     await tester.tapAt(workspace.screen(tester, const Offset(0, 2)));
     await tester.pumpAndSettle();
     final placed = model.project.activeStorey.stairs.single;
@@ -63,6 +67,9 @@ void main() {
     expect(placed.unitVector.dx, closeTo(0, 1e-6));
     expect(placed.unitVector.dy, closeTo(1, 1e-6));
     expect(placed.stepCount, 17);
+    expect(placed.placementCorner.distance, lessThan(1e-6));
+    final first = placed.plan.nosings.first;
+    expect(math.min(first.$1.distance, first.$2.distance), lessThan(1e-6));
     model.undo();
     await tester.pumpAndSettle();
     expect(model.project.activeStorey.stairs, isEmpty);
@@ -71,11 +78,7 @@ void main() {
   test('3D risers reach the exact upper finished-floor elevation', () {
     for (final shape in StairShape.values) {
       final s = stair(
-        design: ArchitectStairDesign(
-          shape: shape,
-          rise: 3,
-          showRailing: false,
-        ),
+        design: ArchitectStairDesign(shape: shape, rise: 3, showRailing: false),
       );
       final p = project(stairs: [s]).copyWith(
         storeys: [

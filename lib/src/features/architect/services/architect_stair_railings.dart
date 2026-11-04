@@ -15,6 +15,96 @@ class StairRailingPath {
 /// Guards are derived, never frozen into the stair when it is placed. Wall
 /// edits, openings and floor heights therefore immediately change the result.
 class ArchitectStairRailings {
+  /// Even bays, with real posts at ends, corners and changes of pitch.
+  /// Infill is spaced independently of the small vertices of curved guards.
+  static List<({Vector3 point, bool post})> members(StairRailingPath path) {
+    final points = path.base;
+    if (points.length < 2) return const [];
+    final distances = <double>[0];
+    for (var i = 1; i < points.length; i++) {
+      final a = points[i - 1], b = points[i];
+      distances.add(distances.last + Offset(b.x - a.x, b.y - a.y).distance);
+    }
+    final total = distances.last;
+    if (total < 1e-8) return const [];
+    final knots = <double>[0];
+    if (!path.wallMounted) {
+      for (var i = 1; i < points.length - 1; i++) {
+        final a = points[i] - points[i - 1], b = points[i + 1] - points[i];
+        final av = Offset(a.x, a.y), bv = Offset(b.x, b.y);
+        if (av.distance < 1e-8 || bv.distance < 1e-8) continue;
+        final turn =
+            (av.dx * bv.dx + av.dy * bv.dy) / (av.distance * bv.distance);
+        if (turn < .95 || (a.z / av.distance - b.z / bv.distance).abs() > .05) {
+          knots.add(distances[i]);
+        }
+      }
+    }
+    knots.add(total);
+    Vector3 pointAt(double at) {
+      var i = 1;
+      while (i < distances.length - 1 && distances[i] < at) {
+        i++;
+      }
+      final length = distances[i] - distances[i - 1];
+      final t = length < 1e-8
+          ? 0.0
+          : ((at - distances[i - 1]) / length).clamp(0.0, 1.0);
+      return points[i - 1] + (points[i] - points[i - 1]) * t;
+    }
+
+    final result = <({Vector3 point, bool post})>[
+      (point: points.first, post: true),
+    ];
+    for (var k = 1; k < knots.length; k++) {
+      final from = knots[k - 1], length = knots[k] - from;
+      final bays = math.max(1, (length / (path.wallMounted ? .9 : 1.0)).ceil());
+      for (var bay = 0; bay < bays; bay++) {
+        final start = from + length * bay / bays, span = length / bays;
+        if (!path.wallMounted) {
+          final divisions = math.max(1, (span / .1).ceil());
+          for (var j = 1; j < divisions; j++) {
+            // Leave a clean joint to the larger structural posts.
+            if (span * math.min(j, divisions - j) / divisions < .035) continue;
+            result.add((
+              point: pointAt(start + span * j / divisions),
+              post: false,
+            ));
+          }
+        }
+        result.add((point: pointAt(start + span), post: true));
+      }
+    }
+    return result;
+  }
+
+  /// Joined offsets avoid gaps and overlapping corners in the plan rail.
+  static List<Offset> planOffset(List<Vector3> points, double distance) {
+    Offset normal(int a, int b) {
+      final v = Offset(points[b].x - points[a].x, points[b].y - points[a].y);
+      return v.distance < 1e-8 ? Offset.zero : Offset(-v.dy, v.dx) / v.distance;
+    }
+
+    return [
+      for (var i = 0; i < points.length; i++)
+        () {
+          final before = normal(i == 0 ? i : i - 1, i == 0 ? i + 1 : i);
+          final after = normal(
+            i == points.length - 1 ? i - 1 : i,
+            i == points.length - 1 ? i : i + 1,
+          );
+          final sum = before + after;
+          final bisector = sum.distance < 1e-8 ? before : sum / sum.distance;
+          final divisor = math.max(
+            .5,
+            bisector.dx * before.dx + bisector.dy * before.dy,
+          );
+          return Offset(points[i].x, points[i].y) +
+              bisector * (distance / divisor);
+        }(),
+    ];
+  }
+
   static final _cache = Expando<Expando<List<StairRailingPath>>>();
   static List<StairRailingPath> build(
     ArchitectStair stair, {

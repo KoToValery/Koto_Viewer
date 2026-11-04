@@ -327,7 +327,7 @@ class Architect2dPainter extends CustomPainter {
     if (ArchitectTextScope.current == null) {
       final key = drawingViewKey ?? 'plan:${_project.activeStoreyId}';
       final denominator = _project.document.viewScales[key] ?? _project.dimensionScale.denominator;
-      ArchitectTextScope(_project.document, key, denominator, zoomScale, units: _project.units, decimals: _project.distanceDecimals).run(() => _paint(canvas, size));
+      ArchitectTextScope(_project.document, key, denominator, zoomScale, units: _project.units, decimals: _project.distanceDecimals, levelUnits: _project.levelUnits, levelDecimals: _project.levelDecimals).run(() => _paint(canvas, size));
     } else { _paint(canvas, size); }
   }
   void _paint(Canvas canvas, Size size) {
@@ -716,7 +716,7 @@ class Architect2dPainter extends CustomPainter {
     }
     final polyline = selected.cadPrimitives
         .where((p) => p.type == CadPrimitiveType.polyline).firstOrNull;
-    if (polyline != null) {
+    if (polyline != null && !polyline.isClosedPolyline) {
       ArchitectElementsPainterHelper.drawCadPrimitives(
         dimensionScale: _project.dimensionScale,
         palette: palette,
@@ -729,6 +729,15 @@ class Architect2dPainter extends CustomPainter {
         final points = polyline.linePoints;
         final scale = math.max(zoomScale, 80.0);
         const color = Color(0xFF00BCD4);
+        for(var i=0;i+1<points.length;i++) {
+          final mid=(points[i]+points[i+1])/2;
+          canvas.drawCircle(mid,3.5/scale,Paint()..color=const Color(0xFFFF9800));
+          if(handleOffsetLength>0) {
+            final grip=ArchitectPolylineEditing.edgeHandle(points,i,zoomScale,handleOffsetLength);
+            canvas.drawLine(mid,grip,Paint()..color=const Color(0xFFFF9800)..strokeWidth=1/scale);
+            _drawTouchGrip(canvas,grip,scale,const Color(0xFFFF9800));
+          }
+        }
         for (var i = 0; i < points.length; i++) {
           canvas.drawCircle(points[i], 3.5 / scale, Paint()..color = color);
           if (handleOffsetLength <= 0) continue;

@@ -1,3 +1,4 @@
+import 'architect_drain_surface.dart';
 // === SECTION: FLOOR DRAIN GEOMETRY ===
 // Table of Contents:
 // 1. FALL FIELD (height of the finished floor above the drain)
@@ -6,11 +7,9 @@
 // 4. DRAWING GEOMETRY (arrows, contour lines) with cache
 
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui';
 import '../models/architect_floor_drain.dart';
 import '../models/architect_wall.dart';
-
 
 /// A door opening that lies on the edge of the wet-area floor.
 class ArchitectDrainThreshold {
@@ -23,7 +22,7 @@ class ArchitectDrainThreshold {
   Offset get middle => (start + end) / 2;
 }
 
-enum ArchitectDrainIssue { outsideFloor, nearDoor }
+enum ArchitectDrainIssue { outsideFloor, nearDoor, invalidSurface }
 
 class ArchitectDrainContour {
   final Path path;
@@ -63,7 +62,10 @@ class ArchitectFloorDrainGeometry {
     final ab = b - a;
     final len2 = ab.distanceSquared;
     if (len2 < 1e-12) return a;
-    final t = (((p - a).dx * ab.dx + (p - a).dy * ab.dy) / len2).clamp(0.0, 1.0);
+    final t = (((p - a).dx * ab.dx + (p - a).dy * ab.dy) / len2).clamp(
+      0.0,
+      1.0,
+    );
     return a + ab * t;
   }
 
@@ -73,12 +75,12 @@ class ArchitectFloorDrainGeometry {
 
   /// Finished-floor height above the drain level at [p], metres.
   static double fall(ArchitectFloorDrain drain, Offset p) =>
+      ArchitectDrainSurface.of(drain).heightAt(p) ??
       distanceToGrate(drain, p) * drain.slopePercent / 100;
 
   /// Unit vector of the water flow at [p]; null on the grate itself.
   static Offset? downhill(ArchitectFloorDrain drain, Offset p) {
-    final v = nearestOnAxis(drain, p) - p;
-    return v.distance < 1e-6 ? null : v / v.distance;
+    return ArchitectDrainSurface.of(drain).downhill(p);
   }
 
   /// The distance function is convex, so its maximum lies on a vertex.
@@ -107,7 +109,10 @@ class ArchitectFloorDrainGeometry {
     final ab = b - a;
     final len2 = ab.distanceSquared;
     if (len2 < 1e-12) return (p - a).distance;
-    final t = (((p - a).dx * ab.dx + (p - a).dy * ab.dy) / len2).clamp(0.0, 1.0);
+    final t = (((p - a).dx * ab.dx + (p - a).dy * ab.dy) / len2).clamp(
+      0.0,
+      1.0,
+    );
     return (p - (a + ab * t)).distance;
   }
 
@@ -127,7 +132,8 @@ class ArchitectFloorDrainGeometry {
     for (final wall in walls) {
       for (final door in wall.doors) {
         final centre =
-            wall.startPoint + (wall.endPoint - wall.startPoint) * door.offsetRatio;
+            wall.startPoint +
+            (wall.endPoint - wall.startPoint) * door.offsetRatio;
         var bestDistance = double.infinity;
         (Offset, Offset)? bestEdge;
         for (var i = 0; i < ring.length; i++) {
@@ -176,6 +182,8 @@ class ArchitectFloorDrainGeometry {
         issues.add(ArchitectDrainIssue.nearDoor);
       }
     }
+    if (!ArchitectDrainSurface.of(drain).drainsContinuously)
+      issues.add(ArchitectDrainIssue.invalidSurface);
     return issues;
   }
 
@@ -256,9 +264,7 @@ class ArchitectFloorDrainGeometry {
       final a = ring[i], b = ring[(i + 1) % ring.length];
       final length = (b - a).distance;
       if (length < ArchitectDrainDefaults.linearMin + 0.2) continue;
-      final hasDoor = doors.any(
-        (t) => _segmentDistance(t.middle, a, b) < 0.05,
-      );
+      final hasDoor = doors.any((t) => _segmentDistance(t.middle, a, b) < 0.05);
       final better =
           best == null ||
           (best.door && !hasDoor) ||
@@ -287,7 +293,9 @@ class ArchitectFloorDrainGeometry {
       x += p.dx;
       y += p.dy;
     }
-    return points.isEmpty ? Offset.zero : Offset(x / points.length, y / points.length);
+    return points.isEmpty
+        ? Offset.zero
+        : Offset(x / points.length, y / points.length);
   }
 
   static Rect _bounds(List<Offset> points) {
@@ -336,19 +344,7 @@ class ArchitectFloorDrainGeometry {
         maxFall: maxHeight,
       );
     }
-    final slope = drain.slopePercent / 100;
-
-    // Contour step: at most six lines, on a round millimetre value.
-    const steps = [5, 10, 20, 25, 50, 100];
-    final stepMm = steps.firstWhere(
-      (s) => s >= maxHeight * 1000 / 6,
-      orElse: () => steps.last,
-    );
     final contours = <ArchitectDrainContour>[];
-    for (var mm = stepMm; mm < maxHeight * 1000 - 1; mm += stepMm) {
-      final offset = mm / 1000 / slope;
-      contours.add(_contour(drain, offset, mm));
-    }
 
     // Arrows on a regular grid, away from walls, grate and thresholds.
     final bounds = _bounds(drain.polygon);
@@ -378,60 +374,6 @@ class ArchitectFloorDrainGeometry {
       issues: issues,
       maxFall: maxHeight,
     );
-  }
-
-  static ArchitectDrainContour _contour(
-    ArchitectFloorDrain drain,
-    double offset,
-    int millimetres,
-  ) {
-    final radius = drain.halfWidth + offset;
-    final path = Path();
-    final c = math.cos(drain.angle), s = math.sin(drain.angle);
-    final matrix = Float64List.fromList([
-      c, s, 0, 0, //
-      -s, c, 0, 0,
-      0, 0, 1, 0,
-      drain.position.dx, drain.position.dy, 0, 1,
-    ]);
-    if (drain.isLinear) {
-      path.addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset.zero,
-            width: drain.size + radius * 2,
-            height: radius * 2,
-          ),
-          Radius.circular(radius),
-        ),
-      );
-    } else {
-      path.addOval(Rect.fromCircle(center: Offset.zero, radius: radius));
-    }
-    // Label on the side of the contour that is furthest inside the room.
-    Offset? label;
-    var bestClearance = 0.0;
-    for (var i = 0; i < 24; i++) {
-      final a = i * math.pi / 12;
-      final dir = Offset(math.cos(a), math.sin(a));
-      final local = drain.isLinear
-          ? Offset(
-              dir.dx.abs() < .2 ? 0 : (dir.dx > 0 ? drain.size / 2 : -drain.size / 2),
-              0,
-            ) + dir * radius
-          : dir * radius;
-      final world = drain.position + Offset(
-        local.dx * c - local.dy * s,
-        local.dx * s + local.dy * c,
-      );
-      if (!drain.containsPoint(world)) continue;
-      final clearance = boundaryDistance(drain, world);
-      if (clearance > bestClearance) {
-        bestClearance = clearance;
-        label = world;
-      }
-    }
-    return ArchitectDrainContour(path.transform(matrix), millimetres, label);
   }
 }
 

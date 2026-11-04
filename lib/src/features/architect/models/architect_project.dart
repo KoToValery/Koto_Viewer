@@ -52,21 +52,31 @@ enum ArchitectDimensionScale {
 class ArchitectStorey {
   final List<ArchitectElementGroup> _groups;
   Set<String> get groupableIds => {
-    ...walls.map((e) => e.id), ...columns.map((e) => e.id),
-    ...beams.map((e) => e.id), ...slabs.map((e) => e.id),
-    ...roofs.map((e) => e.id), ...openings.map((e) => e.id),
-    ...stairs.map((e) => e.id), ...dimensions.map((e) => e.id),
-    ...elevationMarkers.map((e) => e.id), ...annotations.map((e) => e.id),
-    ...cadPrimitives.map((e) => e.id), ...components.map((e) => e.id), ...floorDrains.map((e) => e.id),
+    ...walls.map((e) => e.id),
+    ...columns.map((e) => e.id),
+    ...beams.map((e) => e.id),
+    ...slabs.map((e) => e.id),
+    ...roofs.map((e) => e.id),
+    ...openings.map((e) => e.id),
+    ...stairs.map((e) => e.id),
+    ...dimensions.map((e) => e.id),
+    ...elevationMarkers.map((e) => e.id),
+    ...annotations.map((e) => e.id),
+    ...cadPrimitives.map((e) => e.id),
+    ...components.map((e) => e.id),
+    ...floorDrains.map((e) => e.id),
     ...zones.where((e) => !e.isAutoBoundary).map((e) => e.id),
   };
   List<ArchitectElementGroup> get groups => _groups.isEmpty
-      ? const [] : ArchitectElementGroup.normalize(_groups, groupableIds);
-  ArchitectElementGroup? groupFor(String id) => groups.where((g) => g.elementIds.contains(id)).firstOrNull;
+      ? const []
+      : ArchitectElementGroup.normalize(_groups, groupableIds);
+  ArchitectElementGroup? groupFor(String id) =>
+      groups.where((g) => g.elementIds.contains(id)).firstOrNull;
   Set<String> expandGroups(Set<String> selection) {
     final result = Set<String>.of(selection);
     for (final group in groups) {
-      if (group.elementIds.any(selection.contains)) result.addAll(group.elementIds);
+      if (group.elementIds.any(selection.contains))
+        result.addAll(group.elementIds);
     }
     return result;
   }
@@ -120,7 +130,8 @@ class ArchitectStorey {
     this.components = const [],
     this.floorDrains = const [],
     this.zoneScheduleOrigin,
-  }) : _zones = zones, _groups = groups;
+  }) : _zones = zones,
+       _groups = groups;
 
   String get elevationLabel {
     if (elevation.abs() < 1e-4) return '±0.00';
@@ -210,7 +221,8 @@ class ArchitectStorey {
     'annotations': annotations.map((a) => a.toJson()).toList(),
     'cadPrimitives': cadPrimitives.map((p) => p.toJson()).toList(),
     'components': components.map((c) => c.toJson()).toList(),
-    if (floorDrains.isNotEmpty) 'floorDrains': floorDrains.map((d) => d.toJson()).toList(),
+    if (floorDrains.isNotEmpty)
+      'floorDrains': floorDrains.map((d) => d.toJson()).toList(),
     if (zoneScheduleOrigin != null)
       'zoneScheduleOrigin': {
         'x': zoneScheduleOrigin!.dx,
@@ -221,8 +233,11 @@ class ArchitectStorey {
   factory ArchitectStorey.fromJson(
     Map<String, dynamic> json,
   ) => ArchitectStorey(
-    groups: [for (final g in json['groups'] as List? ?? const [])
-      if (g is Map) ArchitectElementGroup.fromJson(Map<String, dynamic>.from(g))],
+    groups: [
+      for (final g in json['groups'] as List? ?? const [])
+        if (g is Map)
+          ArchitectElementGroup.fromJson(Map<String, dynamic>.from(g)),
+    ],
     id: json['id'] as String,
     name: json['name'] as String,
     elevation: (json['elevation'] as num?)?.toDouble() ?? 0.0,
@@ -299,7 +314,11 @@ class ArchitectStorey {
             )
             .toList() ??
         const [],
-    floorDrains: [for (final d in json['floorDrains'] as List? ?? const []) if (d is Map) ArchitectFloorDrain.fromJson(Map<String, dynamic>.from(d))],
+    floorDrains: [
+      for (final d in json['floorDrains'] as List? ?? const [])
+        if (d is Map)
+          ArchitectFloorDrain.fromJson(Map<String, dynamic>.from(d)),
+    ],
     components:
         (json['components'] as List<dynamic>?)
             ?.map(
@@ -335,6 +354,8 @@ class ArchitectProject {
   final DateTime updatedAt;
   final ArchitectUnit units;
   final int distanceDecimals;
+  final ArchitectUnit levelUnits;
+  final int levelDecimals;
   final ArchitectDimensionScale dimensionScale;
   final ArchitectDocument document;
   final List<ArchitectStorey> storeys;
@@ -358,6 +379,8 @@ class ArchitectProject {
     required this.updatedAt,
     this.units = ArchitectUnit.meters,
     this.distanceDecimals = 2,
+    this.levelUnits = ArchitectUnit.meters,
+    this.levelDecimals = 2,
     this.dimensionScale = ArchitectDimensionScale.scale100,
     this.document = const ArchitectDocument(),
     required this.storeys,
@@ -377,6 +400,9 @@ class ArchitectProject {
 
   String formatLength(double meters) =>
       units.format(meters, decimals: distanceDecimals);
+
+  String formatLevel(double metres) =>
+      formatArchitectLevel(metres, units: levelUnits, decimals: levelDecimals);
 
   ArchitectStorey get activeStorey => storeys.firstWhere(
     (s) => s.id == activeStoreyId,
@@ -474,6 +500,8 @@ class ArchitectProject {
     DateTime? updatedAt,
     ArchitectUnit? units,
     int? distanceDecimals,
+    ArchitectUnit? levelUnits,
+    int? levelDecimals,
     ArchitectDimensionScale? dimensionScale,
     ArchitectDocument? document,
     List<ArchitectStorey>? storeys,
@@ -497,6 +525,8 @@ class ArchitectProject {
     updatedAt: updatedAt ?? this.updatedAt,
     units: units ?? this.units,
     distanceDecimals: distanceDecimals ?? this.distanceDecimals,
+    levelUnits: levelUnits ?? this.levelUnits,
+    levelDecimals: levelDecimals ?? this.levelDecimals,
     dimensionScale: dimensionScale ?? this.dimensionScale,
     document: document ?? this.document,
     storeys: storeys ?? this.storeys,
@@ -522,6 +552,8 @@ class ArchitectProject {
     'updatedAt': updatedAt.toIso8601String(),
     'units': units.name,
     'distanceDecimals': distanceDecimals,
+    'levelUnits': levelUnits.name,
+    'levelDecimals': levelDecimals,
     'dimensionScale': dimensionScale.denominator,
     'document': document.toJson(),
     'storeys': storeys.map((s) => s.toJson()).toList(),
@@ -549,6 +581,12 @@ class ArchitectProject {
     updatedAt:
         DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
     document: ArchitectDocument.fromProjectJson(json),
+    levelUnits:
+        ArchitectUnit.values
+            .where((u) => u.name == json['levelUnits'])
+            .firstOrNull ??
+        ArchitectUnit.meters,
+    levelDecimals: ((json['levelDecimals'] as num?)?.toInt() ?? 2).clamp(0, 4),
     units: ArchitectUnit.values.firstWhere(
       (u) => u.name == json['units'],
       orElse: () => ArchitectUnit.meters,
@@ -617,8 +655,13 @@ class ArchitectProject {
         .where((s) => !s.isPreset)
         .toList(),
     hatchPatterns: (json['hatchPatterns'] as List? ?? [])
-        .map((s) => ArchitectHatchPattern.fromJson(Map<String, dynamic>.from(s as Map)))
-        .where((s) => !s.isPreset).toList(),
+        .map(
+          (s) => ArchitectHatchPattern.fromJson(
+            Map<String, dynamic>.from(s as Map),
+          ),
+        )
+        .where((s) => !s.isPreset)
+        .toList(),
     openingStyles:
         (json['openingStyles'] as List<dynamic>?)
             ?.map(

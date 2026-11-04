@@ -365,6 +365,18 @@ class ArchitectDocument {
     sheets: sheets ?? this.sheets,
     templates: templates ?? this.templates,
   );
+  ArchitectDocument copyElementOverrides(Map<String, String> ids) {
+    final sizes = Map<String, double>.of(overrideMm);
+    for (final entry in overrideMm.entries) {
+      final parts = entry.key.split('/');
+      if (parts.length != 4) continue;
+      final id = ids[parts[1]];
+      if (id != null)
+        sizes['${parts[0]}/$id/${parts[2]}/${parts[3]}'] = entry.value;
+    }
+    return copyWith(overrideMm: sizes);
+  }
+
   double textMm(
     String view,
     String element,

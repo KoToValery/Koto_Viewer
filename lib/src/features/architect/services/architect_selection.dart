@@ -1,3 +1,4 @@
+import '../rendering/architect_annotation_layout.dart';
 import '../widgets/architect_elevation_labels.dart';
 import '../models/architect_contour.dart';
 import 'architect_roof_drainage_geometry.dart';
@@ -117,6 +118,13 @@ class ArchitectSelection {
 
   static Rect? bounds(ArchitectProject project, String id) {
     final s = project.activeStorey;
+    for (final a in s.annotations) {
+      if (a.id == id)
+        return ArchitectAnnotationLayout.outline(
+          a,
+          project: project,
+        ).getBounds();
+    }
     for (final axis in project.gridAxes) {
       if (axis.id == id) {
         return Rect.fromPoints(axis.start, axis.end).inflate(.02);
@@ -227,6 +235,11 @@ class ArchitectSelection {
 
   static Path outline(ArchitectProject project, String id) {
     final s = project.activeStorey;
+    for (final a in s.annotations) {
+      if (a.id == id)
+        return ArchitectAnnotationLayout.outline(a, project: project);
+    }
+
     final path = Path();
     for (final component in s.components) {
       if (component.id == id) {
@@ -498,6 +511,90 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         }
       }
       for (final value in textValues.entries) {
+        final isText = project.activeStorey.annotations.any(
+          (a) => a.id == e['id'],
+        );
+        final isLevel = project.activeStorey.elevationMarkers.any(
+          (a) => a.id == e['id'],
+        );
+        if (value.key == 'closed' &&
+            project.activeStorey.cadPrimitives.any(
+              (p) => p.id == e['id'] && p.type == CadPrimitiveType.polyline,
+            )) {
+          if (!{'true', 'false'}.contains(value.value))
+            throw ArgumentError('Invalid closure');
+          final line = ArchitectCadPrimitive.fromJson(e),
+              close = value.value == 'true';
+          final points = List<Offset>.of(line.linePoints);
+          if (points.length > 2 && points.first == points.last)
+            points.removeLast();
+          if (close && !ArchitectContour.valid(points, const []))
+            throw ArgumentError('Invalid contour');
+          if (close) points.add(points.first);
+          ArchitectCadPrimitive.validatePolyline(points);
+          e.addAll(
+            line
+                .copyWith(
+                  closed: close,
+                  polygon: points,
+                  startPoint: points.first,
+                  endPoint: points.last,
+                )
+                .toJson(),
+          );
+          continue;
+        }
+        if (isText &&
+            {
+              'alignment',
+              'fontWeight',
+              'italic',
+              'underline',
+              'textColor',
+            }.contains(value.key)) {
+          switch (value.key) {
+            case 'alignment':
+              if (!{'left', 'center', 'right'}.contains(value.value))
+                throw ArgumentError('Invalid alignment');
+              e['alignment'] = value.value;
+            case 'fontWeight':
+              final n = int.tryParse(value.value);
+              if (n == null || n < 100 || n > 900 || n % 100 != 0)
+                throw ArgumentError('Invalid weight');
+              e['fontWeight'] = n;
+            case 'textColor':
+              final n = int.tryParse(value.value);
+              if (n == null || n < 0 || n > 0xFFFFFFFF)
+                throw ArgumentError('Invalid color');
+              e['colorValue'] = n;
+            default:
+              if (!{'true', 'false'}.contains(value.value))
+                throw ArgumentError('Invalid boolean');
+              e[value.key] = value.value == 'true';
+          }
+          continue;
+        }
+        if (isLevel &&
+            {'symbol', 'levelUnits', 'levelDecimals'}.contains(value.key)) {
+          if (value.key == 'symbol') {
+            if (!ArchitectLevelSymbol.values.any((s) => s.name == value.value))
+              throw ArgumentError('Invalid level symbol');
+            e['symbol'] = value.value;
+          } else if (value.value == 'inherit') {
+            e.remove(value.key);
+          } else if (value.key == 'levelUnits') {
+            if (!ArchitectUnit.values.any((u) => u.name == value.value))
+              throw ArgumentError('Invalid level unit');
+            e['levelUnits'] = value.value;
+          } else {
+            final n = int.tryParse(value.value);
+            if (n == null || n < 0 || n > 4)
+              throw ArgumentError('Invalid level precision');
+            e['levelDecimals'] = n;
+          }
+          continue;
+        }
+
         if (value.key == 'wallPanelPlacement') {
           final wall = ArchitectWall.fromJson(e);
           if (!wall.system.isPanel) {

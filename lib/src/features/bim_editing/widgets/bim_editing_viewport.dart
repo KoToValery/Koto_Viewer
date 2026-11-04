@@ -22,6 +22,9 @@ class BimEditingViewport extends StatefulWidget {
   /// A stationary longer hold opens context after selection/edit activation.
   /// The host cancels its pending preview when it handles this callback.
   final bool Function(Offset)? onContextHold;
+
+  /// Optional stationary right click; dragging the same button still pans.
+  final bool Function(Offset)? onSecondaryTap;
   final bool Function() isDraggingHandle;
   final ValueChanged<PointerDownEvent> onToolDown;
   final ValueChanged<PointerMoveEvent> onToolMove;
@@ -44,6 +47,7 @@ class BimEditingViewport extends StatefulWidget {
     this.onToolHoldStart,
     this.onSelectionHold,
     this.onContextHold,
+    this.onSecondaryTap,
     required this.isDraggingHandle,
     required this.onToolDown,
     required this.onToolMove,
@@ -60,6 +64,7 @@ class BimEditingViewport extends StatefulWidget {
 class _BimEditingViewportState extends State<BimEditingViewport> {
   final Map<int, Offset> _pointers = {};
   bool _navigation = false;
+  bool _secondaryTapCandidate = false;
   bool _suppressRelease = false;
   bool _canPan = false;
   Offset? _down;
@@ -104,6 +109,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
   void _downEvent(PointerDownEvent event) {
     _pointers[event.pointer] = event.localPosition;
     if (_pointers.length > 1) {
+      _secondaryTapCandidate = false;
       _holdTimer?.cancel();
       _contextHoldTimer?.cancel();
       _held = false;
@@ -113,6 +119,9 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
       return;
     }
     _down = event.localPosition;
+    _secondaryTapCandidate =
+        event.kind == PointerDeviceKind.mouse &&
+        (event.buttons & kSecondaryMouseButton) != 0;
     _navigation =
         (event.buttons & (kMiddleMouseButton | kSecondaryMouseButton)) != 0;
     _suppressRelease = _navigation;
@@ -198,6 +207,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
     _pointers[event.pointer] = event.localPosition;
     if (_down != null && (event.localPosition - _down!).distance > 8) {
       _contextHoldTimer?.cancel();
+      _secondaryTapCandidate = false;
     }
     if (!_held &&
         _down != null &&
@@ -239,6 +249,9 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
     if (!_pointers.containsKey(event.pointer)) return;
     _holdTimer?.cancel();
     _contextHoldTimer?.cancel();
+    if (_secondaryTapCandidate && _pointers.length == 1) {
+      widget.onSecondaryTap?.call(event.localPosition);
+    }
     if (_pendingEditDown != null &&
         !_suppressRelease &&
         !_navigation &&
@@ -263,6 +276,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
     _contextHoldTimer?.cancel();
     _pendingEditDown = null;
     _held = false;
+    _secondaryTapCandidate = false;
     _navigation = false;
     _suppressRelease = false;
     _canPan = false;

@@ -43,8 +43,18 @@ class _NumberState extends State<ArchitectPropertyNumberField> {
   @override
   void didUpdateWidget(covariant ArchitectPropertyNumberField old) {
     super.didUpdateWidget(old);
-    if ((!focus.hasFocus || widget.readOnly) && old.value != widget.value) {
-      controller.text = _text();
+    if ((!focus.hasFocus || widget.readOnly) &&
+        (old.value != widget.value ||
+            old.project.units != widget.project.units ||
+            old.project.distanceDecimals != widget.project.distanceDecimals)) {
+      final nextText = _text();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            (!focus.hasFocus || widget.readOnly) &&
+            controller.text != nextText) {
+          controller.text = nextText;
+        }
+      });
     }
   }
 
