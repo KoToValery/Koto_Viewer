@@ -19757,6 +19757,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'3D'**
   String get architectFenestration3DShort;
+
+  /// No description provided for @architectFenestrationGlazing.
+  ///
+  /// In en, this message translates to:
+  /// **'Glazing'**
+  String get architectFenestrationGlazing;
+
+  /// No description provided for @architectFenestrationGlazingSingleShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Single'**
+  String get architectFenestrationGlazingSingleShort;
+
+  /// No description provided for @architectFenestrationGlazingDoubleShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Double'**
+  String get architectFenestrationGlazingDoubleShort;
+
+  /// No description provided for @architectFenestrationGlazingTripleShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Triple'**
+  String get architectFenestrationGlazingTripleShort;
 }
 
 class _AppLocalizationsDelegate

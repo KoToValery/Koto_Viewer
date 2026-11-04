@@ -3764,5 +3764,9 @@
   "architectFenestrationInfill": "Пълнеж",
   "architectFenestrationProfileDepth": "Дълбочина на касата",
   "architectFenestrationProfileFace": "Ширина на касата",
-  "architectFenestration3DShort": "3D"
+  "architectFenestration3DShort": "3D",
+  "architectFenestrationGlazing": "Остъкляване",
+  "architectFenestrationGlazingSingleShort": "Единично",
+  "architectFenestrationGlazingDoubleShort": "Двойно",
+  "architectFenestrationGlazingTripleShort": "Тройно"
 }

@@ -366,6 +366,45 @@ class FenestrationPropertiesPanel extends StatelessWidget {
                       4,
                 ),
               ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: DropdownButtonFormField<GlazingType>(
+                key: ValueKey('glazing-${style.glazingType}'),
+                initialValue: style.glazingType,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: l.architectFenestrationGlazing,
+                ),
+                items: [
+                  DropdownMenuItem(
+                    value: GlazingType.single,
+                    child: Text(l.architectFenestrationGlazingSingleShort),
+                  ),
+                  DropdownMenuItem(
+                    value: GlazingType.double,
+                    child: Text(l.architectFenestrationGlazingDoubleShort),
+                  ),
+                  DropdownMenuItem(
+                    value: GlazingType.triple,
+                    child: Text(l.architectFenestrationGlazingTripleShort),
+                  ),
+                ],
+                onChanged: (v) {
+                  if (v != null) {
+                    onChanged(
+                      style.copyWith(
+                        glazingType: v,
+                        glazingThickness: switch (v) {
+                          GlazingType.single => .006,
+                          GlazingType.double => .024,
+                          GlazingType.triple => .036,
+                        },
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
             number(
               'glazing-thickness',
               l.architectFenestrationGlazingThickness,
@@ -515,7 +554,9 @@ class _NumberState extends State<FenestrationNumberField> {
       .replaceFirst(RegExp(r'\.?0+$'), '');
   double? parse(String text) {
     final n = double.tryParse(text.trim().replaceAll(',', '.'));
-    if (n == null || !n.isFinite || (widget.integer && n != n.roundToDouble())) {
+    if (n == null ||
+        !n.isFinite ||
+        (widget.integer && n != n.roundToDouble())) {
       return null;
     }
     final value = n / widget.scale;

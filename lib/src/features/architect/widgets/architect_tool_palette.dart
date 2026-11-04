@@ -1646,7 +1646,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                         ),
                       ),
                       subtitle: Text(
-                        '${(s.defaultWidth * 100).round()} × ${(s.defaultHeight * 100).round()} cm'
+                        '${ArchitectFenestrationStyle.centimeters(s.defaultWidth)} × ${ArchitectFenestrationStyle.centimeters(s.defaultHeight)} cm'
                         '${s.hasCasing ? ' • ${l10n.architectFenestrationCasing}' : ''}',
                         style: const TextStyle(
                           fontSize: 11,

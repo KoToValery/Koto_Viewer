@@ -581,10 +581,39 @@ class ArchitectFenestrationStyle {
     this.transom,
   });
 
+  static String centimeters(double meters) =>
+      (meters * 100).toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '');
+
   Color get glassColor => Color(glassColorValue);
   Color get casingColor => Color(casingColorValue);
-  bool get isPreset => standardCatalog().any((s) => s.id == id);
+  static final _presetIds = standardCatalog().map((s) => s.id).toSet();
+  bool get isPreset => _presetIds.contains(id);
   double get doorBodyHeight => defaultHeight - (transom?.height ?? 0);
+  bool get hasValidGeometry {
+    if (!defaultWidth.isFinite ||
+        !defaultHeight.isFinite ||
+        defaultWidth < .4 ||
+        defaultWidth > 5 ||
+        defaultHeight < .4 ||
+        defaultHeight > 4 ||
+        !frameFaceWidth.isFinite ||
+        frameFaceWidth <= 0 ||
+        doorBodyHeight < .4 ||
+        (transom != null &&
+            (kind != FenestrationKind.door ||
+                !transom!.height.isFinite ||
+                transom!.height <= 0))) {
+      return false;
+    }
+    final layout = resolveLayout();
+    return panes.isNotEmpty &&
+        layout.panes.length == panes.length &&
+        layout.panes.values.every((e) {
+          final inset = e.pane.isOpenable ? e.pane.sashProfileWidth * 2 : 0;
+          return e.rect.width > inset + .01 && e.rect.height > inset + .01;
+        });
+  }
+
   List<FenestrationPane> get panes => [
     ...rootSubdivision.collectPanes(),
     ...?transom?.subdivision.collectPanes(),
@@ -804,16 +833,8 @@ class ArchitectFenestrationStyle {
     Offset canvasPoint,
     Size canvasSize,
   ) {
-    final margin = hasCasing ? (casingWidth * 1.8 + 0.20) : 0.25;
-    final totalW = defaultWidth + margin * 2;
-    final totalH = defaultHeight + margin * 2;
-    final scaleX = canvasSize.width / totalW;
-    final scaleY = canvasSize.height / totalH;
-    final scale = math.min(scaleX, scaleY) * 0.90;
-    final origin = Offset(
-      canvasSize.width / 2 - (defaultWidth / 2) * scale,
-      canvasSize.height / 2 + (defaultHeight / 2) * scale,
-    );
+    final fit = elevationFit(canvasSize);
+    final scale = fit.scale, origin = fit.origin;
     final x = (canvasPoint.dx - origin.dx) / scale;
     final y = (origin.dy - canvasPoint.dy) / scale;
     if (x < -0.05 ||
@@ -829,6 +850,32 @@ class ArchitectFenestrationStyle {
     return null;
   }
 
+  /// Pixel margins include dimension text, independent of model size and zoom.
+  ({double scale, Offset origin}) elevationFit(
+    Size size, {
+    bool dimensions = true,
+  }) {
+    final inset = dimensions && size.shortestSide >= 180 ? 52.0 : 10.0;
+    final trim = hasCasing ? casingWidth : 0.0;
+    final bottomTrim = includeBottomCasing ? trim : 0.0;
+    final scale = math.max(
+      .001,
+      math.min(
+            math.max(1, size.width - 2 * inset) / (defaultWidth + 2 * trim),
+            math.max(1, size.height - 2 * inset) /
+                (defaultHeight + trim + bottomTrim),
+          ) *
+          .96,
+    );
+    return (
+      scale: scale,
+      origin: Offset(
+        (size.width - defaultWidth * scale) / 2,
+        size.height / 2 + (defaultHeight + trim - bottomTrim) * scale / 2,
+      ),
+    );
+  }
+
   /// Gets the metric rect for a given pane ID.
   Rect? getPaneRect(String paneId) {
     return subdivisionForHeight(defaultHeight).collectPaneRects(
@@ -836,7 +883,15 @@ class ArchitectFenestrationStyle {
     )[paneId];
   }
 
-  List<({Offset hinge, Offset direction, Offset normal, double length})>
+  List<
+    ({
+      Offset hinge,
+      Offset direction,
+      Offset normal,
+      double length,
+      bool hingeLeft,
+    })
+  >
   doorPlanLeaves({
     required Offset center,
     required Offset direction,
@@ -881,6 +936,7 @@ class ArchitectFenestrationStyle {
             direction: leafU,
             normal: Offset(-leafU.dy, leafU.dx) * (sign * (left ? -1 : 1)),
             length: e.rect.width,
+            hingeLeft: left,
           );
         }(),
     ];
@@ -1047,6 +1103,7 @@ class ArchitectFenestrationStyle {
         frameDepth: frameDepth,
         glazingThickness: glazingThickness,
         openable: entry.pane.isOpenable,
+        glazed: entry.pane.isGlazed,
         zoomScale: zoomScale,
         palette: palette,
         isSelected: isSelected,
@@ -1090,12 +1147,7 @@ class ArchitectFenestrationStyle {
           ..close(),
         framePaint,
       );
-      final closed =
-          (leaf.hinge - centerPos).dx * u.dx +
-                  (leaf.hinge - centerPos).dy * u.dy <
-              0
-          ? u
-          : -u;
+      final closed = leaf.hingeLeft ? u : -u;
       final start = math.atan2(closed.dy, closed.dx);
       var sweep = math.atan2(leaf.direction.dy, leaf.direction.dx) - start;
       while (sweep > math.pi) {
@@ -1186,6 +1238,7 @@ class ArchitectFenestrationStyle {
         text: TextSpan(
           text: text,
           style: TextStyle(
+            fontFamily: 'ArchitectNoto',
             color: isSelected
                 ? const Color(0xFF00E5FF)
                 : palette.foreground(const Color(0xFF45515B)),
@@ -1224,18 +1277,8 @@ class ArchitectFenestrationStyle {
     String? selectedPaneId,
     bool showDimensions = true,
   }) {
-    final margin = hasCasing ? (casingWidth * 1.8 + 0.20) : 0.25;
-    final totalW = defaultWidth + margin * 2;
-    final totalH = defaultHeight + margin * 2;
-
-    final scaleX = size.width / totalW;
-    final scaleY = size.height / totalH;
-    final scale = math.min(scaleX, scaleY) * 0.90;
-
-    final origin = Offset(
-      size.width / 2 - (defaultWidth / 2) * scale,
-      size.height / 2 + (defaultHeight / 2) * scale,
-    );
+    final fit = elevationFit(size, dimensions: showDimensions);
+    final scale = fit.scale, origin = fit.origin;
 
     // Paints
     final framePaint = Paint()
@@ -1355,7 +1398,9 @@ class ArchitectFenestrationStyle {
         selectedPaneId: selectedPaneId,
       );
     }
-    if (showDimensions) _drawElevationDimensions(canvas, origin, scale);
+    if (showDimensions && size.shortestSide >= 180) {
+      _drawElevationDimensions(canvas, origin, scale);
+    }
   }
 
   void _renderSubdivisionElevation({
@@ -1536,45 +1581,6 @@ class ArchitectFenestrationStyle {
           ..strokeWidth = 2.5
           ..style = PaintingStyle.stroke,
       );
-
-      // Dimension pill in center of selected pane
-      final centerP = toCanvas(inX + inW / 2, inY + inH / 2);
-      final nominal = getPaneRect(pane.id) ?? rect;
-      final dimStr =
-          '${(nominal.width * 100).round()} × ${(nominal.height * 100).round()} cm';
-      final dimTp = ArchitectTextPainter(
-        text: TextSpan(
-          text: dimStr,
-          style: const TextStyle(
-            color: Color(0xFF00E5FF),
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      final badgeRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: centerP,
-          width: dimTp.width + 12,
-          height: dimTp.height + 6,
-        ),
-        const Radius.circular(4),
-      );
-      canvas.drawRRect(
-        badgeRect,
-        Paint()
-          ..color = const Color(0xF2FFFFFF)
-          ..style = PaintingStyle.fill,
-      );
-      canvas.drawRRect(
-        badgeRect,
-        Paint()
-          ..color = const Color(0xFF00E5FF)
-          ..strokeWidth = 1.0
-          ..style = PaintingStyle.stroke,
-      );
-      dimTp.paint(canvas, centerP - Offset(dimTp.width / 2, dimTp.height / 2));
     }
   }
 
@@ -1605,11 +1611,12 @@ class ArchitectFenestrationStyle {
         canvas.drawLine(Offset(sX1, subY), Offset(sX2, subY), dimPaint);
         canvas.drawLine(Offset(sX1, subY - 3), Offset(sX1, subY + 3), dimPaint);
         canvas.drawLine(Offset(sX2, subY - 3), Offset(sX2, subY + 3), dimPaint);
-        final sText = '${((slice.right - slice.left) * 100).round()}';
+        final sText = centimeters(slice.right - slice.left);
         final sTp = ArchitectTextPainter(
           text: TextSpan(
             text: sText,
             style: const TextStyle(
+              fontFamily: 'ArchitectNoto',
               color: Color(0xFF0277BD),
               fontSize: 9,
               fontWeight: FontWeight.bold,
@@ -1629,11 +1636,12 @@ class ArchitectFenestrationStyle {
     canvas.drawLine(Offset(bX1, bY - 4), Offset(bX1, bY + 4), dimPaint);
     canvas.drawLine(Offset(bX2, bY - 4), Offset(bX2, bY + 4), dimPaint);
 
-    final wText = '${(defaultWidth * 100).round()} cm';
+    final wText = '${centimeters(defaultWidth)} cm';
     final wPainter = ArchitectTextPainter(
       text: TextSpan(
         text: wText,
         style: const TextStyle(
+          fontFamily: 'ArchitectNoto',
           color: Color(0xFF0277BD),
           fontSize: 10,
           fontWeight: FontWeight.bold,
@@ -1654,11 +1662,12 @@ class ArchitectFenestrationStyle {
     canvas.drawLine(Offset(lX - 4, lY1), Offset(lX + 4, lY1), dimPaint);
     canvas.drawLine(Offset(lX - 4, lY2), Offset(lX + 4, lY2), dimPaint);
 
-    final hText = '${(defaultHeight * 100).round()} cm';
+    final hText = '${centimeters(defaultHeight)} cm';
     final hPainter = ArchitectTextPainter(
       text: TextSpan(
         text: hText,
         style: const TextStyle(
+          fontFamily: 'ArchitectNoto',
           color: Color(0xFF0277BD),
           fontSize: 10,
           fontWeight: FontWeight.bold,

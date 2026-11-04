@@ -51,7 +51,8 @@ class FenestrationLibraryService extends ChangeNotifier {
   }
 
   /// Initializes the service and loads custom models from persistent storage.
-  Future<void> init() => _loading ??= _load();
+  Future<void> init() =>
+      _isLoaded ? SynchronousFuture<void>(null) : (_loading ??= _load());
 
   Future<void> _load() async {
     if (_isLoaded) return;

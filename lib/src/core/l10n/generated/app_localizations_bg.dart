@@ -10904,4 +10904,16 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectFenestration3DShort => '3D';
+
+  @override
+  String get architectFenestrationGlazing => 'Остъкляване';
+
+  @override
+  String get architectFenestrationGlazingSingleShort => 'Единично';
+
+  @override
+  String get architectFenestrationGlazingDoubleShort => 'Двойно';
+
+  @override
+  String get architectFenestrationGlazingTripleShort => 'Тройно';
 }

@@ -506,7 +506,28 @@ class ArchitectDoor {
             tolerance + leafThickness) {
           return true;
         }
+        final radial = point - leaf.hinge;
+        if ((radial.distance - leaf.length).abs() <= tolerance + .05) {
+          final left = leaf.hingeLeft;
+          final closed = left ? u : -u;
+          final sign = (left ? 1 : -1) * (openInward ? 1 : -1);
+          var angle =
+              (math.atan2(radial.dy, radial.dx) -
+                  math.atan2(closed.dy, closed.dx)) *
+              sign;
+          while (angle < 0) {
+            angle += 2 * math.pi;
+          }
+          if (angle <= openAngleDeg * math.pi / 180 + .02) return true;
+        }
       }
+      return ArchitectOpeningPlanPainter.containsPoint(
+        point,
+        center: centerPos,
+        normal: n,
+        wallThickness: wallThickness,
+        tolerance: tolerance,
+      );
     }
     // Use the exact leaf and jamb dimensions that are drawn.
     final leaf = _leafGeometry(pLeftBase, pRightBase, u, n, halfThick);

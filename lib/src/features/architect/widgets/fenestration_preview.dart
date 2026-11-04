@@ -12,6 +12,7 @@ enum FenestrationPreviewMode { elevation, plan, threeD }
 
 /// Library and editor previews use the same model renderers as placed openings.
 class FenestrationPreview extends StatelessWidget {
+  static final _meshes = Expando<Mesh3D>();
   final ArchitectFenestrationStyle style;
   final FenestrationPreviewMode mode;
   final bool dimensions;
@@ -29,7 +30,7 @@ class FenestrationPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (mode == FenestrationPreviewMode.threeD) {
-      final mesh = Mesh3D(
+      final mesh = _meshes[style] ??= Mesh3D(
         name: style.name,
         triangles: Fenestration3dBuilder.buildOpening3D(
           style: style,

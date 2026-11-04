@@ -10857,4 +10857,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectFenestration3DShort => '3D';
+
+  @override
+  String get architectFenestrationGlazing => 'Glazing';
+
+  @override
+  String get architectFenestrationGlazingSingleShort => 'Single';
+
+  @override
+  String get architectFenestrationGlazingDoubleShort => 'Double';
+
+  @override
+  String get architectFenestrationGlazingTripleShort => 'Triple';
 }

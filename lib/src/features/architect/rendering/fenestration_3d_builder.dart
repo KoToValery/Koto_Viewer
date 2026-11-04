@@ -165,11 +165,22 @@ class Fenestration3dBuilder {
           n: n,
           halfW: r.width / 2 + fFace,
           fFace: fFace,
-          wallThickness: wallThickness,
+          frameDepth: fDepth,
           exteriorSign: exteriorSign,
           zBottom: zBottom + r.top,
           zTop: zBottom + r.bottom,
-          isHingeLeft: isHingeLeft,
+          isHingeLeft:
+              layout.panes.values
+                      .where(
+                        (e) =>
+                            e.pane.isOpenable &&
+                            style.transom?.subdivision.findPane(e.pane.id) ==
+                                null,
+                      )
+                      .length >
+                  1
+              ? r.center.dx < width / 2
+              : isHingeLeft,
         );
       }
     }
@@ -701,13 +712,13 @@ class Fenestration3dBuilder {
     required Offset n,
     required double halfW,
     required double fFace,
-    required double wallThickness,
+    required double frameDepth,
     required double exteriorSign,
     required double zBottom,
     required double zTop,
     bool isHingeLeft = true,
   }) {
-    final halfThick = wallThickness / 2.0;
+    final halfThick = frameDepth / 2.0;
     // Interior face is opposite to exteriorSign
     final interiorDir = -exteriorSign;
     final hingeX = isHingeLeft ? -(halfW - fFace) : (halfW - fFace);

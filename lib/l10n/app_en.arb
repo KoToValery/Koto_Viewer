@@ -6007,5 +6007,9 @@
   "architectFenestrationInfill": "Infill",
   "architectFenestrationProfileDepth": "Frame depth",
   "architectFenestrationProfileFace": "Frame face width",
-  "architectFenestration3DShort": "3D"
+  "architectFenestration3DShort": "3D",
+  "architectFenestrationGlazing": "Glazing",
+  "architectFenestrationGlazingSingleShort": "Single",
+  "architectFenestrationGlazingDoubleShort": "Double",
+  "architectFenestrationGlazingTripleShort": "Triple"
 }

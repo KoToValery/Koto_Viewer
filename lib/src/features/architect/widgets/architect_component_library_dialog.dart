@@ -205,7 +205,14 @@ class _ArchitectComponentLibraryDialogState
               child: SegmentedButton<FenestrationPreviewMode>(
                 expandedInsets: EdgeInsets.zero,
                 showSelectedIcon: false,
-                style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  foregroundColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? Colors.black87
+                        : Colors.white70,
+                  ),
+                ),
                 segments: [
                   ButtonSegment(
                     value: FenestrationPreviewMode.elevation,
@@ -365,7 +372,7 @@ class _ArchitectComponentLibraryDialogState
                           final isCustomStyle = !presetIds.contains(style.id);
                           return _card(
                             style.localizedName(l),
-                            '${(style.defaultWidth * 100).round()}×${(style.defaultHeight * 100).round()} cm',
+                            '${ArchitectFenestrationStyle.centimeters(style.defaultWidth)}×${ArchitectFenestrationStyle.centimeters(style.defaultHeight)} cm',
                             FenestrationPreview(
                               style: style,
                               mode: _previewMode,

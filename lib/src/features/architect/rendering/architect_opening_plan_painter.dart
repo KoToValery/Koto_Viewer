@@ -310,6 +310,7 @@ class ArchitectOpeningPlanPainter {
     required double frameDepth,
     required double glazingThickness,
     required bool openable,
+    bool glazed = true,
     required double zoomScale,
     required ArchitectCanvasPalette palette,
     bool isSelected = false,
@@ -345,6 +346,20 @@ class ArchitectOpeningPlanPainter {
           frame,
         );
       }
+    }
+    if (!glazed) {
+      final a = left - normal * depth, b = right - normal * depth;
+      final c = right + normal * depth, d = left + normal * depth;
+      canvas.drawPath(
+        Path()
+          ..moveTo(a.dx, a.dy)
+          ..lineTo(b.dx, b.dy)
+          ..lineTo(c.dx, c.dy)
+          ..lineTo(d.dx, d.dy)
+          ..close(),
+        frame,
+      );
+      return;
     }
     final glass = Paint()
       ..color = isSelected

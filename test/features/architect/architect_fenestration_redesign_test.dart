@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -21,6 +22,16 @@ ArchitectFenestrationStyle doorStyle() =>
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    for (final family in ['ArchitectNoto', 'Arial', 'Roboto']) {
+      await (FontLoader(
+        family,
+      )..addFont(rootBundle.load('assets/fonts/NotoSans-Regular.ttf'))).load();
+    }
+    await (FontLoader(
+      'MaterialIcons',
+    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+  });
   test(
     'transom keeps door body, supports editing, splitting, and old JSON',
     () {
@@ -182,18 +193,74 @@ void main() {
     },
   );
 
+  test(
+    'side glazing keeps the actual hinge and invalid small layouts are rejected',
+    () {
+      final style = doorStyle().copyWith(
+        defaultWidth: 1.4,
+        rootSubdivision: const FenestrationSubdivision(
+          id: 'root',
+          isSplit: true,
+          ratios: [.7, .3],
+          children: [
+            FenestrationSubdivision(
+              id: 'fixed',
+              pane: FenestrationPane(id: 'fixed-pane'),
+            ),
+            FenestrationSubdivision(
+              id: 'door',
+              pane: FenestrationPane(
+                id: 'door-pane',
+                paneType: PaneType.doorLeaf,
+              ),
+            ),
+          ],
+        ),
+      );
+      final leaf = style
+          .doorPlanLeaves(
+            center: Offset.zero,
+            direction: const Offset(1, 0),
+            normal: const Offset(0, 1),
+            width: 1.4,
+            height: 2,
+            wallThickness: .37,
+          )
+          .single;
+      expect(leaf.hinge.dx, greaterThan(0));
+      expect(leaf.hingeLeft, isTrue);
+      expect(style.hasValidGeometry, isTrue);
+      expect(style.copyWith(defaultWidth: .4).hasValidGeometry, isFalse);
+      expect(ArchitectFenestrationStyle.centimeters(.975), '97.5');
+    },
+  );
+
+  test(
+    'elevation fit reserves dimensions and shares hit testing coordinates',
+    () {
+      final style = doorStyle().withTransom(const FenestrationTransom());
+      for (final size in [const Size(320, 332), const Size(1089, 844)]) {
+        final fit = style.elevationFit(size);
+        expect(fit.origin.dy + 48, lessThan(size.height));
+        expect(fit.origin.dx - 48, greaterThan(0));
+        final point = fit.origin + Offset(.45 * fit.scale, -2.2 * fit.scale);
+        expect(style.hitTestFromCanvas(point, size)!.$1.id, 'transom_pane');
+      }
+    },
+  );
+
   Future<void> capture(WidgetTester tester, GlobalKey key, String name) async {
     await tester.runAsync(() async {
-    final boundary =
-        key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-    final image = await boundary.toImage(pixelRatio: 1);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    final directory = Directory('build/fenestration_review')
-      ..createSync(recursive: true);
-    File(
-      '${directory.path}/$name.png',
-    ).writeAsBytesSync(data!.buffer.asUint8List());
-    image.dispose();
+      final boundary =
+          key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      final image = await boundary.toImage(pixelRatio: 1);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      final directory = Directory('build/fenestration_review')
+        ..createSync(recursive: true);
+      File(
+        '${directory.path}/$name.png',
+      ).writeAsBytesSync(data!.buffer.asUint8List());
+      image.dispose();
     });
   }
 
@@ -211,7 +278,7 @@ void main() {
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        theme: ThemeData(useMaterial3: true),
+        theme: ThemeData(useMaterial3: true, fontFamily: 'ArchitectNoto'),
         home: Builder(
           builder: (context) => Scaffold(
             body: Center(
@@ -302,6 +369,72 @@ void main() {
     await tester.binding.setSurfaceSize(null);
   });
 
+  testWidgets(
+    'invalid size blocks saving and unsubmitted changes trigger discard',
+    (tester) async {
+      final key = GlobalKey();
+      await openEditor(tester, const Size(1280, 900), const Locale('bg'), key);
+      final l = AppLocalizations.of(
+        tester.element(find.byType(FenestrationEditorScreen)),
+      )!;
+      final width = find.descendant(
+        of: find.byKey(const ValueKey('fenestration-width')),
+        matching: find.byType(TextFormField),
+      );
+      await tester.enterText(width, '0');
+      await tester.tap(find.byKey(const ValueKey('fenestration-save')));
+      await tester.pumpAndSettle();
+      expect(find.text(l.architectFenestrationInvalidSize), findsWidgets);
+      expect(find.byType(FenestrationEditorScreen), findsOneWidget);
+      await tester.enterText(width, '101,2');
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.text(l.architectFenestrationDiscardTitle), findsOneWidget);
+      await tester.tap(find.text(l.architectFenestrationKeepEditing));
+      await tester.pumpAndSettle();
+      expect(find.byType(FenestrationEditorScreen), findsOneWidget);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l.architectFenestrationDiscard));
+      await tester.pumpAndSettle();
+      expect(find.byType(FenestrationEditorScreen), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.binding.setSurfaceSize(null);
+    },
+  );
+
+  testWidgets(
+    'saving a preset asks for a name and creates an independent model',
+    (tester) async {
+      final key = GlobalKey();
+      ArchitectFenestrationStyle? saved;
+      final preset = ArchitectFenestrationStyle.standardCatalog().firstWhere(
+        (s) => s.kind == FenestrationKind.door,
+      );
+      await openEditor(
+        tester,
+        const Size(1280, 900),
+        const Locale('en'),
+        key,
+        style: preset,
+        result: (s) => saved = s,
+      );
+      await tester.tap(find.byKey(const ValueKey('fenestration-save')));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const ValueKey('fenestration-name'));
+      expect(field, findsOneWidget);
+      await tester.enterText(field, 'D-02');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(saved, isNotNull);
+      expect(saved!.name, 'D-02');
+      expect(saved!.isPreset, isFalse);
+      expect(saved!.id, isNot(preset.id));
+      expect(tester.takeException(), isNull);
+      await tester.binding.setSurfaceSize(null);
+    },
+  );
+
   for (final locale in ['bg', 'en']) {
     for (final size in [const Size(320, 740), const Size(1440, 960)]) {
       testWidgets('editor visual review $locale $size', (tester) async {
@@ -357,11 +490,17 @@ void main() {
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
-    await FenestrationLibraryService.instance.saveStyle(doorStyle().withTransom(const FenestrationTransom()));
+    await tester.runAsync(() async {
+      SharedPreferences.setMockInitialValues({});
+      await FenestrationLibraryService.instance.saveStyle(
+        doorStyle().withTransom(const FenestrationTransom()),
+      );
+    });
     final key = GlobalKey();
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('bg'),
+        theme: ThemeData(fontFamily: 'ArchitectNoto'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(

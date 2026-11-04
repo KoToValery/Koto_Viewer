@@ -35,6 +35,8 @@ class _FenestrationEditorState extends State<FenestrationEditorScreen> {
   String? _paneId;
   bool _saving = false, _canPop = false;
   double _panelFraction = .45;
+  double _startZoom = 1.5;
+  final _nameControllers = <TextEditingController>[];
   String _json(ArchitectFenestrationStyle style) => jsonEncode(style.toJson());
   bool get _dirty => _json(_style) != _original;
 
@@ -58,12 +60,21 @@ class _FenestrationEditorState extends State<FenestrationEditorScreen> {
 
   @override
   void dispose() {
+    for (final controller in _nameControllers) {
+      controller.dispose();
+    }
     _transform.dispose();
     super.dispose();
   }
 
   void _change(ArchitectFenestrationStyle next) {
     if (_json(next) == _json(_style)) return;
+    if (next.panes.length != _style.panes.length && !next.hasValidGeometry) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.architectFenestrationInvalidSize)),
+      );
+      return;
+    }
     setState(() {
       _undo.add(_style);
       if (_undo.length > 100) _undo.removeAt(0);
@@ -92,6 +103,7 @@ class _FenestrationEditorState extends State<FenestrationEditorScreen> {
 
   Future<bool> _editName() async {
     final controller = TextEditingController(text: _style.name);
+    _nameControllers.add(controller);
     final key = GlobalKey<FormState>();
     final name = await showDialog<String>(
       context: context,
@@ -129,8 +141,7 @@ class _FenestrationEditorState extends State<FenestrationEditorScreen> {
         ],
       ),
     );
-    // Dialog exit animation still owns the controller until the route is gone.
-    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
+
     if (name == null || !mounted) return false;
     _change(_style.copyWith(name: name));
     return true;
@@ -139,6 +150,12 @@ class _FenestrationEditorState extends State<FenestrationEditorScreen> {
   Future<void> _save() async {
     if (_saving || !(_form.currentState?.validate() ?? true)) return;
     _form.currentState?.save();
+    if (!_style.hasValidGeometry) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.architectFenestrationInvalidSize)),
+      );
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     if (_style.name.trim().isEmpty && !await _editName()) return;
     if (!mounted) return;
@@ -162,9 +179,11 @@ class _FenestrationEditorState extends State<FenestrationEditorScreen> {
   }
 
   Future<void> _leave() async {
+    final invalidInput = !(_form.currentState?.validate() ?? true);
+    _form.currentState?.save();
     FocusManager.instance.primaryFocus?.unfocus();
     final discard =
-        !_dirty ||
+        (!_dirty && !invalidInput) ||
         await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
@@ -281,14 +300,15 @@ class _FenestrationEditorState extends State<FenestrationEditorScreen> {
       );
       if (_mode == FenestrationPreviewMode.threeD) {
         return GestureDetector(
-          onPanUpdate: (d) => setState(() {
-            _camera.yaw += d.delta.dx * .01;
-            _camera.pitch = (_camera.pitch + d.delta.dy * .01).clamp(
+          onScaleStart: (_) => _startZoom = _camera.zoom,
+          onScaleUpdate: (d) => setState(() {
+            _camera.yaw += d.focalPointDelta.dx * .01;
+            _camera.pitch = (_camera.pitch + d.focalPointDelta.dy * .01).clamp(
               -math.pi / 2 + .05,
               math.pi / 2 - .05,
             );
+            _camera.zoom = (_startZoom * d.scale).clamp(.5, 5);
           }),
-          onScaleUpdate: null,
           child: preview,
         );
       }
@@ -376,17 +396,31 @@ class _FenestrationEditorState extends State<FenestrationEditorScreen> {
                       child: SegmentedButton<FenestrationPreviewMode>(
                         showSelectedIcon: false,
                         expandedInsets: EdgeInsets.zero,
-                        style: const ButtonStyle(
+                        style: ButtonStyle(
                           visualDensity: VisualDensity.compact,
+                          padding: WidgetStatePropertyAll(
+                            EdgeInsets.symmetric(horizontal: 4),
+                          ),
+                          textStyle: WidgetStatePropertyAll(
+                            Theme.of(
+                              context,
+                            ).textTheme.labelLarge!.copyWith(fontSize: 13),
+                          ),
                         ),
                         segments: [
                           ButtonSegment(
                             value: FenestrationPreviewMode.elevation,
-                            label: Text(l.architectFenestrationElevationShort),
+                            label: Text(
+                              l.architectFenestrationElevationShort,
+                              maxLines: 1,
+                            ),
                           ),
                           ButtonSegment(
                             value: FenestrationPreviewMode.plan,
-                            label: Text(l.architectFenestrationPlanShort),
+                            label: Text(
+                              l.architectFenestrationPlanShort,
+                              maxLines: 1,
+                            ),
                           ),
                           ButtonSegment(
                             value: FenestrationPreviewMode.threeD,
