@@ -306,6 +306,9 @@ void main() {
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(5, 1));
       await tester.pumpAndSettle();
+      expect(model.project, same(before));
+      await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
+      await tester.pumpAndSettle();
       expect(
         model.project.activeStorey.walls.first.endPoint,
         const Offset(5, 0),

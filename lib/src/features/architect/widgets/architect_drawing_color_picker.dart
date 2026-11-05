@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -155,7 +156,7 @@ class _DrawingColorDialogState extends State<ArchitectDrawingColorDialog> {
       final isBg =
           palette == ArchitectColorPalette.bgOup ||
           palette == ArchitectColorPalette.bgPup;
-      return AlertDialog(
+      return architectAlertDialog(
         title: Text(l.architectColorInfo),
         content: SizedBox(
           width: 320,
@@ -197,7 +198,7 @@ class _DrawingColorDialogState extends State<ArchitectDrawingColorDialog> {
                   .contains(search.toLowerCase()),
         )
         .toList();
-    return AlertDialog(
+    return architectAlertDialog(
       title: Row(
         children: [
           Expanded(child: Text(l.architectDrawingColor)),
@@ -342,7 +343,7 @@ class _CustomColorDialogState extends State<ArchitectCustomColorDialog> {
   Widget build(BuildContext context) {
     final l = context.l10n;
     final value = rgb ?? (widget.initial.argb & 0xFFFFFF);
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.architectColorCustom),
       content: SizedBox(
         width: 280,

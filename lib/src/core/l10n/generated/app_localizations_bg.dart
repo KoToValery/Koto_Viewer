@@ -3465,10 +3465,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectCategoryPlan => 'План';
 
   @override
-  String get architectCategoryBuild => 'Строеж';
+  String get architectCategoryBuild => 'Сграда';
 
   @override
-  String get architectCategoryDrawing => 'Чертане';
+  String get architectCategoryDrawing => 'Линии и щрих';
 
   @override
   String get architectToolCategories => 'Категории';
@@ -3859,8 +3859,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneEditContour => 'Редактирай контур';
 
   @override
-  String get architectZonePresetsDialogTitle =>
-      'Видове помещения по подразбиране';
+  String get architectZonePresetsDialogTitle => 'Помещения';
 
   @override
   String get architectZonePresetsDialogSubtitle =>
@@ -3871,7 +3870,7 @@ class AppLocalizationsBg extends AppLocalizations {
       'Възстанови стандартните за категорията';
 
   @override
-  String get architectZonePresetsResetAll => 'Възстанови всички стандартни';
+  String get architectZonePresetsResetAll => 'Нулирай всички';
 
   @override
   String get architectZonePresetsSaved => 'Видовете помещения са запазени';
@@ -4177,7 +4176,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectCategorySpaces => 'Пространства';
 
   @override
-  String get architectCategoryAnnotations => 'Надписи';
+  String get architectCategoryAnnotations => 'Коти и текст';
 
   @override
   String get architectCategoryCad => 'CAD Чертане';
@@ -8690,7 +8689,7 @@ class AppLocalizationsBg extends AppLocalizations {
       'Постави точки и затвори полигона с първата точка или с отметката.';
 
   @override
-  String get architectCategoryEdit => 'Редакция';
+  String get architectCategoryEdit => 'Избор';
 
   @override
   String get architectSelectReplace => 'Замени';
@@ -10916,4 +10915,61 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectFenestrationGlazingTripleShort => 'Тройно';
+
+  @override
+  String get architectToolSearch => 'Търси инструмент';
+
+  @override
+  String get architectToolNoResults => 'Няма намерени инструменти.';
+
+  @override
+  String get architectSheetFit => 'Побери листа';
+
+  @override
+  String get architectSheetReady => 'Готов за PDF';
+
+  @override
+  String get architectSheetCheck => 'Провери листа';
+
+  @override
+  String get architectSheetOutside =>
+      'Чертеж или заглавието му излиза извън полето на листа. Премести го или намали рамката.';
+
+  @override
+  String get architectSheetOverlap =>
+      'Чертежите се застъпват. Раздалечи рамките им.';
+
+  @override
+  String get architectSheetTitleOverlap =>
+      'Чертеж застъпва антетката. Премести го над нея.';
+
+  @override
+  String get architectSheetMissingTemplate =>
+      'Шаблонът на антетката липсва. Избери шаблон.';
+
+  @override
+  String get architectSheetExported => 'PDF файлът е запазен.';
+
+  @override
+  String architectSheetScaleAdjusted(int scale) {
+    return 'Изгледът е побран в мащаб 1:$scale.';
+  }
+
+  @override
+  String get architectSheetCropHint =>
+      'Рамката изрязва чертежа. Използвай „Побери изгледа“ за целия източник.';
+
+  @override
+  String get architectSheetFitView => 'Побери изгледа';
+
+  @override
+  String get architectSheetExportOrder =>
+      'Редът на PDF страниците следва избора ти.';
+
+  @override
+  String get architectSheetNoSpace =>
+      'Няма място за още един изглед. Създай лист или промени рамките на поставените изгледи.';
+
+  @override
+  String get architectSheetPlaceShort => 'Изглед';
 }

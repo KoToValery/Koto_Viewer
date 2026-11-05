@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_zone.dart';
@@ -33,15 +34,14 @@ class ArchitectZonePresetsDialog extends StatefulWidget {
     required ArchitectZonePresets presets,
     required ValueChanged<ArchitectZonePresets> onSave,
     ArchitectZoneCategory? initialCategory,
-  }) =>
-      showDialog(
-        context: context,
-        builder: (ctx) => ArchitectZonePresetsDialog(
-          presets: presets,
-          onSave: onSave,
-          initialCategory: initialCategory,
-        ),
-      );
+  }) => showDialog(
+    context: context,
+    builder: (ctx) => ArchitectZonePresetsDialog(
+      presets: presets,
+      onSave: onSave,
+      initialCategory: initialCategory,
+    ),
+  );
 
   @override
   State<ArchitectZonePresetsDialog> createState() =>
@@ -74,12 +74,18 @@ class _ArchitectZonePresetsDialogState
   void _loadCategoryFields() {
     final l = context.l10n;
     _nameController.text = _currentPresets.categoryName(_selectedCategory, l);
-    _floorController.text =
-        _currentPresets.defaultFloorFinish(_selectedCategory, l);
-    _wallController.text =
-        _currentPresets.defaultWallFinish(_selectedCategory, l);
-    _ceilingController.text =
-        _currentPresets.defaultCeilingFinish(_selectedCategory, l);
+    _floorController.text = _currentPresets.defaultFloorFinish(
+      _selectedCategory,
+      l,
+    );
+    _wallController.text = _currentPresets.defaultWallFinish(
+      _selectedCategory,
+      l,
+    );
+    _ceilingController.text = _currentPresets.defaultCeilingFinish(
+      _selectedCategory,
+      l,
+    );
   }
 
   void _applyCurrentCategoryEdits() {
@@ -150,11 +156,12 @@ class _ArchitectZonePresetsDialogState
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    final colors = Theme.of(context).colorScheme;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isCompact = screenWidth < 500;
 
-    return AlertDialog(
-      backgroundColor: const Color(0xFF1E2230),
+    return architectAlertDialog(
+      backgroundColor: colors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -163,36 +170,28 @@ class _ArchitectZonePresetsDialogState
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: const Color(0x3380CBC4),
+              color: colors.secondaryContainer,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
-              Icons.tune_rounded,
-              color: Color(0xFF80CBC4),
-              size: 20,
-            ),
+            child: Icon(Icons.tune_rounded, color: colors.primary, size: 20),
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  l.architectZonePresetsDialogTitle,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  l.architectZonePresetsDialogSubtitle,
-                  style: const TextStyle(color: Colors.white60, fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+            child: Text(
+              l.architectZonePresetsDialogTitle,
+              style: TextStyle(
+                color: colors.onSurface,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Tooltip(
+            message: l.architectZonePresetsDialogSubtitle,
+            child: Icon(
+              Icons.help_outline,
+              color: colors.onSurfaceVariant,
+              size: 20,
             ),
           ),
         ],
@@ -219,19 +218,19 @@ class _ArchitectZonePresetsDialogState
                               category.icon,
                               size: 14,
                               color: _selectedCategory == category
-                                  ? Colors.black
+                                  ? colors.onSecondaryContainer
                                   : category.color,
                             ),
                             const SizedBox(width: 4),
                             Text(category.localizedName(l)),
                           ],
                         ),
-                        selectedColor: category.color,
-                        backgroundColor: const Color(0x22FFFFFF),
+                        selectedColor: colors.secondaryContainer,
+                        backgroundColor: colors.surfaceContainerHigh,
                         labelStyle: TextStyle(
                           color: _selectedCategory == category
-                              ? Colors.black
-                              : Colors.white,
+                              ? colors.onSecondaryContainer
+                              : colors.onSurface,
                           fontSize: 12,
                           fontWeight: _selectedCategory == category
                               ? FontWeight.bold
@@ -250,8 +249,10 @@ class _ArchitectZonePresetsDialogState
 
               // Active category badge
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: _selectedCategory.color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
@@ -263,7 +264,7 @@ class _ArchitectZonePresetsDialogState
                   children: [
                     Icon(
                       _selectedCategory.icon,
-                      color: _selectedCategory.color,
+                      color: colors.primary,
                       size: 18,
                     ),
                     const SizedBox(width: 8),
@@ -271,7 +272,7 @@ class _ArchitectZonePresetsDialogState
                       child: Text(
                         _selectedCategory.localizedName(l),
                         style: TextStyle(
-                          color: _selectedCategory.color,
+                          color: colors.primary,
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                         ),
@@ -281,15 +282,15 @@ class _ArchitectZonePresetsDialogState
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                         padding: const EdgeInsets.symmetric(horizontal: 6),
-                        foregroundColor: Colors.white70,
+                        foregroundColor: colors.onSurfaceVariant,
                       ),
                       onPressed: _resetSelectedCategory,
-                      icon: const Icon(Icons.refresh_rounded, size: 14),
+                      icon: Icon(Icons.refresh_rounded, size: 14),
                       label: Text(
                         isCompact
                             ? l.commandUiReset
                             : l.architectZonePresetsResetCategory,
-                        style: const TextStyle(fontSize: 11),
+                        style: TextStyle(fontSize: 12),
                       ),
                     ),
                   ],
@@ -341,10 +342,10 @@ class _ArchitectZonePresetsDialogState
       actions: [
         TextButton(
           onPressed: _resetAll,
-          style: TextButton.styleFrom(foregroundColor: Colors.white54),
+          style: TextButton.styleFrom(foregroundColor: colors.onSurfaceVariant),
           child: Text(
             l.architectZonePresetsResetAll,
-            style: const TextStyle(fontSize: 12),
+            style: TextStyle(fontSize: 12),
           ),
         ),
         TextButton(
@@ -353,8 +354,8 @@ class _ArchitectZonePresetsDialogState
         ),
         FilledButton(
           style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF00E5FF),
-            foregroundColor: Colors.black,
+            backgroundColor: colors.primary,
+            foregroundColor: colors.onPrimary,
           ),
           onPressed: _save,
           child: Text(l.save),

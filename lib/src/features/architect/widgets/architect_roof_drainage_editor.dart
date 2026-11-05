@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -300,7 +301,7 @@ class _PipeDialogState extends State<_PipeDialog> {
     final walls =
         widget.project?.storeys.expand((s) => s.walls).toList() ??
         <ArchitectWall>[];
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.architectDrainagePipe),
       content: SizedBox(
         width: 360,

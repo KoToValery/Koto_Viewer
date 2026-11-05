@@ -5942,13 +5942,13 @@ abstract class AppLocalizations {
   /// Architectural tool category
   ///
   /// In en, this message translates to:
-  /// **'Build'**
+  /// **'Building'**
   String get architectCategoryBuild;
 
   /// Architectural tool category
   ///
   /// In en, this message translates to:
-  /// **'Draw'**
+  /// **'2D drawing'**
   String get architectCategoryDrawing;
 
   /// Tooltip for architectural tool category picker
@@ -6668,7 +6668,7 @@ abstract class AppLocalizations {
   /// Title for predefined room types dialog
   ///
   /// In en, this message translates to:
-  /// **'Default Room Types'**
+  /// **'Room presets'**
   String get architectZonePresetsDialogTitle;
 
   /// Subtitle for predefined room types dialog
@@ -6686,7 +6686,7 @@ abstract class AppLocalizations {
   /// Button to reset all room categories to built-in defaults
   ///
   /// In en, this message translates to:
-  /// **'Reset All Defaults'**
+  /// **'Reset all'**
   String get architectZonePresetsResetAll;
 
   /// Snackbar message when room type presets are saved
@@ -7262,7 +7262,7 @@ abstract class AppLocalizations {
   /// Annotations and dimensions category
   ///
   /// In en, this message translates to:
-  /// **'Notes'**
+  /// **'Dimensions & text'**
   String get architectCategoryAnnotations;
 
   /// Freehand CAD drafting category
@@ -15524,7 +15524,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectCategoryEdit.
   ///
   /// In en, this message translates to:
-  /// **'Edit'**
+  /// **'Select'**
   String get architectCategoryEdit;
 
   /// No description provided for @architectSelectReplace.
@@ -19781,6 +19781,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Triple'**
   String get architectFenestrationGlazingTripleShort;
+
+  /// No description provided for @architectToolSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a tool'**
+  String get architectToolSearch;
+
+  /// No description provided for @architectToolNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No tools found.'**
+  String get architectToolNoResults;
+
+  /// No description provided for @architectSheetFit.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit sheet'**
+  String get architectSheetFit;
+
+  /// No description provided for @architectSheetReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for PDF'**
+  String get architectSheetReady;
+
+  /// No description provided for @architectSheetCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check layout'**
+  String get architectSheetCheck;
+
+  /// No description provided for @architectSheetOutside.
+  ///
+  /// In en, this message translates to:
+  /// **'A drawing or its title extends beyond the sheet margins. Move it or reduce its frame.'**
+  String get architectSheetOutside;
+
+  /// No description provided for @architectSheetOverlap.
+  ///
+  /// In en, this message translates to:
+  /// **'Drawings overlap. Move their frames apart.'**
+  String get architectSheetOverlap;
+
+  /// No description provided for @architectSheetTitleOverlap.
+  ///
+  /// In en, this message translates to:
+  /// **'A drawing overlaps the title block. Move it above the title block.'**
+  String get architectSheetTitleOverlap;
+
+  /// No description provided for @architectSheetMissingTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'The title block template is missing. Select a template.'**
+  String get architectSheetMissingTemplate;
+
+  /// No description provided for @architectSheetExported.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF saved.'**
+  String get architectSheetExported;
+
+  /// No description provided for @architectSheetScaleAdjusted.
+  ///
+  /// In en, this message translates to:
+  /// **'The view fits at 1:{scale}.'**
+  String architectSheetScaleAdjusted(int scale);
+
+  /// No description provided for @architectSheetCropHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The frame crops the drawing. Use Fit view to show the full source.'**
+  String get architectSheetCropHint;
+
+  /// No description provided for @architectSheetFitView.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit view'**
+  String get architectSheetFitView;
+
+  /// No description provided for @architectSheetExportOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF page order follows your selection.'**
+  String get architectSheetExportOrder;
+
+  /// No description provided for @architectSheetNoSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'No room for another view. Create a sheet or resize the existing frames.'**
+  String get architectSheetNoSpace;
+
+  /// No description provided for @architectSheetPlaceShort.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get architectSheetPlaceShort;
 }
 
 class _AppLocalizationsDelegate

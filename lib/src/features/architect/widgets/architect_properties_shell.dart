@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -99,7 +100,7 @@ class ArchitectPropertiesShellState extends State<ArchitectPropertiesShell> {
     if (widget.isDirty?.call() ?? false) {
       final discard = await showDialog<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
+        builder: (ctx) => architectAlertDialog(
           title: Text(ctx.l10n.propertiesUnsaved),
           content: Text(ctx.l10n.propertiesUnsavedHelp),
           actions: [

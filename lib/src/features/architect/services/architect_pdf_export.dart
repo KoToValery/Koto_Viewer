@@ -17,6 +17,12 @@ class ArchitectPdfExport {
     ArchitectPublicationSources sources = const ArchitectPublicationSources(),
   }) async {
     if (sheets.isEmpty) throw ArgumentError('No sheets');
+    final problems = [
+      for (final sheet in sheets)
+        for (final issue in ArchitectSheetComposer.issues(snapshot, sheet, l))
+          '${sheet.number}: $issue',
+    ];
+    if (problems.isNotEmpty) throw StateError(problems.join('\n'));
     final regular = (await rootBundle.load(
       'assets/fonts/NotoSans-Regular.ttf',
     )).buffer.asUint8List();

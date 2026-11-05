@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'architect_properties_shell.dart';
@@ -383,7 +384,7 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
     final result = await showDialog<(ArchitectMaterialLayer, int)>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, update) => AlertDialog(
+        builder: (ctx, update) => architectAlertDialog(
           title: Text(l.wallLayerAdd),
           content: SingleChildScrollView(
             child: Form(
@@ -908,7 +909,11 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
             ),
             const SizedBox(width: 8),
             SizedBox(
-              width: 88,
+              width:
+                  104 +
+                  40 *
+                      (MediaQuery.textScalerOf(context).scale(1).clamp(1, 2) -
+                          1),
               child: TextFormField(
                 key: ValueKey('wall-layer-thickness-${d.layer.id}'),
                 controller: d.input,
@@ -918,7 +923,11 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                 textAlign: TextAlign.end,
                 decoration: InputDecoration(
                   suffixText: widget.project.units.symbol,
-                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 14,
+                  ),
+                  isDense: false,
                 ),
                 onChanged: (_) => setState(changed),
                 validator: (_) => invalidNumber(d) ? '' : null,

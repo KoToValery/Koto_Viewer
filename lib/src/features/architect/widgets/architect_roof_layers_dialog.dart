@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:convert';
 import 'dart:async';
@@ -134,7 +135,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
     final nameController = TextEditingController(text: _assembly.customName);
     final chosenName = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => architectAlertDialog(
         title: Text(l.roofSaveLibrary),
         content: TextField(
           controller: nameController,
@@ -175,7 +176,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
     final messenger = ScaffoldMessenger.of(context);
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => architectAlertDialog(
         title: Text(l.roofDeleteLibrary),
         content: Text(l.roofDeleteConfirm(_assembly.label(l))),
         actions: [

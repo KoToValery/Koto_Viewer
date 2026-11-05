@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 
@@ -50,7 +51,7 @@ class _AxisValueDialogState extends State<_AxisValueDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => architectAlertDialog(
     title: Text(widget.title),
     content: TextField(
       key: const ValueKey('architect-axis-value'),

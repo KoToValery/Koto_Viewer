@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -145,7 +146,7 @@ class _DownpipeHandleState extends State<ArchitectDownpipeHandle> {
         .toStringAsFixed(project.distanceDecimals);
     final value = await showDialog<double>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => architectAlertDialog(
         title: Text(context.l10n.architectDrainageOffset),
         content: TextFormField(
           initialValue: text,

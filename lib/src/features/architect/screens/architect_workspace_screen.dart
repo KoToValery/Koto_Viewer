@@ -1,3 +1,4 @@
+import '../widgets/architect_dialog.dart';
 import '../services/architect_column_clearance.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../services/architect_selection_candidates.dart';
@@ -2315,7 +2316,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       context: context,
 
-      builder: (context) => AlertDialog(
+      builder: (context) => architectAlertDialog(
 
         key: const ValueKey('architect-dimension-finish-dialog'),
 
@@ -2391,7 +2392,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       context: context,
 
-      builder: (context) => AlertDialog(
+      builder: (context) => architectAlertDialog(
 
         title: Text(context.l10n.architectPropertyOffset),
 
@@ -13485,7 +13486,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       barrierDismissible: true,
 
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => architectAlertDialog(
 
         backgroundColor: const Color(0xFF1E2430),
 
@@ -16542,7 +16543,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final form = GlobalKey<FormState>();
     await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => architectAlertDialog(
         title: Text(context.l10n.architectPolylineEdge),
         content: Form(
           key: form,
@@ -16620,7 +16621,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     var distance = gap.distance;
     await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => architectAlertDialog(
         title: Text(context.l10n.architectColumnClearance),
         content: SizedBox(
           width: 220,
@@ -21618,7 +21619,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => architectAlertDialog(
         title: Text(l.delete),
         content: Text(
           l.wallTypeDeleteConfirm(type.catalogLabel(l, _project.units)),
@@ -24894,7 +24895,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       context: context,
 
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => architectAlertDialog(
 
         backgroundColor: const Color(0xFF1E1E24),
 
@@ -27098,7 +27099,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             final logs = ArchitectLogger.history;
 
-            return AlertDialog(
+            return architectAlertDialog(
 
               backgroundColor: const Color(0xFF1E1E24),
 

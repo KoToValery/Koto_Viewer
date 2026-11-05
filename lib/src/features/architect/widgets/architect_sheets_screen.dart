@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:math' as math;
@@ -12,6 +13,28 @@ import '../services/architect_command_controller.dart';
 import '../services/architect_drawing_publisher.dart';
 import '../services/architect_sheet_composer.dart';
 import '../services/architect_pdf_export.dart';
+import '../services/architect_sheet_layout.dart';
+
+String _paperFormat(double width, double height) {
+  for (final e in {
+    'A4': (297, 210),
+    'A3': (420, 297),
+    'A2': (594, 420),
+    'A1': (841, 594),
+    'A0': (1189, 841),
+  }.entries) {
+    if ((math.max(width, height) - e.value.$1).abs() < .1 &&
+        (math.min(width, height) - e.value.$2).abs() < .1) {
+      return e.key;
+    }
+  }
+  return 'custom';
+}
+
+String _paperNumber(double value) {
+  final text = ArchitectUnit.trimZeros(value.toStringAsFixed(3));
+  return text == '-0' ? '0' : text;
+}
 
 String _id() => DateTime.now().microsecondsSinceEpoch.toString();
 double? _parse(String text) =>
@@ -34,6 +57,120 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
   Rect? moving;
   bool busy = false;
   final transform = TransformationController();
+  final canvasKey = GlobalKey();
+  Size viewportSize = Size.zero;
+  String? fittedSheet;
+  final drawingScenes = <(String, int), ArchitectVectorScene>{};
+  ArchitectProject? sceneProject;
+  AppLocalizations? sceneLabels;
+  ArchitectPublicationSources? sceneSources;
+
+  void fitSheet() {
+    final s = sheet;
+    if (s == null || viewportSize.isEmpty) return;
+    final scale = math.min(
+      viewportSize.width / (s.widthMm * 2 + 48),
+      viewportSize.height / (s.heightMm * 2 + 48),
+    );
+    transform.value = Matrix4.identity()
+      ..translateByDouble(
+        (viewportSize.width - (s.widthMm * 2 + 48) * scale) / 2,
+        (viewportSize.height - (s.heightMm * 2 + 48) * scale) / 2,
+        0,
+        1,
+      )
+      ..scaleByDouble(scale, scale, 1, 1);
+  }
+
+  void message(String value) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(value)));
+
+  Future<void> checkLayout() async {
+    final s = sheet;
+    if (s == null) return;
+    final l = context.l10n,
+        problems = ArchitectSheetComposer.issues(project, s, context.l10n);
+    await showDialog<void>(
+      context: context,
+      builder: (c) => architectAlertDialog(
+        scrollable: true,
+        title: Text(
+          problems.isEmpty ? l.architectSheetReady : l.architectSheetCheck,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final issue in problems)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(issue),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: Text(l.close)),
+        ],
+      ),
+    );
+  }
+
+  ArchitectDrawingPlacement? fitPlacement(
+    ArchitectDrawingPlacement place,
+    Rect area,
+    ArchitectSavedDrawing drawing,
+  ) {
+    final l = context.l10n;
+    try {
+      return ArchitectSheetLayout.fit(
+        place,
+        area,
+        (scale) => ArchitectDrawingPublisher.build(
+          project,
+          drawing,
+          scale,
+          l,
+          sources: widget.sources,
+        ),
+        title: (scale) =>
+            '${place.number}  ${ArchitectSheetComposer.drawingName(drawing, l)}  1:$scale',
+      );
+    } on ArchitectSheetFitException {
+      message(l.architectSheetNoSpace);
+      return null;
+    }
+  }
+
+  void fitView() {
+    final p = placement, s = sheet;
+    if (p == null || p.locked || s == null) return;
+    final drawing = document.drawings
+        .where((d) => d.id == p.drawingId)
+        .firstOrNull;
+    if (drawing == null ||
+        !ArchitectDrawingPublisher.hasSource(project, drawing)) {
+      return;
+    }
+    final area = ArchitectSheetLayout.freeArea(
+      project,
+      s,
+      context.l10n,
+      excludePlacement: p.id,
+    );
+    if (area == null) {
+      message(context.l10n.architectSheetNoSpace);
+      return;
+    }
+    final l = context.l10n;
+    final fitted = fitPlacement(p, area, drawing);
+    if (fitted == null) return;
+    savePlacement(fitted);
+    if (fitted.scale != p.scale) {
+      message(l.architectSheetScaleAdjusted(fitted.scale));
+    }
+  }
+
   ArchitectProject get project => widget.controller.project;
   ArchitectDocument get document => project.document;
   ArchitectSheet? get sheet =>
@@ -98,7 +235,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
           id: 'plan:${s.id}',
           sourceId: s.id,
           kind: ArchitectDrawingKind.plan,
-          name: s.isRoof ? '' : '${s.name} · ${s.elevationLabel}',
+          name: s.isRoof ? '' : s.name,
           roof: s.isRoof,
           scale:
               document.viewScales['plan:${s.id}'] ??
@@ -140,6 +277,10 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
     final sources = _sourceOptions()
         .where((d) => ArchitectDrawingPublisher.hasSource(project, d))
         .toList();
+    if (sources.isEmpty) {
+      message(l.architectSheetNoViews);
+      return;
+    }
     final value = await showDialog<ArchitectSavedDrawing>(
       context: context,
       builder: (c) => SimpleDialog(
@@ -158,32 +299,25 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
         .where((e) => e.id == value.id)
         .firstOrNull;
     final drawing = existing ?? value;
-    final scene = ArchitectDrawingPublisher.build(
-      project,
-      drawing,
-      drawing.scale,
-      l,
-      sources: widget.sources,
-    );
     final index = sheet!.placements.length;
-    final frame = Rect.fromLTWH(
-      sheet!.marginMm + index * 5,
-      sheet!.marginMm + index * 5,
-      math.min(scene.bounds.width + 4, sheet!.widthMm - 2 * sheet!.marginMm),
-      math.min(
-        scene.bounds.height + 4,
-        math.max(1, sheet!.heightMm - 2 * sheet!.marginMm - 40),
+    final area = ArchitectSheetLayout.freeArea(project, sheet!, l);
+    if (area == null) {
+      message(l.architectSheetNoSpace);
+      return;
+    }
+    final place = fitPlacement(
+      ArchitectDrawingPlacement(
+        id: _id(),
+        drawingId: drawing.id,
+        frame: area,
+        anchor: Offset.zero,
+        scale: drawing.scale,
+        number: '${index + 1}',
       ),
+      area,
+      drawing,
     );
-    final place = ArchitectDrawingPlacement(
-      id: _id(),
-      drawingId: drawing.id,
-      frame: frame,
-      anchor:
-          (scene.bounds.topLeft - const Offset(2, 2)) * (drawing.scale / 1000),
-      scale: drawing.scale,
-      number: '${index + 1}',
-    );
+    if (place == null) return;
     final nextSheet = sheet!.copyWith(
       placements: [...sheet!.placements, place],
     );
@@ -199,6 +333,9 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
       ),
     );
     setState(() => selected = place.id);
+    if (place.scale != drawing.scale) {
+      message(l.architectSheetScaleAdjusted(place.scale));
+    }
   }
 
   Future<void> placementProperties() async {
@@ -237,13 +374,34 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
   void duplicate() {
     final p = placement;
     if (p == null) return;
-    final j = p.toJson()
-      ..['id'] = _id()
-      ..['number'] = '${sheet!.placements.length + 1}'
-      ..['locked'] = false;
-    final copy = ArchitectDrawingPlacement.fromJson(
-      j,
-    ).copyWith(frame: p.frame.shift(const Offset(5, 5)));
+    final drawing = document.drawings
+        .where((d) => d.id == p.drawingId)
+        .firstOrNull;
+    if (drawing == null ||
+        !ArchitectDrawingPublisher.hasSource(project, drawing)) {
+      return;
+    }
+    final l = context.l10n;
+    final area = ArchitectSheetLayout.freeArea(project, sheet!, l);
+    if (area == null) {
+      message(l.architectSheetNoSpace);
+      return;
+    }
+    final copy = fitPlacement(
+      ArchitectDrawingPlacement(
+        id: _id(),
+        drawingId: p.drawingId,
+        number: '${sheet!.placements.length + 1}',
+        frame: area,
+        anchor: p.anchor,
+        scale: p.scale,
+        rotation: p.rotation,
+        showTitle: p.showTitle,
+      ),
+      area,
+      drawing,
+    );
+    if (copy == null) return;
     saveSheet(sheet!.copyWith(placements: [...sheet!.placements, copy]));
     setState(() => selected = copy.id);
   }
@@ -366,8 +524,9 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (c) => StatefulBuilder(
-        builder: (c, update) => AlertDialog(
+        builder: (c, update) => architectAlertDialog(
           title: Text(l.architectSheetVisibility),
+          scrollable: true,
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -420,7 +579,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
     final result = await showDialog<List<String>>(
       context: context,
       builder: (c) => StatefulBuilder(
-        builder: (c, update) => AlertDialog(
+        builder: (c, update) => architectAlertDialog(
           title: Text(l.architectSheetSelect),
           content: SizedBox(
             width: 400,
@@ -428,13 +587,17 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Text(l.architectSheetExportOrder),
+                  const SizedBox(height: 8),
                   for (final s in document.sheets)
                     CheckboxListTile(
                       title: Text(
                         '${s.number} · ${ArchitectSheetComposer.sheetName(s, l)}',
                       ),
                       subtitle: chosen.contains(s.id)
-                          ? Text('${chosen.indexOf(s.id) + 1}')
+                          ? Text(
+                              '${chosen.indexOf(s.id) + 1} · ${s.widthMm.round()} × ${s.heightMm.round()} mm',
+                            )
                           : null,
                       value: chosen.contains(s.id),
                       onChanged: (v) => update(() {
@@ -472,11 +635,6 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
         for (final id in result)
           snapshot.document.sheets.firstWhere((s) => s.id == id),
       ];
-      if (sheets.any(
-        (s) => ArchitectSheetComposer.missingSources(snapshot, s).isNotEmpty,
-      )) {
-        throw StateError(l.architectSheetMissingSource);
-      }
       final bytes = await ArchitectPdfExport.export(
         snapshot,
         sheets,
@@ -508,6 +666,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
             (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
           await File(path).writeAsBytes(bytes, flush: true);
         }
+        if (path != null && mounted) message(l.architectSheetExported);
       }
     } catch (e) {
       if (mounted) {
@@ -539,6 +698,14 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                   if (v.id == p.id) v.copyWith(frame: moving) else v,
               ],
             );
+      if (!identical(sceneProject, project) ||
+          !identical(sceneLabels, l) ||
+          !identical(sceneSources, widget.sources)) {
+        drawingScenes.clear();
+        sceneProject = project;
+        sceneLabels = l;
+        sceneSources = widget.sources;
+      }
       final scene = shown == null
           ? null
           : ArchitectSheetComposer.compose(
@@ -547,29 +714,22 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
               l,
               allowMissing: true,
               sources: widget.sources,
+              drawingScenes: drawingScenes,
             );
       return Scaffold(
         appBar: AppBar(
           title: Text(l.architectSheets),
           actions: [
             IconButton(
-              tooltip: l.architectZoneUndoAction,
-              onPressed: widget.controller.canUndo
-                  ? widget.controller.undo
-                  : null,
-              icon: const AppIcon(AppIconId.undo),
-            ),
-            IconButton(
-              tooltip: l.architectZoneRedoAction,
-              onPressed: widget.controller.canRedo
-                  ? widget.controller.redo
-                  : null,
-              icon: const AppIcon(AppIconId.redo),
-            ),
-            IconButton(
               tooltip: l.architectSheetAdd,
               onPressed: busy ? null : () => sheetProperties(create: true),
               icon: const AppIcon(AppIconId.add),
+            ),
+            IconButton(
+              key: const ValueKey('architect-sheet-export'),
+              tooltip: l.architectSheetExport,
+              onPressed: busy || s == null ? null : output,
+              icon: const AppIcon(AppIconId.pdf),
             ),
             PopupMenuButton<String>(
               enabled: !busy && s != null,
@@ -598,28 +758,28 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                   child: AppMenuLabel(
                     icon: AppIconId.properties,
                     child: Text(l.architectSheetProperties),
-                ),
+                  ),
                 ),
                 PopupMenuItem(
                   value: 'template',
                   child: AppMenuLabel(
                     icon: AppIconId.layoutGrid,
                     child: Text(l.architectSheetTemplate),
-                ),
+                  ),
                 ),
                 PopupMenuItem(
                   value: 'pdf',
                   child: AppMenuLabel(
                     icon: AppIconId.pdf,
                     child: Text(l.architectSheetExport),
-                ),
+                  ),
                 ),
                 PopupMenuItem(
                   value: 'print',
                   child: AppMenuLabel(
                     icon: AppIconId.print,
                     child: Text(l.architectSheetPrint),
-                ),
+                  ),
                 ),
                 PopupMenuItem(
                   value: 'delete',
@@ -635,194 +795,314 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
         body: Column(
           children: [
             if (busy) const LinearProgressIndicator(),
-            if (s != null)
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
+            if (s != null) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
                   children: [
-                    DropdownButton<String>(
-                      value: s.id,
-                      items: [
-                        for (final v in document.sheets)
-                          DropdownMenuItem(
-                            value: v.id,
-                            child: Text(
-                              '${v.number} · ${ArchitectSheetComposer.sheetName(v, l)}',
+                    Expanded(
+                      child: DropdownButton<String>(
+                        key: const ValueKey('architect-sheet-selector'),
+                        value: s.id,
+                        isExpanded: true,
+                        items: [
+                          for (final v in document.sheets)
+                            DropdownMenuItem(
+                              value: v.id,
+                              child: Text(
+                                '${v.number} · ${ArchitectSheetComposer.sheetName(v, l)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                      ],
-                      onChanged: (v) => setState(() {
-                        sheetId = v;
-                        selected = null;
-                      }),
-                    ),
-                    IconButton(
-                      tooltip: l.architectSheetPlace,
-                      onPressed: placeView,
-                      icon: const AppIcon(AppIconId.imageAdd),
-                    ),
-                    IconButton(
-                      tooltip: l.architectSheetEdit,
-                      onPressed: p == null || p.locked
-                          ? null
-                          : placementProperties,
-                      icon: const AppIcon(AppIconId.properties),
-                    ),
-                    IconButton(
-                      tooltip: l.architectSheetVisibility,
-                      onPressed: p == null ? null : visibility,
-                      icon: const AppIcon(AppIconId.layers),
-                    ),
-                    IconButton(
-                      tooltip: l.architectSheetDuplicate,
-                      onPressed: p == null ? null : duplicate,
-                      icon: const AppIcon(AppIconId.duplicate),
-                    ),
-                    IconButton(
-                      tooltip: p?.locked == true
-                          ? l.architectSheetUnlock
-                          : l.architectSheetLock,
-                      onPressed: p == null
-                          ? null
-                          : () => savePlacement(p.copyWith(locked: !p.locked)),
-                      icon: AppIcon.fromMaterial(
-                        p?.locked == true ? Icons.lock : Icons.lock_open,
+                        ],
+                        onChanged: busy
+                            ? null
+                            : (v) => setState(() {
+                                sheetId = v;
+                                selected = null;
+                                moving = null;
+                              }),
                       ),
                     ),
-                    PopupMenuButton<String>(
-                      tooltip: l.architectSheetAlign,
-                      enabled: p != null && !p.locked,
-                      onSelected: align,
-                      itemBuilder: (_) => [
-                        PopupMenuItem(
-                          value: 'left',
-                          child: AppMenuLabel(
-                            icon: AppIconId.alignLeft,
-                            child: Text(l.architectSheetLeft),
-                        ),
-                        ),
-                        PopupMenuItem(
-                          value: 'right',
-                          child: AppMenuLabel(
-                            icon: AppIconId.alignRight,
-                            child: Text(l.architectSheetRight),
-                        ),
-                        ),
-                        PopupMenuItem(
-                          value: 'top',
-                          child: AppMenuLabel(
-                            icon: AppIconId.alignTop,
-                            child: Text(l.architectSheetTop),
-                        ),
-                        ),
-                        PopupMenuItem(
-                          value: 'bottom',
-                          child: AppMenuLabel(
-                            icon: AppIconId.alignBottom,
-                            child: Text(l.architectSheetBottom),
-                        ),
-                        ),
-                      ],
-                      icon: const AppIcon(AppIconId.alignLeft),
+                    IconButton(
+                      tooltip: l.architectZoneUndoAction,
+                      onPressed: busy
+                          ? null
+                          : widget.controller.canUndo
+                          ? widget.controller.undo
+                          : null,
+                      icon: const AppIcon(AppIconId.undo),
                     ),
                     IconButton(
-                      tooltip: l.architectSheetDelete,
-                      onPressed: p == null || p.locked
+                      tooltip: l.architectZoneRedoAction,
+                      onPressed: busy
                           ? null
-                          : () {
-                              saveSheet(
-                                s.copyWith(
-                                  placements: s.placements
-                                      .where((e) => e.id != p.id)
-                                      .toList(),
-                                ),
-                              );
-                              setState(() => selected = null);
-                            },
-                      icon: const AppIcon(AppIconId.delete),
+                          : widget.controller.canRedo
+                          ? widget.controller.redo
+                          : null,
+                      icon: const AppIcon(AppIconId.redo),
+                    ),
+                    IconButton(
+                      tooltip: l.architectSheetFit,
+                      onPressed: fitSheet,
+                      icon: const AppIcon(AppIconId.fitView),
                     ),
                   ],
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Tooltip(
+                      message: l.architectSheetPlace,
+                      child: FilledButton.icon(
+                        onPressed: busy ? null : placeView,
+                        icon: const AppIcon(AppIconId.imageAdd, size: 18),
+                        label: Text(l.architectSheetPlaceShort),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextButton(
+                        key: const ValueKey('architect-sheet-preflight'),
+                        onPressed: checkLayout,
+                        child: Text(
+                          ArchitectSheetComposer.issues(project, s, l).isEmpty
+                              ? l.architectSheetReady
+                              : l.architectSheetCheck,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (p != null)
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        tooltip: l.architectSheetFitView,
+                        onPressed: p.locked || busy ? null : fitView,
+                        icon: const AppIcon(AppIconId.fitView),
+                      ),
+                      IconButton(
+                        tooltip: l.architectSheetEdit,
+                        onPressed: p.locked || busy
+                            ? null
+                            : placementProperties,
+                        icon: const AppIcon(AppIconId.properties),
+                      ),
+                      IconButton(
+                        tooltip: l.architectSheetVisibility,
+                        onPressed: busy ? null : visibility,
+                        icon: const AppIcon(AppIconId.layers),
+                      ),
+                      IconButton(
+                        tooltip: l.architectSheetDuplicate,
+                        onPressed: busy ? null : duplicate,
+                        icon: const AppIcon(AppIconId.duplicate),
+                      ),
+                      IconButton(
+                        tooltip: p.locked
+                            ? l.architectSheetUnlock
+                            : l.architectSheetLock,
+                        onPressed: busy
+                            ? null
+                            : () =>
+                                  savePlacement(p.copyWith(locked: !p.locked)),
+                        icon: AppIcon.fromMaterial(
+                          p.locked ? Icons.lock : Icons.lock_open,
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        tooltip: l.architectSheetAlign,
+                        enabled: !busy && !p.locked,
+                        onSelected: align,
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'left',
+                            child: AppMenuLabel(
+                              icon: AppIconId.alignLeft,
+                              child: Text(l.architectSheetLeft),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'right',
+                            child: AppMenuLabel(
+                              icon: AppIconId.alignRight,
+                              child: Text(l.architectSheetRight),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'top',
+                            child: AppMenuLabel(
+                              icon: AppIconId.alignTop,
+                              child: Text(l.architectSheetTop),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'bottom',
+                            child: AppMenuLabel(
+                              icon: AppIconId.alignBottom,
+                              child: Text(l.architectSheetBottom),
+                            ),
+                          ),
+                        ],
+                        icon: const AppIcon(AppIconId.alignLeft),
+                      ),
+                      IconButton(
+                        tooltip: l.architectSheetDelete,
+                        onPressed: p.locked || busy
+                            ? null
+                            : () {
+                                saveSheet(
+                                  s.copyWith(
+                                    placements: s.placements
+                                        .where((e) => e.id != p.id)
+                                        .toList(),
+                                  ),
+                                );
+                                setState(() => selected = null);
+                              },
+                        icon: const AppIcon(AppIconId.delete),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
             Expanded(
               child: s == null
-                  ? Center(child: Text(l.architectSheetEmpty))
-                  : InteractiveViewer(
-                      transformationController: transform,
-                      constrained: false,
-                      minScale: .15,
-                      maxScale: 8,
-                      boundaryMargin: const EdgeInsets.all(100),
+                  ? Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24),
-                        child: SizedBox(
-                          width: s.widthMm * 2,
-                          height: s.heightMm * 2,
-                          child: Stack(
-                            children: [
-                              CustomPaint(
-                                size: Size(s.widthMm * 2, s.heightMm * 2),
-                                painter: _SheetPainter(scene!),
-                              ),
-                              for (final v in shown!.placements)
-                                Positioned(
-                                  left: v.frame.left * 2,
-                                  top: v.frame.top * 2,
-                                  width: v.frame.width * 2,
-                                  height: v.frame.height * 2,
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.translucent,
-                                    onTap: () =>
-                                        setState(() => selected = v.id),
-                                    onDoubleTap: () {
-                                      final source = document.drawings
-                                          .where((e) => e.id == v.drawingId)
-                                          .firstOrNull;
-                                      if (source != null &&
-                                          ArchitectDrawingPublisher.hasSource(
-                                            project,
-                                            source,
-                                          )) {
-                                        Navigator.pop(context, source);
-                                      }
-                                    },
-                                    onPanStart: v.locked
-                                        ? null
-                                        : (_) => setState(() {
-                                            selected = v.id;
-                                            moving = v.frame;
-                                          }),
-                                    onPanUpdate: v.locked
-                                        ? null
-                                        : (e) => setState(
-                                            () => moving = (moving ?? v.frame)
-                                                .shift(e.delta / 2),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              l.architectSheetEmpty,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: () => sheetProperties(create: true),
+                              icon: const AppIcon(AppIconId.add),
+                              label: Text(l.architectSheetAdd),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        viewportSize = constraints.biggest;
+                        final key =
+                            '${s.id}/${s.widthMm}/${s.heightMm}/$viewportSize';
+                        if (fittedSheet != key) {
+                          fittedSheet = key;
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) fitSheet();
+                          });
+                        }
+                        return InteractiveViewer(
+                          transformationController: transform,
+                          constrained: false,
+                          minScale: .02,
+                          maxScale: 8,
+                          boundaryMargin: const EdgeInsets.all(100),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: SizedBox(
+                              key: canvasKey,
+                              width: s.widthMm * 2,
+                              height: s.heightMm * 2,
+                              child: Stack(
+                                children: [
+                                  CustomPaint(
+                                    size: Size(s.widthMm * 2, s.heightMm * 2),
+                                    painter: _SheetPainter(scene!),
+                                  ),
+                                  for (final v in shown!.placements)
+                                    Positioned(
+                                      left: v.frame.left * 2,
+                                      top: v.frame.top * 2,
+                                      width: v.frame.width * 2,
+                                      height: v.frame.height * 2,
+                                      child: GestureDetector(
+                                        behavior: HitTestBehavior.translucent,
+                                        onTap: () =>
+                                            setState(() => selected = v.id),
+                                        onDoubleTap: () {
+                                          final source = document.drawings
+                                              .where((e) => e.id == v.drawingId)
+                                              .firstOrNull;
+                                          if (source != null &&
+                                              ArchitectDrawingPublisher.hasSource(
+                                                project,
+                                                source,
+                                              )) {
+                                            Navigator.pop(context, source);
+                                          }
+                                        },
+                                        onPanStart: v.locked || busy
+                                            ? null
+                                            : (details) => setState(() {
+                                                selected = v.id;
+                                                moving = v.frame;
+                                              }),
+                                        onPanUpdate: v.locked || busy
+                                            ? null
+                                            : (e) => setState(() {
+                                                final box =
+                                                    canvasKey.currentContext!
+                                                            .findRenderObject()
+                                                        as RenderBox;
+                                                final localDelta =
+                                                    box.globalToLocal(
+                                                      e.globalPosition,
+                                                    ) -
+                                                    box.globalToLocal(
+                                                      e.globalPosition -
+                                                          e.delta,
+                                                    );
+                                                moving = (moving ?? v.frame)
+                                                    .shift(localDelta / 2);
+                                              }),
+                                        onPanEnd: v.locked || busy
+                                            ? null
+                                            : (_) {
+                                                final r = snap(
+                                                  moving ?? v.frame,
+                                                );
+                                                setState(() => moving = null);
+                                                savePlacement(
+                                                  v.copyWith(frame: r),
+                                                );
+                                              },
+                                        onPanCancel: () =>
+                                            setState(() => moving = null),
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: selected == v.id
+                                                  ? Colors.blue
+                                                  : Colors.grey.withValues(
+                                                      alpha: .25,
+                                                    ),
+                                              width: selected == v.id ? 2 : .5,
+                                            ),
                                           ),
-                                    onPanEnd: v.locked
-                                        ? null
-                                        : (_) {
-                                            final r = snap(moving ?? v.frame);
-                                            moving = null;
-                                            savePlacement(v.copyWith(frame: r));
-                                          },
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: selected == v.id
-                                              ? Colors.blue
-                                              : Colors.grey.withValues(
-                                                  alpha: .25,
-                                                ),
-                                          width: selected == v.id ? 2 : .5,
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                            ],
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
             ),
           ],
@@ -884,7 +1164,7 @@ class _SheetDialogState extends State<_SheetDialog> {
       l.architectSheetHeight,
       l.architectSheetMargin,
     ];
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.architectSheetProperties),
       content: SizedBox(
         width: 420,
@@ -893,7 +1173,16 @@ class _SheetDialogState extends State<_SheetDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                initialValue: 'custom',
+                key: ValueKey(
+                  _paperFormat(
+                    _parse(values[4].text) ?? 0,
+                    _parse(values[5].text) ?? 0,
+                  ),
+                ),
+                initialValue: _paperFormat(
+                  _parse(values[4].text) ?? 0,
+                  _parse(values[5].text) ?? 0,
+                ),
                 decoration: InputDecoration(labelText: l.architectSheetFormat),
                 items: [
                   for (final v in ['A4', 'A3', 'A2', 'A1', 'A0'])
@@ -931,6 +1220,7 @@ class _SheetDialogState extends State<_SheetDialog> {
               for (var i = 0; i < values.length; i++)
                 TextField(
                   controller: values[i],
+                  onChanged: i == 4 || i == 5 ? (_) => setState(() {}) : null,
                   decoration: InputDecoration(labelText: labels[i]),
                   keyboardType: i >= 4
                       ? const TextInputType.numberWithOptions(decimal: true)
@@ -998,15 +1288,18 @@ class _PlacementDialog extends StatefulWidget {
 }
 
 class _PlacementDialogState extends State<_PlacementDialog> {
+  late final original = <double>[
+    widget.initial.frame.left,
+    widget.initial.frame.top,
+    widget.initial.frame.width,
+    widget.initial.frame.height,
+    widget.units.toUnit(widget.initial.anchor.dx),
+    widget.units.toUnit(widget.initial.anchor.dy),
+    widget.initial.rotation,
+  ];
   late final fields = [
     widget.initial.number,
-    '${widget.initial.frame.left}',
-    '${widget.initial.frame.top}',
-    '${widget.initial.frame.width}',
-    '${widget.initial.frame.height}',
-    '${widget.units.toUnit(widget.initial.anchor.dx)}',
-    '${widget.units.toUnit(widget.initial.anchor.dy)}',
-    '${widget.initial.rotation}',
+    for (final value in original) _paperNumber(value),
   ].map((e) => TextEditingController(text: e)).toList();
   late int scale = widget.initial.scale;
   late String? source =
@@ -1036,8 +1329,16 @@ class _PlacementDialogState extends State<_PlacementDialog> {
       '${l.architectSheetAnchorY} (${widget.units.symbol})',
       l.architectSheetRotation,
     ];
-    return AlertDialog(
-      title: Text(l.architectSheetEdit),
+    return architectAlertDialog(
+      title: Row(
+        children: [
+          Expanded(child: Text(l.architectSheetEdit)),
+          Tooltip(
+            message: l.architectSheetCropHint,
+            child: const AppIcon(AppIconId.help, size: 20),
+          ),
+        ],
+      ),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
@@ -1046,12 +1347,17 @@ class _PlacementDialogState extends State<_PlacementDialog> {
             children: [
               DropdownButtonFormField<String>(
                 initialValue: source,
+                isExpanded: true,
                 decoration: InputDecoration(labelText: l.architectSheetSource),
                 items: [
                   for (final d in widget.drawings)
                     DropdownMenuItem(
                       value: d.id,
-                      child: Text(ArchitectSheetComposer.drawingName(d, l)),
+                      child: Text(
+                        ArchitectSheetComposer.drawingName(d, l),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                 ],
                 onChanged: (v) => source = v,
@@ -1060,7 +1366,10 @@ class _PlacementDialogState extends State<_PlacementDialog> {
                 initialValue: scale,
                 decoration: InputDecoration(labelText: l.architectSheetScale),
                 items: [
-                  for (final n in ArchitectDrawingScale.presets)
+                  for (final n in {
+                    ...ArchitectDrawingScale.presets,
+                    scale,
+                  }.toList()..sort())
                     DropdownMenuItem(value: n, child: Text('1:$n')),
                 ],
                 onChanged: (v) => scale = v!,
@@ -1097,7 +1406,12 @@ class _PlacementDialogState extends State<_PlacementDialog> {
         ),
         FilledButton(
           onPressed: () {
-            final n = fields.skip(1).map((c) => _parse(c.text)).toList();
+            final n = [
+              for (var i = 0; i < original.length; i++)
+                fields[i + 1].text == _paperNumber(original[i])
+                    ? original[i]
+                    : _parse(fields[i + 1].text),
+            ];
             if (source == null ||
                 n.any((v) => v == null || !v.isFinite) ||
                 n[2]! <= 0 ||
@@ -1112,8 +1426,12 @@ class _PlacementDialogState extends State<_PlacementDialog> {
                 number: fields[0].text,
                 frame: Rect.fromLTWH(n[0]!, n[1]!, n[2]!, n[3]!),
                 anchor: Offset(
-                  widget.units.fromUnit(n[4]!),
-                  widget.units.fromUnit(n[5]!),
+                  fields[5].text == _paperNumber(original[4])
+                      ? widget.initial.anchor.dx
+                      : widget.units.fromUnit(n[4]!),
+                  fields[6].text == _paperNumber(original[5])
+                      ? widget.initial.anchor.dy
+                      : widget.units.fromUnit(n[5]!),
                 ),
                 rotation: n[6],
                 scale: scale,
@@ -1158,7 +1476,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
     final result = await showDialog<ArchitectTitleItem>(
       context: context,
       builder: (c) => StatefulBuilder(
-        builder: (c, update) => AlertDialog(
+        builder: (c, update) => architectAlertDialog(
           title: Text(l.architectSheetField),
           content: SizedBox(
             width: 400,
@@ -1252,7 +1570,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.architectSheetTemplate),
       content: SizedBox(
         width: 500,

@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -59,6 +60,7 @@ class _ArchitectComponentLibraryDialogState
   ArchitectComponentCategory? _category;
   _Source _source = _Source.all;
   String _search = '';
+  ColorScheme get colors => Theme.of(context).colorScheme;
   FenestrationPreviewMode _previewMode = FenestrationPreviewMode.elevation;
   bool get _show3d => _previewMode == FenestrationPreviewMode.threeD;
 
@@ -143,7 +145,7 @@ class _ArchitectComponentLibraryDialogState
         .toList();
     return Dialog(
       insetPadding: EdgeInsets.all(phone ? 8 : 24),
-      backgroundColor: const Color(0xFF1E1E26),
+      backgroundColor: colors.surface,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 880, maxHeight: 720),
         child: Column(
@@ -155,8 +157,8 @@ class _ArchitectComponentLibraryDialogState
                   Expanded(
                     child: Text(
                       l.architectLibrary,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colors.onSurface,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -164,20 +166,26 @@ class _ArchitectComponentLibraryDialogState
                   ),
                   IconButton(
                     tooltip: l.architectLibraryImportHelp,
-                    icon: const AppIcon(
+                    icon: AppIcon(
                       AppIconId.upload,
-                      color: Colors.white70,
+                      color: colors.onSurfaceVariant,
                     ),
                     onPressed: _import,
                   ),
                   IconButton(
                     tooltip: l.architectComponentStudioTitle,
-                    icon: const AppIcon(AppIconId.code, color: Colors.white70),
+                    icon: AppIcon(
+                      AppIconId.code,
+                      color: colors.onSurfaceVariant,
+                    ),
                     onPressed: () => ComponentStudioDialog.show(context),
                   ),
                   IconButton(
                     tooltip: l.close,
-                    icon: const AppIcon(AppIconId.close, color: Colors.white70),
+                    icon: AppIcon(
+                      AppIconId.close,
+                      color: colors.onSurfaceVariant,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -186,13 +194,13 @@ class _ArchitectComponentLibraryDialogState
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: TextField(
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: colors.onSurface),
                 decoration: InputDecoration(
                   hintText: l.search,
-                  hintStyle: const TextStyle(color: Colors.white54),
-                  prefixIcon: const AppIcon(
+                  hintStyle: TextStyle(color: colors.onSurfaceVariant),
+                  prefixIcon: AppIcon(
                     AppIconId.search,
-                    color: Colors.white54,
+                    color: colors.onSurfaceVariant,
                   ),
                   isDense: true,
                   border: const OutlineInputBorder(),
@@ -210,7 +218,7 @@ class _ArchitectComponentLibraryDialogState
                   foregroundColor: WidgetStateProperty.resolveWith(
                     (states) => states.contains(WidgetState.selected)
                         ? Colors.black87
-                        : Colors.white70,
+                        : colors.onSurfaceVariant,
                   ),
                 ),
                 segments: [
@@ -246,13 +254,13 @@ class _ArchitectComponentLibraryDialogState
                         isExpanded: true,
                         dropdownColor: const Color(0xFF262633),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white,
+                          color: colors.onSurface,
                           fontSize: 13,
                         ),
                         value: _category,
                         hint: Text(
                           l.architectLibraryAll,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: colors.onSurface),
                         ),
                         items: [
                           DropdownMenuItem(
@@ -277,7 +285,7 @@ class _ArchitectComponentLibraryDialogState
                         isExpanded: true,
                         dropdownColor: const Color(0xFF262633),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white,
+                          color: colors.onSurface,
                           fontSize: 13,
                         ),
                         value: _source,
@@ -302,32 +310,32 @@ class _ArchitectComponentLibraryDialogState
                 ],
               ),
             ),
-            const Divider(height: 1, color: Colors.white12),
+            Divider(height: 1, color: colors.outlineVariant),
             if (widget.onSelectFloorDrain != null &&
                 (_category == null ||
                     _category == ArchitectComponentCategory.sanitary) &&
                 _source != _Source.custom &&
                 _matches(l.architectToolFloorDrain))
               ListTile(
-                leading: const AppIcon(
-                  AppIconId.water,
-                  color: Color(0xFF00E5FF),
-                ),
+                leading: AppIcon(AppIconId.water, color: Color(0xFF00E5FF)),
                 title: Text(
                   l.architectToolFloorDrain,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: colors.onSurface,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 subtitle: Text(
                   l.architectFloorDrainLibraryDesc,
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
-                trailing: const AppIcon(
+                trailing: AppIcon(
                   AppIconId.chevronRight,
                   size: 14,
-                  color: Colors.white54,
+                  color: colors.onSurfaceVariant,
                 ),
                 onTap: () {
                   Navigator.of(context).pop();
@@ -339,10 +347,13 @@ class _ArchitectComponentLibraryDialogState
                 _source != _Source.custom &&
                 _matches(l.architectDrainageSmart))
               ListTile(
-                leading: const AppIcon(AppIconId.water, color: Colors.white70),
+                leading: AppIcon(
+                  AppIconId.water,
+                  color: colors.onSurfaceVariant,
+                ),
                 title: Text(
                   l.architectDrainageSmart,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: colors.onSurface),
                 ),
                 onTap: () {
                   Navigator.of(context).pop();
@@ -354,14 +365,20 @@ class _ArchitectComponentLibraryDialogState
                   ? Center(
                       child: Text(
                         l.architectComponentNoItems,
-                        style: const TextStyle(color: Colors.white60),
+                        style: TextStyle(color: colors.onSurfaceVariant),
                       ),
                     )
                   : GridView.builder(
                       padding: const EdgeInsets.all(8),
                       gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: phone ? 190 : 220,
-                        mainAxisExtent: 158,
+                        mainAxisExtent:
+                            188 +
+                            40 *
+                                (MediaQuery.textScalerOf(
+                                      context,
+                                    ).scale(1).clamp(1, 2) -
+                                    1),
                         crossAxisSpacing: 4,
                         mainAxisSpacing: 4,
                       ),
@@ -396,7 +413,7 @@ class _ArchitectComponentLibraryDialogState
                                 ? () async {
                                     final confirm = await showDialog<bool>(
                                       context: context,
-                                      builder: (ctx) => AlertDialog(
+                                      builder: (ctx) => architectAlertDialog(
                                         title: Text(
                                           l.architectFenestrationDelete,
                                         ),
@@ -473,7 +490,7 @@ class _ArchitectComponentLibraryDialogState
                               ? () async {
                                   final confirm = await showDialog<bool>(
                                     context: context,
-                                    builder: (ctx) => AlertDialog(
+                                    builder: (ctx) => architectAlertDialog(
                                       title: Text(l.architectComponentDelete),
                                       content: Text(
                                         l.architectComponentDeleteConfirm(
@@ -527,7 +544,7 @@ class _ArchitectComponentLibraryDialogState
     String? editTooltip,
     IconData? editIcon,
   }) => Card(
-    color: const Color(0xFF2A2A38),
+    color: colors.surfaceContainerHigh,
     clipBehavior: Clip.antiAlias,
     child: InkWell(
       onTap: select,
@@ -549,7 +566,7 @@ class _ArchitectComponentLibraryDialogState
                             editTooltip ??
                             context.l10n.architectComponentStudioTitle,
                         icon: editIcon == null
-                            ? const AppIcon(AppIconId.code, size: 18)
+                            ? AppIcon(AppIconId.code, size: 18)
                             : Icon(editIcon, size: 18),
                         onPressed: onEdit,
                       ),
@@ -560,7 +577,7 @@ class _ArchitectComponentLibraryDialogState
                       left: 0,
                       child: IconButton(
                         tooltip: context.l10n.delete,
-                        icon: const AppIcon(
+                        icon: AppIcon(
                           AppIconId.delete,
                           size: 18,
                           color: Colors.redAccent,
@@ -574,17 +591,17 @@ class _ArchitectComponentLibraryDialogState
             const SizedBox(height: 6),
             Text(
               name,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: colors.onSurface,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
             ),
             Text(
               dimensions,
-              style: const TextStyle(color: Colors.white60, fontSize: 11),
+              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
             ),
           ],
         ),

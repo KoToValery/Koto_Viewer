@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'architect_zone_apartment_controls.dart';
 import 'package:flutter/material.dart';
@@ -59,6 +60,8 @@ class ArchitectZonePropertiesCard extends StatefulWidget {
 
 class _ArchitectZonePropertiesCardState
     extends State<ArchitectZonePropertiesCard> {
+  ColorScheme get colors => Theme.of(context).colorScheme;
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -68,7 +71,7 @@ class _ArchitectZonePropertiesCardState
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xF21C1E26),
+        color: colors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: zone.color.withValues(alpha: 0.6),
@@ -127,10 +130,7 @@ class _ArchitectZonePropertiesCardState
               // Category Selector Dropdown (Space-efficient, zero hardcoded names)
               Expanded(
                 child: zone.isApartment
-                    ? Text(
-                        zone.name,
-                        style: const TextStyle(color: Colors.white),
-                      )
+                    ? Text(zone.name, style: TextStyle(color: colors.onSurface))
                     : DropdownButtonHideUnderline(
                         child: DropdownButton<ArchitectZoneCategory>(
                           value: zone.category,
@@ -158,11 +158,11 @@ class _ArchitectZonePropertiesCardState
                                 ),
                               ),
                           ],
-                          dropdownColor: const Color(0xFF1E2230),
+                          dropdownColor: colors.surface,
                           borderRadius: BorderRadius.circular(10),
-                          icon: const AppIcon(
+                          icon: AppIcon(
                             AppIconId.expandMore,
-                            color: Colors.white70,
+                            color: colors.onSurfaceVariant,
                             size: 20,
                           ),
                           items: ArchitectZoneCategory.values.map((cat) {
@@ -171,7 +171,10 @@ class _ArchitectZonePropertiesCardState
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  AppIcon.fromMaterial(cat.icon, size: 16, color: cat.color,
+                                  AppIcon.fromMaterial(
+                                    cat.icon,
+                                    size: 16,
+                                    color: cat.color,
                                   ),
                                   const SizedBox(width: 6),
                                   Flexible(
@@ -180,7 +183,7 @@ class _ArchitectZonePropertiesCardState
                                       style: TextStyle(
                                         color: cat == zone.category
                                             ? cat.color
-                                            : Colors.white,
+                                            : colors.onSurface,
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -210,9 +213,9 @@ class _ArchitectZonePropertiesCardState
 
               // Edit details pencil (if custom name is set)
               IconButton(
-                icon: const AppIcon(
+                icon: AppIcon(
                   AppIconId.editGroup,
-                  color: Colors.white70,
+                  color: colors.onSurfaceVariant,
                   size: 20,
                 ),
                 tooltip: l10n.architectZoneName,
@@ -247,7 +250,7 @@ class _ArchitectZonePropertiesCardState
               // Schedule table shortcut
               if (widget.onOpenScheduleTable != null)
                 IconButton(
-                  icon: const AppIcon(
+                  icon: AppIcon(
                     AppIconId.schedule,
                     color: Color(0xFF38BDF8),
                     size: 19,
@@ -261,7 +264,7 @@ class _ArchitectZonePropertiesCardState
 
               // Delete zone button
               IconButton(
-                icon: const AppIcon(
+                icon: AppIcon(
                   AppIconId.delete,
                   color: Colors.redAccent,
                   size: 19,
@@ -275,9 +278,9 @@ class _ArchitectZonePropertiesCardState
 
               // Close inspector button
               IconButton(
-                icon: const AppIcon(
+                icon: AppIcon(
                   AppIconId.close,
-                  color: Colors.white60,
+                  color: colors.onSurfaceVariant,
                   size: 19,
                 ),
                 onPressed: widget.onClose,
@@ -298,13 +301,13 @@ class _ArchitectZonePropertiesCardState
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
-                  color: const Color(0x1AFFFFFF),
+                  color: colors.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white12),
+                  border: Border.all(color: colors.outlineVariant),
                 ),
                 child: Row(
                   children: [
-                    const AppIcon(
+                    AppIcon(
                       AppIconId.properties,
                       color: Color(0xFF38BDF8),
                       size: 14,
@@ -315,8 +318,8 @@ class _ArchitectZonePropertiesCardState
                         '${l10n.architectZoneScheduleColFloor}: ${zone.resolvedFloorFinish(l10n)}  •  '
                         '${l10n.architectZoneScheduleColWalls}: ${zone.resolvedWallFinish(l10n)}  •  '
                         '${l10n.architectZoneScheduleColCeiling}: ${zone.resolvedCeilingFinish(l10n)}',
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        style: TextStyle(
+                          color: colors.onSurfaceVariant,
                           fontSize: 10.5,
                         ),
                         maxLines: 1,
@@ -324,9 +327,9 @@ class _ArchitectZonePropertiesCardState
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const AppIcon(
+                    AppIcon(
                       AppIconId.chevronRight,
-                      color: Colors.white38,
+                      color: colors.onSurfaceVariant,
                       size: 16,
                     ),
                   ],
@@ -348,9 +351,9 @@ class _ArchitectZonePropertiesCardState
                   controlAffinity: ListTileControlAffinity.leading,
                   title: Text(
                     l10n.architectZoneModeManual,
-                    style: const TextStyle(color: Colors.white70),
+                    style: TextStyle(color: colors.onSurfaceVariant),
                   ),
-                  side: const BorderSide(color: Colors.white54),
+                  side: BorderSide(color: colors.outline),
                   value: !zone.isAutoBoundary,
                   onChanged: zone.isApartment
                       ? null
@@ -396,8 +399,8 @@ class _ArchitectZonePropertiesCardState
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1E2230),
+        builder: (ctx, setDialogState) => architectAlertDialog(
+          backgroundColor: colors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -408,7 +411,7 @@ class _ArchitectZonePropertiesCardState
               Expanded(
                 child: Text(
                   '${zone.name} (${BimDistanceUnit.trimZeros(zone.area.toStringAsFixed(2))} m²)',
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  style: TextStyle(color: colors.onSurface, fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -428,15 +431,17 @@ class _ArchitectZonePropertiesCardState
                         width: 80,
                         child: TextField(
                           controller: numberController,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colors.onSurface,
                             fontSize: 14,
                           ),
                           decoration: InputDecoration(
                             labelText: l10n.architectZoneNumberPrompt,
-                            labelStyle: const TextStyle(color: Colors.white70),
+                            labelStyle: TextStyle(
+                              color: colors.onSurfaceVariant,
+                            ),
                             filled: true,
-                            fillColor: const Color(0x22FFFFFF),
+                            fillColor: colors.surfaceContainerHigh,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -496,12 +501,12 @@ class _ArchitectZonePropertiesCardState
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    style: TextStyle(color: colors.onSurface, fontSize: 13),
                     decoration: InputDecoration(
                       labelText: l10n.architectZoneClearHeight,
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      labelStyle: TextStyle(color: colors.onSurfaceVariant),
                       filled: true,
-                      fillColor: const Color(0x22FFFFFF),
+                      fillColor: colors.surfaceContainerHigh,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),

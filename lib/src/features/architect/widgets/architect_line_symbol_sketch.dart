@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -122,7 +123,7 @@ class _ArchitectLineSymbolSketchState extends State<ArchitectLineSymbolSketch> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.architectLineSymbolCustom),
       content: SizedBox(
         width: 300,

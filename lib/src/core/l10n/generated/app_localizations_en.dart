@@ -3452,10 +3452,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectCategoryPlan => 'Plan';
 
   @override
-  String get architectCategoryBuild => 'Build';
+  String get architectCategoryBuild => 'Building';
 
   @override
-  String get architectCategoryDrawing => 'Draw';
+  String get architectCategoryDrawing => '2D drawing';
 
   @override
   String get architectToolCategories => 'Categories';
@@ -3842,7 +3842,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectZoneEditContour => 'Edit Contour';
 
   @override
-  String get architectZonePresetsDialogTitle => 'Default Room Types';
+  String get architectZonePresetsDialogTitle => 'Room presets';
 
   @override
   String get architectZonePresetsDialogSubtitle =>
@@ -3852,7 +3852,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectZonePresetsResetCategory => 'Reset Category Defaults';
 
   @override
-  String get architectZonePresetsResetAll => 'Reset All Defaults';
+  String get architectZonePresetsResetAll => 'Reset all';
 
   @override
   String get architectZonePresetsSaved => 'Room type presets saved';
@@ -4158,7 +4158,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectCategorySpaces => 'Spaces';
 
   @override
-  String get architectCategoryAnnotations => 'Notes';
+  String get architectCategoryAnnotations => 'Dimensions & text';
 
   @override
   String get architectCategoryCad => 'Drafting';
@@ -8653,7 +8653,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Place vertices and close the polygon at its first point or with the check button.';
 
   @override
-  String get architectCategoryEdit => 'Edit';
+  String get architectCategoryEdit => 'Select';
 
   @override
   String get architectSelectReplace => 'Replace';
@@ -10869,4 +10869,61 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectFenestrationGlazingTripleShort => 'Triple';
+
+  @override
+  String get architectToolSearch => 'Find a tool';
+
+  @override
+  String get architectToolNoResults => 'No tools found.';
+
+  @override
+  String get architectSheetFit => 'Fit sheet';
+
+  @override
+  String get architectSheetReady => 'Ready for PDF';
+
+  @override
+  String get architectSheetCheck => 'Check layout';
+
+  @override
+  String get architectSheetOutside =>
+      'A drawing or its title extends beyond the sheet margins. Move it or reduce its frame.';
+
+  @override
+  String get architectSheetOverlap =>
+      'Drawings overlap. Move their frames apart.';
+
+  @override
+  String get architectSheetTitleOverlap =>
+      'A drawing overlaps the title block. Move it above the title block.';
+
+  @override
+  String get architectSheetMissingTemplate =>
+      'The title block template is missing. Select a template.';
+
+  @override
+  String get architectSheetExported => 'PDF saved.';
+
+  @override
+  String architectSheetScaleAdjusted(int scale) {
+    return 'The view fits at 1:$scale.';
+  }
+
+  @override
+  String get architectSheetCropHint =>
+      'The frame crops the drawing. Use Fit view to show the full source.';
+
+  @override
+  String get architectSheetFitView => 'Fit view';
+
+  @override
+  String get architectSheetExportOrder =>
+      'PDF page order follows your selection.';
+
+  @override
+  String get architectSheetNoSpace =>
+      'No room for another view. Create a sheet or resize the existing frames.';
+
+  @override
+  String get architectSheetPlaceShort => 'View';
 }

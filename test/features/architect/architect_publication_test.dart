@@ -19,6 +19,7 @@ import 'package:kotoview/src/features/architect/services/architect_command_contr
 import 'package:kotoview/src/features/architect/services/architect_drawing_publisher.dart';
 import 'package:kotoview/src/features/architect/services/architect_pdf_export.dart';
 import 'package:kotoview/src/features/architect/services/architect_sheet_composer.dart';
+import 'package:kotoview/src/features/architect/services/architect_sheet_layout.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_sheets_screen.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/bim_projects/models/bim_coordinate_frame.dart';
@@ -481,9 +482,16 @@ void main() {
       final p = fixture().copyWith(
         document: ArchitectDocument(drawings: [drawing], sheets: [sheet]),
       );
+      final small = sheet.copyWith(widthMm: 297, heightMm: 210, placements: []);
+      final fitted = ArchitectSheetLayout.fit(
+        sheet.placements.single,
+        ArchitectSheetLayout.drawingArea(p, small),
+        (scale) => ArchitectDrawingPublisher.build(p, drawing, scale, l),
+        title: (scale) => '1  ${l.architectSheetPlan}  1:$scale',
+      );
       final bytes = await ArchitectPdfExport.export(p, [
         sheet,
-        sheet.copyWith(widthMm: 297, heightMm: 210),
+        small.copyWith(placements: [fitted]),
       ], l);
       final pdf = PdfDocument(inputBytes: bytes);
       expect(pdf.pages.count, 2);

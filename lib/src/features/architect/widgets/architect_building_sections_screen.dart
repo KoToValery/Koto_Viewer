@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../rendering/architect_hatch_geometry.dart';
 import '../services/architect_section_junctions.dart';
@@ -538,7 +539,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
     var input = value.name;
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => architectAlertDialog(
         title: Text(context.l10n.architectPropertyName),
         content: TextFormField(
           initialValue: input,

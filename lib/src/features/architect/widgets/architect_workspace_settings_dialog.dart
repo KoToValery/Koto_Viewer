@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../../../core/widgets/app_settings_screen.dart';
 import 'package:flutter/material.dart';
@@ -109,7 +110,7 @@ class _ArchitectWorkspaceSettingsDialogState
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.architectSettings),
       content: SizedBox(
         width: 300,

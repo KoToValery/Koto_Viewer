@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -71,7 +72,7 @@ class _ThicknessState extends State<ArchitectWallThicknessDialog> {
             : null;
       },
     );
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(
         widget.wall.system.isLog
             ? l.wallLogDiameter

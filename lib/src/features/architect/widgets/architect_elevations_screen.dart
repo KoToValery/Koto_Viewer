@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../rendering/architect_hatch_geometry.dart';
 import '../models/architect_hatch_pattern.dart';
@@ -775,7 +776,7 @@ class _NorthDialogState extends State<_NorthDialog> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.architectNorth),
       content: SizedBox(
         width: 340,

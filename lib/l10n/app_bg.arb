@@ -1083,9 +1083,9 @@
   "architectGridSpacingY": "Разстояние Y (m)",
   "architectCategoryPlan": "План",
   "@architectCategoryPlan": {"description": "Architectural tool category"},
-  "architectCategoryBuild": "Строеж",
+  "architectCategoryBuild": "Сграда",
   "@architectCategoryBuild": {"description": "Architectural tool category"},
-  "architectCategoryDrawing": "Чертане",
+  "architectCategoryDrawing": "Линии и щрих",
   "@architectCategoryDrawing": {"description": "Architectural tool category"},
   "architectToolCategories": "Категории",
   "@architectToolCategories": {"description": "Tooltip for architectural tool category picker"},
@@ -1245,10 +1245,10 @@
   "architectZoneTablePendingHint": "Докоснете за преместване, или потвърдете със зеленото тикче",
   "architectZoneContextMenu": "Опции за помещението",
   "architectZoneEditContour": "Редактирай контур",
-  "architectZonePresetsDialogTitle": "Видове помещения по подразбиране",
+  "architectZonePresetsDialogTitle": "Помещения",
   "architectZonePresetsDialogSubtitle": "Име и настилки по подразбиране за всяка категория",
   "architectZonePresetsResetCategory": "Възстанови стандартните за категорията",
-  "architectZonePresetsResetAll": "Възстанови всички стандартни",
+  "architectZonePresetsResetAll": "Нулирай всички",
   "architectZonePresetsSaved": "Видовете помещения са запазени",
   "architectZonePresetsTooltip": "Предефиниране на видове помещения и настилки",
   "architectZoneFloorLaminate": "Ламинат",
@@ -1363,7 +1363,7 @@
   "architectCadShapePlaced": "CAD фигура поставена",
   "architectCategoryStructure": "Конструкция",
   "architectCategorySpaces": "Пространства",
-  "architectCategoryAnnotations": "Надписи",
+  "architectCategoryAnnotations": "Коти и текст",
   "architectCategoryCad": "CAD Чертане",
   "selectedElement": "Избран: {id}",
   "architectWizardTitle": "Нов архитектурен проект",
@@ -2890,7 +2890,7 @@
   "architectSelectionClear": "Изчисти",
   "architectSelectRectangleHint": "Посочи два срещуположни ъгъла или издърпай рамка. Два пръста преместват изгледа.",
   "architectSelectPolygonHint": "Постави точки и затвори полигона с първата точка или с отметката.",
-  "architectCategoryEdit": "Редакция",
+  "architectCategoryEdit": "Избор",
   "architectSelectReplace": "Замени",
   "architectSelectAdd": "Добави",
   "architectSelectRemove": "Премахни",
@@ -3768,5 +3768,28 @@
   "architectFenestrationGlazing": "Остъкляване",
   "architectFenestrationGlazingSingleShort": "Единично",
   "architectFenestrationGlazingDoubleShort": "Двойно",
-  "architectFenestrationGlazingTripleShort": "Тройно"
+  "architectFenestrationGlazingTripleShort": "Тройно",
+  "architectToolSearch": "Търси инструмент",
+  "architectToolNoResults": "Няма намерени инструменти.",
+  "architectSheetFit": "Побери листа",
+  "architectSheetReady": "Готов за PDF",
+  "architectSheetCheck": "Провери листа",
+  "architectSheetOutside": "Чертеж или заглавието му излиза извън полето на листа. Премести го или намали рамката.",
+  "architectSheetOverlap": "Чертежите се застъпват. Раздалечи рамките им.",
+  "architectSheetTitleOverlap": "Чертеж застъпва антетката. Премести го над нея.",
+  "architectSheetMissingTemplate": "Шаблонът на антетката липсва. Избери шаблон.",
+  "architectSheetExported": "PDF файлът е запазен.",
+  "architectSheetScaleAdjusted": "Изгледът е побран в мащаб 1:{scale}.",
+  "@architectSheetScaleAdjusted": {
+    "placeholders": {
+      "scale": {
+        "type": "int"
+      }
+    }
+  },
+  "architectSheetCropHint": "Рамката изрязва чертежа. Използвай „Побери изгледа“ за целия източник.",
+  "architectSheetFitView": "Побери изгледа",
+  "architectSheetExportOrder": "Редът на PDF страниците следва избора ти.",
+  "architectSheetNoSpace": "Няма място за още един изглед. Създай лист или промени рамките на поставените изгледи.",
+  "architectSheetPlaceShort": "Изглед"
 }

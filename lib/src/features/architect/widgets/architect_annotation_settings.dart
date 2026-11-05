@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -74,7 +75,7 @@ Future<void> showArchitectAnnotationSettings(
           });
         }
 
-        return AlertDialog(
+        return architectAlertDialog(
           title: Text('${l.architectAnnotationSettings} · 1:$scale'),
           content: SizedBox(
             width: 430,

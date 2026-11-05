@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -299,7 +300,7 @@ class _RotationAngleDialogState extends State<_RotationAngleDialog> {
   @override
   Widget build(BuildContext context) {
     final value = double.tryParse(controller.text);
-    return AlertDialog(
+    return architectAlertDialog(
       constraints: const BoxConstraints(maxWidth: 300),
       title: Text(context.l10n.architectPropertyAngle),
       content: SingleChildScrollView(

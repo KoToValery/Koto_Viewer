@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -83,7 +84,7 @@ class _TypesState extends State<ArchitectWallTypesManager> {
     if (uses(type.id) == 0) {
       final confirmed = await showDialog<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
+        builder: (ctx) => architectAlertDialog(
           title: Text(ctx.l10n.delete),
           content: Text(ctx.l10n.wallTypeDeleteConfirm(type.catalogLabel(ctx.l10n, project.units))),
           actions: [
@@ -113,7 +114,7 @@ class _TypesState extends State<ArchitectWallTypesManager> {
       final accepted = await showDialog<bool>(
         context: context,
         builder: (ctx) => StatefulBuilder(
-          builder: (ctx, update) => AlertDialog(
+          builder: (ctx, update) => architectAlertDialog(
             title: Text(ctx.l10n.wallTypeReplacement),
             content: Column(
               mainAxisSize: MainAxisSize.min,

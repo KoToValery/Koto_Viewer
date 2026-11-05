@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -112,7 +113,7 @@ class ArchitectHatchPicker extends StatelessWidget {
     }.values.toList();
     final chosen = await showDialog<ArchitectHatchPattern>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => architectAlertDialog(
         title: Text(l.architectToolHatch),
         contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
         content: SizedBox(
@@ -269,7 +270,7 @@ class _HatchGeneratorState extends State<ArchitectHatchGenerator> {
   @override
   Widget build(BuildContext context) {
     final l=context.l10n;
-    return AlertDialog(title:Text(l.architectHatchGenerator),content:SizedBox(width:320,
+    return architectAlertDialog(title:Text(l.architectHatchGenerator),content:SizedBox(width:320,
       child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
         TextField(key:const ValueKey('hatch-generator-name'),controller:name,
           decoration:InputDecoration(labelText:l.architectPropertyName),onChanged:(_)=>setState((){}),
@@ -550,7 +551,7 @@ class _ArchitectHatchEditorState extends State<ArchitectHatchEditor> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.architectHatchCustom),
       content: SizedBox(
         width: 300,

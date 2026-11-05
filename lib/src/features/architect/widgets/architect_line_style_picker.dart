@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import '../models/architect_line_symbol.dart';
@@ -109,7 +110,7 @@ class ArchitectLineStylePicker extends StatelessWidget {
     final chosen = await showDialog<ArchitectLineStyle>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
+        builder: (dialogContext, setDialogState) => architectAlertDialog(
           title: Text(l.architectLineStyle),
           contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
           content: SizedBox(
@@ -142,7 +143,7 @@ class ArchitectLineStylePicker extends StatelessWidget {
                             onPressed: () async {
                               final confirm = await showDialog<bool>(
                                 context: dialogContext,
-                                builder: (ctx) => AlertDialog(
+                                builder: (ctx) => architectAlertDialog(
                                   title: Text(l.architectLineDeleteConfirmTitle,
                                   ),
                                   content: Text(
@@ -339,7 +340,7 @@ class _ArchitectLinePatternEditorState
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.architectLinePatternEditor),
       content: SizedBox(
         width: 300,

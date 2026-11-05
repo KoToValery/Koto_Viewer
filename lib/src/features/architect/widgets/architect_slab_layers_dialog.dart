@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'dart:async';
@@ -321,7 +322,7 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                       final messenger = ScaffoldMessenger.of(context);
                       final confirmed = await showDialog<bool>(
                         context: context,
-                        builder: (ctx) => AlertDialog(
+                        builder: (ctx) => architectAlertDialog(
                           title: Text(l.slabDeleteLibrary),
                           content: Text(
                             l.slabDeleteConfirm(
@@ -400,7 +401,7 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                       final messenger = ScaffoldMessenger.of(context);
                       final confirmed = await showDialog<bool>(
                         context: context,
-                        builder: (ctx) => AlertDialog(
+                        builder: (ctx) => architectAlertDialog(
                           title: Text(l.slabDeleteLibrary),
                           content: Text(
                             l.slabDeleteConfirm(
@@ -768,7 +769,7 @@ class _LayerEditorState extends State<_LayerEditor> {
           : l.slabInvalid;
     }
 
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.slabEditLayer),
       content: SizedBox(
         width: 340,

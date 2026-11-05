@@ -1,3 +1,4 @@
+import '../widgets/architect_dialog.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -107,7 +108,7 @@ class _FenestrationEditorState extends State<FenestrationEditorScreen> {
     final key = GlobalKey<FormState>();
     final name = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => architectAlertDialog(
         title: Text(ctx.l10n.architectFenestrationName),
         content: Form(
           key: key,
@@ -186,7 +187,7 @@ class _FenestrationEditorState extends State<FenestrationEditorScreen> {
         (!_dirty && !invalidInput) ||
         await showDialog<bool>(
               context: context,
-              builder: (ctx) => AlertDialog(
+              builder: (ctx) => architectAlertDialog(
                 title: Text(ctx.l10n.architectFenestrationDiscardTitle),
                 content: Text(ctx.l10n.architectFenestrationDiscardMessage),
                 actions: [
