@@ -29,6 +29,7 @@ List<ArchitectCandidateLabel> architectCandidateLabels(
     ArchitectTool.opening => l.architectToolOpening,
     ArchitectTool.stair => l.architectToolStair,
     ArchitectTool.component => l.architectToolComponent,
+    ArchitectTool.services => l.architectServiceBodies,
     ArchitectTool.zone => l.architectToolZone,
     ArchitectTool.dimension => l.architectToolDimension,
     ArchitectTool.level => l.architectToolLevel,

@@ -19877,6 +19877,234 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'View'**
   String get architectSheetPlaceShort;
+
+  /// No description provided for @architectCategoryServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Services'**
+  String get architectCategoryServices;
+
+  /// No description provided for @architectServiceBodies.
+  ///
+  /// In en, this message translates to:
+  /// **'Risers'**
+  String get architectServiceBodies;
+
+  /// No description provided for @architectOpeningCircular.
+  ///
+  /// In en, this message translates to:
+  /// **'Round'**
+  String get architectOpeningCircular;
+
+  /// No description provided for @architectOpeningCircularHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Round penetration for drainage, water or pipes. Two points define its bounds; the shorter side sets the diameter.'**
+  String get architectOpeningCircularHelp;
+
+  /// No description provided for @architectServiceVentSingle.
+  ///
+  /// In en, this message translates to:
+  /// **'Single vent block'**
+  String get architectServiceVentSingle;
+
+  /// No description provided for @architectServiceVentDouble.
+  ///
+  /// In en, this message translates to:
+  /// **'Twin vent block'**
+  String get architectServiceVentDouble;
+
+  /// No description provided for @architectServiceVentTransition.
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete transition'**
+  String get architectServiceVentTransition;
+
+  /// No description provided for @architectServiceCompactVent.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact LS 1'**
+  String get architectServiceCompactVent;
+
+  /// No description provided for @architectServiceCompactTransition.
+  ///
+  /// In en, this message translates to:
+  /// **'LS 1 transition'**
+  String get architectServiceCompactTransition;
+
+  /// No description provided for @architectServiceCombinedRiser.
+  ///
+  /// In en, this message translates to:
+  /// **'Combined plumbing riser'**
+  String get architectServiceCombinedRiser;
+
+  /// No description provided for @architectServiceSewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Drain Ø110'**
+  String get architectServiceSewer;
+
+  /// No description provided for @architectServiceWater.
+  ///
+  /// In en, this message translates to:
+  /// **'Water Ø32'**
+  String get architectServiceWater;
+
+  /// No description provided for @architectServiceDryRiser.
+  ///
+  /// In en, this message translates to:
+  /// **'Dry riser DN100'**
+  String get architectServiceDryRiser;
+
+  /// No description provided for @architectServiceSleeve.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleeve Ø160'**
+  String get architectServiceSleeve;
+
+  /// No description provided for @architectServiceChimney.
+  ///
+  /// In en, this message translates to:
+  /// **'Chimney Ø180'**
+  String get architectServiceChimney;
+
+  /// No description provided for @architectServiceVentHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete ventilation blocks, 300×250×200 or 500×300×200 mm, stacked vertically with hollow channels. For ventilation.'**
+  String get architectServiceVentHelp;
+
+  /// No description provided for @architectServiceTransitionHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Transition comprising two 500×300×200 mm concrete blocks. A schematic opening in the web connects the branch to the main channel; check the manufacturer’s installation detail.'**
+  String get architectServiceTransitionHelp;
+
+  /// No description provided for @architectServiceCompactHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Envelope based on Schiedel LS 1: 355×220 mm, 330 mm course. Main channel 200×170 mm and branch 90×170 mm. Transition geometry is schematic.'**
+  String get architectServiceCompactHelp;
+
+  /// No description provided for @architectServiceCombinedHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Coordination layout, 500×250 mm: Ø110 drain, Ø50 pipe and two insulated Ø32 water pipes with an inspection cover. Coordinate the enclosure size for the project.'**
+  String get architectServiceCombinedHelp;
+
+  /// No description provided for @architectServicePipeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Hollow pipe or sleeve with a clear bore. Intersected slabs are cut automatically; dimensions are in centimetres.'**
+  String get architectServicePipeHelp;
+
+  /// No description provided for @architectServiceDryHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical DN100 steel pipe, 114.3 mm outside diameter. Coordination element; fittings and fire service design are specified by the project.'**
+  String get architectServiceDryHelp;
+
+  /// No description provided for @architectServiceChimneyHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Envelope 360×360 mm with Ø180 flue based on Schiedel ABSOLUT. Hollow ceramic liner, insulation, casing and ventilated cap. Above-roof height and clearances are project parameters.'**
+  String get architectServiceChimneyHelp;
+
+  /// No description provided for @architectServiceCap.
+  ///
+  /// In en, this message translates to:
+  /// **'Cap'**
+  String get architectServiceCap;
+
+  /// No description provided for @architectServiceCapNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Open top'**
+  String get architectServiceCapNone;
+
+  /// No description provided for @architectServiceCapFlat.
+  ///
+  /// In en, this message translates to:
+  /// **'Flat'**
+  String get architectServiceCapFlat;
+
+  /// No description provided for @architectServiceCapPitched.
+  ///
+  /// In en, this message translates to:
+  /// **'Pitched'**
+  String get architectServiceCapPitched;
+
+  /// No description provided for @architectServiceCapConical.
+  ///
+  /// In en, this message translates to:
+  /// **'Conical'**
+  String get architectServiceCapConical;
+
+  /// No description provided for @architectServiceAutoHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow roof'**
+  String get architectServiceAutoHeight;
+
+  /// No description provided for @architectServiceAutoHeightHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Height follows the highest intersected roof surface plus the chosen extension. This is a geometry setting; the required height is determined by the project.'**
+  String get architectServiceAutoHeightHelp;
+
+  /// No description provided for @architectServiceAboveRoof.
+  ///
+  /// In en, this message translates to:
+  /// **'Above roof'**
+  String get architectServiceAboveRoof;
+
+  /// No description provided for @architectServiceFlueDiameter.
+  ///
+  /// In en, this message translates to:
+  /// **'Flue Ø'**
+  String get architectServiceFlueDiameter;
+
+  /// No description provided for @architectServiceRoofClearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Roof clearance'**
+  String get architectServiceRoofClearance;
+
+  /// No description provided for @architectServiceVent.
+  ///
+  /// In en, this message translates to:
+  /// **'Vent Ø110'**
+  String get architectServiceVent;
+
+  /// No description provided for @architectServiceFireplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Fireplace'**
+  String get architectServiceFireplace;
+
+  /// No description provided for @architectServiceFireplaceHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact 550×600 mm fireplace with combustion chamber, door, grate and Ø180 flue. Upper levels show only the chimney; its roof opening and flashing follow the fireplace when moved. The coordination envelope follows compact fireplace modules.'**
+  String get architectServiceFireplaceHelp;
+
+  /// No description provided for @architectServiceAllStoreys.
+  ///
+  /// In en, this message translates to:
+  /// **'All levels'**
+  String get architectServiceAllStoreys;
+
+  /// No description provided for @architectServiceAllStoreysHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'One continuous element from the lowest storey to the roof. Switch off to start at its placement level. Edit or delete it on the placement level to update every plan.'**
+  String get architectServiceAllStoreysHelp;
+
+  /// No description provided for @architectServiceVentOutletHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Ø110 roof vent with weather collar and flashing. Automatic height and the above-roof extension can be adjusted.'**
+  String get architectServiceVentOutletHelp;
 }
 
 class _AppLocalizationsDelegate

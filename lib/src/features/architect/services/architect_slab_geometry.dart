@@ -7,6 +7,7 @@ import '../models/architect_section.dart';
 import '../models/architect_slab_assembly.dart';
 import '../rendering/architect_stair_mesh.dart';
 import 'architect_slab_assemblies.dart';
+import 'architect_service_geometry.dart';
 
 double slabDot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
 
@@ -71,25 +72,35 @@ class ArchitectSlabGeometry {
   static bool inside(List<Offset> polygon, Offset p) =>
       polygon.length >= 3 && (Path()..addPolygon(polygon, true)).contains(p);
 
-  static bool contains(ArchitectStorey storey, ArchitectSlab slab, Offset p) =>
+  static List<List<Offset>> holes(ArchitectStorey storey, ArchitectSlab slab,
+      {ArchitectProject? project}) => [
+    ...slab.holes,
+    ...storey.openings.map((o) => o.boundary),
+    ...ArchitectServiceGeometry.slabHoles(storey, project: project,
+      bottom: storey.elevation + slab.coreTopOffset - slab.thickness,
+      top: storey.elevation + slab.coreTopOffset),
+  ];
+
+  static bool contains(ArchitectStorey storey, ArchitectSlab slab, Offset p,
+      {ArchitectProject? project}) =>
       inside(slab.polygon, p) &&
-      !slab.holes.any((h) => inside(h, p)) &&
-      !storey.openings.any((o) => inside(o.boundary, p));
+      !holes(storey, slab, project: project).any((h) => inside(h, p));
 
   /// Partition at every contour crossing, then classify midpoints. Handles
   /// concave footprints, overlapping openings and cuts through vertices.
   static List<(double, double)> intervals(
     ArchitectStorey storey,
     ArchitectSlab slab,
-    ArchitectSection section,
-  ) {
+    ArchitectSection section, {
+    ArchitectProject? project,
+  }) {
+    final contours = holes(storey, slab, project: project);
     final breaks = <double>[0, section.length];
     final u = section.axis;
     double cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
     for (final polygon in [
       slab.polygon,
-      ...slab.holes,
-      ...storey.openings.map((o) => o.boundary),
+      ...contours,
     ]) {
       for (var i = 0; i < polygon.length; i++) {
         final a = polygon[i], v = polygon[(i + 1) % polygon.length] - a;
@@ -107,7 +118,8 @@ class ArchitectSlabGeometry {
     for (var i = 0; i < breaks.length - 1; i++) {
       final a = breaks[i], b = breaks[i + 1];
       if (b - a < 1e-8 ||
-          !contains(storey, slab, section.pointAt((a + b) / 2))) {
+          !inside(slab.polygon, section.pointAt((a + b) / 2)) ||
+          contours.any((h) => inside(h, section.pointAt((a + b) / 2)))) {
         continue;
       }
       if (result.isNotEmpty && (result.last.$2 - a).abs() < 1e-8) {
@@ -123,15 +135,15 @@ class ArchitectSlabGeometry {
   /// Convex fragments allow the very same holed footprint in 3D as in sections.
   static List<List<Offset>> footprint(
     ArchitectStorey storey,
-    ArchitectSlab slab,
-  ) {
+    ArchitectSlab slab, {
+    ArchitectProject? project,
+  }) {
     var pieces = [
       for (final (a, b, c) in ArchitectStairMesh.triangulate(slab.polygon))
         [slab.polygon[a], slab.polygon[b], slab.polygon[c]],
     ];
     for (final boundary in [
-      ...slab.holes,
-      ...storey.openings.map((o) => o.boundary),
+      ...holes(storey, slab, project: project),
     ]) {
       for (final (a, b, c) in ArchitectStairMesh.triangulate(boundary)) {
         final clip = [boundary[a], boundary[b], boundary[c]];
@@ -178,7 +190,7 @@ class ArchitectSlabGeometry {
     ArchitectSlab slab,
   ) {
     final result = <Triangle3D>[];
-    final pieces = footprint(storey, slab);
+    final pieces = footprint(storey, slab, project: project);
     for (final surface in surfaces(project, storey, slab)) {
       final color = materialColor(surface.layer.material);
       for (final p in pieces) {

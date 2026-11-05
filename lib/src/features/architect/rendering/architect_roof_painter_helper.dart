@@ -10,6 +10,7 @@ import '../models/architect_project.dart';
 import '../services/architect_roof_geometry.dart';
 import '../services/architect_roof_tool.dart';
 import '../services/architect_roof_junctions.dart';
+import '../services/architect_service_geometry.dart';
 import 'architect_panel_roof_geometry.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_path_solid.dart';
@@ -18,6 +19,8 @@ import 'architect_wall_network.dart';
 // === SECTION: COMMITTED ROOF PLANES 2D PAINTER ===
 
 class ArchitectRoofPainterHelper {
+  static final _slopeIndicatorCenters = Expando<Offset>();
+
   /// Dashed overhead edges on the next floor below the roof, using the same
   /// cleaned footprints as its own plan and drawing shared ridges only once.
   static void paintOverhead({
@@ -26,25 +29,51 @@ class ArchitectRoofPainterHelper {
     required double scale,
     required Color color,
   }) {
-    final elevations = project.storeys
-        .where((s) => s.elevation > project.activeStorey.elevation && s.roofs.isNotEmpty)
-        .map((s) => s.elevation).toList()..sort();
+    final elevations =
+        project.storeys
+            .where(
+              (s) =>
+                  s.elevation > project.activeStorey.elevation &&
+                  s.roofs.isNotEmpty,
+            )
+            .map((s) => s.elevation)
+            .toList()
+          ..sort();
     if (elevations.isEmpty) return;
     final seen = <String>{};
-    final pen = Paint()..color = color.withValues(alpha: .65)
-      ..style = PaintingStyle.stroke..strokeWidth = 1 / scale;
-    for (final floor in project.storeys.where((s) => s.elevation == elevations.first)) {
+    final pen = Paint()
+      ..color = color.withValues(alpha: .65)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1 / scale;
+    for (final floor in project.storeys.where(
+      (s) => s.elevation == elevations.first,
+    )) {
       final junctions = ArchitectRoofJunctions.of(floor, project: project);
       for (final roof in floor.roofs) {
         architectDrawingSources(canvas, {roof.id}, 'roofOverhead');
-        final footprint = roof.assembly.panels == null ? junctions.footprint(roof)
-            : ArchitectPanelRoofGeometry.panelFootprint(floor, roof, project: project);
+        final footprint = roof.assembly.panels == null
+            ? junctions.footprint(roof)
+            : ArchitectPanelRoofGeometry.panelFootprint(
+                floor,
+                roof,
+                project: project,
+              );
         for (final contour in ArchitectPathSolid.contours(footprint)) {
           for (var i = 0; i < contour.length; i++) {
             final a = contour[i], b = contour[(i + 1) % contour.length];
-            final keys = [for (final p in [a, b]) '${(p.dx * 1e5).round()},${(p.dy * 1e5).round()}']..sort();
+            final keys = [
+              for (final p in [a, b])
+                '${(p.dx * 1e5).round()},${(p.dy * 1e5).round()}',
+            ]..sort();
             if (!seen.add(keys.join(':'))) continue;
-            _drawDashedLine(canvas, a, b, pen, dashLength: 6 / scale, gapLength: 4 / scale);
+            _drawDashedLine(
+              canvas,
+              a,
+              b,
+              pen,
+              dashLength: 6 / scale,
+              gapLength: 4 / scale,
+            );
           }
         }
       }
@@ -108,8 +137,13 @@ class ArchitectRoofPainterHelper {
       if (roof.points.length < 3) continue;
       final isSelected =
           !isGhost && !isLowerLevel && selectedIds.contains(roof.id);
-      final path = roof.assembly.panels!=null?
-        ArchitectPanelRoofGeometry.panelFootprint(storey,roof,project:project):junctions.footprint(roof);
+      final path = roof.assembly.panels != null
+          ? ArchitectPanelRoofGeometry.panelFootprint(
+              storey,
+              roof,
+              project: project,
+            )
+          : junctions.footprint(roof);
       if (path.getBounds().isEmpty) continue;
 
       if (project != null) {
@@ -125,7 +159,8 @@ class ArchitectRoofPainterHelper {
       final baseColor = switch (topMat) {
         ArchitectRoofMaterial.clayTiles => const Color(0xFFC85A32),
         ArchitectRoofMaterial.concreteTiles => const Color(0xFF78909C),
-        ArchitectRoofMaterial.metalSeam || ArchitectRoofMaterial.steel => const Color(0xFF546E7A),
+        ArchitectRoofMaterial.metalSeam ||
+        ArchitectRoofMaterial.steel => const Color(0xFF546E7A),
         ArchitectRoofMaterial.bitumenShingles => const Color(0xFF6D4C41),
         ArchitectRoofMaterial.waterproofing => const Color(0xFF455A64),
         _ => const Color(0xFFC85A32),
@@ -139,12 +174,15 @@ class ArchitectRoofPainterHelper {
         final diag = bounds.size.longestSide + 1.0;
         final center = bounds.center;
         final slopeDir = roof.slopeDirection;
-        final isStandingSeam = topMat == ArchitectRoofMaterial.metalSeam || roof.assembly.panels!=null;
+        final isStandingSeam =
+            topMat == ArchitectRoofMaterial.metalSeam ||
+            roof.assembly.panels != null;
         final stepDir = isStandingSeam
             ? Offset(-slopeDir.dy, slopeDir.dx)
             : slopeDir;
         final lineDir = Offset(-stepDir.dy, stepDir.dx);
-        final step = roof.assembly.panels?.module ?? (isStandingSeam ? 0.60 : 0.35);
+        final step =
+            roof.assembly.panels?.module ?? (isStandingSeam ? 0.60 : 0.35);
 
         final hatchAlpha = isLowerLevel ? 0.12 : (isSelected ? 0.35 : 0.22);
         final hatchW = isLowerLevel ? 0.5 / scale : 0.8 / scale;
@@ -155,7 +193,9 @@ class ArchitectRoofPainterHelper {
 
         final count = (diag / step).ceil();
         for (var i = -count; i <= count; i++) {
-          final origin = (roof.assembly.panels!=null?roof.eavesEdge.$1:center) + stepDir * (i * step);
+          final origin =
+              (roof.assembly.panels != null ? roof.eavesEdge.$1 : center) +
+              stepDir * (i * step);
           canvas.drawLine(
             origin - lineDir * diag,
             origin + lineDir * diag,
@@ -320,6 +360,16 @@ class ArchitectRoofPainterHelper {
           isSelected: isSelected,
           isLowerLevel: isLowerLevel,
           position: junctions.labelPoint(roof),
+          availableArea: path,
+          avoid: [
+            if (project != null)
+              for (final p in ArchitectServiceGeometry.penetrations(
+                project,
+                storey,
+                roof,
+              ))
+                p.opening.getBounds().inflate(.10),
+          ],
         );
       }
     }
@@ -348,9 +398,14 @@ class ArchitectRoofPainterHelper {
   }) {
     if (roof.points.length < 3) return false;
     final radius = math.max(0.45, 22.0 / scale);
-    final center = storey == null
-        ? roof.centroid
-        : ArchitectRoofJunctions.of(storey, project: project).labelPoint(roof);
+    final center =
+        _slopeIndicatorCenters[roof] ??
+        (storey == null
+            ? roof.centroid
+            : ArchitectRoofJunctions.of(
+                storey,
+                project: project,
+              ).labelPoint(roof));
     return (worldPoint - center).distance <= radius;
   }
 
@@ -363,14 +418,93 @@ class ArchitectRoofPainterHelper {
     bool isSelected = false,
     bool isLowerLevel = false,
     Offset? position,
+    Path? availableArea,
+    List<Rect> avoid = const [],
   }) {
     final scope = ArchitectTextScope.current;
     if (scope != null) {
       scale = 11 / scope.height(roof.id, ArchitectAnnotationRole.symbol);
     }
-    final center = position ?? roof.centroid;
+    // Label: slope degrees, percent, and elevation badge
+    final degText = roof.slopeDegrees.toStringAsFixed(
+      roof.slopeDegrees % 1 == 0 ? 0 : 1,
+    );
+    final upperDegText = roof.upperSlopeDegrees.toStringAsFixed(
+      roof.upperSlopeDegrees % 1 == 0 ? 0 : 1,
+    );
+    final pctText = roof.slopePercent.round();
+    final slopeText = roof.isMansard
+        ? '$degText° / $upperDegText°'
+        : '$degText° ($pctText%)';
+    final ridgeZ = storey.elevation + roof.ridgeTopElevation;
+    final sign = ridgeZ >= 0 ? '+' : '';
+    final ridgeLabel = scope?.length(ridgeZ) ?? ridgeZ.toStringAsFixed(2);
+    final label = isLowerLevel
+        ? '${scope?.length(storey.elevation) ?? storey.elevationLabel}  $degText°'
+        : '$slopeText  $sign$ridgeLabel';
+
+    final fontSize = 11.0 / scale;
+    final tp = ArchitectTextPainter(
+      elementId: roof.id,
+      role: ArchitectAnnotationRole.symbol,
+      modelScale: 1,
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: ArchitectPaperStyle.ink,
+          fontSize: fontSize,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    var center = position ?? roof.centroid;
     final dir = roof.slopeDirection;
+    if (avoid.isNotEmpty && availableArea != null) {
+      List<Rect> symbolBounds(Offset point) => [
+        Rect.fromLTWH(
+          point.dx - tp.width / 2 - 4 / scale,
+          point.dy + 4 / scale,
+          tp.width + 8 / scale,
+          tp.height + 4 / scale,
+        ).inflate(2 / scale),
+        Rect.fromPoints(
+          point - dir * (18 / scale),
+          point + dir * (18 / scale),
+        ).inflate(6 / scale),
+      ];
+      bool fits(Offset point) {
+        return symbolBounds(point).every(
+          (bounds) =>
+              [
+                bounds.topLeft,
+                bounds.topRight,
+                bounds.bottomLeft,
+                bounds.bottomRight,
+                bounds.center,
+              ].every(availableArea.contains) &&
+              avoid.every((obstacle) => !obstacle.overlaps(bounds)),
+        );
+      }
+
+      if (!fits(center)) {
+        final bounds = availableArea.getBounds();
+        final candidates = [
+          for (final y in [.5, .4, .6, .25, .75, .1, .9])
+            for (final x in [.5, .4, .6, .25, .75, .1, .9])
+              Offset(
+                bounds.left + bounds.width * x,
+                bounds.top + bounds.height * y,
+              ),
+        ];
+        center = candidates.where(fits).firstOrNull ?? center;
+      }
+    }
     final arrowHalfLen = 18.0 / scale;
+    if (scope?.publication != true && canvas is! ArchitectVectorCanvas) {
+      _slopeIndicatorCenters[roof] = center;
+    }
     final start = center - dir * arrowHalfLen;
     final end = center + dir * arrowHalfLen;
 
@@ -409,40 +543,6 @@ class ArchitectRoofPainterHelper {
     final head2 = end - dir * headLen - perp * (headLen * 0.55);
     canvas.drawLine(end, head1, arrowPaint);
     canvas.drawLine(end, head2, arrowPaint);
-
-    // Label: slope degrees, percent, and elevation badge
-    final degText = roof.slopeDegrees.toStringAsFixed(
-      roof.slopeDegrees % 1 == 0 ? 0 : 1,
-    );
-    final upperDegText = roof.upperSlopeDegrees.toStringAsFixed(
-      roof.upperSlopeDegrees % 1 == 0 ? 0 : 1,
-    );
-    final pctText = roof.slopePercent.round();
-    final slopeText = roof.isMansard
-        ? '$degText° / $upperDegText°'
-        : '$degText° ($pctText%)';
-    final ridgeZ = storey.elevation + roof.ridgeTopElevation;
-    final sign = ridgeZ >= 0 ? '+' : '';
-    final ridgeLabel = scope?.length(ridgeZ) ?? ridgeZ.toStringAsFixed(2);
-    final label = isLowerLevel
-        ? '${scope?.length(storey.elevation) ?? storey.elevationLabel}  $degText°'
-        : '$slopeText  $sign$ridgeLabel';
-
-    final fontSize = 11.0 / scale;
-    final tp = ArchitectTextPainter(
-      elementId: roof.id,
-      role: ArchitectAnnotationRole.symbol,
-      modelScale: 1,
-      text: TextSpan(
-        text: label,
-        style: TextStyle(
-          color: ArchitectPaperStyle.ink,
-          fontSize: fontSize,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
 
     final padX = 4.0 / scale;
     final padY = 2.0 / scale;
@@ -575,11 +675,7 @@ class ArchitectRoofPainterHelper {
             ..strokeWidth = 2.0 / draftingScale
             ..style = PaintingStyle.stroke,
         );
-        canvas.drawCircle(
-          a,
-          3.4 / draftingScale,
-          Paint()..color = accent,
-        );
+        canvas.drawCircle(a, 3.4 / draftingScale, Paint()..color = accent);
         canvas.drawCircle(
           a,
           1.2 / draftingScale,

@@ -279,19 +279,20 @@ class ArchitectElementTool extends ChangeNotifier {
     required Offset p2,
   }) {
     final rect = Rect.fromPoints(p1, p2);
-    if (rect.width < 0.15 || rect.height < 0.15) return null;
+    final circular = openingType == OpeningType.circular;
+    final minimum = circular ? .02 : .15;
+    if (rect.width < minimum || rect.height < minimum) return null;
     final now = ArchitectElementId.next('element');
-    final boundary = [
-      rect.topLeft,
-      rect.topRight,
-      rect.bottomRight,
-      rect.bottomLeft,
-    ];
+    final diameter = math.min(rect.width, rect.height);
+    final boundary = circular
+        ? [for (var i = 0; i < 48; i++)
+            rect.center + Offset(math.cos(i * math.pi / 24),
+                math.sin(i * math.pi / 24)) * (diameter / 2)]
+        : [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft];
     final newOpening = ArchitectOpening(
       id: 'op_$now',
       boundary: boundary,
       type: openingType,
-      label: 'Opening ${storey.openings.length + 1}',
     );
 
     return (
@@ -475,7 +476,8 @@ class ArchitectElementTool extends ChangeNotifier {
       elevationMarkers: tool == ArchitectTool.level
           ? storey.elevationMarkers
           : [],
-      components: tool == ArchitectTool.component ? storey.components : [],
+      components: tool.usesComponent ? storey.components.where((c) =>
+          c.isServiceComponent == (tool == ArchitectTool.services)).toList() : [],
       floorDrains: tool == ArchitectTool.floorDrain ? storey.floorDrains : [],
       zones: tool == ArchitectTool.zone ? storey.zones : [],
       cadPrimitives: storey.cadPrimitives

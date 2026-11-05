@@ -7,6 +7,7 @@ enum ArchitectToolCategory {
   plan,
   build,
   structure,
+  services,
   furnishing,
   views,
   annotations,
@@ -18,6 +19,7 @@ enum ArchitectToolCategory {
     plan => l.architectCategoryPlan,
     build => l.architectCategoryBuild,
     structure => l.architectCategoryStructure,
+    services => l.architectCategoryServices,
     furnishing => l.architectFurnishing,
     views => l.architectCategoryViews,
     annotations => l.architectCategoryAnnotations,
@@ -29,6 +31,7 @@ enum ArchitectToolCategory {
     plan => AppIconId.zone,
     build => AppIconId.wall,
     structure => AppIconId.beam,
+    services => AppIconId.component,
     furnishing => AppIconId.furniture,
     views => AppIconId.section,
     annotations => AppIconId.dimension,
@@ -46,9 +49,9 @@ enum ArchitectToolCategory {
     ArchitectTool.wall ||
     ArchitectTool.door ||
     ArchitectTool.window ||
-    ArchitectTool.opening ||
     ArchitectTool.stair ||
     ArchitectTool.roof => build,
+    ArchitectTool.opening || ArchitectTool.services => services,
     ArchitectTool.component || ArchitectTool.floorDrain => furnishing,
     ArchitectTool.column ||
     ArchitectTool.beam ||
@@ -88,6 +91,7 @@ extension ArchitectToolCatalogLabel on ArchitectTool {
     ArchitectTool.opening => (AppIconId.opening, l.architectToolOpening),
     ArchitectTool.stair => (AppIconId.stairs, l.architectToolStair),
     ArchitectTool.component => (AppIconId.furniture, l.architectLibrary),
+    ArchitectTool.services => (AppIconId.component, l.architectServiceBodies),
     ArchitectTool.zone => (AppIconId.zone, l.architectToolZone),
     ArchitectTool.zoneTable => (AppIconId.schedule, l.architectToolZoneTable),
     ArchitectTool.dimension => (AppIconId.dimension, l.architectToolDimension),

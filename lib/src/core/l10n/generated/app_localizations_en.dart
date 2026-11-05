@@ -10926,4 +10926,130 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectSheetPlaceShort => 'View';
+
+  @override
+  String get architectCategoryServices => 'Services';
+
+  @override
+  String get architectServiceBodies => 'Risers';
+
+  @override
+  String get architectOpeningCircular => 'Round';
+
+  @override
+  String get architectOpeningCircularHelp =>
+      'Round penetration for drainage, water or pipes. Two points define its bounds; the shorter side sets the diameter.';
+
+  @override
+  String get architectServiceVentSingle => 'Single vent block';
+
+  @override
+  String get architectServiceVentDouble => 'Twin vent block';
+
+  @override
+  String get architectServiceVentTransition => 'Concrete transition';
+
+  @override
+  String get architectServiceCompactVent => 'Compact LS 1';
+
+  @override
+  String get architectServiceCompactTransition => 'LS 1 transition';
+
+  @override
+  String get architectServiceCombinedRiser => 'Combined plumbing riser';
+
+  @override
+  String get architectServiceSewer => 'Drain Ø110';
+
+  @override
+  String get architectServiceWater => 'Water Ø32';
+
+  @override
+  String get architectServiceDryRiser => 'Dry riser DN100';
+
+  @override
+  String get architectServiceSleeve => 'Sleeve Ø160';
+
+  @override
+  String get architectServiceChimney => 'Chimney Ø180';
+
+  @override
+  String get architectServiceVentHelp =>
+      'Concrete ventilation blocks, 300×250×200 or 500×300×200 mm, stacked vertically with hollow channels. For ventilation.';
+
+  @override
+  String get architectServiceTransitionHelp =>
+      'Transition comprising two 500×300×200 mm concrete blocks. A schematic opening in the web connects the branch to the main channel; check the manufacturer’s installation detail.';
+
+  @override
+  String get architectServiceCompactHelp =>
+      'Envelope based on Schiedel LS 1: 355×220 mm, 330 mm course. Main channel 200×170 mm and branch 90×170 mm. Transition geometry is schematic.';
+
+  @override
+  String get architectServiceCombinedHelp =>
+      'Coordination layout, 500×250 mm: Ø110 drain, Ø50 pipe and two insulated Ø32 water pipes with an inspection cover. Coordinate the enclosure size for the project.';
+
+  @override
+  String get architectServicePipeHelp =>
+      'Hollow pipe or sleeve with a clear bore. Intersected slabs are cut automatically; dimensions are in centimetres.';
+
+  @override
+  String get architectServiceDryHelp =>
+      'Vertical DN100 steel pipe, 114.3 mm outside diameter. Coordination element; fittings and fire service design are specified by the project.';
+
+  @override
+  String get architectServiceChimneyHelp =>
+      'Envelope 360×360 mm with Ø180 flue based on Schiedel ABSOLUT. Hollow ceramic liner, insulation, casing and ventilated cap. Above-roof height and clearances are project parameters.';
+
+  @override
+  String get architectServiceCap => 'Cap';
+
+  @override
+  String get architectServiceCapNone => 'Open top';
+
+  @override
+  String get architectServiceCapFlat => 'Flat';
+
+  @override
+  String get architectServiceCapPitched => 'Pitched';
+
+  @override
+  String get architectServiceCapConical => 'Conical';
+
+  @override
+  String get architectServiceAutoHeight => 'Follow roof';
+
+  @override
+  String get architectServiceAutoHeightHelp =>
+      'Height follows the highest intersected roof surface plus the chosen extension. This is a geometry setting; the required height is determined by the project.';
+
+  @override
+  String get architectServiceAboveRoof => 'Above roof';
+
+  @override
+  String get architectServiceFlueDiameter => 'Flue Ø';
+
+  @override
+  String get architectServiceRoofClearance => 'Roof clearance';
+
+  @override
+  String get architectServiceVent => 'Vent Ø110';
+
+  @override
+  String get architectServiceFireplace => 'Fireplace';
+
+  @override
+  String get architectServiceFireplaceHelp =>
+      'Compact 550×600 mm fireplace with combustion chamber, door, grate and Ø180 flue. Upper levels show only the chimney; its roof opening and flashing follow the fireplace when moved. The coordination envelope follows compact fireplace modules.';
+
+  @override
+  String get architectServiceAllStoreys => 'All levels';
+
+  @override
+  String get architectServiceAllStoreysHelp =>
+      'One continuous element from the lowest storey to the roof. Switch off to start at its placement level. Edit or delete it on the placement level to update every plan.';
+
+  @override
+  String get architectServiceVentOutletHelp =>
+      'Open Ø110 roof vent with weather collar and flashing. Automatic height and the above-roof extension can be adjusted.';
 }

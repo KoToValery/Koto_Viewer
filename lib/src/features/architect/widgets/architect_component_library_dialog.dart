@@ -13,6 +13,7 @@ import '../services/component_geometry_cache.dart';
 import '../services/component_library_service.dart';
 import '../services/fenestration_library_service.dart';
 import 'architect_component_labels.dart';
+import 'component_dimensions_dialog.dart';
 import 'component_studio_dialog.dart';
 import 'component_preview_painters.dart';
 import 'fenestration_preview.dart';
@@ -24,12 +25,14 @@ class ArchitectComponentLibraryDialog extends StatefulWidget {
   final ValueChanged<ArchitectFenestrationStyle>? onSelectFenestration;
   final VoidCallback? onSelectDownpipe;
   final VoidCallback? onSelectFloorDrain;
+  final ArchitectComponentCategory? initialCategory;
   const ArchitectComponentLibraryDialog({
     super.key,
     this.onSelectComponent,
     this.onSelectFenestration,
     this.onSelectDownpipe,
     this.onSelectFloorDrain,
+    this.initialCategory,
   });
 
   static Future<void> show(
@@ -38,6 +41,7 @@ class ArchitectComponentLibraryDialog extends StatefulWidget {
     ValueChanged<ArchitectFenestrationStyle>? onSelectFenestration,
     VoidCallback? onSelectDownpipe,
     VoidCallback? onSelectFloorDrain,
+    ArchitectComponentCategory? initialCategory,
   }) => showDialog(
     context: context,
     builder: (_) => ArchitectComponentLibraryDialog(
@@ -45,6 +49,7 @@ class ArchitectComponentLibraryDialog extends StatefulWidget {
       onSelectFenestration: onSelectFenestration,
       onSelectDownpipe: onSelectDownpipe,
       onSelectFloorDrain: onSelectFloorDrain,
+      initialCategory: initialCategory,
     ),
   );
 
@@ -67,6 +72,7 @@ class _ArchitectComponentLibraryDialogState
   @override
   void initState() {
     super.initState();
+    _category = widget.initialCategory;
     ComponentLibraryService.instance.addListener(_refresh);
     FenestrationLibraryService.instance.addListener(_refresh);
     ComponentLibraryService.instance.init();
@@ -457,12 +463,18 @@ class _ArchitectComponentLibraryDialogState
                         final d = definitions[index];
                         final geometry = ComponentGeometryCache.instance
                             .getOrCompute(d, d.defaultParameters);
-                        final sizes = ['width', 'depth', 'height']
-                            .map(
-                              (key) => ((d.defaultParameters[key] as num) * 100)
-                                  .round(),
-                            )
-                            .join('×');
+                        final sizes =
+                            [
+                                  'width',
+                                  'depth',
+                                  if (d.id != 'service_chimney') 'height',
+                                ]
+                                .map(
+                                  (key) => componentDimensionCm(
+                                    d.defaultParameters[key] as num,
+                                  ),
+                                )
+                                .join('×');
                         return _card(
                           componentLabel(l, d),
                           '$sizes cm',
@@ -471,7 +483,7 @@ class _ArchitectComponentLibraryDialogState
                                 ? ComponentMeshPreviewPainter(
                                     geometry.mesh3d,
                                     .55,
-                                    .65,
+                                    .65 + (d.id == 'service_fireplace' ? math.pi : 0),
                                   )
                                 : _ComponentThumbnailPainter(geometry.block2d),
                           ),
@@ -485,7 +497,29 @@ class _ArchitectComponentLibraryDialogState
                                   context,
                                   initialScriptJson: d.rawSourceJson,
                                 )
+                              : d.category ==
+                                    ArchitectComponentCategory.services
+                              ? () async {
+                                  final values =
+                                      await ComponentDimensionsDialog.show(
+                                        context,
+                                        d,
+                                        d.defaultParameters,
+                                      );
+                                  if (values == null || !context.mounted) {
+                                    return;
+                                  }
+                                  library.setActiveDefinition(
+                                    d,
+                                    parameters: values,
+                                  );
+                                  widget.onSelectComponent?.call(d);
+                                  Navigator.of(context).pop();
+                                }
                               : null,
+                          editTooltip: l.architectProperties,
+                          editIcon: Icons.tune,
+                          help: serviceComponentHelp(l, d.id),
                           onDelete: d is ScriptedComponentDefinition
                               ? () async {
                                   final confirm = await showDialog<bool>(
@@ -543,6 +577,7 @@ class _ArchitectComponentLibraryDialogState
     VoidCallback? onDelete,
     String? editTooltip,
     IconData? editIcon,
+    String? help,
   }) => Card(
     color: colors.surfaceContainerHigh,
     clipBehavior: Clip.antiAlias,
@@ -589,14 +624,17 @@ class _ArchitectComponentLibraryDialogState
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colors.onSurface,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+            Tooltip(
+              message: help ?? name,
+              child: Text(
+                name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.onSurface,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             Text(

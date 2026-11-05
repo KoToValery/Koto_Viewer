@@ -27,6 +27,7 @@ import '../models/architect_wall.dart';
 import 'architect_building_elevation.dart';
 import 'component_geometry_cache.dart';
 import 'component_library_service.dart';
+import 'architect_service_geometry.dart';
 
 class ArchitectSectionRegion {
   final String sourceId;
@@ -407,7 +408,7 @@ class ArchitectBuildingSection {
     /*
     for (final floor in project.storeys) {
       for (final slab in floor.slabs) {
-        final spans = ArchitectSlabGeometry.intervals(floor, slab, cut);
+        final spans = ArchitectSlabGeometry.intervals(floor, slab, cut, project: project);
         for (final surface in ArchitectSlabGeometry.surfaces(
           project,
           floor,
@@ -1122,27 +1123,30 @@ class ArchitectBuildingSection {
         } else if (def != null) {
           final geo = ComponentGeometryCache.instance.getOrCompute(
             def,
-            comp.parameters,
+            ArchitectServiceGeometry.parameters(project, floor, comp),
           );
           final cosR = math.cos(comp.rotation);
           final sinR = math.sin(comp.rotation);
-          final zBase = floor.elevation + comp.elevationOffset;
+          final zBase = ArchitectServiceGeometry.baseElevation(project, floor, comp);
           Vector3 tr(Vector3 p) => Vector3(
             comp.position.dx + p.x * cosR - p.y * sinR,
             comp.position.dy + p.x * sinR + p.y * cosR,
             zBase + p.z,
           );
           final compPath = sliceMesh([
+            ...ArchitectServiceGeometry.flashing(project, floor, comp),
+            ...ArchitectServiceGeometry.terminal(project, floor, comp),
             for (final t in geo.mesh3d.triangles)
               Triangle3D(v0: tr(t.v0), v1: tr(t.v1), v2: tr(t.v2)),
-          ]);
+          ], exact: comp.isServiceComponent);
           if (compPath != null) {
             regions.add(
               ArchitectSectionRegion(
                 comp.id,
                 SlabMaterial.custom,
                 compPath,
-                customFillColor: const Color(0xFFCFD8DC),
+                customFillColor: comp.isServiceComponent
+                    ? const Color(0xFFF5F5F5) : const Color(0xFFCFD8DC),
               ),
             );
           }
@@ -1438,7 +1442,7 @@ class ArchitectBuildingSection {
     }
     for (final floor in project.storeys) {
       for (final slab in floor.slabs.where((s) => s.id == detail.slabId)) {
-        if (ArchitectSlabGeometry.intervals(floor, slab, cut).any(
+        if (ArchitectSlabGeometry.intervals(floor, slab, cut, project: project).any(
           (s) => detail.station >= s.$1 - 1e-8 && detail.station <= s.$2 + 1e-8,
         )) {
           return (storey: floor, slab: slab);

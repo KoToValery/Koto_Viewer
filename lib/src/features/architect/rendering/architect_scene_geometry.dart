@@ -40,6 +40,8 @@ class ArchitectSceneGeometry {
       for (final drain in s.floorDrains) ...drain.polygon,
       for (final roof in s.roofs) ...roof.points,
       for (final opening in s.openings) ...opening.boundary,
+      for (final component in s.components)
+        if (component.isVisible) ...component.worldPolygonCorners,
       for (final stair in s.stairs) ...[stair.displayBounds.topLeft, stair.displayBounds.bottomRight],
       for (final dim in s.dimensions) ...[
         ...dim.witnessPoints,

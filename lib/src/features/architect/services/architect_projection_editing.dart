@@ -462,7 +462,9 @@ class ArchitectProjectionEditing {
     double? ceiling;
     for (final floor in p.storeys) {
       for (final slab in floor.slabs) {
-        if (!ArchitectSlabGeometry.contains(floor, slab, centre)) continue;
+        if (!ArchitectSlabGeometry.contains(floor, slab, centre, project: p)) {
+          continue;
+        }
         final underside = ArchitectSlabGeometry.surfaces(
           p,
           floor,

@@ -429,7 +429,7 @@ class _BuildingSectionsState extends State<ArchitectBuildingSectionsScreen> {
           var station = rawStation.clamp(0, value.length).toDouble();
           for (final floor in project.storeys) {
             for (final slab in floor.slabs.where((s) => s.id == id)) {
-              final spans = ArchitectSlabGeometry.intervals(floor, slab, value);
+              final spans = ArchitectSlabGeometry.intervals(floor, slab, value, project: project);
               if (spans.isNotEmpty) {
                 station = spans
                     .map(

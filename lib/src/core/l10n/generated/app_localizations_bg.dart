@@ -10972,4 +10972,130 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectSheetPlaceShort => 'Изглед';
+
+  @override
+  String get architectCategoryServices => 'Инсталации';
+
+  @override
+  String get architectServiceBodies => 'Щрангове';
+
+  @override
+  String get architectOpeningCircular => 'Кръгъл';
+
+  @override
+  String get architectOpeningCircularHelp =>
+      'Кръгъл отвор за канализация, вода или тръби. Две точки задават габарита; диаметърът следва по-късата страна.';
+
+  @override
+  String get architectServiceVentSingle => 'Единично вент. тяло';
+
+  @override
+  String get architectServiceVentDouble => 'Двойно вент. тяло';
+
+  @override
+  String get architectServiceVentTransition => 'Бетонен преход';
+
+  @override
+  String get architectServiceCompactVent => 'Компактно LS 1';
+
+  @override
+  String get architectServiceCompactTransition => 'Преход LS 1';
+
+  @override
+  String get architectServiceCombinedRiser => 'Общ ВиК щранг';
+
+  @override
+  String get architectServiceSewer => 'Канал Ø110';
+
+  @override
+  String get architectServiceWater => 'Вода Ø32';
+
+  @override
+  String get architectServiceDryRiser => 'Сухотръбие DN100';
+
+  @override
+  String get architectServiceSleeve => 'Втулка Ø160';
+
+  @override
+  String get architectServiceChimney => 'Комин Ø180';
+
+  @override
+  String get architectServiceVentHelp =>
+      'Бетонни вентилационни тела 300×250×200 или 500×300×200 mm, подредени по височина. Кухи канали. За вентилация.';
+
+  @override
+  String get architectServiceTransitionHelp =>
+      'Преход от две бетонни тела 500×300×200 mm. Схематичен отвор в преградата свързва страничния канал с основния; проверете конкретния монтажен детайл на производителя.';
+
+  @override
+  String get architectServiceCompactHelp =>
+      'Габарит по Schiedel LS 1: 355×220 mm, модул 330 mm. Основен канал 200×170 mm и страничен 90×170 mm. Преходът е схематичен.';
+
+  @override
+  String get architectServiceCombinedHelp =>
+      'Компоновъчна схема 500×250 mm: канал Ø110, тръба Ø50 и две водопроводни тръби Ø32 с изолация и ревизионен капак. Габаритът подлежи на координация по проекта.';
+
+  @override
+  String get architectServicePipeHelp =>
+      'Куха тръба или втулка с реален вътрешен отвор. Пресечените плочи се изрязват автоматично; размерите са в сантиметри.';
+
+  @override
+  String get architectServiceDryHelp =>
+      'Вертикална стоманена тръба DN100, външен диаметър 114,3 mm. Компоновъчен елемент; арматурата и пожарната схема се определят по проекта.';
+
+  @override
+  String get architectServiceChimneyHelp =>
+      'Габарит 360×360 mm и димоход Ø180 по Schiedel ABSOLUT. Куха керамична тръба, изолация, обвивка и проветрива шапка. Надпокривната височина и отстоянията са проектни параметри.';
+
+  @override
+  String get architectServiceCap => 'Шапка';
+
+  @override
+  String get architectServiceCapNone => 'Без шапка';
+
+  @override
+  String get architectServiceCapFlat => 'Плоска';
+
+  @override
+  String get architectServiceCapPitched => 'Двускатна';
+
+  @override
+  String get architectServiceCapConical => 'Конусна';
+
+  @override
+  String get architectServiceAutoHeight => 'До покрива';
+
+  @override
+  String get architectServiceAutoHeightHelp =>
+      'Височината следва най-високата пресечена покривна повърхност и зададеното излизане над нея. Това е геометрична настройка; нужната височина се определя по проекта.';
+
+  @override
+  String get architectServiceAboveRoof => 'Над покрива';
+
+  @override
+  String get architectServiceFlueDiameter => 'Димоход Ø';
+
+  @override
+  String get architectServiceRoofClearance => 'Фуга при покрива';
+
+  @override
+  String get architectServiceVent => 'Отдушник Ø110';
+
+  @override
+  String get architectServiceFireplace => 'Камина';
+
+  @override
+  String get architectServiceFireplaceHelp =>
+      'Компактна камина 550×600 mm с горивна камера, врата, решетка и димоход Ø180. На горните нива се показва само коминът; покривният отвор и обшивката следват преместването ѝ. Компоновъчният габарит е по компактни каминни модули.';
+
+  @override
+  String get architectServiceAllStoreys => 'Всички нива';
+
+  @override
+  String get architectServiceAllStoreysHelp =>
+      'Един непрекъснат елемент от най-ниския етаж до покрива. Изключете, за да започва от нивото на поставяне. Промените и изтриването се правят от нивото на поставяне и обновяват всички планове.';
+
+  @override
+  String get architectServiceVentOutletHelp =>
+      'Отворен отдушник Ø110 над покрива с водоплътен борд и обшивка. Автоматичната височина и излизането над покрива могат да се променят.';
 }

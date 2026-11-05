@@ -312,7 +312,7 @@ class ArchitectSlab {
 // 3. ARCHITECTURAL OPENING / SHAFT / VOID
 // ===========================================================================
 
-enum OpeningType { shaft, floorVoid, elevator }
+enum OpeningType { shaft, floorVoid, elevator, circular }
 
 class ArchitectOpening {
   final String id;
@@ -323,7 +323,7 @@ class ArchitectOpening {
   const ArchitectOpening({
     required this.id,
     required this.boundary,
-    this.label = 'Shaft',
+    this.label = '',
     this.type = OpeningType.shaft,
   });
 
@@ -369,7 +369,7 @@ class ArchitectOpening {
                 )
                 .toList() ??
             const [],
-        label: json['label'] as String? ?? 'Shaft',
+        label: json['label'] as String? ?? '',
         type: OpeningType.values.firstWhere(
           (t) => t.name == json['type'],
           orElse: () => OpeningType.shaft,

@@ -8,6 +8,7 @@ import 'architect_wall_type_picker.dart';
 import '../models/architect_project.dart' show ArchitectUnit;
 import 'architect_stair_labels.dart';
 import 'architect_component_labels.dart';
+import '../components/definitions/service_components.dart';
 import 'component_dimensions_dialog.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_column.dart';
@@ -229,7 +230,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     setState(() => category = result.category);
     if (result.tool != null) {
       widget.onToolChanged(result.tool!);
-      if (result.tool == ArchitectTool.component) {
+      if (result.tool!.usesComponent) {
         widget.onOpenComponentLibrary?.call();
       }
     } else if (result.category == ArchitectToolCategory.furnishing) {
@@ -369,7 +370,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   _buildBeamSubBar(context)
                 else if (activeTool == ArchitectTool.stair)
                   _buildStairSubBar(context)
-                else if (activeTool == ArchitectTool.component &&
+                else if (activeTool.usesComponent &&
                     !compactComponents)
                   _buildComponentSubBar(context)
                 else if (activeTool == ArchitectTool.opening)
@@ -562,7 +563,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                     onToolChanged(ArchitectTool.pan);
                   } else {
                     onToolChanged(tool);
-                    if (tool == ArchitectTool.component) {
+                    if (tool.usesComponent) {
                       widget.onOpenComponentLibrary?.call();
                     }
                   }
@@ -1135,7 +1136,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
             ),
           ),
           const SizedBox(width: 4),
-          OutlinedButton.icon(
+          if (activeTool != ArchitectTool.services) OutlinedButton.icon(
             key: const ValueKey("component-tool-floor-drain-btn"),
             style: OutlinedButton.styleFrom(
               foregroundColor: colors.onSurfaceVariant,
@@ -1152,7 +1153,11 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           const SizedBox(width: 4),
           Tooltip(
             message:
-                '${(w * 100).round()}×${(d * 100).round()}×${(h * 100).round()} cm',
+                activeTool == ArchitectTool.services &&
+                    ServiceComponentDefinition.continuousIds.contains(activeDef.id) &&
+                    activeParams['autoHeight'] != false
+                    ? '${componentDimensionCm(w)}×${componentDimensionCm(d)} cm • ${l.architectServiceAutoHeight}'
+                    : '${componentDimensionCm(w)}×${componentDimensionCm(d)}×${componentDimensionCm(h)} cm',
             child: TextButton.icon(
               key: const ValueKey('component-tool-size-btn'),
               icon: AppIcon(AppIconId.measure, size: 18),
@@ -1262,6 +1267,20 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               if (sel) onOpeningTypeChanged?.call(OpeningType.floorVoid);
             },
             visualDensity: VisualDensity.compact,
+          ),
+          const SizedBox(width: 6),
+          Tooltip(
+            message: l10n.architectOpeningCircularHelp,
+            child: ChoiceChip(
+              key: const ValueKey('opening-circular'),
+              avatar: const AppIcon(AppIconId.radioOff, size: 14),
+              label: Text(l10n.architectOpeningCircular),
+              selected: openingType == OpeningType.circular,
+              onSelected: (selected) {
+                if (selected) onOpeningTypeChanged?.call(OpeningType.circular);
+              },
+              visualDensity: VisualDensity.compact,
+            ),
           ),
         ],
       ),

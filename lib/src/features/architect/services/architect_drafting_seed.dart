@@ -89,6 +89,7 @@ class ArchitectDraftingSeed {
     ArchitectTool.opening: {},
     ArchitectTool.stair: {},
     ArchitectTool.component: {'elevationOffset', 'visibleInSection'},
+    ArchitectTool.services: {'elevationOffset', 'visibleInSection'},
     ArchitectTool.zone: {
       'floorFinish',
       'wallFinish',
@@ -143,7 +144,9 @@ class ArchitectDraftingSeed {
     for (final entry in _collections.entries) {
       for (final record in (json[entry.key] as List? ?? const [])) {
         final value = record as Map<String, dynamic>;
-        yield (entry.value, value);
+        yield (entry.key == 'components' &&
+                (value['definitionId'] as String? ?? '').startsWith('service_')
+            ? ArchitectTool.services : entry.value, value);
         if (entry.value == ArchitectTool.wall) yield* _records(value);
       }
     }

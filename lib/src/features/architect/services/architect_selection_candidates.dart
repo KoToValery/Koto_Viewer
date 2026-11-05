@@ -53,7 +53,8 @@ class ArchitectSelectionCandidates {
       for (final e in s.floorDrains) e.id: ArchitectTool.floorDrain,
       for (final e in s.slabs) e.id: ArchitectTool.slab,
       for (final e in s.components.reversed)
-        if (e.isVisible) e.id: ArchitectTool.component,
+        if (e.isVisible) e.id: e.isServiceComponent
+            ? ArchitectTool.services : ArchitectTool.component,
       for (final e in s.zones) e.id: ArchitectTool.zone,
       for (final e in project.gridAxes) e.id: ArchitectTool.axis,
       for (final e in project.sections) e.id: ArchitectTool.section,

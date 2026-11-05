@@ -38,6 +38,7 @@ import '../models/architect_overhang.dart';
 import '../services/architect_overhang_detector.dart';
 import 'architect_overhang_painter_helper.dart';
 import '../services/architect_roof_tool.dart';
+import 'architect_service_plan_painter.dart';
 import 'architect_roof_painter_helper.dart';
 
 enum ArchitectPaintLayer { all, model, interaction }
@@ -69,6 +70,9 @@ enum ArchitectTool {
   section,
   elevation,
   pan,
+  services;
+
+  bool get usesComponent => this == component || this == services;
 }
 
 enum WallDraftingMode { singleLine, chained }
@@ -85,6 +89,8 @@ class Architect2dPainter extends CustomPainter {
   final ArchitectCanvasPalette palette;
   final AppLocalizations? l10n;
   final ArchitectTool activeTool;
+  final OpeningType activeOpeningType;
+  final bool showServiceProjections;
   final ArchitectLineStyle activeCadLineStyle;
   final List<ArchitectMaterialLayer> activeWallLayers;
   final Offset? activeWallArcEnd;
@@ -223,6 +229,8 @@ class Architect2dPainter extends CustomPainter {
     this.marqueePoints = const [],
     this.marqueePolygon = const [],
     required this.activeTool,
+    this.activeOpeningType = OpeningType.shaft,
+    this.showServiceProjections = true,
     this.activeCadLineStyle = ArchitectLineStyle.solid,
     this.activeWallLayers = const [],
     this.activeWallArcEnd,
@@ -364,6 +372,7 @@ class Architect2dPainter extends CustomPainter {
       );
       _drawGridAxes(canvas);
       ArchitectElementsPainterHelper.drawSlabs(
+        project: _project,
         palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
@@ -463,7 +472,14 @@ class Architect2dPainter extends CustomPainter {
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
       );
+      if (showServiceProjections) {
+        ArchitectServicePlanPainter.roofOpenings(
+          canvas: canvas, project: _project, storey: _elementLayerStorey,
+          scale: zoomScale, palette: palette,
+        );
+      }
       ArchitectElementsPainterHelper.drawComponents(
+        project: showServiceProjections ? _project : null,
         palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
@@ -518,6 +534,7 @@ class Architect2dPainter extends CustomPainter {
       ArchitectElementsPainterHelper.drawActiveElementsDrafting(
         canvas: canvas,
         activeTool: activeTool,
+        openingType: activeOpeningType,
         draftStart: activeDraftStart,
         draftEnd: activeDraftEnd,
         stairPreview: stairPreview,
@@ -793,6 +810,7 @@ class Architect2dPainter extends CustomPainter {
         _project.activeStorey.walls,
       ),
       activeTool: ArchitectTool.select,
+      showServiceProjections: false,
       paintGrid: false,
       zoomScale: zoomScale,
       selectedElementId: selectedElementId,

@@ -1777,7 +1777,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ArchitectTool.stair => storey.stairs.any((s) => s.id == id),
 
-      ArchitectTool.component => storey.components.any((c) => c.id == id),
+      ArchitectTool.component || ArchitectTool.services => storey.components.any((c) => c.id == id),
 
       ArchitectTool.dimension => storey.dimensions.any((d) => d.id == id),
 
@@ -2991,7 +2991,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }.contains(tool)) {
       return null;
     }
-    if (tool == ArchitectTool.component) {
+    if (tool?.usesComponent == true) {
       final component = _project.activeStorey.components.where((c) => c.id == ids.single).firstOrNull;
       if (component == null || ComponentLibraryService.instance.findDefinition(component.definitionId,
               ) == null) {
@@ -3114,6 +3114,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _activeZoneKind = zone.kind;
           break;
         case ArchitectTool.component:
+        case ArchitectTool.services:
           final component = ArchitectComponentInstance.fromJson(json);
           final library = ComponentLibraryService.instance;
           final definition = library.findDefinition(component.definitionId);
@@ -4159,6 +4160,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _moveSelection = false;
 
     _activeTool = nextTool;
+    if (nextTool.usesComponent) {
+      final library = ComponentLibraryService.instance;
+      final services = nextTool == ArchitectTool.services;
+      if ((library.activeDefinition.category == ArchitectComponentCategory.services) != services) {
+        library.setActiveDefinition(library.getAllDefinitions().firstWhere((d) =>
+            (d.category == ArchitectComponentCategory.services) == services));
+      }
+    }
     if (nextTool == ArchitectTool.select && keepSingle != null) {
       _selectionIds.add(keepSingle);
       _selectedElementId = keepSingle;
@@ -12524,7 +12533,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 6B. In Component tool
 
-    if (_activeTool == ArchitectTool.component) {
+    if (_activeTool.usesComponent) {
 
       final activeDef = ComponentLibraryService.instance.activeDefinition;
 
@@ -17319,23 +17328,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_activeTool == ArchitectTool.section) return _hitSection(point);
     if (_activeTool == ArchitectTool.elevation) return _hitElevation(point);
 
-    if (_acceptsAnySelection || _activeTool == ArchitectTool.component) {
+    if (_acceptsAnySelection || _activeTool.usesComponent) {
       final secHit = _hitSection(point);
       if (secHit != null) return secHit;
       final elvHit = _hitElevation(point);
       if (elvHit != null) return elvHit;
 
-      if (_showFurnitureLayer) {
+      {
 
         for (final component in _project.activeStorey.components.reversed) {
 
-          if (component.isVisible && component.containsPoint(point)) return component.id;
+          if (!component.isVisible || !_showFurnitureLayer && !component.isServiceComponent) continue;
+          if (!_acceptsAnySelection && component.isServiceComponent != (_activeTool == ArchitectTool.services)) continue;
+          if (component.containsPoint(point)) return component.id;
 
         }
 
       }
 
-      if (_activeTool == ArchitectTool.component && !_acceptsAnySelection) return null;
+      if (_activeTool.usesComponent && !_acceptsAnySelection) return null;
 
       return _elementTool.hitTestElement(
 
@@ -26157,6 +26168,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ArchitectComponentLibraryDialog.show(
 
                       context,
+                      initialCategory: _activeTool == ArchitectTool.services
+                          ? ArchitectComponentCategory.services : null,
 
                       onSelectDownpipe: () => _beginDownpipePlacement(),
                       onSelectFloorDrain: () => setState(() => _activeTool = ArchitectTool.floorDrain,
@@ -26164,7 +26177,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       onSelectComponent: (def) {
 
-                        setState(() => _activeTool = ArchitectTool.component);
+                        setState(() => _activeTool = def.category == ArchitectComponentCategory.services
+                            ? ArchitectTool.services : ArchitectTool.component);
 
                       },
 
@@ -29938,7 +29952,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     showFurniture: _showFurnitureLayer,
 
-    componentPreview: _activeTool == ArchitectTool.component && _cursorModel != null
+    activeOpeningType: _elementTool.openingType,
+
+    componentPreview: _activeTool.usesComponent && _cursorModel != null
 
         ? () {
 
