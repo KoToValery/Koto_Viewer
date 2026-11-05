@@ -17418,7 +17418,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _onSelectionHold(Offset screenPoint) {
     if (_marqueeTool.isDrafting) return false;
-    if (!_acceptsAnySelection && _activeTool != ArchitectTool.wall) return false;
 
     if (_wallCutIds.isNotEmpty ||
 
@@ -17517,17 +17516,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _onContextHold(Offset screenPoint) {
     _dismissTouchCandidates();
     if (_marqueeTool.isDrafting) return false;
-    if (!_acceptsAnySelection && _activeTool != ArchitectTool.zone) return false;
 
-    if (!_selectionContextActive &&
-
-        (_activeTool == ArchitectTool.door ||
-
-            _activeTool == ArchitectTool.window)) {
-
-      return false;
-
-    }
+    // Candidates already respect the active drawing tool. Existing elements
+    // keep their context menu while that tool is active, as well as in Select.
 
     if (_handleMoved ||
 
@@ -17558,6 +17549,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_activeTool == ArchitectTool.zone) {
       if (hitZone != null) {
         setState(() {
+          _cancelActiveDrags();
           _selectedZoneId = hitZone.id;
           _selectedElementId = null;
           _selectionIds
@@ -17592,11 +17584,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (id != null) {
         final zone = _project.activeStorey.zones.where((z) => z.id == id).firstOrNull;
         if (zone != null) {
+          setState(_cancelActiveDrags);
           unawaited(_showZoneContextMenu(screenPoint, zone));
           return true;
         }
 
         setState(() {
+
+          _cancelActiveDrags();
 
           _radialMenuScreenPosition = screenPoint;
 
@@ -17633,6 +17628,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (hitRoof != null) {
 
         setState(() {
+
+          _cancelActiveDrags();
 
           _selectionIds.clear();
 
@@ -27003,6 +27000,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       Positioned(bottom: 0, left: 0, right: 0, child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Keep the canvas stable when a hold selects an axis.
+                          if (_showSelectionActions && !_multiSelect &&
+                              _effectiveSelection.length == 1 &&
+                              _axisTool.selectedAxisId != null && !_is3DView)
+                            Builder(builder: (_) {
+                              final axis = _axisTool.getSelectedAxis(_project);
+                              if (axis == null) return const SizedBox.shrink();
+                              return ArchitectGridAxisPropertiesCard(
+                                axis: axis,
+                                onOffset: () => _handleAxisOffset(axis),
+                                onAlign: () => _handleAxisAlign(axis),
+                                onDelete: () => _handleAxisDelete(axis),
+                                onClose: () => _axisTool.deselect(),
+                              );
+                            }),
                           if (_touchCandidates != null && !_is3DView && !_printPreview)
                             Padding(padding: const EdgeInsets.all(8),
                               child: _buildTouchCandidatePicker(),
@@ -27039,46 +27051,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         )
                   : const SizedBox.shrink(),
                 ),
-              // Floating Axis Property Inspector Card if an axis is selected
-
-              if (!_multiSelect &&
-
-                  _effectiveSelection.length == 1 &&
-
-                  _axisTool.selectedAxisId != null &&
-
-                  !_is3DView)
-
-                Builder(
-
-                  builder: (ctx) {
-
-                    final selectedAxis = _axisTool.getSelectedAxis(_project);
-
-                    if (selectedAxis == null) return const SizedBox.shrink();
-
-                    return ArchitectGridAxisPropertiesCard(
-
-                      axis: selectedAxis,
-
-                      onOffset: () => _handleAxisOffset(selectedAxis),
-
-                      onAlign: () => _handleAxisAlign(selectedAxis),
-
-                      onDelete: () => _handleAxisDelete(selectedAxis),
-
-                      onClose: () => _axisTool.deselect(),
-
-                    );
-
-                  },
-
-                ),
-
-
-
-
-
             ],
 
           ),
