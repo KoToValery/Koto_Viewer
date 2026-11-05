@@ -19827,7 +19827,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectSheetTitleOverlap.
   ///
   /// In en, this message translates to:
-  /// **'A drawing overlaps the title block. Move it above the title block.'**
+  /// **'A drawing overlaps the title block. Move it or edit its boundary.'**
   String get architectSheetTitleOverlap;
 
   /// No description provided for @architectSheetMissingTemplate.
@@ -19848,11 +19848,77 @@ abstract class AppLocalizations {
   /// **'The view fits at 1:{scale}.'**
   String architectSheetScaleAdjusted(int scale);
 
+  /// No description provided for @architectSheetCrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Crop'**
+  String get architectSheetCrop;
+
+  /// No description provided for @architectSheetCropRectangle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rectangle'**
+  String get architectSheetCropRectangle;
+
+  /// No description provided for @architectSheetCropPolygon.
+  ///
+  /// In en, this message translates to:
+  /// **'Polygon'**
+  String get architectSheetCropPolygon;
+
+  /// No description provided for @architectSheetCropAddPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add point'**
+  String get architectSheetCropAddPoint;
+
+  /// No description provided for @architectSheetCropRemovePoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove point'**
+  String get architectSheetCropRemovePoint;
+
+  /// No description provided for @architectSheetCropInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The boundary crosses itself or has no area.'**
+  String get architectSheetCropInvalid;
+
+  /// No description provided for @architectSheetPlaceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a position for the drawing.'**
+  String get architectSheetPlaceHint;
+
+  /// No description provided for @architectSheetSnap.
+  ///
+  /// In en, this message translates to:
+  /// **'Snap'**
+  String get architectSheetSnap;
+
+  /// No description provided for @architectSheetSelectDrawing.
+  ///
+  /// In en, this message translates to:
+  /// **'Select drawing'**
+  String get architectSheetSelectDrawing;
+
   /// No description provided for @architectSheetCropHint.
   ///
   /// In en, this message translates to:
-  /// **'The frame crops the drawing. Use Fit view to show the full source.'**
+  /// **'Move the boundary to crop the drawing without changing its scale. Fit view restores the full source.'**
   String get architectSheetCropHint;
+
+  /// No description provided for @architectSheetScaleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing scale also resizes the boundary. For example, 1:50 to 1:100 halves its width and height.'**
+  String get architectSheetScaleHint;
+
+  /// No description provided for @architectSheetVisibilityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Visibility applies only to this placement.'**
+  String get architectSheetVisibilityHint;
 
   /// No description provided for @architectSheetFitView.
   ///
@@ -19869,7 +19935,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectSheetNoSpace.
   ///
   /// In en, this message translates to:
-  /// **'No room for another view. Create a sheet or resize the existing frames.'**
+  /// **'The view cannot fit in the available space. Move or resize the drawings, or place it freely.'**
   String get architectSheetNoSpace;
 
   /// No description provided for @architectSheetPlaceShort.

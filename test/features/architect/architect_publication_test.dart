@@ -21,6 +21,7 @@ import 'package:kotoview/src/features/architect/services/architect_pdf_export.da
 import 'package:kotoview/src/features/architect/services/architect_sheet_composer.dart';
 import 'package:kotoview/src/features/architect/services/architect_sheet_layout.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_sheets_screen.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_sheet_viewport.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/bim_projects/models/bim_coordinate_frame.dart';
 
@@ -542,6 +543,17 @@ void main() {
     await tester.tap(find.byTooltip('Place view'));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Етаж 1').last);
+    await tester.pumpAndSettle();
+    expect(c.project.document.sheets.single.placements, isEmpty);
+    final viewport = tester.state<ArchitectSheetViewportState>(
+      find.byType(ArchitectSheetViewport),
+    );
+    await tester.tapAt(
+      tester.getTopLeft(
+            find.byKey(const ValueKey('architect-sheet-viewport-input')),
+          ) +
+          viewport.paperToScreen(const Offset(10, 10)),
+    );
     await tester.pumpAndSettle();
     expect(c.project.document.sheets.single.placements, hasLength(1));
     expect(tester.takeException(), isNull);

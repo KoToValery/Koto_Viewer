@@ -18,6 +18,7 @@ import 'package:kotoview/src/features/architect/services/architect_sheet_compose
 import 'package:kotoview/src/features/architect/services/architect_sheet_layout.dart';
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_sheets_screen.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_sheet_viewport.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_catalog.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_workspace_settings_dialog.dart';
@@ -507,7 +508,22 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.textContaining('Етаж 1').last);
         await tester.pumpAndSettle();
+        expect(c.project.document.sheets.single.placements, isEmpty);
+        final viewportState = tester.state<ArchitectSheetViewportState>(
+          find.byType(ArchitectSheetViewport),
+        );
+        final input = find.byKey(
+          const ValueKey('architect-sheet-viewport-input'),
+        );
+        await tester.tapAt(
+          tester.getTopLeft(input) +
+              viewportState.paperToScreen(const Offset(10, 10)),
+        );
+        await tester.pumpAndSettle();
         expect(c.project.document.sheets.single.placements, hasLength(1));
+        // Fitting is now an explicit action, after freely placing the source.
+        await tester.tap(find.byTooltip(l.architectSheetFitView));
+        await tester.pumpAndSettle();
         expect(
           ArchitectSheetComposer.issues(
             c.project,
@@ -517,15 +533,19 @@ void main() {
           isEmpty,
         );
         await capture(tester, key, 'sheet-$language-$dark');
-        final paper = find.byWidgetPredicate(
-          (w) =>
-              w is CustomPaint &&
-              w.painter.runtimeType.toString() == '_SheetPainter',
-        );
-        final paperRect = tester.getRect(paper);
-        final viewport = tester.getRect(find.byType(InteractiveViewer));
-        expect(viewport.contains(paperRect.topLeft), isTrue);
-        expect(viewport.contains(paperRect.bottomRight), isTrue);
+        final viewport = tester.getRect(input);
+        final topLeft =
+            viewport.topLeft + viewportState.paperToScreen(Offset.zero);
+        final bottomRight =
+            viewport.topLeft +
+            viewportState.paperToScreen(
+              Offset(
+                c.project.document.sheets.single.widthMm,
+                c.project.document.sheets.single.heightMm,
+              ),
+            );
+        expect(viewport.contains(topLeft), isTrue);
+        expect(viewport.contains(bottomRight), isTrue);
         await tester.tap(find.byTooltip(l.architectSheetEdit));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
@@ -544,6 +564,32 @@ void main() {
           expect(field.controller!.text.length, lessThan(13));
         }
         await tester.tap(find.text(l.architectSheetSave));
+        await tester.pumpAndSettle();
+        expect(
+          c.project.document.sheets.single.placements.single.toJson(),
+          beforeProperties,
+        );
+        await tester.tap(find.byKey(const ValueKey('architect-sheet-crop')));
+        await tester.pumpAndSettle();
+        await capture(tester, key, 'crop-rectangle-$language-$dark');
+        await tester.tap(
+          find.byKey(const ValueKey('architect-sheet-crop-polygon')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('architect-sheet-crop-add-point')),
+        );
+        await tester.pumpAndSettle();
+        await capture(tester, key, 'crop-polygon-$language-$dark');
+        final saveButton = find.byKey(
+          const ValueKey('architect-sheet-crop-save'),
+        );
+        expect(
+          tester.getRect(input).overlaps(tester.getRect(saveButton)),
+          isTrue,
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('architect-sheet-crop-cancel')),
+        );
         await tester.pumpAndSettle();
         expect(
           c.project.document.sheets.single.placements.single.toJson(),

@@ -37,6 +37,15 @@ updates never recenter the frame or change the anchor. Missing sources are
 marked on the sheet and block export. Double-opening a placement navigates to
 its source view.
 
+An optional placement-local crop polygon uses paper mm relative to the frame
+origin. Legacy placements without it keep rectangular clipping. Editing the
+boundary rebases the frame and compensates the source anchor, including rotated
+views, so the drawing does not move as the boundary changes. Scale changes resize
+both the frame and its crop around the top-left corner while regenerating paper
+annotations. Visibility overrides belong to each placement and inherit unset
+values from the saved drawing; editing one placement never edits its siblings.
+Saved drawing names remain shared and have a separate Rename action.
+
 Vector operations retain semantic roles, source ID sets and clips. Shared wall,
 section and elevation contours retain multiple candidate contributors. This is
 publication provenance, not a completed line-edit/reconciliation engine. A later
@@ -45,12 +54,28 @@ matching the nearest unrelated line.
 
 ## Sheets and output
 
-The sheet editor supports A4–A0 and custom sizes, source placement, independent
-scale/rotation/crop, source visibility, frame snapping, margin alignment,
-locking, duplication and deletion. Frame and source-anchor coordinates can be
-edited in Properties. Title-block templates consist of bordered/unbordered cells
+The sheet editor supports A4–A0 and custom sizes, free source placement,
+independent scale/rotation/crop, placement visibility, live frame snapping,
+margin alignment, locking, duplication and deletion. A full sheet does not block
+insertion: overlapping or off-sheet placements may be staged on the editor's
+pasteboard and arranged later. Explicit Fit view restores the whole source;
+failure preserves the current placement. Frame and source-anchor coordinates
+can be edited in Properties. Title-block templates consist of bordered/unbordered cells
 (including zero-height/width rules), text and dynamic fields. Long values wrap;
 overflow is highlighted in preview and blocks export until the cell is enlarged.
+
+Rectangle and simple polygon crop boundaries share the planar BIM editing
+geometry. The editor and PDF consume the same vector clip path, including text
+and hatches. Preflight considers actual crop regions and titles separately, so
+intersecting bounding rectangles alone do not create false overlap errors.
+Draft conflicts remain editable, while unresolved printable-area/title-block
+conflicts and missing sources still block final export. Source scene caches
+include canonical effective visibility, scale, locale and underlay inputs;
+changing only a paper transform or crop reuses the source scene.
+During a pointer preview, the static sheet and the active drawing content are
+cached separately. Moving translates the content layer; cropping applies the
+live boundary to the uncropped layer. Neither gesture records the other views
+again. Entering crop mode preserves the camera zoom.
 
 The PDF writer emits paths and embedded text, with independent page sizes for
 each selected sheet. Curves are approximated by vector segments up to 0.2 mm
@@ -68,3 +93,11 @@ Undo, plans/sections/elevations, CAD alignment/layers, source deletion, mixed-si
 PDF/Cyrillic output and a phone placement workflow. It writes a PDF and screen
 render under ignored `build/architect_publication/` for visual comparison with
 a PDF renderer.
+
+The sheet geometry, crop publication, interaction and visibility/duplication
+tests cover legacy and malformed crops, concave boundaries, source anchors at
+arbitrary rotation, custom scales, free insertion on a full sheet, off-sheet
+staging, screen-space snapping, multi-pointer cancellation, one-step crop Undo,
+instance visibility and cached pointer previews. Mobile publication tests also
+exercise the crop controls in both locales/themes with enlarged text. Set
+`ARCHITECT_MOBILE_QA=true` with `--dart-define` to write their screen captures.

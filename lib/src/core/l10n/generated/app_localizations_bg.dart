@@ -10941,7 +10941,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectSheetTitleOverlap =>
-      'Чертеж застъпва антетката. Премести го над нея.';
+      'Чертеж застъпва антетката. Премести го или промени контура му.';
 
   @override
   String get architectSheetMissingTemplate =>
@@ -10956,8 +10956,43 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
+  String get architectSheetCrop => 'Изрязване';
+
+  @override
+  String get architectSheetCropRectangle => 'Правоъгълник';
+
+  @override
+  String get architectSheetCropPolygon => 'Контур';
+
+  @override
+  String get architectSheetCropAddPoint => 'Добави точка';
+
+  @override
+  String get architectSheetCropRemovePoint => 'Премахни точка';
+
+  @override
+  String get architectSheetCropInvalid => 'Контурът се пресича или няма площ.';
+
+  @override
+  String get architectSheetPlaceHint => 'Посочи място за чертежа.';
+
+  @override
+  String get architectSheetSnap => 'Прилепване';
+
+  @override
+  String get architectSheetSelectDrawing => 'Избери чертеж';
+
+  @override
   String get architectSheetCropHint =>
-      'Рамката изрязва чертежа. Използвай „Побери изгледа“ за целия източник.';
+      'Премести границата, за да изрежеш чертежа, без да променяш мащаба. „Побери изгледа“ възстановява целия източник.';
+
+  @override
+  String get architectSheetScaleHint =>
+      'Мащабът променя и размера на контура. Например от 1:50 към 1:100 ширината и височината намаляват наполовина.';
+
+  @override
+  String get architectSheetVisibilityHint =>
+      'Видимостта се отнася само за това поставяне.';
 
   @override
   String get architectSheetFitView => 'Побери изгледа';
@@ -10968,7 +11003,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectSheetNoSpace =>
-      'Няма място за още един изглед. Създай лист или промени рамките на поставените изгледи.';
+      'Изгледът не се побира в свободното място. Премести или смали чертежите, или го постави свободно.';
 
   @override
   String get architectSheetPlaceShort => 'Изглед';

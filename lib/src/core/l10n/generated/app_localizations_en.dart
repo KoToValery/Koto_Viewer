@@ -10895,7 +10895,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectSheetTitleOverlap =>
-      'A drawing overlaps the title block. Move it above the title block.';
+      'A drawing overlaps the title block. Move it or edit its boundary.';
 
   @override
   String get architectSheetMissingTemplate =>
@@ -10910,8 +10910,44 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get architectSheetCrop => 'Crop';
+
+  @override
+  String get architectSheetCropRectangle => 'Rectangle';
+
+  @override
+  String get architectSheetCropPolygon => 'Polygon';
+
+  @override
+  String get architectSheetCropAddPoint => 'Add point';
+
+  @override
+  String get architectSheetCropRemovePoint => 'Remove point';
+
+  @override
+  String get architectSheetCropInvalid =>
+      'The boundary crosses itself or has no area.';
+
+  @override
+  String get architectSheetPlaceHint => 'Choose a position for the drawing.';
+
+  @override
+  String get architectSheetSnap => 'Snap';
+
+  @override
+  String get architectSheetSelectDrawing => 'Select drawing';
+
+  @override
   String get architectSheetCropHint =>
-      'The frame crops the drawing. Use Fit view to show the full source.';
+      'Move the boundary to crop the drawing without changing its scale. Fit view restores the full source.';
+
+  @override
+  String get architectSheetScaleHint =>
+      'Changing scale also resizes the boundary. For example, 1:50 to 1:100 halves its width and height.';
+
+  @override
+  String get architectSheetVisibilityHint =>
+      'Visibility applies only to this placement.';
 
   @override
   String get architectSheetFitView => 'Fit view';
@@ -10922,7 +10958,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectSheetNoSpace =>
-      'No room for another view. Create a sheet or resize the existing frames.';
+      'The view cannot fit in the available space. Move or resize the drawings, or place it freely.';
 
   @override
   String get architectSheetPlaceShort => 'View';

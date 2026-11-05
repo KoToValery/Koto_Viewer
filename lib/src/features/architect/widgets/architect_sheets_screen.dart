@@ -14,6 +14,8 @@ import '../services/architect_drawing_publisher.dart';
 import '../services/architect_sheet_composer.dart';
 import '../services/architect_pdf_export.dart';
 import '../services/architect_sheet_layout.dart';
+import '../services/architect_sheet_geometry.dart';
+import 'architect_sheet_viewport.dart';
 
 String _paperFormat(double width, double height) {
   for (final e in {
@@ -54,33 +56,23 @@ class ArchitectSheetsScreen extends StatefulWidget {
 
 class _SheetsState extends State<ArchitectSheetsScreen> {
   String? sheetId, selected;
-  Rect? moving;
+  ArchitectDrawingPlacement? pendingPlacement;
+  ArchitectSavedDrawing? pendingDrawing;
+  bool cropMode = false;
   bool busy = false;
-  final transform = TransformationController();
-  final canvasKey = GlobalKey();
-  Size viewportSize = Size.zero;
-  String? fittedSheet;
-  final drawingScenes = <(String, int), ArchitectVectorScene>{};
-  ArchitectProject? sceneProject;
+  final viewportKey = GlobalKey<ArchitectSheetViewportState>();
+  final drawingScenes = <Object, ArchitectVectorScene>{};
+  Object? sceneRevision;
   AppLocalizations? sceneLabels;
   ArchitectPublicationSources? sceneSources;
 
-  void fitSheet() {
-    final s = sheet;
-    if (s == null || viewportSize.isEmpty) return;
-    final scale = math.min(
-      viewportSize.width / (s.widthMm * 2 + 48),
-      viewportSize.height / (s.heightMm * 2 + 48),
-    );
-    transform.value = Matrix4.identity()
-      ..translateByDouble(
-        (viewportSize.width - (s.widthMm * 2 + 48) * scale) / 2,
-        (viewportSize.height - (s.heightMm * 2 + 48) * scale) / 2,
-        0,
-        1,
-      )
-      ..scaleByDouble(scale, scale, 1, 1);
-  }
+  void fitSheet() => viewportKey.currentState?.fitSheet();
+
+  void cancelEdit() => setState(() {
+    pendingPlacement = null;
+    pendingDrawing = null;
+    cropMode = false;
+  });
 
   void message(String value) => ScaffoldMessenger.of(
     context,
@@ -119,8 +111,9 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
   ArchitectDrawingPlacement? fitPlacement(
     ArchitectDrawingPlacement place,
     Rect area,
-    ArchitectSavedDrawing drawing,
-  ) {
+    ArchitectSavedDrawing drawing, {
+    bool reportFailure = true,
+  }) {
     final l = context.l10n;
     try {
       return ArchitectSheetLayout.fit(
@@ -128,7 +121,9 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
         area,
         (scale) => ArchitectDrawingPublisher.build(
           project,
-          drawing,
+          drawing.copyWith(
+            visibility: {...drawing.visibility, ...place.visibilityOverrides},
+          ),
           scale,
           l,
           sources: widget.sources,
@@ -137,7 +132,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
             '${place.number}  ${ArchitectSheetComposer.drawingName(drawing, l)}  1:$scale',
       );
     } on ArchitectSheetFitException {
-      message(l.architectSheetNoSpace);
+      if (reportFailure) message(l.architectSheetNoSpace);
       return null;
     }
   }
@@ -152,19 +147,25 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
         !ArchitectDrawingPublisher.hasSource(project, drawing)) {
       return;
     }
-    final area = ArchitectSheetLayout.freeArea(
+    final areas = ArchitectSheetLayout.freeAreas(
       project,
       s,
       context.l10n,
       excludePlacement: p.id,
     );
-    if (area == null) {
-      message(context.l10n.architectSheetNoSpace);
+    final l = context.l10n;
+    ArchitectDrawingPlacement? fitted;
+    for (final area in areas) {
+      final candidate = fitPlacement(p, area, drawing, reportFailure: false);
+      if (candidate != null &&
+          (fitted == null || candidate.scale < fitted.scale)) {
+        fitted = candidate;
+      }
+    }
+    if (fitted == null) {
+      message(l.architectSheetNoSpace);
       return;
     }
-    final l = context.l10n;
-    final fitted = fitPlacement(p, area, drawing);
-    if (fitted == null) return;
     savePlacement(fitted);
     if (fitted.scale != p.scale) {
       message(l.architectSheetScaleAdjusted(fitted.scale));
@@ -178,12 +179,6 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
       document.sheets.firstOrNull;
   ArchitectDrawingPlacement? get placement =>
       sheet?.placements.where((e) => e.id == selected).firstOrNull;
-  @override
-  void dispose() {
-    transform.dispose();
-    super.dispose();
-  }
-
   void commit(ArchitectDocument next) =>
       widget.controller.commit(project.copyWith(document: next));
   void saveSheet(ArchitectSheet value) => commit(
@@ -225,6 +220,9 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
     setState(() {
       sheetId = result.id;
       selected = null;
+      pendingPlacement = null;
+      pendingDrawing = null;
+      cropMode = false;
     });
   }
 
@@ -299,31 +297,48 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
         .where((e) => e.id == value.id)
         .firstOrNull;
     final drawing = existing ?? value;
-    final index = sheet!.placements.length;
-    final area = ArchitectSheetLayout.freeArea(project, sheet!, l);
-    if (area == null) {
-      message(l.architectSheetNoSpace);
+    final scene = ArchitectDrawingPublisher.build(
+      project,
+      drawing,
+      drawing.scale,
+      l,
+      sources: widget.sources,
+    );
+    final bounds = scene.bounds;
+    final gap = ArchitectSheetLayout.gapMm;
+    final origin = Offset(sheet!.marginMm, sheet!.marginMm);
+    final place = ArchitectDrawingPlacement(
+      id: _id(),
+      drawingId: drawing.id,
+      frame: Rect.fromLTWH(
+        origin.dx,
+        origin.dy,
+        math.max(20, bounds.width + gap),
+        math.max(20, bounds.height + gap),
+      ),
+      anchor:
+          (bounds.topLeft - Offset(gap / 2, gap / 2)) * (drawing.scale / 1000),
+      scale: drawing.scale,
+      number: '${sheet!.placements.length + 1}',
+    );
+    setState(() {
+      pendingDrawing = drawing;
+      pendingPlacement = place;
+      cropMode = false;
+    });
+  }
+
+  void placePending(ArchitectDrawingPlacement place) {
+    final target = sheet, drawing = pendingDrawing;
+    if (target == null || drawing == null || pendingPlacement?.id != place.id) {
       return;
     }
-    final place = fitPlacement(
-      ArchitectDrawingPlacement(
-        id: _id(),
-        drawingId: drawing.id,
-        frame: area,
-        anchor: Offset.zero,
-        scale: drawing.scale,
-        number: '${index + 1}',
-      ),
-      area,
-      drawing,
-    );
-    if (place == null) return;
     final nextSheet = sheet!.copyWith(
       placements: [...sheet!.placements, place],
     );
     commit(
       document.copyWith(
-        drawings: existing == null
+        drawings: !document.drawings.any((d) => d.id == drawing.id)
             ? [...document.drawings, drawing]
             : document.drawings,
         sheets: [
@@ -332,10 +347,11 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
         ],
       ),
     );
-    setState(() => selected = place.id);
-    if (place.scale != drawing.scale) {
-      message(l.architectSheetScaleAdjusted(place.scale));
-    }
+    setState(() {
+      selected = place.id;
+      pendingPlacement = null;
+      pendingDrawing = null;
+    });
   }
 
   Future<void> placementProperties() async {
@@ -381,29 +397,27 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
         !ArchitectDrawingPublisher.hasSource(project, drawing)) {
       return;
     }
-    final l = context.l10n;
-    final area = ArchitectSheetLayout.freeArea(project, sheet!, l);
-    if (area == null) {
-      message(l.architectSheetNoSpace);
-      return;
-    }
-    final copy = fitPlacement(
-      ArchitectDrawingPlacement(
+    setState(() {
+      pendingDrawing = drawing;
+      pendingPlacement = p.copyWith(
         id: _id(),
-        drawingId: p.drawingId,
         number: '${sheet!.placements.length + 1}',
-        frame: area,
-        anchor: p.anchor,
-        scale: p.scale,
-        rotation: p.rotation,
-        showTitle: p.showTitle,
-      ),
-      area,
-      drawing,
+        locked: false,
+        frame: p.frame.shift(const Offset(10, 10)),
+      );
+      cropMode = false;
+    });
+  }
+
+  Future<void> changeScale() async {
+    final initial = placement;
+    if (initial == null || initial.locked) return;
+    final value = await showDialog<int>(
+      context: context,
+      builder: (_) => _ScaleDialog(initial.scale),
     );
-    if (copy == null) return;
-    saveSheet(sheet!.copyWith(placements: [...sheet!.placements, copy]));
-    setState(() => selected = copy.id);
+    if (!mounted || value == null || placement?.id != initial.id) return;
+    savePlacement(ArchitectSheetGeometry.changeScale(initial, value));
   }
 
   void align(String side) {
@@ -417,45 +431,6 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
       _ => Offset(0, s.heightMm - s.marginMm - r.bottom),
     };
     savePlacement(p.copyWith(frame: r.shift(delta)));
-  }
-
-  Rect snap(Rect frame) {
-    final s = sheet!;
-    final xs = [
-      s.marginMm,
-      s.widthMm - s.marginMm,
-      for (final p in s.placements.where((e) => e.id != selected)) ...[
-        p.frame.left,
-        p.frame.right,
-      ],
-    ];
-    final ys = [
-      s.marginMm,
-      s.heightMm - s.marginMm,
-      for (final p in s.placements.where((e) => e.id != selected)) ...[
-        p.frame.top,
-        p.frame.bottom,
-      ],
-    ];
-    double delta(List<double> values, double a, double b) {
-      var best = 2.0, result = 0.0;
-      for (final v in values) {
-        for (final edge in [a, b]) {
-          if ((v - edge).abs() < best) {
-            best = (v - edge).abs();
-            result = v - edge;
-          }
-        }
-      }
-      return result;
-    }
-
-    return frame.shift(
-      Offset(
-        delta(xs, frame.left, frame.right),
-        delta(ys, frame.top, frame.bottom),
-      ),
-    );
   }
 
   Future<void> template() async {
@@ -506,14 +481,58 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
     );
   }
 
-  Future<void> visibility() async {
+  Future<void> renameDrawing() async {
     final drawing = document.drawings
-        .where((e) => e.id == placement?.drawingId)
+        .where((d) => d.id == placement?.drawingId)
         .firstOrNull;
     if (drawing == null) return;
     final l = context.l10n;
-    final visible = {...drawing.visibility};
-    final name = TextEditingController(text: drawing.name);
+    var name = drawing.name;
+    final value = await showDialog<String>(
+      context: context,
+      builder: (c) => architectAlertDialog(
+        title: Text(l.commandIconRename),
+        content: TextFormField(
+          initialValue: name,
+          onChanged: (value) => name = value,
+          autofocus: true,
+          decoration: InputDecoration(labelText: l.architectSheetNameField),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: Text(l.architectSheetCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, name),
+            child: Text(l.architectSheetSave),
+          ),
+        ],
+      ),
+    );
+    // The name belongs to the saved source. Visibility is edited independently
+    // below, so its dialog cannot change any sibling placement accidentally.
+    if (mounted && value != null && value != drawing.name) {
+      commit(
+        document.copyWith(
+          drawings: [
+            for (final d in document.drawings)
+              if (d.id == drawing.id) d.copyWith(name: value) else d,
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> visibility() async {
+    final initial = placement;
+    if (initial == null) return;
+    final drawing = document.drawings
+        .where((e) => e.id == initial.drawingId)
+        .firstOrNull;
+    if (drawing == null) return;
+    final l = context.l10n;
+    final visible = {...initial.visibilityOverrides};
     final labels = {
       'axes': l.architectSheetAxes,
       'zones': l.architectSheetZones,
@@ -530,16 +549,16 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: name,
-                decoration: InputDecoration(
-                  labelText: l.architectSheetNameField,
-                ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(l.architectSheetVisibilityHint),
               ),
               for (final entry in labels.entries)
                 CheckboxListTile(
                   title: Text(entry.value),
-                  value: visible[entry.key] != false,
+                  value:
+                      (visible[entry.key] ?? drawing.visibility[entry.key]) !=
+                      false,
                   onChanged: (v) => update(() => visible[entry.key] = v!),
                 ),
             ],
@@ -557,20 +576,9 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
         ),
       ),
     );
-    if (result == true && mounted) {
-      commit(
-        document.copyWith(
-          drawings: [
-            for (final d in document.drawings)
-              if (d.id == drawing.id)
-                d.copyWith(visibility: visible, name: name.text)
-              else
-                d,
-          ],
-        ),
-      );
+    if (result == true && mounted && placement?.id == initial.id) {
+      savePlacement(initial.copyWith(visibilityOverrides: visible));
     }
-    name.dispose();
   }
 
   Future<void> output({bool print = false}) async {
@@ -690,49 +698,72 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
     animation: widget.controller,
     builder: (context, _) {
       final l = context.l10n, s = sheet, p = placement;
-      final shown = s == null || moving == null || p == null
-          ? s
-          : s.copyWith(
-              placements: [
-                for (final v in s.placements)
-                  if (v.id == p.id) v.copyWith(frame: moving) else v,
-              ],
-            );
-      if (!identical(sceneProject, project) ||
+      final editing = pendingPlacement != null || cropMode;
+      final revision = ArchitectDrawingPublisher.sourceRevision(project);
+      if (sceneRevision != revision ||
           !identical(sceneLabels, l) ||
           !identical(sceneSources, widget.sources)) {
         drawingScenes.clear();
-        sceneProject = project;
+        sceneRevision = revision;
         sceneLabels = l;
         sceneSources = widget.sources;
       }
-      final scene = shown == null
-          ? null
-          : ArchitectSheetComposer.compose(
-              project,
-              shown,
-              l,
-              allowMissing: true,
-              sources: widget.sources,
-              drawingScenes: drawingScenes,
-            );
+      ArchitectVectorScene buildScene(
+        ArchitectSheet preview, {
+        Set<String> excludePlacements = const {},
+      }) {
+        final drawing = pendingDrawing;
+        final previewProject =
+            drawing == null || document.drawings.any((d) => d.id == drawing.id)
+            ? project
+            : project.copyWith(
+                document: document.copyWith(
+                  drawings: [...document.drawings, drawing],
+                ),
+              );
+        return ArchitectSheetComposer.compose(
+          previewProject,
+          preview,
+          l,
+          allowMissing: true,
+          previewOutsideSheet: true,
+          excludePlacements: excludePlacements,
+          sources: widget.sources,
+          drawingScenes: drawingScenes,
+        );
+      }
+
+      String drawingLabel(ArchitectDrawingPlacement value) {
+        final drawing =
+            document.drawings
+                .where((d) => d.id == value.drawingId)
+                .firstOrNull ??
+            pendingDrawing;
+        final name = drawing == null
+            ? l.architectSheetMissingSource
+            : ArchitectSheetComposer.drawingName(drawing, l);
+        return '${value.number}  $name  1:${value.scale}';
+      }
+
       return Scaffold(
         appBar: AppBar(
           title: Text(l.architectSheets),
           actions: [
             IconButton(
               tooltip: l.architectSheetAdd,
-              onPressed: busy ? null : () => sheetProperties(create: true),
+              onPressed: busy || editing
+                  ? null
+                  : () => sheetProperties(create: true),
               icon: const AppIcon(AppIconId.add),
             ),
             IconButton(
               key: const ValueKey('architect-sheet-export'),
               tooltip: l.architectSheetExport,
-              onPressed: busy || s == null ? null : output,
+              onPressed: busy || editing || s == null ? null : output,
               icon: const AppIcon(AppIconId.pdf),
             ),
             PopupMenuButton<String>(
-              enabled: !busy && s != null,
+              enabled: !busy && !editing && s != null,
               onSelected: (v) {
                 if (v == 'properties') sheetProperties();
                 if (v == 'template') template();
@@ -821,13 +852,15 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                             : (v) => setState(() {
                                 sheetId = v;
                                 selected = null;
-                                moving = null;
+                                pendingPlacement = null;
+                                pendingDrawing = null;
+                                cropMode = false;
                               }),
                       ),
                     ),
                     IconButton(
                       tooltip: l.architectZoneUndoAction,
-                      onPressed: busy
+                      onPressed: busy || editing
                           ? null
                           : widget.controller.canUndo
                           ? widget.controller.undo
@@ -836,7 +869,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                     ),
                     IconButton(
                       tooltip: l.architectZoneRedoAction,
-                      onPressed: busy
+                      onPressed: busy || editing
                           ? null
                           : widget.controller.canRedo
                           ? widget.controller.redo
@@ -858,7 +891,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                     Tooltip(
                       message: l.architectSheetPlace,
                       child: FilledButton.icon(
-                        onPressed: busy ? null : placeView,
+                        onPressed: busy || editing ? null : placeView,
                         icon: const AppIcon(AppIconId.imageAdd, size: 18),
                         label: Text(l.architectSheetPlaceShort),
                       ),
@@ -867,7 +900,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                     Expanded(
                       child: TextButton(
                         key: const ValueKey('architect-sheet-preflight'),
-                        onPressed: checkLayout,
+                        onPressed: editing ? null : checkLayout,
                         child: Text(
                           ArchitectSheetComposer.issues(project, s, l).isEmpty
                               ? l.architectSheetReady
@@ -878,11 +911,25 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                   ],
                 ),
               ),
-              if (p != null)
+              if (p != null && !editing)
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
+                      IconButton(
+                        key: const ValueKey('architect-sheet-crop'),
+                        tooltip: l.architectSheetCrop,
+                        onPressed: p.locked || busy
+                            ? null
+                            : () => setState(() => cropMode = true),
+                        icon: const AppIcon(AppIconId.cutOpening),
+                      ),
+                      IconButton(
+                        key: const ValueKey('architect-sheet-scale'),
+                        tooltip: l.architectSheetScale,
+                        onPressed: p.locked || busy ? null : changeScale,
+                        icon: const AppIcon(AppIconId.aspectRatio),
+                      ),
                       IconButton(
                         tooltip: l.architectSheetFitView,
                         onPressed: p.locked || busy ? null : fitView,
@@ -899,6 +946,11 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                         tooltip: l.architectSheetVisibility,
                         onPressed: busy ? null : visibility,
                         icon: const AppIcon(AppIconId.layers),
+                      ),
+                      IconButton(
+                        tooltip: l.commandIconRename,
+                        onPressed: busy ? null : renameDrawing,
+                        icon: const AppIcon(AppIconId.rename),
                       ),
                       IconButton(
                         tooltip: l.architectSheetDuplicate,
@@ -995,114 +1047,62 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                         ),
                       ),
                     )
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        viewportSize = constraints.biggest;
-                        final key =
-                            '${s.id}/${s.widthMm}/${s.heightMm}/$viewportSize';
-                        if (fittedSheet != key) {
-                          fittedSheet = key;
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (mounted) fitSheet();
-                          });
-                        }
-                        return InteractiveViewer(
-                          transformationController: transform,
-                          constrained: false,
-                          minScale: .02,
-                          maxScale: 8,
-                          boundaryMargin: const EdgeInsets.all(100),
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: SizedBox(
-                              key: canvasKey,
-                              width: s.widthMm * 2,
-                              height: s.heightMm * 2,
-                              child: Stack(
-                                children: [
-                                  CustomPaint(
-                                    size: Size(s.widthMm * 2, s.heightMm * 2),
-                                    painter: _SheetPainter(scene!),
-                                  ),
-                                  for (final v in shown!.placements)
-                                    Positioned(
-                                      left: v.frame.left * 2,
-                                      top: v.frame.top * 2,
-                                      width: v.frame.width * 2,
-                                      height: v.frame.height * 2,
-                                      child: GestureDetector(
-                                        behavior: HitTestBehavior.translucent,
-                                        onTap: () =>
-                                            setState(() => selected = v.id),
-                                        onDoubleTap: () {
-                                          final source = document.drawings
-                                              .where((e) => e.id == v.drawingId)
-                                              .firstOrNull;
-                                          if (source != null &&
-                                              ArchitectDrawingPublisher.hasSource(
-                                                project,
-                                                source,
-                                              )) {
-                                            Navigator.pop(context, source);
-                                          }
-                                        },
-                                        onPanStart: v.locked || busy
-                                            ? null
-                                            : (details) => setState(() {
-                                                selected = v.id;
-                                                moving = v.frame;
-                                              }),
-                                        onPanUpdate: v.locked || busy
-                                            ? null
-                                            : (e) => setState(() {
-                                                final box =
-                                                    canvasKey.currentContext!
-                                                            .findRenderObject()
-                                                        as RenderBox;
-                                                final localDelta =
-                                                    box.globalToLocal(
-                                                      e.globalPosition,
-                                                    ) -
-                                                    box.globalToLocal(
-                                                      e.globalPosition -
-                                                          e.delta,
-                                                    );
-                                                moving = (moving ?? v.frame)
-                                                    .shift(localDelta / 2);
-                                              }),
-                                        onPanEnd: v.locked || busy
-                                            ? null
-                                            : (_) {
-                                                final r = snap(
-                                                  moving ?? v.frame,
-                                                );
-                                                setState(() => moving = null);
-                                                savePlacement(
-                                                  v.copyWith(frame: r),
-                                                );
-                                              },
-                                        onPanCancel: () =>
-                                            setState(() => moving = null),
-                                        child: DecoratedBox(
-                                          decoration: BoxDecoration(
-                                            border: Border.all(
-                                              color: selected == v.id
-                                                  ? Colors.blue
-                                                  : Colors.grey.withValues(
-                                                      alpha: .25,
-                                                    ),
-                                              width: selected == v.id ? 2 : .5,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
+                  : ArchitectSheetViewport(
+                      key: viewportKey,
+                      sheet: s,
+                      buildScene: buildScene,
+                      buildBackground: (preview, excluded) =>
+                          buildScene(preview, excludePlacements: {excluded}),
+                      buildContent: (value) =>
+                          ArchitectSheetComposer.placementContent(
+                            pendingDrawing != null &&
+                                    !document.drawings.any(
+                                      (d) => d.id == pendingDrawing!.id,
+                                    )
+                                ? project.copyWith(
+                                    document: document.copyWith(
+                                      drawings: [
+                                        ...document.drawings,
+                                        pendingDrawing!,
+                                      ],
                                     ),
-                                ],
-                              ),
-                            ),
+                                  )
+                                : project,
+                            value,
+                            l,
+                            sources: widget.sources,
+                            drawingScenes: drawingScenes,
                           ),
-                        );
+                      selectedId: selected,
+                      onSelect: (id) => setState(() {
+                        selected = id;
+                        cropMode = false;
+                      }),
+                      onMove: savePlacement,
+                      onOpenSource: (id) {
+                        final source = document.drawings
+                            .where((d) => d.id == id)
+                            .firstOrNull;
+                        if (source != null &&
+                            ArchitectDrawingPublisher.hasSource(
+                              project,
+                              source,
+                            )) {
+                          Navigator.pop(context, source);
+                        }
                       },
+                      pendingPlacement: pendingPlacement,
+                      onPlace: placePending,
+                      onCancelPlacement: cancelEdit,
+                      cropMode: cropMode,
+                      onCrop: (value) {
+                        savePlacement(value);
+                        setState(() => cropMode = false);
+                      },
+                      onCancelCrop: () => setState(() => cropMode = false),
+                      busy: busy,
+                      titleBlock: ArchitectSheetLayout.titleBlock(project, s),
+                      drawingLabel: drawingLabel,
                     ),
             ),
           ],
@@ -1110,20 +1110,6 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
       );
     },
   );
-}
-
-class _SheetPainter extends CustomPainter {
-  final ArchitectVectorScene scene;
-  _SheetPainter(this.scene);
-  @override
-  void paint(Canvas c, Size size) {
-    c.scale(2);
-    scene.paint(c);
-  }
-
-  @override
-  bool shouldRepaint(covariant _SheetPainter oldDelegate) =>
-      !identical(scene, oldDelegate.scene);
 }
 
 class _SheetDialog extends StatefulWidget {
@@ -1301,7 +1287,9 @@ class _PlacementDialogState extends State<_PlacementDialog> {
     widget.initial.number,
     for (final value in original) _paperNumber(value),
   ].map((e) => TextEditingController(text: e)).toList();
-  late int scale = widget.initial.scale;
+  late final scaleField = TextEditingController(
+    text: '${widget.initial.scale}',
+  );
   late String? source =
       widget.drawings.any((e) => e.id == widget.initial.drawingId)
       ? widget.initial.drawingId
@@ -1313,6 +1301,7 @@ class _PlacementDialogState extends State<_PlacementDialog> {
     for (final c in fields) {
       c.dispose();
     }
+    scaleField.dispose();
     super.dispose();
   }
 
@@ -1362,18 +1351,7 @@ class _PlacementDialogState extends State<_PlacementDialog> {
                 ],
                 onChanged: (v) => source = v,
               ),
-              DropdownButtonFormField<int>(
-                initialValue: scale,
-                decoration: InputDecoration(labelText: l.architectSheetScale),
-                items: [
-                  for (final n in {
-                    ...ArchitectDrawingScale.presets,
-                    scale,
-                  }.toList()..sort())
-                    DropdownMenuItem(value: n, child: Text('1:$n')),
-                ],
-                onChanged: (v) => scale = v!,
-              ),
+              _scaleInput(context, scaleField),
               for (var i = 0; i < fields.length; i++)
                 TextField(
                   controller: fields[i],
@@ -1406,6 +1384,7 @@ class _PlacementDialogState extends State<_PlacementDialog> {
         ),
         FilledButton(
           onPressed: () {
+            final scale = int.tryParse(scaleField.text.trim());
             final n = [
               for (var i = 0; i < original.length; i++)
                 fields[i + 1].text == _paperNumber(original[i])
@@ -1413,31 +1392,116 @@ class _PlacementDialogState extends State<_PlacementDialog> {
                     : _parse(fields[i + 1].text),
             ];
             if (source == null ||
+                scale == null ||
+                scale <= 0 ||
                 n.any((v) => v == null || !v.isFinite) ||
                 n[2]! <= 0 ||
                 n[3]! <= 0) {
               setState(() => invalid = true);
               return;
             }
-            Navigator.pop(
-              context,
-              widget.initial.copyWith(
-                drawingId: source,
-                number: fields[0].text,
-                frame: Rect.fromLTWH(n[0]!, n[1]!, n[2]!, n[3]!),
-                anchor: Offset(
-                  fields[5].text == _paperNumber(original[4])
-                      ? widget.initial.anchor.dx
-                      : widget.units.fromUnit(n[4]!),
-                  fields[6].text == _paperNumber(original[5])
-                      ? widget.initial.anchor.dy
-                      : widget.units.fromUnit(n[5]!),
-                ),
-                rotation: n[6],
-                scale: scale,
-                showTitle: title,
+            var next =
+                ArchitectSheetGeometry.resizeFrame(
+                  widget.initial,
+                  Rect.fromLTWH(n[0]!, n[1]!, n[2]!, n[3]!),
+                ).copyWith(
+                  drawingId: source,
+                  number: fields[0].text,
+                  anchor: Offset(
+                    fields[5].text == _paperNumber(original[4])
+                        ? widget.initial.anchor.dx
+                        : widget.units.fromUnit(n[4]!),
+                    fields[6].text == _paperNumber(original[5])
+                        ? widget.initial.anchor.dy
+                        : widget.units.fromUnit(n[5]!),
+                  ),
+                  rotation: n[6],
+                  showTitle: title,
+                );
+            if (scale != widget.initial.scale) {
+              next = ArchitectSheetGeometry.changeScale(next, scale);
+            }
+            Navigator.pop(context, next);
+          },
+          child: Text(l.architectSheetSave),
+        ),
+      ],
+    );
+  }
+}
+
+Widget _scaleInput(BuildContext context, TextEditingController controller) {
+  final l = context.l10n;
+  return TextField(
+    key: const ValueKey('architect-sheet-scale-input'),
+    controller: controller,
+    keyboardType: TextInputType.number,
+    decoration: InputDecoration(
+      labelText: l.architectSheetScale,
+      prefixText: '1:',
+      suffixIcon: PopupMenuButton<int>(
+        tooltip: l.architectSheetScale,
+        icon: const AppIcon(AppIconId.expandMore, size: 20),
+        onSelected: (value) => controller.text = '$value',
+        itemBuilder: (_) => [
+          for (final value in ArchitectDrawingScale.presets)
+            PopupMenuItem(value: value, child: Text('1:$value')),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ScaleDialog extends StatefulWidget {
+  final int initial;
+  const _ScaleDialog(this.initial);
+  @override
+  State<_ScaleDialog> createState() => _ScaleDialogState();
+}
+
+class _ScaleDialogState extends State<_ScaleDialog> {
+  late final controller = TextEditingController(text: '${widget.initial}');
+  bool invalid = false;
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    return architectAlertDialog(
+      title: Text(l.architectSheetScale),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _scaleInput(context, controller),
+            const SizedBox(height: 12),
+            Text(l.architectSheetScaleHint),
+            if (invalid)
+              Text(
+                l.architectSheetInvalid,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
-            );
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.architectSheetCancel),
+        ),
+        FilledButton(
+          onPressed: () {
+            final value = int.tryParse(controller.text.trim());
+            if (value == null || value <= 0) {
+              setState(() => invalid = true);
+              return;
+            }
+            Navigator.pop(context, value);
           },
           child: Text(l.architectSheetSave),
         ),

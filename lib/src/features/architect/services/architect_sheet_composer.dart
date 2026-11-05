@@ -4,9 +4,64 @@ import '../../../core/l10n/generated/app_localizations.dart';
 import '../models/architect_project.dart';
 import '../rendering/architect_vector_scene.dart';
 import 'architect_drawing_publisher.dart';
+import 'architect_sheet_geometry.dart';
 import 'architect_sheet_layout.dart';
 
 class ArchitectSheetComposer {
+  static ArchitectVectorScene _sourceScene(
+    ArchitectProject p,
+    ArchitectDrawingPlacement place,
+    ArchitectSavedDrawing drawing,
+    AppLocalizations l,
+    ArchitectPublicationSources sources,
+    Map<Object, ArchitectVectorScene>? drawingScenes,
+  ) {
+    final effectiveDrawing = drawing.copyWith(
+      visibility: {...drawing.visibility, ...place.visibilityOverrides},
+    );
+    final key = ArchitectDrawingPublisher.sceneKey(
+      effectiveDrawing,
+      place.scale,
+      l,
+      sources: sources,
+    );
+    ArchitectVectorScene build() => ArchitectDrawingPublisher.build(
+      p,
+      effectiveDrawing,
+      place.scale,
+      l,
+      sources: sources,
+    );
+    return drawingScenes?.putIfAbsent(key, build) ?? build();
+  }
+
+  /// Uncropped, title-free content in sheet coordinates. An editing gesture can
+  /// reuse this layer with a live clip/translation without recording the sheet
+  /// or its thousands of source operations again on every pointer movement.
+  static ArchitectVectorScene placementContent(
+    ArchitectProject p,
+    ArchitectDrawingPlacement place,
+    AppLocalizations l, {
+    ArchitectPublicationSources sources = const ArchitectPublicationSources(),
+    Map<Object, ArchitectVectorScene>? drawingScenes,
+  }) {
+    final drawing = p.document.drawings
+        .where((d) => d.id == place.drawingId)
+        .firstOrNull;
+    if (drawing == null ||
+        !ArchitectDrawingPublisher.hasSource(p, drawing) ||
+        !ArchitectSheetGeometry.valid(place.copyWith(clearCrop: true))) {
+      return const ArchitectVectorScene([], 1);
+    }
+    final canvas = ArchitectVectorCanvas();
+    final unit = 1000 / place.scale;
+    canvas.translate(place.frame.left, place.frame.top);
+    canvas.rotate(place.rotation * math.pi / 180);
+    canvas.translate(-place.anchor.dx * unit, -place.anchor.dy * unit);
+    _sourceScene(p, place, drawing, l, sources, drawingScenes).paint(canvas);
+    return ArchitectVectorScene(canvas.operations, 1);
+  }
+
   static String drawingName(ArchitectSavedDrawing d, AppLocalizations l) =>
       ArchitectSheetLayout.drawingName(d, l);
   static String sheetName(ArchitectSheet s, AppLocalizations l) =>
@@ -43,15 +98,19 @@ class ArchitectSheetComposer {
     ArchitectSheet sheet,
     AppLocalizations l, {
     bool allowMissing = false,
+    bool previewOutsideSheet = false,
+    Set<String> excludePlacements = const {},
     ArchitectPublicationSources sources = const ArchitectPublicationSources(),
-    Map<(String, int), ArchitectVectorScene>? drawingScenes,
+    Map<Object, ArchitectVectorScene>? drawingScenes,
   }) {
-    final blockers = issues(p, sheet, l);
-    if (blockers.isNotEmpty && !allowMissing) {
-      throw StateError(blockers.join('\n'));
+    if (!allowMissing) {
+      final blockers = issues(p, sheet, l);
+      if (blockers.isNotEmpty) throw StateError(blockers.join('\n'));
     }
     final canvas = ArchitectVectorCanvas();
-    canvas.clipRect(Rect.fromLTWH(0, 0, sheet.widthMm, sheet.heightMm));
+    if (!previewOutsideSheet) {
+      canvas.clipRect(Rect.fromLTWH(0, 0, sheet.widthMm, sheet.heightMm));
+    }
     canvas.drawRect(
       Rect.fromLTWH(0, 0, sheet.widthMm, sheet.heightMm),
       Paint()..color = Colors.white,
@@ -85,6 +144,20 @@ class ArchitectSheetComposer {
       ArchitectAnnotationRole.ordinary,
     );
     for (final place in sheet.placements) {
+      if (excludePlacements.contains(place.id)) continue;
+      canvas.sources(const {}, 'sheet');
+      if (!ArchitectSheetGeometry.valid(place)) {
+        final origin = place.frame.topLeft;
+        text(
+          l.architectSheetInvalid,
+          origin.dx.isFinite && origin.dy.isFinite
+              ? origin
+              : Offset(sheet.marginMm, sheet.marginMm),
+          2.2,
+          color: Colors.red,
+        );
+        continue;
+      }
       final drawing = p.document.drawings
           .where((d) => d.id == place.drawingId)
           .firstOrNull;
@@ -97,24 +170,16 @@ class ArchitectSheetComposer {
         );
         continue;
       }
-      ArchitectVectorScene buildScene() => ArchitectDrawingPublisher.build(
-        p,
-        drawing,
-        place.scale,
-        l,
-        sources: sources,
-      );
-      final scene =
-          drawingScenes?.putIfAbsent((drawing.id, place.scale), buildScene) ??
-          buildScene();
+      final scene = _sourceScene(p, place, drawing, l, sources, drawingScenes);
       final unit = 1000 / place.scale;
       canvas.save();
-      canvas.clipRect(place.frame);
+      canvas.clipPath(ArchitectSheetGeometry.clipPath(place));
       canvas.translate(place.frame.left, place.frame.top);
       canvas.rotate(place.rotation * math.pi / 180);
       canvas.translate(-place.anchor.dx * unit, -place.anchor.dy * unit);
       scene.paint(canvas);
       canvas.restore();
+      canvas.sources(const {}, 'sheet');
       if (place.showTitle) {
         final title =
             '${place.number}  ${drawingName(drawing, l)}  1:${place.scale}';

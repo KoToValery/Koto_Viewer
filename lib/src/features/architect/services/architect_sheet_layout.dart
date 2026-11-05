@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/generated/app_localizations.dart';
 import '../models/architect_project.dart';
 import '../rendering/architect_vector_scene.dart';
+import 'architect_sheet_geometry.dart';
 
 class ArchitectSheetFitException implements Exception {}
 
@@ -55,50 +56,104 @@ class ArchitectSheetLayout {
     );
   }
 
-  static Rect? freeArea(
+  /// Maximal rectangular candidates, including the space beside the title block.
+  static List<Rect> freeAreas(
     ArchitectProject p,
     ArchitectSheet s,
     AppLocalizations l, {
     String? excludePlacement,
   }) {
-    var areas = [drawingArea(p, s)];
-    for (final place in s.placements.where((e) => e.id != excludePlacement)) {
-      final source = p.document.drawings
-          .where((d) => d.id == place.drawingId)
-          .firstOrNull;
-      final name = source == null ? '' : drawingName(source, l);
-      final height = place.showTitle
-          ? titleHeight(
-              '${place.number}  $name  1:${place.scale}',
-              place.frame.width,
-            )
-          : 0;
-      final used = Rect.fromLTRB(
-        place.frame.left,
-        place.frame.top,
-        place.frame.right,
-        place.frame.bottom + height,
-      ).inflate(gapMm);
+    var areas = [printable(s)];
+    final used = <Rect>[
+      if (titleBlock(p, s) case final block?) block.inflate(gapMm),
+      for (final place in s.placements.where(
+        (e) => e.id != excludePlacement && ArchitectSheetGeometry.valid(e),
+      ))
+        occupiedPath(
+          place,
+          '${place.number}  ${_placementName(p, place, l)}  1:${place.scale}',
+        ).getBounds().inflate(gapMm),
+    ];
+    for (final occupied in used) {
       final next = <Rect>[];
       for (final area in areas) {
-        if (!area.overlaps(used)) {
+        if (!area.overlaps(occupied)) {
           next.add(area);
           continue;
         }
-        final cut = area.intersect(used);
-        next.addAll(
-          [
-            Rect.fromLTRB(area.left, area.top, area.right, cut.top),
-            Rect.fromLTRB(area.left, cut.bottom, area.right, area.bottom),
-            Rect.fromLTRB(area.left, cut.top, cut.left, cut.bottom),
-            Rect.fromLTRB(cut.right, cut.top, area.right, cut.bottom),
-          ].where((r) => r.width >= 20 && r.height >= 20),
-        );
+        final cut = area.intersect(occupied);
+        // Keep full-height side candidates as well as full-width upper/lower
+        // candidates. They may overlap each other, but never the occupied area.
+        next.addAll([
+          Rect.fromLTRB(area.left, area.top, area.right, cut.top),
+          Rect.fromLTRB(area.left, cut.bottom, area.right, area.bottom),
+          Rect.fromLTRB(area.left, area.top, cut.left, area.bottom),
+          Rect.fromLTRB(cut.right, area.top, area.right, area.bottom),
+        ]);
       }
-      areas = next;
+      final candidates = next
+          .where((r) => r.isFinite && r.width >= 20 && r.height >= 20)
+          .toSet()
+          .toList();
+      areas = [
+        for (final area in candidates)
+          if (!candidates.any(
+            (other) =>
+                other != area &&
+                other.left <= area.left &&
+                other.top <= area.top &&
+                other.right >= area.right &&
+                other.bottom >= area.bottom,
+          ))
+            area,
+      ];
     }
     areas.sort((a, b) => (b.width * b.height).compareTo(a.width * a.height));
-    return areas.where((r) => r.width >= 20 && r.height >= 20).firstOrNull;
+    return areas;
+  }
+
+  static Rect? freeArea(
+    ArchitectProject p,
+    ArchitectSheet s,
+    AppLocalizations l, {
+    String? excludePlacement,
+  }) => freeAreas(p, s, l, excludePlacement: excludePlacement).firstOrNull;
+
+  static String _placementName(
+    ArchitectProject p,
+    ArchitectDrawingPlacement place,
+    AppLocalizations l,
+  ) {
+    final drawing = p.document.drawings
+        .where((d) => d.id == place.drawingId)
+        .firstOrNull;
+    return drawing == null ? '' : drawingName(drawing, l);
+  }
+
+  static Rect? titleRect(ArchitectDrawingPlacement place, String title) =>
+      place.showTitle
+      ? Rect.fromLTWH(
+          place.frame.left,
+          place.frame.bottom,
+          place.frame.width,
+          titleHeight(title, place.frame.width),
+        )
+      : null;
+
+  static Path occupiedPath(ArchitectDrawingPlacement place, String title) {
+    final path = ArchitectSheetGeometry.clipPath(place);
+    if (titleRect(place, title) case final rect?) path.addRect(rect);
+    return path;
+  }
+
+  static bool _overlaps(Path a, Path b) {
+    if (!a.getBounds().overlaps(b.getBounds())) return false;
+    final intersection = Path.combine(
+      PathOperation.intersect,
+      a,
+      b,
+    ).getBounds();
+    return intersection.width > .00001 && intersection.height > .00001;
   }
 
   static String fieldValue(
@@ -188,41 +243,56 @@ class ArchitectSheetLayout {
         messages.add(l.architectSheetTemplateOverflow);
       }
     }
-    final occupied = <Rect>[];
+    final occupied = <Path>[];
     for (final place in s.placements) {
       final source = p.document.drawings
           .where((d) => d.id == place.drawingId)
           .firstOrNull;
-      final frame = place.frame;
-      if (!frame.isFinite ||
-          frame.isEmpty ||
-          place.scale <= 0 ||
-          !place.rotation.isFinite ||
-          !place.anchor.dx.isFinite ||
-          !place.anchor.dy.isFinite) {
+      if (!ArchitectSheetGeometry.valid(place)) {
         messages.add(l.architectSheetInvalid);
         continue;
       }
       final name = drawingNames[place.drawingId] ?? source?.name ?? '';
       final title = '${place.number}  $name  1:${place.scale}';
-      final occupiedFrame = Rect.fromLTRB(
-        frame.left,
-        frame.top,
-        frame.right,
-        frame.bottom + (place.showTitle ? titleHeight(title, frame.width) : 0),
-      );
-      if (!_contains(bounds, occupiedFrame)) {
+      final path = occupiedPath(place, title);
+      if (!_contains(bounds, path.getBounds())) {
         messages.add(l.architectSheetOutside);
       }
-      if (block != null && occupiedFrame.overlaps(block)) {
+      if (block != null && _overlaps(path, Path()..addRect(block))) {
         messages.add(l.architectSheetTitleOverlap);
       }
-      if (occupied.any((r) => r.overlaps(occupiedFrame))) {
+      if (occupied.any((other) => _overlaps(other, path))) {
         messages.add(l.architectSheetOverlap);
       }
-      occupied.add(occupiedFrame);
+      occupied.add(path);
     }
     return messages.toList();
+  }
+
+  /// Try every candidate; prefer retaining the largest drawing scale.
+  static ArchitectDrawingPlacement fitAreas(
+    ArchitectDrawingPlacement place,
+    List<Rect> areas,
+    ArchitectVectorScene Function(int scale) build, {
+    required String Function(int scale) title,
+  }) {
+    ArchitectDrawingPlacement? best;
+    final scenes = <int, ArchitectVectorScene>{};
+    for (final area in areas) {
+      try {
+        final candidate = fit(
+          place,
+          area,
+          (scale) => scenes.putIfAbsent(scale, () => build(scale)),
+          title: title,
+        );
+        if (best == null || candidate.scale < best.scale) best = candidate;
+      } on ArchitectSheetFitException {
+        // A narrow candidate can fail while another candidate still fits.
+      }
+    }
+    if (best == null) throw ArchitectSheetFitException();
+    return best;
   }
 
   /// Scale changes regenerate annotation sizes. The caller rebuilds the scene
@@ -272,10 +342,11 @@ class ArchitectSheetLayout {
       );
       if (factor <= 1.001) break;
       final minimum = (scale * factor).ceil();
-      final next = ArchitectDrawingScale.presets
-          .where((n) => n >= minimum)
-          .firstOrNull;
-      if (next == null) throw ArchitectSheetFitException();
+      final next =
+          ArchitectDrawingScale.presets
+              .where((n) => n >= minimum)
+              .firstOrNull ??
+          minimum;
       scale = next;
     }
     scene = sceneAt(scale);
@@ -293,6 +364,7 @@ class ArchitectSheetLayout {
       math.min(area.width, titleWidth),
     );
     return place.copyWith(
+      clearCrop: true,
       scale: scale,
       frame: Rect.fromLTWH(area.left, area.top, width, bounds.height + gapMm),
       anchor:

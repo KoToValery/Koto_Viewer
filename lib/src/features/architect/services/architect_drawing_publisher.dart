@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/generated/app_localizations.dart';
@@ -26,6 +27,59 @@ class ArchitectPublicationSources {
 /// Shared scene generation for the working print preview, sheet and PDF.
 class ArchitectDrawingPublisher {
   static final _cache = Expando<Map<String, ArchitectVectorScene>>();
+
+  /// Source inputs are immutable model values. Paper-only document edits do not
+  /// invalidate expensive drawing scenes; geometry and annotation edits do.
+  static Object sourceRevision(ArchitectProject p) => (
+    p.id,
+    p.name,
+    p.units,
+    p.distanceDecimals,
+    p.levelUnits,
+    p.levelDecimals,
+    p.dimensionScale,
+    p.storeys,
+    p.activeStoreyId,
+    p.gridAxes,
+    p.wallTypes,
+    p.lineStyles,
+    p.hatchPatterns,
+    p.openingStyles,
+    p.slabAssemblies,
+    p.sections,
+    p.sectionVisibility,
+    p.elevations,
+    p.northSymbol,
+    p.slabCompositionNumbers,
+    p.document.viewScales,
+    p.document.profileMm,
+    p.document.overrideMm,
+  );
+
+  /// Map insertion order must not change which publication scene is reused.
+  static String visibilityKey(Map<String, bool> visibility) {
+    final keys = visibility.keys.toList()..sort();
+    return jsonEncode([
+      for (final key in keys) [key, visibility[key]],
+    ]);
+  }
+
+  static String sceneKey(
+    ArchitectSavedDrawing drawing,
+    int denominator,
+    AppLocalizations l, {
+    ArchitectPublicationSources sources = const ArchitectPublicationSources(),
+  }) => jsonEncode([
+    drawing.id,
+    drawing.sourceKey,
+    drawing.roof,
+    denominator,
+    l.localeName,
+    visibilityKey(drawing.visibility),
+    identityHashCode(sources.underlays[drawing.sourceId]),
+    sources.frame.hashCode,
+    visibilityKey(sources.visibility),
+  ]);
   static bool hasSource(ArchitectProject p, ArchitectSavedDrawing drawing) =>
       switch (drawing.kind) {
         ArchitectDrawingKind.plan => p.storeys.any(
@@ -46,11 +100,11 @@ class ArchitectDrawingPublisher {
     AppLocalizations l, {
     ArchitectPublicationSources sources = const ArchitectPublicationSources(),
   }) {
+    if (denominator <= 0) throw ArgumentError.value(denominator, 'denominator');
     if (!hasSource(p, drawing)) {
       throw StateError('Missing drawing source: ${drawing.id}');
     }
-    final key =
-        '${drawing.id}/$denominator/${l.localeName}/${drawing.visibility}/${identityHashCode(sources.underlays[drawing.sourceId])}/${sources.frame.hashCode}/${sources.visibility}';
+    final key = sceneKey(drawing, denominator, l, sources: sources);
     final cache = _cache[p] ??= {};
     if (cache.containsKey(key)) return cache[key]!;
     final scope = ArchitectTextScope(
@@ -86,6 +140,15 @@ class ArchitectDrawingPublisher {
         gridAxes: drawing.visibility['axes'] == false ? [] : p.gridAxes,
         dimensionScale: ArchitectDimensionScale.values.firstWhere(
           (s) => s.denominator == denominator,
+          // Legacy painters still accept the preset enum. Publication text and
+          // paper/model transforms use the exact denominator in this scope.
+          orElse: () => ArchitectDimensionScale.values.reduce(
+            (a, b) =>
+                (a.denominator - denominator).abs() <=
+                    (b.denominator - denominator).abs()
+                ? a
+                : b,
+          ),
         ),
       );
       if (drawing.kind == ArchitectDrawingKind.plan) {
