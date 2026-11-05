@@ -25,6 +25,11 @@ def circle(x, y, radius):
     return f'<circle cx="{x}" cy="{y}" r="{radius}"/>'
 
 
+def detail(d):
+    """Secondary construction lines stay lighter than the element silhouette."""
+    return f'<path d="{d}" stroke-width="1.25"/>'
+
+
 def add(name, geometry, aliases=''):
     assert name not in ICONS, name
     ICONS[name] = dict(geometry=geometry)
@@ -175,22 +180,30 @@ add('lock', R(4, 10, 16, 12, 2) + P('M7 10V7a5 5 0 0 1 10 0v3 M12 15v3'))
 add('unlock', R(4, 10, 16, 12, 2) + P('M7 10V7a5 5 0 0 1 9-3 M12 15v3'), 'lock_open')
 
 # Drawing and BIM tools.
-add('wall', P('M3 5h18v14H3Z M8 5v6 M16 5v6 M3 11h18 M7 11v8 M15 11v8'), 'line_weight')
-add('door', P('M3 21V3h10v18 M13 3a18 18 0 0 1 8 15 M13 21l8-3 M9 12h.1'), 'meeting_room door_front_door')
-add('window', R(3, 4, 18, 16) + P('M6 4v16 M18 4v16 M6 12h12 M12 4v16'))
-add('column', R(6, 5, 12, 14) + P('M3 2h5 M2 3v5 M16 2h5v6 M2 16v6h6 M16 22h6v-6'), 'view_column')
-add('beam', P('M3 7h18v3H3Z M10 10v4 M14 10v4 M3 14h18v3H3Z M5 20h14'), 'horizontal_rule')
-add('slab', P('m3 8 12-4 6 4-12 4Z M3 8v7l6 4 12-4V8 M9 12v7'))
-add('opening', P('M3 7V3h4 M17 3h4v4 M21 17v4h-4 M7 21H3v-4') + R(7, 7, 10, 10), 'crop_free tab_unselected')
-add('roof', P('m2 13 10-10 10 10 M5 10v11h14V10 M8 7l8 8 M12 3l7 7 M7 21v-5h5v5'), 'roofing')
-add('stairs', P('M3 21v-5h5v-5h5V6h5V2 M3 21h18V2 M4 12l12-9 m-5 0h5v5'))
+# Architectural silhouettes use sparse, conventional construction cues: a
+# masonry panel, a plan-view door swing, a framed window and solid members.
+# Keep the 1.75-unit outer stroke; reserve 1.25 for glazing, joints and arcs.
+add('wall', P('M3 7h14v14H3Z M3 7l4-4h14v14l-4 4 M17 7l4-4')
+    + detail('M3 12h14 M3 17h14 M10 7v5 M7 12v5 M12 17v4'), 'line_weight')
+add('door', P('M2 17h4v4H2 M20 17h2v4h-2Z M6 19V5')
+    + detail('M6 5a14 14 0 0 1 14 14'), 'meeting_room door_front_door')
+add('window', R(4, 3, 16, 16, .5) + P('M2 21h20')
+    + detail('M12 3v16 M4 11h16'))
+add('column', P('m7 5 6-3 5 3v14l-6 3-5-3Z M7 5l5 3 6-3 M12 8v14'), 'view_column')
+add('beam', P('M4 4h16v4h-6v8h6v4H4v-4h6V8H4Z'), 'horizontal_rule')
+add('slab', P('m2 10 10-6 10 6-10 6Z M2 10v4l10 6 10-6v-4 M12 16v4'))
+add('opening', R(3, 3, 18, 18) + detail('m7 7 10 10 M17 7 7 17'), 'crop_free tab_unselected')
+add('roof', P('m2 14 6-8 8-3 6 8-8 3Z M8 6l6 8 M2 14v3h12l8-3v-3 M14 14v3'), 'roofing')
+add('stairs', P('M3 21v-5h5v-5h5V6h5V3h3v18Z')
+    + detail('m3 10 7-7 M5 3h5v5'))
 add('axis', P('M12 8v4 m0 3v4 m0 2v1 M3 14h4 m3 0h4 m3 0h4') + C(12, 4, 3), 'grid_3x3')
-add('section', P('M4 3v18 M20 3v18 M4 12h16 M4 6l5 3-5 3 M20 18l-5-3 5-3'), 'splitscreen')
-add('elevation', P('M3 21V9l9-6 9 6v12Z M3 10h18 M7 14h3v3H7Z M14 14h3v3h-3Z M10 21v-2h4v2'))
+add('section', P('M4 20V9h16v11 M4 4 2 9h4Z M20 4l-2 5h4Z'), 'splitscreen')
+add('elevation', P('m2 10 10-7 10 7 M4 9v12h16V9 M2 21h20')
+    + detail('M7 12h3v4H7Z M14 12h3v4h-3Z'))
 add('building', R(5, 3, 14, 18) + P('M9 7h1 M14 7h1 M9 11h1 M14 11h1 M9 15h1 M14 15h1 M10 21v-3h4v3'), 'apartment business domain')
 add('new_building', P('M3 21V3h12v8 M7 7h1 M11 7h1 M7 12h1 M7 17h1 M18 13v9 M14 17h8'), 'add_business add_home_work')
 add('building_off', R(5, 3, 14, 18) + P('M9 7h1 M14 7h1 M9 11h1 M14 11h1 M9 15h1 M14 15h1 M3 3l18 18'), 'domain_disabled')
-add('storeys', P('M3 5h18 M3 12h18 M3 19h18 M6 3v18 M18 3v18 M9 8h6 M9 15h6'))
+add('storeys', P('M5 3v18 M19 3v18 M3 7h18 M3 14h18 M3 21h18'))
 add('zone', P('M3 3h18v18H3Z M3 9h7v12 M10 13h11 M14 3v10'), 'space_dashboard dashboard')
 add('schedule', table, 'table_chart table_view assessment list_alt')
 add('zone_schedule', table + P('M6 6h.1 M6 11h.1 M6 16h.1'))
@@ -217,10 +230,11 @@ add('layers_off', P('m4 7 8-4 10 5-8 4 M3 12l9 5 9-5 M3 16l9 5 6-3 M3 3l18 18'),
 add('grid', grid, 'grid_on grid_4x4')
 add('grid_off', grid + P('M2 2l20 20'))
 add('terrain', P('m2 20 7-15 5 8 3-5 5 12Z M7 9l4 4 2-2'), 'landscape')
-add('floor_drain', R(4, 4, 16, 16) + C(12, 12, 5) + P('M7 12h10 M12 7v10 M9 8l6 8 M15 8l-6 8'))
+add('floor_drain', R(3, 3, 18, 18, 1) + detail('M7 8h10 M7 12h10 M7 16h10'))
 add('water', P('M12 2C9 7 5 11 5 15a7 7 0 0 0 14 0c0-4-4-8-7-13Z M8 15a4 4 0 0 0 4 4'), 'water_drop')
-add('foundation', P('M8 3h8v12h4v6H4v-6h4Z M2 21h20 M6 17l-2 2 M11 16l-5 5 M16 16l-5 5 M20 17l-4 4'))
-add('wall_joint', P('M3 7h6V3h6v6h6v6h-6v6H9V13H3Z'), 'merge_type')
+add('foundation', P('M8 3h8v11h5v7H3v-7h5Z M2 21h20')
+    + detail('m5 18 3-3 M11 20l5-5 M18 20l2-2'))
+add('wall_joint', P('M3 3h6v12h12v6H3Z') + detail('m3 21 6-6'), 'merge_type')
 add('rounded_corner', P('M3 21V10a7 7 0 0 1 7-7h11 M8 21V11a3 3 0 0 1 3-3h10'))
 add('line_style', P('M3 5h18 M3 12h4 m4 0h4 m4 0h2 M3 19h1 m4 0h1 m4 0h1 m4 0h1'), 'border_style')
 add('line_weight', P('M3 4h18 M3 9h18') + '<path d="M3 15h18" stroke-width="3"/>' + '<path d="M3 21h18" stroke-width="4"/>', 'density_medium density_small view_headline')
@@ -232,7 +246,8 @@ add('furniture', P('M5 11V4h14v7 M3 10h4v6h10v-6h4v9H3Z M5 19v3 M19 19v3'), 'cha
 add('bed', P('M3 21V7h18v14 M3 16h18 M3 11h18 M6 7V4h12v3 M7 11v5 M17 11v5'))
 add('bath', P('M2 12h20 M4 12v5a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-5 M6 20v2 M18 20v2 M5 12V5a3 3 0 0 1 6 0 M8 5h5'), 'bathtub')
 add('kitchen', R(5, 2, 14, 20, 1) + P('M5 10h14 M8 5v2 M8 14v4'))
-add('balcony', P('M3 10h18 M3 20h18 M5 10v10 M10 10v10 M15 10v10 M20 10v10 M4 4h16'), 'deck')
+add('balcony', P('M7 7V3h10v4 M2 10h20 M3 10v11h18V10')
+    + detail('M8 10v11 M16 10v11'), 'deck')
 add('fence', P('M3 8 6 4l3 4v14H3Z M15 8l3-4 3 4v14h-6Z M9 12h6 M9 18h6'))
 add('cabin', P('m2 10 10-8 10 8 M5 8v14h14V8 M5 12h14 M5 16h14 M5 20h14'))
 add('tree', P('m12 2-8 9h4l-6 7h8v4h4v-4h8l-6-7h4Z'), 'nature_people')
@@ -348,11 +363,11 @@ add('lightbulb', P('M8 17c0-4-3-4-3-8a7 7 0 0 1 14 0c0 4-3 4-3 8Z M8 20h8 M10 23
 add('align_right', P('M21 3v18 M3 5h14 M8 10h9 M3 15h14 M8 20h9'))
 add('polygon', P('m3 6 11-3 7 8-6 10-12-5Z'))
 add('arc', P('M3 20A17 17 0 0 1 20 3') + C(3, 20, 1.5) + C(20, 3, 1.5))
-add('roof_gable', P('M2 17 12 5l10 12 M5 14v7h14v-7 M12 5v12'))
+add('roof_gable', P('M2 17 12 5l10 12 M5 13.4V21h14v-7.6'))
 add('roof_hip', R(3, 4, 18, 16) + P('m3 4 6 8-6 8 M21 4l-6 8 6 8 M9 12h6'))
-add('roof_shed', P('M2 13 22 4 M5 12v9h14V6 M5 17h14'))
+add('roof_shed', P('M2 13 22 4 M5 11.65V21h14V5.35'))
 add('roof_flat', P('M2 5h20v4H2Z M5 9v12h14V9'))
-add('roof_mansard', P('m2 17 4-9 6-4 6 4 4 9 M5 14v7h14v-7 M6 8h12'))
+add('roof_mansard', P('m2 17 4-9 6-4 6 4 4 9 M5 10.25V21h14V10.25'))
 add('selection_contained', R(3, 3, 18, 18) + R(8, 8, 8, 8))
 add('selection_crossing', '<rect x="3" y="3" width="16" height="18" stroke-dasharray="2 2"/>' + R(12, 8, 10, 8))
 add('shading_edges', cube)

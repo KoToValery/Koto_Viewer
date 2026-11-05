@@ -26,7 +26,7 @@ unregistered glyph throws instead of displaying an unrelated fallback symbol.
 
 1. Author geometry in `tools/generate_command_icons.py` and add the corresponding
    `commandIcon…` label to both ARB files. ARB is the only source for display text.
-   Use the 24-unit grid, 1.75-unit main stroke,
+   Use the 24-unit grid, 1.75-unit main stroke and optional 1.25-unit secondary lines,
    rounded ends/joints, transparent background and `currentColor`. Keep detail
    sparse enough to read at 14 pixels. SVGs contain no fonts, raster data or links.
 2. Run `python tools/generate_command_icons.py`, `flutter gen-l10n`, then
@@ -43,3 +43,9 @@ For native Flutter render contact sheets, run the test with
 Numeric values, user/preset names, plain confirmation buttons, file thumbnails
 and drawing geometry keep their existing presentation. Product labels and
 tooltips are sourced from ARB in both supported languages.
+
+Architectural element symbols use distinct construction silhouettes: masonry
+with visible thickness, a plan-view door swing, a window frame and sill, a
+column prism, a continuous beam section and a thin slab. Glazing divisions,
+masonry joints and swing arcs use lighter secondary lines. Roofs and stairs
+avoid crossing decorative strokes so they remain legible at small sizes.
