@@ -31,10 +31,21 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+**/build/
 /coverage/
+*.dill
 
-# Optional command icon render contact sheets.
-/scratch/command_icon_previews/
+# Scratch files and temporary artifacts
+/scratch/*
+!/scratch/SuperSense_Gerbers/
+!/scratch/command_mirror_aim_bg.png
+!/scratch/command_mirror_review_bg.png
+!/scratch/select_analysis_consistency_probe_test.dart
+!/scratch/wall_drafting_bg_360.png
+!/scratch/wall_drafting_bg_390.png
+!/scratch/wall_drafting_en_360.png
+!/scratch/wall_drafting_en_390.png
+!/scratch/wall_stage2_visual_test.dart
 
 # Symbolication related
 app.*.symbols
