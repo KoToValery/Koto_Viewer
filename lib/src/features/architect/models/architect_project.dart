@@ -1,5 +1,7 @@
 import 'architect_element_group.dart';
 export 'architect_element_group.dart';
+import 'architect_layer.dart';
+export 'architect_layer.dart';
 import 'architect_line_style.dart';
 import 'architect_hatch_pattern.dart';
 import 'architect_document.dart';
@@ -386,6 +388,8 @@ class ArchitectProject {
   final ArchitectNorthSymbol? northSymbol;
   final Map<String, int> slabCompositionNumbers;
   final bool showDecorativeOnPlan;
+  final List<ArchitectLayer> layers;
+  final Map<String, String> elementLayers;
 
   const ArchitectProject({
     required this.id,
@@ -412,7 +416,38 @@ class ArchitectProject {
     this.northSymbol,
     this.slabCompositionNumbers = const {},
     this.showDecorativeOnPlan = false,
+    this.layers = const [],
+    this.elementLayers = const {},
   });
+
+  List<ArchitectLayer> get effectiveLayers {
+    if (layers.isEmpty) return ArchitectLayer.defaultLayers();
+    final existingIds = layers.map((l) => l.id).toSet();
+    return [
+      ...layers,
+      for (final std in ArchitectLayer.defaultLayers())
+        if (!existingIds.contains(std.id)) std,
+    ];
+  }
+
+  String elementLayerId(String elementId, String defaultLayerId) {
+    final custom = elementLayers[elementId];
+    if (custom != null && effectiveLayers.any((l) => l.id == custom)) {
+      return custom;
+    }
+    return defaultLayerId;
+  }
+
+  bool isElementVisible(String elementId, String defaultLayerId) {
+    final layerId = elementLayerId(elementId, defaultLayerId);
+    final layer = effectiveLayers.where((l) => l.id == layerId).firstOrNull;
+    return layer?.visible ?? true;
+  }
+
+  bool isLayerVisible(String layerId) {
+    final layer = effectiveLayers.where((l) => l.id == layerId).firstOrNull;
+    return layer?.visible ?? true;
+  }
 
   String formatLength(double meters) =>
       units.format(meters, decimals: distanceDecimals);
@@ -535,6 +570,8 @@ class ArchitectProject {
     bool clearNorthSymbol = false,
     Map<String, int>? slabCompositionNumbers,
     bool? showDecorativeOnPlan,
+    List<ArchitectLayer>? layers,
+    Map<String, String>? elementLayers,
   }) => ArchitectProject(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -561,6 +598,8 @@ class ArchitectProject {
     slabCompositionNumbers:
         slabCompositionNumbers ?? this.slabCompositionNumbers,
     showDecorativeOnPlan: showDecorativeOnPlan ?? this.showDecorativeOnPlan,
+    layers: layers ?? this.layers,
+    elementLayers: elementLayers ?? this.elementLayers,
   );
 
   Map<String, dynamic> toJson() => {
@@ -588,6 +627,8 @@ class ArchitectProject {
     if (northSymbol != null) 'northSymbol': northSymbol!.toJson(),
     'slabCompositionNumbers': slabCompositionNumbers,
     if (showDecorativeOnPlan) 'showDecorativeOnPlan': true,
+    if (layers.isNotEmpty) 'layers': layers.map((l) => l.toJson()).toList(),
+    if (elementLayers.isNotEmpty) 'elementLayers': elementLayers,
   };
 
   factory ArchitectProject.fromJson(
@@ -691,6 +732,12 @@ class ArchitectProject {
             )
             .toList() ??
         const [],
+    layers: (json['layers'] as List? ?? [])
+        .map((l) => ArchitectLayer.fromJson(Map<String, dynamic>.from(l as Map)))
+        .toList(),
+    elementLayers: (json['elementLayers'] as Map? ?? {}).map(
+      (k, v) => MapEntry(k as String, v as String),
+    ),
   );
 
   /// Factory creating an architectural project configured from the starter wizard.

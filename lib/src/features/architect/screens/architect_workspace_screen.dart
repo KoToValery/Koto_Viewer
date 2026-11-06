@@ -49,6 +49,10 @@ import '../services/architect_line_styles.dart';
 
 import '../services/architect_line_editing.dart';
 import '../services/architect_polyline_editing.dart';
+import '../services/architect_chamfer_fillet.dart';
+import '../widgets/architect_chamfer_fillet_dialog.dart';
+import '../widgets/architect_layers_dialog.dart';
+import '../widgets/architect_element_layer_dialog.dart';
 
 import '../services/architect_offset.dart';
 import '../services/architect_rotation.dart';
@@ -4897,7 +4901,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _selectionBoxDown;
   Offset? _selectionBoxDownScreen;
   bool _selectionBoxDragging = false;
-  bool get _showSelectionActions => (_effectiveSelection.isNotEmpty || (_multiSelect && !_explicitSelectionOperation)) &&
+  bool get _showSelectionActions => (_effectiveSelection.isNotEmpty || _isZoneTableSelected || (_multiSelect && !_explicitSelectionOperation)) &&
       !_marqueeTool.isDrafting && !_is3DView && _radialMenuScreenPosition == null && _newPointTargetId == null;
   bool get _showSelectionControl => _multiSelect &&
       _radialMenuScreenPosition == null && !_moveSelection && _newPointTargetId == null && _offsetOptions == null &&
@@ -5616,17 +5620,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   ArchitectDrawingColor _activeHatchColor = ArchitectDrawingColor.ink;
 
   Widget _hatchControl() => ArchitectHatchDraftBar(
-
     automatic: _automaticHatch,
-
     onAutomaticChanged: (v) => setState(() {
-
       _automaticHatch = v;
-
       _elementTool.cancelSlabDrafting();
-
     }),
-
+    precisionMode: _wallPrecisionMode,
+    onPrecisionToggle: () => setState(() => _wallPrecisionMode = !_wallPrecisionMode),
     pattern: _activeHatchPattern,
     color: _activeHatchColor,
     onColorChanged: (color) => setState(() => _activeHatchColor = color),
@@ -7874,55 +7874,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     // 2. Zone Schedule Table hit check (drag table or select it)
-
     if ((_activeTool == ArchitectTool.zoneTable ||
-
             _activeTool == ArchitectTool.zone ||
-
             _activeTool == ArchitectTool.select) &&
-
-        _project.activeStorey.zoneScheduleOrigin != null &&
-
-        _project.activeStorey.zones.isNotEmpty) {
-
+        _project.activeStorey.zoneScheduleOrigin != null) {
       final tables = ArchitectZonePainterHelper.scheduleTables(
-
         project: _modelCommands.project, storey: _project.activeStorey,
-
         l10n: context.l10n, viewKey: _workspaceViewKey, zoomScale: _currentScale,
-
       );
-
       for (final table in tables.reversed) {
-
         if (!table.bounds.contains(rawModel)) continue;
-
         _selectedZoneTableId = table.group.id;
-
         _isDraggingZoneTable = true;
-
         _isHandleEngaged = true;
-
         _zoneTableDragOffset = table.origin - rawModel;
-
         _zoneTablePreviewOrigin = table.origin;
-
         setState(() {
-
           _isZoneTableSelected = true;
-
           _selectedZoneId = null;
-
           _selectedElementId = null;
-
-          _selectionIds.clear();
-
+          if (!_multiSelect) {
+            _selectionIds.clear();
+          }
         });
-
         HapticFeedback.selectionClick();
-
         return;
-
       }
 
     }
@@ -10227,6 +10203,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if ((_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain) &&
 
         _elementTool.slabDraftPoints.isNotEmpty) {
+      if (_wallDirectionLocked) return;
 
       _elementTool.updateSlabCandidate(_resolveSlabPoint(rawModel));
 
@@ -12897,6 +12874,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     // 9. In Slab tool
 
     if (_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain) {
+      if (_wallDirectionLocked) return;
 
       final pt = _resolveSlabPoint(rawModel);
 
@@ -12909,8 +12887,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               math.min(16.0 / _currentScale, .20)) {
 
         if (_activeTool == ArchitectTool.hatch) { _commitHatch(); return; }
-
-      if (_activeTool == ArchitectTool.floorDrain) { _commitFloorDrain(); return; }
 
         if (_activeTool == ArchitectTool.floorDrain) { _commitFloorDrain(); return; }
 
@@ -12932,6 +12908,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }
 
       } else {
+        if (_activeTool == ArchitectTool.hatch &&
+            _wallPrecisionMode &&
+            _elementTool.slabDraftPoints.isNotEmpty) {
+          final lastPt = _elementTool.slabDraftPoints.last;
+          if ((pt - lastPt).distance >= .001) {
+            setState(() {
+              _draftStart = lastPt;
+              _draftEnd = pt;
+              _wallDirectionLocked = true;
+              _wallPanelAnchor = (lastPt + pt) / 2;
+            });
+            return;
+          }
+        }
 
         setState(() => _elementTool.addSlabPoint(pt));
 
@@ -14259,6 +14249,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _finishChainedWall() {
     final chainIds = Set<String>.from(_liveDraftChainIds);
+    if (_polylineDraftId != null) {
+      chainIds.add(_polylineDraftId!);
+      _polylineDraftId = null;
+    }
     _finishDraftGroup();
 
     setState(() {
@@ -14277,6 +14271,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   /// Preferences such as the reference line and chain mode survive this reset.
   void _resetWallDraft() {
     _interactionEpoch++;
+    _polylineDraftId = null;
     _draftStart = null;
     _draftEnd = null;
     _wallArcEnd = null;
@@ -18313,11 +18308,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (!_is3DView && ArchitectOffset.supports(_project.activeStorey, _effectiveSelection)) {
+      items.add(_radialItem(action: ArchitectRadialAction.offset, color: const Color(0xFF80CBC4)));
+    }
 
-      items.add(_radialItem(action: ArchitectRadialAction.offset, color: const Color(0xFF80CBC4),
-        ),
-      );
-
+    final canChamferFillet = _selectedWallIds.isNotEmpty ||
+        _selectedLineIds.isNotEmpty ||
+        _project.activeStorey.slabs.any((s) => _effectiveSelection.contains(s.id)) ||
+        _project.activeStorey.cadPrimitives.any((p) => _effectiveSelection.contains(p.id));
+    if (canChamferFillet) {
+      if (!items.any((item) => item.action == ArchitectRadialAction.chamfer)) {
+        items.add(_radialItem(action: ArchitectRadialAction.chamfer, color: const Color(0xFF80CBC4)));
+      }
+      if (!items.any((item) => item.action == ArchitectRadialAction.fillet)) {
+        items.add(_radialItem(action: ArchitectRadialAction.fillet, color: const Color(0xFF4DB6AC)));
+      }
     }
 
     if (_commands.isPlan && _editingGroupId == null) {
@@ -20313,6 +20317,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ArchitectRotation.supports(_project.activeStorey, _effectiveSelection,
         )) {
       _startRotation();
+      return;
+    }
+
+    if (action == ArchitectRadialAction.chamfer) {
+      _triggerChamfer();
+      return;
+    }
+    if (action == ArchitectRadialAction.fillet) {
+      _triggerFillet();
       return;
     }
 
@@ -23306,9 +23319,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _deleteSelection() {
     _discardGeometryCommand();
 
+    if (_isZoneTableSelected) {
+      _removeZoneScheduleTable();
+    }
+
     final ids = _selectionIds.isNotEmpty ? Set<String>.of(_selectionIds) : _effectiveSelection;
 
-    if (ids.isEmpty) return;
+    if (ids.isEmpty) {
+      _clearSelection();
+      return;
+    }
 
     final hadWalls = _project.activeStorey.walls.any((w) => ids.contains(w.id));
 
@@ -24490,6 +24510,228 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  int? _selectedVertexIndexFor(List<Offset> pts) {
+    final ref = _cursorModel ?? _selectionCyclePoint;
+    if (ref != null && pts.isNotEmpty) {
+      var bestIdx = 0;
+      var bestDist = double.infinity;
+      for (var i = 0; i < pts.length; i++) {
+        final d = (pts[i] - ref).distance;
+        if (d < bestDist) {
+          bestDist = d;
+          bestIdx = i;
+        }
+      }
+      return bestIdx;
+    }
+    return null;
+  }
+
+  Future<void> _triggerChamfer() => _openChamferFilletDialog(isFillet: false);
+  Future<void> _triggerFillet() => _openChamferFilletDialog(isFillet: true);
+
+  Future<void> _openChamferFilletDialog({required bool isFillet}) async {
+    final ids = _effectiveSelection;
+    final storey = _project.activeStorey;
+    final canApplyToAll = _selectedPolygon != null ||
+        storey.slabs.any((s) => ids.contains(s.id)) ||
+        storey.cadPrimitives.any((p) => ids.contains(p.id) && (p.isPolygon || p.type == CadPrimitiveType.polyline));
+
+    final options = await showArchitectChamferFilletDialog(
+      context,
+      unitToMeters: _project.units.scale,
+      unitSymbol: _project.units.symbol,
+      initialIsFillet: isFillet,
+      canApplyToAll: canApplyToAll,
+    );
+    if (options == null) return;
+
+    _applyChamferFillet(options);
+  }
+
+  void _applyChamferFillet(ArchitectChamferFilletOptions options) {
+    final ids = _effectiveSelection;
+    var storey = _project.activeStorey;
+    var changed = false;
+
+    final updatedSlabs = storey.slabs.map((slab) {
+      if (!ids.contains(slab.id)) return slab;
+      final newPolygon = options.isFillet
+          ? ArchitectChamferFillet.polygonFillet(
+              slab.polygon,
+              vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(slab.polygon),
+              radius: options.value,
+            )
+          : ArchitectChamferFillet.polygonChamfer(
+              slab.polygon,
+              vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(slab.polygon),
+              distance: options.value,
+            );
+      if (newPolygon.length >= 3) {
+        changed = true;
+        return slab.copyWith(polygon: newPolygon);
+      }
+      return slab;
+    }).toList();
+    storey = storey.copyWith(slabs: updatedSlabs);
+
+    final updatedPrimitives = storey.cadPrimitives.map((prim) {
+      if (!ids.contains(prim.id)) return prim;
+      if (prim.type == CadPrimitiveType.polyline || prim.isPolygon) {
+        final pts = prim.isPolygon ? prim.polygonCorners : prim.linePoints;
+        final isClosed = prim.isPolygon || prim.isClosedPolyline;
+        final newPts = options.isFillet
+            ? ArchitectChamferFillet.polygonFillet(
+                pts,
+                vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(pts),
+                radius: options.value,
+                isClosed: isClosed,
+              )
+            : ArchitectChamferFillet.polygonChamfer(
+                pts,
+                vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(pts),
+                distance: options.value,
+                isClosed: isClosed,
+              );
+        if (newPts.length >= 2) {
+          changed = true;
+          return prim.type == CadPrimitiveType.polyline
+              ? prim.copyWith(linePoints: newPts, polygon: newPts)
+              : prim.copyWith(polygon: newPts);
+        }
+      }
+      return prim;
+    }).toList();
+    storey = storey.copyWith(cadPrimitives: updatedPrimitives);
+
+    final selectedWalls = storey.walls.where((w) => ids.contains(w.id)).toList();
+    if (selectedWalls.length == 2) {
+      final wA = selectedWalls[0];
+      final wB = selectedWalls[1];
+      final res = options.isFillet
+          ? ArchitectChamferFillet.wallPairFillet(wA, wB, radius: options.value)
+          : ArchitectChamferFillet.wallPairChamfer(wA, wB, distance: options.value);
+      if (res != null) {
+        final nextWalls = storey.walls.map((w) {
+          if (w.id == wA.id) return res.wallA;
+          if (w.id == wB.id) return res.wallB;
+          return w;
+        }).toList()..add(res.connector);
+        storey = storey.copyWith(walls: nextWalls);
+        changed = true;
+      }
+    }
+
+    final selectedLines = storey.cadPrimitives
+        .where((p) => ids.contains(p.id) && p.type == CadPrimitiveType.line)
+        .toList();
+    if (selectedLines.length == 2) {
+      final lA = selectedLines[0];
+      final lB = selectedLines[1];
+      final res = ArchitectChamferFillet.linePairChamfer(lA, lB, distance: options.value);
+      if (res != null) {
+        final nextPrimitives = storey.cadPrimitives.map((p) {
+          if (p.id == lA.id) return res.lineA;
+          if (p.id == lB.id) return res.lineB;
+          return p;
+        }).toList()..add(res.connector);
+        storey = storey.copyWith(cadPrimitives: nextPrimitives);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      _commands.commit(_project.updateActiveStorey(storey));
+      _saveBiMProjectIfAttached();
+      setState(() {});
+    }
+  }
+
+  Future<void> _triggerChangeLayer() async {
+    final ids = _effectiveSelection;
+    if (ids.isEmpty) return;
+    final firstId = ids.first;
+    final currentLayerId = _project.elementLayerId(firstId, ArchitectLayer.wallLayerId);
+
+    final selectedLayerId = await showArchitectElementLayerPicker(
+      context,
+      project: _project,
+      currentLayerId: currentLayerId,
+    );
+    if (selectedLayerId == null || selectedLayerId == currentLayerId) return;
+
+    final updatedElementLayers = Map<String, String>.from(_project.elementLayers);
+    for (final id in ids) {
+      updatedElementLayers[id] = selectedLayerId;
+    }
+    _commands.commit(
+      _project.copyWith(elementLayers: updatedElementLayers),
+    );
+    _saveBiMProjectIfAttached();
+    setState(() {});
+  }
+
+  void _openLayersDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => ArchitectLayersDialog(
+        project: _project,
+        onToggleVisibility: (layer) {
+          final updated = _project.effectiveLayers.map((l) {
+            if (l.id == layer.id) {
+              return l.copyWith(visible: !l.visible);
+            }
+            return l;
+          }).toList();
+          setState(() {
+            _project = _project.copyWith(layers: updated);
+          });
+          _saveBiMProjectIfAttached();
+        },
+        onCreateLayer: (name, colorValue) {
+          final id = 'CUSTOM_${DateTime.now().millisecondsSinceEpoch}';
+          final newLayer = ArchitectLayer(
+            id: id,
+            name: name,
+            isStandard: false,
+            visible: true,
+            colorValue: colorValue,
+          );
+          setState(() {
+            _project = _project.copyWith(
+              layers: [..._project.effectiveLayers, newLayer],
+            );
+          });
+          _saveBiMProjectIfAttached();
+        },
+        onDeleteLayer: (layer) {
+          if (layer.isStandard) return;
+          final updatedLayers = _project.effectiveLayers
+              .where((l) => l.id != layer.id)
+              .toList();
+          final updatedElementLayers = Map<String, String>.from(_project.elementLayers);
+          updatedElementLayers.removeWhere((_, lId) => lId == layer.id);
+          setState(() {
+            _project = _project.copyWith(
+              layers: updatedLayers,
+              elementLayers: updatedElementLayers,
+            );
+          });
+          _saveBiMProjectIfAttached();
+        },
+        onShowAll: () {
+          final updated = _project.effectiveLayers
+              .map((l) => l.copyWith(visible: true))
+              .toList();
+          setState(() {
+            _project = _project.copyWith(layers: updated);
+          });
+          _saveBiMProjectIfAttached();
+        },
+      ),
+    );
+  }
+
   Widget _buildSelectionBar({bool menuOnly = false}) {
     if (_commandReady ||
         (_commandPreview != null &&
@@ -24548,6 +24790,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       () => _performLinearSelectionAction(command, segmentIds),
       commandId: commandId,
     );
+
+    if (ids.isEmpty && _isZoneTableSelected) {
+      return ArchitectSelectionActionBar(
+        actions: [
+          action(
+            'architect-selection-delete',
+            l.delete,
+            Icons.delete_outline,
+            _deleteSelection,
+            primary: true,
+            color: danger,
+          ),
+          action(
+            'architect-clear-selection',
+            l.architectSelectionClear,
+            Icons.close,
+            _clearSelection,
+            primary: true,
+          ),
+        ],
+        count: 1,
+        menuOnly: menuOnly,
+        showClear: true,
+        showCount: false,
+        onAction: _dismissTouchCandidates,
+      );
+    }
 
     final doors = storey.walls
         .expand((w) => w.doors)
@@ -24965,6 +25234,49 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         );
       }
     }
+    final canChamferFillet = wallIds.isNotEmpty ||
+        lineIds.isNotEmpty ||
+        storey.slabs.any((s) => ids.contains(s.id)) ||
+        storey.cadPrimitives.any((p) => ids.contains(p.id) && (p.isPolygon || p.type == CadPrimitiveType.polyline || p.type == CadPrimitiveType.line));
+
+    if (canChamferFillet) {
+      actions.add(
+        ArchitectSelectionAction(
+          id: 'architect-chamfer-fillet-menu',
+          label: l.architectChamfer,
+          icon: icon(Icons.rounded_corner),
+          children: [
+            action(
+              'architect-chamfer',
+              l.architectChamfer,
+              Icons.crop_square_outlined,
+              _triggerChamfer,
+              color: accent,
+            ),
+            action(
+              'architect-fillet',
+              l.architectFillet,
+              Icons.rounded_corner,
+              _triggerFillet,
+              color: accent,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (ids.isNotEmpty) {
+      actions.add(
+        action(
+          'architect-change-layer',
+          l.architectChangeLayer,
+          Icons.layers_outlined,
+          _triggerChangeLayer,
+          color: accent,
+        ),
+      );
+    }
+
     actions.addAll([
       action(
         'architect-selection-delete',
@@ -25661,6 +25973,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         ),
 
                         onPressed: _showWorkspaceSettings,
+
+                      ),
+
+                      IconButton(
+
+                        key: const ValueKey('architect-layers'),
+
+                        tooltip: l10n.architectLayers,
+
+                        icon: const AppIcon(
+                          AppIconId.layers,
+
+                          color: Colors.white,
+
+                        ),
+
+                        onPressed: _openLayersDialog,
 
                       ),
 
@@ -29528,7 +29857,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         ),
 
-      if (_linearDraftTool)
+      if (_linearDraftTool || (_activeTool == ArchitectTool.hatch && _elementTool.slabDraftPoints.isNotEmpty))
 
         AnimatedBuilder(
 
@@ -29631,33 +29960,79 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                   _project.units.fromUnit(value);
 
+                          if (_activeTool == ArchitectTool.hatch) {
+                            _elementTool.updateSlabCandidate(_draftEnd!);
+                          }
+
                           _activeSnapLabel = null;
 
                           _repaintPreview();
 
                         },
 
-                        onEnd: () => _commitCurrentWallSegment(
+                        onEnd: () {
+                          if (_activeTool == ArchitectTool.hatch) {
+                            final pt = _draftEnd!;
+                            setState(() {
+                              _elementTool.addSlabPoint(pt);
+                              _wallDirectionLocked = false;
+                              _wallPanelAnchor = null;
+                              _draftStart = null;
+                              _draftEnd = null;
+                            });
+                            if (_elementTool.slabDraftPoints.length >= 3) {
+                              _commitHatch();
+                            }
+                            return;
+                          }
+                          _commitCurrentWallSegment(
 
-                          _draftEnd!,
+                            _draftEnd!,
 
-                          continueChain: false,
+                            continueChain: false,
 
-                        ),
+                          );
+                        },
 
-                        onContinue: () => _commitCurrentWallSegment(
+                        onContinue: () {
+                          if (_activeTool == ArchitectTool.hatch) {
+                            final pt = _draftEnd!;
+                            setState(() {
+                              _elementTool.addSlabPoint(pt);
+                              _draftStart = pt;
+                              _draftEnd = pt;
+                              _wallDirectionLocked = false;
+                              _wallPanelAnchor = null;
+                            });
+                            _repaintPreview();
+                            return;
+                          }
+                          _commitCurrentWallSegment(
 
-                          _draftEnd!,
+                            _draftEnd!,
 
-                          continueChain: true,
+                            continueChain: true,
 
-                        ),
+                          );
+                        },
 
                         onUnlock: () =>
 
                             setState(() => _wallDirectionLocked = false),
 
-                        onCancel: _finishChainedWall,
+                        onCancel: () {
+                          if (_activeTool == ArchitectTool.hatch) {
+                            setState(() {
+                              _wallDirectionLocked = false;
+                              _wallPanelAnchor = null;
+                              _draftStart = null;
+                              _draftEnd = null;
+                            });
+                            _repaintPreview();
+                            return;
+                          }
+                          _finishChainedWall();
+                        },
 
                       ),
 

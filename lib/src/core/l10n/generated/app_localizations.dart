@@ -12803,10 +12803,10 @@ abstract class AppLocalizations {
   /// **'Free Standing'**
   String get architectPlacementModeFree;
 
-  /// No description provided for @architectLayerFurniture.
+  /// Layer for furniture and sanitary components
   ///
   /// In en, this message translates to:
-  /// **'Furniture Layer'**
+  /// **'Furniture & Interior'**
   String get architectLayerFurniture;
 
   /// No description provided for @architectComponentNoItems.
@@ -20999,6 +20999,198 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Slope: {angle}° ({percent}%)'**
   String architectWallCalculatedSlope(String angle, String percent);
+
+  /// Chamfer command to bevel a corner
+  ///
+  /// In en, this message translates to:
+  /// **'Chamfer'**
+  String get architectChamfer;
+
+  /// Fillet command to round a corner in an arc
+  ///
+  /// In en, this message translates to:
+  /// **'Fillet'**
+  String get architectFillet;
+
+  /// Distance to cut back corner for chamfer
+  ///
+  /// In en, this message translates to:
+  /// **'Chamfer distance'**
+  String get architectChamferDistance;
+
+  /// Radius of corner fillet arc
+  ///
+  /// In en, this message translates to:
+  /// **'Fillet radius'**
+  String get architectFilletRadius;
+
+  /// Apply chamfer or fillet to all polygon corners
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to all corners'**
+  String get architectApplyToAllCorners;
+
+  /// Apply chamfer or fillet to selected corner
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to selected corner'**
+  String get architectApplyToCorner;
+
+  /// Error when chamfer or fillet exceeds segment length
+  ///
+  /// In en, this message translates to:
+  /// **'Distance or radius is too large for this corner'**
+  String get architectChamferFilletInvalid;
+
+  /// Layers management title
+  ///
+  /// In en, this message translates to:
+  /// **'Layers'**
+  String get architectLayers;
+
+  /// Button to create a new custom layer
+  ///
+  /// In en, this message translates to:
+  /// **'New Layer'**
+  String get architectNewLayer;
+
+  /// Label for layer name input
+  ///
+  /// In en, this message translates to:
+  /// **'Layer name'**
+  String get architectLayerName;
+
+  /// Delete custom layer action
+  ///
+  /// In en, this message translates to:
+  /// **'Delete layer'**
+  String get architectDeleteLayer;
+
+  /// Change layer of selected element(s)
+  ///
+  /// In en, this message translates to:
+  /// **'Change layer'**
+  String get architectChangeLayer;
+
+  /// Indicates current layer of element
+  ///
+  /// In en, this message translates to:
+  /// **'Current layer: {name}'**
+  String architectCurrentLayer(String name);
+
+  /// Prompt to pick a target layer
+  ///
+  /// In en, this message translates to:
+  /// **'Select layer'**
+  String get architectSelectLayer;
+
+  /// Warning when trying to delete built-in layer
+  ///
+  /// In en, this message translates to:
+  /// **'Standard layers cannot be deleted'**
+  String get architectCannotDeleteStandardLayer;
+
+  /// Color associated with layer
+  ///
+  /// In en, this message translates to:
+  /// **'Layer color'**
+  String get architectLayerColor;
+
+  /// Button to make all layers visible
+  ///
+  /// In en, this message translates to:
+  /// **'Show all layers'**
+  String get architectAllLayersVisible;
+
+  /// Layer for walls
+  ///
+  /// In en, this message translates to:
+  /// **'Walls'**
+  String get architectLayerWalls;
+
+  /// Layer for doors
+  ///
+  /// In en, this message translates to:
+  /// **'Doors'**
+  String get architectLayerDoors;
+
+  /// Layer for windows
+  ///
+  /// In en, this message translates to:
+  /// **'Windows'**
+  String get architectLayerWindows;
+
+  /// Layer for slabs
+  ///
+  /// In en, this message translates to:
+  /// **'Slabs'**
+  String get architectLayerSlabs;
+
+  /// Layer for roofs
+  ///
+  /// In en, this message translates to:
+  /// **'Roofs'**
+  String get architectLayerRoofs;
+
+  /// Layer for columns
+  ///
+  /// In en, this message translates to:
+  /// **'Columns'**
+  String get architectLayerColumns;
+
+  /// Layer for beams
+  ///
+  /// In en, this message translates to:
+  /// **'Beams'**
+  String get architectLayerBeams;
+
+  /// Layer for stairs
+  ///
+  /// In en, this message translates to:
+  /// **'Stairs'**
+  String get architectLayerStairs;
+
+  /// Layer for zones and rooms
+  ///
+  /// In en, this message translates to:
+  /// **'Rooms & Zones'**
+  String get architectLayerZones;
+
+  /// Layer for dimensions
+  ///
+  /// In en, this message translates to:
+  /// **'Dimensions'**
+  String get architectLayerDimensions;
+
+  /// Layer for text and annotations
+  ///
+  /// In en, this message translates to:
+  /// **'Text & Annotations'**
+  String get architectLayerText;
+
+  /// Layer for structural grid axes
+  ///
+  /// In en, this message translates to:
+  /// **'Grid Axes'**
+  String get architectLayerGrid;
+
+  /// Layer for hatches and fills
+  ///
+  /// In en, this message translates to:
+  /// **'Hatches'**
+  String get architectLayerHatches;
+
+  /// Layer for CAD drawing primitives
+  ///
+  /// In en, this message translates to:
+  /// **'CAD Lines'**
+  String get architectLayerCad;
+
+  /// Layer for site contours and drainage
+  ///
+  /// In en, this message translates to:
+  /// **'Site & Drainage'**
+  String get architectLayerDrainage;
 }
 
 class _AppLocalizationsDelegate

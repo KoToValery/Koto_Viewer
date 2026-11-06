@@ -334,6 +334,8 @@ class ArchitectHatchDraftBar extends StatelessWidget {
   final ValueChanged<bool>? onAutomaticChanged;
   final ArchitectDrawingColor color;
   final ValueChanged<ArchitectDrawingColor>? onColorChanged;
+  final bool precisionMode;
+  final VoidCallback? onPrecisionToggle;
   const ArchitectHatchDraftBar({
     super.key,
     required this.pattern,
@@ -348,6 +350,8 @@ class ArchitectHatchDraftBar extends StatelessWidget {
     this.onAutomaticChanged,
     this.color = ArchitectDrawingColor.ink,
     this.onColorChanged,
+    this.precisionMode = false,
+    this.onPrecisionToggle,
   });
   @override
   Widget build(BuildContext context) {
@@ -379,6 +383,17 @@ class ArchitectHatchDraftBar extends StatelessWidget {
                 isSelected: !automatic,
                 icon: const AppIcon(AppIconId.polyline, size: 20),
                 onPressed: () => onAutomaticChanged!(false),
+              ),
+              IconButton(
+                key: const ValueKey('hatch-dimension-mode'),
+                tooltip: l.architectWallLength,
+                isSelected: precisionMode,
+                icon: AppIcon(
+                  AppIconId.measure,
+                  size: 20,
+                  color: precisionMode ? Colors.cyanAccent : Colors.white70,
+                ),
+                onPressed: onPrecisionToggle,
               ),
             ],
             ArchitectHatchPicker(

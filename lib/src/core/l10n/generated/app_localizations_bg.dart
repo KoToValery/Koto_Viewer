@@ -7219,7 +7219,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectPlacementModeFree => 'Свободно стоящ';
 
   @override
-  String get architectLayerFurniture => 'Слой Обзавеждане';
+  String get architectLayerFurniture => 'Обзавеждане';
 
   @override
   String get architectComponentNoItems => 'Няма намерени елементи';
@@ -11579,4 +11579,104 @@ class AppLocalizationsBg extends AppLocalizations {
   String architectWallCalculatedSlope(String angle, String percent) {
     return 'Наклон: $angle° ($percent%)';
   }
+
+  @override
+  String get architectChamfer => 'Скосяване';
+
+  @override
+  String get architectFillet => 'Закръгляне в дъга';
+
+  @override
+  String get architectChamferDistance => 'Разстояние за скосяване';
+
+  @override
+  String get architectFilletRadius => 'Радиус на закръгление';
+
+  @override
+  String get architectApplyToAllCorners => 'Приложи за всички ъгли';
+
+  @override
+  String get architectApplyToCorner => 'Приложи за този ъгъл';
+
+  @override
+  String get architectChamferFilletInvalid =>
+      'Разстоянието или радиусът е твърде голям за този ъгъл';
+
+  @override
+  String get architectLayers => 'Слоеве';
+
+  @override
+  String get architectNewLayer => 'Нов слой';
+
+  @override
+  String get architectLayerName => 'Име на слоя';
+
+  @override
+  String get architectDeleteLayer => 'Изтриване на слой';
+
+  @override
+  String get architectChangeLayer => 'Промяна на слой';
+
+  @override
+  String architectCurrentLayer(String name) {
+    return 'Текущ слой: $name';
+  }
+
+  @override
+  String get architectSelectLayer => 'Избери слой';
+
+  @override
+  String get architectCannotDeleteStandardLayer =>
+      'Стандартните слоеве не могат да се изтриват';
+
+  @override
+  String get architectLayerColor => 'Цвят на слоя';
+
+  @override
+  String get architectAllLayersVisible => 'Покажи всички слоеве';
+
+  @override
+  String get architectLayerWalls => 'Стени';
+
+  @override
+  String get architectLayerDoors => 'Врати';
+
+  @override
+  String get architectLayerWindows => 'Прозорци';
+
+  @override
+  String get architectLayerSlabs => 'Плочи';
+
+  @override
+  String get architectLayerRoofs => 'Покриви';
+
+  @override
+  String get architectLayerColumns => 'Колони';
+
+  @override
+  String get architectLayerBeams => 'Греди';
+
+  @override
+  String get architectLayerStairs => 'Стълби';
+
+  @override
+  String get architectLayerZones => 'Зони и помещения';
+
+  @override
+  String get architectLayerDimensions => 'Оразмеряване';
+
+  @override
+  String get architectLayerText => 'Текст и пояснения';
+
+  @override
+  String get architectLayerGrid => 'Оси';
+
+  @override
+  String get architectLayerHatches => 'Щриховки';
+
+  @override
+  String get architectLayerCad => 'Чертожни линии';
+
+  @override
+  String get architectLayerDrainage => 'Терен и отводняване';
 }

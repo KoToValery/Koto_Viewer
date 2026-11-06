@@ -7189,7 +7189,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectPlacementModeFree => 'Free Standing';
 
   @override
-  String get architectLayerFurniture => 'Furniture Layer';
+  String get architectLayerFurniture => 'Furniture & Interior';
 
   @override
   String get architectComponentNoItems => 'No items found';
@@ -11533,4 +11533,104 @@ class AppLocalizationsEn extends AppLocalizations {
   String architectWallCalculatedSlope(String angle, String percent) {
     return 'Slope: $angle° ($percent%)';
   }
+
+  @override
+  String get architectChamfer => 'Chamfer';
+
+  @override
+  String get architectFillet => 'Fillet';
+
+  @override
+  String get architectChamferDistance => 'Chamfer distance';
+
+  @override
+  String get architectFilletRadius => 'Fillet radius';
+
+  @override
+  String get architectApplyToAllCorners => 'Apply to all corners';
+
+  @override
+  String get architectApplyToCorner => 'Apply to selected corner';
+
+  @override
+  String get architectChamferFilletInvalid =>
+      'Distance or radius is too large for this corner';
+
+  @override
+  String get architectLayers => 'Layers';
+
+  @override
+  String get architectNewLayer => 'New Layer';
+
+  @override
+  String get architectLayerName => 'Layer name';
+
+  @override
+  String get architectDeleteLayer => 'Delete layer';
+
+  @override
+  String get architectChangeLayer => 'Change layer';
+
+  @override
+  String architectCurrentLayer(String name) {
+    return 'Current layer: $name';
+  }
+
+  @override
+  String get architectSelectLayer => 'Select layer';
+
+  @override
+  String get architectCannotDeleteStandardLayer =>
+      'Standard layers cannot be deleted';
+
+  @override
+  String get architectLayerColor => 'Layer color';
+
+  @override
+  String get architectAllLayersVisible => 'Show all layers';
+
+  @override
+  String get architectLayerWalls => 'Walls';
+
+  @override
+  String get architectLayerDoors => 'Doors';
+
+  @override
+  String get architectLayerWindows => 'Windows';
+
+  @override
+  String get architectLayerSlabs => 'Slabs';
+
+  @override
+  String get architectLayerRoofs => 'Roofs';
+
+  @override
+  String get architectLayerColumns => 'Columns';
+
+  @override
+  String get architectLayerBeams => 'Beams';
+
+  @override
+  String get architectLayerStairs => 'Stairs';
+
+  @override
+  String get architectLayerZones => 'Rooms & Zones';
+
+  @override
+  String get architectLayerDimensions => 'Dimensions';
+
+  @override
+  String get architectLayerText => 'Text & Annotations';
+
+  @override
+  String get architectLayerGrid => 'Grid Axes';
+
+  @override
+  String get architectLayerHatches => 'Hatches';
+
+  @override
+  String get architectLayerCad => 'CAD Lines';
+
+  @override
+  String get architectLayerDrainage => 'Site & Drainage';
 }

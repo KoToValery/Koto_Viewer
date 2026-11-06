@@ -26,6 +26,8 @@ enum BimEditAction {
   ungroup,
   editGroup,
   openView,
+  chamfer,
+  fillet,
 }
 
 class BimEditActions {
@@ -53,6 +55,8 @@ class BimEditActions {
         BimEditAction.ungroup => l.bimUngroup,
         BimEditAction.editGroup => l.bimEditGroup,
         BimEditAction.openView => l.architectOpenView,
+        BimEditAction.chamfer => l.architectChamfer,
+        BimEditAction.fillet => l.architectFillet,
       };
   static AppIconId icon(BimEditAction action) => switch (action) {
     BimEditAction.move => AppIconId.move,
@@ -77,6 +81,8 @@ class BimEditActions {
     BimEditAction.ungroup => AppIconId.ungroup,
     BimEditAction.editGroup => AppIconId.editGroup,
     BimEditAction.openView => AppIconId.visible,
+    BimEditAction.chamfer => AppIconId.rectangle,
+    BimEditAction.fillet => AppIconId.roundedCorner,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};

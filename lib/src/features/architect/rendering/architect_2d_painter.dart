@@ -680,31 +680,88 @@ class Architect2dPainter extends CustomPainter {
     ArchitectStorey storey, {
     required bool selectedOnly,
   }) {
-    if (!selectedOnly &&
-        (layer != ArchitectPaintLayer.model || selectedElementId == null)) {
-      return storey;
+    bool isVisible(String id, String defaultLayerId) =>
+        project.isElementVisible(id, defaultLayerId);
+
+    bool keep(String id, String defaultLayerId) {
+      if (!isVisible(id, defaultLayerId)) return false;
+      if (selectedOnly) return id == selectedElementId;
+      if (layer == ArchitectPaintLayer.model && selectedElementId != null) {
+        return id != selectedElementId;
+      }
+      return true;
     }
-    bool keep(String id) =>
-        selectedOnly ? id == selectedElementId : id != selectedElementId;
+
+    final doorsVisible = project.isLayerVisible(ArchitectLayer.doorLayerId);
+    final windowsVisible = project.isLayerVisible(ArchitectLayer.windowLayerId);
+
     return storey.copyWith(
-      walls: storey.walls.where((e) => keep(e.id)).toList(),
-      columns: storey.columns.where((e) => keep(e.id)).toList(),
-      beams: storey.beams.where((e) => keep(e.id)).toList(),
-      slabs: storey.slabs.where((e) => keep(e.id)).toList(),
-      roofs: storey.roofs.where((e) => keep(e.id)).toList(),
-      openings: storey.openings.where((e) => keep(e.id)).toList(),
-      stairs: storey.stairs.where((e) => keep(e.id)).toList(),
-      dimensions: storey.dimensions.where((e) => keep(e.id)).toList(),
-      annotations: storey.annotations.where((e) => keep(e.id)).toList(),
+      walls: storey.walls
+          .where((e) => keep(e.id, ArchitectLayer.wallLayerId))
+          .map((w) {
+            if (!doorsVisible || !windowsVisible) {
+              return w.copyWith(
+                doors: doorsVisible ? w.doors : const [],
+                windows: windowsVisible ? w.windows : const [],
+              );
+            }
+            return w;
+          })
+          .toList(),
+      columns: storey.columns
+          .where((e) => keep(e.id, ArchitectLayer.columnLayerId))
+          .toList(),
+      beams: storey.beams
+          .where((e) => keep(e.id, ArchitectLayer.beamLayerId))
+          .toList(),
+      slabs: storey.slabs
+          .where((e) => keep(e.id, ArchitectLayer.slabLayerId))
+          .toList(),
+      roofs: storey.roofs
+          .where((e) => keep(e.id, ArchitectLayer.roofLayerId))
+          .toList(),
+      openings: storey.openings
+          .where((e) => keep(e.id, ArchitectLayer.slabLayerId))
+          .toList(),
+      stairs: storey.stairs
+          .where((e) => keep(e.id, ArchitectLayer.stairLayerId))
+          .toList(),
+      dimensions: storey.dimensions
+          .where((e) => keep(e.id, ArchitectLayer.dimensionLayerId))
+          .toList(),
+      annotations: storey.annotations
+          .where((e) => keep(e.id, ArchitectLayer.textLayerId))
+          .toList(),
       elevationMarkers: storey.elevationMarkers
-          .where((e) => keep(e.id))
+          .where((e) => keep(e.id, ArchitectLayer.textLayerId))
           .toList(),
-      cadPrimitives: storey.cadPrimitives.where((e) => keep(e.id) || (!selectedOnly && e.type == CadPrimitiveType.hatch)).toList(),
-      floorDrains: storey.floorDrains.where((e) => keep(e.id)).toList(),
+      cadPrimitives: storey.cadPrimitives
+          .where((e) {
+            final defLayer = e.type == CadPrimitiveType.hatch
+                ? ArchitectLayer.hatchLayerId
+                : ArchitectLayer.cadLayerId;
+            if (!isVisible(e.id, defLayer)) return false;
+            if (selectedOnly) return e.id == selectedElementId;
+            if (layer == ArchitectPaintLayer.model && selectedElementId != null) {
+              return e.id != selectedElementId || e.type == CadPrimitiveType.hatch;
+            }
+            return true;
+          })
+          .toList(),
+      floorDrains: storey.floorDrains
+          .where((e) => keep(e.id, ArchitectLayer.drainageLayerId))
+          .toList(),
       decorativeElements: storey.decorativeElements
-          .where((e) => keep(e.id))
+          .where((e) => keep(e.id, ArchitectLayer.wallLayerId))
           .toList(),
-      zones: selectedOnly ? [] : storey.zones,
+      components: storey.components
+          .where((e) => keep(e.id, ArchitectLayer.furnitureLayerId))
+          .toList(),
+      zones: selectedOnly
+          ? []
+          : storey.zones
+              .where((e) => isVisible(e.id, ArchitectLayer.zoneLayerId))
+              .toList(),
     );
   }
 
@@ -1106,6 +1163,7 @@ class Architect2dPainter extends CustomPainter {
   }
 
   void _drawZoneSchedule(Canvas canvas) {
+    if (!_project.isLayerVisible(ArchitectLayer.zoneLayerId)) return;
     final isDraggingOrGhostingTable =
         zoneTableDragPreviewOrigin != null ||
         (activeTool == ArchitectTool.zoneTable && cursorPosition != null);
@@ -1227,6 +1285,7 @@ class Architect2dPainter extends CustomPainter {
   // ===========================================================================
 
   void _drawGridAxes(Canvas canvas) {
+    if (!project.isLayerVisible(ArchitectLayer.gridLayerId)) return;
     ArchitectGridAxisPainterHelper.drawAxes(
       palette: palette,
       canvas: canvas,
