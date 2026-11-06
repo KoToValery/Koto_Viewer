@@ -11555,4 +11555,28 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectDecorativeHintVoid =>
       'Изберете два ъгъла върху декоративен елемент за отвор.';
+
+  @override
+  String get architectPropertyStartHeight => 'Начална височина (H1)';
+
+  @override
+  String get architectPropertyEndHeight => 'Крайна височина (H2)';
+
+  @override
+  String get architectPropertyTiltAngle => 'Наклон на стената (°)';
+
+  @override
+  String get architectWallSlopedTop => 'Скосен връх (Калкан)';
+
+  @override
+  String get architectWallSlopedTopHelp =>
+      'Различна височина в двата края за калкани и скосени стени';
+
+  @override
+  String get architectWallClipToRoof => 'Изрязване от покрив';
+
+  @override
+  String architectWallCalculatedSlope(String angle, String percent) {
+    return 'Наклон: $angle° ($percent%)';
+  }
 }

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import '../services/architect_floor_drain_geometry.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:convert';
@@ -233,7 +234,11 @@ class _ArchitectElementPropertiesDialogState
     final l = context.l10n;
     return switch (key) {
       'arcRadius' => l.propertiesRadius,
-      'height' => l.architectPropertyHeight,
+      'height' => isSlopedWall
+          ? l.architectPropertyStartHeight
+          : l.architectPropertyHeight,
+      'endHeight' => l.architectPropertyEndHeight,
+      'tiltAngle' => l.architectPropertyTiltAngle,
       'width' =>
         widget.elementIds.every(
               (id) => widget.project.activeStorey.columns.any(
@@ -274,11 +279,18 @@ class _ArchitectElementPropertiesDialogState
     'hatchScale',
     'hatchAngle',
   }.contains(key);
+  bool get isSlopedWall =>
+      (values.containsKey('endHeight') ||
+          (_common('endHeight') != null && !_cleared.contains('endHeight'))) &&
+      records.every((e) => e.containsKey('referenceLine'));
+
   double? fieldValue(String key) {
+    if (_cleared.contains(key)) return null;
     if (key == 'height' &&
         records.every((e) => e.containsKey('referenceLine')) &&
         followsHeight &&
-        normalWalls) {
+        normalWalls &&
+        !isSlopedWall) {
       return widget.project.activeStorey.height;
     }
     if (key == 'thickness' &&
@@ -566,7 +578,7 @@ class _ArchitectElementPropertiesDialogState
           : widget.project,
       label: label(key),
       value: fieldValue(key),
-      onClear: key == 'targetArea'
+      onClear: (key == 'targetArea' || key == 'tiltAngle')
           ? () => setState(() {
               values.remove(key);
               _cleared.add(key);
@@ -1597,22 +1609,90 @@ class _ArchitectElementPropertiesDialogState
             ),
           ),
           const SizedBox(height: 16),
-          if (normalWalls)
+          if (normalWalls) ...[
             CheckboxListTile(
               key: const ValueKey('architect-property-followStoreyHeight'),
               contentPadding: EdgeInsets.zero,
               title: Text(l.architectWallFollowStorey),
               tristate: true,
-              value: texts.containsKey('followStoreyHeight')
-                  ? texts['followStoreyHeight'] == 'true'
-                  : _common('followStoreyHeight') as bool?,
+              value: isSlopedWall
+                  ? false
+                  : (texts.containsKey('followStoreyHeight')
+                      ? texts['followStoreyHeight'] == 'true'
+                      : _common('followStoreyHeight') as bool?),
+              onChanged: isSlopedWall
+                  ? null
+                  : (v) => setState(() {
+                      texts['followStoreyHeight'] = '${v ?? false}';
+                      if (v == true) values.remove('height');
+                    }),
+            ),
+            CheckboxListTile(
+              key: const ValueKey('architect-property-slopedTop'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(l.architectWallSlopedTop),
+              subtitle: Text(l.architectWallSlopedTopHelp),
+              value: isSlopedWall,
               onChanged: (v) => setState(() {
-                texts['followStoreyHeight'] = '${v ?? false}';
-                if (v == true) values.remove('height');
+                if (v == true) {
+                  final curH = values['height'] ??
+                      (records.first['height'] as num?)?.toDouble() ??
+                      widget.project.activeStorey.height;
+                  values['endHeight'] = curH + 1.0;
+                  _cleared.remove('endHeight');
+                  texts['followStoreyHeight'] = 'false';
+                  texts['clipToRoof'] = 'false';
+                } else {
+                  values.remove('endHeight');
+                  _cleared.add('endHeight');
+                }
               }),
             ),
+          ],
           numberField('height', true),
+          if (isSlopedWall) ...[
+            numberField('endHeight', false),
+            CheckboxListTile(
+              key: const ValueKey('architect-property-clipToRoof'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(l.architectWallClipToRoof),
+              value: texts.containsKey('clipToRoof')
+                  ? texts['clipToRoof'] == 'true'
+                  : (_common('clipToRoof') as bool? ?? true),
+              onChanged: (v) => setState(() {
+                texts['clipToRoof'] = '${v ?? true}';
+              }),
+            ),
+            () {
+              final h1 =
+                  fieldValue('height') ?? widget.project.activeStorey.height;
+              final h2 = fieldValue('endHeight') ?? h1;
+              final wall = widget.project.activeStorey.walls
+                  .where((w) => widget.elementIds.contains(w.id))
+                  .firstOrNull;
+              final len = wall?.length ?? 1.0;
+              final deg = len > 1e-4
+                  ? (math.atan2((h2 - h1).abs(), len) * 180 / math.pi)
+                  : 0.0;
+              final pct = len > 1e-4 ? (((h2 - h1).abs() / len) * 100) : 0.0;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  l.architectWallCalculatedSlope(
+                    deg.toStringAsFixed(1),
+                    pct.toStringAsFixed(1),
+                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              );
+            }(),
+          ],
           numberField('baseOffset', false),
+          if (records.every((e) => e.containsKey('referenceLine')))
+            numberField('tiltAngle', false),
           if (fields.containsKey('arcRadius')) numberField('arcRadius', false),
           if (normalWalls)
             Padding(

@@ -33,6 +33,8 @@ class ArchitectSelection {
     'slopePercent',
     'angle',
     'height',
+    'endHeight',
+    'tiltAngle',
     'thickness',
     'width',
     'depth',
@@ -117,6 +119,8 @@ class ArchitectSelection {
       if (wall.isCurved) fields['arcRadius'] = wall.arc!.radius;
       fields['coreThickness'] = wall.coreThickness;
       fields['insulationThicknessOverride'] = wall.insulationThickness;
+      fields['endHeight'] = wall.endHeight ?? wall.height;
+      fields['tiltAngle'] = wall.tiltAngle ?? 0.0;
     }
     return fields;
   }
@@ -488,6 +492,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
             'offsetDistance',
             'baseOffset',
             'normalOffset',
+            'tiltAngle',
           }.contains(entry.key) &&
           value <
               (entry.key == 'sillHeight' ||
@@ -496,6 +501,9 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
                   ? 0
                   : .001)) {
         throw ArgumentError('Invalid dimension');
+      }
+      if (entry.key == 'tiltAngle' && (value < -80 || value > 80)) {
+        throw ArgumentError('Invalid tilt angle');
       }
       if (entry.key == 'stepCount' &&
           (value != value.roundToDouble() || value < 1 || value > 1000)) {
@@ -516,8 +524,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
     }
     for (final e in entries) {
       for (final key in clearValues) {
-        if (key != 'targetArea' ||
-            !project.activeStorey.zones.any((z) => z.id == e['id'])) {
+        if (!{'targetArea', 'endHeight', 'tiltAngle'}.contains(key)) {
           throw ArgumentError('Cannot clear property');
         }
         e.remove(key);
@@ -702,7 +709,8 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         }
         if ((!e.containsKey(value.key) &&
                 value.key != 'styleId' &&
-                value.key != 'cutDisplayMode') ||
+                value.key != 'cutDisplayMode' &&
+                value.key != 'clipToRoof') ||
             !{
               'text',
               'label',
@@ -730,6 +738,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
               'isAutoBoundary',
               'material',
               'showOnPlan',
+              'clipToRoof',
             }.contains(value.key)) {
           throw ArgumentError('Unsupported property');
         }
@@ -787,9 +796,10 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
               }
             }
           }
-        } else if (value.key == 'followStoreyHeight') {
+        } else if (value.key == 'followStoreyHeight' ||
+            value.key == 'clipToRoof') {
           if (!{'true', 'false'}.contains(value.value)) {
-            throw ArgumentError('Invalid height mode');
+            throw ArgumentError('Invalid boolean mode');
           }
           e[value.key] = value.value == 'true';
         } else {

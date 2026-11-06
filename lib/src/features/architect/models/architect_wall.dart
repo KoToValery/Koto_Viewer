@@ -80,6 +80,9 @@ class ArchitectWall {
   final Offset endPoint;
   final double thickness; // in meters (default 0.25 m = 25 cm)
   final double height; // in meters (default 2.80 m or 1.05/1.20 m for parapets)
+  final double? endHeight; // in meters (for sloped gable walls with variable height)
+  final double? tiltAngle; // in degrees from vertical (transverse lean/batter)
+  final bool clipToRoof; // whether roof underside clips this wall (default true)
   final double
   baseOffset; // in meters relative to storey elevation (default 0.0 m)
   final bool followStoreyHeight;
@@ -115,6 +118,9 @@ class ArchitectWall {
     required this.endPoint,
     this.thickness = 0.25,
     this.height = 2.80,
+    this.endHeight,
+    this.tiltAngle,
+    this.clipToRoof = true,
     this.baseOffset = 0.0,
     this.followStoreyHeight = true,
     this.coreMaterialOverride,
@@ -181,6 +187,36 @@ class ArchitectWall {
 
   double effectiveHeight(double storeyHeight) =>
       followStoreyHeight && !isParapet ? storeyHeight : height;
+
+  bool get isSlopedTop =>
+      endHeight != null && (endHeight! - height).abs() > 1e-4;
+
+  bool get isTilted => tiltAngle != null && tiltAngle!.abs() > 1e-4;
+
+  double effectiveEndHeight(double storeyHeight) =>
+      isSlopedTop ? endHeight! : effectiveHeight(storeyHeight);
+
+  double heightAtRatio(double t) => isSlopedTop
+      ? height + (endHeight! - height) * t.clamp(0.0, 1.0)
+      : height;
+
+  double heightAtPoint(Offset point) {
+    if (!isSlopedTop) return height;
+    final len = length;
+    if (len < 1e-4) return height;
+    final t = BimLineGeometry.parameter(point, centerStart, centerEnd);
+    return heightAtRatio(t);
+  }
+
+  double get topSlopeDegrees =>
+      isSlopedTop && length > 1e-4
+          ? math.atan2(endHeight! - height, length) * 180 / math.pi
+          : 0.0;
+
+  double get topSlopePercent =>
+      isSlopedTop && length > 1e-4
+          ? ((endHeight! - height) / length) * 100
+          : 0.0;
   WallCoreMaterial get coreMaterial => system.isLog
       ? WallCoreMaterial.timber
       : system.isSpecial
@@ -499,6 +535,11 @@ class ArchitectWall {
     Offset? endPoint,
     double? thickness,
     double? height,
+    double? endHeight,
+    bool clearEndHeight = false,
+    double? tiltAngle,
+    bool clearTiltAngle = false,
+    bool? clipToRoof,
     double? baseOffset,
     bool? followStoreyHeight,
     WallCoreMaterial? coreMaterial,
@@ -531,6 +572,9 @@ class ArchitectWall {
     endPoint: endPoint ?? this.endPoint,
     thickness: thickness ?? this.thickness,
     height: height ?? this.height,
+    endHeight: clearEndHeight ? null : endHeight ?? this.endHeight,
+    tiltAngle: clearTiltAngle ? null : tiltAngle ?? this.tiltAngle,
+    clipToRoof: clipToRoof ?? this.clipToRoof,
     baseOffset: baseOffset ?? this.baseOffset,
     followStoreyHeight: followStoreyHeight ?? this.followStoreyHeight,
     coreMaterialOverride: coreMaterial ?? coreMaterialOverride,
@@ -662,6 +706,9 @@ class ArchitectWall {
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'thickness': thickness,
     'height': height,
+    if (endHeight != null) 'endHeight': endHeight,
+    if (tiltAngle != null) 'tiltAngle': tiltAngle,
+    if (!clipToRoof) 'clipToRoof': clipToRoof,
     'baseOffset': baseOffset,
     'followStoreyHeight': followStoreyHeight && !isParapet,
     'coreMaterial': coreMaterial.name,
@@ -725,6 +772,9 @@ class ArchitectWall {
     ),
     thickness: (json['thickness'] as num?)?.toDouble() ?? 0.25,
     height: (json['height'] as num?)?.toDouble() ?? 2.80,
+    endHeight: (json['endHeight'] as num?)?.toDouble(),
+    tiltAngle: (json['tiltAngle'] as num?)?.toDouble(),
+    clipToRoof: json['clipToRoof'] as bool? ?? true,
     baseOffset: (json['baseOffset'] as num?)?.toDouble() ?? 0.0,
     followStoreyHeight: json['followStoreyHeight'] as bool? ?? false,
     coreMaterialOverride: WallCoreMaterial.values
@@ -866,6 +916,11 @@ class ArchitectWall {
           referenceLine: WallReferenceLine.center,
           baseOffset: bottom - storeyElevation,
           height: top - bottom,
+          endHeight: isSlopedTop
+              ? (top - bottom) + (endHeight! - height)
+              : null,
+          tiltAngle: tiltAngle,
+          clipToRoof: clipToRoof,
           followStoreyHeight: false,
           plinth: const ArchitectWallPlinth(),
           doors: [
@@ -1000,7 +1055,8 @@ class ArchitectWall {
 
     final wallColor = solidColor ?? const Color(0xFFECEFF1);
     final zBottom = storeyElevation + baseOffset;
-    final zTop = zBottom + height;
+    final maxWallHeight = isSlopedTop ? math.max(height, endHeight!) : height;
+    final zTop = zBottom + maxWallHeight;
 
     // Extrude a solid rectangular prism segment between two offsets along the baseline
     void addWallPrism(
@@ -1016,22 +1072,47 @@ class ArchitectWall {
       final a = centerStart + u * startAlong;
       final b = centerStart + u * endAlong;
 
+      final t1 = len > 1e-4 ? (startAlong / len).clamp(0.0, 1.0) : 0.0;
+      final t2 = len > 1e-4 ? (endAlong / len).clamp(0.0, 1.0) : 1.0;
+
+      final atNominalTop = (zMax - zTop).abs() < 1e-4;
+      final zMax1 = atNominalTop
+          ? zBottom + heightAtRatio(t1)
+          : math.min(zMax, zBottom + heightAtRatio(t1));
+      final zMax2 = atNominalTop
+          ? zBottom + heightAtRatio(t2)
+          : math.min(zMax, zBottom + heightAtRatio(t2));
+
       final p1 = a - n * halfThick;
       final p2 = b - n * halfThick;
       final p3 = b + n * halfThick;
       final p4 = a + n * halfThick;
 
-      final v1B = Vector3(p1.dx, p1.dy, zMin);
-      final v2B = Vector3(p2.dx, p2.dy, zMin);
-      final v3B = Vector3(p3.dx, p3.dy, zMin);
-      final v4B = Vector3(p4.dx, p4.dy, zMin);
+      final tiltRad = isTilted ? (tiltAngle! * math.pi / 180.0) : 0.0;
+      final tanTilt = math.tan(tiltRad);
+      Offset tiltShift(double z) => n * ((z - zBottom) * tanTilt);
 
-      final v1T = Vector3(p1.dx, p1.dy, zMax);
-      final v2T = Vector3(p2.dx, p2.dy, zMax);
-      final v3T = Vector3(p3.dx, p3.dy, zMax);
-      final v4T = Vector3(p4.dx, p4.dy, zMax);
+      final p1B = p1 + tiltShift(zMin);
+      final p2B = p2 + tiltShift(zMin);
+      final p3B = p3 + tiltShift(zMin);
+      final p4B = p4 + tiltShift(zMin);
 
-      // 4 Vertical sides
+      final p1T = p1 + tiltShift(zMax1);
+      final p2T = p2 + tiltShift(zMax2);
+      final p3T = p3 + tiltShift(zMax2);
+      final p4T = p4 + tiltShift(zMax1);
+
+      final v1B = Vector3(p1B.dx, p1B.dy, zMin);
+      final v2B = Vector3(p2B.dx, p2B.dy, zMin);
+      final v3B = Vector3(p3B.dx, p3B.dy, zMin);
+      final v4B = Vector3(p4B.dx, p4B.dy, zMin);
+
+      final v1T = Vector3(p1T.dx, p1T.dy, zMax1);
+      final v2T = Vector3(p2T.dx, p2T.dy, zMax2);
+      final v3T = Vector3(p3T.dx, p3T.dy, zMax2);
+      final v4T = Vector3(p4T.dx, p4T.dy, zMax1);
+
+      // 4 Vertical/Slanted sides
       tris.add(Triangle3D(v0: v1B, v1: v2B, v2: v2T, color: wallColor));
       tris.add(Triangle3D(v0: v1B, v1: v2T, v2: v1T, color: wallColor));
 

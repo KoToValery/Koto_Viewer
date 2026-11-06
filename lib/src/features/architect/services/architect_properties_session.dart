@@ -49,7 +49,7 @@ class ArchitectPropertyDescriptor {
         id,
         measure: switch (id) {
           'targetArea' => ArchitectPropertyMeasure.area,
-          'rotationDeg' || 'hatchAngle' => ArchitectPropertyMeasure.angle,
+          'rotationDeg' || 'hatchAngle' || 'tiltAngle' => ArchitectPropertyMeasure.angle,
           'angle' => ArchitectPropertyMeasure.radians,
           'stepCount' => ArchitectPropertyMeasure.count,
           'hatchScale' || 'slopePercent' => ArchitectPropertyMeasure.scalar,
@@ -61,6 +61,7 @@ class ArchitectPropertyDescriptor {
           'rotationDeg' ||
           'baseOffset' ||
           'offsetDistance' => -double.infinity,
+          'tiltAngle' => -80,
           'hatchAngle' => -180,
           'sillHeight' || 'insulationThicknessOverride' => 0,
           'hatchScale' => .1,
@@ -69,6 +70,7 @@ class ArchitectPropertyDescriptor {
         },
         maximum: switch (id) {
           'hatchAngle' => 180,
+          'tiltAngle' => 80,
           'hatchScale' => 20,
           'stepCount' => 1000,
           _ => double.infinity,

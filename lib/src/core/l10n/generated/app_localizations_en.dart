@@ -11509,4 +11509,28 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectDecorativeHintVoid =>
       'Tap two corners on a decorative element to cut an opening.';
+
+  @override
+  String get architectPropertyStartHeight => 'Start Height (H1)';
+
+  @override
+  String get architectPropertyEndHeight => 'End Height (H2)';
+
+  @override
+  String get architectPropertyTiltAngle => 'Tilt Angle';
+
+  @override
+  String get architectWallSlopedTop => 'Sloped top (Gable)';
+
+  @override
+  String get architectWallSlopedTopHelp =>
+      'Different height at start and end for gables and ramp walls';
+
+  @override
+  String get architectWallClipToRoof => 'Clip to roof';
+
+  @override
+  String architectWallCalculatedSlope(String angle, String percent) {
+    return 'Slope: $angle° ($percent%)';
+  }
 }

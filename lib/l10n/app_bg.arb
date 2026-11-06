@@ -3982,5 +3982,12 @@
   "architectDecorativeHintFacade": "Начертайте декоративна форма по фасадата.",
   "architectDecorativeHintFrame": "Изберете два диагонални ъгъла за рамка или пано.",
   "architectDecorativeHintArc": "Изберете център и радиус за кръгъл детайл.",
-  "architectDecorativeHintVoid": "Изберете два ъгъла върху декоративен елемент за отвор."
+  "architectDecorativeHintVoid": "Изберете два ъгъла върху декоративен елемент за отвор.",
+  "architectPropertyStartHeight": "Начална височина (H1)",
+  "architectPropertyEndHeight": "Крайна височина (H2)",
+  "architectPropertyTiltAngle": "Наклон на стената (°)",
+  "architectWallSlopedTop": "Скосен връх (Калкан)",
+  "architectWallSlopedTopHelp": "Различна височина в двата края за калкани и скосени стени",
+  "architectWallClipToRoof": "Изрязване от покрив",
+  "architectWallCalculatedSlope": "Наклон: {angle}° ({percent}%)"
 }

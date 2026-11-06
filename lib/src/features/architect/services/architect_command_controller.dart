@@ -423,10 +423,12 @@ class SplitArchitectWall extends ArchitectModelCommand {
       }
     }
     final point = wall.referencePointAt(ratio);
+    final splitHeight = wall.isSlopedTop ? wall.heightAtRatio(ratio) : null;
     final first = wall.copyWith(
       endPoint: point,
       arcBulge: wall.isCurved ? math.tan(math.atan(wall.arcBulge) * ratio) : 0,
       connectEnd: !detachCut,
+      endHeight: splitHeight,
       doors: [
         for (final d in wall.doors)
           if (d.offsetRatio < ratio)
@@ -445,6 +447,8 @@ class SplitArchitectWall extends ArchitectModelCommand {
           ? math.tan(math.atan(wall.arcBulge) * (1 - ratio))
           : 0,
       connectStart: !detachCut,
+      height: splitHeight ?? wall.height,
+      endHeight: wall.endHeight,
       doors: [
         for (final d in wall.doors)
           if (d.offsetRatio > ratio)
@@ -633,6 +637,8 @@ class TrimArchitectWall extends ArchitectModelCommand {
           : 0,
       connectStart: from == 0 ? wall.connectStart : true,
       connectEnd: to == 1 ? wall.connectEnd : true,
+      height: wall.isSlopedTop ? wall.heightAtRatio(from) : wall.height,
+      endHeight: wall.isSlopedTop ? wall.heightAtRatio(to) : wall.endHeight,
       doors: [
         for (final d in wall.doors)
           if (d.offsetRatio > from && d.offsetRatio < to)

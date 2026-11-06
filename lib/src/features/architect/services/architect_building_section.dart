@@ -553,7 +553,8 @@ class ArchitectBuildingSection {
           );
         }
         final baseWallHeight = wall.effectiveHeight(floor.height);
-        final canExtendToRoof = activeRoofSlices.isNotEmpty && !wall.isParapet;
+        final canExtendToRoof =
+            activeRoofSlices.isNotEmpty && !wall.isParapet && wall.clipToRoof;
         final prismHeight = canExtendToRoof
             ? math.max(baseWallHeight, maxRoofHeightAboveFloor)
             : baseWallHeight;
@@ -615,7 +616,7 @@ class ArchitectBuildingSection {
 
         // If extended to meet a sloped roof, clip the wall top to the underside of the roof slices
         // (and to normal storey height outside the roof footprint)
-        if (activeRoofSlices.isNotEmpty && !wall.isParapet) {
+        if (activeRoofSlices.isNotEmpty && !wall.isParapet && wall.clipToRoof) {
           final ceilingClip = Path();
           var cursor = 0.0;
           final normalTop = floor.elevation + baseWallHeight;

@@ -6225,5 +6225,25 @@
   "architectDecorativeHintFacade": "Draw decorative shape on facade.",
   "architectDecorativeHintFrame": "Tap two corners to place frame or panel.",
   "architectDecorativeHintArc": "Tap center and radius (or 3 arc points).",
-  "architectDecorativeHintVoid": "Tap two corners on a decorative element to cut an opening."
+  "architectDecorativeHintVoid": "Tap two corners on a decorative element to cut an opening.",
+  "architectPropertyStartHeight": "Start Height (H1)",
+  "@architectPropertyStartHeight": { "description": "Wall start height for sloped gable walls" },
+  "architectPropertyEndHeight": "End Height (H2)",
+  "@architectPropertyEndHeight": { "description": "Wall end height for sloped gable walls" },
+  "architectPropertyTiltAngle": "Tilt Angle",
+  "@architectPropertyTiltAngle": { "description": "Transverse slant/tilt angle of a wall from vertical in degrees" },
+  "architectWallSlopedTop": "Sloped top (Gable)",
+  "@architectWallSlopedTop": { "description": "Toggle to make a wall sloped/trapezoidal at the top for gables" },
+  "architectWallSlopedTopHelp": "Different height at start and end for gables and ramp walls",
+  "@architectWallSlopedTopHelp": { "description": "Help subtitle for sloped gable walls" },
+  "architectWallClipToRoof": "Clip to roof",
+  "@architectWallClipToRoof": { "description": "Whether roof underside cuts the wall top" },
+  "architectWallCalculatedSlope": "Slope: {angle}° ({percent}%)",
+  "@architectWallCalculatedSlope": {
+    "description": "Calculated slope of a sloped gable wall",
+    "placeholders": {
+      "angle": { "type": "String" },
+      "percent": { "type": "String" }
+    }
+  }
 }

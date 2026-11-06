@@ -132,7 +132,9 @@ class ArchitectWallSolids {
             storey.elevation +
             w.baseOffset +
             (w.railing == null
-                ? w.effectiveHeight(storey.height)
+                ? (w.isSlopedTop
+                    ? math.max(w.height, w.endHeight!)
+                    : w.effectiveHeight(storey.height))
                 : w.solidBodyHeight),
     };
     final walls = [
@@ -141,7 +143,7 @@ class ArchitectWallSolids {
           () {
             final w = original.solidBodyWall!;
             var height = w.effectiveHeight(storey.height);
-            if (w.followStoreyHeight && !w.isParapet) {
+            if (w.followStoreyHeight && !w.isParapet && w.clipToRoof) {
               for (final (floor, roof) in roofEnvelopes) {
                 for (final point in roof.points) {
                   height = math.max(
@@ -197,7 +199,10 @@ class ArchitectWallSolids {
     final breaks = <double>{};
     for (final wall in walls) {
       final bottom = storey.elevation + wall.baseOffset,
-          top = bottom + wall.height;
+          top = bottom +
+              (wall.isSlopedTop
+                  ? math.max(wall.height, wall.endHeight!)
+                  : wall.height);
       breaks.addAll([bottom, top, nominalTops[wall.id]!]);
       if (wall.plinth.enabled) {
         for (final z in [
@@ -275,7 +280,16 @@ class ArchitectWallSolids {
                 region.layer.role == ArchitectLayerRole.insulation);
 
         var parts = [
-          ArchitectVerticalPart(footprint, (_) => bottom, (_) => top),
+          ArchitectVerticalPart(
+            footprint,
+            (_) => bottom,
+            wall.isSlopedTop
+                ? (p) =>
+                    storey.elevation +
+                    wall.baseOffset +
+                    wall.heightAtPoint(p)
+                : (_) => top,
+          ),
         ];
         for (final (outline, surface) in slabs) {
           if (surface.layer.id != 'core' && (isCoreLayer || isExteriorLayer)) {
@@ -298,14 +312,16 @@ class ArchitectWallSolids {
             surface.topAt,
           );
         }
-        for (final (floor, roof) in roofEnvelopes) {
-          parts = ArchitectVerticalClip.subtract(
-            parts,
-            ArchitectRoofJunctions.of(floor, project: project).footprint(roof),
-            (p) => floor.elevation + roof.undersideElevationAt(p),
-            (p) => floor.elevation + roof.topElevationAt(p),
-            removeAbove: true,
-          );
+        if (wall.clipToRoof) {
+          for (final (floor, roof) in roofEnvelopes) {
+            parts = ArchitectVerticalClip.subtract(
+              parts,
+              ArchitectRoofJunctions.of(floor, project: project).footprint(roof),
+              (p) => floor.elevation + roof.undersideElevationAt(p),
+              (p) => floor.elevation + roof.topElevationAt(p),
+              removeAbove: true,
+            );
+          }
         }
         for (final bearing in ridgeBearings.where(
           (b) => b.wall.id == wall.id,

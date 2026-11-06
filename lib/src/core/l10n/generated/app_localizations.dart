@@ -20957,6 +20957,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap two corners on a decorative element to cut an opening.'**
   String get architectDecorativeHintVoid;
+
+  /// Wall start height for sloped gable walls
+  ///
+  /// In en, this message translates to:
+  /// **'Start Height (H1)'**
+  String get architectPropertyStartHeight;
+
+  /// Wall end height for sloped gable walls
+  ///
+  /// In en, this message translates to:
+  /// **'End Height (H2)'**
+  String get architectPropertyEndHeight;
+
+  /// Transverse slant/tilt angle of a wall from vertical in degrees
+  ///
+  /// In en, this message translates to:
+  /// **'Tilt Angle'**
+  String get architectPropertyTiltAngle;
+
+  /// Toggle to make a wall sloped/trapezoidal at the top for gables
+  ///
+  /// In en, this message translates to:
+  /// **'Sloped top (Gable)'**
+  String get architectWallSlopedTop;
+
+  /// Help subtitle for sloped gable walls
+  ///
+  /// In en, this message translates to:
+  /// **'Different height at start and end for gables and ramp walls'**
+  String get architectWallSlopedTopHelp;
+
+  /// Whether roof underside cuts the wall top
+  ///
+  /// In en, this message translates to:
+  /// **'Clip to roof'**
+  String get architectWallClipToRoof;
+
+  /// Calculated slope of a sloped gable wall
+  ///
+  /// In en, this message translates to:
+  /// **'Slope: {angle}° ({percent}%)'**
+  String architectWallCalculatedSlope(String angle, String percent);
 }
 
 class _AppLocalizationsDelegate
