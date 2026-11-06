@@ -1,3 +1,5 @@
+import 'architect_dialog.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -13,7 +15,8 @@ class ArchitectLineSymbolSketch extends StatefulWidget {
   final bool tilePreview;
   final double previewSizeMm, previewSpacingMm, previewRowSpacingMm, previewAngleDeg;
   const ArchitectLineSymbolSketch({super.key, this.initial = const [], this.tilePreview = false,
-    this.previewSizeMm=4,this.previewSpacingMm=8,this.previewRowSpacingMm=8,this.previewAngleDeg=0});
+    this.previewSizeMm=4,this.previewSpacingMm=8,this.previewRowSpacingMm=8,this.previewAngleDeg=0,
+  });
   @override
   State<ArchitectLineSymbolSketch> createState() =>
       _ArchitectLineSymbolSketchState();
@@ -41,7 +44,8 @@ class _ArchitectLineSymbolSketchState extends State<ArchitectLineSymbolSketch> {
     if(vertex==null) return;
     final area=_SketchPainter.frame(size);
     final p=Offset((((raw.dx-area.center.dx)/area.width).clamp(-.5,.5)*32).round()/32,
-      (((raw.dy-area.center.dy)/area.height).clamp(-.5,.5)*32).round()/32);
+      (((raw.dy-area.center.dy)/area.height).clamp(-.5,.5)*32).round()/32,
+    );
     setState(() {
       final stroke=_strokes[vertex.$1];
       final closed=stroke.length>2 && stroke.first==stroke.last;
@@ -70,7 +74,8 @@ class _ArchitectLineSymbolSketchState extends State<ArchitectLineSymbolSketch> {
     );
     if (_points) {
       // A fine, stable grid makes repeated click-built segments controllable.
-      point = Offset((point.dx * 32).round() / 32, (point.dy * 32).round() / 32);
+      point = Offset((point.dx * 32).round() / 32, (point.dy * 32).round() / 32,
+      );
       if (_ortho && !_newStroke && _strokes.isNotEmpty && _strokes.last.isNotEmpty) {
         final last=_strokes.last.last, delta=point-last;
         point=delta.dx.abs()>delta.dy.abs()?Offset(point.dx,last.dy):Offset(last.dx,point.dy);
@@ -118,7 +123,7 @@ class _ArchitectLineSymbolSketchState extends State<ArchitectLineSymbolSketch> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.architectLineSymbolCustom),
       content: SizedBox(
         width: 300,
@@ -136,7 +141,7 @@ class _ArchitectLineSymbolSketchState extends State<ArchitectLineSymbolSketch> {
                     key: const ValueKey('line-symbol-points'),
                     tooltip: l.architectLineSymbolPoints,
                     isSelected: _points,
-                    icon: const Icon(Icons.polyline_outlined),
+                    icon: const AppIcon(AppIconId.polyline),
                     onPressed: () {
                       _finish();
                       setState(() => _points = true);
@@ -146,7 +151,7 @@ class _ArchitectLineSymbolSketchState extends State<ArchitectLineSymbolSketch> {
                     key: const ValueKey('line-symbol-freehand'),
                     tooltip: l.architectLineSymbolFreehand,
                     isSelected: !_points,
-                    icon: const Icon(Icons.gesture),
+                    icon: const AppIcon(AppIconId.gesture),
                     onPressed: () {
                       _finish();
                       setState(() => _points = false);
@@ -157,13 +162,13 @@ class _ArchitectLineSymbolSketchState extends State<ArchitectLineSymbolSketch> {
                     key: const ValueKey('line-symbol-ortho'),
                     tooltip:l.architectSketchOrtho,
                     isSelected:_ortho,
-                    icon:const Icon(Icons.square_foot),
+                    icon:const AppIcon(AppIconId.measure),
                     onPressed:()=>setState(()=>_ortho=!_ortho),
                   ),
                   IconButton(
                     key: const ValueKey('line-symbol-undo'),
                     tooltip: l.undoAction,
-                    icon: const Icon(Icons.undo),
+                    icon: const AppIcon(AppIconId.undo),
                     onPressed: _strokes.isEmpty
                         ? null
                         : () => setState(() {
@@ -175,7 +180,7 @@ class _ArchitectLineSymbolSketchState extends State<ArchitectLineSymbolSketch> {
                   IconButton(
                     key: const ValueKey('line-symbol-clear'),
                     tooltip: l.clear,
-                    icon: const Icon(Icons.clear_all),
+                    icon: const AppIcon(AppIconId.clearAll),
                     onPressed: () => setState(() {
                       _strokes.clear();
                       _newStroke = true;
@@ -197,7 +202,8 @@ class _ArchitectLineSymbolSketchState extends State<ArchitectLineSymbolSketch> {
                           : null,
                       onPanDown:(e)=>_panOrigin=e.localPosition,
                       onPanStart: _points
-                          ? (e)=>_startVertexDrag(_panOrigin??e.localPosition,size)
+                          ? (e)=>_startVertexDrag(_panOrigin??e.localPosition,size,
+                            )
                           : (e) {
                               _finish();
                               _add(_panOrigin??e.localPosition, size);
@@ -247,7 +253,10 @@ class _ArchitectLineSymbolSketchState extends State<ArchitectLineSymbolSketch> {
               ...[
                 Text(l.architectSketchPreview),
                 SizedBox(height:widget.tilePreview?100:42,width:double.infinity,
-                  child:CustomPaint(painter:_valid?_SketchRepeatPainter(_result(),widget.tilePreview,widget.previewSizeMm,widget.previewSpacingMm,widget.previewRowSpacingMm,widget.previewAngleDeg):null)),
+                  child:CustomPaint(painter:_valid?_SketchRepeatPainter(_result(),widget.tilePreview,widget.previewSizeMm,widget.previewSpacingMm,widget.previewRowSpacingMm,widget.previewAngleDeg,
+                          ):null,
+                  ),
+                ),
               ],
             ],
           ),
@@ -272,20 +281,29 @@ class _SketchRepeatPainter extends CustomPainter {
   final List<List<Offset>> strokes;
   final bool tile;
   final double sizeMm, spacingMm, rowMm, angleDeg;
-  _SketchRepeatPainter(this.strokes,this.tile,this.sizeMm,this.spacingMm,this.rowMm,this.angleDeg);
+  _SketchRepeatPainter(this.strokes,this.tile,this.sizeMm,this.spacingMm,this.rowMm,this.angleDeg,
+  );
   @override
   void paint(Canvas canvas,Size size) {
     final symbol=ArchitectLineSymbol(shape:ArchitectLineSymbolShape.custom,
-      strokes:strokes,sizeMm:sizeMm,spacingMm:spacingMm,clearLine:false);
-    final style=ArchitectLineStyle(id:'preview',name:'_',segmentsMm:[],symbol:symbol);
+      strokes:strokes,sizeMm:sizeMm,spacingMm:spacingMm,clearLine:false,
+    );
+    final style=ArchitectLineStyle(id:'preview',name:'_',segmentsMm:[],symbol:symbol,
+    );
     final boundary=Path()..addRect(Offset.zero&size);
     canvas.save();canvas.clipRect(Offset.zero&size);
     final path=tile?ArchitectHatchGeometry.path(boundary:boundary,
       pattern:ArchitectHatchPattern(id:'preview',name:'_',layers:[
-        ArchitectHatchLayer(angleDeg:angleDeg,spacingMm:rowMm,lineStyle:style,symbolsOnly:true)]),unitsPerMm:3)
-      :ArchitectLinePattern.path(Path()..moveTo(0,size.height/2)..lineTo(size.width,size.height/2),style,3);
+        ArchitectHatchLayer(angleDeg:angleDeg,spacingMm:rowMm,lineStyle:style,symbolsOnly:true,
+                ),
+              ],
+            ),unitsPerMm:3,
+          )
+      :ArchitectLinePattern.path(Path()..moveTo(0,size.height/2)..lineTo(size.width,size.height/2),style,3,
+          );
     canvas.drawPath(path,Paint()..color=const Color(0xFF212121)
-      ..style=PaintingStyle.stroke..strokeWidth=1);
+      ..style=PaintingStyle.stroke..strokeWidth=1,
+    );
     canvas.restore();
   }
   @override

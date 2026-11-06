@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -177,7 +178,7 @@ void main() {
               items: const [
                 ArchitectRadialMenuItem(
                   action: BimEditAction.move,
-                  icon: Icons.open_with,
+                  icon: AppIconId.move,
                   label: 'Move',
                   color: Colors.cyan,
                 ),

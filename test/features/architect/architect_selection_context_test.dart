@@ -15,7 +15,9 @@ import 'package:kotoview/src/features/architect/services/architect_command_contr
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_wall_drafting_panel.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_radial_menu.dart';
+import 'architect_editing_test.dart' as editing;
 import 'architect_manual_selection_test.dart' as selection;
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'architect_workspace_interaction_test.dart' as workspace;
 
 const polygon = [Offset(-1, -1), Offset(1, -1), Offset(1, 1), Offset(-1, 1)];
@@ -328,6 +330,59 @@ void main() {
     ),
   ];
   for (final (tool, storey, point, id) in cases) {
+    for (final drawing in [false, true]) {
+      for (final secondary in [false, true]) {
+        testWidgets(
+          '$tool context opens in ${drawing ? "drawing" : "navigation"} '
+          'with ${secondary ? "right click" : "touch hold"}',
+          (tester) async {
+            final c = ArchitectCommandController(
+              project(storey, axes: tool == ArchitectTool.axis),
+            );
+            addTearDown(c.dispose);
+            await open(tester, c);
+            if (drawing) {
+              palette(tester).onToolChanged(tool);
+              await tester.pumpAndSettle();
+            }
+            final original = c.project;
+            final canvas = find.byKey(
+              const ValueKey('architect-viewport-input'),
+            );
+            final canvasSize = tester.getSize(canvas);
+            final gesture = await tester.startGesture(
+              workspace.screen(tester, point),
+              kind: secondary
+                  ? PointerDeviceKind.mouse
+                  : PointerDeviceKind.touch,
+              buttons: secondary ? kSecondaryMouseButton : kPrimaryButton,
+            );
+            if (!secondary) {
+              // Rebuild after selection, while the same finger stays down.
+              await tester.pump(const Duration(milliseconds: 281));
+              expect(find.byType(ArchitectRadialMenu), findsNothing);
+              expect(tester.getSize(canvas), canvasSize);
+              await tester.pump(const Duration(milliseconds: 420));
+            }
+            await gesture.up();
+            await tester.pumpAndSettle();
+            if (tool == ArchitectTool.zone) {
+              expect(find.byType(PopupMenuItem<String>), findsWidgets);
+            } else {
+              expect(find.byType(ArchitectRadialMenu), findsOneWidget);
+              final menu = tester.widget<ArchitectRadialMenu>(
+                find.byType(ArchitectRadialMenu),
+              );
+              expect(menu.items, isNotEmpty);
+            }
+            expect(workspace.overlay(tester).selectedElementIds, {id});
+            expect(c.project, same(original));
+            expect(c.canUndo, isFalse);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
     testWidgets(
       'General selection activates $tool and empty space exits without drawing',
       (tester) async {
@@ -392,6 +447,7 @@ void main() {
     addTearDown(c.dispose);
     await open(tester, c);
     await tap(tester, const Offset(1, 0));
+    await tool_ui.prepare(tester, Icons.near_me_outlined);
     await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
     await tester.pumpAndSettle();
     expect(palette(tester).multiSelect, isTrue);
@@ -478,11 +534,13 @@ void main() {
                 id: 'wall',
                 startPoint: Offset(-3, 0),
                 endPoint: Offset(3, 0),
+                exteriorResolved: true,
               ),
               ArchitectWall(
                 id: 'neighbor',
                 startPoint: Offset(-3, 3),
                 endPoint: Offset(3, 3),
+                exteriorResolved: true,
               ),
             ],
           ),
@@ -503,6 +561,7 @@ void main() {
       panel.onLength(1.5);
       await tester.tap(find.byKey(const ValueKey('wall-end')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(c.undoCount, 1);
       expect(
         c.project.activeStorey.walls.first.startPoint.dy.abs(),

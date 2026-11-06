@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../models/coordinate_system.dart';
 import '../services/coordinate_system_service.dart';
@@ -23,7 +25,8 @@ class _CoordinateSettingsDialogState extends State<CoordinateSettingsDialog> {
   String _selectedRegion = 'All';
   final TextEditingController _searchController = TextEditingController();
 
-  final List<String> _regions = const ['All', 'Balkans', 'Europe', 'Americas', 'Global'];
+  final List<String> _regions = const ['All', 'Balkans', 'Europe', 'Americas', 'Global',
+  ];
 
   @override
   void initState() {
@@ -88,7 +91,8 @@ class _CoordinateSettingsDialogState extends State<CoordinateSettingsDialog> {
                   'Official Geodetic & Cadastral Systems (${CoordinateSystem.values.length})',
                   style: TextStyle(
                     fontSize: 12,
-                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7,
+                    ),
                   ),
                 ),
               ],
@@ -106,12 +110,14 @@ class _CoordinateSettingsDialogState extends State<CoordinateSettingsDialog> {
             TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search by country, projection, or EPSG code...',
-                hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey.shade500),
-                prefixIcon: const Icon(Icons.search, size: 20),
+                hintText:
+                    context.l10n.commandUiSearchByCountryProjectionOrEpsgCode,
+                hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey.shade500,
+                ),
+                prefixIcon: const AppIcon(AppIconId.search, size: 20),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
+                        icon: const AppIcon(AppIconId.close, size: 18),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
@@ -119,16 +125,20 @@ class _CoordinateSettingsDialogState extends State<CoordinateSettingsDialog> {
                       )
                     : null,
                 filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35,
+                ),
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2)),
+                  borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2),
+                  ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2)),
+                  borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2),
+                  ),
                 ),
               ),
               style: const TextStyle(fontSize: 13),
@@ -158,7 +168,8 @@ class _CoordinateSettingsDialogState extends State<CoordinateSettingsDialog> {
                       selectedColor: theme.colorScheme.primary,
                       backgroundColor: theme.colorScheme.surface,
                       visualDensity: VisualDensity.compact,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
+                      ),
                       onSelected: (selected) {
                         if (selected) {
                           setState(() => _selectedRegion = region);
@@ -180,11 +191,13 @@ class _CoordinateSettingsDialogState extends State<CoordinateSettingsDialog> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.search_off_rounded, size: 40, color: Colors.grey.shade400),
+                          Icon(Icons.search_off_rounded, size: 40, color: Colors.grey.shade400,
+                          ),
                           const SizedBox(height: 8),
                           Text(
                             'No coordinate system found for "$_searchQuery"',
-                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600,
+                            ),
                           ),
                         ],
                       ),
@@ -208,13 +221,15 @@ class _CoordinateSettingsDialogState extends State<CoordinateSettingsDialog> {
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: isCurrent
-                                    ? theme.colorScheme.primary.withValues(alpha: 0.08)
+                                    ? theme.colorScheme.primary.withValues(alpha: 0.08,
+                                      )
                                     : theme.cardColor,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: isCurrent
                                       ? theme.colorScheme.primary
-                                      : theme.dividerColor.withValues(alpha: 0.35),
+                                      : theme.dividerColor.withValues(alpha: 0.35,
+                                        ),
                                   width: isCurrent ? 1.8 : 1.0,
                                 ),
                               ),
@@ -241,7 +256,8 @@ class _CoordinateSettingsDialogState extends State<CoordinateSettingsDialog> {
                                           children: [
                                             Text(
                                               crs.countryFlag,
-                                              style: const TextStyle(fontSize: 15),
+                                              style: const TextStyle(fontSize: 15,
+                                              ),
                                             ),
                                             const SizedBox(width: 6),
                                             Expanded(
@@ -260,13 +276,16 @@ class _CoordinateSettingsDialogState extends State<CoordinateSettingsDialog> {
                                             if (crs.isDefault)
                                               Container(
                                                 padding: const EdgeInsets.symmetric(
-                                                    horizontal: 5, vertical: 1.5),
+                                                    horizontal: 5, vertical: 1.5,
+                                                    ),
                                                 decoration: BoxDecoration(
                                                   color: Colors.green.withValues(alpha: 0.15),
                                                   borderRadius: BorderRadius.circular(6),
                                                 ),
-                                                child: const Text(
-                                                  'Default',
+                                                child: Text(
+                                                  context
+                                                      .l10n
+                                                      .contextMenuDefault,
                                                   style: TextStyle(
                                                     fontSize: 9.5,
                                                     fontWeight: FontWeight.bold,
@@ -281,7 +300,8 @@ class _CoordinateSettingsDialogState extends State<CoordinateSettingsDialog> {
                                           children: [
                                             Container(
                                               padding: const EdgeInsets.symmetric(
-                                                  horizontal: 5, vertical: 1.5),
+                                                  horizontal: 5, vertical: 1.5,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 color: theme.colorScheme.primary
                                                     .withValues(alpha: 0.09),
@@ -299,7 +319,8 @@ class _CoordinateSettingsDialogState extends State<CoordinateSettingsDialog> {
                                             const SizedBox(width: 6),
                                             Container(
                                               padding: const EdgeInsets.symmetric(
-                                                  horizontal: 5, vertical: 1.5),
+                                                  horizontal: 5, vertical: 1.5,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 color: Colors.blueGrey.withValues(alpha: 0.12),
                                                 borderRadius: BorderRadius.circular(4),
@@ -342,17 +363,18 @@ class _CoordinateSettingsDialogState extends State<CoordinateSettingsDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, null),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.architectSheetCancel),
         ),
         ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
             backgroundColor: theme.colorScheme.primary,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           ),
-          icon: const Icon(Icons.check, size: 18),
-          label: const Text('Save Selection'),
+          icon: const AppIcon(AppIconId.confirm, size: 18),
+          label: Text(context.l10n.commandUiSaveSelection),
           onPressed: () async {
             final navigator = Navigator.of(context);
             await CoordinateSystemService.setCoordinateSystem(_selected);

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,7 +12,8 @@ import '../../../core/services/recent_files_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'local_network_share_dialog.dart';
 
-enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, xlsx, txt, md, docx, pptx, rtf, eps, cdr, pcb, kicad, plt, step, iges, ifc, other }
+enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, xlsx, txt, md, docx, pptx, rtf, eps, cdr, pcb, kicad, plt, step, iges, ifc, other,
+}
 
 _ShareFileType _detectFileType(String path) {
   final lower = path.toLowerCase();
@@ -112,12 +114,15 @@ class ShareOptionsSheet extends StatelessWidget {
         _showError(context, context.l10n.fileNotFoundOrInaccessible);
       }
     } on PlatformException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'ShareOptionsSheet._shareFileNative.platform');
+      AppErrorHandler.recordError(e, stack, context: 'ShareOptionsSheet._shareFileNative.platform',
+      );
       if (context.mounted) {
-        _showError(context, context.l10n.errorSharingFile(e.message ?? e.toString()));
+        _showError(context, context.l10n.errorSharingFile(e.message ?? e.toString()),
+        );
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'ShareOptionsSheet._shareFileNative');
+      AppErrorHandler.recordError(e, stack, context: 'ShareOptionsSheet._shareFileNative',
+      );
       if (context.mounted) {
         _showError(context, context.l10n.errorSharingFile(e.toString()));
       }
@@ -158,7 +163,8 @@ class ShareOptionsSheet extends StatelessWidget {
 
       final uploadDir = await LocalServerService.getUploadDirectory();
       final originalName = filePath.split(Platform.pathSeparator).last;
-      var targetFile = File('${uploadDir.path}${Platform.pathSeparator}$originalName');
+      var targetFile = File('${uploadDir.path}${Platform.pathSeparator}$originalName',
+      );
 
       if (await targetFile.exists()) {
         final lastDot = originalName.lastIndexOf('.');
@@ -166,7 +172,8 @@ class ShareOptionsSheet extends StatelessWidget {
         final ext = lastDot != -1 ? originalName.substring(lastDot) : '';
         int counter = 1;
         while (await targetFile.exists()) {
-          targetFile = File('${uploadDir.path}${Platform.pathSeparator}${base}_$counter$ext');
+          targetFile = File('${uploadDir.path}${Platform.pathSeparator}${base}_$counter$ext',
+          );
           counter++;
         }
       }
@@ -178,7 +185,8 @@ class ShareOptionsSheet extends StatelessWidget {
         final item = PdfItem.fromPath(targetFile.path, sizeInBytes: fileSize);
         await RecentFilesService.addRecentFile(item);
       } catch (e, stack) {
-        AppErrorHandler.recordError(e, stack, context: 'ShareOptionsSheet._copyToUploadFolder.recent');
+        AppErrorHandler.recordError(e, stack, context: 'ShareOptionsSheet._copyToUploadFolder.recent',
+        );
       }
 
       if (context.mounted) {
@@ -186,7 +194,8 @@ class ShareOptionsSheet extends StatelessWidget {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -197,14 +206,16 @@ class ShareOptionsSheet extends StatelessWidget {
             ),
             backgroundColor: const Color(0xFF10B981),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
+            ),
             margin: const EdgeInsets.all(16),
             duration: const Duration(seconds: 2),
           ),
         );
       }
     } catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'ShareOptionsSheet._copyToUploadFolder');
+      AppErrorHandler.recordError(e, stack, context: 'ShareOptionsSheet._copyToUploadFolder',
+      );
       if (context.mounted) {
         _showError(context, 'Error copying file: $e');
       }
@@ -438,8 +449,7 @@ class ShareOptionsSheet extends StatelessWidget {
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontSize: 12.5,
                               color: theme.textTheme.bodyMedium?.color?.withValues(
-                                alpha: 0.7,
-                              ),
+                                alpha: 0.7),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -489,7 +499,8 @@ class ShareOptionsSheet extends StatelessWidget {
 
               _ShareOptionTile(
                 icon: Icons.wifi_rounded,
-                color: const Color(0xFF9333EA), // Purple color for local network
+                color: const Color(0xFF9333EA,
+                ), // Purple color for local network
                 title: 'Local Network',
                 subtitle: 'Share with QR code over WiFi',
                 isDark: isDark,
@@ -512,13 +523,14 @@ class ShareOptionsSheet extends StatelessWidget {
               // Show all — text button, low visual weight on purpose
               TextButton.icon(
                 onPressed: () => _shareWithAll(context),
-                icon: Icon(
-                  Icons.apps_rounded,
+                icon: AppIcon(
+                  AppIconId.layoutGrid,
                   size: 18,
-                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
+                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6,
+                  ),
                 ),
                 label: Text(
-                  'All Options',
+                  context.l10n.commandUiAllOptions,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.textTheme.bodyMedium?.color?.withValues(
                       alpha: 0.6,
@@ -587,7 +599,7 @@ class _ShareOptionTile extends StatelessWidget {
                   color: color.withValues(alpha: isDark ? 0.18 : 0.1),
                   borderRadius: BorderRadius.circular(13),
                 ),
-                child: Icon(icon, color: color, size: 22),
+                child: AppIcon.fromMaterial(icon, color: color, size: 22),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -613,8 +625,8 @@ class _ShareOptionTile extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
+              AppIcon(
+                AppIconId.chevronRight,
                 size: 22,
                 color: theme.textTheme.bodyMedium?.color?.withValues(
                   alpha: 0.4,

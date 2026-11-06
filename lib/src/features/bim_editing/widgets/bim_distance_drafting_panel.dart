@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'bim_numeric_keypad.dart';
 import '../properties/bim_numeric_rule.dart';
@@ -13,6 +14,9 @@ class BimDistanceDraftingPanel extends StatefulWidget {
   final VoidCallback onEnd, onContinue, onUnlock, onCancel;
   final bool showContinue, showDirection, keypadInitiallyOpen;
   final String? title, endLabel;
+
+  /// Tool-specific controls above the length, without changing keypad state.
+  final Widget? extraControls;
   const BimDistanceDraftingPanel({
     super.key,
     required this.length,
@@ -29,6 +33,7 @@ class BimDistanceDraftingPanel extends StatefulWidget {
     this.keypadInitiallyOpen = false,
     this.title,
     this.endLabel,
+    this.extraControls,
   });
   @override
   State<BimDistanceDraftingPanel> createState() =>
@@ -84,6 +89,10 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (widget.extraControls != null) ...[
+              widget.extraControls!,
+              const SizedBox(height: 4),
+            ],
             if (widget.title != null && widget.title!.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.only(bottom: 4, left: 2, right: 2),
@@ -125,8 +134,8 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                         ),
                       ),
                     ),
-                    Icon(
-                      Icons.dialpad,
+                    AppIcon(
+                      AppIconId.layoutGrid,
                       size: 16,
                       color: _keypad ? colors.tertiary : colors.primary,
                     ),
@@ -171,8 +180,8 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                         ),
                       ),
                       onPressed: widget.onUnlock,
-                      icon: Icon(
-                        Icons.explore_outlined,
+                      icon: AppIcon(
+                        AppIconId.compass,
                         size: 18,
                         color: colors.primary,
                       ),
@@ -258,11 +267,10 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                       ),
                     ),
                     onPressed: widget.onCancel,
-                    icon: Icon(
-                      Icons.close_rounded,
+                    icon: AppIcon(
+                      AppIconId.close,
                       color: colors.error,
                       size: 19,
-                      weight: 700,
                     ),
                   ),
                 ],

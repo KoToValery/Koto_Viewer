@@ -94,6 +94,7 @@ void main() {
       await mouse.removePointer();
       await tester.tapAt(workspace.screen(tester, const Offset(-2, 6)));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       near(
         model.project.activeStorey.cadPrimitives.first.startPoint,
         const Offset(-2, 2),
@@ -350,10 +351,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(preview, closeTo(-math.pi / 8, 1e-8));
-        await tester.tap(
-          find.byKey(const ValueKey('architect-rotation-apply')),
-        );
-        await tester.pump();
+
         expect(applied, closeTo(-math.pi / 8, 1e-8));
         expect(tester.takeException(), isNull);
       },
@@ -380,7 +378,7 @@ void main() {
       workspace.overlay(tester).project.activeStorey.toJson(),
       isNot(before),
     );
-    await tester.tap(find.byKey(const ValueKey('architect-rotation-cancel')));
+    await tester.tap(find.byKey(const ValueKey('architect-command-cancel')));
     await tester.pumpAndSettle();
     expect(workspace.overlay(tester).project.activeStorey.toJson(), before);
     await editing.contextHold(tester, const Offset(2, 0));
@@ -389,7 +387,7 @@ void main() {
       find.byKey(const ValueKey('architect-rotation-preset-90')),
     );
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('architect-rotation-apply')));
+    await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
     await tester.pumpAndSettle();
     near(
       model.project.activeStorey.cadPrimitives.first.startPoint,

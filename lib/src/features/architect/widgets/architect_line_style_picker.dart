@@ -1,3 +1,5 @@
+import 'architect_dialog.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import '../models/architect_line_symbol.dart';
 import 'architect_line_symbol_editor.dart';
@@ -84,11 +86,13 @@ class ArchitectLineStylePicker extends StatelessWidget {
   final ArchitectLineStyle? value;
   final List<ArchitectLineStyle> customStyles;
   final ValueChanged<ArchitectLineStyle> onChanged;
+  final ValueChanged<ArchitectLineStyle>? onDeleteStyle;
   final bool compact;
   const ArchitectLineStylePicker({
     super.key,
     required this.value,
     required this.onChanged,
+    this.onDeleteStyle,
     this.customStyles = const [],
     this.compact = false,
   });
@@ -105,35 +109,80 @@ class ArchitectLineStylePicker extends StatelessWidget {
     }.values.toList();
     final chosen = await showDialog<ArchitectLineStyle>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l.architectLineStyle),
-        contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-        content: SizedBox(
-          width: 300,
-          height: MediaQuery.sizeOf(context).height * .45,
-          child: ListView(
-            children: [
-              for (final style in options)
-                ListTile(
-                  key: ValueKey('line-style-${style.id}'),
-                  dense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  title: Text(
-                    style.label(l),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => architectAlertDialog(
+          title: Text(l.architectLineStyle),
+          contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          content: SizedBox(
+            width: 300,
+            height: MediaQuery.sizeOf(context).height * .45,
+            child: ListView(
+              children: [
+                for (final style in options)
+                  ListTile(
+                    key: ValueKey('line-style-${style.id}'),
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    title: Text(
+                      style.label(l),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ArchitectLineStyleSample(style: style, width: 86),
+                        if (!style.isPreset && onDeleteStyle != null)
+                          IconButton(
+                            icon: const AppIcon(
+                              AppIconId.delete,
+                              size: 18,
+                              color: Colors.redAccent,
+                            ),
+                            tooltip: l.delete,
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: dialogContext,
+                                builder: (ctx) => architectAlertDialog(
+                                  title: Text(l.architectLineDeleteConfirmTitle,
+                                  ),
+                                  content: Text(
+                                    l.architectLineDeleteConfirmPrompt(
+                                      style.label(l),
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, false),
+                                      child: Text(l.cancel),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: Text(l.delete),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                setDialogState(() {
+                                  options.removeWhere((s) => s.id == style.id);
+                                });
+                                onDeleteStyle!(style);
+                              }
+                            },
+                          ),
+                      ],
+                    ),
+                    selected: style == value,
+                    onTap: () => Navigator.pop(dialogContext, style),
                   ),
-                  trailing: ArchitectLineStyleSample(style: style, width: 86),
-                  selected: style == value,
-                  onTap: () => Navigator.pop(dialogContext, style),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
-        actions: [
+          actions: [
           TextButton.icon(
             key: const ValueKey('line-style-custom'),
-            icon: const Icon(Icons.tune, size: 18),
+            icon: const AppIcon(AppIconId.properties, size: 18),
             label: Text(l.architectLinePatternEditor),
             onPressed: () async {
               final style = await showDialog<ArchitectLineStyle>(
@@ -153,7 +202,8 @@ class ArchitectLineStylePicker extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
     if (chosen != null && context.mounted) onChanged(chosen);
   }
 
@@ -290,7 +340,7 @@ class _ArchitectLinePatternEditorState
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.architectLinePatternEditor),
       content: SizedBox(
         width: 300,
@@ -366,7 +416,7 @@ class _ArchitectLinePatternEditorState
                       IconButton(
                         key: ValueKey('line-pattern-remove-$pair'),
                         tooltip: l.architectLinePatternRemove,
-                        icon: const Icon(Icons.remove_circle_outline, size: 20),
+                        icon: const AppIcon(AppIconId.removeCircle, size: 20),
                         onPressed: _segments.length <= 2
                             ? null
                             : () => setState(
@@ -383,7 +433,7 @@ class _ArchitectLinePatternEditorState
                   onPressed: _segments.length >= 16
                       ? null
                       : () => setState(() => _segments.addAll([3, 1.5])),
-                  icon: const Icon(Icons.add, size: 18),
+                  icon: const AppIcon(AppIconId.add, size: 18),
                   label: Text(l.architectLinePatternAdd),
                 ),
               ],

@@ -230,8 +230,14 @@ void main() {
       expect(placed.baseOffset, .15);
       expect(placed.followStoreyHeight, isFalse);
       expect(placed.id, isNot(original.id));
+      final resolvedOriginal = model.project.activeStorey.walls.first;
+      expect(resolvedOriginal.exteriorResolved, isTrue);
+      // Committing a drawing resolves exterior metadata for existing walls;
+      // selecting their defaults must preserve all geometry and other fields.
       expect(
-        model.project.activeStorey.walls.first.toJson(),
+        resolvedOriginal
+            .copyWith(exteriorResolved: original.exteriorResolved)
+            .toJson(),
         original.toJson(),
       );
       model.undo();

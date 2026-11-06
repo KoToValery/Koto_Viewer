@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../l10n/l10n_extensions.dart';
 
@@ -48,7 +49,7 @@ class ViewerLoadingScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white70),
+          icon: const AppIcon(AppIconId.close, color: Colors.white70),
           tooltip: l10n?.cancel ?? 'Cancel',
           onPressed: () {
             if (onCancel != null) {
@@ -90,8 +91,7 @@ class ViewerLoadingScreen extends StatelessWidget {
                     child: Icon(
                       icon,
                       color: accentColor,
-                      size: 38,
-                    ),
+                      size: 38),
                   ),
                   const SizedBox(height: 24),
                 ],
@@ -114,7 +114,8 @@ class ViewerLoadingScreen extends StatelessWidget {
                 if (formattedSize.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white12,
                       borderRadius: BorderRadius.circular(12),

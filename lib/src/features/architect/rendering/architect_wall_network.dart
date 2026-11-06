@@ -104,7 +104,7 @@ class ArchitectWallNetwork {
       for (final b in walls.skip(i + 1)) {
         if (a.system.isSpecial || b.system.isSpecial) continue;
         if (a.isCurved || b.isCurved) {
-          final nodes = a.intersections(b);
+          final nodes = a.intersections(b).toList();
           // An endpoint on a face still joins even if the saved references differ.
           for (final p in [a.startPoint, a.endPoint]) {
             if (b.containsPoint(p, tolerance: .0001) &&

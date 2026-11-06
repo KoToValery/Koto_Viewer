@@ -16,10 +16,7 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/generated/app_localizations.dart';
 
 /// Semantic classification of the fenestration element.
-enum FenestrationKind {
-  window,
-  door,
-}
+enum FenestrationKind { window, door }
 
 /// Operational type of a specific pane / cell in the fenestration raster.
 enum PaneType {
@@ -52,11 +49,14 @@ enum GlazingType {
   triple, // triple glazing (трислоен стъклопакет 36mm)
 }
 
+/// Infill is independent of the mechanism: a solid door still opens.
+enum FenestrationInfill { glazing, solid }
+
 /// Position of exterior decorative trim / casing.
 enum CasingPlacement {
   exterior, // façade side only
   interior, // room side only
-  both,     // both façade and room sides
+  both, // both façade and room sides
 }
 
 // =============================================================================
@@ -69,6 +69,7 @@ class FenestrationPane {
   final PaneType paneType;
   final double sashProfileWidth; // default 0.06m (60mm)
   final bool hasHandle;
+  final FenestrationInfill? infill;
   final int muntinCols; // vertical muntins / шпроси (0..4)
   final int muntinRows; // horizontal muntins / шпроси (0..4)
   final double muntinWidth; // muntin profile width (default 0.02 = 20mm)
@@ -78,6 +79,7 @@ class FenestrationPane {
     this.paneType = PaneType.fixedGlazing,
     this.sashProfileWidth = 0.06,
     this.hasHandle = false,
+    this.infill,
     this.muntinCols = 0,
     this.muntinRows = 0,
     this.muntinWidth = 0.02,
@@ -90,8 +92,10 @@ class FenestrationPane {
       paneType == PaneType.topHopper ||
       paneType == PaneType.doorLeaf;
 
-  bool get isGlazed => paneType != PaneType.solidPanel;
-  bool get isSolidPanel => paneType == PaneType.solidPanel;
+  bool get isGlazed => infill == null
+      ? paneType != PaneType.solidPanel
+      : infill == FenestrationInfill.glazing;
+  bool get isSolidPanel => !isGlazed;
 
   bool get hasMuntins => isGlazed && (muntinCols > 0 || muntinRows > 0);
 
@@ -100,51 +104,57 @@ class FenestrationPane {
     PaneType? paneType,
     double? sashProfileWidth,
     bool? hasHandle,
+    FenestrationInfill? infill,
     int? muntinCols,
     int? muntinRows,
     double? muntinWidth,
-  }) =>
-      FenestrationPane(
-        id: id ?? this.id,
-        paneType: paneType ?? this.paneType,
-        sashProfileWidth: sashProfileWidth ?? this.sashProfileWidth,
-        hasHandle: hasHandle ?? this.hasHandle,
-        muntinCols: muntinCols ?? this.muntinCols,
-        muntinRows: muntinRows ?? this.muntinRows,
-        muntinWidth: muntinWidth ?? this.muntinWidth,
-      );
+  }) => FenestrationPane(
+    id: id ?? this.id,
+    paneType: paneType ?? this.paneType,
+    sashProfileWidth: sashProfileWidth ?? this.sashProfileWidth,
+    hasHandle: hasHandle ?? this.hasHandle,
+    infill: infill ?? this.infill,
+    muntinCols: muntinCols ?? this.muntinCols,
+    muntinRows: muntinRows ?? this.muntinRows,
+    muntinWidth: muntinWidth ?? this.muntinWidth,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'paneType': paneType.name,
-        'sashProfileWidth': sashProfileWidth,
-        'hasHandle': hasHandle,
-        if (muntinCols > 0) 'muntinCols': muntinCols,
-        if (muntinRows > 0) 'muntinRows': muntinRows,
-        if (muntinWidth != 0.02) 'muntinWidth': muntinWidth,
-      };
+    'id': id,
+    'paneType': paneType.name,
+    'sashProfileWidth': sashProfileWidth,
+    'hasHandle': hasHandle,
+    if (infill != null) 'infill': infill!.name,
+    if (muntinCols > 0) 'muntinCols': muntinCols,
+    if (muntinRows > 0) 'muntinRows': muntinRows,
+    if (muntinWidth != 0.02) 'muntinWidth': muntinWidth,
+  };
 
-  factory FenestrationPane.fromJson(Map<String, dynamic> json) =>
-      FenestrationPane(
-        id: json['id'] as String? ?? 'p_${DateTime.now().microsecondsSinceEpoch}',
-        paneType: PaneType.values.firstWhere(
-          (t) => t.name == json['paneType'],
-          orElse: () => PaneType.fixedGlazing,
-        ),
-        sashProfileWidth:
-            (json['sashProfileWidth'] as num?)?.toDouble() ?? 0.06,
-        hasHandle: json['hasHandle'] as bool? ?? false,
-        muntinCols: (json['muntinCols'] as num?)?.toInt() ?? 0,
-        muntinRows: (json['muntinRows'] as num?)?.toInt() ?? 0,
-        muntinWidth: (json['muntinWidth'] as num?)?.toDouble() ?? 0.02,
-      );
+  factory FenestrationPane.fromJson(
+    Map<String, dynamic> json,
+  ) => FenestrationPane(
+    id: json['id'] as String? ?? 'p_${DateTime.now().microsecondsSinceEpoch}',
+    paneType: PaneType.values.firstWhere(
+      (t) => t.name == json['paneType'],
+      orElse: () => PaneType.fixedGlazing,
+    ),
+    sashProfileWidth: (json['sashProfileWidth'] as num?)?.toDouble() ?? 0.06,
+    hasHandle: json['hasHandle'] as bool? ?? false,
+    infill: FenestrationInfill.values
+        .where((v) => v.name == json['infill'])
+        .firstOrNull,
+    muntinCols: (json['muntinCols'] as num?)?.toInt() ?? 0,
+    muntinRows: (json['muntinRows'] as num?)?.toInt() ?? 0,
+    muntinWidth: (json['muntinWidth'] as num?)?.toDouble() ?? 0.02,
+  );
 }
 
 /// Node in the recursive subdivision tree of the fenestration opening.
 class FenestrationSubdivision {
   final String id;
   final bool isSplit;
-  final bool isVertical; // true = vertical splits (columns), false = horizontal splits (transom)
+  final bool
+  isVertical; // true = vertical splits (columns), false = horizontal splits (transom)
   final List<double> ratios; // proportional widths or heights (sum = 1.0)
   final List<FenestrationSubdivision> children;
   final FenestrationPane? pane;
@@ -165,15 +175,14 @@ class FenestrationSubdivision {
     List<double>? ratios,
     List<FenestrationSubdivision>? children,
     FenestrationPane? pane,
-  }) =>
-      FenestrationSubdivision(
-        id: id ?? this.id,
-        isSplit: isSplit ?? this.isSplit,
-        isVertical: isVertical ?? this.isVertical,
-        ratios: ratios ?? this.ratios,
-        children: children ?? this.children,
-        pane: pane ?? this.pane,
-      );
+  }) => FenestrationSubdivision(
+    id: id ?? this.id,
+    isSplit: isSplit ?? this.isSplit,
+    isVertical: isVertical ?? this.isVertical,
+    ratios: ratios ?? this.ratios,
+    children: children ?? this.children,
+    pane: pane ?? this.pane,
+  );
 
   /// Recursively finds a pane by ID.
   FenestrationPane? findPane(String paneId) {
@@ -227,6 +236,7 @@ class FenestrationSubdivision {
           paneType: pane?.paneType ?? PaneType.fixedGlazing,
           sashProfileWidth: pane?.sashProfileWidth ?? 0.06,
           hasHandle: pane?.hasHandle ?? false,
+          infill: pane?.infill,
           muntinCols: pane?.muntinCols ?? 0,
           muntinRows: pane?.muntinRows ?? 0,
           muntinWidth: pane?.muntinWidth ?? 0.02,
@@ -261,12 +271,14 @@ class FenestrationSubdivision {
     }
     return copyWith(
       children: children
-          .map((c) => c.splitPane(
-                targetPaneId,
-                vertical: vertical,
-                count: count,
-                customRatios: customRatios,
-              ))
+          .map(
+            (c) => c.splitPane(
+              targetPaneId,
+              vertical: vertical,
+              count: count,
+              customRatios: customRatios,
+            ),
+          )
           .toList(),
     );
   }
@@ -274,8 +286,9 @@ class FenestrationSubdivision {
   /// Collapses an individual division or pane back to a single leaf pane.
   FenestrationSubdivision collapsePane(String targetPaneId) {
     if (!isSplit) return this;
-    final hasDirectTarget =
-        children.any((c) => !c.isSplit && c.pane?.id == targetPaneId);
+    final hasDirectTarget = children.any(
+      (c) => !c.isSplit && c.pane?.id == targetPaneId,
+    );
     if (hasDirectTarget) {
       final keepPane = children
           .firstWhere((c) => c.pane != null, orElse: () => children.first)
@@ -283,7 +296,8 @@ class FenestrationSubdivision {
       return FenestrationSubdivision(
         id: id,
         isSplit: false,
-        pane: keepPane?.copyWith(id: 'pane_$id') ??
+        pane:
+            keepPane?.copyWith(id: 'pane_$id') ??
             FenestrationPane(id: 'pane_$id', paneType: PaneType.fixedGlazing),
       );
     }
@@ -302,8 +316,9 @@ class FenestrationSubdivision {
     if (!isSplit) return this;
 
     if (isVertical == isWidth) {
-      final childIdx =
-          children.indexWhere((c) => c.findPane(targetPaneId) != null);
+      final childIdx = children.indexWhere(
+        (c) => c.findPane(targetPaneId) != null,
+      );
       if (childIdx >= 0 && children.length > 1) {
         final totalDim = isWidth ? bounds.width : bounds.height;
         if (totalDim > 0.05) {
@@ -318,8 +333,10 @@ class FenestrationSubdivision {
           nextRatios[childIdx] = newRatio;
           for (int i = 0; i < nextRatios.length; i++) {
             if (i != childIdx) {
-              nextRatios[i] =
-                  (ratios[i] * (remainingNew / remainingOld)).clamp(0.02, 0.95);
+              nextRatios[i] = (ratios[i] * (remainingNew / remainingOld)).clamp(
+                0.02,
+                0.95,
+              );
             }
           }
           final sum = nextRatios.reduce((a, b) => a + b);
@@ -426,40 +443,42 @@ class FenestrationSubdivision {
     return FenestrationSubdivision(
       id: id,
       isSplit: false,
-      pane: FenestrationPane(
-        id: 'pane_$id',
-        paneType: PaneType.fixedGlazing,
-      ),
+      pane: FenestrationPane(id: 'pane_$id', paneType: PaneType.fixedGlazing),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'isSplit': isSplit,
-        'isVertical': isVertical,
-        'ratios': ratios,
-        'children': children.map((c) => c.toJson()).toList(),
-        'pane': pane?.toJson(),
-      };
+    'id': id,
+    'isSplit': isSplit,
+    'isVertical': isVertical,
+    'ratios': ratios,
+    'children': children.map((c) => c.toJson()).toList(),
+    'pane': pane?.toJson(),
+  };
 
-  factory FenestrationSubdivision.fromJson(Map<String, dynamic> json) =>
-      FenestrationSubdivision(
-        id: json['id'] as String? ?? 'sub_${DateTime.now().microsecondsSinceEpoch}',
-        isSplit: json['isSplit'] as bool? ?? false,
-        isVertical: json['isVertical'] as bool? ?? true,
-        ratios: (json['ratios'] as List<dynamic>?)
-                ?.map((e) => (e as num).toDouble())
-                .toList() ??
-            const [1.0],
-        children: (json['children'] as List<dynamic>?)
-                ?.map((e) => FenestrationSubdivision.fromJson(
-                    e as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        pane: json['pane'] != null
-            ? FenestrationPane.fromJson(json['pane'] as Map<String, dynamic>)
-            : null,
-      );
+  factory FenestrationSubdivision.fromJson(
+    Map<String, dynamic> json,
+  ) => FenestrationSubdivision(
+    id: json['id'] as String? ?? 'sub_${DateTime.now().microsecondsSinceEpoch}',
+    isSplit: json['isSplit'] as bool? ?? false,
+    isVertical: json['isVertical'] as bool? ?? true,
+    ratios:
+        (json['ratios'] as List<dynamic>?)
+            ?.map((e) => (e as num).toDouble())
+            .toList() ??
+        const [1.0],
+    children:
+        (json['children'] as List<dynamic>?)
+            ?.map(
+              (e) =>
+                  FenestrationSubdivision.fromJson(e as Map<String, dynamic>),
+            )
+            .toList() ??
+        const [],
+    pane: json['pane'] != null
+        ? FenestrationPane.fromJson(json['pane'] as Map<String, dynamic>)
+        : null,
+  );
 }
 
 // =============================================================================
@@ -467,36 +486,77 @@ class FenestrationSubdivision {
 // =============================================================================
 
 /// Full parametric blueprint for a window or door.
+class FenestrationTransom {
+  final double height;
+  final FenestrationSubdivision subdivision;
+  const FenestrationTransom({
+    this.height = .40,
+    this.subdivision = const FenestrationSubdivision(
+      id: 'transom',
+      pane: FenestrationPane(id: 'transom_pane'),
+    ),
+  });
+  FenestrationTransom copyWith({
+    double? height,
+    FenestrationSubdivision? subdivision,
+  }) => FenestrationTransom(
+    height: height ?? this.height,
+    subdivision: subdivision ?? this.subdivision,
+  );
+  Map<String, dynamic> toJson() => {
+    'height': height,
+    'subdivision': subdivision.toJson(),
+  };
+  factory FenestrationTransom.fromJson(Map<String, dynamic> json) =>
+      FenestrationTransom(
+        height: (json['height'] as num?)?.toDouble() ?? .40,
+        subdivision: FenestrationSubdivision.fromJson(
+          json['subdivision'] as Map<String, dynamic>,
+        ),
+      );
+}
+
+/// Bottom-up model coordinates. Clear pane rectangles never overlap profiles.
+class FenestrationLayout {
+  final Map<String, ({FenestrationPane pane, Rect rect})> panes;
+  final List<Rect> dividers;
+  const FenestrationLayout(this.panes, this.dividers);
+}
+
 class ArchitectFenestrationStyle {
   final String id;
   final String name;
   final FenestrationKind kind;
 
   // Geometry
-  final double defaultWidth;      // m (e.g. 1.40 m)
-  final double defaultHeight;     // m (e.g. 1.40 m for window, 2.00 m for door)
+  final double defaultWidth; // m (e.g. 1.40 m)
+  final double defaultHeight; // m (e.g. 1.40 m for window, 2.00 m for door)
   final double defaultSillHeight; // m (e.g. 0.85 m for window, 0.00 m for door)
 
   // 5-Chamber Profile Parameters
-  final double frameDepth;     // standard 5-chamber PVC is 0.07 m (70 mm)
+  final double frameDepth; // standard 5-chamber PVC is 0.07 m (70 mm)
   final double frameFaceWidth; // profile face width 0.07 m (70 mm)
-  final bool centerInCore;     // place frame centered in masonry core
+  final bool centerInCore; // place frame centered in masonry core
 
   // Glazing Parameters
   final GlazingType glazingType;
   final double glazingThickness; // standard double glazing is 0.024 m (24 mm)
-  final int glassColorValue;     // e.g. 0x884FC3F7
+  final int glassColorValue; // e.g. 0x884FC3F7
 
   // Exterior Casing / Architrave (Обрамчване / Обшивка)
   final bool hasCasing;
-  final double casingWidth;      // width of trim around opening on wall face (0.10 m)
-  final double casingProjection; // projection forward in front of wall/insulation (0.03 m)
+  final double
+  casingWidth; // width of trim around opening on wall face (0.10 m)
+  final double
+  casingProjection; // projection forward in front of wall/insulation (0.03 m)
   final CasingPlacement casingPlacement;
-  final int casingColorValue;    // 0xFFECEFF1
-  final bool includeBottomCasing; // true = trim under window; false = external sill ledge
+  final int casingColorValue; // 0xFFECEFF1
+  final bool
+  includeBottomCasing; // true = trim under window; false = external sill ledge
 
   // Subdivision tree
   final FenestrationSubdivision rootSubdivision;
+  final FenestrationTransom? transom;
 
   const ArchitectFenestrationStyle({
     required this.id,
@@ -518,11 +578,118 @@ class ArchitectFenestrationStyle {
     this.casingColorValue = 0xFFECEFF1,
     this.includeBottomCasing = false,
     required this.rootSubdivision,
+    this.transom,
   });
+
+  static String centimeters(double meters) =>
+      (meters * 100).toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '');
 
   Color get glassColor => Color(glassColorValue);
   Color get casingColor => Color(casingColorValue);
-  bool get isPreset => id.startsWith('win_preset_') || id.startsWith('door_preset_');
+  static final _presetIds = standardCatalog().map((s) => s.id).toSet();
+  bool get isPreset => _presetIds.contains(id);
+  double get doorBodyHeight => defaultHeight - (transom?.height ?? 0);
+  bool get hasValidGeometry {
+    if (!defaultWidth.isFinite ||
+        !defaultHeight.isFinite ||
+        defaultWidth < .4 ||
+        defaultWidth > 5 ||
+        defaultHeight < .4 ||
+        defaultHeight > 4 ||
+        !frameFaceWidth.isFinite ||
+        frameFaceWidth <= 0 ||
+        doorBodyHeight < .4 ||
+        (transom != null &&
+            (kind != FenestrationKind.door ||
+                !transom!.height.isFinite ||
+                transom!.height <= 0))) {
+      return false;
+    }
+    final layout = resolveLayout();
+    return panes.isNotEmpty &&
+        layout.panes.length == panes.length &&
+        layout.panes.values.every((e) {
+          final inset = e.pane.isOpenable ? e.pane.sashProfileWidth * 2 : 0;
+          return e.rect.width > inset + .01 && e.rect.height > inset + .01;
+        });
+  }
+
+  List<FenestrationPane> get panes => [
+    ...rootSubdivision.collectPanes(),
+    ...?transom?.subdivision.collectPanes(),
+  ];
+
+  ArchitectFenestrationStyle withTransom(FenestrationTransom? next) => copyWith(
+    defaultHeight: doorBodyHeight + (next?.height ?? 0),
+    transom: next,
+    clearTransom: next == null,
+  );
+
+  /// Nominal zones are used for metric editing; physical profiles use resolveLayout.
+  FenestrationSubdivision subdivisionForHeight(double height) {
+    final top = transom;
+    if (top == null || kind != FenestrationKind.door) return rootSubdivision;
+    return FenestrationSubdivision(
+      id: 'assembly',
+      isSplit: true,
+      isVertical: false,
+      ratios: [(height - top.height) / height, top.height / height],
+      children: [rootSubdivision, top.subdivision],
+    );
+  }
+
+  FenestrationLayout resolveLayout({double? width, double? height}) {
+    final w = width ?? defaultWidth,
+        h = height ?? defaultHeight,
+        f = frameFaceWidth;
+    final leaves = <String, ({FenestrationPane pane, Rect rect})>{};
+    final dividers = <Rect>[];
+    void visit(FenestrationSubdivision node, Rect r) {
+      if (r.width <= 0 || r.height <= 0) return;
+      if (!node.isSplit) {
+        if (node.pane != null) {
+          leaves[node.pane!.id] = (pane: node.pane!, rect: r);
+        }
+        return;
+      }
+      var cursor = node.isVertical ? r.left : r.top;
+      for (var i = 0; i < node.children.length; i++) {
+        final length = (node.isVertical ? r.width : r.height) * node.ratios[i];
+        final start = cursor + (i == 0 ? 0 : f / 2);
+        final end =
+            cursor + length - (i == node.children.length - 1 ? 0 : f / 2);
+        visit(
+          node.children[i],
+          node.isVertical
+              ? Rect.fromLTRB(start, r.top, end, r.bottom)
+              : Rect.fromLTRB(r.left, start, r.right, end),
+        );
+        cursor += length;
+        if (i < node.children.length - 1) {
+          dividers.add(
+            node.isVertical
+                ? Rect.fromLTWH(cursor - f / 2, r.top, f, r.height)
+                : Rect.fromLTWH(r.left, cursor - f / 2, r.width, f),
+          );
+        }
+      }
+    }
+
+    final bottom = kind == FenestrationKind.window ? f : 0.0;
+    final inner = Rect.fromLTRB(f, bottom, w - f, h - f);
+    if (transom != null && kind == FenestrationKind.door) {
+      final split = h - transom!.height;
+      visit(rootSubdivision, Rect.fromLTRB(f, bottom, w - f, split - f / 2));
+      visit(
+        transom!.subdivision,
+        Rect.fromLTRB(f, split + f / 2, w - f, h - f),
+      );
+      dividers.add(Rect.fromLTWH(f, split - f / 2, w - 2 * f, f));
+    } else {
+      visit(rootSubdivision, inner);
+    }
+    return FenestrationLayout(leaves, dividers);
+  }
 
   ArchitectFenestrationStyle copyWith({
     String? id,
@@ -544,28 +711,30 @@ class ArchitectFenestrationStyle {
     int? casingColorValue,
     bool? includeBottomCasing,
     FenestrationSubdivision? rootSubdivision,
-  }) =>
-      ArchitectFenestrationStyle(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        kind: kind ?? this.kind,
-        defaultWidth: defaultWidth ?? this.defaultWidth,
-        defaultHeight: defaultHeight ?? this.defaultHeight,
-        defaultSillHeight: defaultSillHeight ?? this.defaultSillHeight,
-        frameDepth: frameDepth ?? this.frameDepth,
-        frameFaceWidth: frameFaceWidth ?? this.frameFaceWidth,
-        centerInCore: centerInCore ?? this.centerInCore,
-        glazingType: glazingType ?? this.glazingType,
-        glazingThickness: glazingThickness ?? this.glazingThickness,
-        glassColorValue: glassColorValue ?? this.glassColorValue,
-        hasCasing: hasCasing ?? this.hasCasing,
-        casingWidth: casingWidth ?? this.casingWidth,
-        casingProjection: casingProjection ?? this.casingProjection,
-        casingPlacement: casingPlacement ?? this.casingPlacement,
-        casingColorValue: casingColorValue ?? this.casingColorValue,
-        includeBottomCasing: includeBottomCasing ?? this.includeBottomCasing,
-        rootSubdivision: rootSubdivision ?? this.rootSubdivision,
-      );
+    FenestrationTransom? transom,
+    bool clearTransom = false,
+  }) => ArchitectFenestrationStyle(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    kind: kind ?? this.kind,
+    defaultWidth: defaultWidth ?? this.defaultWidth,
+    defaultHeight: defaultHeight ?? this.defaultHeight,
+    defaultSillHeight: defaultSillHeight ?? this.defaultSillHeight,
+    frameDepth: frameDepth ?? this.frameDepth,
+    frameFaceWidth: frameFaceWidth ?? this.frameFaceWidth,
+    centerInCore: centerInCore ?? this.centerInCore,
+    glazingType: glazingType ?? this.glazingType,
+    glazingThickness: glazingThickness ?? this.glazingThickness,
+    glassColorValue: glassColorValue ?? this.glassColorValue,
+    hasCasing: hasCasing ?? this.hasCasing,
+    casingWidth: casingWidth ?? this.casingWidth,
+    casingProjection: casingProjection ?? this.casingProjection,
+    casingPlacement: casingPlacement ?? this.casingPlacement,
+    casingColorValue: casingColorValue ?? this.casingColorValue,
+    includeBottomCasing: includeBottomCasing ?? this.includeBottomCasing,
+    rootSubdivision: rootSubdivision ?? this.rootSubdivision,
+    transom: clearTransom ? null : transom ?? this.transom,
+  );
 
   /// Sets the exact metric dimension for a child leaf pane along [isWidth].
   ArchitectFenestrationStyle setPaneMetricDimension(
@@ -573,29 +742,30 @@ class ArchitectFenestrationStyle {
     double newDimension,
     bool isWidth,
   ) {
-    if (!rootSubdivision.isSplit) {
-      return isWidth
-          ? copyWith(defaultWidth: newDimension.clamp(0.40, 5.0))
-          : copyWith(defaultHeight: newDimension.clamp(0.40, 4.0));
+    final top = transom;
+    final inTop = top?.subdivision.findPane(paneId) != null;
+    final tree = inTop ? top!.subdivision : rootSubdivision;
+    final zoneHeight = inTop ? top!.height : doorBodyHeight;
+    final rect = tree.collectPaneRects(
+      Rect.fromLTWH(0, 0, defaultWidth, zoneHeight),
+    )[paneId];
+    if (rect == null) return this;
+    final span = isWidth ? rect.width : rect.height;
+    final total = isWidth ? defaultWidth : zoneHeight;
+    if ((span - total).abs() < 1e-6) {
+      if (isWidth) return copyWith(defaultWidth: newDimension.clamp(.40, 5.0));
+      if (inTop) return withTransom(top!.copyWith(height: newDimension));
+      return copyWith(defaultHeight: newDimension + (top?.height ?? 0));
     }
-    final paneRect = getPaneRect(paneId);
-    if (paneRect != null) {
-      final spanDim = isWidth ? paneRect.width : paneRect.height;
-      final totalDim = isWidth ? defaultWidth : defaultHeight;
-      if ((spanDim - totalDim).abs() < 1e-3) {
-        return isWidth
-            ? copyWith(defaultWidth: newDimension.clamp(0.40, 5.0))
-            : copyWith(defaultHeight: newDimension.clamp(0.40, 4.0));
-      }
-    }
-    return copyWith(
-      rootSubdivision: rootSubdivision.setChildMetricDimension(
-        targetPaneId: paneId,
-        newDimension: newDimension,
-        bounds: Rect.fromLTWH(0, 0, defaultWidth, defaultHeight),
-        isWidth: isWidth,
-      ),
+    final changed = tree.setChildMetricDimension(
+      targetPaneId: paneId,
+      newDimension: newDimension,
+      bounds: Rect.fromLTWH(0, 0, defaultWidth, zoneHeight),
+      isWidth: isWidth,
     );
+    return inTop
+        ? copyWith(transom: top!.copyWith(subdivision: changed))
+        : copyWith(rootSubdivision: changed);
   }
 
   /// Splits an individual leaf pane identified by [paneId].
@@ -605,6 +775,18 @@ class ArchitectFenestrationStyle {
     int count = 2,
     List<double>? customRatios,
   }) {
+    if (transom?.subdivision.findPane(paneId) != null) {
+      return copyWith(
+        transom: transom!.copyWith(
+          subdivision: transom!.subdivision.splitPane(
+            paneId,
+            vertical: vertical,
+            count: count,
+            customRatios: customRatios,
+          ),
+        ),
+      );
+    }
     return copyWith(
       rootSubdivision: rootSubdivision.splitPane(
         paneId,
@@ -617,24 +799,33 @@ class ArchitectFenestrationStyle {
 
   /// Collapses an individual division or pane back to a single leaf pane.
   ArchitectFenestrationStyle collapsePane(String paneId) {
-    return copyWith(
-      rootSubdivision: rootSubdivision.collapsePane(paneId),
-    );
+    if (transom?.subdivision.findPane(paneId) != null) {
+      return copyWith(
+        transom: transom!.copyWith(
+          subdivision: transom!.subdivision.collapsePane(paneId),
+        ),
+      );
+    }
+    return copyWith(rootSubdivision: rootSubdivision.collapsePane(paneId));
   }
 
   /// Updates a specific pane with new properties.
   ArchitectFenestrationStyle updatePane(FenestrationPane updated) {
-    return copyWith(
-      rootSubdivision: rootSubdivision.updatePane(updated),
-    );
+    if (transom?.subdivision.findPane(updated.id) != null) {
+      return copyWith(
+        transom: transom!.copyWith(
+          subdivision: transom!.subdivision.updatePane(updated),
+        ),
+      );
+    }
+    return copyWith(rootSubdivision: rootSubdivision.updatePane(updated));
   }
 
   /// Hit tests a metric point (x, y) relative to bottom-left opening origin.
   (FenestrationPane, Rect)? hitTest(Offset metricPoint) {
-    return rootSubdivision.hitTest(
-      metricPoint,
-      Rect.fromLTWH(0, 0, defaultWidth, defaultHeight),
-    );
+    return subdivisionForHeight(
+      defaultHeight,
+    ).hitTest(metricPoint, Rect.fromLTWH(0, 0, defaultWidth, defaultHeight));
   }
 
   /// Hit tests from canvas pixel coordinates.
@@ -642,16 +833,8 @@ class ArchitectFenestrationStyle {
     Offset canvasPoint,
     Size canvasSize,
   ) {
-    final margin = hasCasing ? (casingWidth * 1.8 + 0.20) : 0.25;
-    final totalW = defaultWidth + margin * 2;
-    final totalH = defaultHeight + margin * 2;
-    final scaleX = canvasSize.width / totalW;
-    final scaleY = canvasSize.height / totalH;
-    final scale = math.min(scaleX, scaleY) * 0.90;
-    final origin = Offset(
-      canvasSize.width / 2 - (defaultWidth / 2) * scale,
-      canvasSize.height / 2 + (defaultHeight / 2) * scale,
-    );
+    final fit = elevationFit(canvasSize);
+    final scale = fit.scale, origin = fit.origin;
     final x = (canvasPoint.dx - origin.dx) / scale;
     final y = (origin.dy - canvasPoint.dy) / scale;
     if (x < -0.05 ||
@@ -660,14 +843,103 @@ class ArchitectFenestrationStyle {
         y > defaultHeight + 0.05) {
       return null;
     }
-    return hitTest(Offset(x, y));
+    final point = Offset(x, y);
+    for (final entry in resolveLayout().panes.values) {
+      if (entry.rect.contains(point)) return (entry.pane, entry.rect);
+    }
+    return null;
+  }
+
+  /// Pixel margins include dimension text, independent of model size and zoom.
+  ({double scale, Offset origin}) elevationFit(
+    Size size, {
+    bool dimensions = true,
+  }) {
+    final inset = dimensions && size.shortestSide >= 180 ? 52.0 : 10.0;
+    final trim = hasCasing ? casingWidth : 0.0;
+    final bottomTrim = includeBottomCasing ? trim : 0.0;
+    final scale = math.max(
+      .001,
+      math.min(
+            math.max(1, size.width - 2 * inset) / (defaultWidth + 2 * trim),
+            math.max(1, size.height - 2 * inset) /
+                (defaultHeight + trim + bottomTrim),
+          ) *
+          .96,
+    );
+    return (
+      scale: scale,
+      origin: Offset(
+        (size.width - defaultWidth * scale) / 2,
+        size.height / 2 + (defaultHeight + trim - bottomTrim) * scale / 2,
+      ),
+    );
   }
 
   /// Gets the metric rect for a given pane ID.
   Rect? getPaneRect(String paneId) {
-    return rootSubdivision.collectPaneRects(
+    return subdivisionForHeight(defaultHeight).collectPaneRects(
       Rect.fromLTWH(0, 0, defaultWidth, defaultHeight),
     )[paneId];
+  }
+
+  List<
+    ({
+      Offset hinge,
+      Offset direction,
+      Offset normal,
+      double length,
+      bool hingeLeft,
+    })
+  >
+  doorPlanLeaves({
+    required Offset center,
+    required Offset direction,
+    required Offset normal,
+    required double width,
+    required double height,
+    required double wallThickness,
+    bool isHingeLeft = true,
+    bool openInward = true,
+    double openAngleDeg = 90,
+    double cutHeight = 1.20,
+  }) {
+    if (kind != FenestrationKind.door) return const [];
+    final entries = resolveLayout(width: width, height: height).panes.values
+        .where(
+          (e) =>
+              e.rect.top <= cutHeight &&
+              e.rect.bottom > cutHeight &&
+              e.pane.isOpenable &&
+              transom?.subdivision.findPane(e.pane.id) == null,
+        )
+        .toList();
+    return [
+      for (final e in entries)
+        () {
+          final left = entries.length == 1
+              ? isHingeLeft
+              : e.rect.center.dx < width / 2;
+          final sign = openInward ? 1.0 : -1.0;
+          final hinge =
+              center +
+              direction * ((left ? e.rect.left : e.rect.right) - width / 2) +
+              normal * (sign * wallThickness / 2);
+          final angle =
+              math.atan2(direction.dy, direction.dx) +
+              (left
+                  ? sign * openAngleDeg * math.pi / 180
+                  : math.pi - sign * openAngleDeg * math.pi / 180);
+          final leafU = Offset(math.cos(angle), math.sin(angle));
+          return (
+            hinge: hinge,
+            direction: leafU,
+            normal: Offset(-leafU.dy, leafU.dx) * (sign * (left ? -1 : 1)),
+            length: e.rect.width,
+            hingeLeft: left,
+          );
+        }(),
+    ];
   }
 
   // ===========================================================================
@@ -684,7 +956,8 @@ class ArchitectFenestrationStyle {
     required double coreThickness,
     required double insulationThickness,
     double? coreCenterShift,
-    required double exteriorSign, // +1 or -1 along normal vector towards exterior
+    required double
+    exteriorSign, // +1 or -1 along normal vector towards exterior
     required double offsetRatio,
     required double elementWidth,
     required double elementHeight,
@@ -693,6 +966,11 @@ class ArchitectFenestrationStyle {
     bool isSelected = false,
     bool wallGeometryProvided = false,
     bool showDimensions = true,
+    double cutPlaneHeight = 1.20,
+    bool isHingeLeft = true,
+    bool openInward = true,
+    double openAngleDeg = 90,
+    double leafThickness = .04,
   }) {
     final wallVec = wallEnd - wallStart;
     final wallLen = wallVec.distance;
@@ -714,7 +992,9 @@ class ArchitectFenestrationStyle {
       ..style = PaintingStyle.fill;
 
     final framePaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF263238))
+      ..color = isSelected
+          ? const Color(0xFF00E5FF)
+          : palette.foreground(const Color(0xFF263238))
       ..strokeWidth = (isSelected ? 2.2 : 1.4) / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -723,43 +1003,61 @@ class ArchitectFenestrationStyle {
       ..style = PaintingStyle.fill;
 
     final casingPaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF546E7A))
+      ..color = isSelected
+          ? const Color(0xFF00E5FF)
+          : palette.foreground(const Color(0xFF546E7A))
       ..strokeWidth = 1.5 / zoomScale
       ..style = PaintingStyle.stroke;
 
     final casingFillPaint = Paint()
-      ..color = casingColor.withValues(alpha: 0.85)
+      ..color = const Color(0xFFF4F5F6)
       ..style = PaintingStyle.fill;
 
     // 1. Cut rough wall opening through wall body (Fill with white mask)
     final maskHalfThick = halfWallThick + 1.5 / zoomScale;
     final openingPath = Path()
-      ..moveTo(pLeftBase.dx - n.dx * maskHalfThick, pLeftBase.dy - n.dy * maskHalfThick)
-      ..lineTo(pRightBase.dx - n.dx * maskHalfThick, pRightBase.dy - n.dy * maskHalfThick)
-      ..lineTo(pRightBase.dx + n.dx * maskHalfThick, pRightBase.dy + n.dy * maskHalfThick)
-      ..lineTo(pLeftBase.dx + n.dx * maskHalfThick, pLeftBase.dy + n.dy * maskHalfThick)
+      ..moveTo(
+        pLeftBase.dx - n.dx * maskHalfThick,
+        pLeftBase.dy - n.dy * maskHalfThick,
+      )
+      ..lineTo(
+        pRightBase.dx - n.dx * maskHalfThick,
+        pRightBase.dy - n.dy * maskHalfThick,
+      )
+      ..lineTo(
+        pRightBase.dx + n.dx * maskHalfThick,
+        pRightBase.dy + n.dy * maskHalfThick,
+      )
+      ..lineTo(
+        pLeftBase.dx + n.dx * maskHalfThick,
+        pLeftBase.dy + n.dy * maskHalfThick,
+      )
       ..close();
-    if(!wallGeometryProvided)canvas.drawPath(openingPath, openingCutPaint);
+    if (!wallGeometryProvided) canvas.drawPath(openingPath, openingCutPaint);
 
     // 2. Wall jamb edges (Линии на зида при светлия отвор)
-    if(!wallGeometryProvided) {
-    canvas.drawLine(
-      pLeftBase - n * halfWallThick,
-      pLeftBase + n * halfWallThick,
-      framePaint,
-    );
-    canvas.drawLine(
-      pRightBase - n * halfWallThick,
-      pRightBase + n * halfWallThick,
-      framePaint,
-    );
-
+    if (!wallGeometryProvided) {
+      canvas.drawLine(
+        pLeftBase - n * halfWallThick,
+        pLeftBase + n * halfWallThick,
+        framePaint,
+      );
+      canvas.drawLine(
+        pRightBase - n * halfWallThick,
+        pRightBase + n * halfWallThick,
+        framePaint,
+      );
     }
     // 3. Frame Positioning: Center in masonry core (5-chamber depth = 70 mm)
     // Frame center is offset along normal by (exteriorSign * (wallThickness - coreThickness)/2) if asymmetric
-    final resolvedCoreShift = coreCenterShift ?? (wallThickness - coreThickness) / 2.0 * (-exteriorSign);
-    final frameCenter = centerPos + n * resolvedCoreShift;
-    final halfFrameDepth = frameDepth / 2.0;
+    final resolvedCoreShift =
+        coreCenterShift ??
+        (wallThickness - coreThickness) / 2.0 * (-exteriorSign);
+    final frameCenter = kind == FenestrationKind.door
+        ? centerPos
+        : centerPos + n * resolvedCoreShift;
+    final halfFrameDepth =
+        (kind == FenestrationKind.door ? wallThickness : frameDepth) / 2.0;
 
     // Draw Left and Right Frame Jambs (Каса: frameFaceWidth x frameDepth)
     void drawFrameJamb(Offset baseCorner, bool isLeft) {
@@ -783,85 +1081,133 @@ class ArchitectFenestrationStyle {
     drawFrameJamb(frameCenter - u * halfW, true);
     drawFrameJamb(frameCenter + u * halfW, false);
 
-    // Closed sashes and glazing beads are drawn separately in each clear bay.
-    final leaves = _collectVerticalSlices(rootSubdivision, elementWidth);
-    for (final slice in leaves) {
-      final left = slice.left + (slice.left == 0 ? frameFaceWidth : frameFaceWidth / 2);
-      final right = slice.right -
-          (slice.right == elementWidth ? frameFaceWidth : frameFaceWidth / 2);
-      if (right <= left) continue;
+    final layout = resolveLayout(width: elementWidth, height: elementHeight);
+    final cut = (cutPlaneHeight - elementSillHeight).clamp(
+      .001,
+      elementHeight - .001,
+    );
+    for (final entry in layout.panes.values) {
+      final r = entry.rect;
+      if (cut < r.top || cut >= r.bottom) continue;
+      final isDoorLeaf =
+          kind == FenestrationKind.door &&
+          entry.pane.isOpenable &&
+          transom?.subdivision.findPane(entry.pane.id) == null;
+      if (isDoorLeaf) continue;
       ArchitectOpeningPlanPainter.paintWindowPane(
         canvas: canvas,
-        left: frameCenter + u * (left - halfW),
-        right: frameCenter + u * (right - halfW),
+        left: frameCenter + u * (r.left - halfW),
+        right: frameCenter + u * (r.right - halfW),
         direction: u,
         normal: n,
         frameDepth: frameDepth,
         glazingThickness: glazingThickness,
-        openable: slice.pane?.isOpenable ?? false,
+        openable: entry.pane.isOpenable,
+        glazed: entry.pane.isGlazed,
         zoomScale: zoomScale,
         palette: palette,
         isSelected: isSelected,
       );
     }
-
-    for (final slice in leaves) {
-      if (slice.hasDividerAfter) {
-        final mullionPos = frameCenter - u * halfW + u * slice.right;
-        final halfMullionW = frameFaceWidth / 2.0;
-        final m1 = mullionPos - u * halfMullionW - n * halfFrameDepth;
-        final m2 = mullionPos - u * halfMullionW + n * halfFrameDepth;
-        final m3 = mullionPos + u * halfMullionW + n * halfFrameDepth;
-        final m4 = mullionPos + u * halfMullionW - n * halfFrameDepth;
-
-        final mPath = Path()
-          ..moveTo(m1.dx, m1.dy)
-          ..lineTo(m2.dx, m2.dy)
-          ..lineTo(m3.dx, m3.dy)
-          ..lineTo(m4.dx, m4.dy)
-          ..close();
-
-        canvas.drawPath(mPath, frameFillPaint);
-        canvas.drawPath(mPath, framePaint);
+    for (final r in layout.dividers) {
+      if (cut < r.top || cut >= r.bottom) continue;
+      final a = frameCenter + u * (r.left - halfW),
+          b = frameCenter + u * (r.right - halfW);
+      final path = Path()
+        ..moveTo((a - n * halfFrameDepth).dx, (a - n * halfFrameDepth).dy)
+        ..lineTo((b - n * halfFrameDepth).dx, (b - n * halfFrameDepth).dy)
+        ..lineTo((b + n * halfFrameDepth).dx, (b + n * halfFrameDepth).dy)
+        ..lineTo((a + n * halfFrameDepth).dx, (a + n * halfFrameDepth).dy)
+        ..close();
+      canvas.drawPath(path, frameFillPaint);
+      canvas.drawPath(path, framePaint);
+    }
+    final doorLeaves = doorPlanLeaves(
+      center: centerPos,
+      direction: u,
+      normal: n,
+      width: elementWidth,
+      height: elementHeight,
+      wallThickness: wallThickness,
+      isHingeLeft: isHingeLeft,
+      openInward: openInward,
+      openAngleDeg: openAngleDeg,
+      cutHeight: cut,
+    );
+    for (final leaf in doorLeaves) {
+      final a = leaf.hinge, b = a + leaf.direction * leaf.length;
+      final c = b + leaf.normal * leafThickness,
+          d = a + leaf.normal * leafThickness;
+      canvas.drawPath(
+        Path()
+          ..moveTo(a.dx, a.dy)
+          ..lineTo(b.dx, b.dy)
+          ..lineTo(c.dx, c.dy)
+          ..lineTo(d.dx, d.dy)
+          ..close(),
+        framePaint,
+      );
+      final closed = leaf.hingeLeft ? u : -u;
+      final start = math.atan2(closed.dy, closed.dx);
+      var sweep = math.atan2(leaf.direction.dy, leaf.direction.dx) - start;
+      while (sweep > math.pi) {
+        sweep -= 2 * math.pi;
+      }
+      while (sweep < -math.pi) {
+        sweep += 2 * math.pi;
+      }
+      for (var angle = 0.0; angle < sweep.abs(); angle += .08) {
+        canvas.drawArc(
+          Rect.fromCircle(center: a, radius: leaf.length),
+          start + sweep.sign * angle,
+          sweep.sign * math.min(.052, sweep.abs() - angle),
+          false,
+          framePaint,
+        );
       }
     }
 
     // 6. Exterior Casing / Architrave (Обрамчване по стената и изолацията)
     // Mounted on exterior surface: coreFace + insulationThickness
     if (hasCasing) {
-      final extFaceDist = halfWallThick; // distance to exterior surface
-      final casingBaseNormal = n * (exteriorSign * extFaceDist);
-      final casingProjVector = n * (exteriorSign * casingProjection);
+      for (final side in [
+        if (casingPlacement != CasingPlacement.interior) exteriorSign,
+        if (casingPlacement != CasingPlacement.exterior) -exteriorSign,
+      ]) {
+        final extFaceDist = halfWallThick; // distance to exterior surface
+        final casingBaseNormal = n * (side * extFaceDist);
+        final casingProjVector = n * (side * casingProjection);
 
-      // Left Casing Ear: from (pLeft - u * casingWidth) to pLeft
-      final lc1 = (pLeftBase + casingBaseNormal) - u * casingWidth;
-      final lc2 = (pLeftBase + casingBaseNormal);
-      final lc3 = lc2 + casingProjVector;
-      final lc4 = lc1 + casingProjVector;
+        // Left Casing Ear: from (pLeft - u * casingWidth) to pLeft
+        final lc1 = (pLeftBase + casingBaseNormal) - u * casingWidth;
+        final lc2 = (pLeftBase + casingBaseNormal);
+        final lc3 = lc2 + casingProjVector;
+        final lc4 = lc1 + casingProjVector;
 
-      final leftCasingPath = Path()
-        ..moveTo(lc1.dx, lc1.dy)
-        ..lineTo(lc2.dx, lc2.dy)
-        ..lineTo(lc3.dx, lc3.dy)
-        ..lineTo(lc4.dx, lc4.dy)
-        ..close();
-      canvas.drawPath(leftCasingPath, casingFillPaint);
-      canvas.drawPath(leftCasingPath, casingPaint);
+        final leftCasingPath = Path()
+          ..moveTo(lc1.dx, lc1.dy)
+          ..lineTo(lc2.dx, lc2.dy)
+          ..lineTo(lc3.dx, lc3.dy)
+          ..lineTo(lc4.dx, lc4.dy)
+          ..close();
+        canvas.drawPath(leftCasingPath, casingFillPaint);
+        canvas.drawPath(leftCasingPath, casingPaint);
 
-      // Right Casing Ear: from pRight to (pRight + u * casingWidth)
-      final rc1 = (pRightBase + casingBaseNormal);
-      final rc2 = (pRightBase + casingBaseNormal) + u * casingWidth;
-      final rc3 = rc2 + casingProjVector;
-      final rc4 = rc1 + casingProjVector;
+        // Right Casing Ear: from pRight to (pRight + u * casingWidth)
+        final rc1 = (pRightBase + casingBaseNormal);
+        final rc2 = (pRightBase + casingBaseNormal) + u * casingWidth;
+        final rc3 = rc2 + casingProjVector;
+        final rc4 = rc1 + casingProjVector;
 
-      final rightCasingPath = Path()
-        ..moveTo(rc1.dx, rc1.dy)
-        ..lineTo(rc2.dx, rc2.dy)
-        ..lineTo(rc3.dx, rc3.dy)
-        ..lineTo(rc4.dx, rc4.dy)
-        ..close();
-      canvas.drawPath(rightCasingPath, casingFillPaint);
-      canvas.drawPath(rightCasingPath, casingPaint);
+        final rightCasingPath = Path()
+          ..moveTo(rc1.dx, rc1.dy)
+          ..lineTo(rc2.dx, rc2.dy)
+          ..lineTo(rc3.dx, rc3.dy)
+          ..lineTo(rc4.dx, rc4.dy)
+          ..close();
+        canvas.drawPath(rightCasingPath, casingFillPaint);
+        canvas.drawPath(rightCasingPath, casingPaint);
+      }
     }
 
     if (kind == FenestrationKind.window) {
@@ -892,7 +1238,10 @@ class ArchitectFenestrationStyle {
         text: TextSpan(
           text: text,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF0277BD)),
+            fontFamily: 'ArchitectNoto',
+            color: isSelected
+                ? const Color(0xFF00E5FF)
+                : palette.foreground(const Color(0xFF45515B)),
             fontSize: 11.5,
             fontWeight: FontWeight.bold,
             height: 1.1,
@@ -926,19 +1275,10 @@ class ArchitectFenestrationStyle {
     required Canvas canvas,
     required Size size,
     String? selectedPaneId,
+    bool showDimensions = true,
   }) {
-    final margin = hasCasing ? (casingWidth * 1.8 + 0.20) : 0.25;
-    final totalW = defaultWidth + margin * 2;
-    final totalH = defaultHeight + margin * 2;
-
-    final scaleX = size.width / totalW;
-    final scaleY = size.height / totalH;
-    final scale = math.min(scaleX, scaleY) * 0.90;
-
-    final origin = Offset(
-      size.width / 2 - (defaultWidth / 2) * scale,
-      size.height / 2 + (defaultHeight / 2) * scale,
-    );
+    final fit = elevationFit(size, dimensions: showDimensions);
+    final scale = fit.scale, origin = fit.origin;
 
     // Paints
     final framePaint = Paint()
@@ -951,7 +1291,7 @@ class ArchitectFenestrationStyle {
       ..style = PaintingStyle.fill;
 
     final glassFill = Paint()
-      ..color = glassColor.withValues(alpha: 0.35)
+      ..color = const Color(0xFFF7F9FA)
       ..style = PaintingStyle.fill;
 
     final swingLinePaint = Paint()
@@ -960,7 +1300,7 @@ class ArchitectFenestrationStyle {
       ..style = PaintingStyle.stroke;
 
     final selectedPaint = Paint()
-      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.40)
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.08)
       ..style = PaintingStyle.fill;
 
     final casingPaint = Paint()
@@ -969,7 +1309,7 @@ class ArchitectFenestrationStyle {
       ..style = PaintingStyle.stroke;
 
     final casingFill = Paint()
-      ..color = casingColor.withValues(alpha: 0.90)
+      ..color = const Color(0xFFF4F5F6)
       ..style = PaintingStyle.fill;
 
     // Helper: converts metric (x, y from bottom-left) to canvas pixels
@@ -1007,7 +1347,11 @@ class ArchitectFenestrationStyle {
         ..lineTo(openingP4.dx, openingP4.dy)
         ..close();
 
-      final fullCasing = Path.combine(PathOperation.difference, casingOuter, casingInner);
+      final fullCasing = Path.combine(
+        PathOperation.difference,
+        casingOuter,
+        casingInner,
+      );
       canvas.drawPath(fullCasing, casingFill);
       canvas.drawPath(fullCasing, casingPaint);
     }
@@ -1028,24 +1372,35 @@ class ArchitectFenestrationStyle {
     canvas.drawPath(outerPath, frameFill);
     canvas.drawPath(outerPath, framePaint);
 
-    // 3. Render subdivisions and panes
-    _renderSubdivisionElevation(
-      canvas: canvas,
-      node: rootSubdivision,
-      rect: Rect.fromLTWH(0, 0, defaultWidth, defaultHeight),
-      frameFace: frameFaceWidth,
-      toCanvas: toCanvas,
-      scale: scale,
-      framePaint: framePaint,
-      frameFill: frameFill,
-      glassFill: glassFill,
-      swingLinePaint: swingLinePaint,
-      selectedPaint: selectedPaint,
-      selectedPaneId: selectedPaneId,
-    );
-
-    // 4. Dimension Markers
-    _drawElevationDimensions(canvas, origin, scale);
+    // Physical layout is shared with 3D and the horizontal cut.
+    final layout = resolveLayout();
+    for (final divider in layout.dividers) {
+      final r = Rect.fromPoints(
+        toCanvas(divider.left, divider.top),
+        toCanvas(divider.right, divider.bottom),
+      );
+      canvas.drawRect(r, frameFill);
+      canvas.drawRect(r, framePaint);
+    }
+    for (final entry in layout.panes.values) {
+      _renderSubdivisionElevation(
+        canvas: canvas,
+        node: FenestrationSubdivision(id: entry.pane.id, pane: entry.pane),
+        rect: entry.rect.inflate(frameFaceWidth),
+        frameFace: frameFaceWidth,
+        toCanvas: toCanvas,
+        scale: scale,
+        framePaint: framePaint,
+        frameFill: frameFill,
+        glassFill: glassFill,
+        swingLinePaint: swingLinePaint,
+        selectedPaint: selectedPaint,
+        selectedPaneId: selectedPaneId,
+      );
+    }
+    if (showDimensions && size.shortestSide >= 180) {
+      _drawElevationDimensions(canvas, origin, scale);
+    }
   }
 
   void _renderSubdivisionElevation({
@@ -1062,77 +1417,6 @@ class ArchitectFenestrationStyle {
     required Paint selectedPaint,
     String? selectedPaneId,
   }) {
-    if (node.isSplit) {
-      double current = 0.0;
-      for (int i = 0; i < node.children.length; i++) {
-        final ratio = node.ratios[i];
-        final child = node.children[i];
-
-        Rect childRect;
-        if (node.isVertical) {
-          final w = rect.width * ratio;
-          childRect = Rect.fromLTWH(rect.left + current, rect.top, w, rect.height);
-          current += w;
-
-          // Draw vertical dividing mullion bar
-          if (i < node.children.length - 1) {
-            final mX = rect.left + current - frameFace / 2.0;
-            final mp1 = toCanvas(mX, rect.top + rect.height);
-            final mp2 = toCanvas(mX + frameFace, rect.top + rect.height);
-            final mp3 = toCanvas(mX + frameFace, rect.top);
-            final mp4 = toCanvas(mX, rect.top);
-
-            final mPath = Path()
-              ..moveTo(mp1.dx, mp1.dy)
-              ..lineTo(mp2.dx, mp2.dy)
-              ..lineTo(mp3.dx, mp3.dy)
-              ..lineTo(mp4.dx, mp4.dy)
-              ..close();
-            canvas.drawPath(mPath, frameFill);
-            canvas.drawPath(mPath, framePaint);
-          }
-        } else {
-          final h = rect.height * ratio;
-          childRect = Rect.fromLTWH(rect.left, rect.top + current, rect.width, h);
-          current += h;
-
-          // Draw horizontal dividing transom bar
-          if (i < node.children.length - 1) {
-            final mY = rect.top + current - frameFace / 2.0;
-            final tp1 = toCanvas(rect.left, mY + frameFace);
-            final tp2 = toCanvas(rect.left + rect.width, mY + frameFace);
-            final tp3 = toCanvas(rect.left + rect.width, mY);
-            final tp4 = toCanvas(rect.left, mY);
-
-            final tPath = Path()
-              ..moveTo(tp1.dx, tp1.dy)
-              ..lineTo(tp2.dx, tp2.dy)
-              ..lineTo(tp3.dx, tp3.dy)
-              ..lineTo(tp4.dx, tp4.dy)
-              ..close();
-            canvas.drawPath(tPath, frameFill);
-            canvas.drawPath(tPath, framePaint);
-          }
-        }
-
-        _renderSubdivisionElevation(
-          canvas: canvas,
-          node: child,
-          rect: childRect,
-          frameFace: frameFace,
-          toCanvas: toCanvas,
-          scale: scale,
-          framePaint: framePaint,
-          frameFill: frameFill,
-          glassFill: glassFill,
-          swingLinePaint: swingLinePaint,
-          selectedPaint: selectedPaint,
-          selectedPaneId: selectedPaneId,
-        );
-      }
-      return;
-    }
-
     // Leaf Pane
     final pane = node.pane;
     if (pane == null) return;
@@ -1163,7 +1447,7 @@ class ArchitectFenestrationStyle {
       canvas.drawPath(
         panePath,
         Paint()
-          ..color = const Color(0xFF6D4C41)
+          ..color = const Color(0xFFF1F1F1)
           ..style = PaintingStyle.fill,
       );
     }
@@ -1190,8 +1474,11 @@ class ArchitectFenestrationStyle {
         ..close();
 
       // Distinct sash frame body between outer daylight opening and glass
-      final sashFramePath =
-          Path.combine(PathOperation.difference, panePath, sashInnerPath);
+      final sashFramePath = Path.combine(
+        PathOperation.difference,
+        panePath,
+        sashInnerPath,
+      );
       canvas.drawPath(
         sashFramePath,
         Paint()
@@ -1234,12 +1521,12 @@ class ArchitectFenestrationStyle {
       final handleOffset = pane.paneType == PaneType.casementLeft
           ? midH - const Offset(12, 0)
           : pane.paneType == PaneType.casementRight
-              ? midL + const Offset(12, 0)
-              : pane.paneType == PaneType.tiltAndTurn
-                  ? midH - const Offset(12, 0)
-                  : pane.paneType == PaneType.doorLeaf
-                      ? midH - const Offset(14, 0)
-                      : null;
+          ? midL + const Offset(12, 0)
+          : pane.paneType == PaneType.tiltAndTurn
+          ? midH - const Offset(12, 0)
+          : pane.paneType == PaneType.doorLeaf
+          ? midH - const Offset(14, 0)
+          : null;
       if (handleOffset != null) {
         final hR = RRect.fromRectAndRadius(
           Rect.fromCenter(center: handleOffset, width: 6, height: 16),
@@ -1294,57 +1581,28 @@ class ArchitectFenestrationStyle {
           ..strokeWidth = 2.5
           ..style = PaintingStyle.stroke,
       );
-
-      // Dimension pill in center of selected pane
-      final centerP = toCanvas(inX + inW / 2, inY + inH / 2);
-      final dimStr =
-          '${(rect.width * 100).round()} × ${(rect.height * 100).round()} cm';
-      final dimTp = ArchitectTextPainter(
-        text: TextSpan(
-          text: dimStr,
-          style: const TextStyle(
-            color: Color(0xFF00E5FF),
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      final badgeRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: centerP,
-          width: dimTp.width + 12,
-          height: dimTp.height + 6,
-        ),
-        const Radius.circular(4),
-      );
-      canvas.drawRRect(
-        badgeRect,
-        Paint()
-          ..color = const Color(0xDD1E222B)
-          ..style = PaintingStyle.fill,
-      );
-      canvas.drawRRect(
-        badgeRect,
-        Paint()
-          ..color = const Color(0xFF00E5FF)
-          ..strokeWidth = 1.0
-          ..style = PaintingStyle.stroke,
-      );
-      dimTp.paint(canvas, centerP - Offset(dimTp.width / 2, dimTp.height / 2));
     }
   }
 
   void _drawElevationDimensions(Canvas canvas, Offset origin, double scale) {
     final dimPaint = Paint()
-      ..color = const Color(0xFF0277BD)
+      ..color = const Color(0xFF45515B)
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
 
     const dimOffset = 32.0;
 
     // Segmented dimension chains for individual columns at bottom
-    final slices = _collectVerticalSlices(rootSubdivision, defaultWidth);
+    final slices =
+        rootSubdivision
+            .collectPaneRects(Rect.fromLTWH(0, 0, defaultWidth, doorBodyHeight))
+            .values
+            .where(
+              (r) =>
+                  r.top <= doorBodyHeight / 2 && r.bottom > doorBodyHeight / 2,
+            )
+            .toList()
+          ..sort((a, b) => a.left.compareTo(b.left));
     if (slices.length > 1) {
       final subY = origin.dy + 14.0;
       for (final slice in slices) {
@@ -1353,11 +1611,12 @@ class ArchitectFenestrationStyle {
         canvas.drawLine(Offset(sX1, subY), Offset(sX2, subY), dimPaint);
         canvas.drawLine(Offset(sX1, subY - 3), Offset(sX1, subY + 3), dimPaint);
         canvas.drawLine(Offset(sX2, subY - 3), Offset(sX2, subY + 3), dimPaint);
-        final sText = '${((slice.right - slice.left) * 100).round()}';
+        final sText = centimeters(slice.right - slice.left);
         final sTp = ArchitectTextPainter(
           text: TextSpan(
             text: sText,
             style: const TextStyle(
+              fontFamily: 'ArchitectNoto',
               color: Color(0xFF0277BD),
               fontSize: 9,
               fontWeight: FontWeight.bold,
@@ -1377,11 +1636,12 @@ class ArchitectFenestrationStyle {
     canvas.drawLine(Offset(bX1, bY - 4), Offset(bX1, bY + 4), dimPaint);
     canvas.drawLine(Offset(bX2, bY - 4), Offset(bX2, bY + 4), dimPaint);
 
-    final wText = '${(defaultWidth * 100).round()} cm';
+    final wText = '${centimeters(defaultWidth)} cm';
     final wPainter = ArchitectTextPainter(
       text: TextSpan(
         text: wText,
         style: const TextStyle(
+          fontFamily: 'ArchitectNoto',
           color: Color(0xFF0277BD),
           fontSize: 10,
           fontWeight: FontWeight.bold,
@@ -1402,11 +1662,12 @@ class ArchitectFenestrationStyle {
     canvas.drawLine(Offset(lX - 4, lY1), Offset(lX + 4, lY1), dimPaint);
     canvas.drawLine(Offset(lX - 4, lY2), Offset(lX + 4, lY2), dimPaint);
 
-    final hText = '${(defaultHeight * 100).round()} cm';
+    final hText = '${centimeters(defaultHeight)} cm';
     final hPainter = ArchitectTextPainter(
       text: TextSpan(
         text: hText,
         style: const TextStyle(
+          fontFamily: 'ArchitectNoto',
           color: Color(0xFF0277BD),
           fontSize: 10,
           fontWeight: FontWeight.bold,
@@ -1450,345 +1711,298 @@ class ArchitectFenestrationStyle {
   // SECTION 6: STANDARD PRESETS CATALOG
   // ===========================================================================
 
-
   static List<ArchitectFenestrationStyle> standardCatalog() => [
-        // 1. Single Casement Window 80x140 cm (5-chamber, double glazing)
-        ArchitectFenestrationStyle(
-          id: 'win_single_casement',
-          name: 'Еднокрил 80/140 (5-камерен)',
-          kind: FenestrationKind.window,
-          defaultWidth: 0.80,
-          defaultHeight: 1.40,
-          defaultSillHeight: 0.85,
-          hasCasing: false,
-          rootSubdivision: const FenestrationSubdivision(
-            id: 'root',
+    // 1. Single Casement Window 80x140 cm (5-chamber, double glazing)
+    ArchitectFenestrationStyle(
+      id: 'win_single_casement',
+      name: 'Еднокрил 80/140 (5-камерен)',
+      kind: FenestrationKind.window,
+      defaultWidth: 0.80,
+      defaultHeight: 1.40,
+      defaultSillHeight: 0.85,
+      hasCasing: false,
+      rootSubdivision: const FenestrationSubdivision(
+        id: 'root',
+        pane: FenestrationPane(id: 'pane_main', paneType: PaneType.tiltAndTurn),
+      ),
+    ),
+
+    // 2. Double Casement Window 140x140 cm (1 turn + 1 tilt&turn)
+    ArchitectFenestrationStyle(
+      id: 'win_double_casement',
+      name: 'Двукрил 140/140 (5-камерен)',
+      kind: FenestrationKind.window,
+      defaultWidth: 1.40,
+      defaultHeight: 1.40,
+      defaultSillHeight: 0.85,
+      hasCasing: false,
+      rootSubdivision: const FenestrationSubdivision(
+        id: 'root',
+        isSplit: true,
+        isVertical: true,
+        ratios: [0.5, 0.5],
+        children: [
+          FenestrationSubdivision(
+            id: 'sub_0',
             pane: FenestrationPane(
-              id: 'pane_main',
+              id: 'p_left',
+              paneType: PaneType.casementLeft,
+            ),
+          ),
+          FenestrationSubdivision(
+            id: 'sub_1',
+            pane: FenestrationPane(
+              id: 'p_right',
               paneType: PaneType.tiltAndTurn,
             ),
           ),
-        ),
+        ],
+      ),
+    ),
 
-        // 2. Double Casement Window 140x140 cm (1 turn + 1 tilt&turn)
-        ArchitectFenestrationStyle(
-          id: 'win_double_casement',
-          name: 'Двукрил 140/140 (5-камерен)',
-          kind: FenestrationKind.window,
-          defaultWidth: 1.40,
-          defaultHeight: 1.40,
-          defaultSillHeight: 0.85,
-          hasCasing: false,
-          rootSubdivision: const FenestrationSubdivision(
-            id: 'root',
+    // 3. Double Casement Window with Exterior Casing (10 cm trim, 3 cm projection)
+    ArchitectFenestrationStyle(
+      id: 'win_double_with_casing',
+      name: 'Двукрил 140/140 с обрамчване',
+      kind: FenestrationKind.window,
+      defaultWidth: 1.40,
+      defaultHeight: 1.40,
+      defaultSillHeight: 0.85,
+      hasCasing: true,
+      casingWidth: 0.10,
+      casingProjection: 0.03,
+      rootSubdivision: const FenestrationSubdivision(
+        id: 'root',
+        isSplit: true,
+        isVertical: true,
+        ratios: [0.5, 0.5],
+        children: [
+          FenestrationSubdivision(
+            id: 'sub_0',
+            pane: FenestrationPane(
+              id: 'p_left',
+              paneType: PaneType.casementLeft,
+            ),
+          ),
+          FenestrationSubdivision(
+            id: 'sub_1',
+            pane: FenestrationPane(
+              id: 'p_right',
+              paneType: PaneType.tiltAndTurn,
+            ),
+          ),
+        ],
+      ),
+    ),
+
+    // 4. Triple Casement Window 210x140 cm (center fixed, 2 sides open)
+    ArchitectFenestrationStyle(
+      id: 'win_triple_casement',
+      name: 'Трикрил 210/140 (фикс + 2 крила)',
+      kind: FenestrationKind.window,
+      defaultWidth: 2.10,
+      defaultHeight: 1.40,
+      defaultSillHeight: 0.85,
+      hasCasing: false,
+      rootSubdivision: const FenestrationSubdivision(
+        id: 'root',
+        isSplit: true,
+        isVertical: true,
+        ratios: [0.333, 0.334, 0.333],
+        children: [
+          FenestrationSubdivision(
+            id: 'sub_0',
+            pane: FenestrationPane(
+              id: 'p_left',
+              paneType: PaneType.casementLeft,
+            ),
+          ),
+          FenestrationSubdivision(
+            id: 'sub_1',
+            pane: FenestrationPane(
+              id: 'p_mid',
+              paneType: PaneType.fixedGlazing,
+            ),
+          ),
+          FenestrationSubdivision(
+            id: 'sub_2',
+            pane: FenestrationPane(
+              id: 'p_right',
+              paneType: PaneType.tiltAndTurn,
+            ),
+          ),
+        ],
+      ),
+    ),
+
+    // 5. Window with Transom 140x180 cm (Фрамуга горе + 2 крила долу)
+    ArchitectFenestrationStyle(
+      id: 'win_with_transom',
+      name: 'Прозорец с надстройка 140/180',
+      kind: FenestrationKind.window,
+      defaultWidth: 1.40,
+      defaultHeight: 1.80,
+      defaultSillHeight: 0.85,
+      hasCasing: false,
+      rootSubdivision: const FenestrationSubdivision(
+        id: 'root',
+        isSplit: true,
+        isVertical: false, // horizontal transom
+        ratios: [0.75, 0.25], // lower 1.35m, upper 0.45m
+        children: [
+          FenestrationSubdivision(
+            id: 'sub_lower',
             isSplit: true,
             isVertical: true,
             ratios: [0.5, 0.5],
             children: [
               FenestrationSubdivision(
-                id: 'sub_0',
+                id: 'sub_l0',
                 pane: FenestrationPane(
-                  id: 'p_left',
+                  id: 'p_l0',
                   paneType: PaneType.casementLeft,
                 ),
               ),
               FenestrationSubdivision(
-                id: 'sub_1',
+                id: 'sub_l1',
                 pane: FenestrationPane(
-                  id: 'p_right',
+                  id: 'p_l1',
                   paneType: PaneType.tiltAndTurn,
                 ),
               ),
             ],
           ),
-        ),
-
-        // 3. Double Casement Window with Exterior Casing (10 cm trim, 3 cm projection)
-        ArchitectFenestrationStyle(
-          id: 'win_double_with_casing',
-          name: 'Двукрил 140/140 с обрамчване',
-          kind: FenestrationKind.window,
-          defaultWidth: 1.40,
-          defaultHeight: 1.40,
-          defaultSillHeight: 0.85,
-          hasCasing: true,
-          casingWidth: 0.10,
-          casingProjection: 0.03,
-          rootSubdivision: const FenestrationSubdivision(
-            id: 'root',
-            isSplit: true,
-            isVertical: true,
-            ratios: [0.5, 0.5],
-            children: [
-              FenestrationSubdivision(
-                id: 'sub_0',
-                pane: FenestrationPane(
-                  id: 'p_left',
-                  paneType: PaneType.casementLeft,
-                ),
-              ),
-              FenestrationSubdivision(
-                id: 'sub_1',
-                pane: FenestrationPane(
-                  id: 'p_right',
-                  paneType: PaneType.tiltAndTurn,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // 4. Triple Casement Window 210x140 cm (center fixed, 2 sides open)
-        ArchitectFenestrationStyle(
-          id: 'win_triple_casement',
-          name: 'Трикрил 210/140 (фикс + 2 крила)',
-          kind: FenestrationKind.window,
-          defaultWidth: 2.10,
-          defaultHeight: 1.40,
-          defaultSillHeight: 0.85,
-          hasCasing: false,
-          rootSubdivision: const FenestrationSubdivision(
-            id: 'root',
-            isSplit: true,
-            isVertical: true,
-            ratios: [0.333, 0.334, 0.333],
-            children: [
-              FenestrationSubdivision(
-                id: 'sub_0',
-                pane: FenestrationPane(
-                  id: 'p_left',
-                  paneType: PaneType.casementLeft,
-                ),
-              ),
-              FenestrationSubdivision(
-                id: 'sub_1',
-                pane: FenestrationPane(
-                  id: 'p_mid',
-                  paneType: PaneType.fixedGlazing,
-                ),
-              ),
-              FenestrationSubdivision(
-                id: 'sub_2',
-                pane: FenestrationPane(
-                  id: 'p_right',
-                  paneType: PaneType.tiltAndTurn,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // 5. Window with Transom 140x180 cm (Фрамуга горе + 2 крила долу)
-        ArchitectFenestrationStyle(
-          id: 'win_with_transom',
-          name: 'Прозорец с надстройка 140/180',
-          kind: FenestrationKind.window,
-          defaultWidth: 1.40,
-          defaultHeight: 1.80,
-          defaultSillHeight: 0.85,
-          hasCasing: false,
-          rootSubdivision: const FenestrationSubdivision(
-            id: 'root',
-            isSplit: true,
-            isVertical: false, // horizontal transom
-            ratios: [0.75, 0.25], // lower 1.35m, upper 0.45m
-            children: [
-              FenestrationSubdivision(
-                id: 'sub_lower',
-                isSplit: true,
-                isVertical: true,
-                ratios: [0.5, 0.5],
-                children: [
-                  FenestrationSubdivision(
-                    id: 'sub_l0',
-                    pane: FenestrationPane(
-                      id: 'p_l0',
-                      paneType: PaneType.casementLeft,
-                    ),
-                  ),
-                  FenestrationSubdivision(
-                    id: 'sub_l1',
-                    pane: FenestrationPane(
-                      id: 'p_l1',
-                      paneType: PaneType.tiltAndTurn,
-                    ),
-                  ),
-                ],
-              ),
-              FenestrationSubdivision(
-                id: 'sub_upper',
-                pane: FenestrationPane(
-                  id: 'p_transom',
-                  paneType: PaneType.topHopper,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // 6. Standard Interior Door 90x200 cm
-        ArchitectFenestrationStyle(
-          id: 'door_interior_standard',
-          name: 'Интериорна врата 90/200',
-          kind: FenestrationKind.door,
-          defaultWidth: 0.90,
-          defaultHeight: 2.00,
-          defaultSillHeight: 0.00,
-          frameFaceWidth: 0.04,
-          frameDepth: 0.05,
-          hasCasing: false,
-          rootSubdivision: const FenestrationSubdivision(
-            id: 'root',
+          FenestrationSubdivision(
+            id: 'sub_upper',
             pane: FenestrationPane(
-              id: 'p_door',
-              paneType: PaneType.doorLeaf,
+              id: 'p_transom',
+              paneType: PaneType.topHopper,
             ),
           ),
-        ),
+        ],
+      ),
+    ),
 
-        // 7. Exterior Entrance Door with Casing & Glass Side Infill 100x210 cm
-        ArchitectFenestrationStyle(
-          id: 'door_entrance_casing',
-          name: 'Входна врата с обрамчване 100/210',
-          kind: FenestrationKind.door,
-          defaultWidth: 1.00,
-          defaultHeight: 2.10,
-          defaultSillHeight: 0.00,
-          frameFaceWidth: 0.07,
-          frameDepth: 0.07,
-          hasCasing: true,
-          casingWidth: 0.10,
-          casingProjection: 0.03,
-          includeBottomCasing: false,
-          rootSubdivision: const FenestrationSubdivision(
-            id: 'root',
-            pane: FenestrationPane(
-              id: 'p_entrance',
-              paneType: PaneType.doorLeaf,
-            ),
-          ),
-        ),
+    // 6. Standard Interior Door 90x200 cm
+    ArchitectFenestrationStyle(
+      id: 'door_interior_standard',
+      name: 'Интериорна врата 90/200',
+      kind: FenestrationKind.door,
+      defaultWidth: 0.90,
+      defaultHeight: 2.00,
+      defaultSillHeight: 0.00,
+      frameFaceWidth: 0.04,
+      frameDepth: 0.05,
+      hasCasing: false,
+      rootSubdivision: const FenestrationSubdivision(
+        id: 'root',
+        pane: FenestrationPane(id: 'p_door', paneType: PaneType.doorLeaf),
+      ),
+    ),
 
-        // 8. Single Glazed Balcony / Terrace Door 90x210 cm (5-chamber, double glazing)
-        ArchitectFenestrationStyle(
-          id: 'door_balcony_glass',
-          name: 'Балконска остъклена врата 90/210',
-          kind: FenestrationKind.door,
-          defaultWidth: 0.90,
-          defaultHeight: 2.10,
-          defaultSillHeight: 0.00,
-          frameFaceWidth: 0.07,
-          frameDepth: 0.07,
-          hasCasing: false,
-          rootSubdivision: const FenestrationSubdivision(
-            id: 'root',
-            pane: FenestrationPane(
-              id: 'p_balcony_glass',
-              paneType: PaneType.tiltAndTurn,
-            ),
-          ),
+    // 7. Exterior Entrance Door with Casing & Glass Side Infill 100x210 cm
+    ArchitectFenestrationStyle(
+      id: 'door_entrance_casing',
+      name: 'Входна врата с обрамчване 100/210',
+      kind: FenestrationKind.door,
+      defaultWidth: 1.00,
+      defaultHeight: 2.10,
+      defaultSillHeight: 0.00,
+      frameFaceWidth: 0.07,
+      frameDepth: 0.07,
+      hasCasing: true,
+      casingWidth: 0.10,
+      casingProjection: 0.03,
+      includeBottomCasing: false,
+      rootSubdivision: const FenestrationSubdivision(
+        id: 'root',
+        pane: FenestrationPane(id: 'p_entrance', paneType: PaneType.doorLeaf),
+      ),
+    ),
+
+    // 8. Single Glazed Balcony / Terrace Door 90x210 cm (5-chamber, double glazing)
+    ArchitectFenestrationStyle(
+      id: 'door_balcony_glass',
+      name: 'Балконска остъклена врата 90/210',
+      kind: FenestrationKind.door,
+      defaultWidth: 0.90,
+      defaultHeight: 2.10,
+      defaultSillHeight: 0.00,
+      frameFaceWidth: 0.07,
+      frameDepth: 0.07,
+      hasCasing: false,
+      rootSubdivision: const FenestrationSubdivision(
+        id: 'root',
+        pane: FenestrationPane(
+          id: 'p_balcony_glass',
+          paneType: PaneType.tiltAndTurn,
         ),
-      ];
+      ),
+    ),
+  ];
 
   // ===========================================================================
   // SECTION 7: JSON SERIALIZATION
   // ===========================================================================
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'kind': kind.name,
-        'defaultWidth': defaultWidth,
-        'defaultHeight': defaultHeight,
-        'defaultSillHeight': defaultSillHeight,
-        'frameDepth': frameDepth,
-        'frameFaceWidth': frameFaceWidth,
-        'centerInCore': centerInCore,
-        'glazingType': glazingType.name,
-        'glazingThickness': glazingThickness,
-        'glassColorValue': glassColorValue,
-        'hasCasing': hasCasing,
-        'casingWidth': casingWidth,
-        'casingProjection': casingProjection,
-        'casingPlacement': casingPlacement.name,
-        'casingColorValue': casingColorValue,
-        'includeBottomCasing': includeBottomCasing,
-        'rootSubdivision': rootSubdivision.toJson(),
-      };
+    'id': id,
+    'name': name,
+    'kind': kind.name,
+    'defaultWidth': defaultWidth,
+    'defaultHeight': defaultHeight,
+    'defaultSillHeight': defaultSillHeight,
+    'frameDepth': frameDepth,
+    'frameFaceWidth': frameFaceWidth,
+    'centerInCore': centerInCore,
+    'glazingType': glazingType.name,
+    'glazingThickness': glazingThickness,
+    'glassColorValue': glassColorValue,
+    'hasCasing': hasCasing,
+    'casingWidth': casingWidth,
+    'casingProjection': casingProjection,
+    'casingPlacement': casingPlacement.name,
+    'casingColorValue': casingColorValue,
+    'includeBottomCasing': includeBottomCasing,
+    'rootSubdivision': rootSubdivision.toJson(),
+    if (transom != null) 'transom': transom!.toJson(),
+  };
 
-  factory ArchitectFenestrationStyle.fromJson(Map<String, dynamic> json) =>
-      ArchitectFenestrationStyle(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        kind: FenestrationKind.values.firstWhere(
-          (k) => k.name == json['kind'],
-          orElse: () => FenestrationKind.window,
-        ),
-        defaultWidth: (json['defaultWidth'] as num?)?.toDouble() ?? 1.40,
-        defaultHeight: (json['defaultHeight'] as num?)?.toDouble() ?? 1.40,
-        defaultSillHeight:
-            (json['defaultSillHeight'] as num?)?.toDouble() ?? 0.85,
-        frameDepth: (json['frameDepth'] as num?)?.toDouble() ?? 0.07,
-        frameFaceWidth: (json['frameFaceWidth'] as num?)?.toDouble() ?? 0.07,
-        centerInCore: json['centerInCore'] as bool? ?? true,
-        glazingType: GlazingType.values.firstWhere(
-          (g) => g.name == json['glazingType'],
-          orElse: () => GlazingType.double,
-        ),
-        glazingThickness:
-            (json['glazingThickness'] as num?)?.toDouble() ?? 0.024,
-        glassColorValue:
-            (json['glassColorValue'] as num?)?.toInt() ?? 0x884FC3F7,
-        hasCasing: json['hasCasing'] as bool? ?? false,
-        casingWidth: (json['casingWidth'] as num?)?.toDouble() ?? 0.10,
-        casingProjection:
-            (json['casingProjection'] as num?)?.toDouble() ?? 0.03,
-        casingPlacement: CasingPlacement.values.firstWhere(
-          (c) => c.name == json['casingPlacement'],
-          orElse: () => CasingPlacement.exterior,
-        ),
-        casingColorValue:
-            (json['casingColorValue'] as num?)?.toInt() ?? 0xFFECEFF1,
-        includeBottomCasing: json['includeBottomCasing'] as bool? ?? false,
-        rootSubdivision: FenestrationSubdivision.fromJson(
-          json['rootSubdivision'] as Map<String, dynamic>,
-        ),
-      );
-
-  // Helper for 2D vertical divider plan projection
-  static List<({double left, double right, bool hasDividerAfter, FenestrationPane? pane})>
-      _collectVerticalSlices(FenestrationSubdivision node, double totalWidth) {
-    final List<({double left, double right, bool hasDividerAfter, FenestrationPane? pane})> result = [];
-
-    void recurse(FenestrationSubdivision curr, double curLeft, double curW) {
-      if (!curr.isSplit || !curr.isVertical) {
-        result.add((
-          left: curLeft,
-          right: curLeft + curW,
-          hasDividerAfter: false,
-          pane: curr.pane,
-        ));
-        return;
-      }
-
-      double x = curLeft;
-      for (int i = 0; i < curr.children.length; i++) {
-        final w = curW * curr.ratios[i];
-        if (!curr.children[i].isSplit || !curr.children[i].isVertical) {
-          result.add((
-            left: x,
-            right: x + w,
-            hasDividerAfter: i < curr.children.length - 1,
-            pane: curr.children[i].pane,
-          ));
-        } else {
-          recurse(curr.children[i], x, w);
-        }
-        x += w;
-      }
-    }
-
-    recurse(node, 0.0, totalWidth);
-    return result;
-  }
+  factory ArchitectFenestrationStyle.fromJson(
+    Map<String, dynamic> json,
+  ) => ArchitectFenestrationStyle(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    kind: FenestrationKind.values.firstWhere(
+      (k) => k.name == json['kind'],
+      orElse: () => FenestrationKind.window,
+    ),
+    defaultWidth: (json['defaultWidth'] as num?)?.toDouble() ?? 1.40,
+    defaultHeight: (json['defaultHeight'] as num?)?.toDouble() ?? 1.40,
+    defaultSillHeight: (json['defaultSillHeight'] as num?)?.toDouble() ?? 0.85,
+    frameDepth: (json['frameDepth'] as num?)?.toDouble() ?? 0.07,
+    frameFaceWidth: (json['frameFaceWidth'] as num?)?.toDouble() ?? 0.07,
+    centerInCore: json['centerInCore'] as bool? ?? true,
+    glazingType: GlazingType.values.firstWhere(
+      (g) => g.name == json['glazingType'],
+      orElse: () => GlazingType.double,
+    ),
+    glazingThickness: (json['glazingThickness'] as num?)?.toDouble() ?? 0.024,
+    glassColorValue: (json['glassColorValue'] as num?)?.toInt() ?? 0x884FC3F7,
+    hasCasing: json['hasCasing'] as bool? ?? false,
+    casingWidth: (json['casingWidth'] as num?)?.toDouble() ?? 0.10,
+    casingProjection: (json['casingProjection'] as num?)?.toDouble() ?? 0.03,
+    casingPlacement: CasingPlacement.values.firstWhere(
+      (c) => c.name == json['casingPlacement'],
+      orElse: () => CasingPlacement.exterior,
+    ),
+    casingColorValue: (json['casingColorValue'] as num?)?.toInt() ?? 0xFFECEFF1,
+    includeBottomCasing: json['includeBottomCasing'] as bool? ?? false,
+    rootSubdivision: FenestrationSubdivision.fromJson(
+      json['rootSubdivision'] as Map<String, dynamic>,
+    ),
+    transom: json['transom'] is Map<String, dynamic>
+        ? FenestrationTransom.fromJson(json['transom'] as Map<String, dynamic>)
+        : null,
+  );
 }

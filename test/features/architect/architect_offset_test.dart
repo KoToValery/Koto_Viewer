@@ -138,7 +138,7 @@ void main() {
       find.byKey(const ValueKey('architect-offset-direction')),
     );
     expect(arrow.painter, isNotNull);
-    final cancel = find.byKey(const ValueKey('architect-offset-cancel'));
+    final cancel = find.byKey(const ValueKey('architect-command-cancel'));
     expect(cancel.hitTestable(), findsOneWidget);
     await tester.tap(cancel);
     await tester.pumpAndSettle();
@@ -643,7 +643,7 @@ void main() {
         workspace.overlay(tester).project.activeStorey.cadPrimitives,
         hasLength(4),
       );
-      await tester.tap(find.byKey(const ValueKey('architect-offset-cancel')));
+      await tester.tap(find.byKey(const ValueKey('architect-command-cancel')));
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.cadPrimitives, hasLength(2));
       await mouse.removePointer();
@@ -655,6 +655,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tapAt(workspace.screen(tester, const Offset(2, -2)));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(model.project.activeStorey.cadPrimitives, hasLength(4));
       expect(model.project.activeStorey.groups, hasLength(2));
       model.undo();
@@ -739,6 +740,7 @@ void main() {
         await mouse.removePointer();
         await tester.tapAt(workspace.screen(tester, const Offset(2, -1)));
         await tester.pumpAndSettle();
+        await editing.acceptGeometryCommand(tester);
         expect(model.project.activeStorey.cadPrimitives, hasLength(2));
         expect(
           model.project.activeStorey.cadPrimitives

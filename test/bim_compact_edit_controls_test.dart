@@ -1,3 +1,4 @@
+import 'support/command_icon_finders.dart';
 import 'package:kotoview/src/features/bim_editing/widgets/bim_transform_renderer.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -375,7 +376,7 @@ void main() {
         expect((copy['end'] as Map)['dy'], closeTo(7, 1e-6));
         expect(source['start'], {'dx': 4.0, 'dy': 5.0});
       }
-      await tester.tap(find.byIcon(Icons.undo_rounded).first);
+      await tester.tap(findCommandIcon(Icons.undo_rounded).first);
       await tester.pumpAndSettle();
       expect(plan().currentStorey.toJson(), initial.toJson());
       if (kind == 'beam') {
@@ -392,7 +393,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(changed.length, beforeMove + 1);
         expect(changed.last.activeStorey.beams.single.end, const Offset(7, 6));
-        await tester.tap(find.byIcon(Icons.undo_rounded).first);
+        await tester.tap(findCommandIcon(Icons.undo_rounded).first);
         await tester.pumpAndSettle();
         expect(plan().currentStorey.toJson(), initial.toJson());
       }

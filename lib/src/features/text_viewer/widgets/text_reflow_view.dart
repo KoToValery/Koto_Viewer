@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -66,8 +68,10 @@ class TextReflowViewState extends State<TextReflowView> {
   @override
   void initState() {
     super.initState();
-    _chapters = TextReflowParser.parse(widget.fullText, defaultTitle: widget.fileName);
-    _currentChapterIndex = (widget.initialChapter ?? 0).clamp(0, math.max(0, _chapters.length - 1));
+    _chapters = TextReflowParser.parse(widget.fullText, defaultTitle: widget.fileName,
+    );
+    _currentChapterIndex = (widget.initialChapter ?? 0).clamp(0, math.max(0, _chapters.length - 1),
+    );
     _currentMiniPageIndex = widget.initialMiniPage ?? 0;
     _pageController = PageController(initialPage: _currentMiniPageIndex);
   }
@@ -76,7 +80,8 @@ class TextReflowViewState extends State<TextReflowView> {
   void didUpdateWidget(covariant TextReflowView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialChapter != null && widget.initialChapter != oldWidget.initialChapter) {
-      _goToChapter(widget.initialChapter!, targetMiniPage: widget.initialMiniPage);
+      _goToChapter(widget.initialChapter!, targetMiniPage: widget.initialMiniPage,
+      );
     } else if (widget.initialMiniPage != null && widget.initialMiniPage != oldWidget.initialMiniPage) {
       if (_pageController.hasClients && widget.initialMiniPage! < _currentPages.length) {
         _pageController.jumpToPage(widget.initialMiniPage!);
@@ -92,7 +97,8 @@ class TextReflowViewState extends State<TextReflowView> {
     super.dispose();
   }
 
-  void _paginateChapter(Size viewportSize, {int? preferredAnchorBlock, int? preferredAnchorChar}) {
+  void _paginateChapter(Size viewportSize, {int? preferredAnchorBlock, int? preferredAnchorChar,
+  }) {
     if (_chapters.isEmpty) return;
 
     int? currentBlock = preferredAnchorBlock;
@@ -118,7 +124,8 @@ class TextReflowViewState extends State<TextReflowView> {
     if (currentBlock != null) {
       targetIndex = result.anchorPageIndex;
     } else {
-      targetIndex = _currentMiniPageIndex.clamp(0, math.max(0, result.pages.length - 1));
+      targetIndex = _currentMiniPageIndex.clamp(0, math.max(0, result.pages.length - 1),
+      );
     }
 
     _currentPages = result.pages;
@@ -132,7 +139,8 @@ class TextReflowViewState extends State<TextReflowView> {
     }
   }
 
-  void _goToChapter(int chapterIndex, {int? targetMiniPage, int? targetBlock, int? targetChar}) {
+  void _goToChapter(int chapterIndex, {int? targetMiniPage, int? targetBlock, int? targetChar,
+  }) {
     if (chapterIndex < 0 || chapterIndex >= _chapters.length) return;
 
     setState(() {
@@ -188,7 +196,8 @@ class TextReflowViewState extends State<TextReflowView> {
           settings: widget.settings,
           textColor: widget.settings.theme.textColor,
         );
-        _goToChapter(_currentChapterIndex - 1, targetMiniPage: math.max(0, prevPages.length - 1));
+        _goToChapter(_currentChapterIndex - 1, targetMiniPage: math.max(0, prevPages.length - 1),
+        );
       } else {
         _goToChapter(_currentChapterIndex - 1);
       }
@@ -257,7 +266,8 @@ class TextReflowViewState extends State<TextReflowView> {
                       const SizedBox(height: 16),
                       Row(
                         children: [
-                          Icon(Icons.auto_stories, color: theme.accentColor, size: 20),
+                          Icon(Icons.auto_stories, color: theme.accentColor, size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -277,14 +287,18 @@ class TextReflowViewState extends State<TextReflowView> {
                               Navigator.pop(context);
                               widget.onExitReflow();
                             },
-                            icon: Icon(Icons.code, size: 16, color: theme.accentColor),
+                            icon: AppIcon(
+                              AppIconId.code, size: 16, color: theme.accentColor,
+                            ),
                             label: Text(
-                              'Raw View',
-                              style: TextStyle(color: theme.accentColor, fontWeight: FontWeight.bold, fontSize: 13),
+                              context.l10n.commandUiRawView,
+                              style: TextStyle(color: theme.accentColor, fontWeight: FontWeight.bold, fontSize: 13,
+                              ),
                             ),
                             style: TextButton.styleFrom(
                               visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4,
+                              ),
                             ),
                           ),
                         ],
@@ -294,7 +308,9 @@ class TextReflowViewState extends State<TextReflowView> {
                       // Font Size
                       Row(
                         children: [
-                          Text('Text Size', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
+                          Text('Text Size', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor,
+                            ),
+                          ),
                           const Spacer(),
                           IconButton.filledTonal(
                             onPressed: currentSettings.fontSize > 12.0
@@ -307,7 +323,7 @@ class TextReflowViewState extends State<TextReflowView> {
                                     setSheetState(() {});
                                   }
                                 : null,
-                            icon: const Icon(Icons.remove, size: 18),
+                            icon: const AppIcon(AppIconId.remove, size: 18),
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -331,7 +347,7 @@ class TextReflowViewState extends State<TextReflowView> {
                                     setSheetState(() {});
                                   }
                                 : null,
-                            icon: const Icon(Icons.add, size: 18),
+                            icon: const AppIcon(AppIconId.add, size: 18),
                           ),
                         ],
                       ),
@@ -340,7 +356,9 @@ class TextReflowViewState extends State<TextReflowView> {
                       // Theme Palette
                       Row(
                         children: [
-                          Text('Theme', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
+                          Text('Theme', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor,
+                            ),
+                          ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: SingleChildScrollView(
@@ -357,12 +375,15 @@ class TextReflowViewState extends State<TextReflowView> {
                                         setSheetState(() {});
                                       },
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: th.backgroundColor,
-                                          borderRadius: BorderRadius.circular(20),
+                                          borderRadius: BorderRadius.circular(20,
+                                          ),
                                           border: Border.all(
-                                            color: isSelected ? th.accentColor : Colors.grey.withValues(alpha: 0.4),
+                                            color: isSelected ? th.accentColor : Colors.grey.withValues(alpha: 0.4,
+                                                  ),
                                             width: isSelected ? 2.5 : 1,
                                           ),
                                           boxShadow: [
@@ -387,7 +408,7 @@ class TextReflowViewState extends State<TextReflowView> {
                                             ),
                                             const SizedBox(width: 6),
                                             Text(
-                                              th.label,
+                                              th.localizedLabel(context.l10n),
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -410,7 +431,9 @@ class TextReflowViewState extends State<TextReflowView> {
                       // Font Family
                       Row(
                         children: [
-                          Text('Font', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
+                          Text('Font', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor,
+                            ),
+                          ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: SingleChildScrollView(
@@ -421,7 +444,8 @@ class TextReflowViewState extends State<TextReflowView> {
                                   return Padding(
                                     padding: const EdgeInsets.only(right: 8),
                                     child: ChoiceChip(
-                                      label: Text(f.label),
+                                      label: Text(f.localizedLabel(context.l10n),
+                                      ),
                                       selected: isSelected,
                                       selectedColor: theme.accentColor.withValues(alpha: 0.18),
                                       labelStyle: TextStyle(
@@ -433,7 +457,8 @@ class TextReflowViewState extends State<TextReflowView> {
                                         if (val) {
                                           final updated = currentSettings.copyWith(font: f);
                                           widget.onSettingsChanged(updated);
-                                          if (_lastViewportSize != null) _paginateChapter(_lastViewportSize!);
+                                          if (_lastViewportSize != null) _paginateChapter(_lastViewportSize!,
+                                            );
                                           setSheetState(() {});
                                         }
                                       },
@@ -450,7 +475,9 @@ class TextReflowViewState extends State<TextReflowView> {
                       // Page Flow Mode: Paginated vs Continuous
                       Row(
                         children: [
-                          Text('Page Flow', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
+                          Text('Page Flow', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor,
+                            ),
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: SegmentedButton<TextReflowMode>(
@@ -458,21 +485,26 @@ class TextReflowViewState extends State<TextReflowView> {
                                 visualDensity: VisualDensity.compact,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              segments: const [
+                              segments: [
                                 ButtonSegment(
                                   value: TextReflowMode.paginated,
-                                  label: Text('Pages', style: TextStyle(fontSize: 11.5)),
-                                  icon: Icon(Icons.auto_stories, size: 15),
+                                  label: Text(
+                                    context.l10n.commandUiPages, style: TextStyle(fontSize: 11.5),
+                                  ),
+                                  icon: AppIcon(AppIconId.book, size: 15),
                                 ),
                                 ButtonSegment(
                                   value: TextReflowMode.continuous,
-                                  label: Text('Continuous', style: TextStyle(fontSize: 11.5)),
-                                  icon: Icon(Icons.view_day_outlined, size: 15),
+                                  label: Text(
+                                    context.l10n.architectLineSolid, style: TextStyle(fontSize: 11.5),
+                                  ),
+                                  icon: AppIcon(AppIconId.layoutRows, size: 15),
                                 ),
                               ],
                               selected: {currentSettings.mode},
                               onSelectionChanged: (set) {
-                                final updated = currentSettings.copyWith(mode: set.first);
+                                final updated = currentSettings.copyWith(mode: set.first,
+                                );
                                 widget.onSettingsChanged(updated);
                                 if (updated.mode == TextReflowMode.paginated && _lastViewportSize != null) {
                                   _paginateChapter(_lastViewportSize!);
@@ -488,7 +520,9 @@ class TextReflowViewState extends State<TextReflowView> {
                       // Line Spacing
                       Row(
                         children: [
-                          Text('Spacing', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
+                          Text('Spacing', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor,
+                            ),
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: SegmentedButton<double>(
@@ -496,14 +530,24 @@ class TextReflowViewState extends State<TextReflowView> {
                                 visualDensity: VisualDensity.compact,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              segments: const [
-                                ButtonSegment(value: 1.4, label: Text('Tight', style: TextStyle(fontSize: 11.5))),
-                                ButtonSegment(value: 1.6, label: Text('Normal', style: TextStyle(fontSize: 11.5))),
-                                ButtonSegment(value: 1.9, label: Text('Relaxed', style: TextStyle(fontSize: 11.5))),
+                              segments: [
+                                ButtonSegment(value: 1.4, label: Text(
+                                    context.l10n.commandUiTight, style: TextStyle(fontSize: 11.5),
+                                  ),
+                                ),
+                                ButtonSegment(value: 1.6, label: Text(
+                                    context.l10n.verticalSlabStatusOk, style: TextStyle(fontSize: 11.5),
+                                  ),
+                                ),
+                                ButtonSegment(value: 1.9, label: Text(
+                                    context.l10n.commandUiRelaxed, style: TextStyle(fontSize: 11.5),
+                                  ),
+                                ),
                               ],
                               selected: {currentSettings.lineHeight},
                               onSelectionChanged: (set) {
-                                final updated = currentSettings.copyWith(lineHeight: set.first);
+                                final updated = currentSettings.copyWith(lineHeight: set.first,
+                                );
                                 widget.onSettingsChanged(updated);
                                 if (_lastViewportSize != null) _paginateChapter(_lastViewportSize!);
                                 setSheetState(() {});
@@ -557,7 +601,8 @@ class TextReflowViewState extends State<TextReflowView> {
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Icon(Icons.format_list_bulleted_rounded, color: theme.accentColor),
+                        Icon(Icons.format_list_bulleted_rounded, color: theme.accentColor,
+                        ),
                         const SizedBox(width: 10),
                         Text(
                           'Table of Contents (${_chapters.length})',
@@ -581,7 +626,8 @@ class TextReflowViewState extends State<TextReflowView> {
                         final isCurrent = index == _currentChapterIndex;
                         return ListTile(
                           selected: isCurrent,
-                          selectedTileColor: theme.accentColor.withValues(alpha: 0.12),
+                          selectedTileColor: theme.accentColor.withValues(alpha: 0.12,
+                          ),
                           leading: CircleAvatar(
                             radius: 14,
                             backgroundColor: isCurrent ? theme.accentColor : theme.textColor.withValues(alpha: 0.1),
@@ -643,7 +689,8 @@ class TextReflowViewState extends State<TextReflowView> {
       color: theme.backgroundColor,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+          final viewportSize = Size(constraints.maxWidth, constraints.maxHeight,
+          );
           if (_lastViewportSize != viewportSize) {
             _lastViewportSize = viewportSize;
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -664,8 +711,7 @@ class TextReflowViewState extends State<TextReflowView> {
   Widget _buildPaginatedView(TextReflowTheme theme) {
     if (_currentPages.isEmpty) {
       return Center(
-        child: CircularProgressIndicator(color: theme.accentColor),
-      );
+        child: CircularProgressIndicator(color: theme.accentColor));
     }
 
     final totalChapters = _chapters.length;
@@ -739,7 +785,9 @@ class TextReflowViewState extends State<TextReflowView> {
             },
             child: PageView.builder(
               controller: _pageController,
-              physics: const PageScrollPhysics(parent: BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics())),
+              physics: const PageScrollPhysics(parent: BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics(),
+                ),
+              ),
               itemCount: _currentPages.length,
               onPageChanged: (index) {
                 setState(() {
@@ -778,7 +826,8 @@ class TextReflowViewState extends State<TextReflowView> {
                             // Show chapter title on page 0
                             if (index == 0 && page.chapterTitle.isNotEmpty)
                               Padding(
-                                padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
+                                padding: const EdgeInsets.only(top: 8.0, bottom: 16.0,
+                                ),
                                 child: Text(
                                   page.chapterTitle,
                                   style: widget.settings.font.getTextStyle(
@@ -908,16 +957,16 @@ class TextReflowViewState extends State<TextReflowView> {
               if (_currentChapterIndex > 0)
                 OutlinedButton.icon(
                   onPressed: () => _goToChapter(_currentChapterIndex - 1),
-                  icon: const Icon(Icons.arrow_back, size: 16),
-                  label: const Text('Prev Chapter'),
+                  icon: const AppIcon(AppIconId.back, size: 16),
+                  label: Text(context.l10n.commandUiPrevChapter),
                 )
               else
                 const SizedBox.shrink(),
               if (_currentChapterIndex < _chapters.length - 1)
                 FilledButton.icon(
                   onPressed: () => _goToChapter(_currentChapterIndex + 1),
-                  icon: const Icon(Icons.arrow_forward, size: 16),
-                  label: const Text('Next Chapter'),
+                  icon: const AppIcon(AppIconId.forward, size: 16),
+                  label: Text(context.l10n.commandUiNextChapter),
                 )
               else
                 Text(

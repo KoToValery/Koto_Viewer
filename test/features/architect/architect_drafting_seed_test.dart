@@ -55,6 +55,7 @@ void main() {
             thickness: .3,
           ),
         ),
+        applyDraftingDefaults: true,
       );
       final placed = model.project.activeStorey.walls.last;
       expect(placed.startPoint, const Offset(0, 4));

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -155,7 +156,8 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
         }
       } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
           event.logicalKey == LogicalKeyboardKey.pageUp) {
-        final prevIdx = widget.projectBundle!.getPreviousVisibleIndex(currentIndex);
+        final prevIdx = widget.projectBundle!.getPreviousVisibleIndex(currentIndex,
+        );
         if (prevIdx != null && widget.onSwitchProjectItem != null) {
           widget.onSwitchProjectItem!(prevIdx);
         }
@@ -276,7 +278,8 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
         }
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'ImageViewer._loadImage.fs');
+      AppErrorHandler.recordError(e, stack, context: 'ImageViewer._loadImage.fs',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         final l10n = AppLocalizations.of(context);
@@ -286,7 +289,8 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'ImageViewer._loadImage.format');
+      AppErrorHandler.recordError(e, stack, context: 'ImageViewer._loadImage.format',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
@@ -298,7 +302,8 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
       AppErrorHandler.recordError(e, stack, context: 'ImageViewer._loadImage');
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
-        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '',
+        );
         setState(() {
           _error = cleanMsg;
           _isLoading = false;
@@ -321,7 +326,8 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
           width: frame.width,
           height: frame.height,
           pngBytes: Uint8List.fromList(img.encodePng(frame)),
-        ));
+        ),
+        );
       }
     }
     // Sort by size descending so highest resolution comes first
@@ -388,14 +394,16 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
     final frame = _icoFrames![_selectedFrameIndex];
     try {
       final tempDir = await getTemporaryDirectory();
-      final nameWithoutExt = _fileName.replaceAll(RegExp(r'\.ico$', caseSensitive: false), '');
+      final nameWithoutExt = _fileName.replaceAll(RegExp(r'\.ico$', caseSensitive: false), '',
+      );
       final framePath = '${tempDir.path}/${nameWithoutExt}_${frame.width}x${frame.height}.png';
       final file = File(framePath);
       await file.writeAsBytes(frame.pngBytes);
       await Share.shareXFiles(
-        [XFile(framePath, mimeType: 'image/png', name: '${nameWithoutExt}_${frame.width}x${frame.height}.png')],
-        text: '$_fileName (${frame.width}x${frame.height})',
-      );
+        [XFile(framePath, mimeType: 'image/png', name: '${nameWithoutExt}_${frame.width}x${frame.height}.png',
+        ),
+      ],
+        text: '$_fileName (${frame.width}x${frame.height})');
     } on Exception catch (_) {
       await Share.shareXFiles([XFile(widget.filePath)]);
     }
@@ -428,11 +436,14 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
         name: _fileName,
       );
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'ImageViewer._printOrExportPdf');
+      AppErrorHandler.recordError(e, stack, context: 'ImageViewer._printOrExportPdf',
+      );
       if (mounted) {
         final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n != null ? l10n.printError(e.toString()) : 'Print error: $e')),
+          SnackBar(content: Text(l10n != null ? l10n.printError(e.toString()) : 'Print error: $e',
+            ),
+          ),
         );
       }
     }
@@ -496,7 +507,8 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                         children: [
                           const Text(
                             'Image Properties',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                            ),
                           ),
                           Text(
                             _fileName,
@@ -512,13 +524,18 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                   ],
                 ),
                 const Divider(height: 24),
-                _buildInfoRow('Format:', _formatLabel, Icons.category_rounded, isDark),
-                _buildInfoRow('Resolution:', resolutionStr, Icons.aspect_ratio_rounded, isDark),
+                _buildInfoRow('Format:', _formatLabel, Icons.category_rounded, isDark,
+                ),
+                _buildInfoRow('Resolution:', resolutionStr, Icons.aspect_ratio_rounded, isDark,
+                ),
                 if (mpStr.isNotEmpty)
-                  _buildInfoRow('Megapixels:', mpStr, Icons.camera_alt_outlined, isDark),
+                  _buildInfoRow('Megapixels:', mpStr, Icons.camera_alt_outlined, isDark,
+                  ),
                 if (aspectStr.isNotEmpty)
-                  _buildInfoRow('Aspect Ratio:', aspectStr, Icons.crop_rounded, isDark),
-                _buildInfoRow('File Size:', _formattedFileSize, Icons.sd_storage_outlined, isDark),
+                  _buildInfoRow('Aspect Ratio:', aspectStr, Icons.crop_rounded, isDark,
+                  ),
+                _buildInfoRow('File Size:', _formattedFileSize, Icons.sd_storage_outlined, isDark,
+                ),
                 if (_fileLastModified != null)
                   _buildInfoRow(
                     'Modified:',
@@ -526,7 +543,8 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                     Icons.access_time_rounded,
                     isDark,
                   ),
-                _buildInfoRow('Path:', widget.filePath, Icons.folder_outlined, isDark),
+                _buildInfoRow('Path:', widget.filePath, Icons.folder_outlined, isDark,
+                ),
                 const SizedBox(height: 12),
               ],
             ),
@@ -588,8 +606,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
     if (widget.projectBundle != null) {
       return Scaffold(
         backgroundColor: Colors.black,
-        body: _buildBody(),
-      );
+        body: _buildBody());
     }
 
     return Scaffold(
@@ -617,7 +634,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
           if (_isIco && _icoFrames != null && _icoFrames!.isNotEmpty) ...[
             // Background mode toggle (Checkerboard / Dark / Light)
             IconButton(
-              icon: Icon(
+              icon: AppIcon.fromMaterial(
                 _bgMode == 0
                     ? Icons.grid_on_rounded
                     : _bgMode == 1
@@ -626,10 +643,10 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                 size: 20,
               ),
               tooltip: _bgMode == 0
-                  ? 'Background: Checkerboard'
+                  ? context.l10n.commandUiBackgroundCheckerboard
                   : _bgMode == 1
-                      ? 'Background: Dark'
-                      : 'Background: Light',
+                      ? context.l10n.commandUiBackgroundDark
+                  : context.l10n.commandUiBackgroundLight,
               onPressed: () {
                 setState(() {
                   _bgMode = (_bgMode + 1) % 3;
@@ -639,11 +656,12 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
             // Pixelated / Sharp toggle
             if (!_showGrid)
               IconButton(
-                icon: Icon(
+                icon: AppIcon.fromMaterial(
                   _pixelated ? Icons.grain_rounded : Icons.blur_linear_rounded,
                   size: 20,
                 ),
-                tooltip: _pixelated ? 'Rendering: Crisp (Pixel-perfect)' : 'Rendering: Smooth',
+                tooltip: _pixelated ? context.l10n.commandUiRenderingCrispPixelPerfect
+                    : context.l10n.commandUiRenderingSmooth,
                 onPressed: () {
                   setState(() {
                     _pixelated = !_pixelated;
@@ -652,11 +670,12 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
               ),
             // View Mode: Single vs Grid
             IconButton(
-              icon: Icon(
+              icon: AppIcon.fromMaterial(
                 _showGrid ? Icons.image_rounded : Icons.grid_view_rounded,
                 size: 20,
               ),
-              tooltip: _showGrid ? 'Single Image View' : 'All Resolutions Grid',
+              tooltip: _showGrid ? context.l10n.commandUiSingleImageView
+                  : context.l10n.commandUiAllResolutionsGrid,
               onPressed: () {
                 setState(() {
                   _showGrid = !_showGrid;
@@ -666,14 +685,14 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
             ),
             // Properties
             IconButton(
-              icon: const Icon(Icons.info_outline_rounded, size: 20),
-              tooltip: 'Properties',
+              icon: const AppIcon(AppIconId.info, size: 20),
+              tooltip: context.l10n.commandIconProperties,
               onPressed: _showPropertiesSheet,
             ),
             // Share menu
             PopupMenuButton<String>(
-              icon: const Icon(Icons.share_rounded, size: 20),
-              tooltip: 'Share',
+              icon: const AppIcon(AppIconId.share, size: 20),
+              tooltip: context.l10n.commandIconShare,
               onSelected: (val) {
                 if (val == 'frame') {
                   _shareCurrentFrame();
@@ -688,29 +707,34 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                   value: 'frame',
                   child: Row(
                     children: [
-                      const Icon(Icons.photo_outlined, size: 18),
+                      const AppIcon(AppIconId.image, size: 18),
                       const SizedBox(width: 8),
-                      Text('Share size (${_icoFrames![_selectedFrameIndex].width}×${_icoFrames![_selectedFrameIndex].height} PNG)'),
+                      Text(
+                        context.l10n.commandUiShareSizeValueValuePng(
+                          (_icoFrames![_selectedFrameIndex].width).toString(),
+                          (_icoFrames![_selectedFrameIndex].height).toString(),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'file',
                   child: Row(
                     children: [
-                      Icon(Icons.file_copy_outlined, size: 18),
+                      AppIcon(AppIconId.duplicate, size: 18),
                       SizedBox(width: 8),
-                      Text('Share original .ico file'),
+                      Text(context.l10n.commandUiShareOriginalIcoFile),
                     ],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'print',
                   child: Row(
                     children: [
-                      Icon(Icons.print_outlined, size: 18),
+                      AppIcon(AppIconId.print, size: 18),
                       SizedBox(width: 8),
-                      Text('Print / Save as PDF'),
+                      Text(context.l10n.commandUiPrintSaveAsPdf),
                     ],
                   ),
                 ),
@@ -720,7 +744,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
             // Standard Raster & PSD Actions
             // Background toggle
             IconButton(
-              icon: Icon(
+              icon: AppIcon.fromMaterial(
                 _bgMode == 0
                     ? Icons.grid_on_rounded
                     : _bgMode == 1
@@ -729,10 +753,10 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                 size: 20,
               ),
               tooltip: _bgMode == 0
-                  ? 'Background: Checkerboard'
+                  ? context.l10n.commandUiBackgroundCheckerboard
                   : _bgMode == 1
-                      ? 'Background: Dark'
-                      : 'Background: Light',
+                      ? context.l10n.commandUiBackgroundDark
+                  : context.l10n.commandUiBackgroundLight,
               onPressed: () {
                 setState(() {
                   _bgMode = (_bgMode + 1) % 3;
@@ -741,11 +765,12 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
             ),
             // Pixelated / Sharp toggle
             IconButton(
-              icon: Icon(
+              icon: AppIcon.fromMaterial(
                 _pixelated ? Icons.grain_rounded : Icons.blur_linear_rounded,
                 size: 20,
               ),
-              tooltip: _pixelated ? 'Rendering: Crisp (Pixel-perfect)' : 'Rendering: Smooth',
+              tooltip: _pixelated ? context.l10n.commandUiRenderingCrispPixelPerfect
+                  : context.l10n.commandUiRenderingSmooth,
               onPressed: () {
                 setState(() {
                   _pixelated = !_pixelated;
@@ -754,14 +779,14 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
             ),
             // Rotate 90°
             IconButton(
-              icon: const Icon(Icons.rotate_right_rounded, size: 21),
-              tooltip: 'Rotate 90°',
+              icon: const AppIcon(AppIconId.rotate, size: 21),
+              tooltip: context.l10n.rotateElement,
               onPressed: _rotate90,
             ),
             // Flip Menu
             PopupMenuButton<String>(
-              icon: const Icon(Icons.flip_rounded, size: 20),
-              tooltip: 'Flip Image',
+              icon: const AppIcon(AppIconId.flipHorizontal, size: 20),
+              tooltip: context.l10n.commandUiFlipImage,
               onSelected: (val) {
                 if (val == 'h') _toggleFlipH();
                 if (val == 'v') _toggleFlipV();
@@ -771,12 +796,14 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                   value: 'h',
                   child: Row(
                     children: [
-                      const Icon(Icons.swap_horiz_rounded, size: 18),
+                      const AppIcon(AppIconId.swapHorizontal, size: 18),
                       const SizedBox(width: 8),
-                      const Text('Flip Horizontal'),
+                      Text(context.l10n.commandUiFlipHorizontal),
                       if (_flipHorizontal) ...[
                         const Spacer(),
-                        const Icon(Icons.check, size: 16, color: Color(0xFF16A34A)),
+                        const AppIcon(
+                          AppIconId.confirm, size: 16, color: Color(0xFF16A34A),
+                        ),
                       ],
                     ],
                   ),
@@ -785,12 +812,14 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                   value: 'v',
                   child: Row(
                     children: [
-                      const Icon(Icons.swap_vert_rounded, size: 18),
+                      const AppIcon(AppIconId.swapVertical, size: 18),
                       const SizedBox(width: 8),
-                      const Text('Flip Vertical'),
+                      Text(context.l10n.commandUiFlipVertical),
                       if (_flipVertical) ...[
                         const Spacer(),
-                        const Icon(Icons.check, size: 16, color: Color(0xFF16A34A)),
+                        const AppIcon(
+                          AppIconId.confirm, size: 16, color: Color(0xFF16A34A),
+                        ),
                       ],
                     ],
                   ),
@@ -799,27 +828,27 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
             ),
             // Properties
             IconButton(
-              icon: const Icon(Icons.info_outline_rounded, size: 20),
-              tooltip: 'Properties',
+              icon: const AppIcon(AppIconId.info, size: 20),
+              tooltip: context.l10n.commandIconProperties,
               onPressed: _showPropertiesSheet,
             ),
             // Share & Export Menu
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert_rounded, size: 20),
-              tooltip: 'More Actions',
+              icon: const AppIcon(AppIconId.moreVertical, size: 20),
+              tooltip: context.l10n.commandUiMoreActions,
               onSelected: (val) {
                 if (val == 'share') _shareCurrentFile();
                 if (val == 'print') _printOrExportPdf();
                 if (val == 'reset') _resetTransform();
               },
-              itemBuilder: (ctx) => const [
+              itemBuilder: (ctx) => [
                 PopupMenuItem(
                   value: 'share',
                   child: Row(
                     children: [
-                      Icon(Icons.share_rounded, size: 18),
+                      AppIcon(AppIconId.share, size: 18),
                       SizedBox(width: 8),
-                      Text('Share File'),
+                      Text(context.l10n.commandUiShareFile),
                     ],
                   ),
                 ),
@@ -827,9 +856,9 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                   value: 'print',
                   child: Row(
                     children: [
-                      Icon(Icons.print_outlined, size: 18),
+                      AppIcon(AppIconId.print, size: 18),
                       SizedBox(width: 8),
-                      Text('Print / Save PDF'),
+                      Text(context.l10n.commandUiPrintSavePdf),
                     ],
                   ),
                 ),
@@ -837,9 +866,9 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                   value: 'reset',
                   child: Row(
                     children: [
-                      Icon(Icons.fit_screen_outlined, size: 18),
+                      AppIcon(AppIconId.fitView, size: 18),
                       SizedBox(width: 8),
-                      Text('Reset View & Transforms'),
+                      Text(context.l10n.commandUiResetViewTransforms),
                     ],
                   ),
                 ),
@@ -860,7 +889,8 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.broken_image_rounded, size: 54, color: Colors.redAccent),
+              const Icon(Icons.broken_image_rounded, size: 54, color: Colors.redAccent,
+              ),
               const SizedBox(height: 16),
               Text(
                 _error!,
@@ -870,8 +900,8 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
               const SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: _loadImage,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Try Again'),
+                icon: const AppIcon(AppIconId.refresh),
+                label: Text(context.l10n.commandUiTryAgain),
               ),
             ],
           ),
@@ -964,7 +994,11 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                         errorBuilder: (_, error, _) {
                           return Padding(
                             padding: const EdgeInsets.all(20),
-                            child: Text('Failed to render image: $error'),
+                            child: Text(
+                              context.l10n.commandUiFailedToRenderImageValue(
+                                (error).toString(),
+                              ),
+                            ),
                           );
                         },
                       ),
@@ -1003,8 +1037,10 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                       child: Row(
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
-                            tooltip: 'Back to Project',
+                            icon: const AppIcon(
+                              AppIconId.back, color: Colors.white, size: 28,
+                            ),
+                            tooltip: context.l10n.commandUiBackToProject,
                             onPressed: () => Navigator.of(context).pop(),
                           ),
                           const SizedBox(width: 8),
@@ -1036,8 +1072,10 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                           ),
                           // Rotate 90
                           IconButton(
-                            icon: const Icon(Icons.rotate_right_rounded, color: Colors.white70, size: 24),
-                            tooltip: 'Rotate 90°',
+                            icon: const AppIcon(
+                              AppIconId.rotate, color: Colors.white70, size: 24,
+                            ),
+                            tooltip: context.l10n.rotateElement,
                             onPressed: () {
                               _rotate90();
                               _scheduleControlsHiding();
@@ -1045,8 +1083,10 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                           ),
                           // Reset zoom / transform
                           IconButton(
-                            icon: const Icon(Icons.fit_screen_outlined, color: Colors.white70, size: 24),
-                            tooltip: 'Reset View',
+                            icon: const AppIcon(
+                              AppIconId.fitView, color: Colors.white70, size: 24,
+                            ),
+                            tooltip: context.l10n.architectResetView,
                             onPressed: () {
                               _resetTransform();
                               _scheduleControlsHiding();
@@ -1090,7 +1130,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                 right: 20,
                 child: _buildFloatingBtn(
                   icon: Icons.fit_screen_outlined,
-                  tooltip: 'Reset View',
+                  tooltip: context.l10n.architectResetView,
                   onTap: _resetTransform,
                 ),
               ),
@@ -1126,7 +1166,8 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
             width: 38,
             height: 38,
             alignment: Alignment.center,
-            child: Icon(icon, size: 20, color: isDark ? Colors.white : Colors.black87),
+            child: AppIcon.fromMaterial(icon, size: 20, color: isDark ? Colors.white : Colors.black87,
+            ),
           ),
         ),
       ),
@@ -1143,11 +1184,13 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6,
+          ),
           child: Row(
             children: [
               Icon(Icons.photo_size_select_actual_outlined,
-                  size: 16, color: theme.colorScheme.primary),
+                  size: 16, color: theme.colorScheme.primary,
+              ),
               const SizedBox(width: 8),
               Text(
                 '${currentFrame.width} × ${currentFrame.height} px',
@@ -1218,11 +1261,12 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                 bottom: 16,
                 child: FloatingActionButton.small(
                   heroTag: 'resetZoom',
-                  tooltip: 'Reset Zoom (1:1)',
-                  backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.85),
+                  tooltip: context.l10n.commandUiResetZoom11,
+                  backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.85,
+                  ),
                   foregroundColor: theme.colorScheme.onSurface,
                   onPressed: _resetZoom,
-                  child: const Icon(Icons.restart_alt_rounded, size: 20),
+                  child: const AppIcon(AppIconId.refresh, size: 20),
                 ),
               ),
             ],
@@ -1357,13 +1401,14 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                   color: isSelected
                       ? theme.colorScheme.primaryContainer
                       : theme.colorScheme.surfaceContainerHighest,
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (isSelected) ...[
-                        Icon(
-                          Icons.check_circle_rounded,
+                        AppIcon(
+                          AppIconId.checkCircle,
                           size: 14,
                           color: theme.colorScheme.primary,
                         ),
@@ -1423,7 +1468,8 @@ class _CheckerboardPainter extends CustomPainter {
     required this.color2,
   });
 
-  factory _CheckerboardPainter.adaptive(BuildContext context, {double checkSize = 14}) {
+  factory _CheckerboardPainter.adaptive(BuildContext context, {double checkSize = 14,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return _CheckerboardPainter(
       checkSize: checkSize,

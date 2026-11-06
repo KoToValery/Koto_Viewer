@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../properties/bim_numeric_rule.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -59,7 +60,7 @@ class _ElementOffsetDialogState extends State<_ElementOffsetDialog> {
           Expanded(child: Text(l.offsetAction)),
           Tooltip(
             message: l.bimOffsetHelp,
-            child: const Icon(Icons.help_outline, size: 20),
+            child: const AppIcon(AppIconId.help, size: 20),
           ),
         ],
       ),

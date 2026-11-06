@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -193,7 +194,7 @@ class _QuickState extends State<_QuickDialog> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(widget.label),
       content: SingleChildScrollView(
         child: Form(

@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_roof.dart';
@@ -46,7 +47,7 @@ class _LayerState extends State<RoofLayerEditorDialog> {
     final l = context.l10n;
     final conflict =
         between && otherZone >= 0 && widget.layers[otherZone].isBetweenRafters;
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.roofUiLayerEdit),
       content: SingleChildScrollView(
         child: Form(

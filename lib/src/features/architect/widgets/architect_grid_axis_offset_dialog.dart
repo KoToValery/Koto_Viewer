@@ -1,3 +1,4 @@
+import 'architect_dialog.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. IMPORTS & DEFINITIONS
 // 2. ARCHITECT GRID AXIS OFFSET DIALOG (SHOW FUNCTION & WIDGET)
@@ -36,7 +37,7 @@ Future<bool> promptDeletePreviousAxisDialog({
 
   final result = await showDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
+    builder: (ctx) => architectAlertDialog(
       backgroundColor: const Color(0xFF1E1E24),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),

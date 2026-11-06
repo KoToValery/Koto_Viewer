@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../../cad_3d/cad_3d_controller.dart';
@@ -112,7 +113,7 @@ class _Architect3dViewportState extends State<Architect3dViewport> {
             child: PopupMenuButton<Object>(
               key: const ValueKey('architect-3d-display'),
               tooltip: l10n.shadingModeTitle,
-              icon: Icon(_shading.icon),
+              icon: AppIcon(_shading.iconId),
               onSelected: (value) => setState(() {
                 if (value is Cad3DShadingMode) {
                   _shading = value;
@@ -125,14 +126,20 @@ class _Architect3dViewportState extends State<Architect3dViewport> {
                   CheckedPopupMenuItem(
                     value: mode,
                     checked: _shading == mode,
-                    child: Text(mode.localizedLabel(l10n)),
+                    child: AppMenuLabel(
+                      icon: mode.iconId,
+                      child: Text(mode.localizedLabel(l10n)),
+                    ),
                   ),
                 if (Cad3DRenderBackend.acceleratedAvailable) ...[
                   const PopupMenuDivider(),
                   CheckedPopupMenuItem(
                     value: 'nativeDepth',
                     checked: _nativeDepth,
-                    child: Text(l10n.cad3dNativeDepthOn),
+                    child: AppMenuLabel(
+                      icon: AppIconId.layers,
+                      child: Text(l10n.cad3dNativeDepthOn),
+                  ),
                   ),
                 ],
               ],

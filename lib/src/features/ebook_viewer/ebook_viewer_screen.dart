@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:archive/archive.dart';
@@ -97,9 +98,11 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
       final book = await EbookParser.parseFromFile(widget.filePath);
 
       // Load saved reading progress and bookmarks
-      final progress = await ReadingProgressService.getProgress(widget.filePath);
+      final progress = await ReadingProgressService.getProgress(widget.filePath,
+      );
       if (progress != null) {
-        _currentChapterIndex = (progress.chapter ?? 0).clamp(0, book.chapters.length - 1);
+        _currentChapterIndex = (progress.chapter ?? 0).clamp(0, book.chapters.length - 1,
+        );
         _pendingResumeMiniPage = progress.miniPage;
         _pendingResumeBlock = progress.blockIndex;
         _pendingResumeChar = progress.charOffset;
@@ -116,7 +119,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
         _checkBookmarkStatus();
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'EbookViewer._loadBook.fs');
+      AppErrorHandler.recordError(e, stack, context: 'EbookViewer._loadBook.fs',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         final l10n = AppLocalizations.of(context);
@@ -126,7 +130,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
         });
       }
     } on ArchiveException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'EbookViewer._loadBook.archive');
+      AppErrorHandler.recordError(e, stack, context: 'EbookViewer._loadBook.archive',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         final l10n = AppLocalizations.of(context);
@@ -136,7 +141,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'EbookViewer._loadBook.format');
+      AppErrorHandler.recordError(e, stack, context: 'EbookViewer._loadBook.format',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         final l10n = AppLocalizations.of(context);
@@ -158,7 +164,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
     }
   }
 
-  void _paginateChapter(Size viewportSize, {int? preferredAnchorBlock, int? preferredAnchorChar}) {
+  void _paginateChapter(Size viewportSize, {int? preferredAnchorBlock, int? preferredAnchorChar,
+  }) {
     if (_book == null || _book!.chapters.isEmpty) return;
 
     // Capture currently visible reading anchor before repaginating
@@ -208,7 +215,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
             SnackBar(
               duration: const Duration(seconds: 2),
               behavior: SnackBarBehavior.floating,
-              content: Text('Resumed at Chapter ${_currentChapterIndex + 1}, Page ${targetIndex + 1}'),
+              content: Text('Resumed at Chapter ${_currentChapterIndex + 1}, Page ${targetIndex + 1}',
+              ),
             ),
           );
         }
@@ -312,7 +320,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
         ),
       );
       if (existing.id.isNotEmpty) {
-        await ReadingProgressService.removeBookmark(widget.filePath, existing.id);
+        await ReadingProgressService.removeBookmark(widget.filePath, existing.id,
+        );
       }
       _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
       setState(() => _isCurrentBookmarked = false);
@@ -350,7 +359,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
           SnackBar(
             duration: const Duration(seconds: 1),
             behavior: SnackBarBehavior.floating,
-            content: Text('Bookmarked: Ch. ${_currentChapterIndex + 1}, Page ${_currentMiniPageIndex + 1}'),
+            content: Text('Bookmarked: Ch. ${_currentChapterIndex + 1}, Page ${_currentMiniPageIndex + 1}',
+            ),
           ),
         );
       }
@@ -391,7 +401,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           children: [
-                            Icon(Icons.bookmark, color: currentTheme.accentColor),
+                            Icon(Icons.bookmark, color: currentTheme.accentColor,
+                            ),
                             const SizedBox(width: 10),
                             Text(
                               'Bookmarks (${_bookmarks.length})',
@@ -411,7 +422,9 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                                 child: Text(
                                   'No bookmarks added yet.\nTap the bookmark icon to save your place.',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(color: currentTheme.textColor.withValues(alpha: 0.6)),
+                                  style: TextStyle(color: currentTheme.textColor.withValues(alpha: 0.6,
+                                    ),
+                                  ),
                                 ),
                               )
                             : ListView.separated(
@@ -423,7 +436,9 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                                   return ListTile(
                                     leading: CircleAvatar(
                                       backgroundColor: currentTheme.accentColor.withValues(alpha: 0.15),
-                                      child: Icon(Icons.bookmark, color: currentTheme.accentColor, size: 18),
+                                      child: AppIcon(
+                                        AppIconId.bookmark, color: currentTheme.accentColor, size: 18,
+                                      ),
                                     ),
                                     title: Text(
                                       b.label,
@@ -443,10 +458,14 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                                       ),
                                     ),
                                     trailing: IconButton(
-                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                      icon: const AppIcon(
+                                        AppIconId.delete, size: 18,
+                                      ),
                                       onPressed: () async {
-                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id);
-                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id,
+                                        );
+                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath,
+                                            );
                                         _checkBookmarkStatus();
                                         setSheetState(() {});
                                         setState(() {});
@@ -478,7 +497,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
     );
   }
 
-  void _goToChapter(int chapterIndex, {int? targetMiniPage, int? targetBlock, int? targetChar}) {
+  void _goToChapter(int chapterIndex, {int? targetMiniPage, int? targetBlock, int? targetChar,
+  }) {
     if (_book == null || chapterIndex < 0 || chapterIndex >= _book!.chapters.length) return;
 
     setState(() {
@@ -546,7 +566,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
           settings: _settings,
           textColor: _settings.themeMode.textColor,
         );
-        _goToChapter(_currentChapterIndex - 1, targetMiniPage: math.max(0, prevPages.length - 1));
+        _goToChapter(_currentChapterIndex - 1, targetMiniPage: math.max(0, prevPages.length - 1),
+        );
       } else {
         _goToChapter(_currentChapterIndex - 1);
       }
@@ -666,19 +687,21 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                       // Font Size
                       Row(
                         children: [
-                          Text('Size', style: TextStyle(fontSize: 14, color: textColor)),
+                          Text('Size', style: TextStyle(fontSize: 14, color: textColor),
+                          ),
                           const Spacer(),
                           IconButton.filledTonal(
                             onPressed: _settings.fontSize > 12.0
                                 ? () {
                                     setState(() {
-                                      _settings = _settings.copyWith(fontSize: _settings.fontSize - 1.5);
+                                      _settings = _settings.copyWith(fontSize: _settings.fontSize - 1.5,
+                                      );
                                     });
                                     if (_lastViewportSize != null) _paginateChapter(_lastViewportSize!);
                                     setSheetState(() {});
                                   }
                                 : null,
-                            icon: const Icon(Icons.remove, size: 18),
+                            icon: const AppIcon(AppIconId.remove, size: 18),
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -695,13 +718,14 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                             onPressed: _settings.fontSize < 36.0
                                 ? () {
                                     setState(() {
-                                      _settings = _settings.copyWith(fontSize: _settings.fontSize + 1.5);
+                                      _settings = _settings.copyWith(fontSize: _settings.fontSize + 1.5,
+                                      );
                                     });
                                     if (_lastViewportSize != null) _paginateChapter(_lastViewportSize!);
                                     setSheetState(() {});
                                   }
                                 : null,
-                            icon: const Icon(Icons.add, size: 18),
+                            icon: const AppIcon(AppIconId.add, size: 18),
                           ),
                         ],
                       ),
@@ -709,7 +733,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                       // Theme
                       Row(
                         children: [
-                          Text('Theme', style: TextStyle(fontSize: 14, color: textColor)),
+                          Text('Theme', style: TextStyle(fontSize: 14, color: textColor),
+                          ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: SingleChildScrollView(
@@ -720,7 +745,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                                   return Padding(
                                     padding: const EdgeInsets.only(right: 8),
                                     child: ChoiceChip(
-                                      label: Text(mode.label),
+                                      label: Text(mode.localizedLabel(context.l10n),
+                                      ),
                                       selected: isSelected,
                                       avatar: Container(
                                         width: 14,
@@ -729,7 +755,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                                           color: mode.backgroundColor,
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                            color: Colors.grey.withValues(alpha: 0.5),
+                                            color: Colors.grey.withValues(alpha: 0.5,
+                                            ),
                                             width: 1,
                                           ),
                                         ),
@@ -737,7 +764,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                                       onSelected: (selected) {
                                         if (selected) {
                                           setState(() {
-                                            _settings = _settings.copyWith(themeMode: mode);
+                                            _settings = _settings.copyWith(themeMode: mode,
+                                            );
                                           });
                                           setSheetState(() {});
                                         }
@@ -754,7 +782,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                       // Font family
                       Row(
                         children: [
-                          Text('Font', style: TextStyle(fontSize: 14, color: textColor)),
+                          Text('Font', style: TextStyle(fontSize: 14, color: textColor),
+                          ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: SingleChildScrollView(
@@ -765,14 +794,17 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                                   return Padding(
                                     padding: const EdgeInsets.only(right: 8),
                                     child: ChoiceChip(
-                                      label: Text(font.label),
+                                      label: Text(font.localizedLabel(context.l10n),
+                                      ),
                                       selected: isSelected,
                                       onSelected: (selected) {
                                         if (selected) {
                                           setState(() {
-                                            _settings = _settings.copyWith(fontFamily: font);
+                                            _settings = _settings.copyWith(fontFamily: font,
+                                            );
                                           });
-                                          if (_lastViewportSize != null) _paginateChapter(_lastViewportSize!);
+                                          if (_lastViewportSize != null) _paginateChapter(_lastViewportSize!,
+                                            );
                                           setSheetState(() {});
                                         }
                                       },
@@ -788,7 +820,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                       // Line Spacing
                       Row(
                         children: [
-                          Text('Spacing', style: TextStyle(fontSize: 14, color: textColor)),
+                          Text('Spacing', style: TextStyle(fontSize: 14, color: textColor),
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: SegmentedButton<double>(
@@ -796,15 +829,25 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                                 visualDensity: VisualDensity.compact,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              segments: const [
-                                ButtonSegment(value: 1.4, label: Text('Tight', style: TextStyle(fontSize: 11.5))),
-                                ButtonSegment(value: 1.65, label: Text('Normal', style: TextStyle(fontSize: 11.5))),
-                                ButtonSegment(value: 1.95, label: Text('Relaxed', style: TextStyle(fontSize: 11.5))),
+                              segments: [
+                                ButtonSegment(value: 1.4, label: Text(
+                                    context.l10n.commandUiTight, style: TextStyle(fontSize: 11.5),
+                                  ),
+                                ),
+                                ButtonSegment(value: 1.65, label: Text(
+                                    context.l10n.verticalSlabStatusOk, style: TextStyle(fontSize: 11.5),
+                                  ),
+                                ),
+                                ButtonSegment(value: 1.95, label: Text(
+                                    context.l10n.commandUiRelaxed, style: TextStyle(fontSize: 11.5),
+                                  ),
+                                ),
                               ],
                               selected: {_settings.lineHeight},
                               onSelectionChanged: (set) {
                                 setState(() {
-                                  _settings = _settings.copyWith(lineHeight: set.first);
+                                  _settings = _settings.copyWith(lineHeight: set.first,
+                                  );
                                 });
                                 if (_lastViewportSize != null) _paginateChapter(_lastViewportSize!);
                                 setSheetState(() {});
@@ -817,7 +860,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                       // Reading Mode
                       Row(
                         children: [
-                          Text('Page Flow', style: TextStyle(fontSize: 14, color: textColor)),
+                          Text('Page Flow', style: TextStyle(fontSize: 14, color: textColor),
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: SegmentedButton<EbookReadingMode>(
@@ -825,22 +869,27 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                                 visualDensity: VisualDensity.compact,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              segments: const [
+                              segments: [
                                 ButtonSegment(
                                   value: EbookReadingMode.paginated,
-                                  icon: Icon(Icons.auto_stories, size: 15),
-                                  label: Text('Pages', style: TextStyle(fontSize: 11.5)),
+                                  icon: AppIcon(AppIconId.book, size: 15),
+                                  label: Text(
+                                    context.l10n.commandUiPages, style: TextStyle(fontSize: 11.5),
+                                  ),
                                 ),
                                 ButtonSegment(
                                   value: EbookReadingMode.continuous,
-                                  icon: Icon(Icons.view_day_outlined, size: 15),
-                                  label: Text('Scroll', style: TextStyle(fontSize: 11.5)),
+                                  icon: AppIcon(AppIconId.layoutRows, size: 15),
+                                  label: Text(
+                                    context.l10n.commandUiScroll, style: TextStyle(fontSize: 11.5),
+                                  ),
                                 ),
                               ],
                               selected: {_settings.readingMode},
                               onSelectionChanged: (set) {
                                 setState(() {
-                                  _settings = _settings.copyWith(readingMode: set.first);
+                                  _settings = _settings.copyWith(readingMode: set.first,
+                                  );
                                 });
                                 setSheetState(() {});
                               },
@@ -892,7 +941,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Icon(Icons.format_list_bulleted_rounded, color: currentTheme.accentColor),
+                        Icon(Icons.format_list_bulleted_rounded, color: currentTheme.accentColor,
+                        ),
                         const SizedBox(width: 10),
                         Text(
                           'Table of Contents (${_book!.chapters.length})',
@@ -945,7 +995,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                             '~${(chapter.wordCount / 200).ceil()} min',
                             style: TextStyle(
                               fontSize: 11,
-                              color: currentTheme.textColor.withValues(alpha: 0.6),
+                              color: currentTheme.textColor.withValues(alpha: 0.6,
+                              ),
                             ),
                           ),
                           onTap: () {
@@ -1011,21 +1062,25 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(6),
                             boxShadow: const [
-                              BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
+                              BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2),
+                              ),
                             ],
                           ),
                           clipBehavior: Clip.antiAlias,
-                          child: Image.memory(meta.coverBytes!, fit: BoxFit.cover),
+                          child: Image.memory(meta.coverBytes!, fit: BoxFit.cover,
+                          ),
                         )
                       else
                         Container(
                           padding: const EdgeInsets.all(12),
                           margin: const EdgeInsets.only(right: 14),
                           decoration: BoxDecoration(
-                            color: currentTheme.accentColor.withValues(alpha: 0.15),
+                            color: currentTheme.accentColor.withValues(alpha: 0.15,
+                            ),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Icon(Icons.book_rounded, color: currentTheme.accentColor, size: 28),
+                          child: Icon(Icons.book_rounded, color: currentTheme.accentColor, size: 28,
+                          ),
                         ),
                       Expanded(
                         child: Column(
@@ -1046,7 +1101,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                               meta.authorString,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: currentTheme.textColor.withValues(alpha: 0.7),
+                                color: currentTheme.textColor.withValues(alpha: 0.7,
+                                ),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1056,7 +1112,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                               _fileName,
                               style: TextStyle(
                                 fontSize: 11.5,
-                                color: currentTheme.textColor.withValues(alpha: 0.5),
+                                color: currentTheme.textColor.withValues(alpha: 0.5,
+                                ),
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1066,15 +1123,20 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                     ],
                   ),
                   const Divider(height: 24),
-                  _buildInfoRow('Format:', _book!.format.name.toUpperCase(), currentTheme),
-                  _buildInfoRow('Total Chapters:', '${_book!.chapterCount} chapters', currentTheme),
-                  _buildInfoRow('Total Word Count:', '${_book!.totalWordCount} words', currentTheme),
-                  _buildInfoRow('Est. Reading Time:', '~${_book!.estimatedReadTimeMinutes} minutes', currentTheme),
+                  _buildInfoRow('Format:', _book!.format.name.toUpperCase(), currentTheme,
+                  ),
+                  _buildInfoRow('Total Chapters:', '${_book!.chapterCount} chapters', currentTheme,
+                  ),
+                  _buildInfoRow('Total Word Count:', '${_book!.totalWordCount} words', currentTheme,
+                  ),
+                  _buildInfoRow('Est. Reading Time:', '~${_book!.estimatedReadTimeMinutes} minutes', currentTheme,
+                  ),
                   _buildInfoRow('File Size:', formattedSize, currentTheme),
                   if (meta.publisher != null && meta.publisher!.isNotEmpty)
                     _buildInfoRow('Publisher:', meta.publisher!, currentTheme),
                   if (meta.publicationDate != null && meta.publicationDate!.isNotEmpty)
-                    _buildInfoRow('Published Date:', meta.publicationDate!, currentTheme),
+                    _buildInfoRow('Published Date:', meta.publicationDate!, currentTheme,
+                    ),
                   if (meta.language != null && meta.language!.isNotEmpty)
                     _buildInfoRow('Language:', meta.language!, currentTheme),
                   if (meta.genre != null && meta.genre!.isNotEmpty)
@@ -1115,12 +1177,15 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontSize: 13, color: theme.textColor.withValues(alpha: 0.7))),
+          Text(label, style: TextStyle(fontSize: 13, color: theme.textColor.withValues(alpha: 0.7),
+            ),
+          ),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
               value,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.textColor),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.textColor,
+              ),
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.end,
             ),
@@ -1134,12 +1199,14 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
     Share.shareXFiles([XFile(widget.filePath)], subject: _fileName);
   }
 
-  List<Widget> _buildEbookActions(BuildContext context, EbookThemeMode currentTheme, bool isPaginated) {
+  List<Widget> _buildEbookActions(BuildContext context, EbookThemeMode currentTheme, bool isPaginated,
+  ) {
     return [
       // Search Toggle
       IconButton(
-        icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
-        tooltip: 'Search Book',
+        icon: AppIcon.fromMaterial(_isSearchOpen ? Icons.close : Icons.search, size: 20,
+        ),
+        tooltip: context.l10n.commandUiSearchBook,
         onPressed: () {
           setState(() {
             _isSearchOpen = !_isSearchOpen;
@@ -1154,19 +1221,20 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
 
       // Table of Contents
       IconButton(
-        icon: const Icon(Icons.format_list_bulleted_rounded, size: 20),
-        tooltip: 'Table of Contents',
+        icon: const AppIcon(AppIconId.list, size: 20),
+        tooltip: context.l10n.tableOfContents,
         onPressed: _showTocSheet,
       ),
 
       // Bookmark Toggle
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
           size: 20,
           color: _isCurrentBookmarked ? currentTheme.accentColor : null,
         ),
-        tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
+        tooltip: _isCurrentBookmarked ? context.l10n.commandUiRemoveBookmark
+            : context.l10n.commandUiAddBookmark,
         onPressed: _toggleBookmark,
       ),
 
@@ -1175,21 +1243,21 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
         icon: Badge(
           isLabelVisible: _bookmarks.isNotEmpty,
           label: Text('${_bookmarks.length}'),
-          child: const Icon(Icons.bookmarks_outlined, size: 20),
+          child: const AppIcon(AppIconId.bookmarks, size: 20),
         ),
-        tooltip: 'Saved Bookmarks',
+        tooltip: context.l10n.commandUiSavedBookmarks,
         onPressed: _showBookmarksSheet,
       ),
 
       // Reading Flow Mode Toggle (Pages vs Scroll)
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           isPaginated ? Icons.auto_stories : Icons.view_day_outlined,
           size: 20,
         ),
         tooltip: isPaginated
-            ? 'Page Flip Mode (Tap for Continuous)'
-            : 'Continuous Scroll (Tap for Pages)',
+            ? context.l10n.commandUiPageFlipModeTapForContinuous
+            : context.l10n.commandUiContinuousScrollTapForPages,
         onPressed: () {
           setState(() {
             _settings = _settings.copyWith(
@@ -1206,29 +1274,29 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
 
       // Reading Settings
       IconButton(
-        icon: const Icon(Icons.tune, size: 20),
-        tooltip: 'Reading Settings',
+        icon: const AppIcon(AppIconId.properties, size: 20),
+        tooltip: context.l10n.commandUiReadingSettings,
         onPressed: _showTypographySheet,
       ),
 
       // Fullscreen
       IconButton(
-        icon: const Icon(Icons.fullscreen, size: 20),
+        icon: const AppIcon(AppIconId.fullscreen, size: 20),
         tooltip: context.l10n.fullscreen,
         onPressed: _toggleControls,
       ),
 
       // Book Info
       IconButton(
-        icon: const Icon(Icons.info_outline, size: 20),
-        tooltip: 'Book Info',
+        icon: const AppIcon(AppIconId.info, size: 20),
+        tooltip: context.l10n.commandUiBookInfo,
         onPressed: _showInfoSheet,
       ),
 
       // Share
       IconButton(
-        icon: const Icon(Icons.share_outlined, size: 20),
-        tooltip: 'Share',
+        icon: const AppIcon(AppIconId.share, size: 20),
+        tooltip: context.l10n.commandIconShare,
         onPressed: _shareFile,
       ),
     ];
@@ -1268,7 +1336,7 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                 foregroundColor: currentTheme.textColor,
                 elevation: 0.5,
                 leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
+                  icon: const AppIcon(AppIconId.back),
                   onPressed: () {
                     _saveReadingProgress();
                     if (_errorMessage != null) RecentFilesService.removeRecentFile(widget.filePath);
@@ -1280,10 +1348,13 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                     ? TextField(
                         controller: _searchController,
                         autofocus: true,
-                        style: TextStyle(color: currentTheme.textColor, fontSize: 15),
+                        style: TextStyle(color: currentTheme.textColor, fontSize: 15,
+                        ),
                         decoration: InputDecoration(
-                          hintText: 'Search in book text...',
-                          hintStyle: TextStyle(color: currentTheme.textColor.withValues(alpha: 0.5)),
+                          hintText: context.l10n.commandUiSearchInBookText,
+                          hintStyle: TextStyle(color: currentTheme.textColor.withValues(alpha: 0.5,
+                            ),
+                          ),
                           border: InputBorder.none,
                         ),
                         onChanged: _onSearchChanged,
@@ -1293,7 +1364,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                         children: [
                           Text(
                             _book?.title ?? _fileName,
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1302,7 +1374,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                               _book!.chapters[_currentChapterIndex].title,
                               style: TextStyle(
                                 fontSize: 11.5,
-                                color: currentTheme.textColor.withValues(alpha: 0.7),
+                                color: currentTheme.textColor.withValues(alpha: 0.7,
+                                ),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1314,7 +1387,7 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                     : [
                         if (_isSearchOpen)
                           IconButton(
-                            icon: const Icon(Icons.close, size: 20),
+                            icon: const AppIcon(AppIconId.close, size: 20),
                             onPressed: () {
                               setState(() {
                                 _isSearchOpen = false;
@@ -1337,14 +1410,16 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                             color: currentTheme.surfaceColor,
                             border: Border(
                               bottom: BorderSide(
-                                color: currentTheme.textColor.withValues(alpha: 0.1),
+                                color: currentTheme.textColor.withValues(alpha: 0.1,
+                                ),
                               ),
                             ),
                           ),
                           child: SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: Row(
-                              children: _buildEbookActions(context, currentTheme, isPaginated),
+                              children: _buildEbookActions(context, currentTheme, isPaginated,
+                              ),
                             ),
                           ),
                         ),
@@ -1358,11 +1433,13 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CircularProgressIndicator(color: currentTheme.accentColor),
+                      CircularProgressIndicator(color: currentTheme.accentColor,
+                      ),
                       const SizedBox(height: 16),
                       Text(
-                        'Opening E-Book...',
-                        style: TextStyle(color: currentTheme.textColor.withValues(alpha: 0.7)),
+                        context.l10n.commandUiOpeningEBook,
+                        style: TextStyle(color: currentTheme.textColor.withValues(alpha: 0.7),
+                        ),
                       ),
                     ],
                   ),
@@ -1374,7 +1451,9 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                            const AppIcon(
+                          AppIconId.error, size: 48, color: Colors.redAccent,
+                        ),
                             const SizedBox(height: 16),
                             Text(
                               _errorMessage!,
@@ -1384,8 +1463,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                             const SizedBox(height: 16),
                             ElevatedButton.icon(
                               onPressed: _loadBook,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Retry'),
+                              icon: const AppIcon(AppIconId.refresh),
+                              label: Text(context.l10n.retry),
                             ),
                           ],
                         ),
@@ -1394,13 +1473,14 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                   : _book == null || _book!.chapters.isEmpty
                       ? Center(
                           child: Text(
-                            'No content found',
+                    context.l10n.commandUiNoContentFound,
                             style: TextStyle(color: currentTheme.textColor),
                           ),
                         )
                       : LayoutBuilder(
                           builder: (context, constraints) {
-                            final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+                            final viewportSize = Size(constraints.maxWidth, constraints.maxHeight,
+                    );
                             if (_lastViewportSize != viewportSize) {
                               _lastViewportSize = viewportSize;
                               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1437,12 +1517,13 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                                                 : Colors.black54,
                                             shape: const CircleBorder(),
                                             child: IconButton(
-                                              icon: Icon(
+                                              icon: AppIcon.fromMaterial(
                                                 _isOrientationLocked
                                                     ? Icons.screen_lock_rotation
                                                     : Icons.screen_rotation,
                                                 color: _isOrientationLocked
-                                                    ? Theme.of(context).colorScheme.onPrimary
+                                                    ? Theme.of(context,
+                                              ).colorScheme.onPrimary
                                                     : Colors.white,
                                               ),
                                               tooltip: _isOrientationLocked
@@ -1456,7 +1537,9 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                                             color: Colors.black54,
                                             shape: const CircleBorder(),
                                             child: IconButton(
-                                              icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
+                                              icon: const AppIcon(
+                                        AppIconId.exitFullscreen, color: Colors.white,
+                                      ),
                                               tooltip: context.l10n.exitFullscreen,
                                               onPressed: _toggleControls,
                                             ),
@@ -1551,7 +1634,9 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
             },
             child: PageView.builder(
               controller: _pageController,
-              physics: const PageScrollPhysics(parent: BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics())),
+              physics: const PageScrollPhysics(parent: BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics(),
+                ),
+              ),
               itemCount: _currentMiniPages.length,
               onPageChanged: _onMiniPageChanged,
               itemBuilder: (context, index) {
@@ -1570,7 +1655,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                       // If first mini-page of chapter, show chapter title
                       if (index == 0)
                         Padding(
-                          padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
+                          padding: const EdgeInsets.only(top: 8.0, bottom: 16.0,
+                          ),
                           child: Text(
                             page.chapterTitle,
                             style: _settings.fontFamily.getTextStyle(
@@ -1686,19 +1772,20 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
               if (_currentChapterIndex > 0)
                 OutlinedButton.icon(
                   onPressed: () => _goToChapter(_currentChapterIndex - 1),
-                  icon: const Icon(Icons.arrow_back, size: 16),
-                  label: const Text('Prev Chapter'),
+                  icon: const AppIcon(AppIconId.back, size: 16),
+                  label: Text(context.l10n.commandUiPrevChapter),
                 )
               else
                 const SizedBox.shrink(),
               if (_currentChapterIndex < _book!.chapters.length - 1)
                 FilledButton.icon(
                   onPressed: () => _goToChapter(_currentChapterIndex + 1),
-                  icon: const Icon(Icons.arrow_forward, size: 16),
-                  label: const Text('Next Chapter'),
+                  icon: const AppIcon(AppIconId.forward, size: 16),
+                  label: Text(context.l10n.commandUiNextChapter),
                 )
               else
-                const Text('End of Book', style: TextStyle(fontStyle: FontStyle.italic)),
+                const Text('End of Book', style: TextStyle(fontStyle: FontStyle.italic),
+                ),
             ],
           ),
         ],
@@ -1768,9 +1855,11 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
           margin: const EdgeInsets.symmetric(vertical: 10.0),
           padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
           decoration: BoxDecoration(
-            border: Border(left: BorderSide(color: theme.accentColor, width: 3.5)),
+            border: Border(left: BorderSide(color: theme.accentColor, width: 3.5),
+            ),
             color: theme.textColor.withValues(alpha: 0.04),
-            borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)),
+            borderRadius: const BorderRadius.horizontal(right: Radius.circular(6),
+            ),
           ),
           child: Text(
             block.text,
@@ -1847,7 +1936,9 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                 final chIdx = _matchedChapterIndices[idx];
                 final ch = _book!.chapters[chIdx];
                 return ListTile(
-                  leading: Icon(Icons.search, color: theme.accentColor, size: 20),
+                  leading: AppIcon(
+                    AppIconId.search, color: theme.accentColor, size: 20,
+                  ),
                   title: Text(
                     ch.title,
                     style: TextStyle(
@@ -1857,7 +1948,7 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                     ),
                   ),
                   subtitle: Text(
-                    'Chapter ${chIdx + 1}',
+                    context.l10n.commandUiChapterValue((chIdx + 1).toString()),
                     style: TextStyle(
                       color: theme.textColor.withValues(alpha: 0.6),
                       fontSize: 12,
@@ -1891,14 +1982,15 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
               top: BorderSide(color: theme.textColor.withValues(alpha: 0.1)),
             ),
             boxShadow: const [
-              BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, -2)),
+              BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, -2),
+              ),
             ],
           ),
           child: Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.chevron_left),
-                tooltip: 'Prev',
+                icon: const AppIcon(AppIconId.chevronLeft),
+                tooltip: context.l10n.commandUiPrev,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: _goToPrevChapterOrPage,
@@ -1934,8 +2026,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.chevron_right),
-                tooltip: 'Next',
+                icon: const AppIcon(AppIconId.chevronRight),
+                tooltip: context.l10n.commandIconChevronRight,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: _goToNextChapterOrPage,

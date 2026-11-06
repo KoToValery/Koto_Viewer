@@ -1,3 +1,4 @@
+import '../services/architect_drain_surface.dart';
 // === SECTION: FLOOR DRAIN PAINTER HELPER ===
 // Table of Contents:
 // 1. PLAN DRAWING (floor tint, contour lines, fall arrows, thresholds)
@@ -15,7 +16,6 @@ import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 import '../services/architect_floor_drain_geometry.dart';
 import 'architect_canvas_palette.dart';
-import 'architect_vector_scene.dart';
 
 class ArchitectFloorDrainPainterHelper {
   ArchitectFloorDrainPainterHelper._();
@@ -76,7 +76,9 @@ class ArchitectFloorDrainPainterHelper {
     canvas.drawPath(
       floor,
       Paint()
-        ..color = selected ? const Color(0xFF00E5FF) : rule.withValues(alpha: .7)
+        ..color = selected
+            ? const Color(0xFF00E5FF)
+            : rule.withValues(alpha: .7)
         ..style = PaintingStyle.stroke
         ..strokeWidth = (selected ? 2.2 : 0.5) / zoomScale,
     );
@@ -88,8 +90,9 @@ class ArchitectFloorDrainPainterHelper {
       ..color = rule.withValues(alpha: .75)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.45 / zoomScale;
-    for (final contour in field.contours) {
-      _dashed(canvas, contour.path, contourPaint, 0.10, 0.06);
+    for (final (a, b) in ArchitectDrainSurface.of(drain).folds) {
+      if ((b - a).distance < drain.halfWidth * .25) continue;
+      canvas.drawLine(a, b, contourPaint);
     }
     final arrowPaint = Paint()
       ..color = ink.withValues(alpha: .8)
@@ -108,7 +111,6 @@ class ArchitectFloorDrainPainterHelper {
     } else {
       _roundSymbol(canvas, drain, zoomScale, ink, palette.background, warning);
     }
-    _drawLabels(canvas, drain, field, zoomScale, ink, warning);
   }
 
   static void _drawThresholds(
@@ -128,68 +130,6 @@ class ArchitectFloorDrainPainterHelper {
       canvas.drawLine(t.start - n, t.start + n, paint);
       canvas.drawLine(t.end - n, t.end + n, paint);
     }
-  }
-
-  static void _drawLabels(
-    Canvas canvas,
-    ArchitectFloorDrain drain,
-    ArchitectDrainField field,
-    double zoomScale,
-    Color ink,
-    bool warning,
-  ) {
-    if (ArchitectTextScope.current == null && zoomScale <= 12.0) return;
-    void text(Offset at, String value, {Color? color, bool bold = false}) {
-      canvas.save();
-      canvas.translate(at.dx, at.dy);
-      canvas.scale(ArchitectPaperStyle.annotationScale);
-      final tp = ArchitectTextPainter(
-        elementId: drain.id,
-        role: ArchitectAnnotationRole.ordinary,
-        modelScale: ArchitectPaperStyle.annotationScale,
-        text: TextSpan(
-          text: value,
-          style: TextStyle(
-            color: color ?? ink,
-            fontFamily: 'Roboto',
-            fontSize: 9.0,
-            fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-          ),
-        ),
-        textAlign: TextAlign.center,
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
-      canvas.restore();
-    }
-
-    for (final contour in field.contours) {
-      final at = contour.labelPoint;
-      if (at != null) text(at, '+${contour.millimetres}');
-    }
-    for (final t in field.thresholds) {
-      final u = (t.end - t.start) / (t.end - t.start).distance;
-      final inward = Offset(-u.dy, u.dx);
-      var point = t.middle + inward * 0.14;
-      if (!ArchitectContourPaths.of(drain).contains(point)) {
-        point = t.middle - inward * 0.14;
-      }
-      text(point, '+${(t.fall * 1000).round()}');
-    }
-    final percent = drain.slopePercent;
-    final value = percent == percent.roundToDouble()
-        ? percent.toStringAsFixed(0)
-        : percent.toStringAsFixed(1);
-    final (a, b) = drain.axis;
-    final mid = (a + b) / 2;
-    final dir = ArchitectFloorDrainGeometry.downhill(drain, drain.centroid);
-    final away = dir == null ? const Offset(0, -1) : -dir;
-    text(
-      mid + away * (drain.halfWidth + 0.16),
-      'i=$value%${warning ? ' !' : ''}',
-      color: warning ? _warning : ink,
-      bold: true,
-    );
   }
 
   // ===========================================================================
@@ -291,23 +231,6 @@ class ArchitectFloorDrainPainterHelper {
     canvas.drawLine(to, to - u * head - n * head * .55, paint);
   }
 
-  static void _dashed(
-    Canvas canvas,
-    Path path,
-    Paint paint,
-    double dash,
-    double gap,
-  ) {
-    for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        final end = math.min(distance + dash, metric.length);
-        canvas.drawPath(metric.extractPath(distance, end), paint);
-        distance = end + gap;
-      }
-    }
-  }
-
   // ===========================================================================
   // 3. SELECTION HANDLES
   // ===========================================================================
@@ -339,7 +262,11 @@ class ArchitectFloorDrainPainterHelper {
         ..strokeWidth = 1.6 / scale
         ..style = PaintingStyle.stroke,
     );
-    canvas.drawCircle(handle, 5.5 / scale, Paint()..color = const Color(0xFF1E1E26));
+    canvas.drawCircle(
+      handle,
+      5.5 / scale,
+      Paint()..color = const Color(0xFF1E1E26),
+    );
     canvas.drawCircle(
       handle,
       5.5 / scale,
@@ -355,8 +282,7 @@ class ArchitectFloorDrainPainterHelper {
 class ArchitectContourPaths {
   ArchitectContourPaths._();
   static final _cache = Expando<Path>();
-  static Path of(ArchitectFloorDrain drain) =>
-      _cache[drain] ??= _build(drain);
+  static Path of(ArchitectFloorDrain drain) => _cache[drain] ??= _build(drain);
   static Path _build(ArchitectFloorDrain drain) {
     var result = Path()..addPolygon(drain.polygon, true);
     for (final hole in drain.holes) {

@@ -123,7 +123,13 @@ class ArchitectRotation {
       ],
       annotations: [
         for (final e in s.annotations)
-          if (ids.contains(e.id)) e.copyWith(position: turn(e.position)) else e,
+          if (ids.contains(e.id))
+            e.copyWith(
+              position: turn(e.position),
+              rotationDeg: (e.rotationDeg + radians * 180 / math.pi) % 360,
+            )
+          else
+            e,
       ],
       elevationMarkers: [
         for (final e in s.elevationMarkers)

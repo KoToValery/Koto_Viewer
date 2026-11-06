@@ -1,3 +1,4 @@
+import 'architect_editing_test.dart' as editing;
 import 'architect_tool_test_helper.dart' as tool_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -130,6 +131,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Stub should be trimmed away, wall w1 should now end at (4, 0)
+      await editing.acceptGeometryCommand(tester);
       final walls = model.project.activeStorey.walls;
       final trimmedW1 = walls.firstWhere((w) => w.id == 'w1');
       expect((trimmedW1.endPoint.dx - 4.0).abs(), lessThan(1e-3));
@@ -177,6 +179,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // The middle span should be cut out, leaving two walls from original w1: (0..3) and (7..10)
+      await editing.acceptGeometryCommand(tester);
       final walls = model.project.activeStorey.walls;
       expect(walls.length, 4); // w1_a, w1_b, w2, w3
       final segA = walls.firstWhere((w) => w.id == 'w1');
@@ -218,7 +221,7 @@ void main() {
       expect(find.byKey(const ValueKey('architect-cut-banner')), findsOneWidget);
 
       // Tap cancel button on the banner
-      await tester.tap(find.byKey(const ValueKey('architect-cut-cancel')));
+      await tester.tap(find.byKey(const ValueKey('architect-command-cancel')));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('architect-cut-banner')), findsNothing);

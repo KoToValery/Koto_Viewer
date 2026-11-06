@@ -99,10 +99,11 @@ class ArchitectWallExteriorResolver {
               ? inferred?.side
               : null;
           final resolved =
-              inferred != null &&
-              (!exterior ||
-                  inferred.side != null ||
-                  wall.exteriorSideMode == WallResolutionMode.manual);
+              !exterior ||
+              wall.exteriorSideMode == WallResolutionMode.manual ||
+              (inferred != null &&
+                  (inferred.side != null ||
+                      wall.locationMode == WallResolutionMode.manual));
           if (location == wall.location &&
               (side == null || side == wall.exteriorSide) &&
               resolved == wall.exteriorResolved) {
@@ -182,7 +183,7 @@ class ArchitectWallExteriorResolver {
             )) {
           continue;
         }
-        final nodes = a.intersections(b, finite: false);
+        final nodes = a.intersections(b, finite: false).toList();
         if (!a.isCurved &&
             !b.isCurved &&
             _cross(a.unitVector, b.unitVector).abs() < _epsilon &&

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
@@ -678,7 +679,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
         title: Text(l10n.bimAlignmentTitle),
         actions: [
           IconButton(
-            icon: const Icon(Icons.upload_file_rounded),
+            icon: const AppIcon(AppIconId.upload),
             tooltip: _currentStorey.hasUnderlay
                 ? l10n.bimProjectReplaceUnderlay
                 : l10n.bimProjectAddUnderlay,
@@ -688,12 +689,12 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
           ),
 
           IconButton(
-            icon: const Icon(Icons.layers_rounded),
+            icon: const AppIcon(AppIconId.layers),
             tooltip: l10n.layersTooltip,
             onPressed: _showLayersSheet,
           ),
           IconButton(
-            icon: Icon(
+            icon: AppIcon.fromMaterial(
               _showOnionSkin ? Icons.compare_rounded : Icons.compare_outlined,
               color: _showOnionSkin ? const Color(0xFF00E5FF) : null,
             ),
@@ -703,7 +704,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
             },
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded),
+            icon: const AppIcon(AppIconId.moreVertical),
             onSelected: (value) {
               switch (value) {
                 case 'reprocess':
@@ -731,18 +732,24 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
               PopupMenuItem(
                 value: 'reprocess',
                 enabled: !_isLoading && _currentStorey.hasUnderlay,
-                child: Text(l10n.bimProjectReprocessUnderlay),
+                child: AppMenuLabel(
+                  icon: AppIconId.refresh,
+                  child: Text(l10n.bimProjectReprocessUnderlay),
+                ),
               ),
               PopupMenuItem(
                 value: 'slab_preview',
                 enabled: !_isLoading && _currentStorey.hasUnderlay,
-                child: Text(l10n.bimSlabPreviewTitle),
+                child: AppMenuLabel(
+                  icon: AppIconId.slab,
+                  child: Text(l10n.bimSlabPreviewTitle),
+                ),
               ),
               PopupMenuItem(
                 value: 'settings',
                 child: Row(
                   children: [
-                    const Icon(Icons.tune_rounded, size: 20),
+                    const AppIcon(AppIconId.properties, size: 20),
                     const SizedBox(width: 10),
                     Text(l10n.displaySettings),
                   ],
@@ -752,7 +759,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                 value: 'theme',
                 child: Row(
                   children: [
-                    Icon(
+                    AppIcon.fromMaterial(
                       _canvasTheme.isDark
                           ? Icons.light_mode_rounded
                           : Icons.dark_mode_rounded,
@@ -772,8 +779,8 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                   value: 'clear_cp',
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.clear_rounded,
+                      const AppIcon(
+                        AppIconId.close,
                         size: 20,
                         color: Colors.orangeAccent,
                       ),
@@ -801,7 +808,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
+                          AppIcon.fromMaterial(
                             hasCp
                                 ? Icons.check_circle_rounded
                                 : Icons.circle_outlined,
@@ -849,12 +856,12 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                       OutlinedButton.icon(
                         key: const ValueKey('bim-add-storey'),
                         onPressed: () => _manageElevation(add: true),
-                        icon: const Icon(Icons.add),
+                        icon: const AppIcon(AppIconId.add),
                         label: Text(l10n.bimProjectAddStorey),
                       ),
                       TextButton.icon(
                         onPressed: () => _manageElevation(),
-                        icon: const Icon(Icons.edit_outlined),
+                        icon: const AppIcon(AppIconId.edit),
                         label: Text(l10n.bimProjectEditElevation),
                       ),
                       TextButton.icon(
@@ -862,7 +869,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                         onPressed: _project.storeys.length > 1
                             ? () => _manageElevation(remove: true)
                             : null,
-                        icon: const Icon(Icons.delete_outline),
+                        icon: const AppIcon(AppIconId.delete),
                         label: Text(l10n.bimProjectDeleteStorey),
                       ),
                     ],
@@ -1167,7 +1174,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                                 ),
                                 const SizedBox(height: 16),
                                 ElevatedButton.icon(
-                                  icon: const Icon(Icons.upload_file_rounded),
+                                  icon: const AppIcon(AppIconId.upload),
                                   label: Text(l10n.bimProjectAddUnderlay),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: theme.colorScheme.primary,
@@ -1260,10 +1267,8 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
 
                         // Ready / Start BiM Button
                         ElevatedButton.icon(
-                          icon: const Icon(
-                            Icons.rocket_launch_rounded,
-                            size: 18,
-                          ),
+                          icon: const AppIcon(AppIconId.rocket,
+                            size: 18),
                           label: Text(l10n.bimAlignmentReadyButton),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF00E5FF),
@@ -1432,8 +1437,10 @@ class _ControlPointOverlayPainter extends CustomPainter {
         ..strokeWidth = 1.8;
       switch (snapType) {
         case DxfSnapType.intersection:
-        canvas.drawLine(p - const Offset(7, 7), p + const Offset(7, 7), snapPaint);
-        canvas.drawLine(p - const Offset(7, -7), p + const Offset(7, -7), snapPaint);
+        canvas.drawLine(p - const Offset(7, 7), p + const Offset(7, 7), snapPaint,
+          );
+        canvas.drawLine(p - const Offset(7, -7), p + const Offset(7, -7), snapPaint,
+          );
         break;
       case DxfSnapType.endpoint:
           canvas.drawRect(

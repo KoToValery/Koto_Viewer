@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 // === SECTION: FLOOR DRAIN BAR ===
 // Compact one-row control for the drain tool: shape, fall, size and (while
 // outlining) the floor source with undo / confirm / cancel.
@@ -70,7 +71,7 @@ class ArchitectFloorDrainBar extends StatelessWidget {
               children: [
                 Tooltip(
                   message: l.architectDrainHint,
-                  child: const Icon(Icons.water_drop_outlined, size: 18),
+                  child: const AppIcon(AppIconId.water, size: 18),
                 ),
                 const SizedBox(width: 6),
                 SegmentedButton<ArchitectDrainShape>(
@@ -170,13 +171,15 @@ class ArchitectFloorDrainBar extends StatelessWidget {
                     message: [
                       if (issues.contains(ArchitectDrainIssue.outsideFloor))
                         l.architectDrainOutsideFloor,
+                      if (issues.contains(ArchitectDrainIssue.invalidSurface))
+                        l.architectDrainInvalidSurface,
                       if (issues.contains(ArchitectDrainIssue.nearDoor))
                         l.architectDrainNearDoor,
                     ].join('\n'),
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 6),
-                      child: Icon(
-                        Icons.warning_amber_rounded,
+                      child: AppIcon(
+                        AppIconId.warning,
                         size: 20,
                         color: Color(0xFFFFB74D),
                       ),
@@ -186,14 +189,14 @@ class ArchitectFloorDrainBar extends StatelessWidget {
                   IconButton(
                     key: const ValueKey('drain-undo'),
                     tooltip: l.undoAction,
-                    icon: const Icon(Icons.undo),
+                    icon: const AppIcon(AppIconId.undo),
                     onPressed: pointCount == 0 ? null : onUndo,
                   ),
                 if (onConfirm != null)
                   IconButton(
                     key: const ValueKey('drain-confirm'),
                     tooltip: l.architectToolFloorDrain,
-                    icon: const Icon(Icons.check),
+                    icon: const AppIcon(AppIconId.confirm),
                     color: const Color(0xFF66BB6A),
                     onPressed: pointCount >= 3 ? onConfirm : null,
                   ),
@@ -201,7 +204,7 @@ class ArchitectFloorDrainBar extends StatelessWidget {
                   IconButton(
                     key: const ValueKey('drain-cancel'),
                     tooltip: l.cancel,
-                    icon: const Icon(Icons.close),
+                    icon: const AppIcon(AppIconId.close),
                     onPressed: onCancel,
                   ),
               ],
@@ -237,14 +240,14 @@ class ArchitectFloorDrainBar extends StatelessWidget {
         IconButton(
           key: ValueKey('$key-minus'),
           visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.remove, size: 18),
+          icon: const AppIcon(AppIconId.remove, size: 18),
           onPressed: onMinus,
         ),
         Text(text, style: const TextStyle(fontSize: 12)),
         IconButton(
           key: ValueKey('$key-plus'),
           visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.add, size: 18),
+          icon: const AppIcon(AppIconId.add, size: 18),
           onPressed: onPlus,
         ),
       ],

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 
 class BimNumericKeypad extends StatelessWidget {
@@ -52,8 +53,8 @@ class BimNumericKeypad extends StatelessWidget {
                         ? null
                         : () => onKey(key),
                     child: key == '⌫'
-                        ? Icon(
-                            Icons.backspace_outlined,
+                        ? AppIcon(
+                            AppIconId.backspace,
                             color: Theme.of(context).colorScheme.onSurface,
                             size: 20,
                           )

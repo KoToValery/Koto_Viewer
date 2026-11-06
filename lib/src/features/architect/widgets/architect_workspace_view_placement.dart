@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_section.dart';
@@ -17,6 +18,7 @@ class ArchitectWorkspaceViewPlacement extends StatefulWidget {
   final Offset Function(Offset) toModel, toScreen;
   final double scale;
   final ValueChanged<String?> onDone;
+  final ValueChanged<ArchitectProject>? onCommit, onPreview;
   final void Function(Offset, double, Offset)? onNavigate;
   const ArchitectWorkspaceViewPlacement({
     super.key,
@@ -28,6 +30,8 @@ class ArchitectWorkspaceViewPlacement extends StatefulWidget {
     required this.toScreen,
     required this.scale,
     required this.onDone,
+    this.onCommit,
+    this.onPreview,
     this.onNavigate,
   });
   @override
@@ -76,43 +80,47 @@ class _PlacementState extends State<ArchitectWorkspaceViewPlacement> {
     }
   }
 
-  void saveEdit() {
+  ArchitectProject? editedProject() {
     final s = section, e = elevation;
     if (first == null || second == null || (second! - first!).distance < .01) {
-      return;
+      return null;
     }
     final steps = editSteps;
-    if (_depth != null && steps.any((p) => p.dy >= _depth!)) return;
-    widget.controller.commit(
-      project.copyWith(
-        sections: [
-          for (final old in project.sections)
-            if (old.id == s?.id)
-              old.copyWith(
-                start: first,
-                end: second,
-                steps: steps,
-                viewDepth: _depth,
-                clearViewDepth: _depth == null,
-              )
-            else
-              old,
-        ],
-        elevations: [
-          for (final old in project.elevations)
-            if (old.id == e?.id)
-              old.copyWith(
-                start: first,
-                end: second,
-                steps: steps,
-                viewDepth: _depth,
-                clearViewDepth: _depth == null,
-              )
-            else
-              old,
-        ],
-      ),
+    if (_depth != null && steps.any((p) => p.dy >= _depth!)) return null;
+    return project.copyWith(
+      sections: [
+        for (final old in project.sections)
+          if (old.id == s?.id)
+            old.copyWith(
+              start: first,
+              end: second,
+              steps: steps,
+              viewDepth: _depth,
+              clearViewDepth: _depth == null,
+            )
+          else
+            old,
+      ],
+      elevations: [
+        for (final old in project.elevations)
+          if (old.id == e?.id)
+            old.copyWith(
+              start: first,
+              end: second,
+              steps: steps,
+              viewDepth: _depth,
+              clearViewDepth: _depth == null,
+            )
+          else
+            old,
+      ],
     );
+  }
+
+  void saveEdit() {
+    final next = editedProject();
+    if (next == null) return;
+    (widget.onCommit ?? widget.controller.commit)(next);
     widget.onDone(widget.id);
   }
 
@@ -149,6 +157,8 @@ class _PlacementState extends State<ArchitectWorkspaceViewPlacement> {
         }
       }
     });
+    final next = editedProject();
+    if (next != null) widget.onPreview?.call(next);
   }
 
   void accept(Offset screen) {
@@ -214,7 +224,7 @@ class _PlacementState extends State<ArchitectWorkspaceViewPlacement> {
             steps: steps,
             clearViewDepth: depth == null,
           );
-      widget.controller.commit(
+      (widget.onCommit ?? widget.controller.commit)(
         project.copyWith(
           sections: [
             for (final old in project.sections)
@@ -236,7 +246,7 @@ class _PlacementState extends State<ArchitectWorkspaceViewPlacement> {
                     ? e?.viewSide
                     : view!.side,
               );
-      widget.controller.commit(
+      (widget.onCommit ?? widget.controller.commit)(
         project.copyWith(
           elevations: [
             for (final old in project.elevations)
@@ -332,100 +342,107 @@ class _PlacementState extends State<ArchitectWorkspaceViewPlacement> {
         ),
         Align(
           alignment: Alignment.topCenter,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      widget.mode == 'edit'
-                          ? l.architectViewEditHint
-                          : widget.mode == 'step'
-                          ? l.architectViewStepHint
-                          : first == null
-                          ? l.architectFacadeStartHint
-                          : second == null
-                          ? l.architectViewEndHint
-                          : l.architectViewDirectionHint,
+          child: Padding(
+            padding: EdgeInsets.only(top: widget.onPreview == null ? 0 : 56),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.mode == 'edit'
+                            ? l.architectViewEditHint
+                            : widget.mode == 'step'
+                            ? l.architectViewStepHint
+                            : first == null
+                            ? l.architectFacadeStartHint
+                            : second == null
+                            ? l.architectViewEndHint
+                            : l.architectViewDirectionHint,
+                      ),
                     ),
-                  ),
-                  if (widget.mode == 'edit')
+                    if (widget.mode == 'edit' && widget.onPreview == null)
+                      IconButton(
+                        tooltip: l.applyAction,
+                        onPressed: saveEdit,
+                        icon: const AppIcon(AppIconId.confirm),
+                      ),
                     IconButton(
-                      tooltip: l.applyAction,
-                      onPressed: saveEdit,
-                      icon: const Icon(Icons.check),
+                      tooltip: l.architectViewDepth,
+                      onPressed: widget.id == null
+                          ? null
+                          : () async {
+                              final currentSteps = widget.mode == 'edit'
+                                  ? editSteps
+                                  : section?.steps ??
+                                        elevation?.steps ??
+                                        const <Offset>[];
+                              final result = await showArchitectViewDepth(
+                                context,
+                                project,
+                                widget.mode == 'edit'
+                                    ? _depth
+                                    : section?.viewDepth ??
+                                          elevation?.viewDepth,
+                                minimumDepth:
+                                    [
+                                      0.0,
+                                      ...currentSteps.map((p) => p.dy),
+                                    ].reduce((a, b) => a > b ? a : b) +
+                                    .01,
+                              );
+                              if (result == null || !mounted) return;
+                              if (widget.mode == 'edit') {
+                                setState(() => _depth = result.depth);
+                                return;
+                              }
+                              final s = section, e = elevation;
+                              final steps =
+                                  s?.steps ?? e?.steps ?? const <Offset>[];
+                              if (result.depth != null &&
+                                  steps.any(
+                                    (p) => p.dy > result.depth! - .01,
+                                  )) {
+                                return;
+                              }
+                              (widget.onCommit ?? widget.controller.commit)(
+                                project.copyWith(
+                                  sections: [
+                                    for (final old in project.sections)
+                                      if (old.id == s?.id)
+                                        old.copyWith(
+                                          viewDepth: result.depth,
+                                          clearViewDepth: result.depth == null,
+                                        )
+                                      else
+                                        old,
+                                  ],
+                                  elevations: [
+                                    for (final old in project.elevations)
+                                      if (old.id == e?.id)
+                                        old.copyWith(
+                                          viewDepth: result.depth,
+                                          clearViewDepth: result.depth == null,
+                                        )
+                                      else
+                                        old,
+                                  ],
+                                ),
+                              );
+                              widget.onDone(widget.id);
+                            },
+                      icon: const AppIcon(AppIconId.measure),
                     ),
-                  IconButton(
-                    tooltip: l.architectViewDepth,
-                    onPressed: widget.id == null
-                        ? null
-                        : () async {
-                            final currentSteps = widget.mode == 'edit'
-                                ? editSteps
-                                : section?.steps ??
-                                      elevation?.steps ??
-                                      const <Offset>[];
-                            final result = await showArchitectViewDepth(
-                              context,
-                              project,
-                              widget.mode == 'edit'
-                                  ? _depth
-                                  : section?.viewDepth ?? elevation?.viewDepth,
-                              minimumDepth:
-                                  [
-                                    0.0,
-                                    ...currentSteps.map((p) => p.dy),
-                                  ].reduce((a, b) => a > b ? a : b) +
-                                  .01,
-                            );
-                            if (result == null || !mounted) return;
-                            if (widget.mode == 'edit') {
-                              setState(() => _depth = result.depth);
-                              return;
-                            }
-                            final s = section, e = elevation;
-                            final steps =
-                                s?.steps ?? e?.steps ?? const <Offset>[];
-                            if (result.depth != null &&
-                                steps.any((p) => p.dy > result.depth! - .01)) {
-                              return;
-                            }
-                            widget.controller.commit(
-                              project.copyWith(
-                                sections: [
-                                  for (final old in project.sections)
-                                    if (old.id == s?.id)
-                                      old.copyWith(
-                                        viewDepth: result.depth,
-                                        clearViewDepth: result.depth == null,
-                                      )
-                                    else
-                                      old,
-                                ],
-                                elevations: [
-                                  for (final old in project.elevations)
-                                    if (old.id == e?.id)
-                                      old.copyWith(
-                                        viewDepth: result.depth,
-                                        clearViewDepth: result.depth == null,
-                                      )
-                                    else
-                                      old,
-                                ],
-                              ),
-                            );
-                            widget.onDone(widget.id);
-                          },
-                    icon: const Icon(Icons.straighten),
-                  ),
-                  IconButton(
-                    tooltip: l.cancel,
-                    onPressed: () => widget.onDone(null),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+                    if (widget.onPreview == null)
+                      IconButton(
+                        tooltip: l.cancel,
+                        onPressed: () => widget.onDone(null),
+                        icon: const AppIcon(AppIconId.close),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

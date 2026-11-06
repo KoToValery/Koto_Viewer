@@ -38,6 +38,7 @@ import '../models/architect_overhang.dart';
 import '../services/architect_overhang_detector.dart';
 import 'architect_overhang_painter_helper.dart';
 import '../services/architect_roof_tool.dart';
+import 'architect_service_plan_painter.dart';
 import 'architect_roof_painter_helper.dart';
 
 enum ArchitectPaintLayer { all, model, interaction }
@@ -69,6 +70,9 @@ enum ArchitectTool {
   section,
   elevation,
   pan,
+  services;
+
+  bool get usesComponent => this == component || this == services;
 }
 
 enum WallDraftingMode { singleLine, chained }
@@ -85,9 +89,13 @@ class Architect2dPainter extends CustomPainter {
   final ArchitectCanvasPalette palette;
   final AppLocalizations? l10n;
   final ArchitectTool activeTool;
+  final OpeningType activeOpeningType;
+  final bool showServiceProjections;
   final ArchitectLineStyle activeCadLineStyle;
   final List<ArchitectMaterialLayer> activeWallLayers;
   final Offset? activeWallArcEnd;
+  final double? activeWallArcBulge;
+  final bool activeWallCurved;
   final Offset? activeDraftStart;
   final Offset? activeDraftEnd;
   final ArchitectStair? stairPreview;
@@ -194,6 +202,8 @@ class Architect2dPainter extends CustomPainter {
   final double handleOffsetLength;
   final (Offset, Offset)? wallEndpointLeaderLine;
   final Offset? newPointCandidate;
+  final Offset? newPointHandleOffset;
+  final bool newPointValid;
   final (Offset, Offset)? newPointLeaderLine;
   final ArchitectWallOvershoot? activeOvershoot;
   final List<ArchitectOverhang>? upperOverhangs;
@@ -219,9 +229,13 @@ class Architect2dPainter extends CustomPainter {
     this.marqueePoints = const [],
     this.marqueePolygon = const [],
     required this.activeTool,
+    this.activeOpeningType = OpeningType.shaft,
+    this.showServiceProjections = true,
     this.activeCadLineStyle = ArchitectLineStyle.solid,
     this.activeWallLayers = const [],
     this.activeWallArcEnd,
+    this.activeWallArcBulge,
+    this.activeWallCurved = false,
     this.activeDraftStart,
     this.activeDraftEnd,
     this.stairPreview,
@@ -309,6 +323,8 @@ class Architect2dPainter extends CustomPainter {
     this.handleOffsetLength = 50.0,
     this.wallEndpointLeaderLine,
     this.newPointCandidate,
+    this.newPointHandleOffset,
+    this.newPointValid = true,
     this.newPointLeaderLine,
   }) : _project = project,
        _zoomScale = zoomScale,
@@ -319,7 +335,7 @@ class Architect2dPainter extends CustomPainter {
     if (ArchitectTextScope.current == null) {
       final key = drawingViewKey ?? 'plan:${_project.activeStoreyId}';
       final denominator = _project.document.viewScales[key] ?? _project.dimensionScale.denominator;
-      ArchitectTextScope(_project.document, key, denominator, zoomScale, units: _project.units, decimals: _project.distanceDecimals).run(() => _paint(canvas, size));
+      ArchitectTextScope(_project.document, key, denominator, zoomScale, units: _project.units, decimals: _project.distanceDecimals, levelUnits: _project.levelUnits, levelDecimals: _project.levelDecimals).run(() => _paint(canvas, size));
     } else { _paint(canvas, size); }
   }
   void _paint(Canvas canvas, Size size) {
@@ -356,6 +372,7 @@ class Architect2dPainter extends CustomPainter {
       );
       _drawGridAxes(canvas);
       ArchitectElementsPainterHelper.drawSlabs(
+        project: _project,
         palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
@@ -455,7 +472,14 @@ class Architect2dPainter extends CustomPainter {
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
       );
+      if (showServiceProjections) {
+        ArchitectServicePlanPainter.roofOpenings(
+          canvas: canvas, project: _project, storey: _elementLayerStorey,
+          scale: zoomScale, palette: palette,
+        );
+      }
       ArchitectElementsPainterHelper.drawComponents(
+        project: showServiceProjections ? _project : null,
         palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
@@ -510,6 +534,7 @@ class Architect2dPainter extends CustomPainter {
       ArchitectElementsPainterHelper.drawActiveElementsDrafting(
         canvas: canvas,
         activeTool: activeTool,
+        openingType: activeOpeningType,
         draftStart: activeDraftStart,
         draftEnd: activeDraftEnd,
         stairPreview: stairPreview,
@@ -708,7 +733,7 @@ class Architect2dPainter extends CustomPainter {
     }
     final polyline = selected.cadPrimitives
         .where((p) => p.type == CadPrimitiveType.polyline).firstOrNull;
-    if (polyline != null) {
+    if (polyline != null && !polyline.isClosedPolyline) {
       ArchitectElementsPainterHelper.drawCadPrimitives(
         dimensionScale: _project.dimensionScale,
         palette: palette,
@@ -721,6 +746,15 @@ class Architect2dPainter extends CustomPainter {
         final points = polyline.linePoints;
         final scale = math.max(zoomScale, 80.0);
         const color = Color(0xFF00BCD4);
+        for(var i=0;i+1<points.length;i++) {
+          final mid=(points[i]+points[i+1])/2;
+          canvas.drawCircle(mid,3.5/scale,Paint()..color=const Color(0xFFFF9800));
+          if(handleOffsetLength>0) {
+            final grip=ArchitectPolylineEditing.edgeHandle(points,i,zoomScale,handleOffsetLength);
+            canvas.drawLine(mid,grip,Paint()..color=const Color(0xFFFF9800)..strokeWidth=1/scale);
+            _drawTouchGrip(canvas,grip,scale,const Color(0xFFFF9800));
+          }
+        }
         for (var i = 0; i < points.length; i++) {
           canvas.drawCircle(points[i], 3.5 / scale, Paint()..color = color);
           if (handleOffsetLength <= 0) continue;
@@ -776,6 +810,7 @@ class Architect2dPainter extends CustomPainter {
         _project.activeStorey.walls,
       ),
       activeTool: ArchitectTool.select,
+      showServiceProjections: false,
       paintGrid: false,
       zoomScale: zoomScale,
       selectedElementId: selectedElementId,
@@ -878,11 +913,14 @@ class Architect2dPainter extends CustomPainter {
 
   void _drawNewPointPreview(Canvas canvas) {
     if (newPointCandidate == null) return;
-    final draftingScale = math.max(zoomScale, 80.0);
-    const candidateColor = Color(0xFF00E5FF);
+    final draftingScale = zoomScale;
+    final candidateColor = newPointValid
+        ? const Color(0xFF006E91) : const Color(0xFFB3261E);
 
     if (newPointLeaderLine != null) {
-      final (from, to) = newPointLeaderLine!;
+      final from = newPointCandidate!;
+      final to = newPointHandleOffset == null ? newPointLeaderLine!.$2
+          : from + newPointHandleOffset! / zoomScale;
       final bgLeaderPaint = Paint()
         ..color = const Color(0x66000000)
         ..strokeWidth = 2.6 / draftingScale
@@ -1211,6 +1249,7 @@ class Architect2dPainter extends CustomPainter {
 
       for (final door in wall.doors) {
         door.paint2D(
+          cutPlaneHeight: project.activeStorey.cutPlaneHeight,
           palette: palette,
           canvas: canvas,
           wallGeometryProvided:wall.isCurved || wall.system.isSpecial,
@@ -1227,6 +1266,7 @@ class Architect2dPainter extends CustomPainter {
       }
       for (final window in wall.windows) {
         window.paint2D(
+          cutPlaneHeight: project.activeStorey.cutPlaneHeight,
           palette: palette,
           canvas: canvas,
           wallGeometryProvided:wall.isCurved || wall.system.isSpecial,
@@ -1293,57 +1333,15 @@ class Architect2dPainter extends CustomPainter {
   // ===========================================================================
 
   void _drawActiveDrafting(Canvas canvas) {
-    for (final gap in wallClearances) {
-      final wall = project.activeStorey.walls.firstWhere(
-        (w) => w.id == gap.wallId,
-      );
-      final direction = gap.end - gap.start;
-      final tick =
-          (direction.distance < 1e-8
-              ? wall.unitVector
-              : Offset(-direction.dy, direction.dx) / direction.distance) *
-          (4 / draftingScale);
-      final paint = Paint()
-        ..color = palette.foreground(const Color(0xFF008C9E))
-        ..strokeWidth = 1 / draftingScale;
-      canvas.drawLine(gap.start, gap.end, paint);
-      for (final point in [gap.start, gap.end]) {
-        canvas.drawLine(point - tick, point + tick, paint);
-      }
-      if (gap.atStart != null) {
-        final dotRadius = 7 / draftingScale;
-        canvas.drawCircle(
-          gap.start,
-          dotRadius,
-          Paint()..color = const Color(0xFFFFB74D),
-        );
-        if (dotRadius * zoomScale >= 4.5) {
-          final marker = ArchitectTextPainter(
-            text: TextSpan(
-              text: gap.atStart! ? '1' : '2',
-              style: TextStyle(
-                color: Colors.black,
-                fontFamily: 'Roboto',
-                fontWeight: FontWeight.bold,
-                fontSize: 10 / draftingScale,
-              ),
-            ),
-            textDirection: TextDirection.ltr,
-          )..layout();
-          marker.paint(
-            canvas,
-            gap.start - Offset(marker.width / 2, marker.height / 2),
-          );
-        }
-      }
-    }
-
+    // Wall dimensions and their editable labels share one screen-space layout.
+    // The workspace interaction overlay paints both witnesses and dimensions.
     if (doorPreview != null) {
       final hostWall = _project.activeStorey.walls
           .where((w) => w.id == doorPreview!.wallId)
           .firstOrNull;
       if (hostWall != null) {
         doorPreview!.paint2D(
+          cutPlaneHeight: project.activeStorey.cutPlaneHeight,
           palette: palette,
           canvas: canvas,
           wallStart: hostWall.openingAxis(doorPreview!.offsetRatio).$1,
@@ -1364,6 +1362,7 @@ class Architect2dPainter extends CustomPainter {
           .firstOrNull;
       if (hostWall != null) {
         windowPreview!.paint2D(
+          cutPlaneHeight: project.activeStorey.cutPlaneHeight,
           palette: palette,
           canvas: canvas,
           wallStart: hostWall.openingAxis(windowPreview!.offsetRatio).$1,
@@ -1757,7 +1756,7 @@ class Architect2dPainter extends CustomPainter {
         id: 'preview',
         location: activeWallIsExterior ? ArchitectWallLocation.exterior : ArchitectWallLocation.interior,
         layers:activeWallLayers,
-        arcBulge:activeWallArcEnd==null?0:ArchitectWallArc.through(p1,p2,activeDraftEnd!),
+        arcBulge:activeWallArcEnd==null?0:activeWallArcBulge ?? ArchitectWallArc.through(p1,p2,activeDraftEnd!),
         startPoint: p1,
         endPoint: p2,
         thickness: activeWallThickness,
@@ -1784,6 +1783,8 @@ class Architect2dPainter extends CustomPainter {
         Paint()..color = Colors.orangeAccent,
       );
       canvas.drawCircle(p2, 2 / draftingScale, Paint()..color = Colors.cyanAccent);
+      // The interactive overlay owns the rise/radius dimension for arc drafts.
+      if (activeWallCurved || activeWallArcEnd != null) return;
       // Keep a single target marker and a length-only badge outside the body.
       final textSpan = TextSpan(
         text: project.formatLength(wall.length),
@@ -1937,6 +1938,8 @@ class Architect2dPainter extends CustomPainter {
       polygonLeaderLine != oldDelegate.polygonLeaderLine ||
       wallEndpointLeaderLine != oldDelegate.wallEndpointLeaderLine ||
       newPointCandidate != oldDelegate.newPointCandidate ||
+      newPointHandleOffset != oldDelegate.newPointHandleOffset ||
+      newPointValid != oldDelegate.newPointValid ||
       newPointLeaderLine != oldDelegate.newPointLeaderLine ||
       handleOffsetLength != oldDelegate.handleOffsetLength ||
       wallCutGuideLine != oldDelegate.wallCutGuideLine ||

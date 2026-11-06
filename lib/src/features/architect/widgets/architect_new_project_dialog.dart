@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -178,10 +179,12 @@ class _ArchitectNewProjectDialogState extends State<ArchitectNewProjectDialog> {
                         style: ButtonStyle(
                           backgroundColor: WidgetStateProperty.resolveWith(
                             (states) => states.contains(WidgetState.selected)
-                                ? const Color(0xFF00E5FF).withValues(alpha: 0.25)
+                                ? const Color(0xFF00E5FF,
+                                  ).withValues(alpha: 0.25)
                                 : const Color(0xFF262630),
                           ),
-                          foregroundColor: WidgetStateProperty.all(Colors.white),
+                          foregroundColor: WidgetStateProperty.all(Colors.white,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 18),
@@ -360,13 +363,16 @@ class _ArchitectNewProjectDialogState extends State<ArchitectNewProjectDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11),
+          ),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                icon: const Icon(Icons.remove, size: 16, color: Colors.white70),
+                icon: const AppIcon(
+                  AppIconId.remove, size: 16, color: Colors.white70,
+                ),
                 onPressed: value > min ? () => onChanged(value - 1) : null,
                 visualDensity: VisualDensity.compact,
               ),
@@ -379,7 +385,9 @@ class _ArchitectNewProjectDialogState extends State<ArchitectNewProjectDialog> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.add, size: 16, color: Colors.white70),
+                icon: const AppIcon(
+                  AppIconId.add, size: 16, color: Colors.white70,
+                ),
                 onPressed: value < max ? () => onChanged(value + 1) : null,
                 visualDensity: VisualDensity.compact,
               ),
@@ -405,13 +413,16 @@ class _ArchitectNewProjectDialogState extends State<ArchitectNewProjectDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11),
+          ),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                icon: const Icon(Icons.remove, size: 16, color: Colors.white70),
+                icon: const AppIcon(
+                  AppIconId.remove, size: 16, color: Colors.white70,
+                ),
                 onPressed: value > step
                     ? () => onChanged((value - step).clamp(0.5, 20.0))
                     : null,
@@ -426,7 +437,9 @@ class _ArchitectNewProjectDialogState extends State<ArchitectNewProjectDialog> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.add, size: 16, color: Colors.white70),
+                icon: const AppIcon(
+                  AppIconId.add, size: 16, color: Colors.white70,
+                ),
                 onPressed: () =>
                     onChanged((value + step).clamp(0.5, 20.0)),
                 visualDensity: VisualDensity.compact,

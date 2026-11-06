@@ -1,3 +1,4 @@
+import '../../../core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -17,6 +18,14 @@ enum Cad3DShadingMode {
   final IconData icon;
 
   const Cad3DShadingMode(this.icon);
+
+  AppIconId get iconId => switch (this) {
+    Cad3DShadingMode.cadShadedEdges => AppIconId.shadingEdges,
+    Cad3DShadingMode.smoothShaded => AppIconId.shadingSmooth,
+    Cad3DShadingMode.flatShaded => AppIconId.shadingFlat,
+    Cad3DShadingMode.wireframe => AppIconId.shadingWire,
+    Cad3DShadingMode.xray => AppIconId.shadingXray,
+  };
 }
 
 /// Canvas Theme for 3D Viewport.

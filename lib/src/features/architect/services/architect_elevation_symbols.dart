@@ -96,35 +96,21 @@ class ArchitectElevationOperation {
             width / 2 - face,
             bottom + height - face,
           );
-          void subdivide(FenestrationSubdivision node, Rect r) {
-            if (!node.isSplit) {
-              final pane = node.pane;
-              if (pane != null) leaf(pane.paneType, r, pane.sashProfileWidth);
-              return;
-            }
-            var current = 0.0;
-            for (var i = 0; i < node.children.length; i++) {
-              final fraction = node.ratios[i];
-              final child = node.isVertical
-                  ? Rect.fromLTWH(
-                      r.left + current,
-                      r.top,
-                      r.width * fraction,
-                      r.height,
-                    )
-                  : Rect.fromLTWH(
-                      r.left,
-                      r.top + current,
-                      r.width,
-                      r.height * fraction,
-                    );
-              subdivide(node.children[i], child);
-              current += node.isVertical ? child.width : child.height;
-            }
-          }
-
           if (style != null) {
-            subdivide(style.rootSubdivision, rect);
+            final layout = style.resolveLayout(width: width, height: height);
+            for (final entry in layout.panes.values) {
+              final r = entry.rect;
+              leaf(
+                entry.pane.paneType,
+                Rect.fromLTWH(
+                  -width / 2 + r.left,
+                  bottom + r.top,
+                  r.width,
+                  r.height,
+                ),
+                entry.pane.sashProfileWidth,
+              );
+            }
           } else if (hingeLeft != null) {
             leaf(PaneType.doorLeaf, rect, .025);
           } else if (panes > 1) {

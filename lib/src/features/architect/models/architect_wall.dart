@@ -182,8 +182,12 @@ class ArchitectWall {
           : WallCoreMaterial.brick);
 
   bool get isCurved => arcBulge.abs() > 1e-8;
-  ArchitectWallArc? get arc =>
-      isCurved ? ArchitectWallArc(startPoint, endPoint, arcBulge) : null;
+  static final _arcs = Expando<ArchitectWallArc>();
+  static final _facePolygons =
+      Expando<Map<(double, double), List<Offset>>>();
+  ArchitectWallArc? get arc => isCurved
+      ? (_arcs[this] ??= ArchitectWallArc(startPoint, endPoint, arcBulge))
+      : null;
   double get length => arc?.length ?? (endPoint - startPoint).distance;
   double get centerLineOffset =>
       centerOffset.dx * normalVector.dx + centerOffset.dy * normalVector.dy;
@@ -208,8 +212,8 @@ class ArchitectWall {
     double high, {
     double from = 0,
     double to = 1,
-  }) =>
-      arc?.face(
+  }) {
+    List<Offset> build() => arc?.face(
         low,
         high,
         from: from,
@@ -222,6 +226,14 @@ class ArchitectWall {
         referencePointAt(to) + normalVector * high,
         referencePointAt(from) + normalVector * high,
       ];
+    // Full skins are immutable and shared by drawing, hit testing and snaps.
+    // Partial/extended skins are transient and must not grow an unbounded cache.
+    if (!isCurved || from != 0 || to != 1) return build();
+    return (_facePolygons[this] ??= {}).putIfAbsent(
+      (low, high),
+      () => List<Offset>.unmodifiable(build()),
+    );
+  }
   void validateGeometry() {
     system.validate(thickness);
     systemPlacement.validate();
@@ -288,17 +300,17 @@ class ArchitectWall {
 
   List<Offset> intersections(ArchitectWall other, {bool finite = true}) {
     if (isCurved && other.isCurved) {
-      return arc!.arcIntersections(other.arc!, finite: finite);
+      return arc!.arcIntersections(other.arc!, finite: finite).toList();
     }
     if (isCurved) {
       return arc!.lineIntersections(
         other.startPoint,
         other.endPoint,
         finite: finite,
-      );
+      ).toList();
     }
     if (other.isCurved) {
-      return other.arc!.lineIntersections(startPoint, endPoint, finite: finite);
+      return other.arc!.lineIntersections(startPoint, endPoint, finite: finite).toList();
     }
     final p = BimLineGeometry.intersection(
       startPoint,
@@ -345,13 +357,19 @@ class ArchitectWall {
   bool get hasInsulation => insulationThickness > 1e-4;
   bool get isInterior => !isExterior;
   bool get isExterior => location == null
-      ? !{'int_12_partition', 'bearing_25_concrete'}.contains(wallTypeId) &&
+      ? !{
+          'int_12_partition',
+          'bearing_25_concrete',
+          'int_25_brick',
+          'int_10_aerated',
+        }.contains(wallTypeId) &&
             (hasInsulation ||
-                {
-                  'ext_25_brick',
-                  'ext_25_12_eps',
-                  'parapet_12',
-                }.contains(wallTypeId))
+                isParapet ||
+                (wallTypeId != null &&
+                    (wallTypeId!.startsWith('ext_') ||
+                        wallTypeId!.startsWith('parapet_') ||
+                        wallTypeId!.contains('exterior') ||
+                        wallTypeId!.contains('parapet'))))
       : location == ArchitectWallLocation.exterior;
   List<ArchitectMaterialLayer> get resolvedLayers => layers.isNotEmpty
       ? layers

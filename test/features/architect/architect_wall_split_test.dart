@@ -1,3 +1,4 @@
+import 'architect_editing_test.dart' as editing;
 import 'architect_tool_test_helper.dart' as tool_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -150,6 +151,7 @@ void main() {
         await tester.tapAt(screen(tester, const Offset(1, 0)));
         await tester.pumpAndSettle();
 
+        await editing.acceptGeometryCommand(tester);
         // Wall is cut into 2 pieces!
         final walls = model.project.activeStorey.walls;
         expect(walls.length, 2);
@@ -204,6 +206,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('architect-split-side2-btn')));
         await tester.pumpAndSettle();
 
+        await editing.acceptGeometryCommand(tester);
         expect(model.project.activeStorey.walls.length, 2);
       },
     );
@@ -239,6 +242,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('architect-split-both-btn')));
         await tester.pumpAndSettle();
 
+        await editing.acceptGeometryCommand(tester);
         expect(model.project.activeStorey.walls.length, 2);
       },
     );
@@ -268,7 +272,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Tap Cancel
-        final cancelBtn = find.byKey(const ValueKey('architect-split-cancel-btn'));
+        final cancelBtn = find.byKey(const ValueKey('architect-command-cancel'));
         expect(cancelBtn, findsOneWidget);
         await tester.tap(cancelBtn);
         await tester.pumpAndSettle();
@@ -308,6 +312,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('architect-split-side1-btn')));
         await tester.pumpAndSettle();
 
+        await editing.acceptGeometryCommand(tester);
         expect(model.project.activeStorey.walls.length, 2);
 
         // Undo

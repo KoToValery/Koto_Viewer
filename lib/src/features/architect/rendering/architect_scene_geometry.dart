@@ -2,8 +2,13 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_project.dart';
 import '../models/architect_elements.dart';
+import '../models/architect_wall.dart';
 
 class ArchitectSceneGeometry {
+  static final _wallBounds = Expando<Rect>();
+
+  static Rect wallBounds(ArchitectWall wall) =>
+      _wallBounds[wall] ??= boundsOf(wall.polygonCorners);
   static Rect boundsOf(Iterable<Offset> points) {
     final values = points.toList();
     if (values.isEmpty) return Rect.zero;
@@ -35,6 +40,8 @@ class ArchitectSceneGeometry {
       for (final drain in s.floorDrains) ...drain.polygon,
       for (final roof in s.roofs) ...roof.points,
       for (final opening in s.openings) ...opening.boundary,
+      for (final component in s.components)
+        if (component.isVisible) ...component.worldPolygonCorners,
       for (final stair in s.stairs) ...[stair.displayBounds.topLeft, stair.displayBounds.bottomRight],
       for (final dim in s.dimensions) ...[
         ...dim.witnessPoints,
@@ -77,7 +84,7 @@ class ArchitectSceneGeometry {
         boundsOf(points).inflate(math.max(margin, 1e-9)).overlaps(expanded);
     final s = project.activeStorey;
     final filtered = s.copyWith(
-      walls: s.walls.where((e) => intersects(e.polygonCorners)).toList(),
+      walls: s.walls.where((e) => wallBounds(e).inflate(1e-9).overlaps(expanded)).toList(),
       zones: s.zones.where((e) => intersects(e.polygon)).toList(),
       columns: s.columns
           .where((e) => intersects([e.position], math.max(e.width, e.depth)))

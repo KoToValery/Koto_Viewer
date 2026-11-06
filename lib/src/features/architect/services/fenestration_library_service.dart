@@ -16,11 +16,14 @@ class FenestrationLibraryService extends ChangeNotifier {
       FenestrationLibraryService._internal();
 
   FenestrationLibraryService._internal();
+  @visibleForTesting
+  FenestrationLibraryService.forTesting();
 
   static const String _storageKey = 'architect_fenestration_custom_styles_v1';
 
   final List<ArchitectFenestrationStyle> _customStyles = [];
   bool _isLoaded = false;
+  Future<void>? _loading;
 
   late ArchitectFenestrationStyle _activeWindowStyle;
   late ArchitectFenestrationStyle _activeDoorStyle;
@@ -48,9 +51,13 @@ class FenestrationLibraryService extends ChangeNotifier {
   }
 
   /// Initializes the service and loads custom models from persistent storage.
-  Future<void> init() async {
+  Future<void> init() =>
+      _isLoaded ? SynchronousFuture<void>(null) : (_loading ??= _load());
+
+  Future<void> _load() async {
     if (_isLoaded) return;
     _initDefaults();
+    var repaired = false;
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -60,9 +67,14 @@ class FenestrationLibraryService extends ChangeNotifier {
         _customStyles.clear();
         for (final item in list) {
           try {
-            _customStyles.add(
-              ArchitectFenestrationStyle.fromJson(item as Map<String, dynamic>),
+            var style = ArchitectFenestrationStyle.fromJson(
+              item as Map<String, dynamic>,
             );
+            if (style.isPreset || _customStyles.any((s) => s.id == style.id)) {
+              style = style.copyWith(id: _newId());
+              repaired = true;
+            }
+            _customStyles.add(style);
           } catch (e) {
             debugPrint('Failed to parse saved fenestration style: $e');
           }
@@ -73,6 +85,14 @@ class FenestrationLibraryService extends ChangeNotifier {
     }
 
     _isLoaded = true;
+    // Persist repaired identities so they remain stable across sessions.
+    if (repaired) {
+      try {
+        await _persist();
+      } catch (e) {
+        debugPrint('Identity repair persistence failed: $e');
+      }
+    }
     notifyListeners();
   }
 
@@ -107,7 +127,16 @@ class FenestrationLibraryService extends ChangeNotifier {
   }
 
   /// Saves or updates a custom style in the internal library and persists to storage.
-  Future<void> saveStyle(ArchitectFenestrationStyle style) async {
+  static int _serial = 0;
+  static String _newId() =>
+      'custom_${DateTime.now().microsecondsSinceEpoch}_${_serial++}';
+
+  Future<ArchitectFenestrationStyle> saveStyle(
+    ArchitectFenestrationStyle style,
+  ) async {
+    await init();
+    if (style.isPreset) style = style.copyWith(id: _newId());
+    final previous = List<ArchitectFenestrationStyle>.of(_customStyles);
     final idx = _customStyles.indexWhere((s) => s.id == style.id);
     if (idx >= 0) {
       _customStyles[idx] = style;
@@ -115,18 +144,30 @@ class FenestrationLibraryService extends ChangeNotifier {
       _customStyles.add(style);
     }
 
+    try {
+      await _persist();
+    } catch (_) {
+      _customStyles
+        ..clear()
+        ..addAll(previous);
+      rethrow;
+    }
     if (style.kind == FenestrationKind.window) {
       _activeWindowStyle = style;
     } else {
       _activeDoorStyle = style;
     }
 
-    await _persist();
     notifyListeners();
+    return style;
   }
 
   /// Deletes a custom style from the library.
   Future<bool> deleteStyle(String id) async {
+    await init();
+    if (ArchitectFenestrationStyle.standardCatalog().any((s) => s.id == id)) {
+      return false;
+    }
     _customStyles.removeWhere((s) => s.id == id);
     if (_activeWindowStyle.id == id) {
       _activeWindowStyle = getWindowStyles().first;
@@ -153,9 +194,12 @@ class FenestrationLibraryService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = _customStyles.map((s) => s.toJson()).toList();
-      await prefs.setString(_storageKey, jsonEncode(list));
+      if (!await prefs.setString(_storageKey, jsonEncode(list))) {
+        throw StateError('Could not persist fenestration library');
+      }
     } catch (e) {
       debugPrint('Failed to persist fenestration styles: $e');
+      rethrow;
     }
   }
 }

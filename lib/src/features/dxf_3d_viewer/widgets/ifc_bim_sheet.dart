@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../models/ifc_model.dart';
 
@@ -83,7 +85,8 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
 
             // Header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8,
+                ),
               child: Row(
                 children: [
                   Container(
@@ -129,8 +132,8 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
                       });
                       widget.onFiltersChanged();
                     },
-                    icon: const Icon(Icons.visibility_rounded, size: 16),
-                    label: const Text('Show All'),
+                    icon: const AppIcon(AppIconId.visible, size: 16),
+                    label: Text(context.l10n.cadLayersShowAll),
                     style: TextButton.styleFrom(
                       foregroundColor: const Color(0xFF00E5FF),
                     ),
@@ -149,20 +152,20 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
               unselectedLabelColor: isDark ? Colors.white54 : Colors.black54,
               tabs: [
                 Tab(
-                  icon: const Icon(Icons.layers_rounded, size: 20),
+                  icon: const AppIcon(AppIconId.layers, size: 20),
                   text: 'Storeys (${model.storeys.length})',
                 ),
                 Tab(
-                  icon: const Icon(Icons.category_rounded, size: 20),
+                  icon: const AppIcon(AppIconId.layoutGrid, size: 20),
                   text: 'Categories (${model.categories.length})',
                 ),
                 if (model.layers.isNotEmpty)
                   Tab(
-                    icon: const Icon(Icons.view_agenda_rounded, size: 20),
+                    icon: const AppIcon(AppIconId.layoutRows, size: 20),
                     text: 'Layers (${model.layers.where((l) => (model.layerCounts[l] ?? 0) > 0).length})',
                   ),
                 const Tab(
-                  icon: Icon(Icons.info_outline_rounded, size: 20),
+                  icon: AppIcon(AppIconId.info, size: 20),
                   text: 'Model Info',
                 ),
               ],
@@ -214,8 +217,8 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
               backgroundColor: isVisible
                   ? const Color(0xFF00E5FF).withValues(alpha: 0.15)
                   : Colors.grey.withValues(alpha: 0.15),
-              child: Icon(
-                Icons.stairs_rounded,
+              child: AppIcon(
+                AppIconId.stairs,
                 color: isVisible ? const Color(0xFF00E5FF) : Colors.grey,
                 size: 20,
               ),
@@ -228,7 +231,10 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
               ),
             ),
             subtitle: Text(
-              'Elevation: ${_formatElevation(storey.elevation)} • $count elements',
+              context.l10n.commandUiElevationValueValueElements(
+                (_formatElevation(storey.elevation)).toString(),
+                (count).toString(),
+              ),
               style: TextStyle(
                 fontSize: 12,
                 color: isDark ? Colors.white54 : Colors.black54,
@@ -238,8 +244,8 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  tooltip: 'Isolate Storey',
-                  icon: const Icon(Icons.filter_center_focus_rounded, size: 20),
+                  tooltip: context.l10n.commandUiIsolateStorey,
+                  icon: const AppIcon(AppIconId.fitView, size: 20),
                   color: isDark ? Colors.white70 : Colors.black54,
                   onPressed: () {
                     setState(() {
@@ -300,7 +306,7 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
                 shape: BoxShape.circle,
                 border: Border.all(color: color, width: 2),
               ),
-              child: Icon(icon, color: color, size: 20),
+              child: AppIcon.fromMaterial(icon, color: color, size: 20),
             ),
             title: Text(
               cat,
@@ -310,7 +316,7 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
               ),
             ),
             subtitle: Text(
-              '$count items',
+              context.l10n.commandUiValueItems((count).toString()),
               style: TextStyle(
                 fontSize: 12,
                 color: isDark ? Colors.white54 : Colors.black54,
@@ -320,8 +326,8 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  tooltip: 'Isolate Category',
-                  icon: const Icon(Icons.filter_center_focus_rounded, size: 20),
+                  tooltip: context.l10n.commandUiIsolateCategory,
+                  icon: const AppIcon(AppIconId.fitView, size: 20),
                   color: isDark ? Colors.white70 : Colors.black54,
                   onPressed: () {
                     setState(() {
@@ -376,8 +382,8 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
               backgroundColor: isVisible
                   ? const Color(0xFF00E5FF).withValues(alpha: 0.15)
                   : Colors.grey.withValues(alpha: 0.15),
-              child: Icon(
-                Icons.view_agenda_rounded,
+              child: AppIcon(
+                AppIconId.layoutRows,
                 color: isVisible ? const Color(0xFF00E5FF) : Colors.grey,
                 size: 20,
               ),
@@ -390,7 +396,7 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
               ),
             ),
             subtitle: Text(
-              '$count elements',
+              context.l10n.commandUiValueElements((count).toString()),
               style: TextStyle(
                 fontSize: 12,
                 color: isDark ? Colors.white54 : Colors.black54,
@@ -400,8 +406,8 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  tooltip: 'Isolate Layer',
-                  icon: const Icon(Icons.filter_center_focus_rounded, size: 20),
+                  tooltip: context.l10n.commandUiIsolateLayer,
+                  icon: const AppIcon(AppIconId.fitView, size: 20),
                   color: isDark ? Colors.white70 : Colors.black54,
                   onPressed: () {
                     setState(() {
@@ -440,11 +446,14 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
           const Divider(),
           _buildInfoRow('BIM Schema', model.schema, isDark),
           const Divider(),
-          _buildInfoRow('Total Elements', '${model.elements.length} building items', isDark),
+          _buildInfoRow('Total Elements', '${model.elements.length} building items', isDark,
+          ),
           const Divider(),
-          _buildInfoRow('Total Storeys', '${model.storeys.length} floor levels', isDark),
+          _buildInfoRow('Total Storeys', '${model.storeys.length} floor levels', isDark,
+          ),
           const Divider(),
-          _buildInfoRow('Total Triangles', '${model.totalTriangles} 3D facets', isDark),
+          _buildInfoRow('Total Triangles', '${model.totalTriangles} 3D facets', isDark,
+          ),
           const Spacer(),
           SizedBox(
             width: double.infinity,
@@ -453,10 +462,13 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
                 backgroundColor: const Color(0xFF16A34A),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              icon: const Icon(Icons.check_circle_outline_rounded),
-              label: const Text('Apply & Close', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              icon: const AppIcon(AppIconId.checkCircle),
+              label: Text(
+                context.l10n.commandUiApplyClose, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
               onPressed: () => Navigator.pop(context),
             ),
           ),

@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../core/models/coordinate_system.dart';
@@ -6,8 +8,7 @@ import '../rendering/dxf_math.dart';
 
 enum DxfImportAction {
   importOriginal,
-  importCentered,
-}
+  importCentered }
 
 /// Dialog displayed before importing a DXF file to inspect entities and verify coordinates.
 class DxfImportDialog extends StatelessWidget {
@@ -103,27 +104,32 @@ class DxfImportDialog extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4,
+                  ),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
+                  border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.description_outlined, size: 18, color: Colors.blueAccent),
+                        const Icon(Icons.description_outlined, size: 18, color: Colors.blueAccent,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             fileName,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Text(
                           '$fileSizeKb KB',
-                          style: TextStyle(fontSize: 11, color: theme.textTheme.bodySmall?.color),
+                          style: TextStyle(fontSize: 11, color: theme.textTheme.bodySmall?.color,
+                          ),
                         ),
                       ],
                     ),
@@ -235,16 +241,17 @@ class DxfImportDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, null),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.architectSheetCancel),
         ),
         ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
             backgroundColor: theme.colorScheme.primary,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
+            ),
           ),
-          icon: const Icon(Icons.add, size: 18),
-          label: const Text('Import'),
+          icon: const AppIcon(AppIconId.add, size: 18),
+          label: Text(context.l10n.commandUiImport),
           onPressed: () => Navigator.pop(context, DxfImportAction.importOriginal),
         ),
       ],
@@ -266,7 +273,8 @@ class DxfImportDialog extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: theme.colorScheme.primary),
+          AppIcon.fromMaterial(icon, size: 13, color: theme.colorScheme.primary,
+          ),
           const SizedBox(width: 4),
           Text(
             label,
@@ -303,7 +311,8 @@ class DxfImportDialog extends StatelessWidget {
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2)),
+            border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2),
+            ),
           ),
           child: Text(
             'X: [${DxfMath.formatDistance(minX)} .. ${DxfMath.formatDistance(maxX)}]\n'

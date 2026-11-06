@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -102,7 +103,7 @@ class _DirectionPickerState extends State<ArchitectViewDirectionPicker> {
                     key: const ValueKey('architect-view-direction-cancel'),
                     tooltip: context.l10n.cancel,
                     onPressed: widget.onCancel,
-                    icon: const Icon(Icons.close),
+                    icon: const AppIcon(AppIconId.close),
                   ),
                 ],
               ),

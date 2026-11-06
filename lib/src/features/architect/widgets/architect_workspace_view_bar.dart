@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -98,8 +99,8 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                         child: Row(
                           children: [
                             if (s.isRoof) ...[
-                              const Icon(
-                                Icons.roofing,
+                              const AppIcon(
+                                AppIconId.roof,
                                 size: 18,
                                 color: Color(0xFF00E5FF),
                               ),
@@ -129,8 +130,8 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                         value: 'add_roof_plan',
                         child: Row(
                           children: [
-                            const Icon(
-                              Icons.add_home_work_outlined,
+                            const AppIcon(
+                              AppIconId.newBuilding,
                               size: 18,
                               color: Color(0xFF00E5FF),
                             ),
@@ -145,28 +146,37 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                       CheckedPopupMenuItem(
                         value: project.elevations[i].id,
                         checked: viewId == project.elevations[i].id,
+                        child: AppMenuLabel(
+                          icon: AppIconId.elevation,
                         child: Text(
                           '${architectElevationLabel(l, project.elevations[i], (project.northSymbol?.angle ?? 0))} · ${i + 1}',
                         ),
+                      ),
                       ),
                   if (type == ArchitectWorkspaceView.section)
                     for (var i = 0; i < project.sections.length; i++)
                       CheckedPopupMenuItem(
                         value: project.sections[i].id,
                         checked: viewId == project.sections[i].id,
-                        child: Text(
+                        child: AppMenuLabel(
+                          icon: AppIconId.section,
+                          child: Text(
                           project.sections[i].name.isNotEmpty
                               ? project.sections[i].name
                               : l.architectSectionNumber(i + 1),
                         ),
                       ),
+                      ),
                   if (type != ArchitectWorkspaceView.plan)
                     PopupMenuItem(
                       value: 'new',
-                      child: Text(
+                      child: AppMenuLabel(
+                        icon: AppIconId.add,
+                        child: Text(
                         type == ArchitectWorkspaceView.section
                             ? l.buildingSectionNew
                             : l.architectFacadeNew,
+                        ),
                       ),
                     ),
                   if (type != ArchitectWorkspaceView.plan &&
@@ -175,19 +185,31 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                           : elevation != null)) ...[
                     PopupMenuItem(
                       value: 'edit',
-                      child: Text(l.architectFacadeEdit),
+                      child: AppMenuLabel(
+                        icon: AppIconId.edit,
+                        child: Text(l.architectFacadeEdit),
+                    ),
                     ),
                     PopupMenuItem(
                       value: 'depth',
-                      child: Text(l.architectViewDepth),
+                      child: AppMenuLabel(
+                        icon: AppIconId.dimension,
+                        child: Text(l.architectViewDepth),
+                    ),
                     ),
                     PopupMenuItem(
                       value: 'step',
-                      child: Text(l.architectViewStep),
+                      child: AppMenuLabel(
+                        icon: AppIconId.stairs,
+                        child: Text(l.architectViewStep),
+                    ),
                     ),
                     PopupMenuItem(
                       value: 'straight',
-                      child: Text(l.architectViewStraight),
+                      child: AppMenuLabel(
+                        icon: AppIconId.line,
+                        child: Text(l.architectViewStraight),
+                    ),
                     ),
                   ],
                   if (type != ArchitectWorkspaceView.plan)
@@ -198,13 +220,19 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                             ? 'architect-building-elevations'
                             : 'architect-building-sections',
                       ),
-                      child: Text(l.architectManageViews),
+                      child: AppMenuLabel(
+                        icon: AppIconId.properties,
+                        child: Text(l.architectManageViews),
+                      ),
                     ),
                   if (type == ArchitectWorkspaceView.section)
                     PopupMenuItem(
                       value: 'visibility',
                       key: const ValueKey('architect-section-visibility'),
-                      child: Text(l.architectViewVisibility),
+                      child: AppMenuLabel(
+                        icon: AppIconId.visible,
+                        child: Text(l.architectViewVisibility),
+                      ),
                     ),
                 ],
                 child: Container(
@@ -278,8 +306,8 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const Icon(
-                        Icons.arrow_drop_down,
+                      const AppIcon(
+                        AppIconId.expandMore,
                         size: 18,
                         color: Colors.white70,
                       ),

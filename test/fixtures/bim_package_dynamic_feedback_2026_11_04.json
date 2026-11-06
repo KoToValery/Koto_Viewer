@@ -1,0 +1,1221 @@
+{
+  "id": "bim_1793720672836_cd05c4",
+  "name": "Architectural Project",
+  "createdAt": "2026-11-03T17:44:32.836679",
+  "updatedAt": "2026-11-04T13:17:28.195583",
+  "units": "centimeters",
+  "distanceDecimals": 1,
+  "dimensionScale": 100,
+  "document": {
+    "version": 1,
+    "viewScales": {},
+    "profileMm": {},
+    "overrideMm": {},
+    "drawings": [],
+    "sheets": [],
+    "templates": [
+      {
+        "id": "standard",
+        "name": "",
+        "items": [
+          {
+            "id": "project",
+            "rect": [
+              0.0,
+              0.0,
+              180.0,
+              10.0
+            ],
+            "field": "project",
+            "text": "",
+            "textMm": 3.3,
+            "border": true
+          },
+          {
+            "id": "drawing",
+            "rect": [
+              0.0,
+              10.0,
+              180.0,
+              10.0
+            ],
+            "field": "drawing",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "number",
+            "rect": [
+              0.0,
+              20.0,
+              40.0,
+              10.0
+            ],
+            "field": "number",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "scale",
+            "rect": [
+              40.0,
+              20.0,
+              40.0,
+              10.0
+            ],
+            "field": "scale",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "author",
+            "rect": [
+              80.0,
+              20.0,
+              60.0,
+              10.0
+            ],
+            "field": "author",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "date",
+            "rect": [
+              140.0,
+              20.0,
+              40.0,
+              10.0
+            ],
+            "field": "date",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          }
+        ]
+      }
+    ]
+  },
+  "storeys": [
+    {
+      "id": "storey_0",
+      "name": "±0.00",
+      "elevation": 0.0,
+      "height": 3.0,
+      "cutPlaneHeight": 1.2,
+      "floorFinishThickness": 0.05,
+      "walls": [
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": false,
+          "id": "wall_element_388d683c_1793720688057042_0",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 0.0,
+            "y": 4.625
+          },
+          "endPoint": {
+            "x": 4.5,
+            "y": 4.625
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720690761847_1",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 4.5,
+            "y": 4.625
+          },
+          "endPoint": {
+            "x": 4.5,
+            "y": -0.025167785234899043
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720694175452_2",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 4.5,
+            "y": -0.025167785234899043
+          },
+          "endPoint": {
+            "x": 9.75,
+            "y": 0.004194630872483174
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720698436517_3",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 9.75,
+            "y": 0.0041946308724831755
+          },
+          "endPoint": {
+            "x": 9.75,
+            "y": 9.0
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720703883230_4",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 9.75,
+            "y": 9.0
+          },
+          "endPoint": {
+            "x": 0.0,
+            "y": 9.0
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720709103395_5",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 0.0,
+            "y": 9.0
+          },
+          "endPoint": {
+            "x": 0.0,
+            "y": 4.625
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720929042262_6",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 2.25,
+            "y": 4.75
+          },
+          "endPoint": {
+            "x": 2.25,
+            "y": 6.875
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "left",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_68002f2f_1793790425552405_0",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 3.584,
+            "y": 6.625
+          },
+          "endPoint": {
+            "x": 3.584,
+            "y": 9.0
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "left",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": false,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720983830113_7",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 4.625,
+            "y": 4.625
+          },
+          "endPoint": {
+            "x": 9.625,
+            "y": 4.625
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793721152568698_8",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 2.25,
+            "y": 6.875
+          },
+          "endPoint": {
+            "x": 9.75,
+            "y": 6.875
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "inner",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793721175865694_9",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 5.521,
+            "y": 11.301
+          },
+          "endPoint": {
+            "x": 8.401897087334515,
+            "y": 11.301
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793721178726878_10",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 8.401897087334515,
+            "y": 11.301
+          },
+          "endPoint": {
+            "x": 8.401897087334515,
+            "y": 13.5
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793721181726494_11",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 8.401897087334515,
+            "y": 13.5
+          },
+          "endPoint": {
+            "x": 5.521,
+            "y": 13.5
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793721187925636_12",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 5.521,
+            "y": 13.5
+          },
+          "endPoint": {
+            "x": 5.521,
+            "y": 11.301
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": false,
+          "id": "wall_element_388d683c_1793725709209760_13",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.12
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": -0.125,
+            "y": 4.5
+          },
+          "endPoint": {
+            "x": -0.125,
+            "y": 2.875
+          },
+          "thickness": 0.12,
+          "height": 1.05,
+          "baseOffset": 0.0,
+          "followStoreyHeight": false,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "outer",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "parapet_12",
+          "parapetFinish": "cap",
+          "parapet": true,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": false,
+          "id": "wall_element_388d683c_1793725714524095_14",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.12
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": -0.125,
+            "y": 2.875
+          },
+          "endPoint": {
+            "x": 4.5,
+            "y": 2.875
+          },
+          "thickness": 0.12,
+          "height": 1.05,
+          "baseOffset": 0.0,
+          "followStoreyHeight": false,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "outer",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "parapet_12",
+          "parapetFinish": "cap",
+          "parapet": true,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "mirror_6f44721d_1793733124093273_2",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 2.375,
+            "y": 14.716718385426752
+          },
+          "endPoint": {
+            "x": 9.000000000000002,
+            "y": 14.716718385426752
+          },
+          "thickness": 0.25,
+          "height": 1.05,
+          "baseOffset": 0.0,
+          "followStoreyHeight": false,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "inner",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": "cap",
+          "parapet": true,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "mirror_6f44721d_1793733318653897_3",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 2.375,
+            "y": 14.40975764222506
+          },
+          "endPoint": {
+            "x": 9.0,
+            "y": 14.40975764222506
+          },
+          "thickness": 0.25,
+          "height": 1.05,
+          "baseOffset": 0.0,
+          "followStoreyHeight": false,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "inner",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": "cap",
+          "parapet": true,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        }
+      ],
+      "zones": [],
+      "columns": [],
+      "beams": [],
+      "slabs": [],
+      "roofs": [],
+      "openings": [],
+      "stairs": [],
+      "dimensions": [],
+      "elevationMarkers": [],
+      "annotations": [],
+      "cadPrimitives": [],
+      "components": []
+    }
+  ],
+  "activeStoreyId": "storey_0",
+  "gridAxes": [
+    {
+      "id": "axis_x_1",
+      "name": "1",
+      "start": {
+        "dx": 0.0,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 0.0,
+        "dy": 15.0
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_x_2",
+      "name": "2",
+      "start": {
+        "dx": 4.5,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 4.5,
+        "dy": 15.0
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_x_3",
+      "name": "3",
+      "start": {
+        "dx": 9.0,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 9.0,
+        "dy": 15.0
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_0",
+      "name": "A",
+      "start": {
+        "dx": -1.5,
+        "dy": 0.0
+      },
+      "end": {
+        "dx": 10.5,
+        "dy": 0.0
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_1",
+      "name": "B",
+      "start": {
+        "dx": -1.5,
+        "dy": 4.5
+      },
+      "end": {
+        "dx": 10.5,
+        "dy": 4.5
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_2",
+      "name": "C",
+      "start": {
+        "dx": -1.5,
+        "dy": 9.0
+      },
+      "end": {
+        "dx": 10.5,
+        "dy": 9.0
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_3",
+      "name": "D",
+      "start": {
+        "dx": -1.5,
+        "dy": 13.5
+      },
+      "end": {
+        "dx": 10.5,
+        "dy": 13.5
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    }
+  ],
+  "wallTypes": [
+    {
+      "id": "ext_25_12_eps",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "exterior",
+      "layers": [],
+      "location": "exterior",
+      "totalThickness": 0.37,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.12,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4293874512
+    },
+    {
+      "id": "int_12_partition",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "interior",
+      "layers": [],
+      "location": "interior",
+      "totalThickness": 0.12,
+      "brickThickness": 0.12,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4294944550
+    },
+    {
+      "id": "ext_25_brick",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "exterior",
+      "layers": [],
+      "location": "exterior",
+      "totalThickness": 0.25,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4294930499
+    },
+    {
+      "id": "bearing_25_concrete",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "interior",
+      "layers": [
+        {
+          "id": "core",
+          "material": "concrete",
+          "role": "core",
+          "thickness": 0.25
+        }
+      ],
+      "location": "interior",
+      "totalThickness": 0.25,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4286091420
+    },
+    {
+      "id": "int_25_brick",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "interior",
+      "layers": [
+        {
+          "id": "core",
+          "material": "brick",
+          "role": "core",
+          "thickness": 0.25
+        }
+      ],
+      "location": "interior",
+      "totalThickness": 0.25,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4286091420
+    },
+    {
+      "id": "int_10_aerated",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "interior",
+      "layers": [
+        {
+          "id": "core",
+          "material": "aeratedConcrete",
+          "role": "core",
+          "thickness": 0.1
+        }
+      ],
+      "location": "interior",
+      "totalThickness": 0.1,
+      "brickThickness": 0.1,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4286091420
+    },
+    {
+      "id": "parapet_12",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "parapet",
+      "layers": [],
+      "location": "exterior",
+      "totalThickness": 0.12,
+      "brickThickness": 0.12,
+      "insulationThickness": 0.0,
+      "customHeight": 1.05,
+      "parapetFinish": "cap",
+      "colorValue": 4280723098
+    }
+  ],
+  "lineStyles": [],
+  "hatchPatterns": [],
+  "openingStyles": [],
+  "slabAssemblies": [],
+  "sections": [],
+  "sectionVisibility": {},
+  "elevations": [],
+  "slabCompositionNumbers": {}
+}

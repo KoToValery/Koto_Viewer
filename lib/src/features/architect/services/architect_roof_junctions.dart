@@ -4,6 +4,7 @@ import 'dart:ui';
 import '../models/architect_project.dart';
 import '../rendering/architect_path_solid.dart';
 import '../rendering/architect_vertical_clip.dart';
+import 'architect_service_geometry.dart';
 
 /// Derived roof envelopes. Original polygons and their eaves references remain
 /// editable; cutting a footprint must never change its slope or datum plane.
@@ -33,6 +34,19 @@ class ArchitectRoofJunctions {
       ],
     ];
     final signature = Object.hashAll([
+      for (final floor in floors)
+        for (final c in floor.components.where((c) => c.isServiceComponent))
+          Object.hash(
+            c.id,
+            c.position,
+            c.rotation,
+            c.isVisible,
+            c.elevationOffset,
+            floor.elevation,
+            Object.hashAll(
+              c.parameters.entries.map((e) => Object.hash(e.key, e.value)),
+            ),
+          ),
       for (final (roof, elevation) in planes)
         Object.hash(
           roof.id,
@@ -58,13 +72,51 @@ class ArchitectRoofJunctions {
                 baseElevationOffset: roof.baseElevationOffset + elevation,
               ),
     ]);
+    final serviceProject =
+        project ??
+        ArchitectProject(
+          id: 'service-envelope',
+          name: '',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+          storeys: [storey],
+          activeStoreyId: storey.id,
+        );
+    for (final (roof, _) in planes) {
+      final owner =
+          serviceProject.storeys
+              .where((s) => s.id == roof.storeyId)
+              .firstOrNull ??
+          storey;
+      var path = result.footprints[roof.id]!;
+      for (final penetration in ArchitectServiceGeometry.penetrations(
+        serviceProject,
+        owner,
+        roof,
+      )) {
+        final overlap = Path.combine(
+          PathOperation.intersect,
+          path,
+          penetration.opening,
+        );
+        if (overlap.getBounds().isEmpty) continue;
+        path = Path.combine(
+          PathOperation.difference,
+          path,
+          penetration.opening,
+        );
+        result.trimmed.add(roof.id);
+      }
+      result.footprints[roof.id] = path;
+    }
     _cache[cacheKey] = (signature, result);
     return result;
   }
 
   static ArchitectRoofJunctions resolve(List<ArchitectRoofPlane> roofs) {
     final original = {
-      for (final roof in roofs) roof.id: ArchitectContour.path(roof.points, roof.holes),
+      for (final roof in roofs)
+        roof.id: ArchitectContour.path(roof.points, roof.holes),
     };
     String group(ArchitectRoofPlane roof) => roof.roofGroupId == null
         ? 'plane:${roof.id}'
@@ -157,11 +209,12 @@ class ArchitectRoofJunctions {
     }
     return ArchitectRoofJunctions._(result, {
       for (final roof in roofs)
-        if (roof.holes.isNotEmpty || !Path.combine(
-          PathOperation.xor,
-          original[roof.id]!,
-          result[roof.id]!,
-        ).getBounds().isEmpty)
+        if (roof.holes.isNotEmpty ||
+            !Path.combine(
+              PathOperation.xor,
+              original[roof.id]!,
+              result[roof.id]!,
+            ).getBounds().isEmpty)
           roof.id,
     });
   }

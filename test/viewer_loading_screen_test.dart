@@ -1,3 +1,4 @@
+import 'support/command_icon_finders.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/models/pdf_item.dart';
@@ -25,9 +26,10 @@ void main() {
       expect(find.text('23.4 MB'), findsOneWidget);
       expect(find.text('Зареждане на PDF документ...'), findsOneWidget);
       expect(find.text('Подготовка на страниците...'), findsOneWidget);
-      expect(find.byIcon(Icons.picture_as_pdf_rounded), findsOneWidget);
+      expect(findCommandIcon(Icons.picture_as_pdf_rounded), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
-    });
+    },
+    );
 
     testWidgets('Renders determinate progress with percentage badge when progress is provided', (tester) async {
       await tester.pumpWidget(
@@ -48,9 +50,11 @@ void main() {
       expect(find.text('5.0 MB'), findsOneWidget);
       expect(find.text('68%'), findsOneWidget);
       expect(find.text('Триангулация: 68%'), findsOneWidget);
-    });
+    },
+    );
 
-    testWidgets('Triggers onCancel callback when close button is pressed', (tester) async {
+    testWidgets('Triggers onCancel callback when close button is pressed', (tester,
+    ) async {
       bool cancelled = false;
 
       await tester.pumpWidget(
@@ -66,7 +70,7 @@ void main() {
       );
 
       expect(cancelled, isFalse);
-      await tester.tap(find.byIcon(Icons.close));
+      await tester.tap(findCommandIcon(Icons.close));
       await tester.pump();
       expect(cancelled, isTrue);
     });
@@ -88,9 +92,10 @@ void main() {
       expect(find.text('8.0 MB'), findsOneWidget);
       expect(find.text('Конвертиране на DWG...'), findsOneWidget);
       expect(find.text('Анализиране на CAD слоеве...'), findsOneWidget);
-      expect(find.byIcon(Icons.architecture_rounded), findsNothing);
+      expect(findCommandIcon(Icons.architecture_rounded), findsNothing);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
-    });
+    },
+    );
   });
 
   group('FBX and 3D / Ebook File Type Tests', () {

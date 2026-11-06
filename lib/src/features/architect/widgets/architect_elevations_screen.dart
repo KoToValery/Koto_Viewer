@@ -1,3 +1,5 @@
+import 'architect_dialog.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../rendering/architect_hatch_geometry.dart';
 import '../models/architect_hatch_pattern.dart';
 import 'architect_projection_drawing_menu.dart';
@@ -262,13 +264,13 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
             key: const ValueKey('architect-facade-new'),
             tooltip: l.architectFacadeNew,
             onPressed: () => begin(_Placement.elevation),
-            icon: const Icon(Icons.add),
+            icon: const AppIcon(AppIconId.add),
           ),
           IconButton(
             key: const ValueKey('architect-north'),
             tooltip: l.architectNorth,
             onPressed: rotateNorth,
-            icon: const Icon(Icons.explore_outlined),
+            icon: const AppIcon(AppIconId.compass),
           ),
           IconButton(
             key: const ValueKey('architect-facade-undo'),
@@ -279,7 +281,7 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
                     widget.controller.undo();
                   }
                 : null,
-            icon: const Icon(Icons.undo),
+            icon: const AppIcon(AppIconId.undo),
           ),
           PopupMenuButton<String>(
             onSelected: (action) {
@@ -308,23 +310,43 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
               if (value != null) ...[
                 PopupMenuItem(
                   value: 'depth',
-                  child: Text(l.architectViewDepth),
+                  child: AppMenuLabel(
+                    icon: AppIconId.dimension,
+                    child: Text(l.architectViewDepth),
+                ),
                 ),
                 PopupMenuItem(
                   value: 'edit',
-                  child: Text(l.architectFacadeEdit),
+                  child: AppMenuLabel(
+                    icon: AppIconId.edit,
+                    child: Text(l.architectFacadeEdit),
+                ),
                 ),
                 PopupMenuItem(
                   value: 'flip',
-                  child: Text(l.architectFacadeReverse),
+                  child: AppMenuLabel(
+                    icon: AppIconId.flipHorizontal,
+                    child: Text(l.architectFacadeReverse),
                 ),
-                PopupMenuItem(value: 'delete', child: Text(l.delete)),
+                ),
+                PopupMenuItem(value: 'delete', child: AppMenuLabel(
+                    icon: AppIconId.delete,
+                    child: Text(l.delete),
+                  ),
+                ),
               ],
-              PopupMenuItem(value: 'north', child: Text(l.architectNorthPlace)),
+              PopupMenuItem(value: 'north', child: AppMenuLabel(
+                  icon: AppIconId.compass,
+                  child: Text(l.architectNorthPlace),
+                ),
+              ),
               PopupMenuItem(
                 value: 'redo',
                 enabled: widget.controller.canRedo,
-                child: Text(l.architectZoneRedoAction),
+                child: AppMenuLabel(
+                  icon: AppIconId.redo,
+                  child: Text(l.architectZoneRedoAction),
+                ),
               ),
             ],
           ),
@@ -367,7 +389,7 @@ class _ElevationsState extends State<ArchitectElevationsScreen> {
                       planTransform.value = Matrix4.identity();
                       elevationTransform.value = Matrix4.identity();
                     },
-                    icon: const Icon(Icons.fit_screen),
+                    icon: const AppIcon(AppIconId.fitView),
                   ),
                   TextButton(
                     key: const ValueKey('architect-facade-plan-toggle'),
@@ -754,7 +776,7 @@ class _NorthDialogState extends State<_NorthDialog> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return AlertDialog(
+    return architectAlertDialog(
       title: Text(l.architectNorth),
       content: SizedBox(
         width: 340,

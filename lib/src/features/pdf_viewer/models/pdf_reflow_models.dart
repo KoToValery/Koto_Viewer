@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -6,20 +7,19 @@ enum PdfReflowTheme {
   light,
   sepia,
   dark,
-  amoled,
-}
+  amoled }
 
 extension PdfReflowThemeExtension on PdfReflowTheme {
-  String get label {
+  String localizedLabel(AppLocalizations l) {
     switch (this) {
       case PdfReflowTheme.light:
-        return 'Light';
+        return l.commandIconGalleryLight;
       case PdfReflowTheme.sepia:
-        return 'Warm Sepia';
+        return l.commandOptionWarmSepia;
       case PdfReflowTheme.dark:
-        return 'Dark Charcoal';
+        return l.commandOptionDarkCharcoal;
       case PdfReflowTheme.amoled:
-        return 'Pure Black';
+        return l.commandOptionPureBlack;
     }
   }
 
@@ -80,18 +80,17 @@ extension PdfReflowThemeExtension on PdfReflowTheme {
 enum PdfReflowFont {
   serif,
   sans,
-  mono,
-}
+  mono }
 
 extension PdfReflowFontExtension on PdfReflowFont {
-  String get label {
+  String localizedLabel(AppLocalizations l) {
     switch (this) {
       case PdfReflowFont.serif:
-        return 'Serif (Book)';
+        return l.commandOptionSerifBook;
       case PdfReflowFont.sans:
-        return 'Sans-Serif (Modern)';
+        return l.commandOptionSansSerifModern;
       case PdfReflowFont.mono:
-        return 'Monospace';
+        return l.commandOptionMonospace;
     }
   }
 

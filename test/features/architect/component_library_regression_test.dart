@@ -202,7 +202,12 @@ void main() {
     final mismatches = <String>[];
     for (final d in ComponentLibraryService.instance.getAllDefinitions()) {
       final p = d.defaultParameters;
-      final mesh = d.generateGeometry(p).mesh3d.bounds;
+      // Catalog XYZ describes the chimney body; the independently configured
+      // rain cap projects beyond it. Cap dimensions are checked by services tests.
+      final mesh = d.generateGeometry({
+        ...p,
+        if (d.id == 'service_chimney') 'capType': 0,
+      }).mesh3d.bounds;
       final spans = [
         mesh.max.x - mesh.min.x,
         mesh.max.y - mesh.min.y,

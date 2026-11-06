@@ -105,6 +105,7 @@ void main() {
       await key(tester, '0.5'); // centimetres
       await tester.tap(find.byKey(const ValueKey('shape-save')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       final result = model.project.activeStorey.cadPrimitives.single;
       expect(result.polygonCorners, [
         const Offset(-.5, -.5),
@@ -141,6 +142,7 @@ void main() {
       await key(tester, '0.5');
       await tester.tap(find.byKey(const ValueKey('shape-save')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       final result = model.project.activeStorey.cadPrimitives.single;
       expect(result.polygonCorners, outer);
       expect(result.holes.single, [
@@ -204,6 +206,7 @@ void main() {
       expect(identical(before, model.project), isTrue);
       await gesture.up();
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       final path = InsertArchitectElementPoint.pathOf(
         model.project.activeStorey,
         'p',

@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 
 enum BaseMapType {
@@ -111,8 +113,7 @@ class RouteLayersSheet extends StatefulWidget {
       isScrollControlled: true,
       builder: (ctx) => RouteLayersSheet(
         settings: currentSettings,
-        onChanged: onChanged,
-      ),
+        onChanged: onChanged),
     );
   }
 
@@ -172,7 +173,8 @@ class _RouteLayersSheetState extends State<RouteLayersSheet> {
             ),
             Row(
               children: [
-                Icon(Icons.layers_rounded, color: theme.colorScheme.primary, size: 24),
+                Icon(Icons.layers_rounded, color: theme.colorScheme.primary, size: 24,
+                ),
                 const SizedBox(width: 10),
                 Text(
                   'Map Overlays & Style',
@@ -182,7 +184,7 @@ class _RouteLayersSheetState extends State<RouteLayersSheet> {
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.close, size: 20),
+                  icon: const AppIcon(AppIconId.close, size: 20),
                   onPressed: () => Navigator.of(context).pop(_current),
                 ),
               ],
@@ -205,7 +207,8 @@ class _RouteLayersSheetState extends State<RouteLayersSheet> {
                   onTap: () => _update(_current.copyWith(baseMap: type)),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? theme.colorScheme.primary.withValues(alpha: 0.1)
@@ -222,8 +225,10 @@ class _RouteLayersSheetState extends State<RouteLayersSheet> {
                       children: [
                         CircleAvatar(
                           radius: 15,
-                          backgroundColor: type.iconColor.withValues(alpha: 0.15),
-                          child: Icon(type.icon, size: 18, color: type.iconColor),
+                          backgroundColor: type.iconColor.withValues(alpha: 0.15,
+                          ),
+                          child: AppIcon.fromMaterial(type.icon, size: 18, color: type.iconColor,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -247,7 +252,7 @@ class _RouteLayersSheetState extends State<RouteLayersSheet> {
                             ],
                           ),
                         ),
-                        Icon(
+                        AppIcon.fromMaterial(
                           isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
                           size: 20,
                           color: isSelected ? theme.colorScheme.primary : Colors.grey,
@@ -268,14 +273,18 @@ class _RouteLayersSheetState extends State<RouteLayersSheet> {
               secondary: const CircleAvatar(
                 radius: 18,
                 backgroundColor: Color(0xFFDCFCE7),
-                child: Icon(Icons.hiking_rounded, color: Color(0xFF16A34A), size: 20),
+                child: AppIcon(
+                  AppIconId.walk, color: Color(0xFF16A34A), size: 20,
+                ),
               ),
-              title: const Text(
-                'Hiking Trails & Markings',
+              title: Text(
+                context.l10n.commandUiHikingTrailsMarkings,
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
-              subtitle: const Text(
-                'Waymarked Trails: official mountain route colors & codes from OSM',
+              subtitle: Text(
+                context
+                    .l10n
+                    .commandUiWaymarkedTrailsOfficialMountainRouteColorsCodesFromOsm,
                 style: TextStyle(fontSize: 12),
               ),
               value: _current.showHikingTrails,
@@ -289,14 +298,18 @@ class _RouteLayersSheetState extends State<RouteLayersSheet> {
               secondary: const CircleAvatar(
                 radius: 18,
                 backgroundColor: Color(0xFFE0E7FF),
-                child: Icon(Icons.directions_bike_rounded, color: Color(0xFF4F46E5), size: 20),
+                child: AppIcon(
+                  AppIconId.bicycle, color: Color(0xFF4F46E5), size: 20,
+                ),
               ),
-              title: const Text(
-                'MTB & Cycling Routes',
+              title: Text(
+                context.l10n.commandUiMtbCyclingRoutes,
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
-              subtitle: const Text(
-                'Waymarked Trails: dedicated mountain bike and cycling network',
+              subtitle: Text(
+                context
+                    .l10n
+                    .commandUiWaymarkedTrailsDedicatedMountainBikeAndCyclingNetwork,
                 style: TextStyle(fontSize: 12),
               ),
               value: _current.showCyclingTrails,
@@ -307,11 +320,14 @@ class _RouteLayersSheetState extends State<RouteLayersSheet> {
             // 3. Track Width Slider
             Row(
               children: [
-                const Icon(Icons.line_weight_rounded, size: 20, color: Colors.grey),
+                const Icon(Icons.line_weight_rounded, size: 20, color: Colors.grey,
+                ),
                 const SizedBox(width: 8),
-                const Text('Track Line Width', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                const Text('Track Line Width', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
                 const Spacer(),
-                Text('${_current.trackWidth.toStringAsFixed(1)} px', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text('${_current.trackWidth.toStringAsFixed(1)} px', style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
               ],
             ),
             Slider(
@@ -327,9 +343,11 @@ class _RouteLayersSheetState extends State<RouteLayersSheet> {
               children: [
                 const Icon(Icons.opacity_rounded, size: 20, color: Colors.grey),
                 const SizedBox(width: 8),
-                const Text('Track Opacity', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                const Text('Track Opacity', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
                 const Spacer(),
-                Text('${(_current.trackOpacity * 100).toStringAsFixed(0)}%', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text('${(_current.trackOpacity * 100).toStringAsFixed(0)}%', style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
               ],
             ),
             Slider(

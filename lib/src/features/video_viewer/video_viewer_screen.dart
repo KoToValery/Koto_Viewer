@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -114,7 +115,8 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
         _scheduleControlsHiding();
       }
     } catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'VideoViewerScreen._initPlayer');
+      AppErrorHandler.recordError(e, stack, context: 'VideoViewerScreen._initPlayer',
+      );
       if (mounted) {
         setState(() {
           _hasError = true;
@@ -374,11 +376,13 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 56),
+            const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 56,
+            ),
             const SizedBox(height: 16),
             const Text(
               'Could not play video',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -389,8 +393,8 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Go Back'),
+              icon: const AppIcon(AppIconId.back),
+              label: Text(context.l10n.commandUiGoBack),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white24,
                 foregroundColor: Colors.white,
@@ -481,7 +485,7 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
+            icon: const AppIcon(AppIconId.back, color: Colors.white, size: 28),
             onPressed: () => Navigator.of(context).pop(),
           ),
           const SizedBox(width: 8),
@@ -499,9 +503,10 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
           ),
           // Loop Toggle
           IconButton(
-            tooltip: _isLooping ? 'Loop: ON' : 'Loop: OFF',
-            icon: Icon(
-              Icons.repeat_rounded,
+            tooltip: _isLooping ? context.l10n.commandUiLoopOn
+                : context.l10n.commandUiLoopOff,
+            icon: AppIcon(
+              AppIconId.repeat,
               color: _isLooping ? Colors.amberAccent : Colors.white70,
               size: 24,
             ),
@@ -510,7 +515,7 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
           // Speed Selector
           PopupMenuButton<double>(
             initialValue: _playbackSpeed,
-            tooltip: 'Playback Speed',
+            tooltip: context.l10n.commandUiPlaybackSpeed,
             icon: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
@@ -533,13 +538,13 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
               1.0,
               1.25,
               1.5,
-              2.0,
-            ].map((s) => PopupMenuItem(value: s, child: Text('${s}x'))).toList(),
+              2.0].map((s) => PopupMenuItem(value: s, child: Text('${s}x'))).toList(),
           ),
           // Orientation lock
           IconButton(
-            tooltip: _isLandscapeLocked ? 'Unlock Orientation' : 'Lock Landscape',
-            icon: Icon(
+            tooltip: _isLandscapeLocked ? context.l10n.commandUiUnlockOrientation
+                : context.l10n.commandUiLockLandscape,
+            icon: AppIcon.fromMaterial(
               _isLandscapeLocked ? Icons.screen_lock_landscape_rounded : Icons.screen_rotation_rounded,
               color: _isLandscapeLocked ? Colors.amberAccent : Colors.white70,
               size: 24,
@@ -548,8 +553,9 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
           ),
           // Mute / Unmute
           IconButton(
-            tooltip: _isMuted ? 'Unmute' : 'Mute',
-            icon: Icon(
+            tooltip: _isMuted ? context.l10n.commandUiUnmute
+                : context.l10n.commandIconMute,
+            icon: AppIcon.fromMaterial(
               _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
               color: _isMuted ? Colors.redAccent : Colors.white70,
               size: 24,
@@ -568,7 +574,7 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
         IconButton(
           iconSize: 42,
           color: Colors.white,
-          icon: const Icon(Icons.replay_10_rounded),
+          icon: const AppIcon(AppIconId.replayTen),
           onPressed: () => _seekRelative(const Duration(seconds: -10), forward: false),
         ),
         const SizedBox(width: 32),
@@ -581,7 +587,7 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
             onTap: _togglePlayPause,
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Icon(
+              child: AppIcon.fromMaterial(
                 isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                 size: 48,
                 color: Colors.black,
@@ -593,7 +599,7 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
         IconButton(
           iconSize: 42,
           color: Colors.white,
-          icon: const Icon(Icons.forward_10_rounded),
+          icon: const AppIcon(AppIconId.forwardTen),
           onPressed: () => _seekRelative(const Duration(seconds: 10), forward: true),
         ),
       ],
@@ -602,7 +608,8 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
 
   Widget _buildBottomBar(Duration position, Duration duration) {
     final maxMs = duration.inMilliseconds.toDouble();
-    final posMs = position.inMilliseconds.toDouble().clamp(0.0, maxMs > 0 ? maxMs : 0.0);
+    final posMs = position.inMilliseconds.toDouble().clamp(0.0, maxMs > 0 ? maxMs : 0.0,
+    );
 
     return Container(
       padding: EdgeInsets.only(
@@ -629,14 +636,17 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
             children: [
               Text(
                 _formatDuration(position),
-                style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500,
+                ),
               ),
               Expanded(
                 child: SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 14,
+                    ),
                     activeTrackColor: Colors.amberAccent,
                     inactiveTrackColor: Colors.white24,
                     thumbColor: Colors.amberAccent,
@@ -647,7 +657,8 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
                     max: maxMs > 0 ? maxMs : 1.0,
                     value: posMs,
                     onChanged: (value) {
-                      _controller?.seekTo(Duration(milliseconds: value.toInt()));
+                      _controller?.seekTo(Duration(milliseconds: value.toInt()),
+                      );
                       _scheduleControlsHiding();
                     },
                   ),
@@ -655,7 +666,8 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
               ),
               Text(
                 _formatDuration(duration),
-                style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -70,7 +71,7 @@ class _PreviewState extends State<ArchitectAutoRoofPreviewDialog> {
             IconButton(
               tooltip: l.close,
               onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.close),
+              icon: const AppIcon(AppIconId.close),
             ),
           ],
         ),

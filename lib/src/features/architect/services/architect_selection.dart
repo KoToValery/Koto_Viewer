@@ -1,3 +1,4 @@
+import '../rendering/architect_annotation_layout.dart';
 import '../widgets/architect_elevation_labels.dart';
 import '../models/architect_contour.dart';
 import 'architect_roof_drainage_geometry.dart';
@@ -8,6 +9,7 @@ import '../models/architect_hatch_pattern.dart';
 import '../models/architect_drawing_color.dart';
 import 'dart:ui';
 import 'dart:math' as math;
+import 'architect_wall_arc_editing.dart';
 import '../models/architect_column.dart';
 import '../models/architect_project.dart';
 import '../models/architect_elements.dart';
@@ -25,6 +27,9 @@ import '../../../core/l10n/l10n_extensions.dart';
 /// A shared property schema for all persisted architectural element kinds.
 class ArchitectSelection {
   static const numericKeys = {
+    'size',
+    'slopePercent',
+    'angle',
     'height',
     'thickness',
     'width',
@@ -84,7 +89,9 @@ class ArchitectSelection {
         if (e[key] is num) key: (e[key] as num).toDouble(),
     };
     // Hatch pen widths are paper-space drawing rules, not model dimensions.
-    if (project.activeStorey.cadPrimitives.any((p) => p.id == id && p.type == CadPrimitiveType.hatch)) {
+    if (project.activeStorey.cadPrimitives.any(
+      (p) => p.id == id && p.type == CadPrimitiveType.hatch,
+    )) {
       fields.remove('strokeWidth');
     }
     if (project.activeStorey.columns.any((c) => c.id == id)) {
@@ -92,11 +99,8 @@ class ArchitectSelection {
           (e['height'] as num?)?.toDouble() ?? project.activeStorey.height;
     }
     if (project.activeStorey.zones.any((z) => z.id == id)) {
-      fields['clearHeight'] =
-          (e['clearHeight'] as num?)?.toDouble() ?? 2.60;
-      if (e['targetArea'] is num) {
-        fields['targetArea'] = (e['targetArea'] as num).toDouble();
-      }
+      fields['clearHeight'] = (e['clearHeight'] as num?)?.toDouble() ?? 2.60;
+      fields['targetArea'] = (e['targetArea'] as num?)?.toDouble() ?? 0;
     }
     if (e.containsKey('referenceLine') ||
         project.activeStorey.columns.any((c) => c.id == id) ||
@@ -105,7 +109,7 @@ class ArchitectSelection {
     }
     if (e.containsKey('referenceLine')) {
       final wall = ArchitectWall.fromJson(e);
-      if(wall.isCurved)fields['arcRadius']=wall.arc!.radius;
+      if (wall.isCurved) fields['arcRadius'] = wall.arc!.radius;
       fields['coreThickness'] = wall.coreThickness;
       fields['insulationThicknessOverride'] = wall.insulationThickness;
     }
@@ -114,8 +118,17 @@ class ArchitectSelection {
 
   static Rect? bounds(ArchitectProject project, String id) {
     final s = project.activeStorey;
+    for (final a in s.annotations) {
+      if (a.id == id)
+        return ArchitectAnnotationLayout.outline(
+          a,
+          project: project,
+        ).getBounds();
+    }
     for (final axis in project.gridAxes) {
-      if (axis.id == id) return Rect.fromPoints(axis.start, axis.end).inflate(.02);
+      if (axis.id == id) {
+        return Rect.fromPoints(axis.start, axis.end).inflate(.02);
+      }
     }
     for (final component in s.components) {
       if (component.id == id) return component.worldBoundingRect;
@@ -136,8 +149,12 @@ class ArchitectSelection {
         if (o.$1 == id) {
           final center = w.centerPointAt(o.$2);
           return ArchitectSceneGeometry.boundsOf([
-            center - w.tangentAt(o.$2) * o.$3 / 2 - w.normalAt(o.$2) * w.thickness / 2,
-            center + w.tangentAt(o.$2) * o.$3 / 2 + w.normalAt(o.$2) * w.thickness / 2,
+            center -
+                w.tangentAt(o.$2) * o.$3 / 2 -
+                w.normalAt(o.$2) * w.thickness / 2,
+            center +
+                w.tangentAt(o.$2) * o.$3 / 2 +
+                w.normalAt(o.$2) * w.thickness / 2,
           ]);
         }
       }
@@ -188,24 +205,41 @@ class ArchitectSelection {
     final p = wall.centerPointAt(ratio);
     final u = wall.tangentAt(ratio) * width / 2;
     final n = wall.normalAt(ratio) * wall.thickness / 2;
-    return Path()..addPolygon([p-u-n,p+u-n,p+u+n,p-u+n],true);
+    return Path()
+      ..addPolygon([p - u - n, p + u - n, p + u + n, p - u + n], true);
   }
 
   static Path columnOutline(ArchitectColumn column) {
     if (column.shape == ColumnShape.circular) {
-      return Path()..addOval(Rect.fromCircle(center:column.position,radius:column.width/2));
+      return Path()..addOval(
+        Rect.fromCircle(center: column.position, radius: column.width / 2),
+      );
     }
-    final angle=column.rotationDeg*math.pi/180;
-    Offset rotate(Offset p)=>column.position+Offset(
-      p.dx*math.cos(angle)-p.dy*math.sin(angle),p.dx*math.sin(angle)+p.dy*math.cos(angle));
-    return Path()..addPolygon([
-      Offset(-column.width/2,-column.depth/2),Offset(column.width/2,-column.depth/2),
-      Offset(column.width/2,column.depth/2),Offset(-column.width/2,column.depth/2),
-    ].map(rotate).toList(),true);
+    final angle = column.rotationDeg * math.pi / 180;
+    Offset rotate(Offset p) =>
+        column.position +
+        Offset(
+          p.dx * math.cos(angle) - p.dy * math.sin(angle),
+          p.dx * math.sin(angle) + p.dy * math.cos(angle),
+        );
+    return Path()..addPolygon(
+      [
+        Offset(-column.width / 2, -column.depth / 2),
+        Offset(column.width / 2, -column.depth / 2),
+        Offset(column.width / 2, column.depth / 2),
+        Offset(-column.width / 2, column.depth / 2),
+      ].map(rotate).toList(),
+      true,
+    );
   }
 
   static Path outline(ArchitectProject project, String id) {
     final s = project.activeStorey;
+    for (final a in s.annotations) {
+      if (a.id == id)
+        return ArchitectAnnotationLayout.outline(a, project: project);
+    }
+
     final path = Path();
     for (final component in s.components) {
       if (component.id == id) {
@@ -222,7 +256,9 @@ class ArchitectSelection {
     for (final w in s.walls) {
       if (w.id == id) {
         return path..addPolygon(
-          ArchitectSpecialWallGeometry.physicalPlanCorners(w, s.walls), true);
+          ArchitectSpecialWallGeometry.physicalPlanCorners(w, s.walls),
+          true,
+        );
       }
       for (final o in [
         ...w.doors.map((d) => (d.id, d.offsetRatio, d.width)),
@@ -240,15 +276,25 @@ class ArchitectSelection {
       if (b.id == id) return path..addPolygon(b.polygonCorners, true);
     }
     for (final drain in s.floorDrains) {
-      if (drain.id == id) return ArchitectContour.path(drain.polygon, drain.holes);
+      if (drain.id == id) {
+        return ArchitectContour.path(drain.polygon, drain.holes);
+      }
     }
     for (final slab in s.slabs) {
       if (slab.id == id) return ArchitectContour.path(slab.polygon, slab.holes);
     }
     for (final roof in s.roofs) {
-      if (roof.id == id) { return Path.combine(PathOperation.union,
-        ArchitectRoofJunctions.of(s, project: project).footprint(roof),
-        ArchitectRoofDrainageGeometry.build(project, s, roof).planPath(roof.drainage.gutterWidth)); }
+      if (roof.id == id) {
+        return Path.combine(
+          PathOperation.union,
+          ArchitectRoofJunctions.of(s, project: project).footprint(roof),
+          ArchitectRoofDrainageGeometry.build(
+            project,
+            s,
+            roof,
+          ).planPath(roof.drainage.gutterWidth),
+        );
+      }
     }
     for (final zone in s.zones) {
       if (zone.id == id) return path..addPolygon(zone.polygon, true);
@@ -267,13 +313,18 @@ class ArchitectSelection {
       }
     }
     for (final p in s.cadPrimitives) {
-      if (p.id == id && (p.type == CadPrimitiveType.line ||
-          p.type == CadPrimitiveType.polyline)) {
+      if (p.id == id &&
+          (p.type == CadPrimitiveType.line ||
+              p.type == CadPrimitiveType.polyline)) {
         return path..addPolygon(p.linePoints, false);
       }
       if (p.id == id && p.type == CadPrimitiveType.circle) {
-        return path..addOval(Rect.fromCircle(center: p.startPoint,
-          radius: (p.endPoint - p.startPoint).distance));
+        return path..addOval(
+          Rect.fromCircle(
+            center: p.startPoint,
+            radius: (p.endPoint - p.startPoint).distance,
+          ),
+        );
       }
       if (p.id == id && p.isPolygon) {
         return ArchitectContour.path(p.polygonCorners, p.holes);
@@ -281,7 +332,8 @@ class ArchitectSelection {
     }
     for (final segments in [
       for (final cut in project.sections.where((e) => e.id == id)) cut.segments,
-      for (final facade in project.elevations.where((e) => e.id == id)) facade.segments,
+      for (final facade in project.elevations.where((e) => e.id == id))
+        facade.segments,
     ]) {
       path.moveTo(segments.first.start.dx, segments.first.start.dy);
       for (final segment in segments) {
@@ -303,7 +355,9 @@ class ArchitectSelection {
   }) {
     if (ids.isEmpty) return '';
     final s = project.activeStorey;
-    if (s.groups.any((g) => g.elementIds.length == ids.length && g.elementIds.containsAll(ids))) {
+    if (s.groups.any(
+      (g) => g.elementIds.length == ids.length && g.elementIds.containsAll(ids),
+    )) {
       return '${l.bimGroupLabel} · ${l.architectSelectionCount(ids.length)}';
     }
     final wallCount = s.walls.where((w) => ids.contains(w.id)).length;
@@ -322,10 +376,18 @@ class ArchitectSelection {
         .where((win) => ids.contains(win.id))
         .length;
     final axisCount = project.gridAxes.where((a) => ids.contains(a.id)).length;
-    final sectionCount = project.sections.where((s) => ids.contains(s.id)).length;
-    final elevationCount = project.elevations.where((e) => ids.contains(e.id)).length;
-    final cadCount = s.cadPrimitives.where((c) => ids.contains(c.id) && c.type != CadPrimitiveType.hatch).length;
-    final hatchCount = s.cadPrimitives.where((c) => ids.contains(c.id) && c.type == CadPrimitiveType.hatch).length;
+    final sectionCount = project.sections
+        .where((s) => ids.contains(s.id))
+        .length;
+    final elevationCount = project.elevations
+        .where((e) => ids.contains(e.id))
+        .length;
+    final cadCount = s.cadPrimitives
+        .where((c) => ids.contains(c.id) && c.type != CadPrimitiveType.hatch)
+        .length;
+    final hatchCount = s.cadPrimitives
+        .where((c) => ids.contains(c.id) && c.type == CadPrimitiveType.hatch)
+        .length;
 
     final parts = <String>[];
     if (wallCount > 0) parts.add(l.architectSelectionWallsCount(wallCount));
@@ -344,7 +406,9 @@ class ArchitectSelection {
       if (sectionCount == 1 && ids.length == 1) {
         final sec = project.sections.firstWhere((s) => ids.contains(s.id));
         final idx = project.sections.indexOf(sec) + 1;
-        parts.add(sec.name.isNotEmpty ? sec.name : l.architectSectionNumber(idx));
+        parts.add(
+          sec.name.isNotEmpty ? sec.name : l.architectSectionNumber(idx),
+        );
       } else {
         parts.add('${l.buildingSections}: $sectionCount');
       }
@@ -352,12 +416,13 @@ class ArchitectSelection {
     if (elevationCount > 0) {
       if (elevationCount == 1 && ids.length == 1) {
         final el = project.elevations.firstWhere((e) => ids.contains(e.id));
-        parts.add(architectElevationLabel(l, el, project.northSymbol?.angle ?? 0));
+        parts.add(
+          architectElevationLabel(l, el, project.northSymbol?.angle ?? 0),
+        );
       } else {
         parts.add('${l.architectFacades}: $elevationCount');
       }
     }
-
 
     if (parts.length == 1) {
       return parts.first;
@@ -375,18 +440,27 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
   final Set<String> elementIds;
   final Map<String, double> values;
   final Map<String, String> textValues;
+  final Set<String> clearValues;
   const SetArchitectElementProperties({
     required this.storeyId,
     required this.elementIds,
     this.values = const {},
     this.textValues = const {},
+    this.clearValues = const {},
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
     for (final entry in values.entries) {
       final value = entry.value;
       if (!value.isFinite) throw ArgumentError('Invalid property');
-      if (!{'rotationDeg', 'hatchAngle', 'elevation', 'offsetDistance', 'baseOffset'}.contains(entry.key) &&
+      if (!{
+            'angle',
+            'rotationDeg',
+            'hatchAngle',
+            'elevation',
+            'offsetDistance',
+            'baseOffset',
+          }.contains(entry.key) &&
           value <
               (entry.key == 'sillHeight' ||
                       entry.key == 'insulationThicknessOverride'
@@ -412,19 +486,24 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
       throw ArgumentError('Unknown element');
     }
     for (final e in entries) {
+      for (final key in clearValues) {
+        if (key != 'targetArea' ||
+            !project.activeStorey.zones.any((z) => z.id == e['id'])) {
+          throw ArgumentError('Cannot clear property');
+        }
+        e.remove(key);
+      }
       final fields = ArchitectSelection.fields(project, e['id'] as String);
       for (final value in values.entries) {
         if (!fields.containsKey(value.key)) {
           throw ArgumentError('Unsupported property');
         }
-        if(value.key=='arcRadius') {
-          final wall=ArchitectWall.fromJson(e),chord=(wall.endPoint-wall.startPoint).distance;
-          if(value.value<chord/2)throw ArgumentError('Invalid arc radius');
-          final root=math.sqrt(math.max(0,value.value*value.value-chord*chord/4));
-          e['arcBulge']=wall.arcBulge.sign*(value.value+(wall.arcBulge.abs()>1?root:-root))/(chord/2);
+        if (value.key == 'arcRadius') {
+          final wall = ArchitectWall.fromJson(e);
+          e['arcBulge'] = wall.arc!.withRadius(value.value).bulge;
           continue;
         }
-        e[value.key] = value.key == 'stepCount' 
+        e[value.key] = value.key == 'stepCount'
             ? value.value.toInt()
             : value.value;
         if (value.key == 'stepCount' && e['design'] is Map) {
@@ -432,6 +511,90 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         }
       }
       for (final value in textValues.entries) {
+        final isText = project.activeStorey.annotations.any(
+          (a) => a.id == e['id'],
+        );
+        final isLevel = project.activeStorey.elevationMarkers.any(
+          (a) => a.id == e['id'],
+        );
+        if (value.key == 'closed' &&
+            project.activeStorey.cadPrimitives.any(
+              (p) => p.id == e['id'] && p.type == CadPrimitiveType.polyline,
+            )) {
+          if (!{'true', 'false'}.contains(value.value))
+            throw ArgumentError('Invalid closure');
+          final line = ArchitectCadPrimitive.fromJson(e),
+              close = value.value == 'true';
+          final points = List<Offset>.of(line.linePoints);
+          if (points.length > 2 && points.first == points.last)
+            points.removeLast();
+          if (close && !ArchitectContour.valid(points, const []))
+            throw ArgumentError('Invalid contour');
+          if (close) points.add(points.first);
+          ArchitectCadPrimitive.validatePolyline(points);
+          e.addAll(
+            line
+                .copyWith(
+                  closed: close,
+                  polygon: points,
+                  startPoint: points.first,
+                  endPoint: points.last,
+                )
+                .toJson(),
+          );
+          continue;
+        }
+        if (isText &&
+            {
+              'alignment',
+              'fontWeight',
+              'italic',
+              'underline',
+              'textColor',
+            }.contains(value.key)) {
+          switch (value.key) {
+            case 'alignment':
+              if (!{'left', 'center', 'right'}.contains(value.value))
+                throw ArgumentError('Invalid alignment');
+              e['alignment'] = value.value;
+            case 'fontWeight':
+              final n = int.tryParse(value.value);
+              if (n == null || n < 100 || n > 900 || n % 100 != 0)
+                throw ArgumentError('Invalid weight');
+              e['fontWeight'] = n;
+            case 'textColor':
+              final n = int.tryParse(value.value);
+              if (n == null || n < 0 || n > 0xFFFFFFFF)
+                throw ArgumentError('Invalid color');
+              e['colorValue'] = n;
+            default:
+              if (!{'true', 'false'}.contains(value.value))
+                throw ArgumentError('Invalid boolean');
+              e[value.key] = value.value == 'true';
+          }
+          continue;
+        }
+        if (isLevel &&
+            {'symbol', 'levelUnits', 'levelDecimals'}.contains(value.key)) {
+          if (value.key == 'symbol') {
+            if (!ArchitectLevelSymbol.values.any((s) => s.name == value.value))
+              throw ArgumentError('Invalid level symbol');
+            e['symbol'] = value.value;
+          } else if (value.value == 'inherit') {
+            e.remove(value.key);
+          } else if (value.key == 'levelUnits') {
+            if (!ArchitectUnit.values.any((u) => u.name == value.value))
+              throw ArgumentError('Invalid level unit');
+            e['levelUnits'] = value.value;
+          } else {
+            final n = int.tryParse(value.value);
+            if (n == null || n < 0 || n > 4)
+              throw ArgumentError('Invalid level precision');
+            e['levelDecimals'] = n;
+          }
+          continue;
+        }
+
         if (value.key == 'wallPanelPlacement') {
           final wall = ArchitectWall.fromJson(e);
           if (!wall.system.isPanel) {
@@ -450,25 +613,37 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
           continue;
         }
         if (value.key == 'drawingColor') {
-          if (!project.activeStorey.cadPrimitives.any((p) => p.id == e['id'] && p.type == CadPrimitiveType.hatch)) {
+          if (!project.activeStorey.cadPrimitives.any(
+            (p) => p.id == e['id'] && p.type == CadPrimitiveType.hatch,
+          )) {
             throw ArgumentError('Drawing fill colors require hatch elements');
           }
-          final color = ArchitectDrawingColor.fromJson(Map<String, dynamic>.from(jsonDecode(value.value) as Map));
+          final color = ArchitectDrawingColor.fromJson(
+            Map<String, dynamic>.from(jsonDecode(value.value) as Map),
+          );
           e['colorValue'] = color.argb;
-          if (color.presetId == null) { e.remove('colorPresetId'); }
-          else { e['colorPresetId'] = color.presetId; }
+          if (color.presetId == null) {
+            e.remove('colorPresetId');
+          } else {
+            e['colorPresetId'] = color.presetId;
+          }
           continue;
         }
         if (value.key == 'hatchPattern' || value.key == 'hatchBorder') {
-          if (!project.activeStorey.cadPrimitives.any((p) =>
-              p.id == e['id'] && p.type == CadPrimitiveType.hatch)) {
+          if (!project.activeStorey.cadPrimitives.any(
+            (p) => p.id == e['id'] && p.type == CadPrimitiveType.hatch,
+          )) {
             throw ArgumentError('Hatch properties require hatch elements');
           }
           if (value.key == 'hatchBorder') {
-            if (value.value != 'true' && value.value != 'false') throw ArgumentError('Invalid border');
+            if (value.value != 'true' && value.value != 'false') {
+              throw ArgumentError('Invalid border');
+            }
             e['hatchBorder'] = value.value == 'true';
           } else {
-            final pattern = ArchitectHatchPattern.fromJson(Map<String, dynamic>.from(jsonDecode(value.value) as Map));
+            final pattern = ArchitectHatchPattern.fromJson(
+              Map<String, dynamic>.from(jsonDecode(value.value) as Map),
+            );
             e['hatchPattern'] = pattern.toJson();
             if (!pattern.isPreset) {
               final catalog = json['hatchPatterns'] as List;
@@ -536,9 +711,11 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
           throw ArgumentError('Invalid cut display mode');
         }
         if (value.key == 'location' &&
-            !ArchitectWallLocation.values.any((v) => v.name == value.value) ||
+                !ArchitectWallLocation.values.any(
+                  (v) => v.name == value.value,
+                ) ||
             {'locationMode', 'exteriorSideMode'}.contains(value.key) &&
-            !WallResolutionMode.values.any((v) => v.name == value.value)) {
+                !WallResolutionMode.values.any((v) => v.name == value.value)) {
           throw ArgumentError('Invalid wall resolution mode');
         }
         if (value.key == 'isAutoBoundary') {
@@ -546,7 +723,9 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
             throw ArgumentError('Invalid boolean value');
           }
           e[value.key] = value.value == 'true';
-        } else if (value.key == 'isHingeLeft' || value.key == 'openInward' || value.key == 'isFlipped') {
+        } else if (value.key == 'isHingeLeft' ||
+            value.key == 'openInward' ||
+            value.key == 'isFlipped') {
           if (!{'true', 'false'}.contains(value.value)) {
             throw ArgumentError('Invalid boolean value');
           }
@@ -557,7 +736,10 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
             if (currentSpec != null && currentSpec.isNotEmpty) {
               final base = ArchitectDoor.extractBaseNumber(currentSpec);
               if (base != null) {
-                e['specId'] = ArchitectDoor.formatSpecId(baseNumber: base, isHingeLeft: boolVal);
+                e['specId'] = ArchitectDoor.formatSpecId(
+                  baseNumber: base,
+                  isHingeLeft: boolVal,
+                );
               }
             }
           }
@@ -587,10 +769,12 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         }
       }
       if (e.containsKey('referenceLine')) {
-        if (textValues.containsKey('location') && !textValues.containsKey('locationMode')) {
+        if (textValues.containsKey('location') &&
+            !textValues.containsKey('locationMode')) {
           e['locationMode'] = 'manual';
         }
-        if (textValues.containsKey('exteriorSide') && !textValues.containsKey('exteriorSideMode')) {
+        if (textValues.containsKey('exteriorSide') &&
+            !textValues.containsKey('exteriorSideMode')) {
           e['exteriorSideMode'] = 'manual';
         }
         final old = project.activeStorey.walls.firstWhere(
@@ -615,20 +799,46 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
             values.containsKey('insulationThicknessOverride')) {
           e['thickness'] = core + insulation;
         }
-        if(old.layers.isNotEmpty && (values.containsKey('coreThickness') || values.containsKey('insulationThicknessOverride') || values.containsKey('thickness'))) {
-          final list=[...old.layers];
-          if(values.containsKey('thickness')&&!values.containsKey('coreThickness')&&list.length!=1)throw ArgumentError('Edit composition layers explicitly');
-          for(final role in [ArchitectLayerRole.core,ArchitectLayerRole.insulation]) {
-            final update=role==ArchitectLayerRole.core?values['coreThickness']??(list.length==1?values['thickness']:null):values['insulationThicknessOverride'];
-            if(update==null)continue;
-            final indices=[for(var i=0;i<list.length;i++)if(list[i].role==role)i];
-            if(indices.length!=1)throw ArgumentError('Edit composition layers explicitly');
-            if(update==0){list.removeAt(indices.single);}else{list[indices.single]=list[indices.single].copyWith(thickness:update);}
+        if (old.layers.isNotEmpty &&
+            (values.containsKey('coreThickness') ||
+                values.containsKey('insulationThicknessOverride') ||
+                values.containsKey('thickness'))) {
+          final list = [...old.layers];
+          if (values.containsKey('thickness') &&
+              !values.containsKey('coreThickness') &&
+              list.length != 1) {
+            throw ArgumentError('Edit composition layers explicitly');
+          }
+          for (final role in [
+            ArchitectLayerRole.core,
+            ArchitectLayerRole.insulation,
+          ]) {
+            final update = role == ArchitectLayerRole.core
+                ? values['coreThickness'] ??
+                      (list.length == 1 ? values['thickness'] : null)
+                : values['insulationThicknessOverride'];
+            if (update == null) continue;
+            final indices = [
+              for (var i = 0; i < list.length; i++)
+                if (list[i].role == role) i,
+            ];
+            if (indices.length != 1) {
+              throw ArgumentError('Edit composition layers explicitly');
+            }
+            if (update == 0) {
+              list.removeAt(indices.single);
+            } else {
+              list[indices.single] = list[indices.single].copyWith(
+                thickness: update,
+              );
+            }
           }
           ArchitectMaterialLayer.validate(list);
-          e['layers']=list.map((l)=>l.toJson()).toList();
-          e['thickness']=list.fold(0.0,(v,l)=>v+l.thickness);
-          e['insulationThicknessOverride']=list.where((l)=>l.role==ArchitectLayerRole.insulation).fold(0.0,(v,l)=>v+l.thickness);
+          e['layers'] = list.map((l) => l.toJson()).toList();
+          e['thickness'] = list.fold(0.0, (v, l) => v + l.thickness);
+          e['insulationThicknessOverride'] = list
+              .where((l) => l.role == ArchitectLayerRole.insulation)
+              .fold(0.0, (v, l) => v + l.thickness);
         }
         e.remove('coreThickness');
       }
@@ -637,9 +847,14 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
       ArchitectProject.fromJson(json),
       previous: project,
     );
-    for (final stair in next.activeStorey.stairs.where((s) => elementIds.contains(s.id))) {
-      if (stair.design != null && !stair.design!.isDraft &&
-          ArchitectStairRules.check(stair).any((c) => c.state == StairCheckState.error)) {
+    for (final stair in next.activeStorey.stairs.where(
+      (s) => elementIds.contains(s.id),
+    )) {
+      if (stair.design != null &&
+          !stair.design!.isDraft &&
+          ArchitectStairRules.check(
+            stair,
+          ).any((c) => c.state == StairCheckState.error)) {
         throw ArgumentError('Stair violates selected geometric rules');
       }
     }
@@ -664,9 +879,14 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
     )) {
       final old = project.activeStorey.walls.firstWhere((w) => w.id == wall.id);
       var updated = wall;
+      if (values.containsKey('arcRadius')) {
+        ArchitectWallArcEditing.validateOpenings(updated);
+      }
       final flipped = old.exteriorSide != wall.exteriorSide;
       if (flipped && wall.isCurved) {
-        updated=wall.copyWith(exteriorSide:old.exteriorSide).mirroredAroundCore();
+        updated = wall
+            .copyWith(exteriorSide: old.exteriorSide)
+            .mirroredAroundCore();
       } else if (flipped) {
         final shift = old.coreCenterStart - wall.coreCenterStart;
         updated = wall.copyWith(
@@ -677,7 +897,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
       result = UpdateArchitectWall(
         storeyId: storeyId,
         wall: updated,
-        carryConnections: !flipped,
+        carryConnections: !flipped && !values.containsKey('arcRadius'),
       ).apply(result);
     }
     // Non-wall fields come from the same validated transaction.

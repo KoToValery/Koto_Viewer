@@ -4,20 +4,66 @@ import '../../../core/l10n/generated/app_localizations.dart';
 import '../models/architect_project.dart';
 import '../rendering/architect_vector_scene.dart';
 import 'architect_drawing_publisher.dart';
+import 'architect_sheet_geometry.dart';
+import 'architect_sheet_layout.dart';
 
 class ArchitectSheetComposer {
+  static ArchitectVectorScene _sourceScene(
+    ArchitectProject p,
+    ArchitectDrawingPlacement place,
+    ArchitectSavedDrawing drawing,
+    AppLocalizations l,
+    ArchitectPublicationSources sources,
+    Map<Object, ArchitectVectorScene>? drawingScenes,
+  ) {
+    final effectiveDrawing = drawing.copyWith(
+      visibility: {...drawing.visibility, ...place.visibilityOverrides},
+    );
+    final key = ArchitectDrawingPublisher.sceneKey(
+      effectiveDrawing,
+      place.scale,
+      l,
+      sources: sources,
+    );
+    ArchitectVectorScene build() => ArchitectDrawingPublisher.build(
+      p,
+      effectiveDrawing,
+      place.scale,
+      l,
+      sources: sources,
+    );
+    return drawingScenes?.putIfAbsent(key, build) ?? build();
+  }
+
+  /// Uncropped, title-free content in sheet coordinates. An editing gesture can
+  /// reuse this layer with a live clip/translation without recording the sheet
+  /// or its thousands of source operations again on every pointer movement.
+  static ArchitectVectorScene placementContent(
+    ArchitectProject p,
+    ArchitectDrawingPlacement place,
+    AppLocalizations l, {
+    ArchitectPublicationSources sources = const ArchitectPublicationSources(),
+    Map<Object, ArchitectVectorScene>? drawingScenes,
+  }) {
+    final drawing = p.document.drawings
+        .where((d) => d.id == place.drawingId)
+        .firstOrNull;
+    if (drawing == null ||
+        !ArchitectDrawingPublisher.hasSource(p, drawing) ||
+        !ArchitectSheetGeometry.valid(place.copyWith(clearCrop: true))) {
+      return const ArchitectVectorScene([], 1);
+    }
+    final canvas = ArchitectVectorCanvas();
+    final unit = 1000 / place.scale;
+    canvas.translate(place.frame.left, place.frame.top);
+    canvas.rotate(place.rotation * math.pi / 180);
+    canvas.translate(-place.anchor.dx * unit, -place.anchor.dy * unit);
+    _sourceScene(p, place, drawing, l, sources, drawingScenes).paint(canvas);
+    return ArchitectVectorScene(canvas.operations, 1);
+  }
+
   static String drawingName(ArchitectSavedDrawing d, AppLocalizations l) =>
-      d.name.isNotEmpty
-      ? d.name
-      : switch (d.kind) {
-          ArchitectDrawingKind.plan =>
-            d.roof ? l.architectRoofPlan : l.architectSheetPlan,
-          ArchitectDrawingKind.section => l.architectSectionNumber(
-            d.sourceNumber,
-          ),
-          ArchitectDrawingKind.elevation =>
-            '${l.architectFacades} ${d.sourceNumber}',
-        };
+      ArchitectSheetLayout.drawingName(d, l);
   static String sheetName(ArchitectSheet s, AppLocalizations l) =>
       s.name.isEmpty ? l.architectSheetName : s.name;
   static List<String> missingSources(
@@ -32,19 +78,39 @@ class ArchitectSheetComposer {
       ))
         place.number,
   ];
+  static List<String> issues(
+    ArchitectProject p,
+    ArchitectSheet sheet,
+    AppLocalizations l,
+  ) => [
+    if (missingSources(p, sheet).isNotEmpty) l.architectSheetMissingSource,
+    ...ArchitectSheetLayout.issues(
+      p,
+      sheet,
+      l,
+      drawingNames: {
+        for (final d in p.document.drawings) d.id: drawingName(d, l),
+      },
+    ),
+  ];
   static ArchitectVectorScene compose(
     ArchitectProject p,
     ArchitectSheet sheet,
     AppLocalizations l, {
     bool allowMissing = false,
+    bool previewOutsideSheet = false,
+    Set<String> excludePlacements = const {},
     ArchitectPublicationSources sources = const ArchitectPublicationSources(),
+    Map<Object, ArchitectVectorScene>? drawingScenes,
   }) {
-    final missing = missingSources(p, sheet);
-    if (missing.isNotEmpty && !allowMissing) {
-      throw StateError(l.architectSheetMissingSource);
+    if (!allowMissing) {
+      final blockers = issues(p, sheet, l);
+      if (blockers.isNotEmpty) throw StateError(blockers.join('\n'));
     }
     final canvas = ArchitectVectorCanvas();
-    canvas.clipRect(Rect.fromLTWH(0, 0, sheet.widthMm, sheet.heightMm));
+    if (!previewOutsideSheet) {
+      canvas.clipRect(Rect.fromLTWH(0, 0, sheet.widthMm, sheet.heightMm));
+    }
     canvas.drawRect(
       Rect.fromLTWH(0, 0, sheet.widthMm, sheet.heightMm),
       Paint()..color = Colors.white,
@@ -78,6 +144,20 @@ class ArchitectSheetComposer {
       ArchitectAnnotationRole.ordinary,
     );
     for (final place in sheet.placements) {
+      if (excludePlacements.contains(place.id)) continue;
+      canvas.sources(const {}, 'sheet');
+      if (!ArchitectSheetGeometry.valid(place)) {
+        final origin = place.frame.topLeft;
+        text(
+          l.architectSheetInvalid,
+          origin.dx.isFinite && origin.dy.isFinite
+              ? origin
+              : Offset(sheet.marginMm, sheet.marginMm),
+          2.2,
+          color: Colors.red,
+        );
+        continue;
+      }
       final drawing = p.document.drawings
           .where((d) => d.id == place.drawingId)
           .firstOrNull;
@@ -90,27 +170,25 @@ class ArchitectSheetComposer {
         );
         continue;
       }
-      final scene = ArchitectDrawingPublisher.build(
-        p,
-        drawing,
-        place.scale,
-        l,
-        sources: sources,
-      );
+      final scene = _sourceScene(p, place, drawing, l, sources, drawingScenes);
       final unit = 1000 / place.scale;
       canvas.save();
-      canvas.clipRect(place.frame);
+      canvas.clipPath(ArchitectSheetGeometry.clipPath(place));
       canvas.translate(place.frame.left, place.frame.top);
       canvas.rotate(place.rotation * math.pi / 180);
       canvas.translate(-place.anchor.dx * unit, -place.anchor.dy * unit);
       scene.paint(canvas);
       canvas.restore();
+      canvas.sources(const {}, 'sheet');
       if (place.showTitle) {
-        text(
-          '${place.number}  ${drawingName(drawing, l)}  1:${place.scale}',
-          place.frame.bottomLeft + const Offset(0, 1),
+        final title =
+            '${place.number}  ${drawingName(drawing, l)}  1:${place.scale}';
+        final tp = ArchitectSheetLayout.textPainter(
+          title,
           2.2,
+          place.frame.width,
         );
+        tp.paint(canvas, place.frame.bottomLeft + const Offset(0, 1));
       }
     }
     final template = p.document.templates
@@ -123,7 +201,10 @@ class ArchitectSheetComposer {
         sheet.widthMm - sheet.marginMm - width,
         sheet.heightMm - sheet.marginMm - height,
       );
-      final scales = sheet.placements.map((e) => e.scale).toSet();
+      canvas.drawRect(
+        Rect.fromLTWH(origin.dx, origin.dy, width, height),
+        Paint()..color = Colors.white,
+      );
       for (final item in template.items) {
         final r = item.rect.shift(origin);
         if (item.border) {
@@ -135,30 +216,13 @@ class ArchitectSheetComposer {
               ..strokeWidth = .18,
           );
         }
-        final value = switch (item.field) {
-          ArchitectTitleField.text => item.text,
-          ArchitectTitleField.project => p.name,
-          ArchitectTitleField.drawing => sheetName(sheet, l),
-          ArchitectTitleField.number => sheet.number,
-          ArchitectTitleField.scale =>
-            scales.length == 1
-                ? '1:${scales.single}'
-                : scales.isEmpty
-                ? '—'
-                : l.architectSheetMixedScales,
-          ArchitectTitleField.author => sheet.author,
-          ArchitectTitleField.date => sheet.date,
-        };
-        final tp = ArchitectTextPainter(
-          text: TextSpan(
-            text: value,
-            style: TextStyle(
-              fontFamily: 'ArchitectNoto',
-              fontSize: item.textMm / ArchitectDrawingScale.fontCapRatio,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: math.max(1, r.width - 2));
+        final value = ArchitectSheetLayout.fieldValue(p, sheet, item, l);
+        if (value.isEmpty) continue;
+        final tp = ArchitectSheetLayout.textPainter(
+          value,
+          item.textMm,
+          r.width - 2,
+        );
         final overflow =
             tp.height + 2 > r.height ||
             width > sheet.widthMm - 2 * sheet.marginMm ||

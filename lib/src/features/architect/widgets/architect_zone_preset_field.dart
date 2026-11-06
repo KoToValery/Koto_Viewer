@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 
 /// A dropdown of presets that also preserves arbitrary user-entered values.
@@ -15,17 +16,25 @@ class ArchitectZonePresetField extends StatelessWidget {
   @override
   Widget build(BuildContext context) => TextField(
     controller: controller,
-    style: const TextStyle(color: Colors.white, fontSize: 13),
+    style: TextStyle(
+      color: Theme.of(context).colorScheme.onSurface,
+      fontSize: 14,
+    ),
     decoration: InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.white70),
+      labelStyle: TextStyle(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
       filled: true,
-      fillColor: const Color(0x22FFFFFF),
+      fillColor: Theme.of(context).colorScheme.surfaceContainerHigh,
       border: const OutlineInputBorder(),
-      isDense: true,
+      isDense: false,
       suffixIcon: PopupMenuButton<String>(
         tooltip: label,
-        icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
+        icon: AppIcon(
+          AppIconId.expandMore,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
         onSelected: (value) => controller.text = value,
         itemBuilder: (_) => [
           for (final preset in presets.toSet())

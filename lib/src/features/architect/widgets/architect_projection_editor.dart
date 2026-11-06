@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../services/architect_selection_candidates.dart';
 import 'architect_candidate_picker.dart';
 import 'architect_roof_pitch_editor.dart';
@@ -9,9 +10,11 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../services/architect_command_controller.dart';
+import '../services/architect_stair_rules.dart';
 import '../services/architect_projection_editing.dart';
 import '../services/architect_projection_snap.dart';
 import 'architect_element_properties_dialog.dart';
+import 'architect_properties_shell.dart';
 import 'architect_roof_layers_dialog.dart';
 import 'architect_slab_layers_dialog.dart';
 import 'architect_stair_properties_dialog.dart';
@@ -35,6 +38,7 @@ void navigateArchitectProjection(
 /// Edits real model elements from either projection. Camera, drawings and model
 /// coordinates stay separate; a drag publishes one validated history entry.
 class ArchitectProjectionEditor extends StatefulWidget {
+  final ValueChanged<ArchitectProject?>? onPropertiesPreview;
   final ArchitectCommandController controller;
   final Map<String, Path> paths;
   final Map<String, Path> roofProfiles;
@@ -46,6 +50,7 @@ class ArchitectProjectionEditor extends StatefulWidget {
   final double scale;
   const ArchitectProjectionEditor({
     super.key,
+    this.onPropertiesPreview,
     required this.controller,
     required this.paths,
     this.roofProfiles = const {},
@@ -247,13 +252,33 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
     if (_candidates != null) setState(() => _candidates = null);
     final ref = selected;
     if (ref == null) return;
+    final document = project;
     final local = project.copyWith(activeStoreyId: ref.storey.id);
     if (ref.kind == ArchitectProjectionKind.roof) {
       final roof = ref.storey.roofs.firstWhere((r) => r.id == ref.id);
-      await showDialog<void>(
+      await showArchitectProperties<void>(
         context: context,
         builder: (_) => ArchitectRoofLayersDialog(
-          initialDrainage: roof.drainage,
+          isCurrent:()=>identical(document,project),          initialDrainage: roof.drainage,
+          onPreview: (result) => widget.onPropertiesPreview?.call(
+            widget.controller.prepare(
+              UpdateArchitectRoofPlane(
+                storeyId: ref.storey.id,
+                roof: roof.copyWith(
+                  assembly: result.assembly,
+                  slopeDegrees: result.slopeDegrees,
+                  eavesOverhang: result.eavesOverhang,
+                  drainage: result.drainage,
+                  eavesCut: result.eavesCut,
+                  baseElevationOffset: result.baseElevationOffset,
+                  attachToWalls: result.attachToWalls,
+                  manualSupportDistance: result.manualSupportDistance,
+                  clearManualSupportDistance:
+                      result.manualSupportDistance == null,
+                ),
+              ).apply(document),
+            ),
+          ),
           project: project,
           roof: roof,
           initialAssembly: roof.assembly,
@@ -283,15 +308,24 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
           ),
         ),
       );
+      widget.onPropertiesPreview?.call(null);
       return;
     }
     if (ref.kind == ArchitectProjectionKind.stair) {
       final stair = ref.storey.stairs.firstWhere((s) => s.id == ref.id);
-      await showDialog<void>(
+      await showArchitectProperties<void>(
         context: context,
         builder: (_) => ArchitectStairPropertiesDialog(
-          project: local,
+          isCurrent:()=>identical(document,project),          project: local,
           stair: stair,
+          onPreview: (next) => widget.onPropertiesPreview?.call(
+            widget.controller.prepare(
+              PutArchitectStair(
+                storeyId: ref.storey.id,
+                stair: next,
+              ).apply(document),
+            ),
+          ),
           onApply: (next) => apply(
             () => ArchitectModelCommand.replace(
               project,
@@ -307,38 +341,46 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
           ),
         ),
       );
+      widget.onPropertiesPreview?.call(null);
       return;
     }
-    await showDialog<void>(
+    if (ref.kind == ArchitectProjectionKind.slab) {
+      await showArchitectProperties<void>(
+        context: context,
+        builder: (_) => ArchitectSlabLayersDialog(
+          project: local,
+          slab: ref.storey.slabs.firstWhere((s) => s.id == ref.id),
+          isCurrent: () => identical(document, project),
+          onPreview: (next) => widget.onPropertiesPreview?.call(
+            widget.controller.prepare(
+              next.copyWith(activeStoreyId: document.activeStoreyId),
+            ),
+          ),
+          onApply: (next) => apply(
+            () => next.copyWith(activeStoreyId: document.activeStoreyId),
+          ),
+        ),
+      );
+      widget.onPropertiesPreview?.call(null);
+      return;
+    }
+    await showArchitectProperties<void>(
       context: context,
       builder: (_) => ArchitectElementPropertiesDialog(
         project: local,
         elementIds: {ref.id},
-        onApply: (values, texts) => apply(
-          () => ArchitectProjectionEditing.properties(
-            project,
-            ref.id,
-            values,
-            texts,
-          ),
+        onApply: (_, _) => false,
+        isCurrent: () => identical(document, project),
+        prepare: (next) => widget.controller.prepare(
+          next.copyWith(activeStoreyId: document.activeStoreyId),
         ),
-        onSlabLayers: ref.kind != ArchitectProjectionKind.slab
-            ? null
-            : () {
-                showDialog<void>(
-                  context: context,
-                  builder: (_) => ArchitectSlabLayersDialog(
-                    project: local,
-                    slab: ref.storey.slabs.firstWhere((s) => s.id == ref.id),
-                    onApply: (next) => apply(
-                      () =>
-                          next.copyWith(activeStoreyId: project.activeStoreyId),
-                    ),
-                  ),
-                );
-              },
+        onPreview: widget.onPropertiesPreview,
+        onApplyProject: (next) =>
+            identical(document, project) &&
+            apply(() => next.copyWith(activeStoreyId: document.activeStoreyId)),
       ),
     );
+    widget.onPropertiesPreview?.call(null);
   }
 
   void align(String side) {
@@ -398,13 +440,24 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
         Offset.zero & overlay.size,
       ),
       items: [
-        PopupMenuItem(value: 'properties', child: Text(l.architectProperties)),
+        PopupMenuItem(value: 'properties', child: AppMenuLabel(
+            icon: AppIconId.properties,
+            child: Text(l.architectProperties),
+          ),
+        ),
         PopupMenuItem(
           value: 'move',
-          child: Text(l.architectRoofMoveVerticalAction),
+          child: AppMenuLabel(
+            icon: AppIconId.move,
+            child: Text(l.architectRoofMoveVerticalAction),
+          ),
         ),
         if (ref?.kind == ArchitectProjectionKind.roof)
-          PopupMenuItem(value: 'pitch', child: Text(l.architectRoofPitchEdit)),
+          PopupMenuItem(value: 'pitch', child: AppMenuLabel(
+              icon: AppIconId.measureAngle,
+              child: Text(l.architectRoofPitchEdit),
+            ),
+          ),
       ],
     );
     if (!mounted || id != hit) return;
@@ -714,20 +767,20 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                           TextButton.icon(
                             key: const ValueKey('projection-properties'),
                             onPressed: properties,
-                            icon: const Icon(Icons.tune, size: 18),
+                            icon: const AppIcon(AppIconId.properties, size: 18),
                             label: Text(l.architectProperties),
                           ),
                           IconButton(
                             key: const ValueKey('projection-move-z'),
                             tooltip: l.architectRoofMoveVerticalAction,
                             onPressed: () => moveNumber(false),
-                            icon: const Icon(Icons.swap_vert),
+                            icon: const AppIcon(AppIconId.swapVertical),
                           ),
                           if (ref.kind == ArchitectProjectionKind.roof)
                             IconButton(
                               key: const ValueKey('projection-roof-pitch'),
                               tooltip: l.architectRoofPitchEdit,
-                              icon: const Icon(Icons.rotate_right),
+                              icon: const AppIcon(AppIconId.rotate),
                               onPressed: startPitch,
                             ),
                           if (ref.kind == ArchitectProjectionKind.roof)
@@ -740,37 +793,50 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                               onPressed: () => setState(
                                 () => roofSnapEnabled = !roofSnapEnabled,
                               ),
-                              icon: const Icon(Icons.grid_off),
-                              selectedIcon: const Icon(Icons.grid_on),
+                              icon: const AppIcon(AppIconId.gridOff),
+                              selectedIcon: const AppIcon(AppIconId.grid),
                             ),
                           if (widget.elevation)
                             IconButton(
                               key: const ValueKey('projection-move-x'),
                               tooltip: l.architectProjectionHorizontal,
                               onPressed: () => moveNumber(true),
-                              icon: const Icon(Icons.swap_horiz),
+                              icon: const AppIcon(AppIconId.swapHorizontal),
                             ),
                           if (ref.isOpening && widget.elevation)
                             PopupMenuButton<String>(
                               tooltip: l.architectWallAlign,
-                              icon: const Icon(Icons.align_horizontal_left),
+                              icon: const AppIcon(AppIconId.alignLeft),
                               onSelected: align,
                               itemBuilder: (_) => [
                                 PopupMenuItem(
                                   value: 'left',
-                                  child: Text(l.architectProjectionAlignLeft),
+                                  child: AppMenuLabel(
+                                    icon: AppIconId.alignLeft,
+                                    child: Text(l.architectProjectionAlignLeft),
+                                ),
                                 ),
                                 PopupMenuItem(
                                   value: 'right',
-                                  child: Text(l.architectProjectionAlignRight),
+                                  child: AppMenuLabel(
+                                    icon: AppIconId.alignRight,
+                                    child: Text(l.architectProjectionAlignRight,
+                                    ),
+                                  ),
                                 ),
                                 PopupMenuItem(
                                   value: 'sill',
-                                  child: Text(l.architectProjectionAlignSill),
+                                  child: AppMenuLabel(
+                                    icon: AppIconId.alignBottom,
+                                    child: Text(l.architectProjectionAlignSill),
+                                ),
                                 ),
                                 PopupMenuItem(
                                   value: 'head',
-                                  child: Text(l.architectProjectionAlignHead),
+                                  child: AppMenuLabel(
+                                    icon: AppIconId.alignTop,
+                                    child: Text(l.architectProjectionAlignHead),
+                                ),
                                 ),
                               ],
                             ),
@@ -780,7 +846,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                               id = null;
                               error = null;
                             }),
-                            icon: const Icon(Icons.close),
+                            icon: const AppIcon(AppIconId.close),
                           ),
                         ],
                       ),

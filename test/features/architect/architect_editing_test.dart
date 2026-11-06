@@ -70,19 +70,28 @@ Future<void> selectTool(WidgetTester tester, String name) async {
     'axis' => Icons.grid_on_rounded,
     _ => throw ArgumentError(name),
   };
-  await tool_ui.prepare(tester, icon);
-  await tester.tap(find.byIcon(icon));
+  await tool_ui.choose(tester, icon);
   await tester.pumpAndSettle();
 }
 
 Future<void> ensureSelectionTool(WidgetTester tester) async {
   // Selection is explicitly chosen; drawing tools no longer acquire elements.
-  final palette = tester.widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette));
+  final palette = tester.widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette),
+  );
   if (palette.activeTool != ArchitectTool.select) {
     await tool_ui.prepare(tester, Icons.near_me_outlined);
     await tester.tap(find.byKey(const ValueKey('architect-tool-select')));
     await tester.pumpAndSettle();
   }
+}
+
+/// Accept the frozen result of an explicitly started geometry command.
+Future<void> acceptGeometryCommand(WidgetTester tester) async {
+  final apply = find.byKey(const ValueKey('architect-command-apply'));
+  expect(apply, findsOneWidget);
+  expect(tester.widget<IconButton>(apply).onPressed, isNotNull);
+  await tester.tap(apply);
+  await tester.pumpAndSettle();
 }
 
 Future<void> hold(WidgetTester tester, Offset point) async {
@@ -741,6 +750,7 @@ void main() {
       await move.moveTo(workspace.screen(tester, const Offset(0, 1)));
       await move.up();
       await tester.pump();
+      await acceptGeometryCommand(tester);
       expect(
         model.project.activeStorey.walls[1].startPoint,
         const Offset(2, 1),
@@ -795,6 +805,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tapAt(workspace.screen(tester, const Offset(3, 2)));
       await tester.pumpAndSettle();
+      await acceptGeometryCommand(tester);
       expect(
         model.project.activeStorey.walls.first.endPoint,
         const Offset(3, 0),
@@ -873,17 +884,14 @@ void main() {
     }
     for (final key in [
       'architect-wall-flip',
-      'architect-wall-cut',
-      'architect-wall-parallel',
-    ]) {
+      'architect-wall-cut']) {
       final button = find.byKey(ValueKey(key));
       final rect = tester.getRect(button);
       expect(rect.left, greaterThanOrEqualTo(0));
       expect(rect.right, lessThanOrEqualTo(360));
       expect(
         find.descendant(
-          of: find.byKey(ValueKey(key == 'architect-wall-parallel'
-            ? 'architect-selection-bar' : 'architect-wall-floating-actions')),
+          of: find.byKey(const ValueKey('architect-wall-floating-actions')),
           matching: button,
         ),
         findsOneWidget,

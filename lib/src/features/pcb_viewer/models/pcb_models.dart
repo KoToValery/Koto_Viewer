@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
@@ -24,8 +25,7 @@ enum PcbApertureType {
   circle,
   rectangle,
   obround,
-  polygon,
-}
+  polygon }
 
 /// Aperture definition.
 class PcbAperture {
@@ -54,8 +54,7 @@ enum PcbCommandType {
   arc,
   flash,
   region,
-  text,
-}
+  text }
 
 /// Vector element or flash pad.
 class PcbCommand {
@@ -172,7 +171,8 @@ class PcbCommand {
         netName = null,
         componentRef = null;
 
-  PcbCommand copyWithPinNumber(String? newPin, {String? newNet, String? newComp}) {
+  PcbCommand copyWithPinNumber(String? newPin, {String? newNet, String? newComp,
+  }) {
     if (type == PcbCommandType.flash) {
       return PcbCommand.flash(
         p1: p1,
@@ -259,7 +259,8 @@ class PcbDocument {
     required this.boundingBox,
   });
 
-  int get trackCount => commands.where((c) => c.type == PcbCommandType.line || c.type == PcbCommandType.arc).length;
+  int get trackCount => commands.where((c) => c.type == PcbCommandType.line || c.type == PcbCommandType.arc,
+      ).length;
   int get padCount => commands.where((c) => c.type == PcbCommandType.flash).length;
   int get regionCount => commands.where((c) => c.type == PcbCommandType.region).length;
   int get holeCount => drillHoles.length;
@@ -331,29 +332,40 @@ class PcbImageItem {
 
   const PcbImageItem({
     required this.fileName,
-    required this.bytes,
-  });
+    required this.bytes});
 }
 
 /// Smart Classification for Files inside a PCB / CAD Production ZIP Archive.
 enum PcbFileCategory {
-  gerber2D('PCB Layers (Gerber)', Icons.layers_outlined, Color(0xFF10B981)),
-  drill('CNC Drill Holes', Icons.adjust_outlined, Color(0xFF06B6D4)),
-  model3D('3D CAD Models', Icons.view_in_ar_outlined, Color(0xFF3B82F6)),
-  schematic('Schematics & Circuits', Icons.schema_outlined, Color(0xFF8B5CF6)),
-  image('Images & 3D Renders', Icons.image_outlined, Color(0xFFEC4899)),
-  bom('Bill of Materials (BOM)', Icons.list_alt_outlined, Color(0xFFF59E0B)),
-  assembly('Assembly & Placement (CPL)', Icons.precision_manufacturing_outlined, Color(0xFFEAB308)),
-  document('Documentation & Drawings', Icons.picture_as_pdf_outlined, Color(0xFFEF4444)),
-  sourceCad('Source CAD Project', Icons.architecture_outlined, Color(0xFF6366F1)),
-  report('Reports & Notes', Icons.description_outlined, Color(0xFF64748B)),
-  other('Other Files', Icons.insert_drive_file_outlined, Color(0xFF94A3B8));
-
-  final String displayName;
+  gerber2D(Icons.layers_outlined, Color(0xFF10B981)),
+  drill(Icons.adjust_outlined, Color(0xFF06B6D4)),
+  model3D(Icons.view_in_ar_outlined, Color(0xFF3B82F6)),
+  schematic(Icons.schema_outlined, Color(0xFF8B5CF6)),
+  image(Icons.image_outlined, Color(0xFFEC4899)),
+  bom(Icons.list_alt_outlined, Color(0xFFF59E0B)),
+  assembly(Icons.precision_manufacturing_outlined, Color(0xFFEAB308)),
+  document(Icons.picture_as_pdf_outlined, Color(0xFFEF4444)),
+  sourceCad(Icons.architecture_outlined, Color(0xFF6366F1)),
+  report(Icons.description_outlined, Color(0xFF64748B)),
+  other(Icons.insert_drive_file_outlined, Color(0xFF94A3B8));
   final IconData icon;
   final Color color;
 
-  const PcbFileCategory(this.displayName, this.icon, this.color);
+  const PcbFileCategory(this.icon, this.color);
+
+  String localizedLabel(AppLocalizations l) => switch (this) {
+    PcbFileCategory.gerber2D => l.commandOptionPcbLayersGerber,
+    PcbFileCategory.drill => l.commandOptionCncDrillHoles,
+    PcbFileCategory.model3D => l.commandOption3DCadModels,
+    PcbFileCategory.schematic => l.commandOptionSchematicsCircuits,
+    PcbFileCategory.image => l.commandOptionImages3DRenders,
+    PcbFileCategory.bom => l.commandOptionBillOfMaterialsBom,
+    PcbFileCategory.assembly => l.commandOptionAssemblyPlacementCpl,
+    PcbFileCategory.document => l.commandOptionDocumentationDrawings,
+    PcbFileCategory.sourceCad => l.commandOptionSourceCadProject,
+    PcbFileCategory.report => l.commandOptionReportsNotes,
+    PcbFileCategory.other => l.commandOptionOtherFiles,
+  };
 }
 
 class PcbArchiveFileItem {
@@ -423,7 +435,8 @@ class PcbProject {
   bool get hasPadNumbers => layers.any((l) => l.document.hasPadNumbers);
 
   PcbLayerItem? get edgeCutsLayer =>
-      layers.cast<PcbLayerItem?>().firstWhere((l) => l?.type == PcbLayerType.edgeCuts, orElse: () => null);
+      layers.cast<PcbLayerItem?>().firstWhere((l) => l?.type == PcbLayerType.edgeCuts, orElse: () => null,
+  );
 
   List<PcbLayerItem> get drillLayers =>
       layers.where((l) => l.type == PcbLayerType.drill).toList();
@@ -432,7 +445,6 @@ class PcbProject {
 /// Theme for PCB Rendering.
 enum PcbTheme {
   fr4Green(
-    'FR4 Green',
     Color(0xFF0F3822),
     Color(0xFFF59E0B),
     Color(0xFF10B981),
@@ -440,7 +452,6 @@ enum PcbTheme {
     Color(0xFFE11D48),
   ),
   matteBlack(
-    'Matte Black',
     Color(0xFF141414),
     Color(0xFFD97706),
     Color(0xFF262626),
@@ -448,7 +459,6 @@ enum PcbTheme {
     Color(0xFFEF4444),
   ),
   arduinoBlue(
-    'Arduino Blue',
     Color(0xFF0C274E),
     Color(0xFFFBBF24),
     Color(0xFF2563EB),
@@ -456,7 +466,6 @@ enum PcbTheme {
     Color(0xFFEC4899),
   ),
   sparkfunRed(
-    'SparkFun Red',
     Color(0xFF3F0B0B),
     Color(0xFFFDE047),
     Color(0xFFDC2626),
@@ -464,7 +473,6 @@ enum PcbTheme {
     Color(0xFF38BDF8),
   ),
   darkCad(
-    'Dark CAD',
     Color(0xFF18181B),
     Color(0xFF38BDF8),
     Color(0xFF059669),
@@ -472,15 +480,12 @@ enum PcbTheme {
     Color(0xFFF43F5E),
   ),
   highContrast(
-    'High Contrast',
     Colors.black,
     Color(0xFFFFFF00),
     Color(0xFF00FF00),
     Colors.white,
     Color(0xFFFF00FF),
   );
-
-  final String label;
   final Color substrate;
   final Color copper;
   final Color mask;
@@ -488,11 +493,19 @@ enum PcbTheme {
   final Color outline;
 
   const PcbTheme(
-    this.label,
     this.substrate,
     this.copper,
     this.mask,
     this.silk,
     this.outline,
   );
+
+  String localizedLabel(AppLocalizations l) => switch (this) {
+    PcbTheme.fr4Green => l.commandOptionFr4Green,
+    PcbTheme.matteBlack => l.commandOptionMatteBlack,
+    PcbTheme.arduinoBlue => l.commandOptionArduinoBlue,
+    PcbTheme.sparkfunRed => l.commandOptionSparkfunRed,
+    PcbTheme.darkCad => l.commandOptionDarkCad,
+    PcbTheme.highContrast => l.commandOptionHighContrast,
+  };
 }

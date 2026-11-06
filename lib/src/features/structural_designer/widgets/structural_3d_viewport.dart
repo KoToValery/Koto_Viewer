@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../../cad_3d/cad_3d_controller.dart';
@@ -88,14 +89,14 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
       backgroundColor: Cad3DTheme.darkCad.background,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const AppIcon(AppIconId.back),
           onPressed: widget.onExit,
         ),
         title: Text(l10n.structural3dTitle),
         actions: [
           if (Cad3DRenderBackend.acceleratedAvailable)
             IconButton(
-              icon: Icon(
+              icon: AppIcon.fromMaterial(
                 _preferNativeDepth ? Icons.layers : Icons.layers_outlined,
               ),
               tooltip: _preferNativeDepth
@@ -105,14 +106,17 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
                   setState(() => _preferNativeDepth = !_preferNativeDepth),
             ),
           PopupMenuButton<Cad3DShadingMode>(
-            icon: Icon(_shadingMode.icon),
+            icon: AppIcon(_shadingMode.iconId),
             tooltip: l10n.shadingModeTitle,
             onSelected: (mode) => setState(() => _shadingMode = mode),
             itemBuilder: (_) => [
               for (final mode in Cad3DShadingMode.values)
                 PopupMenuItem(
                   value: mode,
-                  child: Text(mode.localizedLabel(l10n)),
+                  child: AppMenuLabel(
+                    icon: mode.iconId,
+                    child: Text(mode.localizedLabel(l10n)),
+                  ),
                 ),
             ],
           ),

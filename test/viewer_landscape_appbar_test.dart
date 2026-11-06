@@ -1,3 +1,4 @@
+import 'support/command_icon_finders.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,13 +13,11 @@ import 'package:kotoview/src/features/text_viewer/text_viewer_screen.dart';
 
 Widget _wrapWithOrientation({
   required Widget child,
-  required Size size,
-}) {
+  required Size size}) {
   return MediaQuery(
     data: MediaQueryData(
       size: size,
-      padding: EdgeInsets.zero,
-    ),
+      padding: EdgeInsets.zero),
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -43,7 +42,8 @@ void main() {
   });
 
   group('Adaptive AppBar (Landscape 1-Row, Portrait 2-Row) Tests', () {
-    testWidgets('MarkdownViewerScreen adapts AppBar bottom and actions', (tester) async {
+    testWidgets('MarkdownViewerScreen adapts AppBar bottom and actions', (tester,
+    ) async {
       final mdFile = File('${tempDir.path}/test.md')..writeAsStringSync('# Title\nContent');
 
       // 1. Portrait mode
@@ -56,8 +56,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       final portraitAppBar = tester.widget<AppBar>(find.byType(AppBar));
-      expect(portraitAppBar.bottom, isNotNull, reason: 'Portrait must have bottom toolbar');
-      expect(portraitAppBar.actions, isEmpty, reason: 'Portrait actions in AppBar should be empty');
+      expect(portraitAppBar.bottom, isNotNull, reason: 'Portrait must have bottom toolbar',
+      );
+      expect(portraitAppBar.actions, isEmpty, reason: 'Portrait actions in AppBar should be empty',
+      );
 
       // 2. Landscape mode
       await tester.pumpWidget(
@@ -69,11 +71,14 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       final landscapeAppBar = tester.widget<AppBar>(find.byType(AppBar));
-      expect(landscapeAppBar.bottom, isNull, reason: 'Landscape must collapse bottom toolbar');
-      expect(landscapeAppBar.actions, isNotEmpty, reason: 'Landscape moves controls to actions');
+      expect(landscapeAppBar.bottom, isNull, reason: 'Landscape must collapse bottom toolbar',
+      );
+      expect(landscapeAppBar.actions, isNotEmpty, reason: 'Landscape moves controls to actions',
+      );
     });
 
-    testWidgets('CodeViewerScreen adapts AppBar bottom and actions', (tester) async {
+    testWidgets('CodeViewerScreen adapts AppBar bottom and actions', (tester,
+    ) async {
       final codeFile = File('${tempDir.path}/test.dart')..writeAsStringSync('void main() {}');
 
       // 1. Portrait mode
@@ -103,7 +108,8 @@ void main() {
       expect(landscapeAppBar.actions, isNotEmpty);
     });
 
-    testWidgets('TextViewerScreen adapts AppBar bottom and actions', (tester) async {
+    testWidgets('TextViewerScreen adapts AppBar bottom and actions', (tester,
+    ) async {
       final txtFile = File('${tempDir.path}/test.txt')..writeAsStringSync('line 1\nline 2');
 
       // 1. Portrait mode
@@ -135,7 +141,8 @@ void main() {
 
     testWidgets('SvgViewerScreen adapts AppBar and contains no floating +/- zoom buttons', (tester) async {
       final svgFile = File('${tempDir.path}/test.svg')
-        ..writeAsStringSync('<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>');
+        ..writeAsStringSync('<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>',
+          );
 
       // 1. Portrait mode
       await tester.pumpWidget(
@@ -150,8 +157,12 @@ void main() {
       expect(portraitAppBar.bottom, isNotNull);
 
       // Verify NO floating '+' and '-' buttons exist in the viewer
-      expect(find.byIcon(Icons.add), findsNothing, reason: 'Floating + button must be removed');
-      expect(find.byIcon(Icons.remove), findsNothing, reason: 'Floating - button must be removed');
+      expect(
+          findCommandIcon(Icons.add), findsNothing, reason: 'Floating + button must be removed',
+        );
+        expect(
+          findCommandIcon(Icons.remove), findsNothing, reason: 'Floating - button must be removed',
+        );
 
       // 2. Landscape mode
       await tester.pumpWidget(
@@ -165,7 +176,8 @@ void main() {
       final landscapeAppBar = tester.widget<AppBar>(find.byType(AppBar));
       expect(landscapeAppBar.bottom, isNull);
       expect(landscapeAppBar.actions, isNotEmpty);
-    });
+    },
+    );
 
     testWidgets('EpsViewerScreen adapts AppBar and contains no floating +/- zoom buttons', (tester) async {
       final epsFile = File('${tempDir.path}/test.eps')..writeAsStringSync('%!PS-Adobe-3.0 EPSF-3.0');
@@ -183,8 +195,8 @@ void main() {
       expect(portraitAppBar.bottom, isNotNull);
 
       // Verify NO floating '+' and '-' buttons
-      expect(find.byIcon(Icons.add), findsNothing);
-      expect(find.byIcon(Icons.remove), findsNothing);
+      expect(findCommandIcon(Icons.add), findsNothing);
+      expect(findCommandIcon(Icons.remove), findsNothing);
 
       // 2. Landscape mode
       await tester.pumpWidget(
@@ -198,7 +210,8 @@ void main() {
       final landscapeAppBar = tester.widget<AppBar>(find.byType(AppBar));
       expect(landscapeAppBar.bottom, isNull);
       expect(landscapeAppBar.actions, isNotEmpty);
-    });
+    },
+    );
 
     testWidgets('HpglViewerScreen adapts AppBar and contains no floating +/- zoom buttons', (tester) async {
       final pltFile = File('${tempDir.path}/test.plt')..writeAsStringSync('IN;SP1;PA0,0;');
@@ -216,8 +229,8 @@ void main() {
       expect(portraitAppBar.bottom, isNotNull);
 
       // Verify NO floating '+' and '-' buttons
-      expect(find.byIcon(Icons.add), findsNothing);
-      expect(find.byIcon(Icons.remove), findsNothing);
+      expect(findCommandIcon(Icons.add), findsNothing);
+      expect(findCommandIcon(Icons.remove), findsNothing);
 
       // 2. Landscape mode
       await tester.pumpWidget(
@@ -231,10 +244,12 @@ void main() {
       final landscapeAppBar = tester.widget<AppBar>(find.byType(AppBar));
       expect(landscapeAppBar.bottom, isNull);
       expect(landscapeAppBar.actions, isNotEmpty);
-    });
+    },
+    );
 
     testWidgets('CdrViewerScreen adapts AppBar and contains no floating +/- zoom buttons', (tester) async {
-      final cdrFile = File('${tempDir.path}/test.cdr')..writeAsBytesSync([0x50, 0x4B, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+      final cdrFile = File('${tempDir.path}/test.cdr')..writeAsBytesSync([0x50, 0x4B, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          ]);
 
       // 1. Portrait mode
       await tester.pumpWidget(
@@ -249,8 +264,8 @@ void main() {
       expect(portraitAppBar.bottom, isNotNull);
 
       // Verify NO floating '+' and '-' buttons
-      expect(find.byIcon(Icons.add), findsNothing);
-      expect(find.byIcon(Icons.remove), findsNothing);
+      expect(findCommandIcon(Icons.add), findsNothing);
+      expect(findCommandIcon(Icons.remove), findsNothing);
 
       // 2. Landscape mode
       await tester.pumpWidget(
@@ -264,6 +279,7 @@ void main() {
       final landscapeAppBar = tester.widget<AppBar>(find.byType(AppBar));
       expect(landscapeAppBar.bottom, isNull);
       expect(landscapeAppBar.actions, isNotEmpty);
-    });
+    },
+    );
   });
 }

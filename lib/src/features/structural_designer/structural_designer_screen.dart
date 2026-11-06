@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../bim_editing/widgets/bim_edit_actions.dart';
 import '../bim_editing/geometry/bim_line_geometry.dart';
 import 'analysis/slab_zone_grouping.dart';
@@ -159,7 +160,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _viewportHeld = false;
     _handlePointerUp(event);
     if (!held) {
-      _handleTapUp(TapUpDetails(localPosition: event.localPosition, kind: event.kind));
+      _handleTapUp(TapUpDetails(localPosition: event.localPosition, kind: event.kind),
+      );
     }
     _cancelContourEditors();
   }
@@ -249,28 +251,36 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   StructuralColumn? _selectedColumn;
   StructuralShearWall? _selectedShearWall;
   StructuralBeam? _selectedBeam;
-  final _slabVertexEditor = BimPolygonEditor<DxfSnapResult>(pointOf: (snap) => snap.point, isSnapped: (snap) => snap.distance.isFinite);
-  final _openingVertexEditor = BimPolygonEditor<DxfSnapResult>(pointOf: (snap) => snap.point, isSnapped: (snap) => snap.distance.isFinite);
+  final _slabVertexEditor = BimPolygonEditor<DxfSnapResult>(pointOf: (snap) => snap.point, isSnapped: (snap) => snap.distance.isFinite,
+  );
+  final _openingVertexEditor = BimPolygonEditor<DxfSnapResult>(pointOf: (snap) => snap.point, isSnapped: (snap) => snap.distance.isFinite,
+  );
   Object? _contourRevision;
   void _previewContourVertex(BimPolygonEditor<DxfSnapResult> editor, String partId,
-      List<Offset> nativePoints, int vertex, Offset raw, Offset target, DxfSnapResult? snap) {
+      List<Offset> nativePoints, int vertex, Offset raw, Offset target, DxfSnapResult? snap,
+  ) {
     if (!identical(_contourRevision, _project)) {
       _slabVertexEditor.cancel(); _openingVertexEditor.cancel(); _contourRevision = _project;
     }
     if (!editor.active || editor.elementId != partId || editor.index != vertex) {
-      editor.startVertex(partId, nativePoints.map((p) => p / _cadUnitsPerMeter).toList(), vertex);
+      editor.startVertex(partId, nativePoints.map((p) => p / _cadUnitsPerMeter).toList(), vertex,
+      );
     }
     editor.update(raw / _cadUnitsPerMeter, (_) => DxfSnapResult(
       point: target / _cadUnitsPerMeter, type: snap?.type ?? DxfSnapType.nearest,
-      distance: snap == null ? double.infinity : snap.distance / _cadUnitsPerMeter),
-      _slabSnapTolerance(merge: true) / _cadUnitsPerMeter);
+      distance: snap == null ? double.infinity : snap.distance / _cadUnitsPerMeter,
+      ),
+      _slabSnapTolerance(merge: true) / _cadUnitsPerMeter,
+    );
   }
   void _cancelContourEditors() { _slabVertexEditor.cancel(); _openingVertexEditor.cancel(); _contourRevision = null; }
   BimDragSession<StructuralBeam>? _beamMove;
   void _beginBeamMove(StructuralBeam beam, Offset screen) {
     _beamMove = BimDragSession(context: _duplicateContext, original: beam,
       anchor: (beam.start + beam.end) / (2 * _cadUnitsPerMeter),
-      translate: StructuralBeamEditingAdapter(frame: BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter)).translate);
+      translate: StructuralBeamEditingAdapter(frame: BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter),
+      ).translate,
+    );
     _beamMove!.grabAt(_screenToCad(screen) / _cadUnitsPerMeter);
     _selectedBeam = beam;
     _selectedColumn = null;
@@ -280,13 +290,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   void _previewBeamMove(Offset screen, {required bool isMouse}) {
     final session = _beamMove;
     if (session == null) return;
-    var target = session.targetForPointer(_screenToCad(screen) / _cadUnitsPerMeter);
+    var target = session.targetForPointer(_screenToCad(screen) / _cadUnitsPerMeter,
+    );
     if (_snapEnabled) {
       final radius = StructuralPointerInteraction.snapToleranceCad(isMouse: isMouse,
         pixelsPerCadUnit: _getCadFitScale() * _transformController.value.getMaxScaleOnAxis(),
-        cadUnitsPerMeter: _cadUnitsPerMeter);
+        cadUnitsPerMeter: _cadUnitsPerMeter,
+      );
       final snap = _findStructuralSnap(target * _cadUnitsPerMeter, radius,
-        excludedElementIds: {session.original.id});
+        excludedElementIds: {session.original.id},
+      );
       if (snap != null) target = snap.point / _cadUnitsPerMeter;
     }
     setState(() => session.updateTarget(_duplicateContext, target));
@@ -294,7 +307,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   StoreyLevel _withBeamMove(StoreyLevel floor) {
     final preview = _beamMove?.preview;
     if (preview == null) return floor;
-    return floor.copyWith(beams: [for (final beam in floor.beams) beam.id == preview.id ? preview : beam]);
+    return floor.copyWith(beams: [for (final beam in floor.beams) beam.id == preview.id ? preview : beam,
+      ],
+    );
   }
   void _finishBeamMove(Offset screen, {required bool isMouse}) {
     _previewBeamMove(screen, isMouse: isMouse);
@@ -303,7 +318,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (preview == null) return;
     _pushUndo();
     _updateActiveStorey(_project.activeStorey.copyWith(beams: [
-      for (final beam in _project.activeStorey.beams) beam.id == preview.id ? preview : beam]));
+      for (final beam in _project.activeStorey.beams) beam.id == preview.id ? preview : beam,
+        ],
+      ),
+    );
     setState(() => _selectedBeam = preview);
   }
   BimDragSession<Object>? _duplicateSession;
@@ -323,13 +341,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   StructuralProject? _axisPreviewProject;
   Offset? _axisMoveStart;
   StructuralGridAxis _axisInMetres(StructuralGridAxis axis) => axis.copyWith(
-    start: axis.start / _cadUnitsPerMeter, end: axis.end / _cadUnitsPerMeter);
+    start: axis.start / _cadUnitsPerMeter, end: axis.end / _cadUnitsPerMeter,
+  );
   StructuralGridAxis _axisInCad(StructuralGridAxis axis) => axis.copyWith(
-    start: axis.start * _cadUnitsPerMeter, end: axis.end * _cadUnitsPerMeter);
+    start: axis.start * _cadUnitsPerMeter, end: axis.end * _cadUnitsPerMeter,
+  );
   void _beginAxisHandle(StructuralGridAxis axis, bool start) {
     _axisMoveStart = null;
     _axisGesture = BimEditSession(context: _duplicateContext,
-      original: List.unmodifiable(_project.effectiveGridAxes));
+      original: List.unmodifiable(_project.effectiveGridAxes),
+    );
     _selectedGridAxis = axis;
     _draggingAxisStart = start;
     _isDraggingAxisHandle = true;
@@ -341,21 +362,28 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   void _previewAxisHandle(Offset screen) {
     final session = _axisGesture;
     if (session == null || _selectedGridAxis == null) return;
-    final original = session.original.firstWhere((a) => a.id == _selectedGridAxis!.id);
+    final original = session.original.firstWhere((a) => a.id == _selectedGridAxis!.id,
+    );
     final model = _axisInMetres(original);
     final point = _screenToCad(screen) / _cadUnitsPerMeter;
     final axes = session.original.map(_axisInMetres).toList();
-    final radius = math.min(16 / (_getCadFitScale() * _transformController.value.getMaxScaleOnAxis() * _cadUnitsPerMeter), .20);
+    final radius = math.min(16 / (_getCadFitScale() * _transformController.value.getMaxScaleOnAxis() * _cadUnitsPerMeter), .20,
+    );
     final StructuralGridAxis updated;
     if (_axisMoveStart != null) {
       final delta = BimAxisOperations.movingDelta(original: model,
-        delta: point - _axisMoveStart!, axes: axes, captureRadius: radius);
-      updated = _axisInCad(model.copyWith(start: model.start + delta, end: model.end + delta));
+        delta: point - _axisMoveStart!, axes: axes, captureRadius: radius,
+      );
+      updated = _axisInCad(model.copyWith(start: model.start + delta, end: model.end + delta),
+      );
     } else {
       updated = _axisInCad(BimAxisOperations.handlePreview(original: model,
-        startHandle: _draggingAxisStart, point: point, axes: axes, captureRadius: radius));
+        startHandle: _draggingAxisStart, point: point, axes: axes, captureRadius: radius,
+        ),
+      );
     }
-    if (!session.update(_duplicateContext, (axes) => BimAxisOperations.alignParallel(axes, updated))) return;
+    if (!session.update(_duplicateContext, (axes) => BimAxisOperations.alignParallel(axes, updated),
+    )) return;
     setState(() {
       _axisPreviewProject = _project.copyWithGridAxes(session.preview);
       _selectedGridAxis = updated;
@@ -382,7 +410,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _cancelAxisGesture();
     if (axes != null) {
       _pushUndo();
-      _updateProjectGridAxes(resequenceGridAxes(axes, isBulgarian: Localizations.localeOf(context).languageCode == 'bg'));
+      _updateProjectGridAxes(resequenceGridAxes(axes, isBulgarian: Localizations.localeOf(context).languageCode == 'bg',
+        ),
+      );
     }
   }
   bool _isMovingColumn = false;
@@ -472,7 +502,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     super.initState();
     _project = widget.initialProject ?? const StructuralProject();
     _initDisplaySettings();
-    DxfDisplaySettingsService.settingsNotifier.addListener(_onDisplaySettingsChanged);
+    DxfDisplaySettingsService.settingsNotifier.addListener(_onDisplaySettingsChanged,
+    );
     _transformController = TransformationController(
       widget.initialTransform != null
           ? Matrix4.copy(widget.initialTransform!)
@@ -507,16 +538,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         );
         if (axes.isNotEmpty) {
           final storeys = List<StoreyLevel>.from(_project.storeys);
-          final activeIndex = _project.activeStoreyIndex.clamp(0, storeys.length - 1);
+          final activeIndex = _project.activeStoreyIndex.clamp(0, storeys.length - 1,
+          );
           storeys[activeIndex] = storeys[activeIndex].copyWith(gridAxes: axes);
           _project = _project.copyWith(storeys: storeys);
         }
       } else {
-        final imported = WallAxisDetector.extractGridAxesFromDocument(_document);
+        final imported = WallAxisDetector.extractGridAxesFromDocument(_document,
+        );
         if (imported.isNotEmpty) {
           final storeys = List<StoreyLevel>.from(_project.storeys);
-          final activeIndex = _project.activeStoreyIndex.clamp(0, storeys.length - 1);
-          storeys[activeIndex] = storeys[activeIndex].copyWith(gridAxes: imported);
+          final activeIndex = _project.activeStoreyIndex.clamp(0, storeys.length - 1,
+          );
+          storeys[activeIndex] = storeys[activeIndex].copyWith(gridAxes: imported,
+          );
           _project = _project.copyWith(storeys: storeys);
         }
       }
@@ -531,7 +566,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // Auto-load persisted BiM model if previously saved for this drawing (demo mode only)
     if (widget.bimContext == null) {
       final docKey = widget.title ?? 'structural_model';
-      StructuralPersistenceService.loadProject(documentKey: docKey).then((saved) {
+      StructuralPersistenceService.loadProject(documentKey: docKey).then((saved,
+      ) {
         if (saved != null && mounted) {
           setState(() {
             _project = saved;
@@ -578,7 +614,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   @override
   void dispose() {
     _scaleSettleTimer?.cancel();
-    DxfDisplaySettingsService.settingsNotifier.removeListener(_onDisplaySettingsChanged);
+    DxfDisplaySettingsService.settingsNotifier.removeListener(_onDisplaySettingsChanged,
+    );
     _transformController.removeListener(_onTransformChanged);
     for (final entry in _originalLayerVisibility.entries) {
       _document.layers[entry.key]?.isVisible = entry.value;
@@ -621,7 +658,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _scaleSettleTimer = Timer(const Duration(milliseconds: 60), () {
       if (!mounted) return;
       final currentScale =
-          _transformController.value.getMaxScaleOnAxis().clamp(0.001, 10000.0);
+          _transformController.value.getMaxScaleOnAxis().clamp(0.001, 10000.0,
+      );
       setState(() {
         _renderScale = currentScale;
       });
@@ -696,18 +734,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         col=_currentColumnPreset.copyWith(id:'__spacing_preview_column__',center:center,
           width:_currentColumnPreset.width*_cadUnitsPerMeter,
           height:_currentColumnPreset.height*_cadUnitsPerMeter,
-          thickness:_currentColumnPreset.thickness*_cadUnitsPerMeter);
+          thickness:_currentColumnPreset.thickness*_cadUnitsPerMeter,
+        );
       }
       if(_isMovingShearWall && _selectedShearWall!=null) {
         final delta=center-_selectedShearWall!.center;
         wall=_selectedShearWall!.copyWith(start:_selectedShearWall!.start+delta,
-            end:_selectedShearWall!.end+delta);
+            end:_selectedShearWall!.end+delta,
+        );
       } else if(_isPlacingWithHold && _activeTool==StructuralDrawTool.shearWall) {
-        final u=Offset(math.cos(_currentWallRotationRad),math.sin(_currentWallRotationRad));
+        final u=Offset(math.cos(_currentWallRotationRad),math.sin(_currentWallRotationRad),
+        );
         wall=StructuralShearWall(id:'__spacing_preview_wall__',
             start:center-u*_currentWallLength*_cadUnitsPerMeter/2,
             end:center+u*_currentWallLength*_cadUnitsPerMeter/2,
-            thickness:_currentWallThickness*_cadUnitsPerMeter);
+            thickness:_currentWallThickness*_cadUnitsPerMeter,
+        );
       }
     }
     if(col==null && wall==null) {
@@ -715,7 +757,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           .where((s)=>s.storeyId==_project.activeStorey.id).firstOrNull?.supportSpans ?? const [];
     }
     return _spanFeedbackCache.evaluate(_project,_cadUnitsPerMeter,
-        previewColumn:col,previewWall:wall);
+        previewColumn:col,previewWall:wall,
+    );
   }
 
   Offset? get _spanFocusCad =>
@@ -860,7 +903,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         maxY = math.max(maxY, p.dy);
       }
       final rect =
-          Rect.fromLTRB(minX, minY, maxX, maxY).inflate(hitMarginScreen);
+          Rect.fromLTRB(minX, minY, maxX, maxY,
+      ).inflate(hitMarginScreen);
       if (rect.contains(screenPos)) {
         return col;
       }
@@ -881,7 +925,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         minY = math.min(minY, p.dy);
         maxY = math.max(maxY, p.dy);
       }
-      final rect = Rect.fromLTRB(minX, minY, maxX, maxY).inflate(hitMarginScreen);
+      final rect = Rect.fromLTRB(minX, minY, maxX, maxY,
+      ).inflate(hitMarginScreen);
       if (rect.contains(screenPos)) {
         return wall;
       }
@@ -902,7 +947,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         minY = math.min(minY, p.dy);
         maxY = math.max(maxY, p.dy);
       }
-      final rect = Rect.fromLTRB(minX, minY, maxX, maxY).inflate(hitMarginScreen);
+      final rect = Rect.fromLTRB(minX, minY, maxX, maxY,
+      ).inflate(hitMarginScreen);
       if (rect.contains(screenPos)) {
         return beam;
       }
@@ -927,7 +973,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           minY = math.min(minY, p.dy);
           maxY = math.max(maxY, p.dy);
         }
-        final rect = Rect.fromLTRB(minX, minY, maxX, maxY).inflate(hitMarginScreen);
+        final rect = Rect.fromLTRB(minX, minY, maxX, maxY,
+        ).inflate(hitMarginScreen);
         if (rect.contains(screenPos)) {
           return (slab.id, i);
         }
@@ -947,7 +994,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return null;
   }
 
-  SlabEdgeGripInfo? _hitTestOpeningMidpoint(Offset screenPos, StructuralSlab slab, int opIdx) {
+  SlabEdgeGripInfo? _hitTestOpeningMidpoint(Offset screenPos, StructuralSlab slab, int opIdx,
+  ) {
     const double hitMarginScreen = 24.0;
     final grips = slab.getOpeningEdgeGrips(opIdx);
     for (final grip in grips) {
@@ -970,9 +1018,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final op = slab.openings[opIdx];
     if (op.length <= 3) return;
 
-    final updatedSlab = slab.removeOpeningVertex(opIdx, _selectedOpeningVertexIndex!);
+    final updatedSlab = slab.removeOpeningVertex(opIdx, _selectedOpeningVertexIndex!,
+    );
     if (updatedSlab != null && _updateOpeningInStorey(
-        (slabId, opIdx), updatedSlab.openings[opIdx], allowTransfer: false)) {
+        (slabId, opIdx), updatedSlab.openings[opIdx], allowTransfer: false,
+        )) {
       setState(() {
         _selectedOpeningVertexIndex = null;
       });
@@ -984,9 +1034,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   StructuralGridAxis? _hitTestGridAxis(Offset screenPos) {
     if (!_showBimAxes) return null;
     final bubbles = GridAxisBubbleLayout.build(axes:_project.activeStorey.gridAxes,
-      project:_cadToScreen, zoom:1, labelScale:GridAxisBubbleLayout.textScale(_transformController.value.getMaxScaleOnAxis()), levels:(axis) {
-        final style=GridAxisPresentation.forStorey(axis,_project.activeStorey,_project.storeys);
-        return style.reference ? style.levels : ''; });
+      project:_cadToScreen, zoom:1, labelScale:GridAxisBubbleLayout.textScale(_transformController.value.getMaxScaleOnAxis(),
+      ), levels:(axis) {
+        final style=GridAxisPresentation.forStorey(axis,_project.activeStorey,_project.storeys,
+        );
+        return style.reference ? style.levels : ''; },
+    );
     for (final axis in _project.activeStorey.gridAxes.reversed) {
       for (final start in [true,false]) {
         final point=bubbles[(axis.id,start)];
@@ -1055,7 +1108,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final labels = SlabPlanLabels.layout(current:_project.activeStorey,
         lower:_floorSlabStorey, upper:_isEditingSlab ? null : _ceilingSlabStorey,
         showFloorSlabs:_isEditingSlab, project:_cadToScreen,
-        selectedId:_editingSlab?.id);
+        selectedId:_editingSlab?.id,
+      );
       for (final label in labels) {
         if (label.rect.contains(screenPos)) {
           _slabBadgeSelectionHandled = true;
@@ -1134,7 +1188,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final len2 = ab.dx * ab.dx + ab.dy * ab.dy;
     if (len2 < 1e-6) return (p - a).distance;
     final t = (((p.dx - a.dx) * ab.dx + (p.dy - a.dy) * ab.dy) / len2)
-        .clamp(0.0, 1.0);
+        .clamp(0.0, 1.0,
+    );
     final proj = a + ab * t;
     return (p - proj).distance;
   }
@@ -1169,7 +1224,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _pushUndo();
     final active = _project.activeStorey;
     final col = _selectedColumn!;
-    final updatedCol = const StructuralColumnEditingAdapter().rotate(col, math.pi / 2);
+    final updatedCol = const StructuralColumnEditingAdapter().rotate(col, math.pi / 2,
+    );
     final updatedCols = active.columns
         .map((c) => c.id == updatedCol.id ? updatedCol : c)
         .toList();
@@ -1327,38 +1383,45 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         ),
         title: Row(
           children: [
-            const Icon(Icons.edit_outlined, color: Color(0xFFFFB300), size: 20),
+            const AppIcon(AppIconId.edit, color: Color(0xFFFFB300), size: 20),
             const SizedBox(width: 8),
-            Text(context.l10n.renameColumnTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            Text(context.l10n.renameColumnTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ],
         ),
         content: TextField(
           controller: controller,
           autofocus: true,
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold,
+          ),
           decoration: InputDecoration(
             labelText: context.l10n.designationLabel,
             labelStyle: const TextStyle(color: Color(0xFFFFB300)),
-            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFB300))),
-            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFB300), width: 2)),
+            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFB300)),
+            ),
+            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFB300), width: 2),
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white54)),
+            child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white54),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFFFB300),
               foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () {
               final val = controller.text.trim();
               Navigator.of(ctx).pop(val.isNotEmpty ? val : current.displayName);
             },
-            child: Text(context.l10n.save, style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.save, style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -1406,7 +1469,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     };
     setState(() {
       _duplicateSession = BimDragSession(context: _duplicateContext, original: draft,
-        anchor: center / _cadUnitsPerMeter, translate: _translatedDuplicate);
+        anchor: center / _cadUnitsPerMeter, translate: _translatedDuplicate,
+      );
       _duplicateStoreyId = active.id;
       _elementGrabOffsetCad = null;
     });
@@ -1418,9 +1482,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   Object _translatedDuplicate(Object original, Offset delta) {
     final frame = BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter);
     return switch (original) {
-      StructuralColumn c => StructuralColumnEditingAdapter(frame: frame).translate(c, delta),
-      StructuralShearWall w => StructuralWallEditingAdapter(frame: frame).translate(w, delta),
-      StructuralBeam b => StructuralBeamEditingAdapter(frame: frame).translate(b, delta),
+      StructuralColumn c => StructuralColumnEditingAdapter(frame: frame,
+      ).translate(c, delta),
+      StructuralShearWall w => StructuralWallEditingAdapter(frame: frame,
+      ).translate(w, delta),
+      StructuralBeam b => StructuralBeamEditingAdapter(frame: frame,
+      ).translate(b, delta),
       _ => throw ArgumentError.value(original),
     };
   }
@@ -1436,7 +1503,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       };
 
   void _updateDuplicateDrag(Offset screenPos, {required bool isMouse}) {
-    var target = (_duplicateSession!.targetForPointer(_screenToCad(screenPos) / _cadUnitsPerMeter)) * _cadUnitsPerMeter;
+    var target = (_duplicateSession!.targetForPointer(_screenToCad(screenPos) / _cadUnitsPerMeter,
+        )) * _cadUnitsPerMeter;
     if (_snapEnabled) {
       final tolerance = StructuralPointerInteraction.snapToleranceCad(
         isMouse: isMouse,
@@ -1454,7 +1522,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (snap != null) target = snap.point;
     }
     setState(() {
-      _duplicateSession?.updateTarget(_duplicateContext, target / _cadUnitsPerMeter);
+      _duplicateSession?.updateTarget(_duplicateContext, target / _cadUnitsPerMeter,
+      );
     });
   }
 
@@ -1550,7 +1619,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_selectedShearWall == null) return;
     _pushUndo();
     final wall = _selectedShearWall!;
-    final updated = const StructuralWallEditingAdapter().rotate(wall, math.pi / 2);
+    final updated = const StructuralWallEditingAdapter().rotate(wall, math.pi / 2,
+    );
     final active = _project.activeStorey;
     final updatedWalls = active.shearWalls
         .map((w) => w.id == updated.id ? updated : w)
@@ -1602,13 +1672,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_elementMoveOriginalCenter != null) {
       final active = _project.activeStorey;
       if (_isMovingColumn && _selectedColumn != null) {
-        final reverted = _selectedColumn!.copyWith(center: _elementMoveOriginalCenter!);
+        final reverted = _selectedColumn!.copyWith(center: _elementMoveOriginalCenter!,
+        );
         final cols = active.columns.map((c) => c.id == reverted.id ? reverted : c).toList();
         _updateActiveStorey(active.copyWith(columns: cols));
         setState(() => _selectedColumn = reverted);
       } else if (_isMovingShearWall && _selectedShearWall != null) {
         final halfLen = _selectedShearWall!.length / 2.0;
-        final u = Offset(math.cos(_selectedShearWall!.angleRad), math.sin(_selectedShearWall!.angleRad));
+        final u = Offset(math.cos(_selectedShearWall!.angleRad), math.sin(_selectedShearWall!.angleRad),
+        );
         final reverted = _selectedShearWall!.copyWith(
           start: _elementMoveOriginalCenter! - u * halfLen,
           end: _elementMoveOriginalCenter! + u * halfLen,
@@ -1629,7 +1701,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.selectionClick();
   }
 
-  String _getShearWallRefLineLabel(BuildContext context, ShearWallReferenceLine refLine) {
+  String _getShearWallRefLineLabel(BuildContext context, ShearWallReferenceLine refLine,
+  ) {
     switch (refLine) {
       case ShearWallReferenceLine.center:
         return context.l10n.refLineCenter;
@@ -1676,38 +1749,45 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         ),
         title: Row(
           children: [
-            const Icon(Icons.edit_outlined, color: Color(0xFF00E5FF), size: 20),
+            const AppIcon(AppIconId.edit, color: Color(0xFF00E5FF), size: 20),
             const SizedBox(width: 8),
-            Text(context.l10n.renameColumnTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            Text(context.l10n.renameColumnTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ],
         ),
         content: TextField(
           controller: controller,
           autofocus: true,
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold,
+          ),
           decoration: InputDecoration(
             labelText: context.l10n.shearWallTitle,
             labelStyle: const TextStyle(color: Color(0xFF00E5FF)),
-            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF))),
-            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF), width: 2)),
+            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF)),
+            ),
+            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF), width: 2),
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white54)),
+            child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white54),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF00E5FF),
               foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () {
               final val = controller.text.trim();
               Navigator.of(ctx).pop(val.isNotEmpty ? val : current.displayName);
             },
-            child: Text(context.l10n.save, style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.save, style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -1733,7 +1813,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _startDuplicateDrag(_selectedShearWall!);
   }
 
-  String _generateNextBeamName(List<StructuralBeam> existing, {required bool isBulgarian}) {
+  String _generateNextBeamName(List<StructuralBeam> existing, {required bool isBulgarian,
+  }) {
     final defaultPrefix = isBulgarian ? 'Г' : 'B';
     int maxNum = 0;
     for (final beam in existing) {
@@ -1759,38 +1840,45 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         ),
         title: Row(
           children: [
-            const Icon(Icons.edit_outlined, color: Color(0xFFFB8C00), size: 20),
+            const AppIcon(AppIconId.edit, color: Color(0xFFFB8C00), size: 20),
             const SizedBox(width: 8),
-            Text(context.l10n.renameBeamTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            Text(context.l10n.renameBeamTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ],
         ),
         content: TextField(
           controller: controller,
           autofocus: true,
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold,
+          ),
           decoration: InputDecoration(
             labelText: context.l10n.beamTitle,
             labelStyle: const TextStyle(color: Color(0xFFFB8C00)),
-            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFB8C00))),
-            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFB8C00), width: 2)),
+            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFB8C00)),
+            ),
+            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFB8C00), width: 2),
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white54)),
+            child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white54),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFFB8C00),
               foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () {
               final val = controller.text.trim();
               Navigator.of(ctx).pop(val.isNotEmpty ? val : current.displayName);
             },
-            child: Text(context.l10n.save, style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.save, style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -1842,7 +1930,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final beam = _selectedBeam!;
     final active = _project.activeStorey;
     final l = beam.length;
-    final newL = math.max(0.30 * _cadUnitsPerMeter, l + deltaMeters * _cadUnitsPerMeter);
+    final newL = math.max(0.30 * _cadUnitsPerMeter, l + deltaMeters * _cadUnitsPerMeter,
+    );
     final dir = (beam.end - beam.start) / (l > 1e-6 ? l : 1.0);
     final newEnd = beam.start + dir * newL;
     final updatedBeam = beam.copyWith(end: newEnd);
@@ -1919,7 +2008,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return Offset(sum.dx / poly.length, sum.dy / poly.length);
   }
 
-  void _startMovingOpening((String, int) key, Offset screenPos, {required bool isMouse}) {
+  void _startMovingOpening((String, int) key, Offset screenPos, {required bool isMouse,
+  }) {
     final poly = _getOpeningPolygon(key);
     if (poly == null || poly.isEmpty) return;
     final center = _getOpeningCenter(poly);
@@ -1958,11 +2048,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   bool _updateOpeningInStorey((String, int) oldKey, List<Offset> newPoly,
-      {bool allowTransfer = true}) {
+      {bool allowTransfer = true,
+  }) {
     final result = SlabOpeningPlacement.apply(
       slabs: _project.activeStorey.slabs, polygon: newPoly,
       scale: _cadUnitsPerMeter, replacing: oldKey, allowTransfer: allowTransfer,
-      floorOwnedOnly: widget.bimContext != null);
+      floorOwnedOnly: widget.bimContext != null,
+    );
     return _applyOpeningPlacement(result);
   }
 
@@ -1974,7 +2066,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         OpeningPlacementIssue.missingOpening => context.l10n.openingMissing,
         _ => context.l10n.openingInvalidPlacement,
       };
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context,
+      ).showSnackBar(SnackBar(content: Text(message)));
       return false;
     }
     _pushUndo();
@@ -2005,7 +2098,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final active = _project.activeStorey;
     final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
     if (slabIdx != -1) {
-      final updatedSlab = active.slabs[slabIdx].updateOpeningType(opIdx, newType);
+      final updatedSlab = active.slabs[slabIdx].updateOpeningType(opIdx, newType,
+      );
       final updatedSlabs = List<StructuralSlab>.from(active.slabs);
       updatedSlabs[slabIdx] = updatedSlab;
       _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
@@ -2042,18 +2136,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   StructuralGridAxis? _findProjectAxis(StructuralGridAxis axis) =>
       _project.effectiveGridAxes.where((a)=>a.id==axis.id).firstOrNull ??
-      _project.effectiveGridAxes.where((a)=>ProjectGridAxes.sameAlignment(a,axis,_cadUnitsPerMeter)).firstOrNull;
+      _project.effectiveGridAxes.where((a)=>ProjectGridAxes.sameAlignment(a,axis,_cadUnitsPerMeter),
+          ).firstOrNull;
 
   void _updateProjectGridAxes(List<StructuralGridAxis> newAxes) {
     if (widget.bimContext != null) {
       final ids=_project.effectiveGridAxes.map((a)=>a.id).toSet();
-      newAxes=[for(final a in newAxes) ids.contains(a.id) ? a : a.copyWith(sourceStoreyIds:[_project.activeStorey.id])];
+      newAxes=[for(final a in newAxes) ids.contains(a.id) ? a : a.copyWith(sourceStoreyIds:[_project.activeStorey.id]),
+      ];
     }
     final previous={for(final a in _project.effectiveGridAxes) a.id:a};
-    final changed=newAxes.where((a)=>previous[a.id]==null || previous[a.id]!.start!=a.start || previous[a.id]!.end!=a.end);
-    if (changed.any((axis)=>newAxes.any((a)=>a.id!=axis.id && ProjectGridAxes.sameAlignment(a,axis,_cadUnitsPerMeter)))) {
+    final changed=newAxes.where((a)=>previous[a.id]==null || previous[a.id]!.start!=a.start || previous[a.id]!.end!=a.end,
+    );
+    if (changed.any((axis)=>newAxes.any((a)=>a.id!=axis.id && ProjectGridAxes.sameAlignment(a,axis,_cadUnitsPerMeter),
+      ),
+    )) {
       newAxes=ProjectGridAxes.merge(newAxes,_cadUnitsPerMeter,
-        isBulgarian:Localizations.localeOf(context).languageCode=='bg');
+        isBulgarian:Localizations.localeOf(context).languageCode=='bg',
+      );
     }
     setState(() {
       _project = _project.copyWithGridAxes(newAxes);
@@ -2087,19 +2187,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   String _getNextAxisName(String current) => BimAxisNaming.getNextAxisName(
-    current, Localizations.localeOf(context).languageCode == 'bg');
+    current, Localizations.localeOf(context).languageCode == 'bg',
+  );
   String _getSuggestedAxisName(Offset start, Offset end) => BimAxisNaming.getSuggestedAxisName(
-    start, end, _project.effectiveGridAxes, Localizations.localeOf(context).languageCode == 'bg');
+    start, end, _project.effectiveGridAxes, Localizations.localeOf(context).languageCode == 'bg',
+      );
 
-  Offset _computeAxisOffsetVector(StructuralGridAxis axis, double distanceMeters, double directionSign) {
-    return BimAxisOperations.offsetVector(axis, distanceMeters * _cadUnitsPerMeter, directionSign);
+  Offset _computeAxisOffsetVector(StructuralGridAxis axis, double distanceMeters, double directionSign,
+  ) {
+    return BimAxisOperations.offsetVector(axis, distanceMeters * _cadUnitsPerMeter, directionSign,
+    );
   }
 
   void _updateAxisOffsetDrag(Offset screenPos) {
     if (!_isOffsettingAxisWithDrag || _axisBeingOffset == null) return;
     final cadPt = _screenToCad(screenPos);
     final axis = _axisBeingOffset!;
-    final newSign = BimAxisOperations.offsetSign(axis, cadPt, previous: _currentOffsetSign);
+    final newSign = BimAxisOperations.offsetSign(axis, cadPt, previous: _currentOffsetSign,
+    );
 
     if (newSign != _currentOffsetSign) {
       setState(() {
@@ -2112,12 +2217,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   StructuralGridAxis? _getAxisOffsetPreview() {
     if (!_isOffsettingAxisWithDrag || _axisBeingOffset == null) return null;
     final axis = _axisBeingOffset!;
-    final offsetVec = _computeAxisOffsetVector(axis, _axisOffsetDistanceMeters, _currentOffsetSign);
+    final offsetVec = _computeAxisOffsetVector(axis, _axisOffsetDistanceMeters, _currentOffsetSign,
+    );
     return axis.copyWith(id: 'preview_offset', name: _getNextAxisName(axis.name),
-      start: axis.start + offsetVec, end: axis.end + offsetVec);
+      start: axis.start + offsetVec, end: axis.end + offsetVec,
+    );
   }
 
-  void _startAxisOffsetDragMode(StructuralGridAxis axis, double distanceMeters) {
+  void _startAxisOffsetDragMode(StructuralGridAxis axis, double distanceMeters,
+  ) {
     setState(() {
       _isOffsettingAxisWithDrag = true;
       _axisBeingOffset = axis;
@@ -2126,16 +2234,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     });
   }
 
-  void _applyAxisOffset(StructuralGridAxis originalAxis, double distanceMeters, double directionSign) {
+  void _applyAxisOffset(StructuralGridAxis originalAxis, double distanceMeters, double directionSign,
+  ) {
     _axisOffsetDistanceMeters = distanceMeters;
-    final offsetVec = _computeAxisOffsetVector(originalAxis, distanceMeters, directionSign);
+    final offsetVec = _computeAxisOffsetVector(originalAxis, distanceMeters, directionSign,
+    );
     final nextName = _getNextAxisName(originalAxis.name);
     final newAxis = originalAxis.copyWith(id: 'axis_${DateTime.now().microsecondsSinceEpoch}',
-      name: nextName, start: originalAxis.start + offsetVec, end: originalAxis.end + offsetVec);
+      name: nextName, start: originalAxis.start + offsetVec, end: originalAxis.end + offsetVec,
+    );
 
     _pushUndo();
     final isBg = Localizations.localeOf(context).languageCode == 'bg';
-    final updatedAxes = resequenceGridAxes([..._project.effectiveGridAxes, newAxis], isBulgarian: isBg);
+    final updatedAxes = resequenceGridAxes([..._project.effectiveGridAxes, newAxis,
+    ], isBulgarian: isBg);
     _updateProjectGridAxes(updatedAxes);
 
     setState(() {
@@ -2160,9 +2272,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         ),
         title: Row(
           children: [
-            const Icon(Icons.check_circle_outline, color: Color(0xFF00E5FF), size: 20),
+            const AppIcon(
+              AppIconId.checkCircle, color: Color(0xFF00E5FF), size: 20,
+            ),
             const SizedBox(width: 8),
-            Text(context.l10n.offsetCreatedTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            Text(context.l10n.offsetCreatedTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ],
         ),
         content: Text(
@@ -2172,16 +2287,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(context.l10n.keepBoth, style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.keepBoth, style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFFF5252),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(context.l10n.deletePrevious, style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.deletePrevious, style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -2209,7 +2328,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   Future<void> _showGridAxisOffsetDialog() async {
     final element = _selectedGridAxis;
     if (element == null) return;
-    final distance = await showStructuralOffsetDialog(context, centimeters: false);
+    final distance = await showStructuralOffsetDialog(context, centimeters: false,
+    );
     if (!mounted || distance == null) return;
     _startAxisOffsetDragMode(element, distance);
   }
@@ -2284,7 +2404,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
-  void _applyColumnOffset(StructuralColumn originalCol, double distanceMeters, Offset direction) {
+  void _applyColumnOffset(StructuralColumn originalCol, double distanceMeters, Offset direction,
+  ) {
     _columnOffsetDistanceMeters = distanceMeters;
     final distCad = distanceMeters * _cadUnitsPerMeter;
     final dirLen = direction.distance;
@@ -2324,9 +2445,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         ),
         title: Row(
           children: [
-            const Icon(Icons.check_circle_outline, color: Color(0xFF00E5FF), size: 20),
+            const AppIcon(
+              AppIconId.checkCircle, color: Color(0xFF00E5FF), size: 20,
+            ),
             const SizedBox(width: 8),
-            Text(context.l10n.offsetCreatedTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            Text(context.l10n.offsetCreatedTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ],
         ),
         content: Text(
@@ -2336,16 +2460,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(context.l10n.keepBoth, style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.keepBoth, style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFFF5252),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(context.l10n.deletePrevious, style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.deletePrevious, style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -2363,7 +2491,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final remainingCols = active.columns.where((c) => c.id != colId).toList();
     final isBg = Localizations.localeOf(context).languageCode == 'bg';
     final updatedCols = deleted != null
-        ? renumberColumnsAfterDeletion(remainingCols, deleted, defaultPrefix: isBg ? 'К' : 'C')
+        ? renumberColumnsAfterDeletion(remainingCols, deleted, defaultPrefix: isBg ? 'К' : 'C',
+          )
         : remainingCols;
     _updateActiveStorey(active.copyWith(columns: updatedCols));
     setState(() {
@@ -2377,7 +2506,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   Future<void> _showColumnOffsetDialog() async {
     final element = _selectedColumn;
     if (element == null) return;
-    final distance = await showStructuralOffsetDialog(context, centimeters: true);
+    final distance = await showStructuralOffsetDialog(context, centimeters: true,
+    );
     if (!mounted || distance == null) return;
     _startColumnOffsetDragMode(element, distance);
   }
@@ -2394,7 +2524,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlgState) => AlertDialog(
           backgroundColor: const Color(0xFF1E1E24),
-          title: Text(context.l10n.columnDimensionsTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
+          title: Text(context.l10n.columnDimensionsTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -2403,7 +2534,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   Expanded(
                     child: TextField(
                       controller: wCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true,
+                      ),
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: context.l10n.widthCm,
@@ -2417,7 +2549,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   Expanded(
                     child: TextField(
                       controller: hCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true,
+                      ),
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: context.l10n.heightCm,
@@ -2439,9 +2572,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   side: const BorderSide(color: Colors.white30),
                 ),
                 segments: [
-                  ButtonSegment(value: ColumnShape.rectangular, label: Text(context.l10n.shapeRectangular, style: const TextStyle(fontSize: 11))),
-                  ButtonSegment(value: ColumnShape.circular, label: Text(context.l10n.shapeCircular, style: const TextStyle(fontSize: 11))),
-                  ButtonSegment(value: ColumnShape.lShape, label: Text(context.l10n.shapeLShape, style: const TextStyle(fontSize: 11))),
+                  ButtonSegment(value: ColumnShape.rectangular, label: Text(context.l10n.shapeRectangular, style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
+                  ButtonSegment(value: ColumnShape.circular, label: Text(context.l10n.shapeCircular, style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
+                  ButtonSegment(value: ColumnShape.lShape, label: Text(context.l10n.shapeLShape, style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
                 ],
                 selected: {shape},
                 onSelectionChanged: (val) => setDlgState(() => shape = val.first),
@@ -2461,7 +2600,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   _currentColumnPreset = _currentColumnPreset.copyWith(
                     shape: shape,
                     width: w.clamp(0.15, 3.0),
-                    height: (shape == ColumnShape.circular ? w : h).clamp(0.15, 3.0),
+                    height: (shape == ColumnShape.circular ? w : h).clamp(0.15, 3.0,
+                    ),
                   );
                 });
                 Navigator.of(ctx).pop();
@@ -2475,19 +2615,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _showCustomWallDialog() {
-    final lCtrl = TextEditingController(text: (_currentWallLength * 100).toInt().toString());
-    final tCtrl = TextEditingController(text: (_currentWallThickness * 100).toInt().toString());
+    final lCtrl = TextEditingController(text: (_currentWallLength * 100).toInt().toString(),
+    );
+    final tCtrl = TextEditingController(text: (_currentWallThickness * 100).toInt().toString(),
+    );
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E24),
-        title: Text(context.l10n.customWallDimensions, style: const TextStyle(color: Colors.white, fontSize: 16)),
+        title: Text(context.l10n.customWallDimensions, style: const TextStyle(color: Colors.white, fontSize: 16),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: lCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true,
+              ),
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: context.l10n.propLengthL,
@@ -2499,7 +2643,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: tCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true,
+              ),
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: context.l10n.thicknessCm,
@@ -2511,7 +2656,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.cancel)),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.cancel),
+          ),
           FilledButton(
             onPressed: () {
               final l = (double.tryParse(lCtrl.text) ?? 150.0) / 100.0;
@@ -2530,19 +2676,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _showCustomBeamDialog() {
-    final wCtrl = TextEditingController(text: (_currentBeamWidth * 100).toInt().toString());
-    final dCtrl = TextEditingController(text: (_currentBeamDepth * 100).toInt().toString());
+    final wCtrl = TextEditingController(text: (_currentBeamWidth * 100).toInt().toString(),
+    );
+    final dCtrl = TextEditingController(text: (_currentBeamDepth * 100).toInt().toString(),
+    );
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E24),
-        title: Text(context.l10n.beamDimensionsTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
+        title: Text(context.l10n.beamDimensionsTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
+        ),
         content: Row(
           children: [
             Expanded(
               child: TextField(
                 controller: wCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true,
+                ),
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: context.l10n.widthBCm,
@@ -2556,7 +2706,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             Expanded(
               child: TextField(
                 controller: dCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true,
+                ),
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: context.l10n.depthHCm,
@@ -2569,7 +2720,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.cancel)),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.cancel),
+          ),
           FilledButton(
             onPressed: () {
               final w = (double.tryParse(wCtrl.text) ?? 25.0) / 100.0;
@@ -2590,12 +2742,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   void _showCustomSlabDialog() {
     if (_editingSlab != null) { _editCeilingSlabLevel(); return; }
     final double initialThickness = _editingSlab?.thickness ?? _currentSlabThickness;
-    final tCtrl = TextEditingController(text: (initialThickness * 100).toInt().toString());
+    final tCtrl = TextEditingController(text: (initialThickness * 100).toInt().toString(),
+    );
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E24),
-        title: Text(context.l10n.slabThicknessTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
+        title: Text(context.l10n.slabThicknessTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
+        ),
         content: TextField(
           controller: tCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -2608,7 +2762,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.cancel)),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.cancel),
+          ),
           FilledButton(
             onPressed: () {
               final t = (double.tryParse(tCtrl.text) ?? 20.0) / 100.0;
@@ -2635,7 +2790,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (slab == null) return;
     final ownerId = _project.activeStorey.id;
     final changed = await showDialog<StructuralSlab>(context: context,
-      builder: (_) => SlabLevelDialog(storey: _project.activeStorey, slab: slab));
+      builder: (_) => SlabLevelDialog(storey: _project.activeStorey, slab: slab),
+    );
     if (!mounted || changed == null || _project.activeStorey.id != ownerId ||
         _editingSlab?.id != slab.id) {
       return;
@@ -2656,7 +2812,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       context: context,
       builder: (_) => SlabEdgeOffsetDialog(
         slabs: _project.activeStorey.slabs, slab: slab,
-        scale: _cadUnitsPerMeter, initialEdge: _selectedSlabVertexIndex ?? 0),
+        scale: _cadUnitsPerMeter, initialEdge: _selectedSlabVertexIndex ?? 0,
+      ),
     );
     if (!mounted || updated == null || _project.activeStorey.id != ownerId ||
         _editingSlab?.id != slab.id) {
@@ -2675,7 +2832,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E24),
-        title: Text(context.l10n.axisNameTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
+        title: Text(context.l10n.axisNameTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
+        ),
         content: TextField(
           controller: nameCtrl,
           autofocus: true,
@@ -2687,7 +2845,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.cancel)),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.cancel),
+          ),
           FilledButton(
             onPressed: () {
               final text = nameCtrl.text.trim();
@@ -2703,7 +2862,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
-  (Offset, Offset)? _findClosestSegmentInCad(Offset cadPt, double toleranceCad) {
+  (Offset, Offset)? _findClosestSegmentInCad(Offset cadPt, double toleranceCad,
+  ) {
     double minDistance = toleranceCad;
     (Offset, Offset)? bestSeg;
 
@@ -2758,7 +2918,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             final ly = (pt.dy - by) * entity.scaleY;
             final rx = lx * cosA - ly * sinA;
             final ry = lx * sinA + ly * cosA;
-            return Offset(entity.insertPoint.dx + rx, entity.insertPoint.dy + ry);
+            return Offset(entity.insertPoint.dx + rx, entity.insertPoint.dy + ry,
+            );
           }
 
           for (final child in block.entities) {
@@ -2770,7 +2931,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               final v = child.vertices;
               for (int i = 0; i < v.length; i++) {
                 if (i + 1 < v.length || child.isClosed) {
-                  checkSegment(transformPt(v[i].offset), transformPt(v[(i + 1) % v.length].offset));
+                  checkSegment(transformPt(v[i].offset), transformPt(v[(i + 1) % v.length].offset),
+                  );
                 }
               }
             }
@@ -2895,7 +3057,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (_editingSlab?.id == slab.id) {
         _editingSlab = active.slabs.firstWhere((s) => s.id == slab.id);
       }
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context,
+      ).showSnackBar(
         SnackBar(content: Text(context.l10n.slabEdgeInvalid)));
       return false;
     }
@@ -2908,7 +3071,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   void _cancelSlabCorrection() {
     if (_initialSlabBeforeCorrection != null && _initialSlabCorrectionProject != null) {
       _updateActiveStorey(_project.activeStorey.copyWith(
-        slabs: _initialSlabCorrectionProject!.activeStorey.slabs));
+        slabs: _initialSlabCorrectionProject!.activeStorey.slabs,
+        ),
+      );
     }
     setState(() {
       _editingSlab = null;
@@ -2967,30 +3132,36 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   StructuralSlab _cleanSlabPolygon(StructuralSlab slab) {
     if (slab.polygon.length <= 3) return slab;
     final minDistanceCad = 0.005 * _cadUnitsPerMeter;
-    final cleaned = StructuralSlab.cleanPolygon(slab.polygon, minDistance: minDistanceCad);
+    final cleaned = StructuralSlab.cleanPolygon(slab.polygon, minDistance: minDistanceCad,
+    );
     return slab.copyWith(polygon: cleaned);
   }
 
   double _slabSnapTolerance({bool merge = false}) => SlabVertexSnap.tolerance(
     _getCadFitScale() * _transformController.value.getMaxScaleOnAxis(),
     _cadUnitsPerMeter,
-    isMouse: _activePointerKind == PointerDeviceKind.mouse, merge: merge);
+    isMouse: _activePointerKind == PointerDeviceKind.mouse, merge: merge,
+  );
 
   DxfSnapResult? _snapSlabPoint(Offset raw, {Offset? previous,
-      Offset? incomingDirection, String? excludedSlabId, int? excludedVertex}) {
+      Offset? incomingDirection, String? excludedSlabId, int? excludedVertex,
+  }) {
     _activeMagneticGuides = [];
     if (!_snapEnabled) return null;
     final tolerance = _slabSnapTolerance();
     final candidates = <DxfSnapResult>[];
     final cad = DxfSnapHelper.findSnapPoint(document: _document,
       cadPoint: raw, toleranceCad: tolerance, basePoint: previous,
-      includeIntersections: true);
+      includeIntersections: true,
+    );
     if (cad != null) candidates.add(cad);
     final edges = <(Offset, Offset)>[
       ...DxfSegmentSnap.nearby(document: _document, point: raw,
-          radius: math.max(.30 * _cadUnitsPerMeter, tolerance * 3), continuousOnly: true),
+          radius: math.max(.30 * _cadUnitsPerMeter, tolerance * 3), continuousOnly: true,
+      ),
       if (previous != null) ...DxfSegmentSnap.nearby(document: _document, point: previous,
-          radius: math.max(.30 * _cadUnitsPerMeter, tolerance * 3), continuousOnly: true),
+          radius: math.max(.30 * _cadUnitsPerMeter, tolerance * 3), continuousOnly: true,
+        ),
     ];
     for (final slab in _project.activeStorey.slabs) {
       for (var i = 0; i < slab.polygon.length; i++) {
@@ -2998,23 +3169,30 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         if (slab.id == excludedSlabId && i == excludedVertex) { continue; }
         final distance = (raw - a).distance;
         if (distance <= tolerance) { candidates.add(DxfSnapResult(
-          point: a, type: DxfSnapType.endpoint, distance: distance)); }
+          point: a, type: DxfSnapType.endpoint, distance: distance,
+            ),
+          ); }
         if (slab.id == excludedSlabId &&
             (i + 1) % slab.polygon.length == excludedVertex) { continue; }
         edges.add((a, b));
         final point = BimLineGeometry.closest(raw, a, b);
         if ((raw - point).distance <= tolerance) { candidates.add(DxfSnapResult(
-          point: point, type: DxfSnapType.nearest, distance: (raw - point).distance)); }
+          point: point, type: DxfSnapType.nearest, distance: (raw - point).distance,
+            ),
+          ); }
       }
     }
     final structural = _findStructuralSnap(raw, tolerance,
-        excludedSlabId: excludedSlabId);
+        excludedSlabId: excludedSlabId,
+    );
     if (structural != null) { candidates.add(structural); }
     final alignment = previous == null ? null : SlabVertexSnap.align(
       raw: raw, previous: previous, edges: edges, tolerance: tolerance,
-      incomingDirection: incomingDirection);
+      incomingDirection: incomingDirection,
+          );
     // Preserve exact corners; perpendicular alignment beats nearest-edge snapping.
-    final exact = candidates.where((c) => c.type == DxfSnapType.endpoint || c.type == DxfSnapType.intersection).toList()
+    final exact = candidates.where((c) => c.type == DxfSnapType.endpoint || c.type == DxfSnapType.intersection,
+            ).toList()
       ..sort((a, b) => a.distance.compareTo(b.distance));
     if (exact.isNotEmpty) {
       if (previous != null) _activeMagneticGuides = [(previous, exact.first.point)];
@@ -3033,13 +3211,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   DxfSnapResult? _snapOpeningPoint(Offset raw) {
     if (_snapEnabled && _openingPointsCad.length >= 3 &&
         (raw-_openingPointsCad.first).distance <= _slabSnapTolerance()) {
-      _activeMagneticGuides = [(_openingPointsCad.last, _openingPointsCad.first)];
+      _activeMagneticGuides = [(_openingPointsCad.last, _openingPointsCad.first),
+      ];
       return DxfSnapResult(point: _openingPointsCad.first,
-        type: DxfSnapType.endpoint, distance: (raw-_openingPointsCad.first).distance);
+        type: DxfSnapType.endpoint, distance: (raw-_openingPointsCad.first).distance,
+      );
     }
     return _snapSlabPoint(raw, previous: _openingPointsCad.lastOrNull,
       incomingDirection: _openingPointsCad.length >= 2
-          ? _openingPointsCad.last - _openingPointsCad[_openingPointsCad.length-2] : null);
+          ? _openingPointsCad.last - _openingPointsCad[_openingPointsCad.length-2] : null,
+    );
   }
 
   void _commitOpeningTap(Offset localPosition) {
@@ -3064,12 +3245,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final previous = polygon[(idx - 1 + count) % count];
     DxfSnapResult? snap = _snapSlabPoint(rawCad, previous: previous,
       incomingDirection: previous - polygon[(idx - 2 + count) % count],
-      excludedSlabId: _editingSlab!.id, excludedVertex: idx);
+      excludedSlabId: _editingSlab!.id, excludedVertex: idx,
+    );
     Offset effectiveCad = snap?.point ?? rawCad;
     final bestCandidate = _snapEnabled ? SlabVertexSnap.mergeCandidate(
-      rawCad, polygon, idx, _slabSnapTolerance(merge: true)) : null;
+      rawCad, polygon, idx, _slabSnapTolerance(merge: true),
+          ) : null;
     if (bestCandidate == null && snap != null && polygon.asMap().entries.any(
-        (e) => e.key != idx && (e.value - snap!.point).distance < 1e-8)) {
+        (e) => e.key != idx && (e.value - snap!.point).distance < 1e-8,
+        )) {
       snap = null;
       effectiveCad = rawCad;
       _activeMagneticGuides = [];
@@ -3077,7 +3261,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     if (bestCandidate != null) {
       effectiveCad = polygon[bestCandidate];
-      snap = DxfSnapResult(point: effectiveCad, type: DxfSnapType.endpoint, distance: 0);
+      snap = DxfSnapResult(point: effectiveCad, type: DxfSnapType.endpoint, distance: 0,
+      );
     }
 
     if (bestCandidate != _mergeCandidateSlabVertexIndex) {
@@ -3085,7 +3270,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     _previewContourVertex(_slabVertexEditor, _editingSlab!.id, _editingSlab!.polygon,
-      idx, rawCad, effectiveCad, snap);
+      idx, rawCad, effectiveCad, snap,
+    );
     final snappedScreen = snap != null ? _cadToScreen(effectiveCad) : null;
 
     setState(() {
@@ -3104,7 +3290,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_selectedOpening == null || _draggingOpeningVertexIndex == null) return;
     final (slabId, opIdx) = _selectedOpening!;
     final active = _project.activeStorey;
-    final slab = active.slabs.firstWhere((s) => s.id == slabId, orElse: () => active.slabs.first);
+    final slab = active.slabs.firstWhere((s) => s.id == slabId, orElse: () => active.slabs.first,
+    );
     if (opIdx >= slab.openings.length) return;
     final op = slab.openings[opIdx];
     final idx = _draggingOpeningVertexIndex!;
@@ -3116,14 +3303,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final rawCad = _screenToCad(targetScreenPos);
     final previous = op[(idx - 1 + op.length) % op.length];
     DxfSnapResult? snap = _snapSlabPoint(rawCad, previous: previous,
-      incomingDirection: previous - op[(idx - 2 + op.length) % op.length]);
+      incomingDirection: previous - op[(idx - 2 + op.length) % op.length],
+    );
     Offset effectiveCad = snap?.point ?? rawCad;
     final bestCandidate = _snapEnabled ? SlabVertexSnap.mergeCandidate(
-      rawCad, op, idx, _slabSnapTolerance(merge: true)) : null;
+      rawCad, op, idx, _slabSnapTolerance(merge: true),
+          ) : null;
 
     if (bestCandidate != null) {
       effectiveCad = op[bestCandidate];
-      snap = DxfSnapResult(point: effectiveCad, type: DxfSnapType.endpoint, distance: 0);
+      snap = DxfSnapResult(point: effectiveCad, type: DxfSnapType.endpoint, distance: 0,
+      );
     }
 
     if (bestCandidate != _mergeCandidateOpeningVertexIndex) {
@@ -3131,7 +3321,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     _previewContourVertex(_openingVertexEditor, '$slabId/$opIdx', op,
-      idx, rawCad, effectiveCad, snap);
+      idx, rawCad, effectiveCad, snap,
+    );
     final snappedScreen = snap != null ? _cadToScreen(effectiveCad) : null;
 
     setState(() {
@@ -3155,8 +3346,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _placementPointerHandled = false;
     if (_duplicateDraft != null) {
       _placementPointerHandled = true;
-      _duplicateSession!.grabAt(_screenToCad(event.localPosition) / _cadUnitsPerMeter);
-      _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
+      _duplicateSession!.grabAt(_screenToCad(event.localPosition) / _cadUnitsPerMeter,
+      );
+      _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse,
+      );
       return;
     }
     _elementGrabOffsetCad = null;
@@ -3237,7 +3430,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             _activeTool = StructuralDrawTool.column;
           });
           _updatePointer(event.localPosition,
-              isMouse: event.kind == PointerDeviceKind.mouse);
+              isMouse: event.kind == PointerDeviceKind.mouse,
+          );
           HapticFeedback.selectionClick();
           return;
         }
@@ -3258,7 +3452,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             _activeTool = StructuralDrawTool.shearWall;
           });
           _updatePointer(event.localPosition,
-              isMouse: event.kind == PointerDeviceKind.mouse);
+              isMouse: event.kind == PointerDeviceKind.mouse,
+          );
           HapticFeedback.selectionClick();
           return;
         }
@@ -3291,7 +3486,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           }
 
           // Check if touched on a midpoint grip of the selected opening
-          final opGrip = _hitTestOpeningMidpoint(event.localPosition, slab, opIdx);
+          final opGrip = _hitTestOpeningMidpoint(event.localPosition, slab, opIdx,
+          );
           if (opGrip != null) {
             setState(() {
               _activeOpeningGrip = opGrip;
@@ -3379,7 +3575,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _isPlacingWithHold = false;
         });
         _updatePointer(event.localPosition,
-            isMouse: event.kind == PointerDeviceKind.mouse);
+            isMouse: event.kind == PointerDeviceKind.mouse,
+        );
         HapticFeedback.selectionClick();
         return;
       }
@@ -3397,7 +3594,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _isPlacingWithHold = false;
         });
         _updatePointer(event.localPosition,
-            isMouse: event.kind == PointerDeviceKind.mouse);
+            isMouse: event.kind == PointerDeviceKind.mouse,
+        );
         HapticFeedback.selectionClick();
         return;
       }
@@ -3406,7 +3604,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final hitOpening = _hitTestOpening(event.localPosition);
         if (hitOpening != null) {
           _startMovingOpening(hitOpening, event.localPosition,
-              isMouse: event.kind == PointerDeviceKind.mouse);
+              isMouse: event.kind == PointerDeviceKind.mouse,
+          );
           return;
         }
       }
@@ -3431,7 +3630,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _activeTool = StructuralDrawTool.column;
         });
         _updatePointer(event.localPosition,
-            isMouse: event.kind == PointerDeviceKind.mouse);
+            isMouse: event.kind == PointerDeviceKind.mouse,
+        );
         HapticFeedback.selectionClick();
         return;
       }
@@ -3450,7 +3650,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _activeTool = StructuralDrawTool.shearWall;
         });
         _updatePointer(event.localPosition,
-            isMouse: event.kind == PointerDeviceKind.mouse);
+            isMouse: event.kind == PointerDeviceKind.mouse,
+        );
         HapticFeedback.selectionClick();
         return;
       }
@@ -3459,7 +3660,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (hitOpening != null) {
         _activeTool = StructuralDrawTool.slabOpening;
         _startMovingOpening(hitOpening, event.localPosition,
-            isMouse: event.kind == PointerDeviceKind.mouse);
+            isMouse: event.kind == PointerDeviceKind.mouse,
+        );
         return;
       }
 
@@ -3551,16 +3753,19 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _handlePointerMove(PointerMoveEvent event) {
     if (!_toolPointerActive) return;
-    if (_beamMove != null) { _previewBeamMove(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse); return; }
+    if (_beamMove != null) { _previewBeamMove(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse,
+      ); return; }
     if (_duplicateDraft != null) {
-      _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
+      _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse,
+      );
       return;
     }
 
     if (_activeTool == StructuralDrawTool.measure) {
       if (_isPlacingWithHold) {
         _updatePointer(event.localPosition,
-            isMouse: event.kind == PointerDeviceKind.mouse);
+            isMouse: event.kind == PointerDeviceKind.mouse,
+        );
       }
       return;
     }
@@ -3624,7 +3829,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // C. Moving column
     if (_isMovingColumn &&
         _selectedColumn != null) {
-      _updatePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
+      _updatePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse,
+      );
       final effectiveCad = _currentCadCoord;
       if (effectiveCad != null) {
         final dist = (effectiveCad - _selectedColumn!.center).distance;
@@ -3638,7 +3844,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // C1b. Moving shear wall
     if (_isMovingShearWall &&
         _selectedShearWall != null) {
-      _updatePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
+      _updatePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse,
+      );
       final effectiveCad = _currentCadCoord;
       if (effectiveCad != null) {
         final dist = (effectiveCad - _selectedShearWall!.center).distance;
@@ -3652,7 +3859,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // C2. Moving opening
     if (_isMovingOpening &&
         _selectedOpening != null) {
-      _updatePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
+      _updatePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse,
+      );
       final effectiveCad = _currentCadCoord;
       if (effectiveCad != null && _movingOpeningOriginalCenter != null) {
         final dist = (effectiveCad - _movingOpeningOriginalCenter!).distance;
@@ -3665,7 +3873,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     // D. Placing element after mouse down or touch hold
     if (_isPlacingWithHold) {
-      _updatePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
+      _updatePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse,
+      );
     }
   }
 
@@ -3721,7 +3930,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // Compute live preview polygon with dynamicPullEdge (avoiding orphan points and artifacts)
     List<Offset>? previewPoly;
     final active = _project.activeStorey;
-    final slabIdx = active.slabs.indexWhere((s) => s.id == _activeExtrudingSlabId);
+    final slabIdx = active.slabs.indexWhere((s) => s.id == _activeExtrudingSlabId,
+    );
     if (slabIdx != -1 && effectiveD.abs() > 1e-4) {
       final previewSlab = active.slabs[slabIdx].dynamicPullEdge(
         edgeIndex: grip.edgeIndex,
@@ -3792,15 +4002,18 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
     final touchPos = screenPos;
 
-    var targetPos = StructuralPointerInteraction.placementTarget(screenPos, isMouse: isMouse);
+    var targetPos = StructuralPointerInteraction.placementTarget(screenPos, isMouse: isMouse,
+    );
     var rawCad = _screenToCad(targetPos);
     final movingCenter = _isMovingColumn ? _selectedColumn?.center
         : _isMovingShearWall ? _selectedShearWall?.center
         : _isMovingOpening ? _movingOpeningOriginalCenter : null;
     if (movingCenter != null) {
       final pointerCad = _screenToCad(screenPos);
-      _elementGrabOffsetCad ??= StructuralPointerInteraction.grabOffset(movingCenter, pointerCad);
-      rawCad = StructuralPointerInteraction.dragTarget(pointerCad, _elementGrabOffsetCad!);
+      _elementGrabOffsetCad ??= StructuralPointerInteraction.grabOffset(movingCenter, pointerCad,
+      );
+      rawCad = StructuralPointerInteraction.dragTarget(pointerCad, _elementGrabOffsetCad!,
+      );
       targetPos = _cadToScreen(rawCad);
     }
     StructuralAxisLockMode effectiveLockMode = StructuralAxisLockMode.autoMode;
@@ -3824,9 +4037,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final toleranceCad = StructuralPointerInteraction.snapToleranceCad(
         isMouse: isMouse,
         pixelsPerCadUnit: fitScale * currentScale.clamp(.001, 10000.0),
-        cadUnitsPerMeter: _cadUnitsPerMeter);
+        cadUnitsPerMeter: _cadUnitsPerMeter,
+      );
       bool acceptsCandidate(Offset center) {
-        if (!StructuralPointerInteraction.accepts(rawCad, center, toleranceCad)) { return false; }
+        if (!StructuralPointerInteraction.accepts(rawCad, center, toleranceCad,
+        )) { return false; }
         if (anchor != null && effectiveLockMode == StructuralAxisLockMode.lockX &&
             (center.dx-anchor.dx).abs()>1e-8*_cadUnitsPerMeter) { return false; }
         if (anchor != null && effectiveLockMode == StructuralAxisLockMode.lockY &&
@@ -3951,7 +4166,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final nCorners = cornerOffsets.length;
         if (nCorners >= 2) {
           for (int i = 0; i < nCorners; i++) {
-            edgeOffsets.add((cornerOffsets[i] + cornerOffsets[(i + 1) % nCorners]) / 2.0);
+            edgeOffsets.add((cornerOffsets[i] + cornerOffsets[(i + 1) % nCorners]) / 2.0,
+            );
           }
         }
 
@@ -4008,7 +4224,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           // Score corner matches
           for (final cornerOffset in cornerOffsets) {
             final pt = candCenter + cornerOffset;
-            final match = _findStructuralSnap(pt, toleranceCad * 0.8, cornersOnly: true) ??
+            final match = _findStructuralSnap(pt, toleranceCad * 0.8, cornersOnly: true,
+                ) ??
                 DxfSnapHelper.findSnapPoint(
                   document: _document,
                   cadPoint: pt,
@@ -4034,7 +4251,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   candScore += 500.0;
                   endpointMatches++;
                   candScreens.add(_cadToScreen(inter));
-                  candSnaps.add(DxfSnapResult(point: inter, type: DxfSnapType.endpoint, distance: 0));
+                  candSnaps.add(DxfSnapResult(point: inter, type: DxfSnapType.endpoint, distance: 0,
+                    ),
+                  );
                   break;
                 }
               }
@@ -4053,7 +4272,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               if (distToAxis < 1e-3) {
                 candScore += 450.0;
                 candScreens.add(_cadToScreen(candEdge));
-                candSnaps.add(DxfSnapResult(point: candEdge, type: DxfSnapType.midpoint, distance: 0));
+                candSnaps.add(DxfSnapResult(point: candEdge, type: DxfSnapType.midpoint, distance: 0,
+                  ),
+                );
                 break;
               }
             }
@@ -4275,7 +4496,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           snap = _snapSlabPoint(rawCad,
             previous: _slabPointsCad.lastOrNull,
             incomingDirection: _slabPointsCad.length >= 2
-              ? _slabPointsCad.last - _slabPointsCad[_slabPointsCad.length - 2] : null);
+              ? _slabPointsCad.last - _slabPointsCad[_slabPointsCad.length - 2] : null,
+          );
         }
 
         if (snap != null) {
@@ -4400,7 +4622,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (_showBimSlabs) {
         final slabs = <String, StructuralSlab>{
           for (final slab in [...storey.slabs, ...?_floorSlabStorey?.slabs,
-              ...?_ceilingSlabStorey?.slabs]) slab.id: slab,
+              ...?_ceilingSlabStorey?.slabs,
+          ]) slab.id: slab,
         };
         for (final slab in slabs.values) {
           polygon(slab.polygon);
@@ -4416,7 +4639,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _transformController.value.getMaxScaleOnAxis().clamp(.0001, 10000.0);
       final result = StructuralMeasurementSnap.find(document: _document,
           raw: raw, tolerance: 22 / pixelsPerCad, edges: edges,
-          start: _measurementStartCad);
+          start: _measurementStartCad,
+      );
       snap = result.snap;
       _activeMagneticGuides = result.guides;
       if (snap != null && (_activeSnap?.point != snap.point ||
@@ -4490,16 +4714,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return null;
   }
 
-  DxfSnapResult? _findStructuralSnap(Offset cadPt, double toleranceCad, {bool cornersOnly = false, String? excludedSlabId, Set<String> excludedElementIds = const {}}) {
+  DxfSnapResult? _findStructuralSnap(Offset cadPt, double toleranceCad, {bool cornersOnly = false, String? excludedSlabId, Set<String> excludedElementIds = const {},
+  }) {
     final frame = BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter);
     final raw = frame.toModel(cadPt), radius = toleranceCad / _cadUnitsPerMeter;
-    final resolver = BimSnapResolver<StructuralSnapFeature>(raw: raw, radius: radius);
-    for (final feature in StructuralSnapScene.of(_project, _cadUnitsPerMeter).query(raw, radius)) {
+    final resolver = BimSnapResolver<StructuralSnapFeature>(raw: raw, radius: radius,
+    );
+    for (final feature in StructuralSnapScene.of(_project, _cadUnitsPerMeter,
+    ).query(raw, radius)) {
       if (excludedElementIds.contains(feature.owner) || feature.owner == excludedSlabId ||
           (_isMovingColumn && feature.owner == _selectedColumn?.id) ||
           (_isMovingShearWall && feature.owner == _selectedShearWall?.id) ||
           (cornersOnly && feature.kind == BimSnapKind.midpoint)) { continue; }
-      resolver.consider(BimSnapCandidate(point: feature.point, kind: feature.kind, source: feature));
+      resolver.consider(BimSnapCandidate(point: feature.point, kind: feature.kind, source: feature,
+        ),
+      );
     }
     final best = resolver.best;
     if (best == null) return null;
@@ -4521,7 +4750,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     if (_activeTool == StructuralDrawTool.measure && _isPlacingWithHold) {
       _updateMeasurementPointer(event.localPosition,
-          isMouse: event.kind == PointerDeviceKind.mouse);
+          isMouse: event.kind == PointerDeviceKind.mouse,
+      );
       _commitPlacement(_currentCadCoord!);
       setState(() {
         _isPlacingWithHold = false;
@@ -4536,9 +4766,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
-    if (_beamMove != null) { _finishBeamMove(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse); return; }
+    if (_beamMove != null) { _finishBeamMove(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse,
+      ); return; }
     if (_duplicateDraft != null && _placementPointerHandled) {
-      _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
+      _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse,
+      );
       _commitDuplicateDrag();
       return;
     }
@@ -4595,7 +4827,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final testPts = _slabVertexEditor.active && !_slabVertexEditor.invalid
             ? _slabVertexEditor.preview!.map((p) => p * _cadUnitsPerMeter).toList()
             : (List<Offset>.from(_editingSlab!.polygon)..[idx] = _draggingSlabVertexCad!);
-        final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter);
+        final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter,
+        );
         if (cleanedPts.length >= 3 && !StructuralSlab.hasSelfIntersections(cleanedPts)) {
           _pushSlabCorrectionUndo();
           final updated = _editingSlab!.copyWith(polygon: cleanedPts);
@@ -4604,7 +4837,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           HapticFeedback.mediumImpact();
         } else if (!StructuralSlab.hasSelfIntersections(testPts)) {
           _pushSlabCorrectionUndo();
-          final updated = _editingSlab!.moveVertex(idx, _draggingSlabVertexCad!);
+          final updated = _editingSlab!.moveVertex(idx, _draggingSlabVertexCad!,
+          );
           final cleaned = _cleanSlabPolygon(updated);
           _editingSlab = cleaned;
           _updateActiveStoreySlab(cleaned);
@@ -4646,7 +4880,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               minDistanceCad: 0.005 * _cadUnitsPerMeter,
             ) ?? slab.removeOpeningVertex(opIdx, idx);
             if (updatedSlab != null && _updateOpeningInStorey(
-                (slabId, opIdx), updatedSlab.openings[opIdx], allowTransfer: false)) {
+                (slabId, opIdx), updatedSlab.openings[opIdx], allowTransfer: false,
+                )) {
               HapticFeedback.heavyImpact();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -4658,12 +4893,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           } else if (_draggingOpeningVertexCad != null) {
             final testPts = List<Offset>.from(op);
             testPts[idx] = _draggingOpeningVertexCad!;
-            final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter);
+            final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter,
+            );
             if (cleanedPts.length >= 3 && !StructuralSlab.hasSelfIntersections(cleanedPts)) {
-              _updateOpeningInStorey((slabId, opIdx), cleanedPts, allowTransfer: false);
+              _updateOpeningInStorey((slabId, opIdx), cleanedPts, allowTransfer: false,
+              );
               HapticFeedback.mediumImpact();
             } else if (!StructuralSlab.hasSelfIntersections(testPts)) {
-              _updateOpeningInStorey((slabId, opIdx), testPts, allowTransfer: false);
+              _updateOpeningInStorey((slabId, opIdx), testPts, allowTransfer: false,
+              );
               HapticFeedback.mediumImpact();
             } else {
               HapticFeedback.vibrate();
@@ -4693,7 +4931,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         if (d.abs() >= 0.05 * scale) {
           final active = _project.activeStorey;
           final slabIdx =
-              active.slabs.indexWhere((s) => s.id == _activeExtrudingSlabId);
+              active.slabs.indexWhere((s) => s.id == _activeExtrudingSlabId,
+          );
           if (slabIdx != -1) {
             if (_isEditingSlab) {
               _pushSlabCorrectionUndo();
@@ -4719,7 +4958,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           // In slab edit mode: tap on midpoint inserts a new vertex
           _pushSlabCorrectionUndo();
           final updated =
-              _editingSlab!.insertMidpointVertex(_activeGrip!.edgeIndex);
+              _editingSlab!.insertMidpointVertex(_activeGrip!.edgeIndex,
+          );
           _editingSlab = updated;
           _updateActiveStoreySlab(updated);
           HapticFeedback.lightImpact();
@@ -4764,14 +5004,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 minDistanceCad: 0.05 * scale,
               );
               _updateOpeningInStorey((slabId, opIdx),
-                updatedSlab.openings[opIdx], allowTransfer: false);
+                updatedSlab.openings[opIdx], allowTransfer: false,
+              );
               HapticFeedback.heavyImpact();
             }
           } else {
             // Tapped on midpoint grip without dragging -> insert midpoint vertex!
-            final updatedSlab = slab.insertOpeningMidpointVertex(opIdx, _activeOpeningGrip!.edgeIndex);
+            final updatedSlab = slab.insertOpeningMidpointVertex(opIdx, _activeOpeningGrip!.edgeIndex,
+            );
             _updateOpeningInStorey((slabId, opIdx),
-              updatedSlab.openings[opIdx], allowTransfer: false);
+              updatedSlab.openings[opIdx], allowTransfer: false,
+            );
             HapticFeedback.lightImpact();
           }
         }
@@ -4795,7 +5038,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           final updatedCol = StructuralColumnEditingAdapter(
             frame: BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter),
           ).translate(_selectedColumn!,
-            (newCenter - _selectedColumn!.center) / _cadUnitsPerMeter);
+            (newCenter - _selectedColumn!.center) / _cadUnitsPerMeter,
+              );
           final active = _project.activeStorey;
           final updatedCols = active.columns
               .map((c) => c.id == updatedCol.id ? updatedCol : c)
@@ -4832,7 +5076,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           final updatedWall = StructuralWallEditingAdapter(
             frame: BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter),
           ).translate(_selectedShearWall!,
-            (newCenter - (_selectedShearWall!.start + _selectedShearWall!.end) / 2) / _cadUnitsPerMeter);
+            (newCenter - (_selectedShearWall!.start + _selectedShearWall!.end) / 2) / _cadUnitsPerMeter,
+              );
           final active = _project.activeStorey;
           final updatedWalls = active.shearWalls
               .map((w) => w.id == updatedWall.id ? updatedWall : w)
@@ -5278,7 +5523,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           final active = _project.activeStorey;
           final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
           if (slabIdx != -1 && opIdx < active.slabs[slabIdx].openings.length) {
-            final hitVIdx = _hitTestOpeningVertex(details.localPosition, active.slabs[slabIdx].openings[opIdx]);
+            final hitVIdx = _hitTestOpeningVertex(details.localPosition, active.slabs[slabIdx].openings[opIdx],
+            );
             if (hitVIdx != null) {
               setState(() {
                 _selectedOpeningVertexIndex = hitVIdx;
@@ -5329,7 +5575,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
       case StructuralDrawTool.slab:
         if (_isEditingSlab) {
-          final hitVIdx = _hitTestSlabVertex(details.localPosition, _editingSlab!);
+          final hitVIdx = _hitTestSlabVertex(details.localPosition, _editingSlab!,
+          );
           if (hitVIdx != null) {
             setState(() {
               _selectedSlabVertexIndex = hitVIdx;
@@ -5538,7 +5785,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           });
           HapticFeedback.lightImpact();
         } else {
-          final suggestedName = _getSuggestedAxisName(_firstWallEdgeStartCad!, _firstWallEdgeEndCad!);
+          final suggestedName = _getSuggestedAxisName(_firstWallEdgeStartCad!, _firstWallEdgeEndCad!,
+          );
           final rawAxis = StructuralGridAxis.fromTwoSegments(
             id: 'axis_${DateTime.now().millisecondsSinceEpoch}',
             name: suggestedName,
@@ -5558,7 +5806,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
             _pushUndo();
             final isBg = Localizations.localeOf(context).languageCode == 'bg';
-            final updatedAxes = resequenceGridAxes([..._project.effectiveGridAxes, axis], isBulgarian: isBg);
+            final updatedAxes = resequenceGridAxes([..._project.effectiveGridAxes, axis,
+            ], isBulgarian: isBg);
             _updateProjectGridAxes(updatedAxes);
             setState(() {
               _firstWallEdgeStartCad = null;
@@ -5573,7 +5822,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     } else if (_activeTool == StructuralDrawTool.shearWall) {
       _pushUndo();
       final nextWallName = _generateNextShearWallName(active.shearWalls);
-      final dir = Offset(math.cos(_currentWallRotationRad), math.sin(_currentWallRotationRad));
+      final dir = Offset(math.cos(_currentWallRotationRad), math.sin(_currentWallRotationRad),
+      );
       final halfLen = (_currentWallLength * scale) / 2.0;
       final newWall = StructuralShearWall(
         id: 'wall_${DateTime.now().millisecondsSinceEpoch}',
@@ -5592,7 +5842,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (!_isPlacingWithHold) {
         cadCoord = _snapSlabPoint(cadCoord, previous: _slabPointsCad.lastOrNull,
           incomingDirection: _slabPointsCad.length >= 2
-            ? _slabPointsCad.last - _slabPointsCad[_slabPointsCad.length - 2] : null)?.point ?? cadCoord;
+            ? _slabPointsCad.last - _slabPointsCad[_slabPointsCad.length - 2] : null,
+            )?.point ?? cadCoord;
       }
       if (_slabPointsCad.length >= 3) {
         final distToFirst = (cadCoord - _slabPointsCad.first).distance;
@@ -5619,7 +5870,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         if ((cadCoord - _beamStartCad!).distance >= 0.3 * scale) {
           _pushUndo();
           final isBg = Localizations.localeOf(context).languageCode == 'bg';
-          final nextBeamName = _generateNextBeamName(active.beams, isBulgarian: isBg);
+          final nextBeamName = _generateNextBeamName(active.beams, isBulgarian: isBg,
+          );
           final newBeam = StructuralBeam(
             id: 'beam_${DateTime.now().millisecondsSinceEpoch}',
             name: nextBeamName,
@@ -5646,7 +5898,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final double fitScale = _getCadFitScale();
         final double currentScale = _transformController.value.getMaxScaleOnAxis();
         final closeThresholdCad = math.min(
-            12.0 / (fitScale * currentScale.clamp(0.001, 10000.0)), .10 * scale);
+            12.0 / (fitScale * currentScale.clamp(0.001, 10000.0)), .10 * scale,
+        );
         if (distToFirst <= closeThresholdCad) {
           _closeOpeningPolygon();
           return;
@@ -5684,11 +5937,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   bool _addOpeningToSlab(List<Offset> opPoly,
-      {SlabOpeningType type = SlabOpeningType.shaft}) {
+      {SlabOpeningType type = SlabOpeningType.shaft,
+  }) {
     final result = SlabOpeningPlacement.apply(
       slabs: _project.activeStorey.slabs, polygon: opPoly,
       scale: _cadUnitsPerMeter, type: type,
-      floorOwnedOnly: widget.bimContext != null);
+      floorOwnedOnly: widget.bimContext != null,
+    );
     final accepted = _applyOpeningPlacement(result);
     if (accepted) HapticFeedback.heavyImpact();
     return accepted;
@@ -5716,7 +5971,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         for (var i = 0; i < seeds.length; i++)
           seeds[i].copyWith(
             colorValue: SlabColors.forSlab(seeds[i], fallback: Structural2dPainter.slabPalette[
-                i % Structural2dPainter.slabPalette.length]).toARGB32(),
+                i % Structural2dPainter.slabPalette.length],
+            ).toARGB32(),
           ),
       ];
       _updateActiveStorey(active.copyWith(slabs: coloredSeeds));
@@ -5728,7 +5984,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   Future<void> _clearStructuralSupports() async {
     final snapshot = _project;
     final count = snapshot.storeys.fold<int>(
-      0, (n, s) => n + s.columns.length + s.shearWalls.length);
+      0, (n, s) => n + s.columns.length + s.shearWalls.length,
+    );
     if (count == 0) return;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -5737,9 +5994,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         content: Text(context.l10n.bimClearStructureConfirm(count)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false),
-            child: Text(context.l10n.cancel)),
+            child: Text(context.l10n.cancel),
+          ),
           FilledButton(onPressed: () => Navigator.pop(ctx, true),
-            child: Text(context.l10n.delete)),
+            child: Text(context.l10n.delete),
+          ),
         ],
       ),
     );
@@ -5747,7 +6006,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _pushUndo();
     setState(() {
       _project = _project.copyWith(storeys: [
-        for (final s in _project.storeys) s.copyWith(columns: [], shearWalls: [])]);
+        for (final s in _project.storeys) s.copyWith(columns: [], shearWalls: []),
+        ],
+      );
       _selectedColumn = null;
       _selectedShearWall = null;
       _isMovingColumn = false;
@@ -5821,7 +6082,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (metadata == null) {
       final wallResult = WallAxisDetector.detect(_document);
       if (wallResult.hasWallsFound) {
-        final envelope = SlabEnvelopeDetector.detect(wallResult, document: _document);
+        final envelope = SlabEnvelopeDetector.detect(wallResult, document: _document,
+        );
         final projections = SlabProjectionDetector.detect(
           _document,
           envelope,
@@ -5834,12 +6096,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           'slabEnvelope': envelope.toJson(),
           'slabProjections': projections.map((p) => p.toJson()).toList(),
         };
-        wallReferences = [...wallResult.wallContourSegments, ...wallResult.closureSegments];
+        wallReferences = [...wallResult.wallContourSegments, ...wallResult.closureSegments,
+        ];
       }
     } else if ((metadata['slabProjections'] as List? ?? []).isEmpty) {
       final wallResult = WallAxisDetector.detect(_document);
       if (wallResult.hasWallsFound) {
-        final envelope = SlabEnvelopeDetector.detect(wallResult, document: _document);
+        final envelope = SlabEnvelopeDetector.detect(wallResult, document: _document,
+        );
         final projections = SlabProjectionDetector.detect(
           _document,
           envelope,
@@ -5857,12 +6121,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
     }
     if (metadata == null || metadata['slabEnvelope'] == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.bimSlabSeedsEmpty)),
-      );
+      ScaffoldMessenger.of(context,
+      ).showSnackBar(
+        SnackBar(content: Text(context.l10n.bimSlabSeedsEmpty)));
       return;
     }
-    if (active.slabs.any((s) => s.id.startsWith(SlabSeedGenerator.prefix(active.id)))) {
+    if (active.slabs.any((s) => s.id.startsWith(SlabSeedGenerator.prefix(active.id)),
+    )) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.bimSlabsAlreadyGenerated)),
       );
@@ -5881,9 +6146,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final total = ((metadata['slabEnvelope'] as Map?)?['contours'] as List? ?? []).length +
         (metadata['slabProjections'] as List? ?? []).length;
     if (seeds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.bimSlabSeedsEmpty)),
-      );
+      ScaffoldMessenger.of(context,
+      ).showSnackBar(
+        SnackBar(content: Text(context.l10n.bimSlabSeedsEmpty)));
       return;
     }
     final accepted = await showDialog<bool>(
@@ -5894,7 +6159,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           seeds.length,
           total > seeds.length ? total - seeds.length : 0,
           (_currentSlabThickness * 100).toStringAsFixed(1),
-        )),
+        ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -5913,10 +6179,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       for (var i = 0; i < seeds.length; i++)
         seeds[i].copyWith(
           colorValue: SlabColors.forSlab(seeds[i], fallback: Structural2dPainter.slabPalette[
-              (active.slabs.length + i) % Structural2dPainter.slabPalette.length]).toARGB32(),
+              (active.slabs.length + i) % Structural2dPainter.slabPalette.length],
+          ).toARGB32(),
         ),
     ];
-    _updateActiveStorey(active.copyWith(slabs: [...active.slabs, ...coloredSeeds]));
+    _updateActiveStorey(active.copyWith(slabs: [...active.slabs, ...coloredSeeds]),
+    );
     _runAnalysis();
     setState(() {});
     _saveProject();
@@ -5977,12 +6245,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
     final docKey = widget.title ?? 'structural_model';
-    StructuralPersistenceService.saveProject(documentKey: docKey, project: _project);
+    StructuralPersistenceService.saveProject(documentKey: docKey, project: _project,
+    );
   }
 
   void _updateActiveStorey(StoreyLevel newStorey) {
     newStorey = newStorey.copyWith(slabs: SlabZoneGrouping.attach(
-      newStorey.slabs, _cadUnitsPerMeter, owner: newStorey));
+      newStorey.slabs, _cadUnitsPerMeter, owner: newStorey,
+      ),
+    );
     final storeys = List<StoreyLevel>.from(_project.storeys);
     storeys[_project.activeStoreyIndex] = newStorey;
     setState(() {
@@ -6019,7 +6290,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         for (final entry in docs.entries) {
           BimUnderlayMetadata.setFiltered(entry.value, activate);
           widget.bimContext?.onLayerVisibilityChanged(entry.key,
-            {for (final l in entry.value.layers.values) l.name: l.isVisible});
+            {for (final l in entry.value.layers.values) l.name: l.isVisible,
+          });
         }
         _underlayRevision++;
         return;
@@ -6041,7 +6313,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           if (e is DxfInsert) {
             final block = _document.blocks[e.blockName];
             if (block != null) {
-              final hasChild = block.entities.any((child) => visibleLayerNames.contains(child.layer));
+              final hasChild = block.entities.any((child) => visibleLayerNames.contains(child.layer),
+              );
               if (hasChild || visibleLayerNames.contains(e.layer)) visibleCount++;
             } else if (visibleLayerNames.contains(e.layer)) {
               visibleCount++;
@@ -6082,7 +6355,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 l.isVisible = sVisible.contains(l.name);
               }
             }
-            final sVisMap = {for (final l in doc.layers.values) l.name: l.isVisible};
+            final sVisMap = {for (final l in doc.layers.values) l.name: l.isVisible,
+            };
             widget.bimContext!.onLayerVisibilityChanged(storeyId, sVisMap);
           }
         }
@@ -6100,7 +6374,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             for (final l in doc.layers.values) {
               l.isVisible = true;
             }
-            final sVisMap = {for (final l in doc.layers.values) l.name: l.isVisible};
+            final sVisMap = {for (final l in doc.layers.values) l.name: l.isVisible,
+            };
             widget.bimContext!.onLayerVisibilityChanged(storeyId, sVisMap);
           }
         }
@@ -6109,8 +6384,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _underlayRevision++;
 
       if (widget.bimContext != null) {
-        final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
-        widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+        final visMap = {for (final l in _document.layers.values) l.name: l.isVisible,
+        };
+        widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap,
+        );
       }
     }
 
@@ -6140,14 +6417,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _customUnderlayFilterLayers = Set<String>.from(newLayers);
           if (_underlayFilterActive) {
             for (final layer in _document.layers.values) {
-              layer.isVisible = _customUnderlayFilterLayers!.contains(layer.name);
+              layer.isVisible = _customUnderlayFilterLayers!.contains(layer.name,
+              );
             }
             _underlayRevision++;
           }
         });
         if (widget.bimContext != null) {
-          final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
-          widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+          final visMap = {for (final l in _document.layers.values) l.name: l.isVisible,
+          };
+          widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap,
+          );
         }
       },
       onResetToAuto: () {
@@ -6195,8 +6475,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               }
             });
             if (widget.bimContext != null) {
-              final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
-              widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+              final visMap = {for (final l in _document.layers.values) l.name: l.isVisible,
+              };
+              widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap,
+              );
             }
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -6212,8 +6494,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       }
                     });
                     if (widget.bimContext != null) {
-                      final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
-                      widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+                      final visMap = {for (final l in _document.layers.values) l.name: l.isVisible,
+                      };
+                      widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap,
+                      );
                     }
                   },
                 ),
@@ -6229,8 +6513,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             _underlayRevision++;
           });
           if (widget.bimContext != null) {
-            final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
-            widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+            final visMap = {for (final l in _document.layers.values) l.name: l.isVisible,
+            };
+            widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap,
+            );
           }
         },
         onShowAllLayers: () {
@@ -6241,8 +6527,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             _underlayRevision++;
           });
           if (widget.bimContext != null) {
-            final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
-            widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+            final visMap = {for (final l in _document.layers.values) l.name: l.isVisible,
+            };
+            widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap,
+            );
           }
         },
         onOpenLayerManager: _showLayersSheet,
@@ -6259,15 +6547,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         document: _document,
         isDark: true,
         additionalLayerCounts: {
-          for (final entry in BimUnderlayMetadata.dynamicLayers(_document).entries)
+          for (final entry in BimUnderlayMetadata.dynamicLayers(_document,
+          ).entries)
             entry.value: entry.key == 'axes' ? _project.activeStorey.gridAxes.length :
               {for (final slab in [..._project.activeStorey.slabs,
-                ...?_floorSlabStorey?.slabs, ...?_ceilingSlabStorey?.slabs]) slab.id}.length,
+                ...?_floorSlabStorey?.slabs, ...?_ceilingSlabStorey?.slabs,
+                    ]) slab.id,
+                  }.length,
         },
         onLayersChanged: () {
           if (widget.bimContext != null) {
-            final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
-            widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+            final visMap = {for (final l in _document.layers.values) l.name: l.isVisible,
+            };
+            widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap,
+            );
           }
           setState(() {
             _underlayRevision++;
@@ -6321,8 +6614,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final updatedAxes=ProjectGridAxes.merge([
       ..._project.effectiveGridAxes,
       for(final a in newGridAxes) a.copyWith(sourceStoreyIds:
-        widget.bimContext==null ? const [] : [_project.activeStorey.id]),
-    ],_cadUnitsPerMeter,isBulgarian:isBg);
+        widget.bimContext==null ? const [] : [_project.activeStorey.id],
+          ),
+    ],_cadUnitsPerMeter,isBulgarian:isBg,
+    );
     _updateProjectGridAxes(updatedAxes);
 
     // Automatically generate initial dynamic slabs in the same step if none exist
@@ -6332,12 +6627,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       ..sort((a, b) => a.elevation.compareTo(b.elevation));
     final hasCeilingLayout = widget.bimContext == null ||
         (higherStoreys.isNotEmpty &&
-          widget.bimContext!.underlaysByStorey.containsKey(higherStoreys.first.id));
-    if (hasCeilingLayout && (active.slabs.isEmpty || !active.slabs.any((s) => s.id.startsWith(SlabSeedGenerator.prefix(active.id))))) {
+          widget.bimContext!.underlaysByStorey.containsKey(higherStoreys.first.id,
+            ));
+    if (hasCeilingLayout && (active.slabs.isEmpty || !active.slabs.any((s) => s.id.startsWith(SlabSeedGenerator.prefix(active.id)),
+            ))) {
       var slabMeta = BimUnderlayMetadata.read(_document);
       List<(Offset, Offset)>? wallReferences;
       if (slabMeta == null) {
-        final envelope = SlabEnvelopeDetector.detect(result, document: _document);
+        final envelope = SlabEnvelopeDetector.detect(result, document: _document,
+        );
         final projections = SlabProjectionDetector.detect(
           _document,
           envelope,
@@ -6350,7 +6648,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           'slabEnvelope': envelope.toJson(),
           'slabProjections': projections.map((p) => p.toJson()).toList(),
         };
-        wallReferences = [...result.wallContourSegments, ...result.closureSegments];
+        wallReferences = [...result.wallContourSegments, ...result.closureSegments,
+        ];
       }
       final seeds = SlabSeedGenerator.generate(
         metadata: slabMeta,
@@ -6368,10 +6667,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           for (var i = 0; i < seeds.length; i++)
             seeds[i].copyWith(
               colorValue: SlabColors.forSlab(seeds[i], fallback: Structural2dPainter.slabPalette[
-                  (currentActive.slabs.length + i) % Structural2dPainter.slabPalette.length]).toARGB32(),
+                  (currentActive.slabs.length + i) % Structural2dPainter.slabPalette.length],
+              ).toARGB32(),
             ),
         ];
-        _updateActiveStorey(currentActive.copyWith(slabs: [...currentActive.slabs, ...coloredSeeds]));
+        _updateActiveStorey(currentActive.copyWith(slabs: [...currentActive.slabs, ...coloredSeeds],
+          ),
+        );
       }
     }
 
@@ -6385,7 +6687,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       result.detectedUnitName,
     );
     final String slabMsg = slabResult.hasValidLayers
-        ? context.l10n.slabLayerAddedToFilter(slabResult.detectedLayers.join(', '))
+        ? context.l10n.slabLayerAddedToFilter(slabResult.detectedLayers.join(', '),
+          )
         : context.l10n.noSlabLayerDetectedOrEmpty;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -6458,7 +6761,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           color: Color(0xFF1E1E24),
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           boxShadow: [
-            BoxShadow(color: Colors.black54, blurRadius: 20, offset: Offset(0, -4)),
+            BoxShadow(color: Colors.black54, blurRadius: 20, offset: Offset(0, -4),
+            ),
           ],
         ),
         child: SafeArea(
@@ -6474,7 +6778,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       color: const Color(0xFFFF5252).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.auto_awesome, color: Color(0xFFFF5252), size: 24),
+                    child: const AppIcon(
+                      AppIconId.auto, color: Color(0xFFFF5252), size: 24,
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -6495,7 +6801,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             best.pairCount,
                             best.totalOverlapLength.toStringAsFixed(1),
                           ),
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF00E5FF)),
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF00E5FF),
+                          ),
                         ),
                       ],
                     ),
@@ -6509,7 +6816,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   result.detectedUnitName,
                   best.layerName,
                 ),
-                style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4,
+                ),
               ),
               const SizedBox(height: 20),
               Row(
@@ -6524,12 +6832,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton.icon(
-                    icon: const Icon(Icons.check_rounded, size: 18),
+                    icon: const AppIcon(AppIconId.confirm, size: 18),
                     label: Text(context.l10n.isolateWallsAndGenerateAxes),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00E5FF),
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     onPressed: () => Navigator.of(ctx).pop(true),
                   ),
@@ -6594,7 +6903,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   Future<void> _showExportDialog() async {
     if (widget.bimContext != null) {
-      await widget.bimContext!.onExport(context, _project, _project.activeStorey.id);
+      await widget.bimContext!.onExport(context, _project, _project.activeStorey.id,
+      );
       return;
     }
     final baseName = widget.title ?? 'structural_model';
@@ -6613,7 +6923,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.share_rounded, color: Color(0xFF00E5FF), size: 22),
+                  const Icon(Icons.share_rounded, color: Color(0xFF00E5FF), size: 22,
+                  ),
                   const SizedBox(width: 10),
                   Text(
                     context.l10n.exportBimModel,
@@ -6633,14 +6944,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.data_object_rounded, color: Color(0xFF00E5FF)),
+                  child: const AppIcon(
+                    AppIconId.code, color: Color(0xFF00E5FF),
+                  ),
                 ),
                 title: Text(
                   context.l10n.exportBimJson,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600,
+                  ),
                 ),
-                subtitle: const Text(
-                  'JSON (.bim.json)',
+                subtitle: Text(
+                  context.l10n.commandUiJsonBimJson,
                   style: TextStyle(color: Colors.white54, fontSize: 12),
                 ),
                 onTap: () async {
@@ -6654,7 +6968,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   } catch (e) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(context.l10n.exportFailed(e.toString()))),
+                        SnackBar(content: Text(context.l10n.exportFailed(e.toString()),
+                          ),
+                        ),
                       );
                     }
                   }
@@ -6668,14 +6984,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     color: const Color(0xFFFFB300).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.architecture_rounded, color: Color(0xFFFFB300)),
+                  child: const AppIcon(
+                    AppIconId.measureAngle, color: Color(0xFFFFB300),
+                  ),
                 ),
                 title: Text(
                   context.l10n.exportStructuralDxf,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600,
+                  ),
                 ),
-                subtitle: const Text(
-                  'AutoCAD DXF (S-COL, S-WALL, S-BEAM, S-SLAB, S-AXIS)',
+                subtitle: Text(
+                  context.l10n.commandUiAutocadDxfSColSWallSBeamSSlabSAxis,
                   style: TextStyle(color: Colors.white54, fontSize: 12),
                 ),
                 onTap: () async {
@@ -6690,7 +7009,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   } catch (e) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(context.l10n.exportFailed(e.toString()))),
+                        SnackBar(content: Text(context.l10n.exportFailed(e.toString()),
+                          ),
+                        ),
                       );
                     }
                   }
@@ -6797,7 +7118,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _document.layers[name]?.isVisible = true;
       _document.layers[name]?.isFrozen = false;
       widget.bimContext?.onLayerVisibilityChanged(_project.activeStorey.id,
-        {for (final l in _document.layers.values) l.name: l.isVisible});
+        {for (final l in _document.layers.values) l.name: l.isVisible,
+      });
     }
     _startSlabCorrection(slabs.first);
   }
@@ -6857,7 +7179,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           final newElev = lastStorey.elevation + lastStorey.height;
           final newStorey = StoreyLevel(
             id: 'storey_$nextIdx',
-            name: context.l10n.storeyLevelName(nextIdx, newElev.toStringAsFixed(2)),
+            name: context.l10n.storeyLevelName(nextIdx, newElev.toStringAsFixed(2),
+            ),
             elevation: newElev,
             height: lastStorey.height,
             gridAxes: _project.effectiveGridAxes,
@@ -6905,7 +7228,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           if (_project.storeys.length <= 1) return;
           _pushUndo();
           final updated = List<StoreyLevel>.from(_project.storeys)..removeAt(idx);
-          final newActive = math.min(_project.activeStoreyIndex, updated.length - 1);
+          final newActive = math.min(_project.activeStoreyIndex, updated.length - 1,
+          );
           setState(() {
             _project = _project.copyWith(
               storeys: updated,
@@ -6930,12 +7254,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _openVerticalCapacityReport() {
     final assessments={for(final floor in _project.ceilingStoreys) floor.id:
-      SupportLayoutEvaluator.evaluate(_project,floor.copyWith(gridAxes:_project.effectiveGridAxes),_cadUnitsPerMeter)};
+      SupportLayoutEvaluator.evaluate(_project,floor.copyWith(gridAxes:_project.effectiveGridAxes),_cadUnitsPerMeter,
+        ),
+    };
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => VerticalCapacitySheet(report: _verticalCapacityReport,assessments:assessments),
+      builder: (ctx) => VerticalCapacitySheet(report: _verticalCapacityReport,assessments:assessments,
+      ),
     );
   }
 
@@ -6952,7 +7279,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         onEditLoads: () {
           Navigator.of(ctx).pop();
           _editSeismicLoads();
-        }),
+        },
+      ),
     );
   }
 
@@ -6991,7 +7319,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final scene = _cadToScene(center);
       final rawExtent = wall?.length ?? math.max(column!.width, column.height);
       final extent = rawExtent.isFinite ? rawExtent : _cadUnitsPerMeter;
-      final edge = _cadToScene(center + Offset(math.max(extent, _cadUnitsPerMeter), 0));
+      final edge = _cadToScene(center + Offset(math.max(extent, _cadUnitsPerMeter), 0),
+      );
       final zoom = (math.min(_viewportSize.width,_viewportSize.height)*0.45 /
         math.max((edge-scene).distance, 1e-6)).clamp(0.001,10000.0);
       final matrix = Matrix4.diagonal3Values(zoom,zoom,1);
@@ -7003,7 +7332,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   Future<void> _editSeismicLoads() async {
     final updated = await showDialog<StructuralProject>(context: context,
-      builder: (_) => SeismicLoadDialog(project: _project));
+      builder: (_) => SeismicLoadDialog(project: _project),
+    );
     if (!mounted || updated == null) return;
     _pushUndo();
     setState(() {
@@ -7038,7 +7368,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final isCompact = screenWidth < 540;
 
     final layersButton = IconButton(
-      icon: const Icon(Icons.layers_outlined, color: Colors.white70, size: 20),
+      icon: const AppIcon(AppIconId.layers, color: Colors.white70, size: 20),
       tooltip: context.l10n.layersTooltip,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -7047,8 +7377,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     final navigationButton = IconButton(
       key: const ValueKey('bim-navigation'),
-      icon: Icon(Icons.pan_tool_rounded, size: 18,
-        color: _activeTool == StructuralDrawTool.select ? const Color(0xFF00E5FF) : Colors.white70),
+      icon: AppIcon(
+        AppIconId.pan, size: 18,
+        color: _activeTool == StructuralDrawTool.select ? const Color(0xFF00E5FF) : Colors.white70,
+      ),
       tooltip: context.l10n.toolNavigation,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 32, minHeight: 36),
@@ -7060,6 +7392,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           ? context.l10n.structuralFilterActive
           : context.l10n.structuralFilterInactive,
       child: InkWell(
+        key: const ValueKey('structural-underlay-filter'),
         borderRadius: BorderRadius.circular(18),
         onTap: _toggleUnderlayFilter,
         onLongPress: _showUnderlayFilterConfig,
@@ -7072,7 +7405,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   shape: BoxShape.circle,
                 )
               : null,
-          child: Icon(
+          child: AppIcon.fromMaterial(
             _underlayFilterActive
                 ? Icons.filter_alt_rounded
                 : Icons.filter_alt_outlined,
@@ -7086,9 +7419,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
 
     final undoButton = IconButton(
-      icon: Icon(Icons.undo_rounded,
+      icon: AppIcon(
+        AppIconId.undo,
           color: _history.canUndo ? Colors.white : Colors.white24,
-          size: 20),
+          size: 20,
+      ),
       tooltip: context.l10n.undoAction,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -7096,7 +7431,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
 
     final exportButton = IconButton(
-      icon: const Icon(Icons.share_outlined, color: Colors.white70, size: 20),
+      icon: const AppIcon(AppIconId.share, color: Colors.white70, size: 20),
       tooltip: context.l10n.exportBimModel,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -7104,7 +7439,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
 
     final viewport3dButton = IconButton(
-      icon: const Icon(Icons.view_in_ar_rounded, color: Color(0xFFFFB300), size: 20),
+      icon: const AppIcon(AppIconId.view3D, color: Color(0xFFFFB300), size: 20),
       tooltip: context.l10n.structural3dView,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -7112,7 +7447,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
 
     final moreMenu = PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 20),
+      icon: const AppIcon(
+        AppIconId.moreVertical, color: Colors.white70, size: 20,
+      ),
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
       color: const Color(0xFF242426),
@@ -7162,13 +7499,18 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       },
       itemBuilder: (context) => [
           PopupMenuItem(value: 'clear_structure',
+            child: AppMenuLabel(
+            icon: AppIconId.deleteAll,
             child: Text(context.l10n.bimClearStructure,
-              style: const TextStyle(color: Colors.orangeAccent, fontSize: 13))),
+              style: const TextStyle(color: Colors.orangeAccent, fontSize: 13),
+            ),
+          ),
+        ),
         PopupMenuItem(
           value: 'toggle_snap',
           child: Row(
             children: [
-              Icon(
+              AppIcon.fromMaterial(
                 _snapEnabled ? Icons.grain_rounded : Icons.lens_blur_rounded,
                 size: 20,
                 color: _snapEnabled ? const Color(0xFF00E5FF) : Colors.white70,
@@ -7185,7 +7527,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           value: 'toggle_foundations',
           child: Row(
             children: [
-              Icon(
+              AppIcon.fromMaterial(
                 _showGroundFoundations ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
                 size: 20,
                 color: _showGroundFoundations ? const Color(0xFF00E5FF) : Colors.white70,
@@ -7203,10 +7545,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             value: 'layers',
             child: Row(
               children: [
-                const Icon(Icons.layers_outlined, size: 20, color: Colors.white70),
+                const AppIcon(
+                  AppIconId.layers, size: 20, color: Colors.white70,
+                ),
                 const SizedBox(width: 12),
                 Text(context.l10n.layersTooltip,
-                    style: const TextStyle(color: Colors.white, fontSize: 13)),
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
               ],
             ),
           ),
@@ -7214,10 +7559,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           value: 'filter_config',
           child: Row(
             children: [
-              const Icon(Icons.tune_rounded, size: 20, color: Color(0xFF00E5FF)),
+              const AppIcon(
+                AppIconId.properties, size: 20, color: Color(0xFF00E5FF),
+              ),
               const SizedBox(width: 12),
               Text(context.l10n.manageUnderlayFilter,
-                  style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
             ],
           ),
         ),
@@ -7226,10 +7574,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             value: 'sync_columns',
             child: Row(
               children: [
-                const Icon(Icons.sync_alt_rounded, size: 20, color: Color(0xFF00E5FF)),
+                const AppIcon(
+                  AppIconId.swapHorizontal, size: 20, color: Color(0xFF00E5FF),
+                ),
                 const SizedBox(width: 12),
                 Text(context.l10n.syncColumnsAcrossStoreys,
-                    style: const TextStyle(color: Colors.white, fontSize: 13)),
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
               ],
             ),
           ),
@@ -7237,10 +7588,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           value: 'display_settings',
           child: Row(
             children: [
-              const Icon(Icons.tune_rounded, size: 20, color: Colors.white70),
+              const AppIcon(
+                AppIconId.properties, size: 20, color: Colors.white70,
+              ),
               const SizedBox(width: 12),
               Text(context.l10n.displaySettings,
-                  style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
             ],
           ),
         ),
@@ -7248,7 +7602,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           value: 'theme_toggle',
           child: Row(
             children: [
-              Icon(
+              AppIcon.fromMaterial(
                 _canvasTheme.isDark
                     ? Icons.light_mode_outlined
                     : Icons.dark_mode_outlined,
@@ -7269,10 +7623,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           value: 'auto_walls',
           child: Row(
             children: [
-              const Icon(Icons.auto_awesome, size: 20, color: Color(0xFFFF5252)),
+              const AppIcon(AppIconId.auto, size: 20, color: Color(0xFFFF5252)),
               const SizedBox(width: 12),
               Text(context.l10n.autoDetectWallsAndAxes,
-                  style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
             ],
           ),
         ),
@@ -7281,10 +7636,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             value: 'export',
             child: Row(
               children: [
-                const Icon(Icons.share_outlined, size: 20, color: Colors.white70),
+                const AppIcon(AppIconId.share, size: 20, color: Colors.white70),
                 const SizedBox(width: 12),
                 Text(context.l10n.exportBimModel,
-                    style: const TextStyle(color: Colors.white, fontSize: 13)),
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
               ],
             ),
           ),
@@ -7330,7 +7686,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         titleSpacing: 0,
         centerTitle: false,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const AppIcon(AppIconId.back, color: Colors.white),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
           onPressed: () => Navigator.of(context).pop(),
@@ -7343,8 +7699,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.layers_rounded,
-                    size: 16, color: Color(0xFF00E5FF)),
+                const AppIcon(
+                  AppIconId.layers,
+                    size: 16, color: Color(0xFF00E5FF),
+                ),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
@@ -7358,7 +7716,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     maxLines: 1,
                   ),
                 ),
-                const Icon(Icons.arrow_drop_down, color: Colors.white70, size: 20),
+                const AppIcon(
+                  AppIconId.expandMore, color: Colors.white70, size: 20,
+                ),
               ],
             ),
           ),
@@ -7378,11 +7738,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             final double fitScale = _getCadFitScale();
             final double currentScale = _transformController.value.getMaxScaleOnAxis();
             final double toleranceCad = 36.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
-            final seg2 = _findClosestSegmentInCad(_currentCadCoord!, toleranceCad * 2.0);
+            final seg2 = _findClosestSegmentInCad(_currentCadCoord!, toleranceCad * 2.0,
+            );
             if (seg2 != null) {
               final rawPreviewAxis = StructuralGridAxis.fromTwoSegments(
                 id: 'preview',
-                name: _getSuggestedAxisName(_firstWallEdgeStartCad!, _firstWallEdgeEndCad!),
+                name: _getSuggestedAxisName(_firstWallEdgeStartCad!, _firstWallEdgeEndCad!,
+                ),
                 a1: _firstWallEdgeStartCad!,
                 a2: _firstWallEdgeEndCad!,
                 b1: seg2.$1,
@@ -7410,7 +7772,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 child: BimEditingViewport(
                   controller: _viewportNavigation,
                   inputKey: const ValueKey('construction-viewport-input'),
-                  interactionKey: (_document, _project.activeStorey.id, _activeTool),
+                  interactionKey: (_document, _project.activeStorey.id, _activeTool,
+                  ),
                   singlePointerPan: true,
                   touchHoldToPlace: true,
                   holdExistingHandles: true,
@@ -7448,7 +7811,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                         : const Color(0xFF757A80),
                                     drawingStrokeWidthOverride: 0.8,
                                     originalStyleLayers: _underlayFilterActive ? {
-                                      if (BimUnderlayMetadata.read(_document)?['wallLayer'] case final String layer) layer,
+                                      if (BimUnderlayMetadata.read(_document,
+                                              )?['wallLayer'] case final String layer) layer,
                                       'WALLS_250',
                                     } : const {},
                                     revision: _underlayRevision,
@@ -7463,7 +7827,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             Positioned.fill(
                               child: CustomPaint(
                                 painter: Structural2dPainter(
-                                  currentStorey: _withBeamMove(_withDuplicate((_axisPreviewProject ?? _project).activeStorey)),
+                                  currentStorey: _withBeamMove(_withDuplicate((_axisPreviewProject ?? _project).activeStorey,
+                                  ),
+                                ),
                                   showSlabs: _showBimSlabs,
                                   showFloorSlabs: widget.bimContext == null || _isEditingSlab,
                                   showGridAxes: _showBimAxes,
@@ -7473,10 +7839,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   hasBasement: _project.hasBasement,
                                   foundationType: _project.foundationType,
                                   stripFoundations: (_showGroundFoundations && _project.activeStorey.elevation.abs() < 1e-4 && !_project.hasBasement)
-                                      ? _project.computeDefaultStripFoundations(_project.activeStorey, cadUnitsPerMeter: _cadUnitsPerMeter)
+                                      ? _project.computeDefaultStripFoundations(_project.activeStorey, cadUnitsPerMeter: _cadUnitsPerMeter,
+                                      )
                                       : null,
                                   matFoundation: (_showGroundFoundations && _project.activeStorey.elevation.abs() < 1e-4 && !_project.hasBasement)
-                                      ? _project.computeDefaultMatFoundation(_project.activeStorey, cadUnitsPerMeter: _cadUnitsPerMeter)
+                                      ? _project.computeDefaultMatFoundation(_project.activeStorey, cadUnitsPerMeter: _cadUnitsPerMeter,
+                                      )
                                       : null,
                                   cantileverZones: _analysisSummary.zones,
                                   verticalReport: _verticalCapacityReport,
@@ -7486,9 +7854,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   supportSpanChecks: _liveSupportSpanChecks,
                                   spanFocusCad: _spanFocusCad,
                                   spanVisibleCadRect: Rect.fromPoints(
-                                    _sceneToCad(_transformController.toScene(Offset.zero)),
+                                    _sceneToCad(_transformController.toScene(Offset.zero),
+                                  ),
                                     _sceneToCad(_transformController.toScene(
-                                        Offset(_viewportSize.width,_viewportSize.height)))),
+                                        Offset(_viewportSize.width,_viewportSize.height,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                                   activeTool: _activeTool,
                                   previewColumn: _currentColumnPreset.copyWith(
                                     width: _currentColumnPreset.width * _cadUnitsPerMeter,
@@ -7518,7 +7891,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   previewOpeningOffsetPolygon: _isExtrudingEdge ? _previewOpeningOffsetPolygon : null,
                                   movingOpeningPolygon: _isMovingOpening && _movingOpeningRelativeOffsets != null
                                       ? _movingOpeningRelativeOffsets!
-                                          .map((r) => (_currentCadCoord ?? _movingOpeningOriginalCenter ?? Offset.zero) + r)
+                                          .map((r) => (_currentCadCoord ?? _movingOpeningOriginalCenter ?? Offset.zero) + r,
+                                          )
                                           .toList()
                                       : null,
                                   currentCursorCad: _currentCadCoord,
@@ -7562,12 +7936,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                 top: 16,
                                 right: 16,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8,
+                                ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xE61E1E24),
                                     borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: const Color(0xFF00E5FF)),
-                                    boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10)],
+                                    border: Border.all(color: const Color(0xFF00E5FF),
+                                  ),
+                                    boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10,
+                                    ),
+                                  ],
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -7575,12 +7953,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                       const SizedBox(
                                         width: 14,
                                         height: 14,
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00E5FF)),
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00E5FF),
+                                      ),
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
                                         context.l10n.filteringUnderlay,
-                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold,
+                                      ),
                                       ),
                                     ],
                                   ),
@@ -7663,13 +8043,18 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     color: const Color(0xEE1C1C1E),
                     borderRadius: BorderRadius.circular(10),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6,
+                      ),
                       child: Row(children: [
-                        const Icon(Icons.layers_outlined, color: Color(0xFF00B0FF), size: 18),
+                        const Icon(Icons.layers_outlined, color: Color(0xFF00B0FF), size: 18,
+                          ),
                         const SizedBox(width: 8),
                         Expanded(child: Text(
                           '${context.l10n.toolSlab} · ${_project.activeStorey.elevationLabel}',
-                          style: const TextStyle(color: Colors.white, fontSize: 12))),
+                          style: const TextStyle(color: Colors.white, fontSize: 12,
+                              ),
+                            ),
+                          ),
                         const SizedBox(width: 8),
                         TextButton(
                           key: const ValueKey('bim-edit-floor-slab'),
@@ -7680,7 +8065,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               ? null : _openCurrentSlab,
                           child: Text(context.l10n.bimEditFloorSlab),
                         ),
-                      ]),
+                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -7693,7 +8079,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
+                          horizontal: 12, vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xCC0D253A),
                         borderRadius: BorderRadius.circular(16),
@@ -7703,12 +8090,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.remove_red_eye_outlined,
-                              size: 14, color: Color(0xFF00E5FF)),
+                              size: 14, color: Color(0xFF00E5FF),
+                          ),
                           const SizedBox(width: 6),
                           Text(
-                            context.l10n.traceReferenceLayer(_project.ghostStorey!.name),
+                            context.l10n.traceReferenceLayer(_project.ghostStorey!.name,
+                            ),
                             style: const TextStyle(
-                                color: Color(0xFF00E5FF), fontSize: 11),
+                                color: Color(0xFF00E5FF), fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
@@ -7724,23 +8114,29 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   right: 0,
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xEE1E1E24),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF00E5FF), width: 1.5),
+                        border: Border.all(color: const Color(0xFF00E5FF), width: 1.5,
+                        ),
                         boxShadow: const [
-                          BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 3)),
+                          BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 3),
+                          ),
                         ],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF00E5FF)),
+                          const Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF00E5FF),
+                          ),
                           const SizedBox(width: 8),
                           Text(
-                            context.l10n.dragForDirectionReleaseToOffset(_axisOffsetDistanceMeters.toStringAsFixed(2)),
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            context.l10n.dragForDirectionReleaseToOffset(_axisOffsetDistanceMeters.toStringAsFixed(2),
+                            ),
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(width: 8),
                           InkWell(
@@ -7748,7 +8144,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               _isOffsettingAxisWithDrag = false;
                               _axisBeingOffset = null;
                             }),
-                            child: const Icon(Icons.close_rounded, size: 16, color: Colors.white54),
+                            child: const AppIcon(
+                              AppIconId.close, size: 16, color: Colors.white54,
+                            ),
                           ),
                         ],
                       ),
@@ -7764,23 +8162,29 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   right: 0,
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xEE1E1E24),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF00E5FF), width: 1.5),
+                        border: Border.all(color: const Color(0xFF00E5FF), width: 1.5,
+                        ),
                         boxShadow: const [
-                          BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 3)),
+                          BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 3),
+                          ),
                         ],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF00E5FF)),
+                          const Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF00E5FF),
+                          ),
                           const SizedBox(width: 8),
                           Text(
-                            context.l10n.dragForDirectionReleaseToOffset(_columnOffsetDistanceMeters.toStringAsFixed(2)),
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            context.l10n.dragForDirectionReleaseToOffset(_columnOffsetDistanceMeters.toStringAsFixed(2),
+                            ),
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(width: 8),
                           InkWell(
@@ -7788,7 +8192,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               _isOffsettingColumnWithDrag = false;
                               _columnBeingOffset = null;
                             }),
-                            child: const Icon(Icons.close_rounded, size: 16, color: Colors.white54),
+                            child: const AppIcon(
+                              AppIconId.close, size: 16, color: Colors.white54,
+                            ),
                           ),
                         ],
                       ),
@@ -7806,9 +8212,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         color: const Color(0xFA1E1E24),
                         child: SafeArea(top: false, child: Row(children: [
                           const SizedBox(width: 12),
-                          Expanded(child: Text(context.l10n.dragDuplicateHint, style: const TextStyle(color: Colors.white))),
-                          TextButton(onPressed: _cancelDuplicateDrag, child: Text(context.l10n.cancel)),
-                        ])),
+                          Expanded(child: Text(context.l10n.dragDuplicateHint, style: const TextStyle(color: Colors.white),
+                                ),
+                              ),
+                          TextButton(onPressed: _cancelDuplicateDrag, child: Text(context.l10n.cancel),
+                              ),
+                        ],
+                          ),
+                        ),
                       )
                     : _isEditingSlab
                     ? _buildSlabCorrectionBottomBar(context)
@@ -7926,8 +8337,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             final double h = _currentColumnPreset.height;
                             _currentColumnPreset = _currentColumnPreset.copyWith(
                               width: h,
-                              height: w,
-                            );
+                              height: w);
                           });
                           HapticFeedback.selectionClick();
                         },
@@ -7954,8 +8364,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             _underlayRevision++;
                           });
                           if (widget.bimContext != null) {
-                            final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
-                            widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+                            final visMap = {for (final l in _document.layers.values) l.name: l.isVisible,
+                            };
+                            widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap,
+                            );
                           }
                         },
                         onIsolateWhiteLayers: () {
@@ -8006,7 +8418,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
       actionButtons.addAll([
         _buildDockActionButton(
-          icon: Icons.delete_outline_rounded,
+          icon: AppIconId.delete,
           label: context.l10n.delete,
           color: const Color(0xFFFF5252),
           onTap: _deleteSelectedColumn,
@@ -8024,7 +8436,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           onTap: _rotateSelectedColumn,
         ),
         _buildDockActionButton(
-          icon: Icons.flip_rounded,
+          icon: AppIconId.flipHorizontal,
           label: context.l10n.mirrorElement,
           color: const Color(0xFFB388FF),
           onTap: _mirrorSelectedColumn,
@@ -8048,7 +8460,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
       actionButtons.addAll([
         _buildDockActionButton(
-          icon: Icons.delete_outline_rounded,
+          icon: AppIconId.delete,
           label: context.l10n.delete,
           color: const Color(0xFFFF5252),
           onTap: _deleteSelectedWall,
@@ -8058,13 +8470,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           onTap: _startMovingSelectedWall,
         ),
         _buildDockActionButton(
-          icon: Icons.line_weight_rounded,
+          icon: AppIconId.wall,
           label: _getShearWallRefLineLabel(context, wall.referenceLine),
           color: const Color(0xFFFFB300),
           onTap: _cycleSelectedWallReferenceLine,
         ),
         _buildDockActionButton(
-          icon: Icons.swap_horiz_rounded,
+          icon: AppIconId.swapHorizontal,
           label: context.l10n.flipSide,
           color: const Color(0xFF00E5FF),
           onTap: _flipSelectedWall,
@@ -8091,7 +8503,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
       actionButtons.addAll([
         _buildDockActionButton(
-          icon: Icons.delete_outline_rounded,
+          icon: AppIconId.delete,
           label: context.l10n.delete,
           color: const Color(0xFFFF5252),
           onTap: _deleteSelectedBeam,
@@ -8144,7 +8556,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             ),
             child: const Text(
               '-10 cm',
-              style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+              style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
@@ -8161,7 +8574,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             ),
             child: const Text(
               '+10 cm',
-              style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+              style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
@@ -8173,7 +8587,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     } else if (_selectedOpening != null) {
       final (slabId, opIdx) = _selectedOpening!;
       final active = _project.activeStorey;
-      final slab = active.slabs.firstWhere((s) => s.id == slabId, orElse: () => active.slabs.first);
+      final slab = active.slabs.firstWhere((s) => s.id == slabId, orElse: () => active.slabs.first,
+      );
       final op = opIdx < slab.openings.length ? slab.openings[opIdx] : <Offset>[];
       double minX = op.isNotEmpty ? op.first.dx : 0, maxX = op.isNotEmpty ? op.first.dx : 0;
       double minY = op.isNotEmpty ? op.first.dy : 0, maxY = op.isNotEmpty ? op.first.dy : 0;
@@ -8214,13 +8629,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       actionButtons.addAll([
         if (_selectedOpeningVertexIndex != null && op.length > 3)
           _buildDockActionButton(
-            icon: Icons.delete_sweep_rounded,
+            icon: AppIconId.deleteAll,
             label: context.l10n.deleteOpeningPoint,
             color: const Color(0xFFFFB300),
             onTap: _deleteSelectedOpeningVertex,
           ),
         _buildDockActionButton(
-          icon: Icons.category_outlined,
+          icon: AppIconId.layoutGrid,
           label: _getOpeningTypeName(opType, context.l10n),
           color: primaryColor,
           onTap: () {
@@ -8249,7 +8664,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           },
         ),
         _buildDockActionButton(
-          icon: Icons.delete_outline_rounded,
+          icon: AppIconId.delete,
           label: context.l10n.delete,
           color: const Color(0xFFFF5252),
           onTap: _deleteSelectedOpening,
@@ -8257,7 +8672,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       ]);
     } else if (_selectedGridAxis != null) {
       final axis = _selectedGridAxis!;
-      final presentation=GridAxisPresentation.forStorey(axis,_project.activeStorey,_project.storeys);
+      final presentation=GridAxisPresentation.forStorey(axis,_project.activeStorey,_project.storeys,
+      );
       primaryColor=presentation.reference ? presentation.color.withValues(alpha:1) : const Color(0xFFFF453A);
       final double lenM = axis.length / _cadUnitsPerMeter;
       title = context.l10n.gridAxisTitle(axis.name);
@@ -8267,7 +8683,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
       actionButtons.addAll([
         _buildDockActionButton(
-          icon: Icons.delete_outline_rounded,
+          icon: AppIconId.delete,
           label: context.l10n.deleteGridAxis,
           color: const Color(0xFFFF5252),
           onTap: _deleteSelectedGridAxis,
@@ -8277,7 +8693,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           onTap: _showGridAxisOffsetDialog,
         ),
         _buildDockActionButton(
-          icon: Icons.edit_outlined,
+          icon: AppIconId.edit,
           label: context.l10n.renameGridAxis,
           color: const Color(0xFFFFB300),
           onTap: _renameSelectedGridAxis,
@@ -8293,7 +8709,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         color: const Color(0xFA1E1E24),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         border: Border(
-          top: BorderSide(color: primaryColor.withValues(alpha: 0.8), width: 1.5),
+          top: BorderSide(color: primaryColor.withValues(alpha: 0.8), width: 1.5,
+          ),
         ),
         boxShadow: const [
           BoxShadow(
@@ -8336,7 +8753,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     borderRadius: BorderRadius.circular(6),
                     child: Padding(
                       padding: const EdgeInsets.all(2.0),
-                      child: Icon(Icons.edit_outlined, size: 14, color: primaryColor),
+                      child: AppIcon(
+                        AppIconId.edit, size: 14, color: primaryColor,
+                      ),
                     ),
                   ),
                 ],
@@ -8357,7 +8776,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   borderRadius: BorderRadius.circular(12),
                   child: const Padding(
                     padding: EdgeInsets.all(4.0),
-                    child: Icon(Icons.close_rounded, size: 18, color: Colors.white54),
+                    child: AppIcon(
+                      AppIconId.close, size: 18, color: Colors.white54,
+                    ),
                   ),
                 ),
               ],
@@ -8381,10 +8802,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
-  Widget _buildDockActionButton({IconData? icon, String? label, BimEditAction? action,
-    required Color color, required VoidCallback onTap}) => BimActionButton(
+  Widget _buildDockActionButton({
+    AppIconId? icon, String? label, BimEditAction? action,
+    required Color color, required VoidCallback onTap,
+  }) => BimActionButton(
       action: icon == null ? action : null, icon: icon ?? BimEditActions.icon(action!), label: label ?? BimEditActions.label(action!, context.l10n),
-      color: color, onTap: onTap, tooltip: action == BimEditAction.duplicate ? context.l10n.dragDuplicateHint : null);
+      color: color, onTap: onTap, tooltip: action == BimEditAction.duplicate ? context.l10n.dragDuplicateHint : null,
+  );
 
   void _cleanEditingSlabContour() {
     if (_editingSlab == null) return;
@@ -8435,8 +8859,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           ),
         ],
         border: Border(
-          top: BorderSide(color: Color(0xFF7C4DFF), width: 1.5),
-        ),
+          top: BorderSide(color: Color(0xFF7C4DFF), width: 1.5)),
       ),
       child: SafeArea(
         top: false,
@@ -8451,17 +8874,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 foregroundColor: const Color(0xFFFF5252),
                 side: const BorderSide(color: Color(0xFFFF5252), width: 1.2),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                    borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              icon: const Icon(Icons.close_rounded, size: 16),
+              icon: const AppIcon(AppIconId.close, size: 16),
               label: Text(
                 context.l10n.cancel,
                 style: const TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.bold),
+                    fontSize: 11, fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -8469,12 +8895,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             IconButton(
               tooltip: context.l10n.slabEdgeOffset,
               onPressed: _editSlabEdgeOffset,
-              icon: const Icon(Icons.straighten, color: Colors.white, size: 20),
+              icon: const AppIcon(
+                AppIconId.measure, color: Colors.white, size: 20,
+              ),
             ),
             IconButton(
               tooltip: context.l10n.cleanSlabContourTooltip,
               onPressed: _cleanEditingSlabContour,
-              icon: const Icon(Icons.auto_fix_high_rounded, color: Color(0xFF00E5FF), size: 20),
+              icon: const AppIcon(
+                AppIconId.auto, color: Color(0xFF00E5FF), size: 20,
+              ),
             ),
             // Delete Selected Vertex Button
             if (_selectedSlabVertexIndex != null && _editingSlab != null && _editingSlab!.polygon.length > 3) ...[
@@ -8483,17 +8913,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFFFFB300),
                   side: const BorderSide(color: Color(0xFFFFB300), width: 1.2),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-                icon: const Icon(Icons.remove_circle_outline, size: 16),
+                icon: const AppIcon(AppIconId.removeCircle, size: 16),
                 label: Text(
                   context.l10n.deleteVertex,
                   style: const TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.bold),
+                      fontSize: 11, fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(width: 6),
@@ -8564,7 +8997,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               onPressed: _slabCorrectionUndoStack.isNotEmpty
                   ? _undoSlabCorrection
                   : null,
-              icon: const Icon(Icons.undo_rounded),
+              icon: const AppIcon(AppIconId.undo),
               iconSize: 20,
               color: const Color(0xFF00E5FF),
               disabledColor: Colors.white24,
@@ -8577,7 +9010,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             // Mirror Slab Button
             IconButton(
               onPressed: _mirrorEditingSlab,
-              icon: const Icon(Icons.flip_rounded),
+              icon: const AppIcon(AppIconId.flipHorizontal),
               iconSize: 20,
               color: const Color(0xFFB388FF),
               padding: const EdgeInsets.all(6),
@@ -8589,7 +9022,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             // Delete Slab Button
             IconButton(
               onPressed: _deleteEditingSlab,
-              icon: const Icon(Icons.delete_outline_rounded),
+              icon: const AppIcon(AppIconId.delete),
               iconSize: 20,
               color: const Color(0xFFFF5252),
               padding: const EdgeInsets.all(6),
@@ -8605,18 +9038,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 backgroundColor: const Color(0xFF00C853),
                 foregroundColor: Colors.white,
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                    borderRadius: BorderRadius.circular(8),
+                ),
                 elevation: 2,
               ),
-              icon: const Icon(Icons.check_rounded, size: 16),
+              icon: const AppIcon(AppIconId.confirm, size: 16),
               label: Text(
                 context.l10n.save,
                 style: const TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.bold),
+                    fontSize: 11, fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -8640,8 +9076,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         color: Color(0xFA1E1E24),
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         border: Border(
-          top: BorderSide(color: Color(0xFF69F0AE), width: 1.5),
-        ),
+          top: BorderSide(color: Color(0xFF69F0AE), width: 1.5)),
         boxShadow: [
           BoxShadow(
             color: Colors.black54,
@@ -8690,16 +9125,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   onPressed: _cancelCurrentMove,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFFF5252),
-                    side: const BorderSide(color: Color(0xFFFF5252), width: 1.2),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    side: const BorderSide(color: Color(0xFFFF5252), width: 1.2,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  icon: const Icon(Icons.close_rounded, size: 16),
+                  icon: const AppIcon(AppIconId.close, size: 16),
                   label: Text(
                     context.l10n.cancelMove,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -8710,16 +9149,19 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00C853),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8),
+                    ),
                     elevation: 2,
                   ),
-                  icon: const Icon(Icons.check_rounded, size: 16),
+                  icon: const AppIcon(AppIconId.confirm, size: 16),
                   label: Text(
                     context.l10n.confirmMove,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],

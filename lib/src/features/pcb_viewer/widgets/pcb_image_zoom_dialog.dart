@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,8 +28,7 @@ class PcbImageZoomDialog extends StatefulWidget {
       barrierColor: Colors.black87,
       builder: (context) => PcbImageZoomDialog(
         images: images,
-        initialIndex: initialIndex,
-      ),
+        initialIndex: initialIndex),
     );
   }
 
@@ -174,13 +175,15 @@ class _PcbImageZoomDialogState extends State<PcbImageZoomDialog> {
                           child: Image.memory(
                             currentImg.bytes,
                             fit: BoxFit.contain,
-                            errorBuilder: (ctx, err, stack) => const Column(
+                            errorBuilder: (ctx, err, stack) => Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.broken_image, size: 64, color: Colors.white38),
+                                AppIcon(
+                                  AppIconId.imageBroken, size: 64, color: Colors.white38,
+                                ),
                                 SizedBox(height: 12),
                                 Text(
-                                  'Could not load image',
+                                  context.l10n.commandUiCouldNotLoadImage,
                                   style: TextStyle(color: Colors.white70),
                                 ),
                               ],
@@ -199,7 +202,8 @@ class _PcbImageZoomDialogState extends State<PcbImageZoomDialog> {
                   right: 0,
                   child: SafeArea(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8,
+                      ),
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
@@ -210,8 +214,10 @@ class _PcbImageZoomDialogState extends State<PcbImageZoomDialog> {
                       child: Row(
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.close, color: Colors.white),
-                            tooltip: 'Close (Esc)',
+                            icon: const AppIcon(
+                              AppIconId.close, color: Colors.white,
+                            ),
+                            tooltip: context.l10n.commandUiCloseEsc,
                             onPressed: () => Navigator.of(context).pop(),
                           ),
                           const SizedBox(width: 8),
@@ -240,8 +246,10 @@ class _PcbImageZoomDialogState extends State<PcbImageZoomDialog> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.restart_alt, color: Colors.white),
-                            tooltip: 'Reset Zoom (100%)',
+                            icon: const AppIcon(
+                              AppIconId.refresh, color: Colors.white,
+                            ),
+                            tooltip: context.l10n.commandUiResetZoom100,
                             onPressed: _resetZoom,
                           ),
                         ],
@@ -262,8 +270,11 @@ class _PcbImageZoomDialogState extends State<PcbImageZoomDialog> {
                           backgroundColor: Colors.black54,
                           radius: 24,
                           child: IconButton(
-                            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
-                            tooltip: 'Previous Image (Left Arrow)',
+                            icon: const AppIcon(
+                              AppIconId.chevronLeft, color: Colors.white, size: 28,
+                            ),
+                            tooltip:
+                                context.l10n.commandUiPreviousImageLeftArrow,
                             onPressed: _previousImage,
                           ),
                         ),
@@ -279,8 +290,10 @@ class _PcbImageZoomDialogState extends State<PcbImageZoomDialog> {
                           backgroundColor: Colors.black54,
                           radius: 24,
                           child: IconButton(
-                            icon: const Icon(Icons.chevron_right, color: Colors.white, size: 28),
-                            tooltip: 'Next Image (Right Arrow)',
+                            icon: const AppIcon(
+                              AppIconId.chevronRight, color: Colors.white, size: 28,
+                            ),
+                            tooltip: context.l10n.commandUiNextImageRightArrow,
                             onPressed: _nextImage,
                           ),
                         ),
@@ -299,27 +312,34 @@ class _PcbImageZoomDialogState extends State<PcbImageZoomDialog> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.white24, width: 0.8),
                       boxShadow: const [
-                        BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 3)),
+                        BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 3),
+                        ),
                       ],
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.add, color: Colors.white, size: 22),
-                          tooltip: 'Zoom In (+)',
+                          icon: const AppIcon(
+                            AppIconId.add, color: Colors.white, size: 22,
+                          ),
+                          tooltip: context.l10n.commandUiZoomIn,
                           onPressed: _zoomIn,
                         ),
                         const Divider(height: 1, color: Colors.white24),
                         IconButton(
-                          icon: const Icon(Icons.remove, color: Colors.white, size: 22),
-                          tooltip: 'Zoom Out (-)',
+                          icon: const AppIcon(
+                            AppIconId.remove, color: Colors.white, size: 22,
+                          ),
+                          tooltip: context.l10n.commandUiZoomOut,
                           onPressed: _zoomOut,
                         ),
                         const Divider(height: 1, color: Colors.white24),
                         IconButton(
-                          icon: const Icon(Icons.fit_screen_outlined, color: Colors.white, size: 22),
-                          tooltip: 'Fit to View',
+                          icon: const AppIcon(
+                            AppIconId.fitView, color: Colors.white, size: 22,
+                          ),
+                          tooltip: context.l10n.commandUiFitToView,
                           onPressed: _resetZoom,
                         ),
                       ],
@@ -338,7 +358,8 @@ class _PcbImageZoomDialogState extends State<PcbImageZoomDialog> {
                       bottom: true,
                       child: Container(
                         height: 84,
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12,
+                        ),
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.bottomCenter,

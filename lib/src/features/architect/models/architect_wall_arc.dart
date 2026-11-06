@@ -1,11 +1,51 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+enum ArchitectArcDimension { sagitta, radius }
+
 /// Signed circular arc: bulge = tan(sweep / 4). Stored independently of tessellation.
 class ArchitectWallArc {
   final Offset start, end;
   final double bulge;
   const ArchitectWallArc(this.start, this.end, this.bulge);
+  double get chordLength => (end - start).distance;
+  Offset get chordMidpoint => (start + end) / 2;
+  double get sagitta => chordLength * bulge.abs() / 2;
+
+  /// Exact midpoint, avoiding subtraction of large circle coordinates on a
+  /// shallow arc. Its signed displacement is opposite the bulge's normal.
+  Offset get midpoint {
+    final chord = end - start;
+    return chordMidpoint - Offset(-chord.dy, chord.dx) * (bulge / 2);
+  }
+
+  ArchitectWallArc withSagitta(double value) {
+    if (!value.isFinite || value <= 0 || chordLength < .001) {
+      throw ArgumentError('Invalid arc sagitta');
+    }
+    return ArchitectWallArc(
+      start,
+      end,
+      (bulge < 0 ? -1 : 1) * 2 * value / chordLength,
+    );
+  }
+
+  ArchitectWallArc withRadius(double value) {
+    final half = chordLength / 2;
+    if (!value.isFinite || value <= 0 || half < .0005 || value < half) {
+      throw ArgumentError('Invalid arc radius');
+    }
+    final root = math.sqrt(math.max(0, (value - half) * (value + half)));
+    // The reciprocal form keeps shallow arcs accurate instead of R - root.
+    final magnitude = bulge.abs() > 1
+        ? (value + root) / half
+        : half / (value + root);
+    if (!magnitude.isFinite || magnitude == 0) {
+      throw ArgumentError('Invalid arc radius');
+    }
+    return ArchitectWallArc(start, end, (bulge < 0 ? -1 : 1) * magnitude);
+  }
+
   double get sweep => 4 * math.atan(bulge);
   double get radius =>
       (end - start).distance * (1 + bulge * bulge) / (4 * bulge.abs());
@@ -60,11 +100,11 @@ class ArchitectWallArc {
 
   List<Offset> lineIntersections(Offset a, Offset b, {bool finite = true}) {
     final d = b - a, f = a - center, aa = d.dx * d.dx + d.dy * d.dy;
-    if (aa < 1e-12) return const [];
+    if (aa < 1e-12) return <Offset>[];
     final bb = 2 * (f.dx * d.dx + f.dy * d.dy),
         cc = f.dx * f.dx + f.dy * f.dy - radius * radius,
         disc = bb * bb - 4 * aa * cc;
-    if (disc < 0) return const [];
+    if (disc < 0) return <Offset>[];
     final result = <Offset>[];
     for (final t in {
       (-bb - math.sqrt(disc)) / (2 * aa),
@@ -84,7 +124,7 @@ class ArchitectWallArc {
     if (d < 1e-8 ||
         d > radius + other.radius + 1e-8 ||
         d < (radius - other.radius).abs() - 1e-8) {
-      return const [];
+      return <Offset>[];
     }
     final a = (radius * radius - other.radius * other.radius + d * d) / (2 * d),
         h = math.sqrt(math.max(0, radius * radius - a * a));

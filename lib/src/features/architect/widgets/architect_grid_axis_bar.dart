@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. IMPORTS & DEFINITIONS
 // 2. ARCHITECT GRID AXIS DRAFTING BAR (WIDGET)
@@ -63,8 +64,8 @@ class ArchitectGridAxisBar extends StatelessWidget {
               message: l10n.architectAxisDrawPrompt,
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.grid_on_rounded,
+                  const AppIcon(
+                    AppIconId.grid,
                     color: Color(0xFFFF5252),
                     size: 18,
                   ),
@@ -92,14 +93,14 @@ class ArchitectGridAxisBar extends StatelessWidget {
             IconButton(
               key: const ValueKey('architect-axes-from-walls'),
               tooltip: l10n.architectAxesFromWallsHelp,
-              icon: const Icon(Icons.auto_awesome, color: Colors.cyanAccent),
+              icon: const AppIcon(AppIconId.auto, color: Colors.cyanAccent),
               onPressed: onGenerateFromWalls,
             ),
           IconButton(
             key: const ValueKey('architect-axes-resequence'),
             tooltip: l10n.resequenceGridAxesAction,
-            icon: const Icon(
-              Icons.format_list_numbered_rounded,
+            icon: const AppIcon(
+              AppIconId.numberedList,
               color: Colors.cyanAccent,
             ),
             onPressed: onResequence,
@@ -107,10 +108,8 @@ class ArchitectGridAxisBar extends StatelessWidget {
           IconButton(
             key: const ValueKey('architect-axes-align'),
             tooltip: l10n.alignGridAxesAction,
-            icon: const Icon(
-              Icons.align_horizontal_left_rounded,
-              color: Colors.white70,
-            ),
+            icon: const AppIcon(AppIconId.alignLeft,
+              color: Colors.white70),
             onPressed: onAlignAll,
           ),
         ],

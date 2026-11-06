@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -134,7 +135,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
         double? ww = firstHeader.windowWidth;
 
         if (wc == null) {
-          final preset = DicomRenderer.suggestPresetForModality(firstHeader.modality);
+          final preset = DicomRenderer.suggestPresetForModality(firstHeader.modality,
+          );
           if (preset != null) {
             wc = preset.center;
             ww = preset.width;
@@ -148,7 +150,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
           windowCenter: wc ?? 127.0,
           windowWidth: (ww ?? 256.0).clamp(1.0, 65535.0),
           accentColor: DicomViewportColors.getColor(i),
-        ));
+        ),
+        );
       }
 
       setState(() {
@@ -168,7 +171,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
       // Generate series thumbnails in the background
       _generateThumbnails();
     } on DicomParseException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy.parse');
+      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy.parse',
+      );
       if (!mounted) return;
       final l10n = AppLocalizations.of(context);
       setState(() {
@@ -176,7 +180,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
         _isLoading = false;
       });
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy.fs');
+      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy.fs',
+      );
       if (!mounted) return;
       final l10n = AppLocalizations.of(context);
       setState(() {
@@ -184,7 +189,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
         _isLoading = false;
       });
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy.format');
+      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy.format',
+      );
       if (!mounted) return;
       final l10n = AppLocalizations.of(context);
       setState(() {
@@ -192,7 +198,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
         _isLoading = false;
       });
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy');
+      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy',
+      );
       if (!mounted) return;
       final l10n = AppLocalizations.of(context);
       setState(() {
@@ -229,7 +236,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
   // Rendering
   // --------------------------------------------------------------------------
 
-  Future<void> _renderViewportSlice(DicomViewportState vp, {double? initialWc, double? initialWw}) async {
+  Future<void> _renderViewportSlice(DicomViewportState vp, {double? initialWc, double? initialWw,
+  }) async {
     if (_study == null || _study!.series.isEmpty) return;
     final series = _study!.series[vp.seriesIndex.clamp(0, _study!.series.length - 1)];
     if (series.slices.isEmpty || vp.isRendering) return;
@@ -265,7 +273,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
       });
       oldImage?.dispose();
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._renderViewportSlice');
+      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._renderViewportSlice',
+      );
       if (!mounted) return;
       setState(() => vp.isRendering = false);
     }
@@ -383,7 +392,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
   // Reference Lines Calculation (Localizer / Scout Lines)
   // --------------------------------------------------------------------------
 
-  List<DicomReferenceLineEntry> _calculateReferenceLinesFor(DicomViewportState targetVp) {
+  List<DicomReferenceLineEntry> _calculateReferenceLinesFor(DicomViewportState targetVp,
+  ) {
     if (!_showReferenceLines || _study == null) return const [];
 
     final results = <DicomReferenceLineEntry>[];
@@ -411,8 +421,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
       if (refLine != null) {
         results.add(DicomReferenceLineEntry(
           line: refLine,
-          color: otherVp.accentColor,
-        ));
+          color: otherVp.accentColor),
+        );
       }
     }
 
@@ -504,20 +514,24 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
         // Layout selector popup
         PopupMenuButton<DicomViewportLayout>(
           tooltip: context.l10n.dicomLayout,
-          icon: const Icon(Icons.grid_view_outlined, color: Colors.white70),
+          icon: const AppIcon(AppIconId.layoutGrid, color: Colors.white70),
           color: const Color(0xFF1E1E2E),
           onSelected: _changeLayout,
           itemBuilder: (context) => [
-            _layoutMenuItem(DicomViewportLayout.single, '1×1 Single', Icons.crop_square),
-            _layoutMenuItem(DicomViewportLayout.splitVertical, '1×2 Vertical', Icons.view_agenda_outlined),
-            _layoutMenuItem(DicomViewportLayout.splitHorizontal, '2×1 Horizontal', Icons.view_column_outlined),
-            _layoutMenuItem(DicomViewportLayout.grid2x2, '2×2 Grid', Icons.grid_view),
+            _layoutMenuItem(DicomViewportLayout.single, '1×1 Single', Icons.crop_square,
+            ),
+            _layoutMenuItem(DicomViewportLayout.splitVertical, '1×2 Vertical', Icons.view_agenda_outlined,
+            ),
+            _layoutMenuItem(DicomViewportLayout.splitHorizontal, '2×1 Horizontal', Icons.view_column_outlined,
+            ),
+            _layoutMenuItem(DicomViewportLayout.grid2x2, '2×2 Grid', Icons.grid_view,
+            ),
           ],
         ),
 
         // Cross-Reference / Localizer Lines Toggle
         IconButton(
-          icon: Icon(
+          icon: AppIcon.fromMaterial(
             _showReferenceLines ? Icons.center_focus_strong : Icons.center_focus_weak,
             color: _showReferenceLines ? _accent : Colors.white60,
           ),
@@ -527,27 +541,27 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
 
         // Overlay text toggle
         IconButton(
-          icon: Icon(
+          icon: AppIcon.fromMaterial(
             _showOverlays ? Icons.branding_watermark : Icons.branding_watermark_outlined,
             color: _showOverlays ? _accent : Colors.white60,
           ),
-          tooltip: 'Toggle HUD text',
+          tooltip: context.l10n.commandUiToggleHudText,
           onPressed: () => setState(() => _showOverlays = !_showOverlays),
         ),
 
         // Metadata sheet toggle
         IconButton(
-          icon: Icon(
-            Icons.info_outline,
+          icon: AppIcon(
+            AppIconId.info,
             color: _showMetadata ? _accent : Colors.white70,
           ),
-          tooltip: 'Show metadata',
+          tooltip: context.l10n.commandUiShowMetadata,
           onPressed: () => setState(() => _showMetadata = !_showMetadata),
         ),
 
         // Share
         IconButton(
-          icon: const Icon(Icons.share, color: Colors.white70),
+          icon: const AppIcon(AppIconId.share, color: Colors.white70),
           onPressed: () => Share.shareXFiles([XFile(widget.filePath)]),
         ),
       ],
@@ -564,7 +578,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
       value: layout,
       child: Row(
         children: [
-          Icon(icon, size: 18, color: isSelected ? _accent : Colors.white70),
+          AppIcon.fromMaterial(icon, size: 18, color: isSelected ? _accent : Colors.white70,
+          ),
           const SizedBox(width: 10),
           Text(
             label,
@@ -576,7 +591,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
           ),
           if (isSelected) ...[
             const Spacer(),
-            const Icon(Icons.check, size: 16, color: _accent),
+            const AppIcon(AppIconId.confirm, size: 16, color: _accent),
           ],
         ],
       ),
@@ -593,7 +608,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
           // Pan & Zoom mode
           _toolButton(
             icon: Icons.pan_tool_outlined,
-            tooltip: 'Pan & Zoom',
+            tooltip: context.l10n.commandUiPanZoom,
             isActive: _interactionMode == DicomInteractionMode.panZoom,
             onPressed: () =>
                 setState(() => _interactionMode = DicomInteractionMode.panZoom),
@@ -601,15 +616,16 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
           // Window/Level drag mode
           _toolButton(
             icon: Icons.brightness_6_outlined,
-            tooltip: 'Window / Level Drag (Drag on screen)',
+            tooltip: context.l10n.commandUiWindowLevelDragDragOnScreen,
             isActive: _interactionMode == DicomInteractionMode.windowLevel,
             onPressed: () => setState(
-                () => _interactionMode = DicomInteractionMode.windowLevel),
+                () => _interactionMode = DicomInteractionMode.windowLevel,
+            ),
           ),
           // Ruler mode
           _toolButton(
             icon: Icons.straighten_outlined,
-            tooltip: 'Ruler Measurement (mm)',
+            tooltip: context.l10n.commandUiRulerMeasurementMm,
             isActive: _interactionMode == DicomInteractionMode.ruler,
             onPressed: () =>
                 setState(() => _interactionMode = DicomInteractionMode.ruler),
@@ -621,9 +637,13 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                 foregroundColor: Colors.amberAccent,
                 visualDensity: VisualDensity.compact,
               ),
-              icon: const Icon(Icons.clear, size: 14),
-              label: Text('Clear (${vp.measurements.length})',
-                  style: const TextStyle(fontSize: 11)),
+              icon: const AppIcon(AppIconId.close, size: 14),
+              label: Text(
+                context.l10n.commandUiClearValue(
+                  (vp.measurements.length).toString(),
+                ),
+                  style: const TextStyle(fontSize: 11),
+              ),
               onPressed: () => setState(() => vp.measurements.clear()),
             ),
         ],
@@ -640,7 +660,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: IconButton(
-        icon: Icon(icon, size: 18),
+        icon: AppIcon.fromMaterial(icon, size: 18),
         tooltip: tooltip,
         style: IconButton.styleFrom(
           backgroundColor: isActive ? _accent.withValues(alpha: 0.25) : Colors.transparent,
@@ -663,7 +683,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
 
     switch (_layout) {
       case DicomViewportLayout.single:
-        return _buildViewportCard(_viewports[_activeViewportIndex.clamp(0, _viewports.length - 1)]);
+        return _buildViewportCard(_viewports[_activeViewportIndex.clamp(0, _viewports.length - 1)],
+        );
 
       case DicomViewportLayout.splitVertical:
         return Column(
@@ -736,8 +757,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
               _buildViewportHeader(vp, series),
               // Viewport Canvas with interactive gestures & reference lines
               Expanded(
-                child: _buildViewportCanvas(vp, series, slice, header),
-              ),
+                child: _buildViewportCanvas(vp, series, slice, header)),
             ],
           ),
         ),
@@ -754,7 +774,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
         children: [
           // Dropdown menu button to change series directly in this viewport
           PopupMenuButton<int>(
-            tooltip: 'Select Series',
+            tooltip: context.l10n.commandUiSelectSeries,
             color: const Color(0xFF1E1E2E),
             padding: EdgeInsets.zero,
             child: Row(
@@ -770,7 +790,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(width: 4),
-                Icon(Icons.keyboard_arrow_down, size: 16, color: vp.accentColor),
+                AppIcon(AppIconId.expandMore, size: 16, color: vp.accentColor),
               ],
             ),
             onSelected: (newSeriesIndex) {
@@ -785,7 +805,9 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                   child: Row(
                     children: [
                       if (isCurrent)
-                        Icon(Icons.check, size: 14, color: vp.accentColor)
+                        AppIcon(
+                          AppIconId.confirm, size: 14, color: vp.accentColor,
+                        )
                       else
                         const SizedBox(width: 14),
                       const SizedBox(width: 8),
@@ -808,14 +830,14 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
           const Spacer(),
           // Caliper / Ruler button for this viewport
           IconButton(
-            icon: Icon(
-              Icons.edit_outlined,
+            icon: AppIcon(
+              AppIconId.edit,
               size: 16,
               color: _interactionMode == DicomInteractionMode.ruler && _activeViewportIndex == vp.viewportIndex
                   ? vp.accentColor
                   : Colors.white54,
             ),
-            tooltip: 'Ruler Measurement',
+            tooltip: context.l10n.commandUiRulerMeasurement,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
             onPressed: () {
@@ -889,7 +911,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                     onPanStart: (details) {
                       if (_interactionMode == DicomInteractionMode.ruler) {
                         final imgCoords = _screenToImageCoords(
-                            details.localPosition, constraints.biggest, imageSize);
+                            details.localPosition, constraints.biggest, imageSize,
+                        );
                         if (imgCoords != null) {
                           setState(() {
                             vp.draftMeasurement = DicomMeasurement(
@@ -906,15 +929,18 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                       if (_interactionMode == DicomInteractionMode.windowLevel) {
                         setState(() {
                           vp.windowWidth = (vp.windowWidth + details.delta.dx * 3.0)
-                              .clamp(1.0, 8192.0);
+                              .clamp(1.0, 8192.0,
+                              );
                           vp.windowCenter = (vp.windowCenter - details.delta.dy * 3.0)
-                              .clamp(-2048.0, 4096.0);
+                              .clamp(-2048.0, 4096.0,
+                              );
                         });
                         _onWindowingChanged(vp);
                       } else if (_interactionMode == DicomInteractionMode.ruler &&
                           vp.draftMeasurement != null) {
                         final imgCoords = _screenToImageCoords(
-                            details.localPosition, constraints.biggest, imageSize);
+                            details.localPosition, constraints.biggest, imageSize,
+                        );
                         if (imgCoords != null) {
                           setState(() {
                             vp.draftMeasurement = DicomMeasurement(
@@ -991,11 +1017,13 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
   }
 
   Offset? _screenToImageCoords(
-      Offset localPos, Size containerSize, Size imageSize) {
+      Offset localPos, Size containerSize, Size imageSize,
+  ) {
     if (imageSize.width == 0 || imageSize.height == 0) return null;
     final fitted = applyBoxFit(BoxFit.contain, imageSize, containerSize);
     final dst = Alignment.center
-        .inscribe(fitted.destination, Offset.zero & containerSize);
+        .inscribe(fitted.destination, Offset.zero & containerSize,
+    );
 
     if (!dst.contains(localPos)) return null;
 
@@ -1004,8 +1032,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
 
     return Offset(
       normX * imageSize.width,
-      normY * imageSize.height,
-    );
+      normY * imageSize.height);
   }
 
   Widget _buildViewportHud(
@@ -1065,8 +1092,10 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
             ],
           ),
           children: [
-            TextSpan(text: '${lines[0]}\n', style: TextStyle(color: color)),
-            TextSpan(text: lines[1], style: TextStyle(color: highlightSecondLineColor)),
+            TextSpan(text: '${lines[0]}\n', style: TextStyle(color: color),
+            ),
+            TextSpan(text: lines[1], style: TextStyle(color: highlightSecondLineColor),
+            ),
           ],
         ),
       );
@@ -1154,11 +1183,12 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                             ),
                           )
                         : Center(
-                            child: Icon(
-                              Icons.view_in_ar,
+                            child: AppIcon(
+                              AppIconId.view3D,
                               size: 24,
                               color: assignedVp != null
-                                  ? assignedVp.accentColor.withValues(alpha: 0.6)
+                                  ? assignedVp.accentColor.withValues(alpha: 0.6,
+                                    )
                                   : Colors.white24,
                             ),
                           ),
@@ -1168,7 +1198,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                     bottom: 2,
                     right: 2,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black87,
                         borderRadius: BorderRadius.circular(2),
@@ -1236,18 +1267,21 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
             IconButton(
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              icon: Icon(
+              icon: AppIcon.fromMaterial(
                 _isPlayingCine ? Icons.pause_circle_filled : Icons.play_circle_filled,
                 color: _isPlayingCine ? vp.accentColor : Colors.white70,
                 size: 22,
               ),
-              tooltip: _isPlayingCine ? 'Pause Cine' : 'Play Cine',
+              tooltip: _isPlayingCine ? context.l10n.commandUiPauseCine
+                  : context.l10n.commandUiPlayCine,
               onPressed: _toggleCine,
             ),
             IconButton(
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              icon: const Icon(Icons.skip_previous, color: Colors.white70, size: 20),
+              icon: const AppIcon(
+                AppIconId.previousTrack, color: Colors.white70, size: 20,
+              ),
               onPressed: vp.sliceIndex > 0
                   ? () => _goToSlice(vp.sliceIndex - 1, vp.viewportIndex)
                   : null,
@@ -1255,7 +1289,9 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
             IconButton(
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              icon: const Icon(Icons.skip_next, color: Colors.white70, size: 20),
+              icon: const AppIcon(
+                AppIconId.nextTrack, color: Colors.white70, size: 20,
+              ),
               onPressed: vp.sliceIndex < count - 1
                   ? () => _goToSlice(vp.sliceIndex + 1, vp.viewportIndex)
                   : null,
@@ -1304,16 +1340,20 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                       visualDensity: VisualDensity.compact,
                       label: Text(p.name, style: const TextStyle(fontSize: 11)),
                       backgroundColor: const Color(0xFF1E1E30),
-                      side: BorderSide(color: vp.accentColor.withValues(alpha: 0.3)),
+                      side: BorderSide(color: vp.accentColor.withValues(alpha: 0.3),
+                    ),
                       labelStyle: const TextStyle(color: Colors.white70),
                       onPressed: () => _applyPreset(vp, p),
                     ),
-                  )),
+                  ),
+              ),
               if (h.windowCenter != null)
                 ActionChip(
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   visualDensity: VisualDensity.compact,
-                  label: const Text('Reset', style: TextStyle(fontSize: 11)),
+                  label: Text(
+                    context.l10n.commandUiReset, style: TextStyle(fontSize: 11),
+                  ),
                   backgroundColor: const Color(0xFF1E1E30),
                   side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
                   labelStyle: const TextStyle(color: Colors.white38),
@@ -1451,13 +1491,17 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
               _metaRow('Institution', h.institutionName!),
             const Divider(color: Colors.white12, height: 14),
             _metaRow('Dimensions', '${h.columns} × ${h.rows} px'),
-            _metaRow('Bits', '${h.bitsAllocated} allocated / ${h.bitsStored} stored'),
+            _metaRow('Bits', '${h.bitsAllocated} allocated / ${h.bitsStored} stored',
+            ),
             if (h.pixelSpacingRow != null)
-              _metaRow('Pixel Spacing', '${h.pixelSpacingRow!.toStringAsFixed(3)} × ${h.pixelSpacingCol!.toStringAsFixed(3)} mm'),
+              _metaRow('Pixel Spacing', '${h.pixelSpacingRow!.toStringAsFixed(3)} × ${h.pixelSpacingCol!.toStringAsFixed(3)} mm',
+              ),
             if (h.sliceThickness != null)
-              _metaRow('Slice Thickness', '${h.sliceThickness!.toStringAsFixed(2)} mm'),
+              _metaRow('Slice Thickness', '${h.sliceThickness!.toStringAsFixed(2)} mm',
+              ),
             if (h.sliceLocation != null)
-              _metaRow('Slice Location', '${h.sliceLocation!.toStringAsFixed(1)} mm'),
+              _metaRow('Slice Location', '${h.sliceLocation!.toStringAsFixed(1)} mm',
+              ),
             _metaRow('Photometric', h.photometricInterpretation),
             const Divider(color: Colors.white12, height: 14),
             _metaRow('Transfer Syntax', h.transferSyntaxLabel),
@@ -1512,7 +1556,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+              const Icon(Icons.error_outline, color: Colors.redAccent, size: 48,
+              ),
               const SizedBox(height: 16),
               const Text(
                 'Cannot display DICOM file or study',
@@ -1542,8 +1587,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                   foregroundColor: _accent,
                   side: const BorderSide(color: _accent),
                 ),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                icon: const AppIcon(AppIconId.refresh),
+                label: Text(context.l10n.retry),
                 onPressed: _loadDicomStudy,
               ),
             ],
@@ -1570,23 +1615,22 @@ class _LocalizerLinesPainter extends CustomPainter {
 
   _LocalizerLinesPainter({
     required this.lines,
-    required this.imageSize,
-  });
+    required this.imageSize});
 
   @override
   void paint(Canvas canvas, Size size) {
     if (imageSize.width == 0 || imageSize.height == 0) return;
 
     final fitted = applyBoxFit(BoxFit.contain, imageSize, size);
-    final dst = Alignment.center.inscribe(fitted.destination, Offset.zero & size);
+    final dst = Alignment.center.inscribe(fitted.destination, Offset.zero & size,
+    );
 
     Offset toCanvas(Offset p) {
       final normX = p.dx / imageSize.width;
       final normY = p.dy / imageSize.height;
       return Offset(
         dst.left + normX * dst.width,
-        dst.top + normY * dst.height,
-      );
+        dst.top + normY * dst.height);
     }
 
     for (final entry in lines) {
@@ -1642,15 +1686,15 @@ class _RulerPainter extends CustomPainter {
     if (imageSize.width == 0 || imageSize.height == 0) return;
 
     final fitted = applyBoxFit(BoxFit.contain, imageSize, size);
-    final dst = Alignment.center.inscribe(fitted.destination, Offset.zero & size);
+    final dst = Alignment.center.inscribe(fitted.destination, Offset.zero & size,
+    );
 
     Offset toCanvas(Offset p) {
       final normX = p.dx / imageSize.width;
       final normY = p.dy / imageSize.height;
       return Offset(
         dst.left + normX * dst.width,
-        dst.top + normY * dst.height,
-      );
+        dst.top + normY * dst.height);
     }
 
     final linePaint = Paint()

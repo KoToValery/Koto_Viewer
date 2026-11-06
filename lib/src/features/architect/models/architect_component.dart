@@ -23,7 +23,8 @@ enum ArchitectComponentCategory {
   office,
   outdoor,
   doors,
-  windows;
+  windows,
+  services;
 
   static ArchitectComponentCategory fromName(String? name) {
     return ArchitectComponentCategory.values.firstWhere(
@@ -147,6 +148,8 @@ class ArchitectComponentInstance {
   bool get isFloorDrainComponent =>
       definitionId == 'sanitary_floor_drain' ||
       definitionId == 'sanitary_linear_drain';
+
+  bool get isServiceComponent => definitionId.startsWith('service_');
 
   bool effectiveVisibleInSection({bool defaultFromDefinition = false}) {
     if (visibleInSection != null) return visibleInSection!;

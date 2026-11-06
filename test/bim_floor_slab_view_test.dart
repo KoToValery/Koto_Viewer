@@ -1,3 +1,4 @@
+import 'support/command_icon_finders.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -323,7 +324,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: find.byType(StoreyManagerSheet),
-          matching: find.byIcon(Icons.close),
+          matching: findCommandIcon(Icons.close),
         ),
       );
       await tester.pumpAndSettle();

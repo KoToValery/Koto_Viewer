@@ -34,7 +34,8 @@ class ArchitectViewDrawing {
           ),
       ],
       annotations: [
-        for (final a in annotations) a.copyWith(position: point(a.position)),
+        for (final a in annotations)
+          a.copyWith(position: point(a.position), rotationDeg: -a.rotationDeg),
       ],
       elevationMarkers: [
         for (final m in elevationMarkers)

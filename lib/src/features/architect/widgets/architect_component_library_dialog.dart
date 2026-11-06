@@ -1,3 +1,5 @@
+import 'architect_dialog.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
@@ -11,8 +13,11 @@ import '../services/component_geometry_cache.dart';
 import '../services/component_library_service.dart';
 import '../services/fenestration_library_service.dart';
 import 'architect_component_labels.dart';
+import 'component_dimensions_dialog.dart';
 import 'component_studio_dialog.dart';
 import 'component_preview_painters.dart';
+import 'fenestration_preview.dart';
+import '../screens/fenestration_editor_screen.dart';
 
 /// One tap selects an object at its catalog size. Editing is a separate action.
 class ArchitectComponentLibraryDialog extends StatefulWidget {
@@ -20,12 +25,14 @@ class ArchitectComponentLibraryDialog extends StatefulWidget {
   final ValueChanged<ArchitectFenestrationStyle>? onSelectFenestration;
   final VoidCallback? onSelectDownpipe;
   final VoidCallback? onSelectFloorDrain;
+  final ArchitectComponentCategory? initialCategory;
   const ArchitectComponentLibraryDialog({
     super.key,
     this.onSelectComponent,
     this.onSelectFenestration,
     this.onSelectDownpipe,
     this.onSelectFloorDrain,
+    this.initialCategory,
   });
 
   static Future<void> show(
@@ -34,6 +41,7 @@ class ArchitectComponentLibraryDialog extends StatefulWidget {
     ValueChanged<ArchitectFenestrationStyle>? onSelectFenestration,
     VoidCallback? onSelectDownpipe,
     VoidCallback? onSelectFloorDrain,
+    ArchitectComponentCategory? initialCategory,
   }) => showDialog(
     context: context,
     builder: (_) => ArchitectComponentLibraryDialog(
@@ -41,6 +49,7 @@ class ArchitectComponentLibraryDialog extends StatefulWidget {
       onSelectFenestration: onSelectFenestration,
       onSelectDownpipe: onSelectDownpipe,
       onSelectFloorDrain: onSelectFloorDrain,
+      initialCategory: initialCategory,
     ),
   );
 
@@ -56,11 +65,14 @@ class _ArchitectComponentLibraryDialogState
   ArchitectComponentCategory? _category;
   _Source _source = _Source.all;
   String _search = '';
-  bool _show3d = false;
+  ColorScheme get colors => Theme.of(context).colorScheme;
+  FenestrationPreviewMode _previewMode = FenestrationPreviewMode.elevation;
+  bool get _show3d => _previewMode == FenestrationPreviewMode.threeD;
 
   @override
   void initState() {
     super.initState();
+    _category = widget.initialCategory;
     ComponentLibraryService.instance.addListener(_refresh);
     FenestrationLibraryService.instance.addListener(_refresh);
     ComponentLibraryService.instance.init();
@@ -139,7 +151,7 @@ class _ArchitectComponentLibraryDialogState
         .toList();
     return Dialog(
       insetPadding: EdgeInsets.all(phone ? 8 : 24),
-      backgroundColor: const Color(0xFF1E1E26),
+      backgroundColor: colors.surface,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 880, maxHeight: 720),
         child: Column(
@@ -151,8 +163,8 @@ class _ArchitectComponentLibraryDialogState
                   Expanded(
                     child: Text(
                       l.architectLibrary,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colors.onSurface,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -160,20 +172,26 @@ class _ArchitectComponentLibraryDialogState
                   ),
                   IconButton(
                     tooltip: l.architectLibraryImportHelp,
-                    icon: const Icon(
-                      Icons.file_upload_outlined,
-                      color: Colors.white70,
+                    icon: AppIcon(
+                      AppIconId.upload,
+                      color: colors.onSurfaceVariant,
                     ),
                     onPressed: _import,
                   ),
                   IconButton(
                     tooltip: l.architectComponentStudioTitle,
-                    icon: const Icon(Icons.code, color: Colors.white70),
+                    icon: AppIcon(
+                      AppIconId.code,
+                      color: colors.onSurfaceVariant,
+                    ),
                     onPressed: () => ComponentStudioDialog.show(context),
                   ),
                   IconButton(
                     tooltip: l.close,
-                    icon: const Icon(Icons.close, color: Colors.white70),
+                    icon: AppIcon(
+                      AppIconId.close,
+                      color: colors.onSurfaceVariant,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -182,26 +200,53 @@ class _ArchitectComponentLibraryDialogState
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: TextField(
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: colors.onSurface),
                 decoration: InputDecoration(
                   hintText: l.search,
-                  hintStyle: const TextStyle(color: Colors.white54),
-                  prefixIcon: const Icon(Icons.search, color: Colors.white54),
-                  suffixIcon: IconButton(
-                    key: const ValueKey('component-library-preview-mode'),
-                    tooltip: _show3d
-                        ? l.architectComponentView2d
-                        : l.architectComponentView3d,
-                    icon: Icon(
-                      _show3d ? Icons.crop_square : Icons.view_in_ar,
-                      color: Colors.white70,
-                    ),
-                    onPressed: () => setState(() => _show3d = !_show3d),
+                  hintStyle: TextStyle(color: colors.onSurfaceVariant),
+                  prefixIcon: AppIcon(
+                    AppIconId.search,
+                    color: colors.onSurfaceVariant,
                   ),
                   isDense: true,
                   border: const OutlineInputBorder(),
                 ),
                 onChanged: (value) => setState(() => _search = value),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: SegmentedButton<FenestrationPreviewMode>(
+                expandedInsets: EdgeInsets.zero,
+                showSelectedIcon: false,
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  foregroundColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? Colors.black87
+                        : colors.onSurfaceVariant,
+                  ),
+                ),
+                segments: [
+                  ButtonSegment(
+                    value: FenestrationPreviewMode.elevation,
+                    label: Text(l.architectFenestrationElevationShort),
+                  ),
+                  ButtonSegment(
+                    value: FenestrationPreviewMode.plan,
+                    label: Text(l.architectFenestrationPlanShort),
+                  ),
+                  ButtonSegment(
+                    value: FenestrationPreviewMode.threeD,
+                    label: Text(
+                      l.architectFenestration3DShort,
+                      key: const ValueKey('component-library-preview-mode'),
+                    ),
+                  ),
+                ],
+                selected: {_previewMode},
+                onSelectionChanged: (v) =>
+                    setState(() => _previewMode = v.first),
               ),
             ),
             Padding(
@@ -215,13 +260,13 @@ class _ArchitectComponentLibraryDialogState
                         isExpanded: true,
                         dropdownColor: const Color(0xFF262633),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white,
+                          color: colors.onSurface,
                           fontSize: 13,
                         ),
                         value: _category,
                         hint: Text(
                           l.architectLibraryAll,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: colors.onSurface),
                         ),
                         items: [
                           DropdownMenuItem(
@@ -246,7 +291,7 @@ class _ArchitectComponentLibraryDialogState
                         isExpanded: true,
                         dropdownColor: const Color(0xFF262633),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white,
+                          color: colors.onSurface,
                           fontSize: 13,
                         ),
                         value: _source,
@@ -271,32 +316,32 @@ class _ArchitectComponentLibraryDialogState
                 ],
               ),
             ),
-            const Divider(height: 1, color: Colors.white12),
+            Divider(height: 1, color: colors.outlineVariant),
             if (widget.onSelectFloorDrain != null &&
                 (_category == null ||
                     _category == ArchitectComponentCategory.sanitary) &&
                 _source != _Source.custom &&
                 _matches(l.architectToolFloorDrain))
               ListTile(
-                leading: const Icon(
-                  Icons.water_drop_outlined,
-                  color: Color(0xFF00E5FF),
-                ),
+                leading: AppIcon(AppIconId.water, color: Color(0xFF00E5FF)),
                 title: Text(
                   l.architectToolFloorDrain,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: colors.onSurface,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 subtitle: Text(
                   l.architectFloorDrainLibraryDesc,
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
-                trailing: const Icon(
-                  Icons.arrow_forward_ios,
+                trailing: AppIcon(
+                  AppIconId.chevronRight,
                   size: 14,
-                  color: Colors.white54,
+                  color: colors.onSurfaceVariant,
                 ),
                 onTap: () {
                   Navigator.of(context).pop();
@@ -308,13 +353,13 @@ class _ArchitectComponentLibraryDialogState
                 _source != _Source.custom &&
                 _matches(l.architectDrainageSmart))
               ListTile(
-                leading: const Icon(
-                  Icons.water_drop_outlined,
-                  color: Colors.white70,
+                leading: AppIcon(
+                  AppIconId.water,
+                  color: colors.onSurfaceVariant,
                 ),
                 title: Text(
                   l.architectDrainageSmart,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: colors.onSurface),
                 ),
                 onTap: () {
                   Navigator.of(context).pop();
@@ -326,14 +371,20 @@ class _ArchitectComponentLibraryDialogState
                   ? Center(
                       child: Text(
                         l.architectComponentNoItems,
-                        style: const TextStyle(color: Colors.white60),
+                        style: TextStyle(color: colors.onSurfaceVariant),
                       ),
                     )
                   : GridView.builder(
                       padding: const EdgeInsets.all(8),
                       gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: phone ? 190 : 220,
-                        mainAxisExtent: 158,
+                        mainAxisExtent:
+                            188 +
+                            40 *
+                                (MediaQuery.textScalerOf(
+                                      context,
+                                    ).scale(1).clamp(1, 2) -
+                                    1),
                         crossAxisSpacing: 4,
                         mainAxisSpacing: 4,
                       ),
@@ -341,31 +392,89 @@ class _ArchitectComponentLibraryDialogState
                       itemBuilder: (context, index) {
                         if (index >= definitions.length) {
                           final style = styles[index - definitions.length];
+                          final isCustomStyle = !presetIds.contains(style.id);
                           return _card(
                             style.localizedName(l),
-                            '${(style.defaultWidth * 100).round()}×${(style.defaultHeight * 100).round()} cm',
-                            Icon(
-                              style.kind == FenestrationKind.door
-                                  ? Icons.meeting_room_outlined
-                                  : Icons.window,
-                              size: 48,
-                              color: Colors.blueGrey,
+                            '${ArchitectFenestrationStyle.centimeters(style.defaultWidth)}×${ArchitectFenestrationStyle.centimeters(style.defaultHeight)} cm',
+                            FenestrationPreview(
+                              style: style,
+                              mode: _previewMode,
                             ),
                             () {
                               widget.onSelectFenestration?.call(style);
                               Navigator.of(context).pop();
                             },
+                            onEdit: () =>
+                                Navigator.push<ArchitectFenestrationStyle>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => FenestrationEditorScreen(
+                                      initialStyle: style,
+                                    ),
+                                  ),
+                                ),
+                            editTooltip: l.architectFenestrationEdit,
+                            editIcon: Icons.edit_outlined,
+                            onDelete: isCustomStyle
+                                ? () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => architectAlertDialog(
+                                        title: Text(
+                                          l.architectFenestrationDelete,
+                                        ),
+                                        content: Text(
+                                          l.architectFenestrationDeleteConfirm(
+                                            style.localizedName(l),
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(ctx, false),
+                                            child: Text(l.cancel),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () =>
+                                                Navigator.pop(ctx, true),
+                                            child: Text(l.delete),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true) {
+                                      await FenestrationLibraryService.instance
+                                          .deleteStyle(style.id);
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            l.architectFenestrationDeleteSuccess,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                : null,
                           );
                         }
                         final d = definitions[index];
                         final geometry = ComponentGeometryCache.instance
                             .getOrCompute(d, d.defaultParameters);
-                        final sizes = ['width', 'depth', 'height']
-                            .map(
-                              (key) => ((d.defaultParameters[key] as num) * 100)
-                                  .round(),
-                            )
-                            .join('×');
+                        final sizes =
+                            [
+                                  'width',
+                                  'depth',
+                                  if (d.id != 'service_chimney') 'height',
+                                ]
+                                .map(
+                                  (key) => componentDimensionCm(
+                                    d.defaultParameters[key] as num,
+                                  ),
+                                )
+                                .join('×');
                         return _card(
                           componentLabel(l, d),
                           '$sizes cm',
@@ -374,7 +483,7 @@ class _ArchitectComponentLibraryDialogState
                                 ? ComponentMeshPreviewPainter(
                                     geometry.mesh3d,
                                     .55,
-                                    .65,
+                                    .65 + (d.id == 'service_fireplace' ? math.pi : 0),
                                   )
                                 : _ComponentThumbnailPainter(geometry.block2d),
                           ),
@@ -388,6 +497,66 @@ class _ArchitectComponentLibraryDialogState
                                   context,
                                   initialScriptJson: d.rawSourceJson,
                                 )
+                              : d.category ==
+                                    ArchitectComponentCategory.services
+                              ? () async {
+                                  final values =
+                                      await ComponentDimensionsDialog.show(
+                                        context,
+                                        d,
+                                        d.defaultParameters,
+                                      );
+                                  if (values == null || !context.mounted) {
+                                    return;
+                                  }
+                                  library.setActiveDefinition(
+                                    d,
+                                    parameters: values,
+                                  );
+                                  widget.onSelectComponent?.call(d);
+                                  Navigator.of(context).pop();
+                                }
+                              : null,
+                          editTooltip: l.architectProperties,
+                          editIcon: Icons.tune,
+                          help: serviceComponentHelp(l, d.id),
+                          onDelete: d is ScriptedComponentDefinition
+                              ? () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => architectAlertDialog(
+                                      title: Text(l.architectComponentDelete),
+                                      content: Text(
+                                        l.architectComponentDeleteConfirm(
+                                          componentLabel(l, d),
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, false),
+                                          child: Text(l.cancel),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, true),
+                                          child: Text(l.delete),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    await library.deleteCustomScript(d.id);
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          l.architectComponentDeleted,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
                               : null,
                         );
                       },
@@ -405,8 +574,12 @@ class _ArchitectComponentLibraryDialogState
     Widget preview,
     VoidCallback select, {
     VoidCallback? onEdit,
+    VoidCallback? onDelete,
+    String? editTooltip,
+    IconData? editIcon,
+    String? help,
   }) => Card(
-    color: const Color(0xFF2A2A38),
+    color: colors.surfaceContainerHigh,
     clipBehavior: Clip.antiAlias,
     child: InkWell(
       onTap: select,
@@ -424,28 +597,49 @@ class _ArchitectComponentLibraryDialogState
                       top: 0,
                       right: 0,
                       child: IconButton(
-                        tooltip: context.l10n.architectComponentStudioTitle,
-                        icon: const Icon(Icons.code, size: 18),
+                        tooltip:
+                            editTooltip ??
+                            context.l10n.architectComponentStudioTitle,
+                        icon: editIcon == null
+                            ? AppIcon(AppIconId.code, size: 18)
+                            : Icon(editIcon, size: 18),
                         onPressed: onEdit,
+                      ),
+                    ),
+                  if (onDelete != null)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      child: IconButton(
+                        tooltip: context.l10n.delete,
+                        icon: AppIcon(
+                          AppIconId.delete,
+                          size: 18,
+                          color: Colors.redAccent,
+                        ),
+                        onPressed: onDelete,
                       ),
                     ),
                 ],
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+            Tooltip(
+              message: help ?? name,
+              child: Text(
+                name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.onSurface,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             Text(
               dimensions,
-              style: const TextStyle(color: Colors.white60, fontSize: 11),
+              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
             ),
           ],
         ),

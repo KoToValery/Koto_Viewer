@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
@@ -85,7 +86,8 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
         });
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'EpsViewer._loadEpsFile.fs');
+      AppErrorHandler.recordError(e, stack, context: 'EpsViewer._loadEpsFile.fs',
+      );
       try {
         await RecentFilesService.removeRecentFile(widget.filePath);
       } on Exception catch (_) {
@@ -99,7 +101,8 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'EpsViewer._loadEpsFile.format');
+      AppErrorHandler.recordError(e, stack, context: 'EpsViewer._loadEpsFile.format',
+      );
       try {
         await RecentFilesService.removeRecentFile(widget.filePath);
       } on Exception catch (_) {
@@ -250,7 +253,8 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
                       color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.gesture_rounded, color: Color(0xFF8B5CF6)),
+                    child: const Icon(Icons.gesture_rounded, color: Color(0xFF8B5CF6),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -259,11 +263,13 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
                       children: [
                         const Text(
                           'EPS Vector • Properties',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Text(
                           _fileName,
-                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
+                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -274,13 +280,16 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
               const Divider(height: 24),
               _buildInfoRow('File Name:', _fileName),
               _buildInfoRow('File Size:', formattedSize),
-              _buildInfoRow('Bounding Box:', '${bounds.width.toStringAsFixed(1)} × ${bounds.height.toStringAsFixed(1)} pt'),
+              _buildInfoRow('Bounding Box:', '${bounds.width.toStringAsFixed(1)} × ${bounds.height.toStringAsFixed(1)} pt',
+              ),
               if (meta.orientation != null) _buildInfoRow('Orientation:', meta.orientation!),
               if (meta.title != null) _buildInfoRow('Title:', meta.title!),
               if (meta.creator != null) _buildInfoRow('Creator:', meta.creator!),
               if (meta.creationDate != null) _buildInfoRow('Date:', meta.creationDate!),
-              _buildInfoRow('Vector Paths:', '${_document!.paths.length} elements'),
-              _buildInfoRow('Current Rotation:', '${_rotationQuarterTurns * 90}°'),
+              _buildInfoRow('Vector Paths:', '${_document!.paths.length} elements',
+              ),
+              _buildInfoRow('Current Rotation:', '${_rotationQuarterTurns * 90}°',
+              ),
             ],
           ),
         );
@@ -294,8 +303,10 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -308,24 +319,24 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
   List<Widget> _buildEpsActions(ThemeData theme) {
     return [
       IconButton(
-        icon: const Icon(Icons.fit_screen_outlined, size: 20),
+        icon: const AppIcon(AppIconId.fitView, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Fit to Screen',
+        tooltip: context.l10n.commandUiFitToScreen,
         onPressed: _document != null ? _fitToScreen : null,
       ),
       IconButton(
-        icon: const Icon(Icons.rotate_right_rounded, size: 20),
+        icon: const AppIcon(AppIconId.rotate, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Rotate 90° Clockwise',
+        tooltip: context.l10n.commandUiRotate90Clockwise,
         onPressed: _document != null ? _rotateClockwise : null,
       ),
       PopupMenuButton<String>(
-        icon: const Icon(Icons.flip_rounded, size: 20),
+        icon: const AppIcon(AppIconId.flipHorizontal, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Flip',
+        tooltip: context.l10n.architectRadialFlip,
         onSelected: (val) {
           if (val == 'h') _toggleFlipHorizontal();
           if (val == 'v') _toggleFlipVertical();
@@ -335,12 +346,14 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
             value: 'h',
             child: Row(
               children: [
-                const Icon(Icons.swap_horiz, size: 18),
+                const AppIcon(AppIconId.swapHorizontal, size: 18),
                 const SizedBox(width: 8),
-                const Text('Flip Horizontal'),
+                Text(context.l10n.commandUiFlipHorizontal),
                 if (_flipHorizontal) ...[
                   const Spacer(),
-                  Icon(Icons.check, size: 16, color: theme.colorScheme.primary),
+                  AppIcon(
+                    AppIconId.confirm, size: 16, color: theme.colorScheme.primary,
+                  ),
                 ],
               ],
             ),
@@ -349,12 +362,14 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
             value: 'v',
             child: Row(
               children: [
-                const Icon(Icons.swap_vert, size: 18),
+                const AppIcon(AppIconId.swapVertical, size: 18),
                 const SizedBox(width: 8),
-                const Text('Flip Vertical'),
+                Text(context.l10n.commandUiFlipVertical),
                 if (_flipVertical) ...[
                   const Spacer(),
-                  Icon(Icons.check, size: 16, color: theme.colorScheme.primary),
+                  AppIcon(
+                    AppIconId.confirm, size: 16, color: theme.colorScheme.primary,
+                  ),
                 ],
               ],
             ),
@@ -362,10 +377,10 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
         ],
       ),
       PopupMenuButton<EpsCanvasTheme>(
-        icon: const Icon(Icons.palette_outlined, size: 20),
+        icon: const AppIcon(AppIconId.palette, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Canvas Theme',
+        tooltip: context.l10n.commandUiCanvasTheme,
         onSelected: (t) => setState(() => _canvasTheme = t),
         itemBuilder: (context) => EpsCanvasTheme.values.map((t) {
           return PopupMenuItem<EpsCanvasTheme>(
@@ -382,10 +397,12 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Text(t.label),
+                Text(t.localizedLabel(context.l10n)),
                 if (_canvasTheme == t) ...[
                   const Spacer(),
-                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                  AppIcon(
+                    AppIconId.confirm, size: 18, color: theme.colorScheme.primary,
+                  ),
                 ],
               ],
             ),
@@ -393,28 +410,28 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
         }).toList(),
       ),
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _showGrid ? Icons.grid_on : Icons.grid_off,
           size: 20,
           color: _showGrid ? theme.colorScheme.primary : null,
         ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Grid',
+        tooltip: context.l10n.commandIconGrid,
         onPressed: () => setState(() => _showGrid = !_showGrid),
       ),
       IconButton(
-        icon: const Icon(Icons.info_outline, size: 20),
+        icon: const AppIcon(AppIconId.info, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Information',
+        tooltip: context.l10n.commandIconInfo,
         onPressed: _showInfoSheet,
       ),
       IconButton(
-        icon: const Icon(Icons.share_outlined, size: 20),
+        icon: const AppIcon(AppIconId.share, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Share',
+        tooltip: context.l10n.commandIconShare,
         onPressed: _shareFile,
       ),
     ];
@@ -431,7 +448,7 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const AppIcon(AppIconId.back),
           onPressed: () => Navigator.of(context).pop(true),
         ),
         title: Text(
@@ -458,8 +475,7 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
                   child: Row(
                     children: [
                       const Spacer(),
-                      ..._buildEpsActions(theme),
-                    ],
+                      ..._buildEpsActions(theme)],
                   ),
                 ),
               ),
@@ -475,7 +491,8 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
                 children: [
                   CircularProgressIndicator(color: Color(0xFF8B5CF6)),
                   SizedBox(height: 16),
-                  Text('Loading EPS Vector Graphic...', style: TextStyle(color: Colors.white70)),
+                  Text('Loading EPS Vector Graphic...', style: TextStyle(color: Colors.white70),
+                  ),
                 ],
               ),
             );
@@ -488,14 +505,16 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                    const Icon(Icons.error_outline, size: 48, color: Colors.redAccent,
+                    ),
                     const SizedBox(height: 16),
-                    Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+                    Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70),
+                    ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: _loadEpsFile,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
+                      icon: const AppIcon(AppIconId.refresh),
+                      label: Text(context.l10n.retry),
                     ),
                   ],
                 ),
@@ -548,7 +567,7 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
                 right: 20,
                 child: _buildFloatingButton(
                   icon: Icons.fit_screen_outlined,
-                  tooltip: 'Fit to View (Center)',
+                  tooltip: context.l10n.commandUiFitToViewCenter,
                   onTap: _fitToScreen,
                   theme: theme,
                 ),
@@ -577,7 +596,8 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
           message: tooltip,
           child: Padding(
             padding: const EdgeInsets.all(10.0),
-            child: Icon(icon, size: 20, color: theme.colorScheme.onSurface),
+            child: AppIcon.fromMaterial(icon, size: 20, color: theme.colorScheme.onSurface,
+            ),
           ),
         ),
       ),

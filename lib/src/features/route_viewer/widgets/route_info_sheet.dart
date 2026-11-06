@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../models/geo_route_models.dart';
 
@@ -71,7 +72,8 @@ class RouteInfoSheet extends StatelessWidget {
             ),
             Row(
               children: [
-                Icon(Icons.route_rounded, color: theme.colorScheme.primary, size: 24),
+                Icon(Icons.route_rounded, color: theme.colorScheme.primary, size: 24,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -87,7 +89,8 @@ class RouteInfoSheet extends StatelessWidget {
                       ),
                       Text(
                         fileName,
-                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -95,7 +98,7 @@ class RouteInfoSheet extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, size: 20),
+                  icon: const AppIcon(AppIconId.close, size: 20),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -159,8 +162,7 @@ class RouteInfoSheet extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 document.description!,
-                style: const TextStyle(fontSize: 13),
-              ),
+                style: const TextStyle(fontSize: 13)),
               const SizedBox(height: 16),
             ],
 
@@ -179,7 +181,8 @@ class RouteInfoSheet extends StatelessWidget {
                   ? Center(
                       child: Text(
                         'No standalone waypoints found in this file.',
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                        style: TextStyle(fontSize: 13, color: Colors.grey.shade500,
+                        ),
                       ),
                     )
                   : ListView.separated(
@@ -193,7 +196,8 @@ class RouteInfoSheet extends StatelessWidget {
                           leading: _buildWaypointIcon(wpt.type),
                           title: Text(
                             wpt.name,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                            ),
                           ),
                           subtitle: Text(
                             [
@@ -205,7 +209,9 @@ class RouteInfoSheet extends StatelessWidget {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                          trailing: const AppIcon(
+                            AppIconId.chevronRight, size: 14,
+                          ),
                           onTap: () {
                             Navigator.of(context).pop();
                             onSelectWaypoint?.call(wpt);
@@ -250,7 +256,8 @@ class RouteInfoSheet extends StatelessWidget {
                 ),
                 Text(
                   value,
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -280,25 +287,29 @@ class RouteInfoSheet extends StatelessWidget {
         return const CircleAvatar(
           radius: 14,
           backgroundColor: Color(0xFFE0F2FE),
-          child: Icon(Icons.water_drop_rounded, color: Color(0xFF0284C7), size: 16),
+          child: Icon(Icons.water_drop_rounded, color: Color(0xFF0284C7), size: 16,
+          ),
         );
       case WaypointType.campsite:
         return const CircleAvatar(
           radius: 14,
           backgroundColor: Color(0xFFDCFCE7),
-          child: Icon(Icons.nature_people_rounded, color: Color(0xFF16A34A), size: 16),
+          child: Icon(Icons.nature_people_rounded, color: Color(0xFF16A34A), size: 16,
+          ),
         );
       case WaypointType.viewpoint:
         return const CircleAvatar(
           radius: 14,
           backgroundColor: Color(0xFFF3E8FF),
-          child: Icon(Icons.remove_red_eye_rounded, color: Color(0xFF9333EA), size: 16),
+          child: Icon(Icons.remove_red_eye_rounded, color: Color(0xFF9333EA), size: 16,
+          ),
         );
       case WaypointType.general:
         return const CircleAvatar(
           radius: 14,
           backgroundColor: Color(0xFFF1F5F9),
-          child: Icon(Icons.location_on_rounded, color: Color(0xFF64748B), size: 16),
+          child: Icon(Icons.location_on_rounded, color: Color(0xFF64748B), size: 16,
+          ),
         );
     }
   }

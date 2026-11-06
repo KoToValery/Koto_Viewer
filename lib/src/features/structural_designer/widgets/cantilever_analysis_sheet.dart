@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/cantilever_analysis_models.dart';
@@ -52,7 +53,7 @@ class CantileverAnalysisSheet extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white70),
+                  icon: const AppIcon(AppIconId.close, color: Colors.white70),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -105,12 +106,14 @@ class CantileverAnalysisSheet extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 16, color: Color(0xFF00E5FF)),
+                  const Icon(Icons.info_outline, size: 16, color: Color(0xFF00E5FF),
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       context.l10n.eurocodeStandardInfo,
-                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                      style: const TextStyle(color: Colors.white70, fontSize: 11,
+                      ),
                     ),
                   ),
                 ],
@@ -126,12 +129,14 @@ class CantileverAnalysisSheet extends StatelessWidget {
                   child: Column(
                     children: [
                       const Icon(Icons.check_circle_outline,
-                          color: Color(0xFF00E676), size: 48),
+                          color: Color(0xFF00E676), size: 48,
+                      ),
                       const SizedBox(height: 10),
                       Text(
                         context.l10n.noCantileversFound,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        style: const TextStyle(color: Colors.white70, fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
@@ -227,7 +232,8 @@ class CantileverAnalysisSheet extends StatelessWidget {
                     ),
                     Text(
                       zone.storeyName,
-                      style: const TextStyle(color: Colors.white60, fontSize: 11),
+                      style: const TextStyle(color: Colors.white60, fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -258,12 +264,16 @@ class CantileverAnalysisSheet extends StatelessWidget {
             children: [
               if (zone.isCorner) ...[
                 _buildProp('Lx', '${zone.length.toStringAsFixed(2)} m'),
-                _buildProp('Ly', '${zone.lengthY?.toStringAsFixed(2) ?? '-'} m'),
-                _buildProp('Ldiag', '${zone.effectiveDiagonal?.toStringAsFixed(2)} m'),
+                _buildProp('Ly', '${zone.lengthY?.toStringAsFixed(2) ?? '-'} m',
+                ),
+                _buildProp('Ldiag', '${zone.effectiveDiagonal?.toStringAsFixed(2)} m',
+                ),
               ] else ...[
-                _buildProp(context.l10n.propLengthL, '${zone.length.toStringAsFixed(2)} m'),
+                _buildProp(context.l10n.propLengthL, '${zone.length.toStringAsFixed(2)} m',
+                ),
               ],
-              _buildProp(context.l10n.propSlabH, '${(zone.slabThickness * 100).toInt()} cm'),
+              _buildProp(context.l10n.propSlabH, '${(zone.slabThickness * 100).toInt()} cm',
+              ),
               _buildProp(
                 'L/h',
                 zone.slendernessRatio.toStringAsFixed(1),
@@ -288,7 +298,8 @@ class CantileverAnalysisSheet extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          context.l10n.deflectionFtot(zone.longTermDeflectionMm.toStringAsFixed(1)),
+                          context.l10n.deflectionFtot(zone.longTermDeflectionMm.toStringAsFixed(1),
+                          ),
                           style: TextStyle(
                             color: isOverLimit
                                 ? const Color(0xFFFF1744)
@@ -298,9 +309,11 @@ class CantileverAnalysisSheet extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          context.l10n.deflectionLimitFlim(zone.limitDeflectionMm.toStringAsFixed(1)),
+                          context.l10n.deflectionLimitFlim(zone.limitDeflectionMm.toStringAsFixed(1),
+                          ),
                           style: const TextStyle(
-                              color: Colors.white60, fontSize: 11),
+                              color: Colors.white60, fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -339,12 +352,15 @@ class CantileverAnalysisSheet extends StatelessWidget {
                       children: [
                         const Text('• ',
                             style: TextStyle(
-                                color: Color(0xFF00E5FF), fontSize: 12)),
+                                color: Color(0xFF00E5FF), fontSize: 12,
+                          ),
+                        ),
                         Expanded(
                           child: Text(
                             rec,
                             style: const TextStyle(
-                                color: Colors.white70, fontSize: 11),
+                                color: Colors.white70, fontSize: 11,
+                            ),
                           ),
                         ),
                       ],
@@ -362,7 +378,8 @@ class CantileverAnalysisSheet extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white60, fontSize: 10)),
+        Text(label, style: const TextStyle(color: Colors.white60, fontSize: 10),
+        ),
         Text(
           value,
           style: TextStyle(

@@ -1485,6 +1485,12 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
+  String get architectCommandReview => 'Прегледай. ✓ записва, X отказва.';
+
+  @override
+  String get architectCommandAim => 'Задай промяната. X отказва.';
+
+  @override
   String get applyAction => 'Приложи';
 
   @override
@@ -3459,10 +3465,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectCategoryPlan => 'План';
 
   @override
-  String get architectCategoryBuild => 'Строеж';
+  String get architectCategoryBuild => 'Сграда';
 
   @override
-  String get architectCategoryDrawing => 'Чертане';
+  String get architectCategoryDrawing => 'Линии и щрих';
 
   @override
   String get architectToolCategories => 'Категории';
@@ -3837,6 +3843,43 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneTableActionPlace => 'Постави таблица';
 
   @override
+  String get architectZoneTableConfirmPlacement => 'Потвърди поставянето';
+
+  @override
+  String get architectZoneTableCancelPlacement => 'Откажи поставянето';
+
+  @override
+  String get architectZoneTablePendingHint =>
+      'Докоснете за преместване, или потвърдете със зеленото тикче';
+
+  @override
+  String get architectZoneContextMenu => 'Опции за помещението';
+
+  @override
+  String get architectZoneEditContour => 'Редактирай контур';
+
+  @override
+  String get architectZonePresetsDialogTitle => 'Помещения';
+
+  @override
+  String get architectZonePresetsDialogSubtitle =>
+      'Име и настилки по подразбиране за всяка категория';
+
+  @override
+  String get architectZonePresetsResetCategory =>
+      'Възстанови стандартните за категорията';
+
+  @override
+  String get architectZonePresetsResetAll => 'Нулирай всички';
+
+  @override
+  String get architectZonePresetsSaved => 'Видовете помещения са запазени';
+
+  @override
+  String get architectZonePresetsTooltip =>
+      'Предефиниране на видове помещения и настилки';
+
+  @override
   String get architectZoneFloorLaminate => 'Ламинат';
 
   @override
@@ -4087,7 +4130,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectOpeningVoid => 'Плоча';
 
   @override
-  String get architectLevelElevation => 'Кота';
+  String get architectLevelElevation => 'Фасада / разрез';
 
   @override
   String get architectAnnotationText => 'Текст';
@@ -4133,7 +4176,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectCategorySpaces => 'Пространства';
 
   @override
-  String get architectCategoryAnnotations => 'Надписи';
+  String get architectCategoryAnnotations => 'Коти и текст';
 
   @override
   String get architectCategoryCad => 'CAD Чертане';
@@ -4295,10 +4338,6 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallInsertPoint => 'Точка';
 
   @override
-  String get architectWallParallelHelp =>
-      'Тап за местене напречно без промяна на ъгъла. Задръж за точен отстъп със знак.';
-
-  @override
   String architectWallEndpointValue(int endpoint, String distance) {
     return '$endpoint · $distance';
   }
@@ -4309,9 +4348,6 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectMagnetHelp =>
       'Прилепване към стени, оси и точки от чертежа.';
-
-  @override
-  String get architectWallParallel => 'Успоредно';
 
   @override
   String get architectWallDraftHint => 'Задръж → точка · 2 пръста → мащаб';
@@ -4361,13 +4397,33 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectSelectionMulti => 'Много';
 
   @override
-  String get architectSelectionMove => 'Влачене';
+  String get architectSelectionMove => 'Премести';
+
+  @override
+  String get architectMoveFree => 'Свободно';
+
+  @override
+  String get architectMoveTransverse => 'Напречно';
+
+  @override
+  String get architectMoveOffset => 'Отстъп…';
+
+  @override
+  String get architectMoveStop => 'Спри';
+
+  @override
+  String get architectMoveHelp =>
+      'Премести: свободно, напречно или с точен отстъп със знак.';
 
   @override
   String get architectSelectConnected => 'Свързани';
 
   @override
-  String get architectSelectSimilar => 'Всички от типа';
+  String get architectSelectSimilar => 'По тип';
+
+  @override
+  String get architectSelectSimilarHelp =>
+      'Избира всички елементи от избраните категории в активния етаж.';
 
   @override
   String get architectContextMenu => 'Меню';
@@ -4642,6 +4698,18 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectFenestrationSaveSuccess =>
       'Моделът е запазен в библиотеката';
+
+  @override
+  String get architectFenestrationDelete => 'Изтрий от библиотеката';
+
+  @override
+  String get architectFenestrationDeleteSuccess =>
+      'Моделът е изтрит от библиотеката';
+
+  @override
+  String architectFenestrationDeleteConfirm(String name) {
+    return 'Изтриване на „$name“ от библиотеката?';
+  }
 
   @override
   String get architectFenestrationLibrary => 'Библиотека дограма';
@@ -4946,11 +5014,13 @@ class AppLocalizationsBg extends AppLocalizations {
   String get bimNewPoint => 'Нова точка';
 
   @override
-  String get bimNewPointHint => 'Посочете позиция по ръба за новата точка';
+  String get bimNewPointHint => 'Плъзнете дръжката, после потвърдете.';
 
   @override
-  String get architectNewPointPrompt =>
-      'Посочете позиция по ръба за новата точка';
+  String get architectNewPointPrompt => 'Позиция';
+
+  @override
+  String get architectNewPointInvalid => 'Извън краища и отвори';
 
   @override
   String get bimWallNewPointHelp =>
@@ -4970,6 +5040,10 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectWallLeadingLine => 'Водеща линия';
+
+  @override
+  String get architectWallLeadingLineHelp =>
+      'Изберете ос или лице за водене на текущия и следващите сегменти.';
 
   @override
   String get architectWallCoreThickness => 'Дебелина ядро';
@@ -5347,7 +5421,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get stairPlaceHelp =>
-      'Посочи първия подстъп, после посоката на изкачване. Дължината и стъпалата се изчисляват от котите.';
+      'Посочи външния ъгъл на първото стъпало, после посоката на изкачване. Дължината и стъпалата се изчисляват от котите.';
 
   @override
   String get stairCode => 'Нормативна база';
@@ -5708,6 +5782,17 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get slabSaveLibrary => 'Запази в библиотеката';
+
+  @override
+  String get slabDeleteLibrary => 'Изтрий от библиотеката';
+
+  @override
+  String get slabLibraryDeleted => 'Съставът е изтрит от библиотеката.';
+
+  @override
+  String slabDeleteConfirm(String name) {
+    return 'Изтриване на „$name“ от личната библиотека?';
+  }
 
   @override
   String get slabLibraryFailed => 'Библиотеката не е записана.';
@@ -6643,6 +6728,14 @@ class AppLocalizationsBg extends AppLocalizations {
   String get wallTypeReplacement => 'Замени с';
 
   @override
+  String wallTypeDeleteConfirm(String name) {
+    return 'Изтриване на къстъм стена „$name“?';
+  }
+
+  @override
+  String get wallTypeDeleted => 'Типът стена е изтрит.';
+
+  @override
   String get wallTypeInUse => 'Изберете заместител за стените с този тип.';
 
   @override
@@ -6687,6 +6780,21 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get wallArc => 'Заоблена стена';
+
+  @override
+  String get wallArcSagitta => 'Стрела';
+
+  @override
+  String get wallArcSagittaHelp =>
+      'Разстояние от средата на хордата до средата на дъгата по водещата линия.';
+
+  @override
+  String get wallArcDimensionHelp =>
+      'Докоснете за промяна на стрелата или радиуса. Началото и краят остават неподвижни.';
+
+  @override
+  String get wallArcInvalidDimension =>
+      'Невалиден размер за тази стена или отворите ѝ.';
 
   @override
   String get wallArcPickEnd => 'Посочи края на дъгата';
@@ -7000,6 +7108,18 @@ class AppLocalizationsBg extends AppLocalizations {
       'Обектът е запазен в потребителската библиотека!';
 
   @override
+  String get architectComponentDelete => 'Изтрий от библиотеката';
+
+  @override
+  String get architectComponentDeleted =>
+      'Компонентът е изтрит от библиотеката';
+
+  @override
+  String architectComponentDeleteConfirm(String name) {
+    return 'Изтриване на „$name“ от библиотеката?';
+  }
+
+  @override
   String get architectComponentCompileBtn => 'Преглед';
 
   @override
@@ -7186,10 +7306,6 @@ class AppLocalizationsBg extends AppLocalizations {
       'Помещенията се включват автоматично според най-голямата обща площ с апартамента. Всяко помещение се отчита изцяло само веднъж. При равни площи се запазва текущият апартамент. Помещенията извън всички апартаменти остават без апартамент.';
 
   @override
-  String get architectLineParallelHelp =>
-      'Докоснете за успоредно местене на линията. Задръжте за въвеждане на отместване със знак.';
-
-  @override
   String get architectLineJoinSuccess => 'Линиите са свързани';
 
   @override
@@ -7240,6 +7356,17 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectLinePatternEditor => 'Собствена шарка';
+
+  @override
+  String get architectLineDeleteConfirmTitle => 'Изтриване на стил линия';
+
+  @override
+  String architectLineDeleteConfirmPrompt(String name) {
+    return 'Изтриване на къстъм стил линия „$name“?';
+  }
+
+  @override
+  String get architectLineStyleDeleted => 'Стилът линия е изтрит.';
 
   @override
   String get architectLineDash => 'Тире';
@@ -8205,6 +8332,27 @@ class AppLocalizationsBg extends AppLocalizations {
   String get roofUiSaveDefaults => 'За следващите покриви';
 
   @override
+  String get roofSaveLibrary => 'Запази в библиотеката';
+
+  @override
+  String get roofDeleteLibrary => 'Изтрий от библиотеката';
+
+  @override
+  String get roofLibrarySaved => 'Покривният състав е запазен в библиотеката.';
+
+  @override
+  String get roofLibraryDeleted =>
+      'Покривният състав е изтрит от библиотеката.';
+
+  @override
+  String roofDeleteConfirm(String name) {
+    return 'Изтриване на „$name“ от личната библиотека?';
+  }
+
+  @override
+  String get roofCustomNamePrompt => 'Име на състава';
+
+  @override
   String get roofUiScopeHelp =>
       'Променят се само редактираните полета. Местата на тръбите остават към своя скат.';
 
@@ -8541,7 +8689,7 @@ class AppLocalizationsBg extends AppLocalizations {
       'Постави точки и затвори полигона с първата точка или с отметката.';
 
   @override
-  String get architectCategoryEdit => 'Редакция';
+  String get architectCategoryEdit => 'Избор';
 
   @override
   String get architectSelectReplace => 'Замени';
@@ -8662,5 +8810,2327 @@ class AppLocalizationsBg extends AppLocalizations {
       'Тап за избор; стрелки при застъпване. Задръж за меню.';
 
   @override
-  String get architectSelectAll => 'Всички';
+  String get architectSelectAll => 'По тип';
+
+  @override
+  String get propertiesBasic => 'Основни';
+
+  @override
+  String get propertiesMore => 'Още';
+
+  @override
+  String get propertiesExpand => 'Разгъни';
+
+  @override
+  String get propertiesCollapse => 'Свий';
+
+  @override
+  String get propertiesUnsaved => 'Незаписани промени';
+
+  @override
+  String get propertiesUnsavedHelp =>
+      'Запазете промените или ги отхвърлете преди затваряне.';
+
+  @override
+  String get propertiesStay => 'Остани';
+
+  @override
+  String get propertiesDiscard => 'Отхвърли';
+
+  @override
+  String get propertiesInvalid => 'Проверете отбелязаните полета.';
+
+  @override
+  String get propertiesStale =>
+      'Документът е променен. Отворете свойствата отново за актуалната версия.';
+
+  @override
+  String get propertiesAutomaticValue => 'Автоматично';
+
+  @override
+  String get propertiesCalculated => 'Изчислено';
+
+  @override
+  String propertiesSelection(String name, int count) {
+    return '$name ($count)';
+  }
+
+  @override
+  String get propertiesGeometry => 'Геометрия';
+
+  @override
+  String get propertiesAppearance => 'Представяне';
+
+  @override
+  String get propertiesManual => 'Ръчно';
+
+  @override
+  String get propertiesClear => 'Изчисти стойността';
+
+  @override
+  String get propertiesDone => 'Готово';
+
+  @override
+  String get propertiesSource => 'Източник';
+
+  @override
+  String get propertiesScopeSelected => 'Избраните елементи';
+
+  @override
+  String get propertiesRadius => 'Радиус';
+
+  @override
+  String get propertiesTextHeight => 'Височина на текста';
+
+  @override
+  String get propertiesSaveOpen => 'Запази и отвори';
+
+  @override
+  String get propertiesSlope => 'Наклон';
+
+  @override
+  String get propertiesBaseOffset => 'Основа';
+
+  @override
+  String get propertiesMixedCompositionHelp =>
+      'Изберете тип за замяна на избраните състави.';
+
+  @override
+  String get propertiesDiameter => 'Диаметър';
+
+  @override
+  String get commandIconAdd => 'Добавяне';
+
+  @override
+  String get commandIconRemove => 'Премахване';
+
+  @override
+  String get commandIconClose => 'Затваряне';
+
+  @override
+  String get commandIconConfirm => 'Потвърждаване';
+
+  @override
+  String get commandIconAddBox => 'Добавяне към избраното';
+
+  @override
+  String get commandIconAddCircle => 'Добавяне на елемент';
+
+  @override
+  String get commandIconRemoveCircle => 'Премахване на елемент';
+
+  @override
+  String get commandIconCheckBox => 'Избрано';
+
+  @override
+  String get commandIconCheckBoxEmpty => 'Неизбрано';
+
+  @override
+  String get commandIconRemoveBox => 'Изваждане от избраното';
+
+  @override
+  String get commandIconCheckCircle => 'Завършено';
+
+  @override
+  String get commandIconRadioOn => 'Активна опция';
+
+  @override
+  String get commandIconRadioOff => 'Неактивна опция';
+
+  @override
+  String get commandIconBack => 'Назад';
+
+  @override
+  String get commandIconForward => 'Напред';
+
+  @override
+  String get commandIconUp => 'Нагоре';
+
+  @override
+  String get commandIconDown => 'Надолу';
+
+  @override
+  String get commandIconChevronLeft => 'Предишно';
+
+  @override
+  String get commandIconChevronRight => 'Следващо';
+
+  @override
+  String get commandIconExpandLess => 'Свиване';
+
+  @override
+  String get commandIconExpandMore => 'Разгъване';
+
+  @override
+  String get commandIconFirstPage => 'Първа страница';
+
+  @override
+  String get commandIconLastPage => 'Последна страница';
+
+  @override
+  String get commandIconOutward => 'Отваряне навън';
+
+  @override
+  String get commandIconDiagonalDown => 'Преместване по диагонал';
+
+  @override
+  String get commandIconMoreHorizontal => 'Още команди';
+
+  @override
+  String get commandIconMoreVertical => 'Още опции';
+
+  @override
+  String get commandIconSearch => 'Търсене';
+
+  @override
+  String get commandIconSearchOff => 'Изчистване на търсенето';
+
+  @override
+  String get commandIconZoomIn => 'Увеличаване';
+
+  @override
+  String get commandIconZoomOut => 'Намаляване';
+
+  @override
+  String get commandIconRefresh => 'Опресняване';
+
+  @override
+  String get commandIconSync => 'Синхронизиране';
+
+  @override
+  String get commandIconSyncProblem => 'Проблем при синхронизиране';
+
+  @override
+  String get commandIconUndo => 'Отмяна';
+
+  @override
+  String get commandIconRedo => 'Възстановяване';
+
+  @override
+  String get commandIconHistory => 'История';
+
+  @override
+  String get commandIconSettings => 'Настройки';
+
+  @override
+  String get commandIconProperties => 'Свойства';
+
+  @override
+  String get commandIconInfo => 'Информация';
+
+  @override
+  String get commandIconHelp => 'Помощ';
+
+  @override
+  String get commandIconWarning => 'Предупреждение';
+
+  @override
+  String get commandIconError => 'Грешка';
+
+  @override
+  String get commandIconFilter => 'Филтриране';
+
+  @override
+  String get commandIconFilterOff => 'Изчистване на филтъра';
+
+  @override
+  String get commandIconFilterList => 'Филтриране на списъка';
+
+  @override
+  String get commandIconSort => 'Сортиране';
+
+  @override
+  String get commandIconDrag => 'Пренареждане';
+
+  @override
+  String get commandIconClearAll => 'Изчистване на всички';
+
+  @override
+  String get commandIconBackspace => 'Изтриване';
+
+  @override
+  String get commandIconSelect => 'Избиране';
+
+  @override
+  String get commandIconSelectAll => 'Избиране на всички';
+
+  @override
+  String get commandIconDeselect => 'Премахване на избора';
+
+  @override
+  String get commandIconMultiSelect => 'Множествен избор';
+
+  @override
+  String get commandIconPan => 'Панорамиране';
+
+  @override
+  String get commandIconMove => 'Преместване';
+
+  @override
+  String get commandIconMoveTransverse => 'Напречно преместване';
+
+  @override
+  String get commandIconDuplicate => 'Дублиране';
+
+  @override
+  String get commandIconEdit => 'Редактиране';
+
+  @override
+  String get commandIconRename => 'Преименуване';
+
+  @override
+  String get commandIconDelete => 'Изтриване';
+
+  @override
+  String get commandIconDeleteAll => 'Изтриване на всички';
+
+  @override
+  String get commandIconRotate => 'Завъртане';
+
+  @override
+  String get commandIconRotateLeft => 'Завъртане наляво';
+
+  @override
+  String get commandIconMirrorMove => 'Огледално преместване';
+
+  @override
+  String get commandIconMirrorCopy => 'Огледално копиране';
+
+  @override
+  String get commandIconFlipHorizontal => 'Хоризонтално обръщане';
+
+  @override
+  String get commandIconFlipVertical => 'Вертикално обръщане';
+
+  @override
+  String get commandIconSwapHorizontal => 'Хоризонтална размяна';
+
+  @override
+  String get commandIconSwapVertical => 'Вертикална размяна';
+
+  @override
+  String get commandIconSplit => 'Разделяне на елемент';
+
+  @override
+  String get commandIconCut => 'Изрязване';
+
+  @override
+  String get commandIconCutOpening => 'Изрязване на отвор';
+
+  @override
+  String get commandIconOffset => 'Отместване';
+
+  @override
+  String get commandIconNewPoint => 'Нова точка';
+
+  @override
+  String get commandIconJoin => 'Свързване на елементи';
+
+  @override
+  String get commandIconStraighten => 'Изправяне';
+
+  @override
+  String get commandIconGroup => 'Групиране';
+
+  @override
+  String get commandIconUngroup => 'Разгрупиране';
+
+  @override
+  String get commandIconEditGroup => 'Редактиране на група';
+
+  @override
+  String get commandIconFile => 'Файл';
+
+  @override
+  String get commandIconOpenFile => 'Отваряне на файл';
+
+  @override
+  String get commandIconFolder => 'Папка';
+
+  @override
+  String get commandIconOpenFolder => 'Отваряне на папка';
+
+  @override
+  String get commandIconNewFolder => 'Нова папка';
+
+  @override
+  String get commandIconCopyFolder => 'Копиране на папка';
+
+  @override
+  String get commandIconFolderOff => 'Недостъпна папка';
+
+  @override
+  String get commandIconFolderFavorite => 'Любима папка';
+
+  @override
+  String get commandIconArchive => 'Архив';
+
+  @override
+  String get commandIconSave => 'Запазване';
+
+  @override
+  String get commandIconSaveAs => 'Запазване като';
+
+  @override
+  String get commandIconDownload => 'Изтегляне';
+
+  @override
+  String get commandIconUpload => 'Качване';
+
+  @override
+  String get commandIconPrint => 'Печат';
+
+  @override
+  String get commandIconShare => 'Споделяне';
+
+  @override
+  String get commandIconLink => 'Връзка';
+
+  @override
+  String get commandIconUnlink => 'Премахване на връзка';
+
+  @override
+  String get commandIconExternal => 'Отваряне в нов прозорец';
+
+  @override
+  String get commandIconThemeDark => 'Тъмна тема';
+
+  @override
+  String get commandIconThemeLight => 'Светла тема';
+
+  @override
+  String get commandIconThemeAuto => 'Автоматична тема';
+
+  @override
+  String get commandIconLanguage => 'Език';
+
+  @override
+  String get commandIconUpdate => 'Проверка за обновяване';
+
+  @override
+  String get commandIconBug => 'Диагностика';
+
+  @override
+  String get commandIconHome => 'Начало';
+
+  @override
+  String get commandIconFavorite => 'Любими';
+
+  @override
+  String get commandIconStar => 'Отбелязано';
+
+  @override
+  String get commandIconBookmark => 'Отметка';
+
+  @override
+  String get commandIconBookmarkAdd => 'Добавяне на отметка';
+
+  @override
+  String get commandIconBookmarks => 'Отметки';
+
+  @override
+  String get commandIconEmail => 'Електронна поща';
+
+  @override
+  String get commandIconWifi => 'Локална мрежа';
+
+  @override
+  String get commandIconWifiOff => 'Мрежата е недостъпна';
+
+  @override
+  String get commandIconComputer => 'Компютър';
+
+  @override
+  String get commandIconStorage => 'Хранилище';
+
+  @override
+  String get commandIconPayment => 'Плащане';
+
+  @override
+  String get commandIconSecurity => 'Сигурност';
+
+  @override
+  String get commandIconVerified => 'Проверено';
+
+  @override
+  String get commandIconLock => 'Заключване';
+
+  @override
+  String get commandIconUnlock => 'Отключване';
+
+  @override
+  String get commandIconWall => 'Стена';
+
+  @override
+  String get commandIconDoor => 'Врата';
+
+  @override
+  String get commandIconWindow => 'Прозорец';
+
+  @override
+  String get commandIconColumn => 'Колона';
+
+  @override
+  String get commandIconBeam => 'Греда';
+
+  @override
+  String get commandIconSlab => 'Плоча';
+
+  @override
+  String get commandIconOpening => 'Отвор';
+
+  @override
+  String get commandIconRoof => 'Покрив';
+
+  @override
+  String get commandIconStairs => 'Стълба';
+
+  @override
+  String get commandIconAxis => 'Конструктивна ос';
+
+  @override
+  String get commandIconSection => 'Разрез';
+
+  @override
+  String get commandIconElevation => 'Фасада';
+
+  @override
+  String get commandIconBuilding => 'Сграда';
+
+  @override
+  String get commandIconNewBuilding => 'Нова сграда';
+
+  @override
+  String get commandIconBuildingOff => 'Скриване на сградата';
+
+  @override
+  String get commandIconStoreys => 'Етажи';
+
+  @override
+  String get commandIconZone => 'Зона';
+
+  @override
+  String get commandIconSchedule => 'Спецификация';
+
+  @override
+  String get commandIconZoneSchedule => 'Таблица на зоните';
+
+  @override
+  String get commandIconDimension => 'Кота за размер';
+
+  @override
+  String get commandIconLevel => 'Кота за височина';
+
+  @override
+  String get commandIconMeasure => 'Измерване на разстояние';
+
+  @override
+  String get commandIconMeasureArea => 'Измерване на площ';
+
+  @override
+  String get commandIconMeasureAngle => 'Измерване на ъгъл';
+
+  @override
+  String get commandIconMeasureRadius => 'Измерване на радиус';
+
+  @override
+  String get commandIconLine => 'Линия';
+
+  @override
+  String get commandIconPolyline => 'Полилиния';
+
+  @override
+  String get commandIconRectangle => 'Правоъгълник';
+
+  @override
+  String get commandIconHatch => 'Щриховка';
+
+  @override
+  String get commandIconText => 'Текст';
+
+  @override
+  String get commandIconTextSize => 'Размер на текста';
+
+  @override
+  String get commandIconTextIncrease => 'По-голям текст';
+
+  @override
+  String get commandIconTextDecrease => 'По-малък текст';
+
+  @override
+  String get commandIconAlignLeft => 'Подравняване вляво';
+
+  @override
+  String get commandIconAlignCenter => 'Центриране';
+
+  @override
+  String get commandIconAlignTop => 'Подравняване горе';
+
+  @override
+  String get commandIconAlignBottom => 'Подравняване долу';
+
+  @override
+  String get commandIconLayers => 'Слоеве';
+
+  @override
+  String get commandIconLayersOff => 'Скриване на слоевете';
+
+  @override
+  String get commandIconGrid => 'Мрежа';
+
+  @override
+  String get commandIconGridOff => 'Скриване на мрежата';
+
+  @override
+  String get commandIconTerrain => 'Терен';
+
+  @override
+  String get commandIconFloorDrain => 'Подов сифон';
+
+  @override
+  String get commandIconWater => 'Вода';
+
+  @override
+  String get commandIconFoundation => 'Фундамент';
+
+  @override
+  String get commandIconWallJoint => 'Съединение на стени';
+
+  @override
+  String get commandIconRoundedCorner => 'Заобляне на ъгъл';
+
+  @override
+  String get commandIconLineStyle => 'Стил на линия';
+
+  @override
+  String get commandIconLineWeight => 'Дебелина на линия';
+
+  @override
+  String get commandIconPoints => 'Точки';
+
+  @override
+  String get commandIconMagnet => 'Прилепване';
+
+  @override
+  String get commandIconGesture => 'Свободно рисуване';
+
+  @override
+  String get commandIconComponent => 'Библиотека с компоненти';
+
+  @override
+  String get commandIconFurniture => 'Обзавеждане';
+
+  @override
+  String get commandIconBed => 'Спалня';
+
+  @override
+  String get commandIconBath => 'Баня';
+
+  @override
+  String get commandIconKitchen => 'Кухня';
+
+  @override
+  String get commandIconBalcony => 'Балкон';
+
+  @override
+  String get commandIconFence => 'Ограда';
+
+  @override
+  String get commandIconCabin => 'Дървена сграда';
+
+  @override
+  String get commandIconTree => 'Озеленяване';
+
+  @override
+  String get commandIconAnalysis => 'Анализ';
+
+  @override
+  String get commandIconSeismic => 'Сеизмичен анализ';
+
+  @override
+  String get commandIconBolt => 'Натоварване';
+
+  @override
+  String get commandIconEngineering => 'Инженерни инструменти';
+
+  @override
+  String get commandIconGraph => 'Връзки в модела';
+
+  @override
+  String get commandIconChart => 'Диаграма';
+
+  @override
+  String get commandIconView3D => 'Тримерен изглед';
+
+  @override
+  String get commandIconOrbit => 'Обикаляне';
+
+  @override
+  String get commandIconFly => 'Свободно движение в 3D';
+
+  @override
+  String get commandIconViewTop => 'Изглед отгоре';
+
+  @override
+  String get commandIconViewFront => 'Изглед отпред';
+
+  @override
+  String get commandIconViewRight => 'Изглед отдясно';
+
+  @override
+  String get commandIconViewBottom => 'Изглед отдолу';
+
+  @override
+  String get commandIconViewBack => 'Изглед отзад';
+
+  @override
+  String get commandIconVisible => 'Показване';
+
+  @override
+  String get commandIconHidden => 'Скриване';
+
+  @override
+  String get commandIconFitView => 'Побиране в изгледа';
+
+  @override
+  String get commandIconFullscreen => 'Цял екран';
+
+  @override
+  String get commandIconExitFullscreen => 'Изход от цял екран';
+
+  @override
+  String get commandIconAspectRatio => 'Съотношение на страните';
+
+  @override
+  String get commandIconPortrait => 'Вертикална ориентация';
+
+  @override
+  String get commandIconScreenRotate => 'Завъртане на екрана';
+
+  @override
+  String get commandIconScreenLock => 'Заключване на ориентацията';
+
+  @override
+  String get commandIconCompare => 'Сравняване';
+
+  @override
+  String get commandIconCrop => 'Изрязване на рамка';
+
+  @override
+  String get commandIconOpacity => 'Прозрачност';
+
+  @override
+  String get commandIconImage => 'Изображение';
+
+  @override
+  String get commandIconImageAdd => 'Добавяне на изображение';
+
+  @override
+  String get commandIconImageFilter => 'Ефекти на изображението';
+
+  @override
+  String get commandIconImageBroken => 'Недостъпно изображение';
+
+  @override
+  String get commandIconCamera => 'Камера';
+
+  @override
+  String get commandIconPalette => 'Цветове';
+
+  @override
+  String get commandIconFill => 'Запълване';
+
+  @override
+  String get commandIconBrush => 'Четка';
+
+  @override
+  String get commandIconPixelated => 'Пикселно показване';
+
+  @override
+  String get commandIconSmooth => 'Гладко показване';
+
+  @override
+  String get commandIconBook => 'Четене';
+
+  @override
+  String get commandIconLibrary => 'Библиотека';
+
+  @override
+  String get commandIconBookClosed => 'Книга';
+
+  @override
+  String get commandIconNotes => 'Бележки';
+
+  @override
+  String get commandIconComment => 'Коментар';
+
+  @override
+  String get commandIconList => 'Списък';
+
+  @override
+  String get commandIconNumberedList => 'Номериран списък';
+
+  @override
+  String get commandIconChecklist => 'Контролен списък';
+
+  @override
+  String get commandIconWrapText => 'Пренасяне на текст';
+
+  @override
+  String get commandIconLineSpacing => 'Междуредие';
+
+  @override
+  String get commandIconTable => 'Таблица';
+
+  @override
+  String get commandIconPdf => 'PDF документ';
+
+  @override
+  String get commandIconCode => 'Код';
+
+  @override
+  String get commandIconCodeOff => 'Скриване на кода';
+
+  @override
+  String get commandIconFunctions => 'Формула';
+
+  @override
+  String get commandIconWatermark => 'Воден знак';
+
+  @override
+  String get commandIconLayoutGrid => 'Мрежово оформление';
+
+  @override
+  String get commandIconLayoutRows => 'Редово оформление';
+
+  @override
+  String get commandIconLayoutSidebar => 'Страничен панел';
+
+  @override
+  String get commandIconLayoutCarousel => 'Каруселен изглед';
+
+  @override
+  String get commandIconLayoutCustom => 'Настройване на оформлението';
+
+  @override
+  String get commandIconPlay => 'Пускане';
+
+  @override
+  String get commandIconPlayCircle => 'Начало на възпроизвеждането';
+
+  @override
+  String get commandIconPause => 'Пауза';
+
+  @override
+  String get commandIconPauseCircle => 'Пауза на възпроизвеждането';
+
+  @override
+  String get commandIconStop => 'Спиране';
+
+  @override
+  String get commandIconStopCircle => 'Спиране на възпроизвеждането';
+
+  @override
+  String get commandIconNextTrack => 'Следващ запис';
+
+  @override
+  String get commandIconPreviousTrack => 'Предишен запис';
+
+  @override
+  String get commandIconFastForward => 'Превъртане напред';
+
+  @override
+  String get commandIconFastRewind => 'Превъртане назад';
+
+  @override
+  String get commandIconForwardTen => 'Десет секунди напред';
+
+  @override
+  String get commandIconReplayTen => 'Десет секунди назад';
+
+  @override
+  String get commandIconRepeat => 'Повтаряне';
+
+  @override
+  String get commandIconRepeatOne => 'Повтаряне на текущото';
+
+  @override
+  String get commandIconVolume => 'Звук';
+
+  @override
+  String get commandIconMute => 'Заглушаване';
+
+  @override
+  String get commandIconVideo => 'Видео';
+
+  @override
+  String get commandIconPresentation => 'Презентация';
+
+  @override
+  String get commandIconAnimation => 'Анимация';
+
+  @override
+  String get commandIconMap => 'Карта';
+
+  @override
+  String get commandIconLocation => 'Местоположение';
+
+  @override
+  String get commandIconLocationAdd => 'Добавяне на местоположение';
+
+  @override
+  String get commandIconLocationEdit => 'Редактиране на местоположение';
+
+  @override
+  String get commandIconLocate => 'Намиране на местоположението';
+
+  @override
+  String get commandIconCompass => 'Компас';
+
+  @override
+  String get commandIconGlobe => 'Координатна система';
+
+  @override
+  String get commandIconRoute => 'Маршрут';
+
+  @override
+  String get commandIconAlternativeRoute => 'Алтернативен маршрут';
+
+  @override
+  String get commandIconTurnLeft => 'Завой наляво';
+
+  @override
+  String get commandIconTurnRight => 'Завой надясно';
+
+  @override
+  String get commandIconFlag => 'Маркер по маршрута';
+
+  @override
+  String get commandIconFinish => 'Финал';
+
+  @override
+  String get commandIconWalk => 'Ходене';
+
+  @override
+  String get commandIconBicycle => 'Велосипед';
+
+  @override
+  String get commandIconTag => 'Етикет';
+
+  @override
+  String get commandIconPin => 'Закачване';
+
+  @override
+  String get commandIconCalendar => 'Дата';
+
+  @override
+  String get commandIconMedical => 'Медицински инструменти';
+
+  @override
+  String get commandIconFingerprint => 'Подпис';
+
+  @override
+  String get commandIconAuto => 'Автоматично';
+
+  @override
+  String get commandIconScience => 'Експериментални инструменти';
+
+  @override
+  String get commandIconRocket => 'Стартиране';
+
+  @override
+  String get commandIconInventory => 'Пресети';
+
+  @override
+  String get commandIconBalance => 'Конструктивни проверки';
+
+  @override
+  String get commandIconWeb => 'Уеб страница';
+
+  @override
+  String get commandIconSpace => 'Интервал';
+
+  @override
+  String get commandIconRoadEdit => 'Редактиране на маршрут';
+
+  @override
+  String get commandIconLightbulb => 'Съвети';
+
+  @override
+  String get commandIconGalleryTitle => 'Икони на командите';
+
+  @override
+  String get commandIconGallerySearch => 'Търсене на команди';
+
+  @override
+  String get commandIconGalleryLight => 'Светло';
+
+  @override
+  String get commandIconGalleryDark => 'Тъмно';
+
+  @override
+  String get commandIconAlignRight => 'Подравняване вдясно';
+
+  @override
+  String get commandIconPolygon => 'Полигон';
+
+  @override
+  String get commandIconArc => 'Дъга';
+
+  @override
+  String get commandIconRoofGable => 'Двускатен покрив';
+
+  @override
+  String get commandIconRoofHip => 'Четирискатен покрив';
+
+  @override
+  String get commandIconRoofShed => 'Едноскатен покрив';
+
+  @override
+  String get commandIconRoofFlat => 'Плосък покрив';
+
+  @override
+  String get commandIconRoofMansard => 'Мансарден покрив';
+
+  @override
+  String get commandIconSelectionContained => 'Избиране изцяло вътре';
+
+  @override
+  String get commandIconSelectionCrossing => 'Избиране при пресичане';
+
+  @override
+  String get commandIconShadingEdges => 'Сенки с ръбове';
+
+  @override
+  String get commandIconShadingSmooth => 'Гладки сенки';
+
+  @override
+  String get commandIconShadingFlat => 'Плоски сенки';
+
+  @override
+  String get commandIconShadingWire => 'Телена мрежа';
+
+  @override
+  String get commandIconShadingXray => 'Прозрачен модел';
+
+  @override
+  String get commandUiCopyThisError => 'Копиране на грешката';
+
+  @override
+  String get commandUiErrorCopiedToClipboard => 'Грешката е копирана';
+
+  @override
+  String get commandUiCopied => 'Копирано!';
+
+  @override
+  String get commandUiCopyAllLogs => 'Копиране на всички записи';
+
+  @override
+  String get commandUiGoToHome => 'Към началото';
+
+  @override
+  String get commandUiCopyReport => 'Копиране на отчета';
+
+  @override
+  String get commandUiViewErrorLog => 'Дневник на грешките';
+
+  @override
+  String get commandUiHideTechnicalDetails =>
+      'Скриване на техническите подробности';
+
+  @override
+  String get commandUiShowTechnicalDetails =>
+      'Показване на техническите подробности';
+
+  @override
+  String get commandUiSearchByCountryProjectionOrEpsgCode =>
+      'Търсене по държава, проекция или EPSG код…';
+
+  @override
+  String get commandUiSaveSelection => 'Запазване на избора';
+
+  @override
+  String get commandUiHex => 'HEX';
+
+  @override
+  String get commandUiJsonBimJson => 'JSON (.bim.json)';
+
+  @override
+  String get commandUiCanvasBackground => 'Фон на платното';
+
+  @override
+  String get commandUiFlipOrientation => 'Обръщане';
+
+  @override
+  String get commandUiFlipHorizontal => 'Хоризонтално обръщане';
+
+  @override
+  String get commandUiFlipVertical => 'Вертикално обръщане';
+
+  @override
+  String get commandUiShareExport => 'Споделяне и експорт';
+
+  @override
+  String get commandUiShareOriginalCdr => 'Споделяне на оригиналния .CDR';
+
+  @override
+  String get commandUiExportAsPngImage => 'Експорт като PNG';
+
+  @override
+  String get commandUiPrintExportPdf => 'Печат / експорт в PDF';
+
+  @override
+  String get commandUiTryAgain => 'Нов опит';
+
+  @override
+  String get commandUiSearch => 'Търсене…';
+
+  @override
+  String get commandUiViewAsPlainText => 'Преглед като обикновен текст';
+
+  @override
+  String get commandUiContinueAnyway => 'Продължаване';
+
+  @override
+  String get commandUiCloseSearch => 'Затваряне на търсенето';
+
+  @override
+  String get commandUiDisableWordWrap => 'Без пренасяне на текст';
+
+  @override
+  String get commandUiEnableWordWrap => 'Пренасяне на текст';
+
+  @override
+  String get commandUiCopyAll => 'Копиране на всичко';
+
+  @override
+  String get commandUiShowRaw => 'Изходен текст';
+
+  @override
+  String get commandUiPrettyPrint => 'Форматиране';
+
+  @override
+  String get commandUiShowSecrets => 'Показване на поверителните стойности';
+
+  @override
+  String get commandUiHideSecrets => 'Скриване на поверителните стойности';
+
+  @override
+  String get commandUiEnableSyntaxHighlighting => 'Синтактично оцветяване';
+
+  @override
+  String commandUiFontSizeValue(String value1) {
+    return 'Размер на шрифта ($value1)';
+  }
+
+  @override
+  String commandUiFontSizeValue2(String value1) {
+    return 'Размер на шрифта: $value1';
+  }
+
+  @override
+  String get commandUiReadingMode => 'Режим на четене';
+
+  @override
+  String commandUiValueTapToChange(String value1) {
+    return '$value1 (докоснете за промяна)';
+  }
+
+  @override
+  String get commandUiRemoveBookmark => 'Премахване на отметката';
+
+  @override
+  String get commandUiAddBookmark => 'Добавяне на отметка';
+
+  @override
+  String get commandUiSavedBookmarks => 'Запазени отметки';
+
+  @override
+  String get commandUiComicInfo => 'Данни за комикса';
+
+  @override
+  String commandUiPageValueError(String value1) {
+    return 'Грешка на страница $value1';
+  }
+
+  @override
+  String get commandUiDecrease => 'Намаляване';
+
+  @override
+  String get commandUiIncrease => 'Увеличаване';
+
+  @override
+  String get commandUiRestartFromPage1UponReachingTheEnd =>
+      'Повтаряне от първата страница след края';
+
+  @override
+  String
+  get commandUiAutomaticallySuspendPageTurnsWhileInspectingPanelsZoomedIn =>
+      'Спиране на прелистването при разглеждане с увеличение';
+
+  @override
+  String commandUiErrorLoadingPageValue(String value1) {
+    return 'Грешка при зареждане на страница $value1';
+  }
+
+  @override
+  String get commandUiToggleRawText => 'Изходен текст';
+
+  @override
+  String get commandUiDelimiter => 'Разделител';
+
+  @override
+  String get commandUiComma => 'Запетая (,)';
+
+  @override
+  String get commandUiSemicolon => 'Точка и запетая (;)';
+
+  @override
+  String get commandUiTabT => 'Табулация (\\\\t)';
+
+  @override
+  String get commandUiPipe => 'Вертикална черта (|)';
+
+  @override
+  String get commandUiSearchRows => 'Търсене в редовете…';
+
+  @override
+  String get commandUiEmptyCsv => 'Празен CSV';
+
+  @override
+  String get commandUiNoMatches => 'Няма съвпадения';
+
+  @override
+  String get commandUiShowingFirst1000RowsForPerformance =>
+      'Показват се първите 1000 реда за по-бърза работа';
+
+  @override
+  String get commandUiToggleHudText => 'Показване на надписите';
+
+  @override
+  String get commandUiShowMetadata => 'Метаданни';
+
+  @override
+  String get commandUiPanZoom => 'Панорамиране и мащабиране';
+
+  @override
+  String get commandUiWindowLevelDragDragOnScreen =>
+      'Прозорец / ниво (плъзгане по екрана)';
+
+  @override
+  String get commandUiRulerMeasurementMm => 'Измерване с линия (mm)';
+
+  @override
+  String commandUiClearValue(String value1) {
+    return 'Изчистване ($value1)';
+  }
+
+  @override
+  String get commandUiSelectSeries => 'Избор на серия';
+
+  @override
+  String get commandUiRulerMeasurement => 'Измерване с линия';
+
+  @override
+  String get commandUiPauseCine => 'Пауза на серията';
+
+  @override
+  String get commandUiPlayCine => 'Възпроизвеждане на серията';
+
+  @override
+  String get commandUiReset => 'Нулиране';
+
+  @override
+  String get commandUiSearchInDocument => 'Търсене в документа';
+
+  @override
+  String get commandUiCopyDocumentText => 'Копиране на текста';
+
+  @override
+  String get commandUiDocumentProperties => 'Свойства на документа';
+
+  @override
+  String get commandUiSearchInDocument2 => 'Търсене в документа…';
+
+  @override
+  String get commandUiMinimizeControls => 'Свиване на контролите';
+
+  @override
+  String get commandUiExitFullscreenEsc => 'Изход от цял екран (ESC)';
+
+  @override
+  String commandUiElevationValueValueElements(String value1, String value2) {
+    return 'Кота: $value1 • $value2 елемента';
+  }
+
+  @override
+  String get commandUiIsolateStorey => 'Изолиране на етажа';
+
+  @override
+  String commandUiValueItems(String value1) {
+    return '$value1 записа';
+  }
+
+  @override
+  String get commandUiIsolateCategory => 'Изолиране на категорията';
+
+  @override
+  String commandUiValueElements(String value1) {
+    return '$value1 елемента';
+  }
+
+  @override
+  String get commandUiIsolateLayer => 'Изолиране на слоя';
+
+  @override
+  String get commandUiApplyClose => 'Прилагане и затваряне';
+
+  @override
+  String get commandUiFitToScreen => 'Побиране на екрана';
+
+  @override
+  String get commandUiImport => 'Импорт';
+
+  @override
+  String get commandUiExitMeasureMarkup => 'Изход от измерване и бележки';
+
+  @override
+  String get commandUiMeasureTools => 'Измерване';
+
+  @override
+  String get commandUiSaveMergedDxf => 'Запазване на обединения DXF';
+
+  @override
+  String get commandUiSaveAnnotatedDxf => 'Запазване на DXF с бележки';
+
+  @override
+  String get commandUiCanvasTheme => 'Тема на платното';
+
+  @override
+  String get commandUiExportAsFastKcad => 'Експорт като бърз KCAD';
+
+  @override
+  String get commandUiHideCadGrid => 'Скриване на CAD мрежата';
+
+  @override
+  String get commandUiShowCadGrid => 'Показване на CAD мрежата';
+
+  @override
+  String get commandUiDrawingProperties => 'Свойства на чертежа';
+
+  @override
+  String get commandUiShareFile => 'Споделяне на файла';
+
+  @override
+  String get commandUiPrintExport => 'Печат / експорт';
+
+  @override
+  String get commandUiEnterAnnotationTextOrSelectAPresetBelow =>
+      'Въведете бележка или изберете готов текст…';
+
+  @override
+  String get commandUiDeleteNote => 'Изтриване на бележката';
+
+  @override
+  String get commandUiUpdateNote => 'Обновяване на бележката';
+
+  @override
+  String get commandUiAddNote => 'Добавяне на бележка';
+
+  @override
+  String commandUiSnapValue(String value1) {
+    return 'Прилепване: $value1';
+  }
+
+  @override
+  String get commandUiClearMeasurement => 'Изчистване на измерването';
+
+  @override
+  String get commandUiExitMeasurement => 'Изход от измерване';
+
+  @override
+  String get commandUiTight => 'Сбито';
+
+  @override
+  String get commandUiRelaxed => 'Свободно';
+
+  @override
+  String get commandUiPages => 'Страници';
+
+  @override
+  String get commandUiScroll => 'Превъртане';
+
+  @override
+  String get commandUiSearchBook => 'Търсене в книгата';
+
+  @override
+  String get commandUiPageFlipModeTapForContinuous =>
+      'Страници (докоснете за непрекъснат преглед)';
+
+  @override
+  String get commandUiContinuousScrollTapForPages =>
+      'Непрекъснат преглед (докоснете за страници)';
+
+  @override
+  String get commandUiReadingSettings => 'Настройки за четене';
+
+  @override
+  String get commandUiBookInfo => 'Данни за книгата';
+
+  @override
+  String get commandUiSearchInBookText => 'Търсене в текста на книгата…';
+
+  @override
+  String get commandUiOpeningEBook => 'Отваряне на електронната книга…';
+
+  @override
+  String get commandUiNoContentFound => 'Няма съдържание';
+
+  @override
+  String get commandUiPrevChapter => 'Предишна глава';
+
+  @override
+  String get commandUiNextChapter => 'Следваща глава';
+
+  @override
+  String commandUiChapterValue(String value1) {
+    return 'Глава $value1';
+  }
+
+  @override
+  String get commandUiPrev => 'Предишна';
+
+  @override
+  String get commandUiRotate90Clockwise => 'Завъртане с 90° надясно';
+
+  @override
+  String get commandUiFitToViewCenter => 'Побиране и центриране';
+
+  @override
+  String get commandUiTypeHereToPreview => 'Въведете текст за преглед';
+
+  @override
+  String get commandUiFolderName => 'Име на папката';
+
+  @override
+  String get commandUiEnterFolderDisplayName => 'Име за показване на папката';
+
+  @override
+  String get commandUiEnterAmountInMax20 => 'Сума в € (до 20 €)';
+
+  @override
+  String get commandUiEG10 => 'напр. 10';
+
+  @override
+  String get commandUiRevolut => 'Revolut';
+
+  @override
+  String get commandUiPaypal => 'PayPal';
+
+  @override
+  String get commandUiFilterByCategory => 'Филтриране по категория';
+
+  @override
+  String get commandUiIncludeSubfoldersOn => 'С подпапки';
+
+  @override
+  String get commandUiIncludeSubfoldersOff => 'Без подпапки';
+
+  @override
+  String get commandUiRenameFolder => 'Преименуване на папката';
+
+  @override
+  String get commandUiRemoveFolderFromList => 'Премахване от списъка';
+
+  @override
+  String get commandUiSelectFolder => 'Избор на папка';
+
+  @override
+  String get commandUiFileNoLongerExistsOnTheDevice =>
+      'Файлът вече не съществува на устройството.';
+
+  @override
+  String get commandUiLicenses => 'Лицензи';
+
+  @override
+  String get commandUiLogs => 'Дневник';
+
+  @override
+  String get commandUiGithub => 'GitHub';
+
+  @override
+  String get commandUiCopyUrl => 'Копиране на адреса';
+
+  @override
+  String get commandUiCloseServer => 'Затваряне на сървъра';
+
+  @override
+  String get commandUiStopSharing => 'Спиране на споделянето';
+
+  @override
+  String get commandUiAllOptions => 'Всички опции';
+
+  @override
+  String get commandUiPlotterProperties => 'Свойства на плотерния файл';
+
+  @override
+  String get commandUiBackgroundCheckerboard => 'Фон: шахматен';
+
+  @override
+  String get commandUiBackgroundDark => 'Фон: тъмен';
+
+  @override
+  String get commandUiBackgroundLight => 'Фон: светъл';
+
+  @override
+  String get commandUiRenderingCrispPixelPerfect =>
+      'Показване: точно по пиксели';
+
+  @override
+  String get commandUiRenderingSmooth => 'Показване: гладко';
+
+  @override
+  String get commandUiSingleImageView => 'Едно изображение';
+
+  @override
+  String get commandUiAllResolutionsGrid => 'Всички резолюции';
+
+  @override
+  String commandUiShareSizeValueValuePng(String value1, String value2) {
+    return 'Споделяне на размера ($value1×$value2 PNG)';
+  }
+
+  @override
+  String get commandUiShareOriginalIcoFile => 'Споделяне на оригиналния .ico';
+
+  @override
+  String get commandUiPrintSaveAsPdf => 'Печат / запазване като PDF';
+
+  @override
+  String get commandUiFlipImage => 'Обръщане на изображението';
+
+  @override
+  String get commandUiMoreActions => 'Още действия';
+
+  @override
+  String get commandUiPrintSavePdf => 'Печат / запазване в PDF';
+
+  @override
+  String get commandUiResetViewTransforms =>
+      'Нулиране на изгледа и трансформациите';
+
+  @override
+  String commandUiFailedToRenderImageValue(String value1) {
+    return 'Грешка при показване на изображението: $value1';
+  }
+
+  @override
+  String get commandUiBackToProject => 'Към проекта';
+
+  @override
+  String get commandUiResetZoom11 => 'Мащаб 1:1';
+
+  @override
+  String get commandUiFormattedView => 'Форматиран преглед';
+
+  @override
+  String get commandUiRawMarkdownSource => 'Изходен Markdown';
+
+  @override
+  String get commandUiCopyMarkdown => 'Копиране на Markdown';
+
+  @override
+  String get commandUiMarkdownProperties => 'Свойства на Markdown';
+
+  @override
+  String commandUiPcbLayersValueValue(String value1, String value2) {
+    return 'PCB слоеве ($value1/$value2)';
+  }
+
+  @override
+  String get commandUi1MmMeasurementGrid => 'Измервателна мрежа 1 mm';
+
+  @override
+  String get commandUiTogglePadNumbers => 'Номера на контактните площадки';
+
+  @override
+  String get commandUiBoardArchiveProperties => 'Свойства на платката / архива';
+
+  @override
+  String get commandUiPcbCanvasTheme => 'Тема на PCB платното';
+
+  @override
+  String get commandUiViewArchiveFiles => 'Файлове в архива';
+
+  @override
+  String get commandUiTop => 'ГОРЕ';
+
+  @override
+  String get commandUiBottom => 'ДОЛУ';
+
+  @override
+  String get commandUiAll => 'ВСИЧКИ';
+
+  @override
+  String get commandUiFitBoardToViewCenter =>
+      'Побиране и центриране на платката';
+
+  @override
+  String get commandUiInteractiveZoomViewer => 'Преглед с увеличение';
+
+  @override
+  String get commandUiSearchDesignatorValuePackageEGR110K =>
+      'Търсене по означение, стойност или корпус (напр. R1, 10k)…';
+
+  @override
+  String commandUiPackageValuevalue(String value1, String value2) {
+    return 'Корпус: $value1$value2';
+  }
+
+  @override
+  String get commandUiOpenIn3DCadViewer => 'Отваряне в 3D CAD';
+
+  @override
+  String get commandUiOpenPdfSchematic => 'Отваряне на PDF схемата';
+
+  @override
+  String get commandUiViewKicadSchematic => 'Преглед на KiCad схемата';
+
+  @override
+  String get commandUiSearchFilesInArchive =>
+      'Търсене във файловете на архива…';
+
+  @override
+  String commandUiAllValue(String value1) {
+    return 'Всички ($value1)';
+  }
+
+  @override
+  String get commandUiCouldNotLoadImage => 'Изображението не може да се зареди';
+
+  @override
+  String get commandUiCloseEsc => 'Затваряне (Esc)';
+
+  @override
+  String get commandUiResetZoom100 => 'Мащаб 100%';
+
+  @override
+  String get commandUiPreviousImageLeftArrow =>
+      'Предишно изображение (стрелка наляво)';
+
+  @override
+  String get commandUiNextImageRightArrow =>
+      'Следващо изображение (стрелка надясно)';
+
+  @override
+  String get commandUiZoomIn => 'Увеличаване (+)';
+
+  @override
+  String get commandUiZoomOut => 'Намаляване (-)';
+
+  @override
+  String get commandUiFitToView => 'Побиране в изгледа';
+
+  @override
+  String get commandUiExitReadingModeBackToOriginalPdf =>
+      'Изход от четене (към оригиналния PDF)';
+
+  @override
+  String get commandUiReadingModeReflowEBook =>
+      'Режим на четене (преформатиране / книга)';
+
+  @override
+  String get commandUiToggleInvertColors => 'Обръщане на цветовете';
+
+  @override
+  String get commandUiPdfProperties => 'Свойства на PDF';
+
+  @override
+  String get commandUiSharePdf => 'Споделяне на PDF';
+
+  @override
+  String get commandUiPrintPdf => 'Печат на PDF';
+
+  @override
+  String get commandUiFitPageToScreen => 'Побиране на страницата';
+
+  @override
+  String get commandUiEnterPfxPassword => 'Парола за PFX';
+
+  @override
+  String get commandUiOriginalPdf => 'Оригинален PDF';
+
+  @override
+  String get commandUiDecreaseFontSize => 'Намаляване на шрифта';
+
+  @override
+  String get commandUiIncreaseFontSize => 'Увеличаване на шрифта';
+
+  @override
+  String get commandUiSwipePages => 'Прелистване';
+
+  @override
+  String get commandUiViewOriginalPdfPage => 'Оригинална PDF страница';
+
+  @override
+  String get commandUiGroupByCategory => 'Групиране по категории';
+
+  @override
+  String get commandUiSearchFilesInProject =>
+      'Търсене във файловете на проекта…';
+
+  @override
+  String get commandUiByCategory => 'По категории';
+
+  @override
+  String get commandUiMoveUp => 'Преместване нагоре';
+
+  @override
+  String get commandUiMoveDown => 'Преместване надолу';
+
+  @override
+  String get commandUiExitPresentation => 'Изход от презентацията';
+
+  @override
+  String get commandUiRouteDetails => 'Данни за маршрута';
+
+  @override
+  String get commandUiShareRoute => 'Споделяне на маршрута';
+
+  @override
+  String get commandUiMapOverlays => 'Слоеве на картата';
+
+  @override
+  String get commandUiFitRoute => 'Побиране на маршрута';
+
+  @override
+  String get commandUiCenterOnLocation => 'Центриране по местоположение';
+
+  @override
+  String get commandUiShowMyLocation => 'Моето местоположение';
+
+  @override
+  String get commandUiCalibrateCompass => 'Калибриране на компаса';
+
+  @override
+  String get commandUiHikingTrailsMarkings => 'Пешеходни маршрути и маркировки';
+
+  @override
+  String get commandUiWaymarkedTrailsOfficialMountainRouteColorsCodesFromOsm =>
+      'Waymarked Trails: официални цветове и кодове на планинските маршрути от OSM';
+
+  @override
+  String get commandUiMtbCyclingRoutes => 'Планински и велосипедни маршрути';
+
+  @override
+  String get commandUiWaymarkedTrailsDedicatedMountainBikeAndCyclingNetwork =>
+      'Waymarked Trails: мрежа за планинско и шосейно колоездене';
+
+  @override
+  String get commandUiAutocadDxfSColSWallSBeamSSlabSAxis =>
+      'AutoCAD DXF (S-COL, S-WALL, S-BEAM, S-SLAB, S-AXIS)';
+
+  @override
+  String commandUiValueEntities(String value1) {
+    return '$value1 обекта';
+  }
+
+  @override
+  String get commandUiWhitePageOn => 'Бяла страница: включена';
+
+  @override
+  String get commandUiWhitePageOffTransparent =>
+      'Бяла страница: изключена (прозрачен фон)';
+
+  @override
+  String get commandUiFindInText => 'Търсене в текста';
+
+  @override
+  String get commandUiExitReadingModeCodeLogView =>
+      'Изход от четене (код / дневник)';
+
+  @override
+  String get commandUiReadingModeReflowOverflowEBook =>
+      'Режим на четене (преформатиране / превъртане / книга)';
+
+  @override
+  String get commandUiSwitchToProportionalFont => 'Пропорционален шрифт';
+
+  @override
+  String get commandUiSwitchToMonospaceFont => 'Моноширинен шрифт';
+
+  @override
+  String get commandUiTextProperties => 'Свойства на текста';
+
+  @override
+  String get commandUiFindInText2 => 'Търсене в текста…';
+
+  @override
+  String get commandUiPreviousMatch => 'Предишно съвпадение';
+
+  @override
+  String get commandUiNextMatch => 'Следващо съвпадение';
+
+  @override
+  String get commandUiRawView => 'Изходен преглед';
+
+  @override
+  String get commandUiGoBack => 'Назад';
+
+  @override
+  String get commandUiLoopOn => 'Повтаряне: включено';
+
+  @override
+  String get commandUiLoopOff => 'Повтаряне: изключено';
+
+  @override
+  String get commandUiPlaybackSpeed => 'Скорост на възпроизвеждане';
+
+  @override
+  String get commandUiUnlockOrientation => 'Отключване на ориентацията';
+
+  @override
+  String get commandUiLockLandscape => 'Заключване хоризонтално';
+
+  @override
+  String get commandUiUnmute => 'Включване на звука';
+
+  @override
+  String commandUiWorkbookSheetsValue(String value1) {
+    return 'Листове в книгата ($value1)';
+  }
+
+  @override
+  String commandUiSheetValue(String value1) {
+    return 'Лист $value1';
+  }
+
+  @override
+  String get commandUiSearchInSheet => 'Търсене в листа';
+
+  @override
+  String get commandUiAllSheets => 'Всички листове';
+
+  @override
+  String get commandUiSpreadsheetProperties => 'Свойства на таблицата';
+
+  @override
+  String get commandUiSearchInActiveSheet => 'Търсене в активния лист…';
+
+  @override
+  String get commandUiCopyCellText => 'Копиране на текста на клетката';
+
+  @override
+  String get commandUiCellContentCopiedToClipboard =>
+      'Съдържанието на клетката е копирано';
+
+  @override
+  String commandUiAllSheetsValue(String value1) {
+    return 'Всички листове ($value1)';
+  }
+
+  @override
+  String get commandOptionLightStudio => 'Светло студио';
+
+  @override
+  String get commandOptionDarkStudio => 'Тъмно студио';
+
+  @override
+  String get commandOptionPureWhite => 'Бяло';
+
+  @override
+  String get commandOptionPureBlack => 'Черно';
+
+  @override
+  String get commandOptionDarkCad => 'Тъмен CAD';
+
+  @override
+  String get commandOptionTransparencyGrid => 'Мрежа за прозрачност';
+
+  @override
+  String get commandOptionFr4Green => 'Зелен FR4';
+
+  @override
+  String get commandOptionMatteBlack => 'Матово черно';
+
+  @override
+  String get commandOptionArduinoBlue => 'Син Arduino';
+
+  @override
+  String get commandOptionSparkfunRed => 'Червен SparkFun';
+
+  @override
+  String get commandOptionHighContrast => 'Висок контраст';
+
+  @override
+  String get commandOptionPcbLayersGerber => 'PCB слоеве (Gerber)';
+
+  @override
+  String get commandOptionCncDrillHoles => 'Отвори за CNC пробиване';
+
+  @override
+  String get commandOption3DCadModels => '3D CAD модели';
+
+  @override
+  String get commandOptionSchematicsCircuits => 'Схеми и вериги';
+
+  @override
+  String get commandOptionImages3DRenders => 'Изображения и 3D визуализации';
+
+  @override
+  String get commandOptionBillOfMaterialsBom => 'Спецификация (BOM)';
+
+  @override
+  String get commandOptionAssemblyPlacementCpl => 'Монтаж и разположение (CPL)';
+
+  @override
+  String get commandOptionDocumentationDrawings => 'Документация и чертежи';
+
+  @override
+  String get commandOptionSourceCadProject => 'Изходен CAD проект';
+
+  @override
+  String get commandOptionReportsNotes => 'Отчети и бележки';
+
+  @override
+  String get commandOptionOtherFiles => 'Други файлове';
+
+  @override
+  String get commandOptionGerbers => 'Gerber';
+
+  @override
+  String get commandOptionPhotosRenders => 'Снимки и визуализации';
+
+  @override
+  String get commandOptionBomParts => 'Спецификация и детайли';
+
+  @override
+  String get commandOptionSchematics => 'Схеми';
+
+  @override
+  String get commandOptionDocsReports => 'Документи и отчети';
+
+  @override
+  String get commandOptionAllFiles => 'Всички файлове';
+
+  @override
+  String get commandOptionLeftToRightWestern => 'Отляво надясно';
+
+  @override
+  String get commandOptionRightToLeftManga => 'Отдясно наляво (манга)';
+
+  @override
+  String get commandOptionVerticalScrollWebtoon =>
+      'Вертикално превъртане (Webtoon)';
+
+  @override
+  String get commandOptionLtr => 'Л→Д';
+
+  @override
+  String get commandOptionManga => 'Манга';
+
+  @override
+  String get commandOptionWebtoon => 'Webtoon';
+
+  @override
+  String get commandOptionLightPaper => 'Светла хартия';
+
+  @override
+  String get commandOptionWarmSepia => 'Топла сепия';
+
+  @override
+  String get commandOptionDarkCharcoal => 'Тъмносиво';
+
+  @override
+  String get commandOptionSerifBook => 'Със серифи';
+
+  @override
+  String get commandOptionSansSerifModern => 'Без серифи';
+
+  @override
+  String get commandOptionMonospaceClean => 'Моноширинен';
+
+  @override
+  String get commandOptionPagesSwipe => 'Прелистване';
+
+  @override
+  String get commandOptionMonospace => 'Моноширинен';
+
+  @override
+  String get commandOptionPaginatedSwipe => 'Прелистване';
+
+  @override
+  String get commandUiCheck => 'Проверка';
+
+  @override
+  String get architectColumnClearance => 'Разстояние от колона';
+
+  @override
+  String get architectLevelFormat => 'Единици за коти';
+
+  @override
+  String get architectLevelSymbol => 'Символ';
+
+  @override
+  String get architectLevelPlan => 'План';
+
+  @override
+  String get architectInheritProject => 'От проекта';
+
+  @override
+  String get architectPrecision => 'Десетични знаци';
+
+  @override
+  String get architectTextPaperHeight => 'Височина на текста (mm на листа)';
+
+  @override
+  String get architectTextAlignment => 'Подравняване';
+
+  @override
+  String get architectTextLeft => 'Ляво';
+
+  @override
+  String get architectTextCenter => 'Центрирано';
+
+  @override
+  String get architectTextRight => 'Дясно';
+
+  @override
+  String get architectTextWeight => 'Дебелина';
+
+  @override
+  String get architectTextRegular => 'Нормален';
+
+  @override
+  String get architectTextSemibold => 'Полуполучер';
+
+  @override
+  String get architectTextBold => 'Получер';
+
+  @override
+  String get architectTextItalic => 'Курсив';
+
+  @override
+  String get architectTextUnderline => 'Подчертан';
+
+  @override
+  String get architectPolylineClose => 'Затвори контура';
+
+  @override
+  String get architectPolylineOpen => 'Отвори контура';
+
+  @override
+  String get architectPolylineEdge => 'Премести сегмент';
+
+  @override
+  String get architectDrainInvalidSurface =>
+      'Подът не може да се оттича непрекъснато към тази решетка. Промени контура или положението на сифона.';
+
+  @override
+  String get architectPolylineClosed => 'Затворен контур';
+
+  @override
+  String get architectFenestrationLeafShort => 'Крило';
+
+  @override
+  String get architectFenestrationDetailsShort => 'Детайли';
+
+  @override
+  String get architectFenestrationTemplates => 'Шаблони';
+
+  @override
+  String get architectFenestrationElevationShort => 'Фасада';
+
+  @override
+  String get architectFenestrationPlanShort => 'План';
+
+  @override
+  String get architectFenestrationTransom => 'Горен прозорец';
+
+  @override
+  String get architectFenestrationTransomHeight =>
+      'Височина на горния прозорец';
+
+  @override
+  String get architectFenestrationDoorBodyHeight => 'Височина на вратата';
+
+  @override
+  String get architectFenestrationTotalHeight => 'Общ отвор';
+
+  @override
+  String get architectFenestrationName => 'Име';
+
+  @override
+  String get architectFenestrationNewWindow => 'Нов прозорец';
+
+  @override
+  String get architectFenestrationNewDoor => 'Нова врата';
+
+  @override
+  String get architectFenestrationDiscardTitle => 'Незапазени промени';
+
+  @override
+  String get architectFenestrationDiscardMessage =>
+      'Промените в модела не са запазени.';
+
+  @override
+  String get architectFenestrationDiscard => 'Отхвърли';
+
+  @override
+  String get architectFenestrationKeepEditing => 'Продължи';
+
+  @override
+  String get architectFenestrationSaveError =>
+      'Моделът не беше запазен. Опитайте отново.';
+
+  @override
+  String get architectFenestrationRedo => 'Повтори';
+
+  @override
+  String get architectFenestrationEdit => 'Редактирай модела';
+
+  @override
+  String get architectFenestrationInvalidSize => 'Невалиден размер';
+
+  @override
+  String get architectFenestrationInfill => 'Пълнеж';
+
+  @override
+  String get architectFenestrationProfileDepth => 'Дълбочина на касата';
+
+  @override
+  String get architectFenestrationProfileFace => 'Ширина на касата';
+
+  @override
+  String get architectFenestration3DShort => '3D';
+
+  @override
+  String get architectFenestrationGlazing => 'Остъкляване';
+
+  @override
+  String get architectFenestrationGlazingSingleShort => 'Единично';
+
+  @override
+  String get architectFenestrationGlazingDoubleShort => 'Двойно';
+
+  @override
+  String get architectFenestrationGlazingTripleShort => 'Тройно';
+
+  @override
+  String get architectToolSearch => 'Търси инструмент';
+
+  @override
+  String get architectToolNoResults => 'Няма намерени инструменти.';
+
+  @override
+  String get architectSheetFit => 'Побери листа';
+
+  @override
+  String get architectSheetReady => 'Готов за PDF';
+
+  @override
+  String get architectSheetCheck => 'Провери листа';
+
+  @override
+  String get architectSheetOutside =>
+      'Чертеж или заглавието му излиза извън полето на листа. Премести го или намали рамката.';
+
+  @override
+  String get architectSheetOverlap =>
+      'Чертежите се застъпват. Раздалечи рамките им.';
+
+  @override
+  String get architectSheetTitleOverlap =>
+      'Чертеж застъпва антетката. Премести го или промени контура му.';
+
+  @override
+  String get architectSheetMissingTemplate =>
+      'Шаблонът на антетката липсва. Избери шаблон.';
+
+  @override
+  String get architectSheetExported => 'PDF файлът е запазен.';
+
+  @override
+  String architectSheetScaleAdjusted(int scale) {
+    return 'Изгледът е побран в мащаб 1:$scale.';
+  }
+
+  @override
+  String get architectSheetCrop => 'Изрязване';
+
+  @override
+  String get architectSheetCropRectangle => 'Правоъгълник';
+
+  @override
+  String get architectSheetCropPolygon => 'Контур';
+
+  @override
+  String get architectSheetCropAddPoint => 'Добави точка';
+
+  @override
+  String get architectSheetCropRemovePoint => 'Премахни точка';
+
+  @override
+  String get architectSheetCropInvalid => 'Контурът се пресича или няма площ.';
+
+  @override
+  String get architectSheetPlaceHint => 'Посочи място за чертежа.';
+
+  @override
+  String get architectSheetSnap => 'Прилепване';
+
+  @override
+  String get architectSheetSelectDrawing => 'Избери чертеж';
+
+  @override
+  String get architectSheetCropHint =>
+      'Премести границата, за да изрежеш чертежа, без да променяш мащаба. „Побери изгледа“ възстановява целия източник.';
+
+  @override
+  String get architectSheetScaleHint =>
+      'Мащабът променя и размера на контура. Например от 1:50 към 1:100 ширината и височината намаляват наполовина.';
+
+  @override
+  String get architectSheetVisibilityHint =>
+      'Видимостта се отнася само за това поставяне.';
+
+  @override
+  String get architectSheetFitView => 'Побери изгледа';
+
+  @override
+  String get architectSheetExportOrder =>
+      'Редът на PDF страниците следва избора ти.';
+
+  @override
+  String get architectSheetNoSpace =>
+      'Изгледът не се побира в свободното място. Премести или смали чертежите, или го постави свободно.';
+
+  @override
+  String get architectSheetPlaceShort => 'Изглед';
+
+  @override
+  String get architectCategoryServices => 'Инсталации';
+
+  @override
+  String get architectServiceBodies => 'Щрангове';
+
+  @override
+  String get architectOpeningCircular => 'Кръгъл';
+
+  @override
+  String get architectOpeningCircularHelp =>
+      'Кръгъл отвор за канализация, вода или тръби. Две точки задават габарита; диаметърът следва по-късата страна.';
+
+  @override
+  String get architectServiceVentSingle => 'Единично вент. тяло';
+
+  @override
+  String get architectServiceVentDouble => 'Двойно вент. тяло';
+
+  @override
+  String get architectServiceVentTransition => 'Бетонен преход';
+
+  @override
+  String get architectServiceCompactVent => 'Компактно LS 1';
+
+  @override
+  String get architectServiceCompactTransition => 'Преход LS 1';
+
+  @override
+  String get architectServiceCombinedRiser => 'Общ ВиК щранг';
+
+  @override
+  String get architectServiceSewer => 'Канал Ø110';
+
+  @override
+  String get architectServiceWater => 'Вода Ø32';
+
+  @override
+  String get architectServiceDryRiser => 'Сухотръбие DN100';
+
+  @override
+  String get architectServiceSleeve => 'Втулка Ø160';
+
+  @override
+  String get architectServiceChimney => 'Комин Ø180';
+
+  @override
+  String get architectServiceVentHelp =>
+      'Бетонни вентилационни тела 300×250×200 или 500×300×200 mm, подредени по височина. Кухи канали. За вентилация.';
+
+  @override
+  String get architectServiceTransitionHelp =>
+      'Преход от две бетонни тела 500×300×200 mm. Схематичен отвор в преградата свързва страничния канал с основния; проверете конкретния монтажен детайл на производителя.';
+
+  @override
+  String get architectServiceCompactHelp =>
+      'Габарит по Schiedel LS 1: 355×220 mm, модул 330 mm. Основен канал 200×170 mm и страничен 90×170 mm. Преходът е схематичен.';
+
+  @override
+  String get architectServiceCombinedHelp =>
+      'Компоновъчна схема 500×250 mm: канал Ø110, тръба Ø50 и две водопроводни тръби Ø32 с изолация и ревизионен капак. Габаритът подлежи на координация по проекта.';
+
+  @override
+  String get architectServicePipeHelp =>
+      'Куха тръба или втулка с реален вътрешен отвор. Пресечените плочи се изрязват автоматично; размерите са в сантиметри.';
+
+  @override
+  String get architectServiceDryHelp =>
+      'Вертикална стоманена тръба DN100, външен диаметър 114,3 mm. Компоновъчен елемент; арматурата и пожарната схема се определят по проекта.';
+
+  @override
+  String get architectServiceChimneyHelp =>
+      'Габарит 360×360 mm и димоход Ø180 по Schiedel ABSOLUT. Куха керамична тръба, изолация, обвивка и проветрива шапка. Надпокривната височина и отстоянията са проектни параметри.';
+
+  @override
+  String get architectServiceCap => 'Шапка';
+
+  @override
+  String get architectServiceCapNone => 'Без шапка';
+
+  @override
+  String get architectServiceCapFlat => 'Плоска';
+
+  @override
+  String get architectServiceCapPitched => 'Двускатна';
+
+  @override
+  String get architectServiceCapConical => 'Конусна';
+
+  @override
+  String get architectServiceAutoHeight => 'До покрива';
+
+  @override
+  String get architectServiceAutoHeightHelp =>
+      'Височината следва най-високата пресечена покривна повърхност и зададеното излизане над нея. Това е геометрична настройка; нужната височина се определя по проекта.';
+
+  @override
+  String get architectServiceAboveRoof => 'Над покрива';
+
+  @override
+  String get architectServiceFlueDiameter => 'Димоход Ø';
+
+  @override
+  String get architectServiceRoofClearance => 'Фуга при покрива';
+
+  @override
+  String get architectServiceVent => 'Отдушник Ø110';
+
+  @override
+  String get architectServiceFireplace => 'Камина';
+
+  @override
+  String get architectServiceFireplaceHelp =>
+      'Компактна камина 550×600 mm с горивна камера, врата, решетка и димоход Ø180. На горните нива се показва само коминът; покривният отвор и обшивката следват преместването ѝ. Компоновъчният габарит е по компактни каминни модули.';
+
+  @override
+  String get architectServiceAllStoreys => 'Всички нива';
+
+  @override
+  String get architectServiceAllStoreysHelp =>
+      'Един непрекъснат елемент от най-ниския етаж до покрива. Изключете, за да започва от нивото на поставяне. Промените и изтриването се правят от нивото на поставяне и обновяват всички планове.';
+
+  @override
+  String get architectServiceVentOutletHelp =>
+      'Отворен отдушник Ø110 над покрива с водоплътен борд и обшивка. Автоматичната височина и излизането над покрива могат да се променят.';
 }

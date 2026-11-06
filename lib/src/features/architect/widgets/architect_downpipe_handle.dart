@@ -1,3 +1,5 @@
+import 'architect_dialog.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -144,7 +146,7 @@ class _DownpipeHandleState extends State<ArchitectDownpipeHandle> {
         .toStringAsFixed(project.distanceDecimals);
     final value = await showDialog<double>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => architectAlertDialog(
         title: Text(context.l10n.architectDrainageOffset),
         content: TextFormField(
           initialValue: text,
@@ -293,7 +295,7 @@ class _DownpipeHandleState extends State<ArchitectDownpipeHandle> {
                       child: TextButton.icon(
                         key: const ValueKey('downpipe-offset'),
                         onPressed: () => number(view),
-                        icon: const Icon(Icons.swap_horiz),
+                        icon: const AppIcon(AppIconId.swapHorizontal),
                         label: Text(
                           '${context.l10n.architectDrainagePipe} ${widget.controller.project.formatLength(draftOffset ?? view.pipe.offset)}',
                         ),
@@ -314,7 +316,7 @@ class _DownpipeHandleState extends State<ArchitectDownpipeHandle> {
                         selected = null;
                         draftOffset = null;
                       }),
-                      icon: const Icon(Icons.close),
+                      icon: const AppIcon(AppIconId.close),
                     ),
                   ],
                 ),

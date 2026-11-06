@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
 import 'package:flutter/material.dart';
 
 /// EPS Bounding Box (llx, lly, urx, ury in PostScript points).
@@ -49,8 +50,7 @@ enum EpsCommandType {
   moveTo,
   lineTo,
   cubicCurveTo,
-  closePath,
-}
+  closePath }
 
 /// Vector path command.
 class EpsPathCommand {
@@ -101,22 +101,27 @@ class EpsDocument {
 
   const EpsDocument({
     required this.metadata,
-    required this.paths,
-  });
+    required this.paths});
 }
 
 /// Canvas Theme for EPS Vector Rendering.
 enum EpsCanvasTheme {
-  darkCad('Dark CAD', Color(0xFF1E1E1E), Color(0xFF2C2C2C), true),
-  blueprint('Blueprint', Color(0xFF0F2042), Color(0xFF1B3566), true),
-  lightStudio('Light Studio', Color(0xFFF8FAFC), Color(0xFFE2E8F0), false),
-  pureBlack('Pure Black', Colors.black, Color(0xFF222222), true),
-  pureWhite('Pure White', Colors.white, Color(0xFFE5E7EB), false);
-
-  final String label;
+  darkCad(Color(0xFF1E1E1E), Color(0xFF2C2C2C), true),
+  blueprint(Color(0xFF0F2042), Color(0xFF1B3566), true),
+  lightStudio(Color(0xFFF8FAFC), Color(0xFFE2E8F0), false),
+  pureBlack(Colors.black, Color(0xFF222222), true),
+  pureWhite(Colors.white, Color(0xFFE5E7EB), false);
   final Color background;
   final Color gridColor;
   final bool isDark;
 
-  const EpsCanvasTheme(this.label, this.background, this.gridColor, this.isDark);
+  const EpsCanvasTheme(this.background, this.gridColor, this.isDark);
+
+  String localizedLabel(AppLocalizations l) => switch (this) {
+    EpsCanvasTheme.darkCad => l.commandOptionDarkCad,
+    EpsCanvasTheme.blueprint => l.cad3dThemeBlueprint,
+    EpsCanvasTheme.lightStudio => l.commandOptionLightStudio,
+    EpsCanvasTheme.pureBlack => l.commandOptionPureBlack,
+    EpsCanvasTheme.pureWhite => l.commandOptionPureWhite,
+  };
 }

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -152,7 +153,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
         });
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'TextViewer._loadReflowSettings');
+      AppErrorHandler.recordError(e, stack, context: 'TextViewer._loadReflowSettings',
+      );
     }
   }
 
@@ -164,9 +166,11 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
       await prefs.setInt('txt_reflow_theme', _reflowSettings.theme.index);
       await prefs.setInt('txt_reflow_font', _reflowSettings.font.index);
       await prefs.setInt('txt_reflow_mode', _reflowSettings.mode.index);
-      await prefs.setDouble('txt_reflow_line_height', _reflowSettings.lineHeight);
+      await prefs.setDouble('txt_reflow_line_height', _reflowSettings.lineHeight,
+      );
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'TextViewer._saveReflowSettings');
+      AppErrorHandler.recordError(e, stack, context: 'TextViewer._saveReflowSettings',
+      );
     }
   }
 
@@ -198,7 +202,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
       _lines = result.text.split(RegExp(r'\r?\n'));
 
       // Load saved progress and bookmarks
-      final progress = await ReadingProgressService.getProgress(widget.filePath);
+      final progress = await ReadingProgressService.getProgress(widget.filePath,
+      );
       if (progress != null) {
         _bookmarks = progress.bookmarks;
         _resumedChapter = progress.chapter;
@@ -217,7 +222,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && _verticalScrollController.hasClients) {
               _verticalScrollController.jumpTo(
-                progress.scrollOffset.clamp(0.0, _verticalScrollController.position.maxScrollExtent),
+                progress.scrollOffset.clamp(0.0, _verticalScrollController.position.maxScrollExtent,
+                ),
               );
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -231,7 +237,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
         }
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'TextViewer._loadTextFile.fs');
+      AppErrorHandler.recordError(e, stack, context: 'TextViewer._loadTextFile.fs',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
@@ -240,7 +247,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'TextViewer._loadTextFile.format');
+      AppErrorHandler.recordError(e, stack, context: 'TextViewer._loadTextFile.format',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
@@ -249,10 +257,12 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
         });
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'TextViewer._loadTextFile');
+      AppErrorHandler.recordError(e, stack, context: 'TextViewer._loadTextFile',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
-        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '',
+        );
         setState(() {
           _errorMessage = context.l10n.errorReadingTextFile(cleanMsg);
           _isLoading = false;
@@ -277,7 +287,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
 
   Future<void> _toggleBookmark() async {
     if (_isReflowMode) {
-      final progress = await ReadingProgressService.getProgress(widget.filePath);
+      final progress = await ReadingProgressService.getProgress(widget.filePath,
+      );
       final currentChapter = progress?.chapter ?? 0;
       final currentMiniPage = progress?.miniPage ?? 0;
       final totalPercent = ((progress?.progressFraction ?? 0.0) * 100).round();
@@ -301,7 +312,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
           SnackBar(
             duration: const Duration(seconds: 1),
             behavior: SnackBarBehavior.floating,
-            content: Text('Bookmarked Page ${currentMiniPage + 1} ($totalPercent%)'),
+            content: Text('Bookmarked Page ${currentMiniPage + 1} ($totalPercent%)',
+            ),
           ),
         );
       }
@@ -367,7 +379,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.2,
+                          ),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -375,11 +388,13 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           children: [
-                            Icon(Icons.bookmark, color: theme.colorScheme.primary),
+                            Icon(Icons.bookmark, color: theme.colorScheme.primary,
+                            ),
                             const SizedBox(width: 10),
                             Text(
                               'Bookmarks (${_bookmarks.length})',
-                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
@@ -391,7 +406,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                                 child: Text(
                                   'No bookmarks saved yet.\nTap the bookmark icon to save your place.',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                                  style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                  ),
                                 ),
                               )
                             : ListView.separated(
@@ -403,23 +419,31 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                                   return ListTile(
                                     leading: CircleAvatar(
                                       backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
-                                      child: Icon(Icons.bookmark, color: theme.colorScheme.primary, size: 18),
+                                      child: AppIcon(
+                                        AppIconId.bookmark, color: theme.colorScheme.primary, size: 18,
+                                      ),
                                     ),
                                     title: Text(
                                       b.label,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14,
+                                      ),
                                     ),
                                     subtitle: Text(
                                       b.snippet,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
+                                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12,
+                                      ),
                                     ),
                                     trailing: IconButton(
-                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                      icon: const AppIcon(
+                                        AppIconId.delete, size: 18,
+                                      ),
                                       onPressed: () async {
-                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id);
-                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id,
+                                        );
+                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath,
+                                            );
                                         setSheetState(() {});
                                         setState(() {});
                                       },
@@ -436,7 +460,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                                         final targetOffset = targetFraction * _verticalScrollController.position.maxScrollExtent;
                                         _verticalScrollController.animateTo(
                                           targetOffset,
-                                          duration: const Duration(milliseconds: 300),
+                                          duration: const Duration(milliseconds: 300,
+                                          ),
                                           curve: Curves.easeOut,
                                         );
                                       }
@@ -532,10 +557,12 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF475569).withValues(alpha: 0.15),
+                      color: const Color(0xFF475569,
+                          ).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.description_outlined, color: Color(0xFF475569)),
+                    child: const Icon(Icons.description_outlined, color: Color(0xFF475569),
+                        ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -544,11 +571,13 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                       children: [
                         const Text(
                           'Text Document • Properties',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                              ),
                         ),
                         Text(
                           _fileName,
-                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
+                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color,
+                              ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -559,9 +588,11 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
               const Divider(height: 24),
               _buildInfoRow('File Name:', _fileName),
               _buildInfoRow('File Size:', formattedSize),
-              _buildInfoRow('Total Lines:', _isLogFile && _logLevelFilter != LogLevelFilter.all ? '${_filteredLines.length} / ${_lines.length} lines' : '${_lines.length} lines'),
+              _buildInfoRow('Total Lines:', _isLogFile && _logLevelFilter != LogLevelFilter.all ? '${_filteredLines.length} / ${_lines.length} lines' : '${_lines.length} lines',
+                  ),
               _buildInfoRow('Total Words:', '$wordCount words'),
-              _buildInfoRow('Total Characters:', '${_fullText.length} chars'),
+              _buildInfoRow('Total Characters:', '${_fullText.length} chars',
+                  ),
               _buildInfoRow('Detected Encoding:', _encodingName),
             ],
           ),
@@ -578,8 +609,10 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -794,10 +827,12 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
     return [
       // Search Action
       IconButton(
-        icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+        icon: AppIcon.fromMaterial(_isSearchOpen ? Icons.close : Icons.search, size: 20,
+        ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: _isSearchOpen ? 'Close Search' : 'Find in Text',
+        tooltip: _isSearchOpen ? context.l10n.commandUiCloseSearch
+            : context.l10n.commandUiFindInText,
         onPressed: () {
           setState(() {
             _isSearchOpen = !_isSearchOpen;
@@ -812,19 +847,19 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
       // If in Reflow Mode, show Table of Contents
       if (_isReflowMode)
         IconButton(
-          icon: const Icon(Icons.format_list_bulleted_rounded, size: 20),
+          icon: const AppIcon(AppIconId.list, size: 20),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-          tooltip: 'Table of Contents',
+          tooltip: context.l10n.tableOfContents,
           onPressed: () => _reflowKey.currentState?.showTocSheet(),
         ),
 
       // Bookmark button
       IconButton(
-        icon: const Icon(Icons.bookmark_add_outlined, size: 20),
+        icon: const AppIcon(AppIconId.bookmarkAdd, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Add Bookmark',
+        tooltip: context.l10n.commandUiAddBookmark,
         onPressed: _toggleBookmark,
       ),
 
@@ -833,17 +868,17 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
         icon: Badge(
           isLabelVisible: _bookmarks.isNotEmpty,
           label: Text('${_bookmarks.length}'),
-          child: const Icon(Icons.bookmarks_outlined, size: 20),
+          child: const AppIcon(AppIconId.bookmarks, size: 20),
         ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Bookmarks',
+        tooltip: context.l10n.commandIconBookmarks,
         onPressed: _showBookmarksSheet,
       ),
 
       // Reading Mode (Reflow / Overflow / E-Book)
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _isReflowMode ? Icons.auto_stories : Icons.auto_stories_outlined,
           size: 20,
           color: _isReflowMode ? _reflowSettings.theme.accentColor : null,
@@ -851,18 +886,18 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: _isReflowMode
-            ? 'Exit Reading Mode (Code/Log View)'
-            : 'Reading Mode (Reflow / Overflow / E-Book)',
+            ? context.l10n.commandUiExitReadingModeCodeLogView
+            : context.l10n.commandUiReadingModeReflowOverflowEBook,
         onPressed: _toggleReflowMode,
       ),
 
       // If in Reflow Mode, show Reading Settings
       if (_isReflowMode)
         IconButton(
-          icon: const Icon(Icons.tune, size: 20),
+          icon: const AppIcon(AppIconId.properties, size: 20),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-          tooltip: 'Reading Settings',
+          tooltip: context.l10n.commandUiReadingSettings,
           onPressed: () => _reflowKey.currentState?.showSettingsSheet(),
         ),
 
@@ -870,35 +905,39 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
       if (!_isReflowMode) ...[
         // Monospace Toggle
         IconButton(
-          icon: Icon(_isMonospace ? Icons.font_download : Icons.font_download_outlined, size: 20),
+          icon: AppIcon.fromMaterial(_isMonospace ? Icons.font_download : Icons.font_download_outlined, size: 20,
+          ),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-          tooltip: _isMonospace ? 'Switch to Proportional Font' : 'Switch to Monospace Font',
+          tooltip: _isMonospace ? context.l10n.commandUiSwitchToProportionalFont
+              : context.l10n.commandUiSwitchToMonospaceFont,
           onPressed: () => setState(() => _isMonospace = !_isMonospace),
         ),
 
         // Word Wrap Toggle (Fit to Screen)
         IconButton(
-          icon: Icon(_isWordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20),
+          icon: AppIcon.fromMaterial(_isWordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20,
+          ),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-          tooltip: _isWordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
+          tooltip: _isWordWrap ? context.l10n.commandUiDisableWordWrap
+              : context.l10n.commandUiEnableWordWrap,
           onPressed: () => setState(() => _isWordWrap = !_isWordWrap),
         ),
 
         // Copy All
         IconButton(
-          icon: const Icon(Icons.copy_all_outlined, size: 20),
+          icon: const AppIcon(AppIconId.duplicate, size: 20),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-          tooltip: 'Copy All',
+          tooltip: context.l10n.commandUiCopyAll,
           onPressed: _copyAllText,
         ),
       ],
 
       // Fullscreen
       IconButton(
-        icon: const Icon(Icons.fullscreen, size: 20),
+        icon: const AppIcon(AppIconId.fullscreen, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: context.l10n.fullscreen,
@@ -907,19 +946,19 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
 
       // Info / Properties
       IconButton(
-        icon: const Icon(Icons.info_outline, size: 20),
+        icon: const AppIcon(AppIconId.info, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Text Properties',
+        tooltip: context.l10n.commandUiTextProperties,
         onPressed: _showInfoSheet,
       ),
 
       // Share
       IconButton(
-        icon: const Icon(Icons.share_outlined, size: 20),
+        icon: const AppIcon(AppIconId.share, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Share',
+        tooltip: context.l10n.commandIconShare,
         onPressed: _shareFile,
       ),
     ];
@@ -944,7 +983,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
         foregroundColor: _isReflowMode ? _reflowSettings.theme.textColor : null,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const AppIcon(AppIconId.back),
           onPressed: () => Navigator.of(context).pop(true),
         ),
         title: _isSearchOpen
@@ -953,12 +992,12 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                 autofocus: true,
                 style: const TextStyle(fontSize: 15),
                 decoration: InputDecoration(
-                  hintText: 'Find in text...',
+                  hintText: context.l10n.commandUiFindInText2,
                   border: InputBorder.none,
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.clear, size: 18),
-                    onPressed: () {
-                      _searchController.clear();
+                    icon: const AppIcon(AppIconId.close, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
                       _onSearchChanged('');
                     },
                   ),
@@ -967,7 +1006,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
               )
             : Text(
                 _fileName,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                      ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -983,7 +1023,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                     border: Border(
                       bottom: BorderSide(
                         color: _isReflowMode
-                            ? _reflowSettings.theme.textColor.withValues(alpha: 0.1)
+                            ? _reflowSettings.theme.textColor.withValues(alpha: 0.1,
+                                    )
                             : (isDark ? Colors.white10 : Colors.black12),
                       ),
                     ),
@@ -992,8 +1033,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Row(
-                      children: _buildTextActions(context),
-                    ),
+                      children: _buildTextActions(context)),
                   ),
                 ),
               ),
@@ -1016,14 +1056,15 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                        const Icon(Icons.error_outline, size: 48, color: Colors.redAccent,
+                    ),
                         const SizedBox(height: 16),
                         Text(_errorMessage!, textAlign: TextAlign.center),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           onPressed: _loadTextFile,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
+                          icon: const AppIcon(AppIconId.refresh),
+                          label: Text(context.l10n.retry),
                         ),
                       ],
                     ),
@@ -1038,11 +1079,13 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                     // Search Match Status Bar with Next/Prev
                     if (!_isReflowMode && _searchQuery.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6,
+                        ),
                         color: const Color(0xFFFFB74D).withValues(alpha: 0.2),
                         child: Row(
                           children: [
-                            const Icon(Icons.search, size: 16, color: Color(0xFFF57C00)),
+                            const Icon(Icons.search, size: 16, color: Color(0xFFF57C00),
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               _matchedLineIndices.isEmpty
@@ -1056,16 +1099,20 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                             ),
                             const Spacer(),
                             IconButton(
-                              icon: const Icon(Icons.keyboard_arrow_up, size: 18),
-                              tooltip: 'Previous Match',
+                              icon: const AppIcon(
+                                AppIconId.expandLess, size: 18,
+                              ),
+                              tooltip: context.l10n.commandUiPreviousMatch,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
                               onPressed: _prevMatch,
                             ),
                             const SizedBox(width: 12),
                             IconButton(
-                              icon: const Icon(Icons.keyboard_arrow_down, size: 18),
-                              tooltip: 'Next Match',
+                              icon: const AppIcon(
+                                AppIconId.expandMore, size: 18,
+                              ),
+                              tooltip: context.l10n.commandUiNextMatch,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
                               onPressed: _nextMatch,
@@ -1118,7 +1165,9 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                                 _isWordWrap
                                     ? ListView.builder(
                                         controller: _verticalScrollController,
-                                        padding: EdgeInsets.fromLTRB(0, 8, 0, 24 + MediaQuery.paddingOf(context).bottom),
+                                        padding: EdgeInsets.fromLTRB(0, 8, 0, 24 + MediaQuery.paddingOf(context,
+                                                ).bottom,
+                                          ),
                                         itemCount: currentLines.length,
                                         itemBuilder: (context, index) => _buildLineItem(
                                           index,
@@ -1136,7 +1185,9 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                                             width: 2500, // Wide canvas for unified horizontal scroll
                                             child: ListView.builder(
                                               controller: _verticalScrollController,
-                                              padding: EdgeInsets.fromLTRB(0, 8, 0, 24 + MediaQuery.paddingOf(context).bottom),
+                                              padding: EdgeInsets.fromLTRB(0, 8, 0, 24 + MediaQuery.paddingOf(context,
+                                                      ).bottom,
+                                                ),
                                               itemCount: currentLines.length,
                                               itemBuilder: (context, index) => _buildLineItem(
                                                 index,
@@ -1169,11 +1220,12 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                           onPressed: _toggleOrientationLock,
                           backgroundColor: _isOrientationLocked
                               ? theme.colorScheme.primary
-                              : theme.colorScheme.surface.withValues(alpha: 0.8),
+                              : theme.colorScheme.surface.withValues(alpha: 0.8,
+                                ),
                           tooltip: _isOrientationLocked
                               ? context.l10n.unlockRotation
                               : context.l10n.lockRotation,
-                          child: Icon(
+                          child: AppIcon.fromMaterial(
                             _isOrientationLocked ? Icons.screen_lock_rotation : Icons.screen_rotation,
                             color: _isOrientationLocked
                                 ? theme.colorScheme.onPrimary
@@ -1184,9 +1236,12 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                         FloatingActionButton.small(
                           heroTag: 'exit_fullscreen',
                           onPressed: _toggleFullscreen,
-                          backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+                          backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8,
+                          ),
                           tooltip: context.l10n.exitFullscreen,
-                          child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
+                          child: AppIcon(
+                            AppIconId.exitFullscreen, color: theme.colorScheme.onSurface,
+                          ),
                         ),
                       ],
                     ),
@@ -1199,8 +1254,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   Widget _buildLineItem(
     int index,
     String lineText,
-    TextStyle fontStyle,
-  ) {
+    TextStyle fontStyle) {
     final isCurrentMatch = _matchedLineIndices.isNotEmpty &&
         _currentMatchIndex >= 0 &&
         _matchedLineIndices[_currentMatchIndex] == index;
@@ -1250,7 +1304,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                 color: theme.colorScheme.surface.withValues(alpha: 0.94),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4,
+                  ),
                 ),
                 boxShadow: const [
                   BoxShadow(
@@ -1263,7 +1318,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.format_size, size: 16, color: theme.colorScheme.primary),
+                  Icon(Icons.format_size, size: 16, color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     '${zoomPercent.toStringAsFixed(0)}%  (${_fontSize.toStringAsFixed(1)} pt)',
@@ -1284,13 +1340,15 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3,
+                      ),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                        color: theme.colorScheme.primary.withValues(alpha: 0.12,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        'Reset',
+                        context.l10n.commandUiReset,
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.bold,

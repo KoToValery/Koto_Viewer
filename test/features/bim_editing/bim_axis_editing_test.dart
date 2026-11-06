@@ -1,3 +1,4 @@
+import '../../support/command_icon_finders.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -108,7 +109,7 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
       expect(find.byType(ChoiceChip), findsNothing);
-      expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
+      expect(findCommandIcon(Icons.arrow_back_rounded), findsNothing);
       final field = find.byKey(const ValueKey('architect-offset-distance'));
       expect(tester.widget<TextField>(field).controller!.text, isEmpty);
       expect(
@@ -225,7 +226,7 @@ void main() {
         );
         expect(changes.last.effectiveGridAxes.single.sourceStoreyIds, ['f']);
         expect(changes.last.effectiveGridAxes.single.bubbleAtStart, isFalse);
-        await tester.tap(find.byIcon(Icons.undo_rounded).first);
+        await tester.tap(findCommandIcon(Icons.undo_rounded).first);
         await tester.pumpAndSettle();
         expect(plan().currentStorey.gridAxes.single.start, axis.start);
         final beforeMove = changes.length;

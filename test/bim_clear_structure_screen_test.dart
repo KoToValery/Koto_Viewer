@@ -1,3 +1,4 @@
+import 'support/command_icon_finders.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -85,7 +86,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       Future<void> open() async {
-        await tester.tap(find.byIcon(Icons.more_vert_rounded));
+        await tester.tap(findCommandIcon(Icons.more_vert_rounded));
         await tester.pumpAndSettle();
         expect(find.text(l.schemeReadinessTitle), findsNothing);
         await tester.tap(find.text(l.bimClearStructure));

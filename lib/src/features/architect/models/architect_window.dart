@@ -132,6 +132,8 @@ class ArchitectWindow {
     required double wallThickness,
     required double zoomScale,
     bool isSelected = false,
+    double cutPlaneHeight = 1.20,
+    bool showAnnotations = true,
     bool wallGeometryProvided = false,
     double coreThickness = 0.25,
     double insulationThickness = 0.0,
@@ -165,7 +167,9 @@ class ArchitectWindow {
         wallThickness: wallThickness,
         coreThickness: coreThickness,
         insulationThickness: insulationThickness,
-        coreCenterShift: coreCenterShift != null ? (isFlipped ? -coreCenterShift : coreCenterShift) : null,
+        coreCenterShift: coreCenterShift != null
+            ? (isFlipped ? -coreCenterShift : coreCenterShift)
+            : null,
         exteriorSign: effectiveExtSign,
         offsetRatio: offsetRatio,
         elementWidth: width,
@@ -174,22 +178,25 @@ class ArchitectWindow {
         zoomScale: zoomScale,
         isSelected: isSelected,
         showDimensions: false,
+        cutPlaneHeight: cutPlaneHeight,
       );
-      ArchitectOpeningPlanPainter.paint(
-        elementId: id,
-        canvas: canvas,
-        centerPos: centerPos,
-        normal: n * effectiveExtSign,
-        wallThickness: wallThickness,
-        width: width,
-        height: height,
-        sillHeight: sillHeight,
-        specId: specId,
-        outsideWall: true,
-        zoomScale: zoomScale,
-        palette: palette,
-        isSelected: isSelected,
-      );
+      if (showAnnotations) {
+        ArchitectOpeningPlanPainter.paint(
+          elementId: id,
+          canvas: canvas,
+          centerPos: centerPos,
+          normal: n * effectiveExtSign,
+          wallThickness: wallThickness,
+          width: width,
+          height: height,
+          sillHeight: sillHeight,
+          specId: specId,
+          outsideWall: true,
+          zoomScale: zoomScale,
+          palette: palette,
+          isSelected: isSelected,
+        );
+      }
       return;
     }
 
@@ -208,7 +215,10 @@ class ArchitectWindow {
     // 1. Cut wall opening rectangle (fill with white to mask wall fill)
     final maskHalfThick = halfThick + 1.5 / zoomScale;
     final openingPath = Path()
-      ..moveTo(pLeftBase.dx - n.dx * maskHalfThick, pLeftBase.dy - n.dy * maskHalfThick)
+      ..moveTo(
+        pLeftBase.dx - n.dx * maskHalfThick,
+        pLeftBase.dy - n.dy * maskHalfThick,
+      )
       ..lineTo(
         pRightBase.dx - n.dx * maskHalfThick,
         pRightBase.dy - n.dy * maskHalfThick,
@@ -217,7 +227,10 @@ class ArchitectWindow {
         pRightBase.dx + n.dx * maskHalfThick,
         pRightBase.dy + n.dy * maskHalfThick,
       )
-      ..lineTo(pLeftBase.dx + n.dx * maskHalfThick, pLeftBase.dy + n.dy * maskHalfThick)
+      ..lineTo(
+        pLeftBase.dx + n.dx * maskHalfThick,
+        pLeftBase.dy + n.dy * maskHalfThick,
+      )
       ..close();
     if (!wallGeometryProvided) canvas.drawPath(openingPath, openingCutPaint);
 
@@ -297,21 +310,23 @@ class ArchitectWindow {
       );
     }
 
-    ArchitectOpeningPlanPainter.paint(
-      elementId: id,
-      canvas: canvas,
-      centerPos: centerPos,
-      normal: n * effectiveExtSign,
-      wallThickness: wallThickness,
-      width: width,
-      height: height,
-      sillHeight: sillHeight,
-      specId: specId,
-      outsideWall: true,
-      zoomScale: zoomScale,
-      palette: palette,
-      isSelected: isSelected,
-    );
+    if (showAnnotations) {
+      ArchitectOpeningPlanPainter.paint(
+        elementId: id,
+        canvas: canvas,
+        centerPos: centerPos,
+        normal: n * effectiveExtSign,
+        wallThickness: wallThickness,
+        width: width,
+        height: height,
+        sillHeight: sillHeight,
+        specId: specId,
+        outsideWall: true,
+        zoomScale: zoomScale,
+        palette: palette,
+        isSelected: isSelected,
+      );
+    }
   }
 
   /// Returns whether [point] hits any part of this window's 2D representation:
@@ -374,7 +389,8 @@ class ArchitectWindow {
     double insulationThickness = 0.0,
     double? coreCenterShift,
     double exteriorSign = 1.0,
-    FenestrationElevationDetail detailLevel = FenestrationElevationDetail.full3D,
+    FenestrationElevationDetail detailLevel =
+        FenestrationElevationDetail.full3D,
   }) {
     if (detailLevel == FenestrationElevationDetail.hidden) {
       return const [];
@@ -389,7 +405,9 @@ class ArchitectWindow {
         wallThickness: wallThickness,
         coreThickness: coreThickness,
         insulationThickness: insulationThickness,
-        coreCenterShift: coreCenterShift != null ? (isFlipped ? -coreCenterShift : coreCenterShift) : null,
+        coreCenterShift: coreCenterShift != null
+            ? (isFlipped ? -coreCenterShift : coreCenterShift)
+            : null,
         exteriorSign: effectiveExtSign,
         offsetRatio: offsetRatio,
         width: width,
@@ -440,7 +458,8 @@ class ArchitectWindow {
     if (detailLevel != FenestrationElevationDetail.outerContourOnly) {
       for (var i = 1; i < panesCount; i++) {
         final centre = centerPos + u * (width * (i / panesCount - .5));
-        final left = centre - u * (jWidth / 2), right = centre + u * (jWidth / 2);
+        final left = centre - u * (jWidth / 2),
+            right = centre + u * (jWidth / 2);
         _addBox3D(
           tris,
           left - n * halfThick,

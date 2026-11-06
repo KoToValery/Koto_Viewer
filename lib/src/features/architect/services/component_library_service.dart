@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../components/definitions/furniture_components.dart';
 import '../components/definitions/kitchen_components.dart';
 import '../components/definitions/sanitary_components.dart';
+import '../components/definitions/service_components.dart';
 import '../components/dsl/parametric_script_parser.dart';
 import '../models/architect_component.dart';
 import '../models/architect_component_definition.dart';
@@ -44,6 +45,7 @@ class ComponentLibraryService extends ChangeNotifier {
     KitchenSinkCabinet(),
     KitchenRefrigerator(),
     KitchenCooktopOven(),
+    ...ServiceComponentDefinition.catalog(),
   ];
 
   final List<ScriptedComponentDefinition> _customScripted = [];

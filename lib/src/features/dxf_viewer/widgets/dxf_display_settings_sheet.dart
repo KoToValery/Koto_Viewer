@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../models/dxf_display_settings.dart';
 import '../models/dxf_models.dart';
@@ -79,7 +81,8 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
             height: 4,
             margin: const EdgeInsets.only(top: 12, bottom: 8),
             decoration: BoxDecoration(
-              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.2),
+              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.2,
+              ),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -108,7 +111,8 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                     children: [
                       Text(
                         'Display Settings',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
                         'Line thickness, dimensions, and point styles',
@@ -122,8 +126,10 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                     const defaultSettings = DxfDisplaySettings();
                     _update(defaultSettings);
                   },
-                  icon: const Icon(Icons.restore, size: 16),
-                  label: const Text('Default', style: TextStyle(fontSize: 12)),
+                  icon: const AppIcon(AppIconId.refresh, size: 16),
+                  label: Text(
+                    context.l10n.contextMenuDefault, style: TextStyle(fontSize: 12),
+                  ),
                 ),
               ],
             ),
@@ -212,7 +218,8 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.density_small, size: 16, color: Colors.grey),
+                      const Icon(Icons.density_small, size: 16, color: Colors.grey,
+                      ),
                       Expanded(
                         child: Slider(
                           value: _current.linetypeScale,
@@ -225,7 +232,8 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                           },
                         ),
                       ),
-                      const Icon(Icons.density_medium, size: 16, color: Colors.grey),
+                      const Icon(Icons.density_medium, size: 16, color: Colors.grey,
+                      ),
                     ],
                   ),
                   Row(
@@ -276,7 +284,8 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.text_decrease, size: 16, color: Colors.grey),
+                      const Icon(Icons.text_decrease, size: 16, color: Colors.grey,
+                      ),
                       Expanded(
                         child: Slider(
                           value: _current.measurementScale,
@@ -289,7 +298,8 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                           },
                         ),
                       ),
-                      const Icon(Icons.text_increase, size: 16, color: Colors.grey),
+                      const Icon(Icons.text_increase, size: 16, color: Colors.grey,
+                      ),
                     ],
                   ),
                   // Quick presets for Measurement Size
@@ -421,11 +431,13 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                   // 4. Point Marker Style Section
                   Row(
                     children: [
-                      Icon(Icons.grain, size: 18, color: theme.colorScheme.primary),
+                      Icon(Icons.grain, size: 18, color: theme.colorScheme.primary,
+                      ),
                       const SizedBox(width: 8),
                       const Text(
                         'Point Marker Style',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5,
+                        ),
                       ),
                     ],
                   ),
@@ -440,10 +452,12 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                         onTap: () => _update(_current.copyWith(pointStyle: style)),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                                ? theme.colorScheme.primary.withValues(alpha: 0.15,
+                                  )
                                 : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
@@ -511,7 +525,8 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                         label: 'Meters (m)',
                         symbol: 'm',
                         isSelected: _current.unitOverride == DxfUnit.meters,
-                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.meters)),
+                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.meters),
+                        ),
                         theme: theme,
                       ),
                       // Centimeters
@@ -519,7 +534,8 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                         label: 'Centimeters (cm)',
                         symbol: 'cm',
                         isSelected: _current.unitOverride == DxfUnit.centimeters,
-                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.centimeters)),
+                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.centimeters),
+                        ),
                         theme: theme,
                       ),
                       // Millimeters
@@ -527,7 +543,8 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                         label: 'Millimeters (mm)',
                         symbol: 'mm',
                         isSelected: _current.unitOverride == DxfUnit.millimeters,
-                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.millimeters)),
+                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.millimeters),
+                        ),
                         theme: theme,
                       ),
                       // Feet
@@ -535,7 +552,8 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                         label: 'Feet (ft)',
                         symbol: 'ft',
                         isSelected: _current.unitOverride == DxfUnit.feet,
-                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.feet)),
+                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.feet),
+                        ),
                         theme: theme,
                       ),
                       // Inches
@@ -543,7 +561,8 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                         label: 'Inches (in)',
                         symbol: 'in',
                         isSelected: _current.unitOverride == DxfUnit.inches,
-                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.inches)),
+                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.inches),
+                        ),
                         theme: theme,
                       ),
                     ],
@@ -575,7 +594,8 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
         decoration: BoxDecoration(
           color: isSelected
               ? theme.colorScheme.primary.withValues(alpha: 0.15)
-              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3,
+                ),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected

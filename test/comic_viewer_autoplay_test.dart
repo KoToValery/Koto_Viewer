@@ -1,3 +1,4 @@
+import 'support/command_icon_finders.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
@@ -55,9 +56,11 @@ void main() {
 
       // Wait until comic loads
       for (int i = 0; i < 40; i++) {
-        await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)));
+        await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)),
+          );
         await tester.pump();
-        if (find.byIcon(Icons.play_circle_outline).evaluate().isNotEmpty) {
+        if (findCommandIcon(Icons.play_circle_outline,
+          ).evaluate().isNotEmpty) {
           break;
         }
       }
@@ -67,7 +70,7 @@ void main() {
       expect(find.byType(FloatingActionButton), findsNothing);
 
       // Start autoplay via the prominent AppBar action button
-      final autoplayBtn = find.byIcon(Icons.play_circle_fill);
+      final autoplayBtn = findCommandIcon(Icons.play_circle_fill);
       expect(autoplayBtn, findsOneWidget);
       await tester.tap(autoplayBtn);
       await tester.pump();
@@ -82,7 +85,8 @@ void main() {
     } finally {
       tempDir.deleteSync(recursive: true);
     }
-  });
+  },
+  );
 
   testWidgets('ComicViewerScreen webtoon autoplay starts and scrolls smoothly', (tester) async {
     final tempDir = Directory.systemTemp.createTempSync('comic_test_webtoon');
@@ -98,21 +102,24 @@ void main() {
       );
 
       for (int i = 0; i < 40; i++) {
-        await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)));
+        await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)),
+          );
         await tester.pump();
-        if (find.byIcon(Icons.play_circle_outline).evaluate().isNotEmpty) {
-          break;
+        if (findCommandIcon(
+            Icons.play_circle_outline,
+          ).evaluate().isNotEmpty) {
+            break;
+          }
         }
-      }
 
-      // Switch to Webtoon mode
-      final readingModeBtn = find.byIcon(Icons.menu_book_rounded);
-      await tester.tap(readingModeBtn);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(ComicReadingMode.verticalContinuous.label));
+        // Switch to Webtoon mode
+        final readingModeBtn = findCommandIcon(Icons.menu_book_rounded);
+        await tester.tap(readingModeBtn);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(ComicReadingMode.verticalContinuous.localizedLabel(lookupAppLocalizations(const Locale('en')))));
       await tester.pumpAndSettle();
 
-      final autoplayBtn = find.byIcon(Icons.play_circle_outline);
+        final autoplayBtn = findCommandIcon(Icons.play_circle_outline);
       await tester.tap(autoplayBtn);
       await tester.pump();
 
@@ -122,9 +129,10 @@ void main() {
       }
 
       expect(find.byType(ComicAutoplayBar), findsOneWidget);
-      expect(find.byIcon(Icons.pause_rounded), findsWidgets);
+      expect(findCommandIcon(Icons.pause_rounded), findsWidgets);
     } finally {
       tempDir.deleteSync(recursive: true);
     }
-  });
+  },
+  );
 }

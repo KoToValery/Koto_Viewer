@@ -1,3 +1,4 @@
+import '../../support/command_icon_finders.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -73,7 +74,9 @@ void main() {
           }
           for (final entry in tool_ui.toolsByIcon.entries) {
             expect(
-              find.byIcon(entry.key),
+              entry.value == ArchitectTool.pan
+                  ? findCommandIcon(entry.key)
+                  : find.byKey(ValueKey('architect-tool-${entry.value.name}')),
               entry.value == ArchitectTool.pan ||
                       ArchitectToolCategory.of(entry.value) == category
                   ? findsOneWidget
@@ -302,6 +305,9 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('architect-wall-extend')));
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(5, 1));
+      await tester.pumpAndSettle();
+      expect(model.project, same(before));
+      await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
       await tester.pumpAndSettle();
       expect(
         model.project.activeStorey.walls.first.endPoint,

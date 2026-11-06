@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../services/architect_building_elevation.dart';
@@ -101,17 +102,17 @@ class _TerrainState extends State<ArchitectTerrainEditor> {
                     onPressed: points.isEmpty
                         ? null
                         : () => setState(() => points.removeLast()),
-                    icon: const Icon(Icons.undo),
+                    icon: const AppIcon(AppIconId.undo),
                   ),
                   IconButton(
                     tooltip: l.delete,
                     onPressed: () => setState(() => points.clear()),
-                    icon: const Icon(Icons.delete_outline),
+                    icon: const AppIcon(AppIconId.delete),
                   ),
                   IconButton(
                     tooltip: l.cancel,
                     onPressed: widget.onCancel,
-                    icon: const Icon(Icons.close),
+                    icon: const AppIcon(AppIconId.close),
                   ),
                   IconButton(
                     key: const ValueKey('terrain-confirm'),
@@ -119,7 +120,9 @@ class _TerrainState extends State<ArchitectTerrainEditor> {
                     onPressed: valid || points.isEmpty
                         ? () => widget.onApply(List.unmodifiable(points))
                         : null,
-                    icon: const Icon(Icons.check_circle, color: Colors.green),
+                    icon: const AppIcon(
+                      AppIconId.checkCircle, color: Colors.green,
+                    ),
                   ),
                 ],
               ),

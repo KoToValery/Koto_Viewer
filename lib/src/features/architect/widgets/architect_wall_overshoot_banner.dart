@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 // === SECTION: ARCHITECT WALL OVERSHOOT BANNER ===
 
 import 'package:flutter/material.dart';
@@ -27,13 +28,13 @@ class ArchitectWallOvershootBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF232530),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.amberAccent.withAlpha(160), width: 1.2),
+        border: Border.all(color: Colors.amberAccent.withAlpha(160), width: 1.2,
+        ),
         boxShadow: const [
           BoxShadow(
             color: Colors.black45,
             blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
+            offset: Offset(0, 3)),
         ],
       ),
       child: Material(
@@ -64,7 +65,8 @@ class ArchitectWallOvershootBanner extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.amberAccent,
                   foregroundColor: Colors.black87,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0,
+                  ),
                   visualDensity: VisualDensity.compact,
                   minimumSize: const Size(0, 30),
                   textStyle: const TextStyle(
@@ -73,7 +75,7 @@ class ArchitectWallOvershootBanner extends StatelessWidget {
                   ),
                 ),
                 onPressed: onTrim,
-                icon: const Icon(Icons.content_cut_rounded, size: 14),
+                icon: const AppIcon(AppIconId.cut, size: 14),
                 label: Text(l10n.architectWallOvershootTrim),
               ),
               const SizedBox(width: 6),
@@ -88,8 +90,8 @@ class ArchitectWallOvershootBanner extends StatelessWidget {
                     minimumSize: const Size(28, 28),
                   ),
                   onPressed: onDismiss,
-                  icon: const Icon(
-                    Icons.close_rounded,
+                  icon: const AppIcon(
+                    AppIconId.close,
                     color: Colors.white70,
                     size: 16,
                   ),

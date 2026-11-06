@@ -128,7 +128,9 @@ class ArchitectDimensionLayout {
     ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
   }) {
     final n = dimension.normal;
-    final extension = n * dimensionScale.paperToModel(1);
+    final extension = n * ArchitectDrawingScale(
+      ArchitectTextScope.current?.denominator ?? dimensionScale.denominator,
+    ).paperToModel(1);
     // Independent short strokes at each row; never bridge back to the wall.
     return [
       for (final tier in tiers)

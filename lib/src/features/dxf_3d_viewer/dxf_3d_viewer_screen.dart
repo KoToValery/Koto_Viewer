@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -534,7 +535,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     return [
       // Quick Views Menu & Controls
       PopupMenuButton<dynamic>(
-        icon: const Icon(Icons.videocam_outlined, size: 20),
+        icon: const AppIcon(AppIconId.video, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: l10n.cad3dCamera,
@@ -555,7 +556,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
               value: v,
               child: Row(
                 children: [
-                  Icon(v.icon, size: 18, color: theme.colorScheme.primary),
+                  AppIcon(v.iconId, size: 18, color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 10),
                   Text(v.localizedLabel(l10n)),
                 ],
@@ -567,7 +569,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
             value: 'toggle_invert_y',
             child: Row(
               children: [
-                Icon(
+                AppIcon.fromMaterial(
                   _camera.invertY
                       ? Icons.swap_vert_rounded
                       : Icons.swap_vert_outlined,
@@ -578,7 +580,9 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                 Text(l10n.cad3dInvertY),
                 const Spacer(),
                 if (_camera.invertY)
-                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                  AppIcon(
+                    AppIconId.confirm, size: 18, color: theme.colorScheme.primary,
+                  ),
               ],
             ),
           ),
@@ -587,7 +591,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
       // Canvas Theme Menu
       PopupMenuButton<Cad3DTheme>(
-        icon: const Icon(Icons.palette_outlined, size: 20),
+        icon: const AppIcon(AppIconId.palette, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: l10n.theme,
@@ -610,7 +614,9 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                 Text(t.localizedLabel(l10n)),
                 if (_theme == t) ...[
                   const Spacer(),
-                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                  AppIcon(
+                    AppIconId.confirm, size: 18, color: theme.colorScheme.primary,
+                  ),
                 ],
               ],
             ),
@@ -621,7 +627,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
       // The legacy native backend has a software Z-buffer, not GPU acceleration.
       if (Cad3DRenderBackend.acceleratedAvailable)
         IconButton(
-          icon: Icon(_useNativeDepth ? Icons.layers : Icons.layers_outlined),
+          icon: AppIcon.fromMaterial(_useNativeDepth ? Icons.layers : Icons.layers_outlined,
+          ),
           tooltip: _useNativeDepth
               ? l10n.cad3dNativeDepthOn
               : l10n.cad3dNativeDepthOff,
@@ -630,7 +637,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
       // BIM Storeys & Categories (when IFC model is loaded)
       if (_ifcModel != null)
         IconButton(
-          icon: const Icon(Icons.apartment_rounded, size: 20),
+          icon: const AppIcon(AppIconId.building, size: 20),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
           color: const Color(0xFF00E5FF),
@@ -640,7 +647,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
       // 3D Model Info & Metrics
       IconButton(
-        icon: const Icon(Icons.info_outline, size: 20),
+        icon: const AppIcon(AppIconId.info, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: l10n.properties3d,
@@ -649,7 +656,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
       // Share
       IconButton(
-        icon: const Icon(Icons.share_outlined, size: 20),
+        icon: const AppIcon(AppIconId.share, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: l10n.share,
@@ -658,7 +665,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
       // Fullscreen Toggle
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _isFullscreen
               ? Icons.fullscreen_exit_rounded
               : Icons.fullscreen_rounded,
@@ -666,7 +673,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: _isFullscreen ? 'Exit Fullscreen' : 'Fullscreen',
+        tooltip: _isFullscreen ? context.l10n.exitFullscreen
+            : context.l10n.fullscreen,
         onPressed: _toggleFullscreen,
       ),
     ];
@@ -722,7 +730,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                     backgroundColor: theme.colorScheme.surface,
                     elevation: 0,
                     leading: IconButton(
-                      icon: const Icon(Icons.arrow_back),
+                      icon: const AppIcon(AppIconId.back),
                       tooltip: l10n.back,
                       onPressed: _handleBack,
                     ),
@@ -832,7 +840,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
                             onPressed: _load3DModel,
-                            icon: const Icon(Icons.refresh),
+                            icon: const AppIcon(AppIconId.refresh),
                             label: Text(l10n.retry),
                           ),
                         ],
@@ -893,8 +901,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
-                                    Icons.pan_tool_rounded,
+                                  const AppIcon(
+                                    AppIconId.pan,
                                     size: 15,
                                     color: Color(0xFF00E5FF),
                                   ),
@@ -952,8 +960,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
-                                    Icons.flight_takeoff_rounded,
+                                  const AppIcon(
+                                    AppIconId.fly,
                                     size: 15,
                                     color: Color(0xFF00E5FF),
                                   ),
@@ -1054,8 +1062,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                             elevation: 4,
                             clipBehavior: Clip.antiAlias,
                             child: IconButton(
-                              icon: const Icon(
-                                Icons.arrow_back_rounded,
+                              icon: const AppIcon(
+                                AppIconId.back,
                                 color: Colors.white,
                                 size: 22,
                               ),
@@ -1078,12 +1086,12 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                             elevation: 4,
                             clipBehavior: Clip.antiAlias,
                             child: IconButton(
-                              icon: const Icon(
-                                Icons.fullscreen_exit_rounded,
+                              icon: const AppIcon(
+                                AppIconId.exitFullscreen,
                                 color: Colors.white,
                                 size: 22,
                               ),
-                              tooltip: 'Exit Fullscreen (ESC)',
+                              tooltip: context.l10n.commandUiExitFullscreenEsc,
                               onPressed: _toggleFullscreen,
                             ),
                           ),
@@ -1125,7 +1133,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                   )
                 : null,
           ),
-          child: Icon(
+          child: AppIcon.fromMaterial(
             icon,
             size: 18,
             color: isSelected
@@ -1159,7 +1167,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(10.0),
-            child: Icon(
+            child: AppIcon.fromMaterial(
               icon,
               size: 20,
               color: isActive ? Colors.black : theme.colorScheme.onSurface,

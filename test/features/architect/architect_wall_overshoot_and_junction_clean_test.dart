@@ -241,7 +241,7 @@ void main() {
         storeyId: storey.id,
         overshoot: os,
       );
-      expect(commands.length, 2);
+      expect(commands.length, 1); // Both walls change in one atomic command.
 
       final project = ArchitectProject(
         id: 'p1',

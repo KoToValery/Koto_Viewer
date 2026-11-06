@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. IMPORTS & DEFINITIONS
 // 2. ARCHITECT GRID AXIS PROPERTIES CARD (WIDGET)
@@ -30,7 +31,8 @@ class ArchitectGridAxisPropertiesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    const primaryColor = Color(0xFFFF9F0A);
+    final scheme = Theme.of(context).colorScheme;
+    final primaryColor = scheme.primary;
     final orientationLabel = axis.isVertical
         ? l10n.architectAxisOrientationV
         : l10n.architectAxisOrientationH;
@@ -39,7 +41,7 @@ class ArchitectGridAxisPropertiesCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFA1E1E24),
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: primaryColor.withValues(alpha: 0.8),
@@ -65,7 +67,7 @@ class ArchitectGridAxisPropertiesCard extends StatelessWidget {
                 Container(
                   width: 10,
                   height: 10,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: primaryColor,
                     shape: BoxShape.circle,
                   ),
@@ -73,8 +75,8 @@ class ArchitectGridAxisPropertiesCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   l10n.gridAxisTitle(axis.name),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: scheme.onSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
@@ -83,8 +85,8 @@ class ArchitectGridAxisPropertiesCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     '•  L = ${axis.formattedLengthMeters}  •  $orientationLabel',
-                    style: const TextStyle(
-                      color: Colors.white70,
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -94,12 +96,12 @@ class ArchitectGridAxisPropertiesCard extends StatelessWidget {
                 InkWell(
                   onTap: onClose,
                   borderRadius: BorderRadius.circular(12),
-                  child: const Padding(
+                  child: Padding(
                     padding: EdgeInsets.all(4.0),
-                    child: Icon(
-                      Icons.close_rounded,
+                    child: AppIcon(
+                      AppIconId.close,
                       size: 18,
-                      color: Colors.white54,
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -167,7 +169,7 @@ class ArchitectGridAxisPropertiesCard extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: color),
+            AppIcon.fromMaterial(icon, size: 14, color: color),
             const SizedBox(width: 5),
             Text(
               label,

@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../models/dxf_models.dart';
 import '../rendering/dxf_math.dart';
@@ -58,7 +60,8 @@ class DxfMeasurementOverlay extends StatelessWidget {
         } else if (measurement!.p2Cad == null) {
           statusText = '2. Tap 2nd point';
         } else {
-          final dist = DxfMath.formatDistance(measurement!.distance!, unit: unit);
+          final dist = DxfMath.formatDistance(measurement!.distance!, unit: unit,
+          );
           statusText = 'Distance: $dist m';
         }
         break;
@@ -73,7 +76,8 @@ class DxfMeasurementOverlay extends StatelessWidget {
           statusText = '3. Tap 3rd vertex';
         } else {
           final area = DxfMath.calculatePolygonArea(measurement!.areaPoints);
-          final perim = DxfMath.calculatePolygonPerimeter(measurement!.areaPoints, isClosed: true);
+          final perim = DxfMath.calculatePolygonPerimeter(measurement!.areaPoints, isClosed: true,
+          );
           statusText = 'Area: ${DxfMath.formatArea(area, unit: unit)} • Perim: ${DxfMath.formatDistance(perim, unit: unit)} m';
         }
         break;
@@ -103,7 +107,8 @@ class DxfMeasurementOverlay extends StatelessWidget {
               : 'Tap circle/arc or 3 points';
         } else {
           final rStr = DxfMath.formatDistance(measurement!.radius!, unit: unit);
-          final dStr = DxfMath.formatDistance(measurement!.radius! * 2.0, unit: unit);
+          final dStr = DxfMath.formatDistance(measurement!.radius! * 2.0, unit: unit,
+          );
           statusText = 'R: $rStr m • Ø: $dStr m';
         }
         break;
@@ -170,7 +175,7 @@ class DxfMeasurementOverlay extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
+                          AppIcon.fromMaterial(
                             tool.icon,
                             size: 15,
                             color: isSelected ? toolColor : Colors.white70,
@@ -205,7 +210,8 @@ class DxfMeasurementOverlay extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 onTap: onToggleSnap,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: snapEnabled ? const Color(0xFF00E5FF).withValues(alpha: 0.2) : Colors.white10,
                     borderRadius: BorderRadius.circular(8),
@@ -217,14 +223,16 @@ class DxfMeasurementOverlay extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.grain,
+                      AppIcon(
+                        AppIconId.pixelated,
                         size: 13,
                         color: snapEnabled ? const Color(0xFF00E5FF) : Colors.white54,
                       ),
                       const SizedBox(width: 3),
                       Text(
-                        'Snap ${snapEnabled ? "ON" : "OFF"}',
+                        context.l10n.commandUiSnapValue(
+                          (snapEnabled ? "ON" : "OFF").toString(),
+                        ),
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.bold,
@@ -240,8 +248,10 @@ class DxfMeasurementOverlay extends StatelessWidget {
 
               // Reset / Clear
               IconButton(
-                icon: const Icon(Icons.refresh, color: Colors.white70, size: 18),
-                tooltip: 'Clear measurement',
+                icon: const AppIcon(
+                  AppIconId.refresh, color: Colors.white70, size: 18,
+                ),
+                tooltip: context.l10n.commandUiClearMeasurement,
                 onPressed: onClear,
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -257,20 +267,22 @@ class DxfMeasurementOverlay extends StatelessWidget {
                   onTap: onUndoPoint,
                   borderRadius: BorderRadius.circular(7),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white12,
                       borderRadius: BorderRadius.circular(7),
                       border: Border.all(color: Colors.white24, width: 0.8),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.undo, size: 12, color: Colors.white),
+                        AppIcon(AppIconId.undo, size: 12, color: Colors.white),
                         SizedBox(width: 3),
                         Text(
-                          'Undo',
-                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.white),
+                          context.l10n.commandIconUndo,
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.white,
+                          ),
                         ),
                       ],
                     ),
@@ -282,7 +294,8 @@ class DxfMeasurementOverlay extends StatelessWidget {
                     onTap: onClosePolygon,
                     borderRadius: BorderRadius.circular(7),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: activeColor.withValues(alpha: 0.28),
                         borderRadius: BorderRadius.circular(7),
@@ -291,10 +304,14 @@ class DxfMeasurementOverlay extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.check, size: 13, color: activeColor),
+                          AppIcon(
+                            AppIconId.confirm,
+                            size: 13,
+                            color: activeColor,
+                          ),
                           const SizedBox(width: 3),
                           Text(
-                            'Close',
+                            context.l10n.commandIconClose,
                             style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.bold,
@@ -311,8 +328,12 @@ class DxfMeasurementOverlay extends StatelessWidget {
 
               // Exit
               IconButton(
-                icon: const Icon(Icons.close, color: Colors.white70, size: 18),
-                tooltip: 'Exit measurement',
+                icon: const AppIcon(
+                  AppIconId.close,
+                  color: Colors.white70,
+                  size: 18,
+                ),
+                tooltip: context.l10n.commandUiExitMeasurement,
                 onPressed: onExit,
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -336,11 +357,7 @@ class DxfMeasurementOverlay extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(
-                  currentTool.icon,
-                  color: activeColor,
-                  size: 13,
-                ),
+                          Icon(currentTool.icon, color: activeColor, size: 13),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(

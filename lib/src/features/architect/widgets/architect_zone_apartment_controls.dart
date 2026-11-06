@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_zone.dart';
@@ -63,7 +64,7 @@ class ArchitectZoneApartmentControls extends StatelessWidget {
             child: OutlinedButton.icon(
               key: const ValueKey('apartment-rooms'),
               onPressed: onRooms,
-              icon: const Icon(Icons.checklist),
+              icon: const AppIcon(AppIconId.checklist),
               label: Text(
                 '${l.architectApartmentRooms} · ${zones.where((z) => !z.isApartment && z.apartmentId == zone.id).length}',
               ),
@@ -88,7 +89,9 @@ class ArchitectZoneApartmentControls extends StatelessWidget {
                   IconButton(
                     tooltip: l.architectApartment,
                     onPressed: () => onOpenApartment?.call(parent.id),
-                    icon: const Icon(Icons.apartment, color: Colors.white70),
+                    icon: const AppIcon(
+                      AppIconId.building, color: Colors.white70,
+                    ),
                   ),
               ],
             ),

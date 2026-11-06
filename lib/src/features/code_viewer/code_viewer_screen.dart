@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -73,8 +74,7 @@ class CodeViewerScreen extends StatefulWidget {
 
   const CodeViewerScreen({
     super.key,
-    required this.filePath,
-  });
+    required this.filePath});
 
   @override
   State<CodeViewerScreen> createState() => _CodeViewerScreenState();
@@ -204,7 +204,8 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
     final painter = TextPainter(
       text: TextSpan(
         text: 'Ag',
-        style: TextStyle(fontFamily: 'monospace', fontSize: _fontSize, height: 1.5),
+        style: TextStyle(fontFamily: 'monospace', fontSize: _fontSize, height: 1.5,
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -238,13 +239,16 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
       _updateDisplayContent();
 
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'CodeViewer._loadCodeFile.fs');
+      AppErrorHandler.recordError(e, stack, context: 'CodeViewer._loadCodeFile.fs',
+      );
       _error = mounted ? context.l10n.fileNotFoundOrInaccessible : e.toString();
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'CodeViewer._loadCodeFile.format');
+      AppErrorHandler.recordError(e, stack, context: 'CodeViewer._loadCodeFile.format',
+      );
       _error = e.message;
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'CodeViewer._loadCodeFile');
+      AppErrorHandler.recordError(e, stack, context: 'CodeViewer._loadCodeFile',
+      );
       _error = e.toString();
     } finally {
       if (mounted) {
@@ -315,14 +319,16 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
           theme: theme,
         );
       } catch (e, stack) {
-        AppErrorHandler.recordError(e, stack, context: 'CodeViewer._parseHighlightedLines');
+        AppErrorHandler.recordError(e, stack, context: 'CodeViewer._parseHighlightedLines',
+        );
         final rawLines = _displayContent.split('\n');
         _lineSpans = rawLines.map((l) => [TextSpan(text: l.isEmpty ? ' ' : l)]).toList();
       }
     }
 
     if (_lineSpans.isEmpty) {
-      _lineSpans = [[const TextSpan(text: ' ')]];
+      _lineSpans = [[const TextSpan(text: ' ')],
+      ];
     }
     _lineCount = _lineSpans.length;
 
@@ -468,10 +474,12 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search...',
+                hintText: context.l10n.commandUiSearch,
                 isDense: true,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8,
+                ),
               ),
               onChanged: _performSearch,
             ),
@@ -482,11 +490,11 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
           if (_searchMatches.isEmpty && _searchController.text.isNotEmpty)
             const Text('0 / 0'),
           IconButton(
-            icon: const Icon(Icons.keyboard_arrow_up),
+            icon: const AppIcon(AppIconId.expandLess),
             onPressed: _searchMatches.isNotEmpty ? _prevMatch : null,
           ),
           IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down),
+            icon: const AppIcon(AppIconId.expandMore),
             onPressed: _searchMatches.isNotEmpty ? _nextMatch : null,
           ),
         ],
@@ -500,7 +508,8 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.warning_amber_rounded, size: 48, color: Colors.orange),
+            const Icon(Icons.warning_amber_rounded, size: 48, color: Colors.orange,
+            ),
             const SizedBox(height: 16),
             const Text('This file is very large.'),
             const Text('Syntax highlighting might cause performance issues.'),
@@ -512,7 +521,7 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
                   _updateLineSpans();
                 });
               },
-              child: const Text('View as Plain Text'),
+              child: Text(context.l10n.commandUiViewAsPlainText),
             ),
             TextButton(
               onPressed: () {
@@ -521,7 +530,7 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
                   _updateLineSpans();
                 });
               },
-              child: const Text('Continue anyway'),
+              child: Text(context.l10n.commandUiContinueAnyway),
             ),
           ],
         ),
@@ -579,8 +588,7 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
                   alignment: Alignment.topRight,
                   child: Text(
                     '${i + 1}',
-                    style: gutterStyle,
-                  ),
+                    style: gutterStyle),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -605,7 +613,8 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
       // Pinned gutter on the left (never scrolls horizontally, line numbers NEVER hidden).
       // Code scrolls horizontally with _horizontalController.
       // Both columns share identical line count and itemExtent: lineHeight for 100% sync.
-      final codeAvailableWidth = math.max(constraints.maxWidth - gutterWidth, _maxLineWidth);
+      final codeAvailableWidth = math.max(constraints.maxWidth - gutterWidth, _maxLineWidth,
+      );
 
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -632,8 +641,7 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
                   alignment: Alignment.centerRight,
                   child: Text(
                     '${i + 1}',
-                    style: gutterStyle,
-                  ),
+                    style: gutterStyle),
                 );
               },
             ),
@@ -681,8 +689,10 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
     return [
       // Search Toggle
       IconButton(
-        icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
-        tooltip: _isSearchOpen ? 'Close Search' : 'Search',
+        icon: AppIcon.fromMaterial(_isSearchOpen ? Icons.close : Icons.search, size: 20,
+        ),
+        tooltip: _isSearchOpen ? context.l10n.commandUiCloseSearch
+            : context.l10n.commandIconSearch,
         onPressed: () {
           setState(() {
             _isSearchOpen = !_isSearchOpen;
@@ -697,32 +707,36 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
 
       // Word Wrap Toggle (Fit to Screen)
       IconButton(
-        icon: Icon(_wordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20),
+        icon: AppIcon.fromMaterial(_wordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20,
+        ),
         color: _wordWrap ? Theme.of(context).colorScheme.primary : null,
-        tooltip: _wordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
+        tooltip: _wordWrap ? context.l10n.commandUiDisableWordWrap
+            : context.l10n.commandUiEnableWordWrap,
         onPressed: () => setState(() => _wordWrap = !_wordWrap),
       ),
 
       // Copy All
       IconButton(
-        icon: const Icon(Icons.copy_all_outlined, size: 20),
-        tooltip: 'Copy All',
+        icon: const AppIcon(AppIconId.duplicate, size: 20),
+        tooltip: context.l10n.commandUiCopyAll,
         onPressed: _copyContent,
       ),
 
       // Share
       IconButton(
-        icon: const Icon(Icons.share_outlined, size: 20),
-        tooltip: 'Share',
+        icon: const AppIcon(AppIconId.share, size: 20),
+        tooltip: context.l10n.commandIconShare,
         onPressed: _shareContent,
       ),
 
       // If JSON / XML: Pretty Print / Format Toggle
       if (_isJsonOrXml)
         IconButton(
-          icon: Icon(_isFormatted ? Icons.code_off : Icons.code, size: 20),
+          icon: AppIcon.fromMaterial(_isFormatted ? Icons.code_off : Icons.code, size: 20,
+          ),
           color: _isFormatted ? Theme.of(context).colorScheme.primary : null,
-          tooltip: _isFormatted ? 'Show Raw' : 'Pretty Print',
+          tooltip: _isFormatted ? context.l10n.commandUiShowRaw
+              : context.l10n.commandUiPrettyPrint,
           onPressed: () {
             setState(() {
               _isFormatted = !_isFormatted;
@@ -734,9 +748,11 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
       // If .env: Hide/Show Secrets Toggle
       if (_isEnv)
         IconButton(
-          icon: Icon(_hideSecrets ? Icons.visibility_off : Icons.visibility, size: 20),
+          icon: AppIcon.fromMaterial(_hideSecrets ? Icons.visibility_off : Icons.visibility, size: 20,
+          ),
           color: _hideSecrets ? Theme.of(context).colorScheme.primary : null,
-          tooltip: _hideSecrets ? 'Show Secrets' : 'Hide Secrets',
+          tooltip: _hideSecrets ? context.l10n.commandUiShowSecrets
+              : context.l10n.commandUiHideSecrets,
           onPressed: () {
             setState(() {
               _hideSecrets = !_hideSecrets;
@@ -748,8 +764,10 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
       // Plain Text vs Syntax Highlighting (for large files)
       if (_isLargeFile)
         IconButton(
-          icon: Icon(_showAsPlainText ? Icons.text_fields : Icons.code, size: 20),
-          tooltip: _showAsPlainText ? 'Enable Syntax Highlighting' : 'View as Plain Text',
+          icon: AppIcon.fromMaterial(_showAsPlainText ? Icons.text_fields : Icons.code, size: 20,
+          ),
+          tooltip: _showAsPlainText ? context.l10n.commandUiEnableSyntaxHighlighting
+              : context.l10n.commandUiViewAsPlainText,
           onPressed: () {
             setState(() {
               _showAsPlainText = !_showAsPlainText;
@@ -760,8 +778,10 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
 
       // Font Size Slider Menu
       PopupMenuButton<String>(
-        icon: const Icon(Icons.format_size, size: 20),
-        tooltip: 'Font Size (${_fontSize.toStringAsFixed(1)})',
+        icon: const AppIcon(AppIconId.textSize, size: 20),
+        tooltip: context.l10n.commandUiFontSizeValue(
+          (_fontSize.toStringAsFixed(1)).toString(),
+        ),
         itemBuilder: (context) => [
           PopupMenuItem(
             enabled: false,
@@ -771,7 +791,9 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Font Size: ${_fontSize.toStringAsFixed(1)}',
+                    context.l10n.commandUiFontSizeValue2(
+                      (_fontSize.toStringAsFixed(1)).toString(),
+                    ),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurface,
                       fontWeight: FontWeight.bold,
@@ -807,7 +829,7 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const AppIcon(AppIconId.back),
           onPressed: () => Navigator.of(context).pop(true),
         ),
         // Row 1: File Name Only
@@ -837,8 +859,7 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: _buildCodeActions(context),
-                    ),
+                      children: _buildCodeActions(context)),
                   ),
                 ),
               ),
@@ -846,7 +867,9 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text('Error: $_error', style: const TextStyle(color: Colors.red)))
+              ? Center(child: Text('Error: $_error', style: const TextStyle(color: Colors.red),
+              ),
+            )
               : Column(
                   children: [
                     if (_isSearchOpen) _buildSearchBar(),
@@ -863,7 +886,8 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8,
+                  ),
                       color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,

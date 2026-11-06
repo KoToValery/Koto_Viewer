@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -108,7 +109,7 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
   static Uint8List _sanitizeXlsxBytes(Uint8List bytes) {
     const knownStandardIds = {
       0, 1, 2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-      37, 38, 39, 40, 45, 46, 47, 48, 49
+      37, 38, 39, 40, 45, 46, 47, 48, 49,
     };
 
     try {
@@ -154,21 +155,26 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
 
             final newXml = doc.toXmlString();
             final newBytes = utf8.encode(newXml);
-            newArchive.addFile(ArchiveFile(file.name, newBytes.length, newBytes));
+            newArchive.addFile(ArchiveFile(file.name, newBytes.length, newBytes),
+            );
             modified = true;
             continue;
           } on xml.XmlException {
             // Regex fallback: strip numFmts completely
-            final cleanContent = content.replaceAll(RegExp(r'<numFmts[\s\S]*?</numFmts>'), '');
+            final cleanContent = content.replaceAll(RegExp(r'<numFmts[\s\S]*?</numFmts>'), '',
+            );
             final newBytes = utf8.encode(cleanContent);
-            newArchive.addFile(ArchiveFile(file.name, newBytes.length, newBytes));
+            newArchive.addFile(ArchiveFile(file.name, newBytes.length, newBytes),
+            );
             modified = true;
             continue;
           } on FormatException {
             // Regex fallback: strip numFmts completely
-            final cleanContent = content.replaceAll(RegExp(r'<numFmts[\s\S]*?</numFmts>'), '');
+            final cleanContent = content.replaceAll(RegExp(r'<numFmts[\s\S]*?</numFmts>'), '',
+            );
             final newBytes = utf8.encode(cleanContent);
-            newArchive.addFile(ArchiveFile(file.name, newBytes.length, newBytes));
+            newArchive.addFile(ArchiveFile(file.name, newBytes.length, newBytes),
+            );
             modified = true;
             continue;
           }
@@ -177,7 +183,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
         final contentBytes = file.content is List<int>
             ? (file.content as List<int>)
             : utf8.encode(file.content.toString());
-        newArchive.addFile(ArchiveFile(file.name, contentBytes.length, contentBytes));
+        newArchive.addFile(ArchiveFile(file.name, contentBytes.length, contentBytes),
+        );
       }
 
       if (modified) {
@@ -213,7 +220,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
       try {
         excel = xl.Excel.decodeBytes(bytes);
       } on Exception catch (decodeEx, decodeStack) {
-        AppErrorHandler.recordError(decodeEx, decodeStack, context: 'XlsxViewer.decodeBytes.retrySanitized');
+        AppErrorHandler.recordError(decodeEx, decodeStack, context: 'XlsxViewer.decodeBytes.retrySanitized',
+        );
         // Retry with sanitized OpenXML styles
         final sanitized = _sanitizeXlsxBytes(bytes);
         excel = xl.Excel.decodeBytes(sanitized);
@@ -237,7 +245,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
         });
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'XlsxViewer._loadExcelFile');
+      AppErrorHandler.recordError(e, stack, context: 'XlsxViewer._loadExcelFile',
+      );
       // If it fails to load as Excel, try CSV / text fallback table
       try {
         final file = File(widget.filePath);
@@ -259,14 +268,16 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
           return;
         }
       } on Exception catch (fallbackErr, fallbackStack) {
-        AppErrorHandler.recordError(fallbackErr, fallbackStack, context: 'XlsxViewer.textFallback');
+        AppErrorHandler.recordError(fallbackErr, fallbackStack, context: 'XlsxViewer.textFallback',
+        );
       }
 
       // If opening failed completely, remove from Recent Files
       await RecentFilesService.removeRecentFile(widget.filePath);
 
       if (mounted) {
-        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '',
+        );
         setState(() {
           _errorMessage = context.l10n.errorLoadingSpreadsheet(cleanMsg);
           _isLoading = false;
@@ -276,7 +287,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
   }
 
   void _parseTextFallback(String text) {
-    final lines = LineSplitter.split(text).map((l) => l.trimRight()).where((l) => l.isNotEmpty).toList();
+    final lines = LineSplitter.split(text,
+    ).map((l) => l.trimRight()).where((l) => l.isNotEmpty).toList();
     if (lines.isEmpty) throw Exception('File is empty.');
 
     String delimiter = ',';
@@ -305,7 +317,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
     _maxRows = parsedRows.length;
     _maxCols = maxCols;
     _sheetData = parsedRows;
-    _sheetFormulas = List.generate(_maxRows, (_) => List.filled(_maxCols, null));
+    _sheetFormulas = List.generate(_maxRows, (_) => List.filled(_maxCols, null),
+    );
 
     final widths = List.filled(_maxCols, 80.0);
     for (int r = 0; r < _maxRows; r++) {
@@ -391,7 +404,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
 
         // Estimate column width from character count (Cyrillic & Latin)
         final cellValue = rows[r][c];
-        final estimatedWidth = math.max(80.0, math.min(380.0, cellValue.length * 9.5 + 24.0));
+        final estimatedWidth = math.max(80.0, math.min(380.0, cellValue.length * 9.5 + 24.0),
+        );
         if (estimatedWidth > widths[c]) {
           widths[c] = estimatedWidth;
         }
@@ -500,14 +514,20 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8,
+                  ),
                   child: Row(
                     children: [
-                      const Icon(Icons.table_chart_outlined, color: Color(0xFF107C41)),
+                      const AppIcon(
+                        AppIconId.schedule, color: Color(0xFF107C41),
+                      ),
                       const SizedBox(width: 10),
                       Text(
-                        'Workbook Sheets (${_sheetNames.length})',
-                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                        context.l10n.commandUiWorkbookSheetsValue(
+                          (_sheetNames.length).toString(),
+                        ),
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -521,7 +541,7 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                       final name = _sheetNames[index];
                       final isSelected = name == _activeSheetName;
                       return ListTile(
-                        leading: Icon(
+                        leading: AppIcon.fromMaterial(
                           isSelected ? Icons.check_circle : Icons.article_outlined,
                           color: isSelected ? const Color(0xFF107C41) : Colors.grey,
                         ),
@@ -533,8 +553,11 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                           ),
                         ),
                         trailing: Text(
-                          'Sheet ${index + 1}',
-                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
+                          context.l10n.commandUiSheetValue(
+                            (index + 1).toString(),
+                          ),
+                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color,
+                          ),
                         ),
                         onTap: () {
                           Navigator.of(context).pop();
@@ -590,7 +613,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                       color: const Color(0xFF107C41).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.table_view_rounded, color: Color(0xFF107C41)),
+                    child: const Icon(Icons.table_view_rounded, color: Color(0xFF107C41),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -599,11 +623,13 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                       children: [
                         const Text(
                           'Excel Spreadsheet • Properties',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Text(
                           _fileName,
-                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
+                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -616,7 +642,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
               _buildInfoRow('File Size:', formattedSize),
               _buildInfoRow('Total Sheets:', '${_sheetNames.length} sheets'),
               _buildInfoRow('Active Sheet:', _activeSheetName),
-              _buildInfoRow('Grid Dimensions:', '$_maxRows rows × $_maxCols columns'),
+              _buildInfoRow('Grid Dimensions:', '$_maxRows rows × $_maxCols columns',
+              ),
             ],
           ),
         );
@@ -630,8 +657,10 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -645,10 +674,12 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
     return [
       // Search Toggle
       IconButton(
-        icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+        icon: AppIcon.fromMaterial(_isSearchOpen ? Icons.close : Icons.search, size: 20,
+        ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: _isSearchOpen ? 'Close Search' : 'Search in Sheet',
+        tooltip: _isSearchOpen ? context.l10n.commandUiCloseSearch
+            : context.l10n.commandUiSearchInSheet,
         onPressed: () {
           setState(() {
             _isSearchOpen = !_isSearchOpen;
@@ -663,28 +694,28 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
 
       // Sheets List Quick Button
       IconButton(
-        icon: const Icon(Icons.table_chart_outlined, size: 20),
+        icon: const AppIcon(AppIconId.schedule, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'All Sheets',
+        tooltip: context.l10n.commandUiAllSheets,
         onPressed: _showSheetsMenu,
       ),
 
       // Info / Properties
       IconButton(
-        icon: const Icon(Icons.info_outline, size: 20),
+        icon: const AppIcon(AppIconId.info, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Spreadsheet Properties',
+        tooltip: context.l10n.commandUiSpreadsheetProperties,
         onPressed: _showInfoSheet,
       ),
 
       // Share
       IconButton(
-        icon: const Icon(Icons.share_outlined, size: 20),
+        icon: const AppIcon(AppIconId.share, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Share',
+        tooltip: context.l10n.commandIconShare,
         onPressed: _shareFile,
       ),
     ];
@@ -730,7 +761,7 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
           backgroundColor: theme.colorScheme.surface,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon: const AppIcon(AppIconId.back),
             onPressed: () {
               if (_errorMessage != null) {
                 RecentFilesService.removeRecentFile(widget.filePath);
@@ -744,12 +775,12 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                 autofocus: true,
                 style: const TextStyle(fontSize: 15),
                 decoration: InputDecoration(
-                  hintText: 'Search in active sheet...',
+                  hintText: context.l10n.commandUiSearchInActiveSheet,
                   border: InputBorder.none,
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.clear, size: 18),
-                    onPressed: () {
-                      _searchController.clear();
+                    icon: const AppIcon(AppIconId.close, size: 18),
+                      onPressed: () {
+                        _searchController.clear();
                       setState(() {
                         _searchQuery = '';
                         _searchMatchCount = 0;
@@ -766,7 +797,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
               )
             : Text(
                 _fileName,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                  ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -788,8 +820,7 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                   child: Row(
                     children: [
                       const Spacer(),
-                      ..._buildXlsxActions(),
-                    ],
+                      ..._buildXlsxActions()],
                   ),
                 ),
               ),
@@ -812,14 +843,15 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                        const Icon(Icons.error_outline, size: 48, color: Colors.redAccent,
+                      ),
                         const SizedBox(height: 16),
                         Text(_errorMessage!, textAlign: TextAlign.center),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           onPressed: _loadExcelFile,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
+                          icon: const AppIcon(AppIconId.refresh),
+                          label: Text(context.l10n.retry),
                         ),
                       ],
                     ),
@@ -830,11 +862,13 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                     // Search Match Status Bar
                     if (_searchQuery.trim().isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6,
+                      ),
                         color: const Color(0xFFFFB74D).withValues(alpha: 0.2),
                         child: Row(
                           children: [
-                            const Icon(Icons.search, size: 16, color: Color(0xFFF57C00)),
+                            const Icon(Icons.search, size: 16, color: Color(0xFFF57C00),
+                          ),
                             const SizedBox(width: 8),
                             Text(
                               'Found $_searchMatchCount ${_searchMatchCount == 1 ? "match" : "matches"} in "$_activeSheetName"',
@@ -850,21 +884,27 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
 
                     // Top Formula / Cell Inspector Bar
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6,
+                    ),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surface,
                         border: Border(
-                          bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
+                          bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3),
+                        ),
                         ),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3,
+                          ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF107C41).withValues(alpha: 0.15),
+                              color: const Color(0xFF107C41,
+                            ).withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFF107C41).withValues(alpha: 0.3)),
+                              border: Border.all(color: const Color(0xFF107C41,
+                              ).withValues(alpha: 0.3),
+                            ),
                             ),
                             child: Text(
                               _selectedRow >= 0 && _selectedCol >= 0
@@ -880,7 +920,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                           if (_selectedFormula != null) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2,
+                            ),
                               decoration: BoxDecoration(
                                 color: Colors.blue.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(4),
@@ -937,16 +978,21 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                           ),
                           if (_selectedCellValue.isNotEmpty || _selectedFormula != null)
                             IconButton(
-                              icon: const Icon(Icons.copy, size: 16),
-                              tooltip: 'Copy Cell Text',
+                              icon: const AppIcon(AppIconId.duplicate, size: 16),
+                              tooltip: context.l10n.commandUiCopyCellText,
                               onPressed: () {
                                 final textToCopy = _selectedFormula != null
                                     ? '=${_selectedFormula!.startsWith('=') ? _selectedFormula!.substring(1) : _selectedFormula}\nResult: $_selectedCellValue'
                                     : _selectedCellValue;
-                                Clipboard.setData(ClipboardData(text: textToCopy));
+                                Clipboard.setData(ClipboardData(text: textToCopy),
+                              );
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Cell content copied to clipboard'),
+                                SnackBar(
+                                    content: Text(
+                                    context
+                                        .l10n
+                                        .commandUiCellContentCopiedToClipboard,
+                                  ),
                                     duration: Duration(seconds: 1),
                                   ),
                                 );
@@ -964,7 +1010,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                             return const Center(child: Text('Sheet is empty.'));
                           }
 
-                          final totalWidth = _colWidths.fold<double>(0.0, (sum, w) => sum + w);
+                          final totalWidth = _colWidths.fold<double>(0.0, (sum, w) => sum + w,
+                        );
                           final scaledRowHeight = rowHeight * _zoomScale;
 
                           return Listener(
@@ -983,9 +1030,11 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                                           alignment: Alignment.center,
                                           decoration: BoxDecoration(
                                             color: headerBg,
-                                            border: Border.all(color: gridLineColor, width: 0.5),
+                                            border: Border.all(color: gridLineColor, width: 0.5,
                                           ),
-                                          child: const Icon(Icons.grid_4x4, size: 14, color: Colors.grey),
+                                          ),
+                                          child: const Icon(Icons.grid_4x4, size: 14, color: Colors.grey,
+                                        ),
                                         ),
                                         // Sticky Column Headers (A, B, C...)
                                         Expanded(
@@ -1006,22 +1055,28 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                                                     alignment: Alignment.center,
                                                     decoration: BoxDecoration(
                                                       color: isColSelected
-                                                          ? const Color(0xFF107C41).withValues(alpha: 0.25)
+                                                          ? const Color(0xFF107C41,
+                                                            ).withValues(alpha: 0.25,
+                                                            )
                                                           : headerBg,
-                                                      border: Border.all(color: gridLineColor, width: 0.5),
+                                                      border: Border.all(color: gridLineColor, width: 0.5,
+                                                      ),
                                                     ),
                                                     child: Text(
                                                       _getColumnLetter(c),
                                                       style: TextStyle(
-                                                        fontSize: 12 * _zoomScale.clamp(0.8, 1.2),
+                                                        fontSize: 12 * _zoomScale.clamp(0.8, 1.2,
+                                                            ),
                                                         fontWeight: FontWeight.bold,
                                                         color: isColSelected
-                                                            ? const Color(0xFF107C41)
+                                                            ? const Color(0xFF107C41,
+                                                              )
                                                             : theme.textTheme.bodyMedium?.color,
                                                       ),
                                                     ),
                                                   );
-                                                }),
+                                                },
+                                              ),
                                               ),
                                             ),
                                           ),
@@ -1049,22 +1104,28 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                                                     alignment: Alignment.center,
                                                     decoration: BoxDecoration(
                                                       color: isRowSelected
-                                                          ? const Color(0xFF107C41).withValues(alpha: 0.25)
+                                                          ? const Color(0xFF107C41,
+                                                            ).withValues(alpha: 0.25,
+                                                            )
                                                           : headerBg,
-                                                      border: Border.all(color: gridLineColor, width: 0.5),
+                                                      border: Border.all(color: gridLineColor, width: 0.5,
+                                                      ),
                                                     ),
                                                     child: Text(
                                                       '${r + 1}',
                                                       style: TextStyle(
-                                                        fontSize: 11 * _zoomScale.clamp(0.8, 1.2),
+                                                        fontSize: 11 * _zoomScale.clamp(0.8, 1.2,
+                                                            ),
                                                         fontWeight: FontWeight.bold,
                                                         color: isRowSelected
-                                                            ? const Color(0xFF107C41)
+                                                            ? const Color(0xFF107C41,
+                                                              )
                                                             : theme.textTheme.bodySmall?.color,
                                                       ),
                                                     ),
                                                   );
-                                                }),
+                                                },
+                                              ),
                                               ),
                                             ),
                                           ),
@@ -1082,12 +1143,14 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                                                 child: SizedBox(
                                                   width: totalWidth * _zoomScale,
                                                   child: Column(
-                                                    children: List.generate(_maxRows, (r) {
+                                                    children: List.generate(_maxRows, (r,
+                                                  ) {
                                                       final rowBg = r % 2 == 0 ? cellBgEven : cellBgOdd;
                                                       return SizedBox(
                                                         height: scaledRowHeight,
                                                         child: Row(
-                                                          children: List.generate(_maxCols, (c) {
+                                                          children: List.generate(_maxCols, (c,
+                                                        ) {
                                                             final colW = _colWidths[c] * _zoomScale;
                                                             final cellText = (r < _sheetData.length &&
                                                                     c < _sheetData[r].length)
@@ -1097,24 +1160,32 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                                                             final isSearchMatch = _searchQuery.trim().isNotEmpty &&
                                                                 cellText
                                                                     .toLowerCase()
-                                                                    .contains(_searchQuery.toLowerCase());
+                                                                    .contains(_searchQuery.toLowerCase(),
+                                                                  );
 
                                                             return InkWell(
-                                                              onTap: () => _onCellTapped(r, c),
+                                                              onTap: () => _onCellTapped(r, c,
+                                                                ),
                                                               child: Container(
                                                                 width: colW,
                                                                 height: scaledRowHeight,
-                                                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                                padding: const EdgeInsets.symmetric(horizontal: 8,
+                                                                  ),
                                                                 alignment: Alignment.centerLeft,
                                                                 decoration: BoxDecoration(
                                                                   color: isSelected
-                                                                      ? const Color(0xFF107C41).withValues(alpha: 0.3)
+                                                                      ? const Color(0xFF107C41,
+                                                                      ).withValues(alpha: 0.3,
+                                                                      )
                                                                       : isSearchMatch
-                                                                          ? const Color(0xFFFFD54F).withValues(alpha: 0.6)
+                                                                          ? const Color(0xFFFFD54F,
+                                                                      ).withValues(alpha: 0.6,
+                                                                      )
                                                                           : rowBg,
                                                                   border: Border.all(
                                                                     color: isSelected
-                                                                        ? const Color(0xFF107C41)
+                                                                        ? const Color(0xFF107C41,
+                                                                        )
                                                                         : gridLineColor,
                                                                     width: isSelected ? 1.5 : 0.5,
                                                                   ),
@@ -1123,7 +1194,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                                                                   cellText,
                                                                   overflow: TextOverflow.ellipsis,
                                                                   style: TextStyle(
-                                                                    fontSize: 12.5 * _zoomScale.clamp(0.8, 1.4),
+                                                                    fontSize: 12.5 * _zoomScale.clamp(0.8, 1.4,
+                                                                          ),
                                                                     color: isSearchMatch && !isDark
                                                                         ? Colors.black87
                                                                         : null,
@@ -1154,12 +1226,15 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                                   bottom: 16,
                                   right: 16,
                                   child: Material(
-                                    color: theme.colorScheme.surface.withValues(alpha: 0.92),
+                                    color: theme.colorScheme.surface.withValues(alpha: 0.92,
+                                  ),
                                     shape: const CircleBorder(),
                                     elevation: 4,
                                     child: IconButton(
-                                      icon: const Icon(Icons.fit_screen_outlined, size: 20),
-                                      tooltip: 'Reset Zoom (100%)',
+                                      icon: const AppIcon(
+                                      AppIconId.fitView, size: 20,
+                                    ),
+                                      tooltip: context.l10n.commandUiResetZoom100,
                                       onPressed: () => setState(() => _zoomScale = 1.0),
                                     ),
                                   ),
@@ -1177,42 +1252,53 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surface,
                         border: Border(
-                          top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
+                          top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3),
+                        ),
                         ),
                       ),
                       child: Row(
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.menu_open_rounded, size: 20),
-                            tooltip: 'All Sheets (${_sheetNames.length})',
+                            icon: const AppIcon(
+                            AppIconId.layoutSidebar, size: 20,
+                          ),
+                            tooltip: context.l10n.commandUiAllSheetsValue(
+                            (_sheetNames.length).toString(),
+                          ),
                             onPressed: _showSheetsMenu,
                           ),
-                          const VerticalDivider(width: 1, indent: 8, endIndent: 8),
+                          const VerticalDivider(width: 1, indent: 8, endIndent: 8,
+                        ),
                           Expanded(
                             child: ListView.builder(
                               scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6,
+                            ),
                               itemCount: _sheetNames.length,
                               itemBuilder: (context, index) {
                                 final name = _sheetNames[index];
                                 final isSelected = name == _activeSheetName;
                                 return Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                                  padding: const EdgeInsets.symmetric(horizontal: 3,
+                                ),
                                   child: Material(
                                     color: isSelected
-                                        ? const Color(0xFF107C41).withValues(alpha: 0.18)
+                                        ? const Color(0xFF107C41,
+                                        ).withValues(alpha: 0.18)
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(8),
                                     child: InkWell(
                                       borderRadius: BorderRadius.circular(8),
                                       onTap: () => _onSheetSelected(name),
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6,
+                                      ),
                                         decoration: BoxDecoration(
                                           border: Border.all(
                                             color: isSelected
                                                 ? const Color(0xFF107C41)
-                                                : theme.dividerColor.withValues(alpha: 0.25),
+                                                : theme.dividerColor.withValues(alpha: 0.25,
+                                                ),
                                             width: isSelected ? 1.5 : 0.8,
                                           ),
                                           borderRadius: BorderRadius.circular(8),
@@ -1220,8 +1306,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(
-                                              Icons.table_chart,
+                                          AppIcon(
+                                            AppIconId.schedule,
                                               size: 14,
                                               color: isSelected ? const Color(0xFF107C41) : Colors.grey,
                                             ),

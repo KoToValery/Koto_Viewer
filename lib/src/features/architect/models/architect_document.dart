@@ -22,6 +22,30 @@ Offset _point(Object? value) {
 }
 
 List<double> _xy(Offset p) => [p.dx, p.dy];
+List<Offset>? _crop(Object? value) {
+  if (value == null) return null;
+  // Preserve invalid crops as invalid, rather than exposing the full source or
+  // failing project loading. Preflight reports them and the editor can repair.
+  if (value is! List || value.length < 3 || value.length > 2048) {
+    return const [];
+  }
+  final points = <Offset>[];
+  for (final point in value) {
+    if (point is! List ||
+        point.length != 2 ||
+        point[0] is! num ||
+        point[1] is! num ||
+        !(point[0] as num).isFinite ||
+        !(point[1] as num).isFinite) {
+      return const [];
+    }
+    points.add(
+      Offset((point[0] as num).toDouble(), (point[1] as num).toDouble()),
+    );
+  }
+  return points;
+}
+
 Rect _rect(Object? value) {
   final r = value as List? ?? const [0, 0, 100, 100];
   return Rect.fromLTWH(
@@ -122,6 +146,13 @@ class ArchitectDrawingPlacement {
   final int scale;
   final double rotation;
   final bool locked, showTitle;
+
+  /// Optional visible boundary, in paper mm relative to [frame.topLeft].
+  /// A null boundary retains the legacy rectangular viewport.
+  final List<Offset>? crop;
+
+  /// Sheet-instance visibility layered over the saved drawing defaults.
+  final Map<String, bool> visibilityOverrides;
   const ArchitectDrawingPlacement({
     required this.id,
     required this.drawingId,
@@ -132,8 +163,11 @@ class ArchitectDrawingPlacement {
     this.rotation = 0,
     this.locked = false,
     this.showTitle = true,
+    this.crop,
+    this.visibilityOverrides = const {},
   });
   ArchitectDrawingPlacement copyWith({
+    String? id,
     String? drawingId,
     String? number,
     Rect? frame,
@@ -142,8 +176,11 @@ class ArchitectDrawingPlacement {
     double? rotation,
     bool? locked,
     bool? showTitle,
+    List<Offset>? crop,
+    bool clearCrop = false,
+    Map<String, bool>? visibilityOverrides,
   }) => ArchitectDrawingPlacement(
-    id: id,
+    id: id ?? this.id,
     drawingId: drawingId ?? this.drawingId,
     number: number ?? this.number,
     frame: frame ?? this.frame,
@@ -152,6 +189,8 @@ class ArchitectDrawingPlacement {
     rotation: rotation ?? this.rotation,
     locked: locked ?? this.locked,
     showTitle: showTitle ?? this.showTitle,
+    crop: clearCrop ? null : crop ?? this.crop,
+    visibilityOverrides: visibilityOverrides ?? this.visibilityOverrides,
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -163,6 +202,9 @@ class ArchitectDrawingPlacement {
     'rotation': rotation,
     'locked': locked,
     'showTitle': showTitle,
+    if (crop != null) 'crop': crop!.map(_xy).toList(),
+    if (visibilityOverrides.isNotEmpty)
+      'visibilityOverrides': visibilityOverrides,
   };
   factory ArchitectDrawingPlacement.fromJson(Map j) =>
       ArchitectDrawingPlacement(
@@ -175,6 +217,10 @@ class ArchitectDrawingPlacement {
         rotation: _number(j['rotation'], 0),
         locked: j['locked'] == true,
         showTitle: j['showTitle'] != false,
+        crop: _crop(j['crop']),
+        visibilityOverrides: Map<String, bool>.from(
+          j['visibilityOverrides'] as Map? ?? {},
+        ),
       );
 }
 
@@ -365,6 +411,19 @@ class ArchitectDocument {
     sheets: sheets ?? this.sheets,
     templates: templates ?? this.templates,
   );
+  ArchitectDocument copyElementOverrides(Map<String, String> ids) {
+    final sizes = Map<String, double>.of(overrideMm);
+    for (final entry in overrideMm.entries) {
+      final parts = entry.key.split('/');
+      if (parts.length != 4) continue;
+      final id = ids[parts[1]];
+      if (id != null) {
+        sizes['${parts[0]}/$id/${parts[2]}/${parts[3]}'] = entry.value;
+      }
+    }
+    return copyWith(overrideMm: sizes);
+  }
+
   double textMm(
     String view,
     String element,

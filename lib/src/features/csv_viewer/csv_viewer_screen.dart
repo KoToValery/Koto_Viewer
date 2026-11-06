@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:csv/csv.dart';
@@ -77,7 +78,8 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'CsvViewer._loadCsv.format');
+      AppErrorHandler.recordError(e, stack, context: 'CsvViewer._loadCsv.format',
+      );
       if (mounted) {
         setState(() {
           _errorMessage = e.message;
@@ -112,10 +114,10 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
   void _parseCsv() {
     try {
       _rows = CsvDecoder(
-        fieldDelimiter: _delimiter,
-      ).convert(_rawText);
+        fieldDelimiter: _delimiter).convert(_rawText);
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'CsvViewer._parseCsv.format');
+      AppErrorHandler.recordError(e, stack, context: 'CsvViewer._parseCsv.format',
+      );
       _rows = [];
     } on Exception catch (e, stack) {
       AppErrorHandler.recordError(e, stack, context: 'CsvViewer._parseCsv');
@@ -152,7 +154,8 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
     if (_searchQuery.isEmpty || _rows.isEmpty) return _rows;
     final headers = _rows.first;
     final dataRows = _rows.sublist(1).where((row) {
-      return row.any((cell) => cell.toString().toLowerCase().contains(_searchQuery.toLowerCase()));
+      return row.any((cell) => cell.toString().toLowerCase().contains(_searchQuery.toLowerCase()),
+      );
     }).toList();
     return [headers, ...dataRows];
   }
@@ -168,13 +171,14 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
         title: Text(_fileName, style: const TextStyle(fontSize: 16)),
         actions: [
           IconButton(
-            icon: Icon(_isRawMode ? Icons.grid_on : Icons.text_snippet),
-            tooltip: 'Toggle Raw Text',
+            icon: AppIcon.fromMaterial(_isRawMode ? Icons.grid_on : Icons.text_snippet,
+            ),
+            tooltip: context.l10n.commandUiToggleRawText,
             onPressed: () => setState(() => _isRawMode = !_isRawMode),
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.tune),
-            tooltip: 'Delimiter',
+            icon: const AppIcon(AppIconId.properties),
+            tooltip: context.l10n.commandUiDelimiter,
             onSelected: (val) {
               setState(() {
                 _delimiter = val;
@@ -182,14 +186,38 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
               });
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: ',', child: Text('Comma (,)')),
-              const PopupMenuItem(value: ';', child: Text('Semicolon (;)')),
-              const PopupMenuItem(value: '\t', child: Text('Tab (\\t)')),
-              const PopupMenuItem(value: '|', child: Text('Pipe (|)')),
+              PopupMenuItem(
+                value: ',',
+                child: AppMenuLabel(
+                  icon: AppIconId.table,
+                  child: Text(context.l10n.commandUiComma),
+                ),
+              ),
+              PopupMenuItem(
+                value: ';',
+                child: AppMenuLabel(
+                  icon: AppIconId.table,
+                  child: Text(context.l10n.commandUiSemicolon),
+                ),
+              ),
+              PopupMenuItem(
+                value: '\t',
+                child: AppMenuLabel(
+                  icon: AppIconId.table,
+                  child: Text(context.l10n.commandUiTabT),
+                ),
+              ),
+              PopupMenuItem(
+                value: '|',
+                child: AppMenuLabel(
+                  icon: AppIconId.table,
+                  child: Text(context.l10n.commandUiPipe),
+                ),
+              ),
             ],
           ),
           IconButton(
-            icon: const Icon(Icons.share),
+            icon: const AppIcon(AppIconId.share),
             onPressed: _shareFile,
           ),
         ],
@@ -204,10 +232,10 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
                       Padding(
                         padding: const EdgeInsets.all(8.0),
                         child: TextField(
-                          decoration: const InputDecoration(
-                            labelText: 'Search rows...',
+                          decoration: InputDecoration(
+                            labelText: context.l10n.commandUiSearchRows,
                             border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.search),
+                            prefixIcon: AppIcon(AppIconId.search),
                           ),
                           onChanged: (val) => setState(() => _searchQuery = val),
                         ),
@@ -236,10 +264,10 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
   }
 
   Widget _buildDataTable() {
-    if (_rows.isEmpty) return const Center(child: Text('Empty CSV'));
+    if (_rows.isEmpty) return Center(child: Text(context.l10n.commandUiEmptyCsv));
     
     final displayRows = _filteredRows;
-    if (displayRows.isEmpty) return const Center(child: Text('No matches'));
+    if (displayRows.isEmpty) return Center(child: Text(context.l10n.commandUiNoMatches));
     
     final headers = displayRows.first;
     final data = displayRows.sublist(1);
@@ -253,7 +281,9 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
             color: Colors.amber.withValues(alpha: 0.2),
-            child: const Text('Showing first 1000 rows for performance', style: TextStyle(fontSize: 12)),
+            child: Text(
+              context.l10n.commandUiShowingFirst1000RowsForPerformance, style: TextStyle(fontSize: 12),
+            ),
           ),
         Expanded(
           child: SingleChildScrollView(
@@ -265,10 +295,13 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
                 sortColumnIndex: _sortColumn != null ? _sortColumn! + 1 : null,
                 sortAscending: _sortAscending,
                 columns: [
-                  const DataColumn(label: Text('#', style: TextStyle(fontWeight: FontWeight.bold))),
+                  const DataColumn(label: Text('#', style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
                   ...List.generate(headers.length, (i) {
                     return DataColumn(
-                      label: Text(headers[i].toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text(headers[i].toString(), style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       onSort: (columnIndex, ascending) => _onSort(columnIndex - 1),
                     );
                   }),
@@ -279,7 +312,9 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
                     cells: [
                       DataCell(Text('${rowIndex + 1}')),
                       ...List.generate(headers.length, (colIndex) {
-                        return DataCell(Text(colIndex < row.length ? row[colIndex].toString() : ''));
+                        return DataCell(Text(colIndex < row.length ? row[colIndex].toString() : '',
+                          ),
+                        );
                       }),
                     ],
                   );

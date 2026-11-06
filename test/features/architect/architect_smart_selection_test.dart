@@ -1,3 +1,4 @@
+import '../../support/command_icon_finders.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -77,9 +78,9 @@ void main() {
 
       final (nextStorey, copyIds) = elementTool.duplicateElementsByIds(
         storey,
-        {'w1', 'c1'},
-        offset: const Offset(1, 1),
-      );
+        {'w1', 'c1',
+      },
+        offset: const Offset(1, 1));
 
       expect(copyIds.length, 2);
       expect(nextStorey.walls.length, 2);
@@ -104,8 +105,7 @@ void main() {
       final storey = ArchitectStorey(
         id: 's1',
         name: 'Floor 1',
-        columns: [c1],
-      );
+        columns: [c1]);
 
       final rotatedStorey = elementTool.rotateElementsByIds(storey, {'c1'});
       expect(rotatedStorey.columns.first.rotationDeg, 90);
@@ -121,8 +121,7 @@ void main() {
       final storey = ArchitectStorey(
         id: 's1',
         name: 'Floor 1',
-        walls: [w1],
-      );
+        walls: [w1]);
 
       final flippedStorey = elementTool.flipElementsByIds(storey, {'w1'});
       expect(flippedStorey.walls.first.startPoint, const Offset(4, 0));
@@ -156,7 +155,8 @@ void main() {
   });
 
   group('ArchitectSelection.summary localization', () {
-    testWidgets('summarizes same-type and mixed-type selections', (tester) async {
+    testWidgets('summarizes same-type and mixed-type selections', (tester,
+    ) async {
       late AppLocalizations l10nEn;
       late AppLocalizations l10nBg;
 
@@ -225,20 +225,28 @@ void main() {
       );
 
       // Walls only summary
-      final wallsSummaryEn = ArchitectSelection.summary(project, {'w1', 'w2'}, l10nEn);
+      final wallsSummaryEn = ArchitectSelection.summary(project, {'w1', 'w2',
+      }, l10nEn);
       expect(wallsSummaryEn, contains('2 walls'));
 
-      final wallsSummaryBg = ArchitectSelection.summary(project, {'w1', 'w2'}, l10nBg);
+      final wallsSummaryBg = ArchitectSelection.summary(project, {'w1', 'w2',
+      }, l10nBg);
       expect(wallsSummaryBg, contains('2 стени'));
 
       // Mixed summary
-      final mixedSummaryEn = ArchitectSelection.summary(project, {'w1', 'c1'}, l10nEn);
+      final mixedSummaryEn = ArchitectSelection.summary(project, {'w1', 'c1',
+      }, l10nEn);
       expect(mixedSummaryEn, contains('2 items:'));
 
-      final mixedSummaryBg = ArchitectSelection.summary(project, {'w1', 'c1'}, l10nBg);
+      final mixedSummaryBg = ArchitectSelection.summary(project, {'w1', 'c1',
+      }, l10nBg);
       expect(mixedSummaryBg, contains('2 елемента:'));
-      expect(ArchitectSelection.summary(project, {'w1', 'c1'}, l10nEn, compact: true), '2 items');
-      expect(ArchitectSelection.summary(project, {'w1', 'c1'}, l10nBg, compact: true), '2 елемента');
+      expect(ArchitectSelection.summary(project, {'w1', 'c1'}, l10nEn, compact: true,
+        ), '2 items',
+      );
+      expect(ArchitectSelection.summary(project, {'w1', 'c1'}, l10nBg, compact: true,
+        ), '2 елемента',
+      );
     });
   });
 
@@ -295,8 +303,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: ArchitectWorkspaceScreen(
-            commandController: commands,
-          ),
+            commandController: commands),
         ),
       );
       await tester.pumpAndSettle();
@@ -311,7 +318,8 @@ void main() {
     BimViewportController camera(WidgetTester tester) => overlay(tester).viewport!;
 
     Offset screen(WidgetTester tester, Offset point) =>
-        tester.getTopLeft(find.byKey(const ValueKey('architect-viewport-input'))) +
+        tester.getTopLeft(find.byKey(const ValueKey('architect-viewport-input')),
+          ) +
         camera(tester).toScreen(point);
 
     testWidgets('Explicit multi-select keeps multiple elements with a compact action bar', (tester) async {
@@ -319,85 +327,111 @@ void main() {
       await openWorkspace(tester, commands);
 
       // Switch to Select tool
-      await tester.tap(find.byIcon(Icons.near_me_outlined));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
-      await tester.pumpAndSettle();
+      await tester.tap(findCommandIcon(Icons.near_me_outlined));
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('architect-multi-select')),
+          );
+          await tester.pumpAndSettle();
 
-      // Tap w1 (at model 2, 0)
+          // Tap w1 (at model 2, 0)
+          await tester.tapAt(screen(tester, const Offset(2, 0)));
+          await tester.pumpAndSettle();
+
+          expect(
+            find.byKey(const ValueKey('architect-selection-bar')),
+            findsOneWidget,
+          );
+
+          // Sequentially tap c1 (at model 2, 2) - should add to selection
+          await tester.tapAt(screen(tester, const Offset(2, 2)));
+          await tester.pumpAndSettle();
+
+          // Selection actions remain available without a count.
+          expect(
+            find.byKey(const ValueKey('architect-selection-bar')),
+            findsOneWidget,
+          );
+          expect(find.text('2 items'), findsNothing);
+          expect(
+            find.byKey(const ValueKey('architect-context-menu-btn')),
+            findsNothing,
+          );
+
+          // Hold a selected element to open the group context menu.
+          final held = await tester.startGesture(
+            screen(tester, const Offset(1, 0)),
+          );
+          await tester.pump(const Duration(milliseconds: 750));
+          await held.up();
+          await tester.pumpAndSettle();
+
+          // ArchitectRadialMenu should be visible with badge
+          expect(find.byType(ArchitectRadialMenu), findsOneWidget);
+          expect(find.textContaining('2 items:'), findsWidgets);
+        },
+      );
+
+      testWidgets(
+        'Select connected walls expands selection to all connected walls',
+        (tester) async {
+          final commands = seededController();
+          await openWorkspace(tester, commands);
+
+          // Select w1
+          await tester.tap(findCommandIcon(Icons.near_me_outlined));
+      await tester.pumpAndSettle();
       await tester.tapAt(screen(tester, const Offset(2, 0)));
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.byKey(const ValueKey('architect-multi-select')),
+          );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey('architect-selection-bar')), findsOneWidget);
+          // Tap "Connected" button in selection bar
+          final connectedBtn = find.byKey(
+            const ValueKey('architect-select-connected'),
+          );
+          expect(connectedBtn, findsOneWidget);
+          await tester.tap(connectedBtn);
+          await tester.pumpAndSettle();
 
-      // Sequentially tap c1 (at model 2, 2) - should add to selection
-      await tester.tapAt(screen(tester, const Offset(2, 2)));
+          // The connected walls are selected without a bottom count.
+          expect(overlay(tester).selectedElementIds, {'w1', 'w2'});
+          expect(find.textContaining('2 walls'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'Select similar elements expands selection to all of same type',
+        (tester) async {
+          final commands = seededController();
+          await openWorkspace(tester, commands);
+
+          // Select w1
+          await tester.tap(findCommandIcon(Icons.near_me_outlined));
+          await tester.pumpAndSettle();
+
+          await tester.tapAt(screen(tester, const Offset(2, 0)));
       await tester.pumpAndSettle();
 
-      // Selection actions remain available without a count.
-      expect(find.byKey(const ValueKey('architect-selection-bar')), findsOneWidget);
-      expect(find.text('2 items'), findsNothing);
-      expect(find.byKey(const ValueKey('architect-context-menu-btn')), findsNothing);
+          await tester.tap(find.byKey(const ValueKey('architect-multi-select')),
+          );
+          await tester.pumpAndSettle();
 
-      // Hold a selected element to open the group context menu.
-      final held = await tester.startGesture(screen(tester, const Offset(1, 0)));
-      await tester.pump(const Duration(milliseconds: 750));
-      await held.up();
+          // Tap "Similar" button
+          final similarBtn = find.byKey(
+            const ValueKey('architect-select-similar'),
+          );
+          expect(similarBtn, findsOneWidget);
+          await tester.tap(similarBtn);
       await tester.pumpAndSettle();
 
-      // ArchitectRadialMenu should be visible with badge
-      expect(find.byType(ArchitectRadialMenu), findsOneWidget);
-      expect(find.textContaining('2 items:'), findsWidgets);
-    });
-
-    testWidgets('Select connected walls expands selection to all connected walls', (tester) async {
-      final commands = seededController();
-      await openWorkspace(tester, commands);
-
-      // Select w1
-      await tester.tap(find.byIcon(Icons.near_me_outlined));
-      await tester.pumpAndSettle();
-
-      await tester.tapAt(screen(tester, const Offset(2, 0)));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
-      await tester.pumpAndSettle();
-
-      // Tap "Connected" button in selection bar
-      final connectedBtn = find.byKey(const ValueKey('architect-select-connected'));
-      expect(connectedBtn, findsOneWidget);
-      await tester.tap(connectedBtn);
-      await tester.pumpAndSettle();
-
-      // The connected walls are selected without a bottom count.
-      expect(overlay(tester).selectedElementIds, {'w1', 'w2'});
-      expect(find.textContaining('2 walls'), findsNothing);
-    });
-
-    testWidgets('Select similar elements expands selection to all of same type', (tester) async {
-      final commands = seededController();
-      await openWorkspace(tester, commands);
-
-      // Select w1
-      await tester.tap(find.byIcon(Icons.near_me_outlined));
-      await tester.pumpAndSettle();
-
-      await tester.tapAt(screen(tester, const Offset(2, 0)));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
-      await tester.pumpAndSettle();
-
-      // Tap "Similar" button
-      final similarBtn = find.byKey(const ValueKey('architect-select-similar'));
-      expect(similarBtn, findsOneWidget);
-      await tester.tap(similarBtn);
-      await tester.pumpAndSettle();
-
-      // Both walls are now selected
-      expect(overlay(tester).selectedElementIds, {'w1', 'w2'});
-      expect(find.textContaining('2 walls'), findsNothing);
-    });
-  });
+          // Both walls are now selected
+          expect(overlay(tester).selectedElementIds, {'w1', 'w2'});
+          expect(find.textContaining('2 walls'), findsNothing);
+        },
+      );
+    },
+  );
 }

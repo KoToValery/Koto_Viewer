@@ -1,3 +1,4 @@
+import 'support/command_icon_finders.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,7 +25,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    testWidgets('shows slide sequence counter and skips hidden files on Next', (tester) async {
+    testWidgets('shows slide sequence counter and skips hidden files on Next', (tester,
+    ) async {
       final f1 = ProjectFileEntry(
         internalPath: '01.mp4',
         fileName: '01.mp4',
@@ -127,10 +129,12 @@ void main() {
 
       // Should show file name and indicator that it is skipped from presentation
       expect(find.text('02.dwg'), findsOneWidget);
-      expect(find.textContaining('Пропуснат от презентацията'), findsOneWidget);
+      expect(find.textContaining('Пропуснат от презентацията'), findsOneWidget,
+        );
       expect(find.text('Скрит'), findsOneWidget);
-      expect(find.byIcon(Icons.visibility_off_rounded), findsOneWidget);
-    });
+      expect(findCommandIcon(Icons.visibility_off_rounded), findsOneWidget);
+    },
+    );
 
     testWidgets('toggling hide button updates file state and saves to preferences', (tester) async {
       final f1 = ProjectFileEntry(
@@ -173,12 +177,15 @@ void main() {
 
       // Should now be hidden
       expect(f1.isHidden, isTrue);
-      expect(find.textContaining('Пропуснат от презентацията'), findsOneWidget);
+      expect(find.textContaining('Пропуснат от презентацията'), findsOneWidget,
+        );
 
       // Verify saved in SharedPreferences
-      final savedHidden = await ProjectBundleService.loadHiddenFiles(bundle.archivePath);
+      final savedHidden = await ProjectBundleService.loadHiddenFiles(bundle.archivePath,
+        );
       expect(savedHidden.contains('01.mp4'), isTrue);
-    });
+    },
+    );
 
     testWidgets('Project file item card renders without RenderFlex overflow on narrow screens', (tester) async {
       final item = ProjectFileEntry(
@@ -197,7 +204,8 @@ void main() {
             width: 320,
             child: Card(
               child: ListTile(
-                contentPadding: const EdgeInsets.only(left: 8, right: 4, top: 2, bottom: 2),
+                contentPadding: const EdgeInsets.only(left: 8, right: 4, top: 2, bottom: 2,
+                  ),
                 horizontalTitleGap: 8,
                 minLeadingWidth: 0,
                 leading: Row(
@@ -211,7 +219,8 @@ void main() {
                         color: Colors.grey.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Icon(Icons.visibility_off_rounded, size: 13, color: Colors.grey),
+                      child: const Icon(Icons.visibility_off_rounded, size: 13, color: Colors.grey,
+                        ),
                     ),
                     const SizedBox(width: 6),
                     Container(
@@ -221,13 +230,15 @@ void main() {
                         color: Colors.teal.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.draw_rounded, color: Colors.teal, size: 20),
+                      child: const Icon(Icons.draw_rounded, color: Colors.teal, size: 20,
+                        ),
                     ),
                   ],
                 ),
                 title: Text(
                   item.fileName,
-                  style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13.5),
+                  style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13.5,
+                    ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -237,11 +248,13 @@ void main() {
                       children: [
                         TextSpan(
                           text: item.formattedSize,
-                          style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                          style: const TextStyle(fontSize: 11.5, color: Colors.grey,
+                            ),
                         ),
                         const TextSpan(
                           text: ' • ',
-                          style: TextStyle(fontSize: 11.5, color: Colors.grey),
+                          style: TextStyle(fontSize: 11.5, color: Colors.grey,
+                            ),
                         ),
                         TextSpan(
                           text: item.category.shortLabel,
@@ -253,7 +266,8 @@ void main() {
                         ),
                         const TextSpan(
                           text: ' • ',
-                          style: TextStyle(fontSize: 11.5, color: Colors.grey),
+                          style: TextStyle(fontSize: 11.5, color: Colors.grey,
+                            ),
                         ),
                         TextSpan(
                           text: context.l10n.hiddenInPresentation,
@@ -273,28 +287,34 @@ void main() {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.visibility_off_rounded, size: 18),
+                      icon: const Icon(Icons.visibility_off_rounded, size: 18,
+                        ),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28,
+                        ),
                       onPressed: () {},
                     ),
                     IconButton(
                       icon: const Icon(Icons.arrow_upward_rounded, size: 18),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 26, minHeight: 28),
+                      constraints: const BoxConstraints(minWidth: 26, minHeight: 28,
+                        ),
                       onPressed: () {},
                     ),
                     IconButton(
-                      icon: const Icon(Icons.arrow_downward_rounded, size: 18),
+                      icon: const Icon(Icons.arrow_downward_rounded, size: 18,
+                        ),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 26, minHeight: 28),
+                      constraints: const BoxConstraints(minWidth: 26, minHeight: 28,
+                        ),
                       onPressed: () {},
                     ),
                     const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 4,
+                        ),
                       child: Icon(Icons.drag_indicator_rounded, size: 20),
                     ),
                   ],
@@ -309,6 +329,7 @@ void main() {
       expect(find.text('0.00 Worksheet (7).dwg'), findsOneWidget);
       expect(find.textContaining('316.6 KB'), findsOneWidget);
       expect(tester.takeException(), isNull);
-    });
+    },
+    );
   });
 }

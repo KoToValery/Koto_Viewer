@@ -1,3 +1,4 @@
+import 'support/command_icon_finders.dart';
 import 'package:kotoview/src/features/structural_designer/widgets/element_palette_bar.dart';
 import 'package:kotoview/src/features/structural_designer/rendering/structural_pointer_painter.dart';
 import 'package:flutter/material.dart';
@@ -92,7 +93,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: find.byType(AppBar),
-          matching: find.byIcon(Icons.undo_rounded),
+          matching: findCommandIcon(Icons.undo_rounded),
         ),
       );
       await tester.pumpAndSettle();

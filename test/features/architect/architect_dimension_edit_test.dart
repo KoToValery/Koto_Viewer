@@ -1,3 +1,4 @@
+import '../../support/command_icon_finders.dart';
 import 'architect_tool_test_helper.dart' as tool_ui;
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -22,7 +23,7 @@ Future<void> selectDimension(
   ArchitectDimension dimension,
 ) async {
   await tool_ui.prepare(tester, Icons.near_me_outlined);
-  await tester.tap(find.byIcon(Icons.near_me_outlined));
+  await tester.tap(findCommandIcon(Icons.near_me_outlined));
   await tester.pumpAndSettle();
   await workspace.wallTap(
     tester,

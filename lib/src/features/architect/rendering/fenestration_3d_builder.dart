@@ -21,14 +21,20 @@ class Fenestration3dBuilder {
 
   // Standard Colors
   static const Color frameColor = Color(0xFF37474F); // Dark slate PVC/Al frame
-  static const Color sashColor = Color(0xFF455A64);  // Inner moving sash frame
+  static const Color sashColor = Color(0xFF455A64); // Inner moving sash frame
   static const Color glassColor = Color(0x994FC3F7); // Cyan double glazing unit
-  static const Color sillColor = Color(0xFF90A4AE);  // Metal/stone exterior sill
-  static const Color gasketColor = Color(0xFF1B1B1B); // Black EPDM rubber glazing gasket
+  static const Color sillColor = Color(0xFF90A4AE); // Metal/stone exterior sill
+  static const Color gasketColor = Color(
+    0xFF1B1B1B,
+  ); // Black EPDM rubber glazing gasket
   static const Color hingeColor = Color(0xFF263238); // Hardware hinge barrel
-  static const Color hingeCapColor = Color(0xFF2E3D44); // Hardware hinge cap & bracket
+  static const Color hingeCapColor = Color(
+    0xFF2E3D44,
+  ); // Hardware hinge cap & bracket
   static const Color handleColor = Color(0xFFB0BEC5); // Hardware lever handle
-  static const Color handleRosetteColor = Color(0xFF546E7A); // Hardware handle rosette
+  static const Color handleRosetteColor = Color(
+    0xFF546E7A,
+  ); // Hardware handle rosette
 
   /// Generates the complete 3D mesh of the fenestration element hosted within a wall.
   static List<Triangle3D> buildOpening3D({
@@ -39,7 +45,8 @@ class Fenestration3dBuilder {
     required double coreThickness,
     required double insulationThickness,
     double? coreCenterShift,
-    required double exteriorSign, // +1 or -1 along wall normal pointing to exterior
+    required double
+    exteriorSign, // +1 or -1 along wall normal pointing to exterior
     required double offsetRatio,
     required double width,
     required double height,
@@ -66,7 +73,8 @@ class Fenestration3dBuilder {
     final zTop = zBottom + height;
 
     // Center in masonry core (5-chamber frame depth = 70 mm = 0.07 m)
-    final resolvedCoreShift = coreCenterShift ??
+    final resolvedCoreShift =
+        coreCenterShift ??
         (wallThickness - coreThickness) / 2.0 * (-exteriorSign);
     final frameCenter = centerPos + n * resolvedCoreShift;
     final fDepth = style.frameDepth;
@@ -113,42 +121,93 @@ class Fenestration3dBuilder {
       }
       return tris;
     }
-    _buildSubdivisions3D(
-      tris: tris,
-      node: style.rootSubdivision,
-      frameCenter: frameCenter,
-      u: u,
-      n: n,
-      halfFDepth: halfFDepth,
-      glazingThick: style.glazingThickness,
-      fFace: fFace,
-      left: -halfW + fFace,
-      right: halfW - fFace,
-      bottomZ: zBottom + (style.kind == FenestrationKind.window ? fFace : 0.0),
-      topZ: zTop - fFace,
-      exteriorSign: exteriorSign,
-      kind: style.kind,
-      detailLevel: detailLevel,
-    );
+    final layout = style.resolveLayout(width: width, height: height);
+    for (final r in layout.dividers) {
+      _addBox3D(
+        tris,
+        frameCenter + u * (r.left - halfW) - n * halfFDepth,
+        frameCenter + u * (r.right - halfW) - n * halfFDepth,
+        frameCenter + u * (r.right - halfW) + n * halfFDepth,
+        frameCenter + u * (r.left - halfW) + n * halfFDepth,
+        zBottom + r.top,
+        zBottom + r.bottom,
+        frameColor,
+      );
+    }
+    for (final entry in layout.panes.values) {
+      final r = entry.rect;
+      final upper = style.transom?.subdivision.findPane(entry.pane.id) != null;
+      _buildSubdivisions3D(
+        tris: tris,
+        node: FenestrationSubdivision(id: entry.pane.id, pane: entry.pane),
+        frameCenter: frameCenter,
+        u: u,
+        n: n,
+        halfFDepth: halfFDepth,
+        glazingThick: style.glazingThickness,
+        fFace: fFace,
+        left: r.left - halfW,
+        right: r.right - halfW,
+        bottomZ: zBottom + r.top,
+        topZ: zBottom + r.bottom,
+        exteriorSign: exteriorSign,
+        kind: upper ? FenestrationKind.window : style.kind,
+        detailLevel: detailLevel,
+      );
+      if (style.kind == FenestrationKind.door &&
+          !upper &&
+          entry.pane.isOpenable &&
+          detailLevel == FenestrationElevationDetail.full3D) {
+        _buildDoorHinges3D(
+          tris: tris,
+          frameCenter: frameCenter + u * (r.center.dx - halfW),
+          u: u,
+          n: n,
+          halfW: r.width / 2 + fFace,
+          fFace: fFace,
+          frameDepth: fDepth,
+          exteriorSign: exteriorSign,
+          zBottom: zBottom + r.top,
+          zTop: zBottom + r.bottom,
+          isHingeLeft:
+              layout.panes.values
+                      .where(
+                        (e) =>
+                            e.pane.isOpenable &&
+                            style.transom?.subdivision.findPane(e.pane.id) ==
+                                null,
+                      )
+                      .length >
+                  1
+              ? r.center.dx < width / 2
+              : isHingeLeft,
+        );
+      }
+    }
 
     // 3. Exterior Casing / Trim (Обрамчване)
     // Sits directly on the exterior wall/insulation face without intersecting the wall body!
     if (style.hasCasing) {
-      _buildExteriorCasing(
-        tris: tris,
-        style: style,
-        centerPos: centerPos,
-        u: u,
-        n: n,
-        wallThickness: wallThickness,
-        coreThickness: coreThickness,
-        insulationThickness: insulationThickness,
-        coreCenterShift: coreCenterShift,
-        exteriorSign: exteriorSign,
-        halfW: halfW,
-        zBottom: zBottom,
-        zTop: zTop,
-      );
+      for (final side in [
+        if (style.casingPlacement != CasingPlacement.interior) exteriorSign,
+        if (style.casingPlacement != CasingPlacement.exterior) -exteriorSign,
+      ]) {
+        _buildExteriorCasing(
+          tris: tris,
+          style: style,
+          centerPos: centerPos,
+          u: u,
+          n: n,
+          wallThickness: wallThickness,
+          coreThickness: coreThickness,
+          insulationThickness: insulationThickness,
+          coreCenterShift: coreCenterShift,
+          exteriorSign: side,
+          halfW: halfW,
+          zBottom: zBottom,
+          zTop: zTop,
+        );
+      }
     }
 
     // 4. Exterior Sill Plate (if window without bottom casing)
@@ -162,24 +221,6 @@ class Fenestration3dBuilder {
         exteriorSign: exteriorSign,
         halfW: halfW,
         zBottom: zBottom,
-      );
-    }
-
-    // 5. Interior-facing 3D Barrel Hinges for doors
-    if (style.kind == FenestrationKind.door &&
-        detailLevel == FenestrationElevationDetail.full3D) {
-      _buildDoorHinges3D(
-        tris: tris,
-        frameCenter: frameCenter,
-        u: u,
-        n: n,
-        halfW: halfW,
-        fFace: fFace,
-        wallThickness: wallThickness,
-        exteriorSign: exteriorSign,
-        zBottom: zBottom,
-        zTop: zTop,
-        isHingeLeft: isHingeLeft,
       );
     }
 
@@ -254,94 +295,6 @@ class Fenestration3dBuilder {
     final curW = right - left;
     final curH = topZ - bottomZ;
     if (curW <= 0.02 || curH <= 0.02) return;
-
-    if (node.isSplit) {
-      if (node.isVertical) {
-        // Vertical mullion splits
-        double currentX = left;
-        for (int i = 0; i < node.children.length; i++) {
-          final w = curW * node.ratios[i];
-          final childRight = currentX + w;
-
-          // Add vertical dividing mullion bar between panes
-          if (i < node.children.length - 1) {
-            final mCenter = childRight;
-            final m1 = frameCenter + u * (mCenter - fFace / 2) - n * halfFDepth;
-            final m2 = frameCenter + u * (mCenter + fFace / 2) - n * halfFDepth;
-            final m3 = frameCenter + u * (mCenter + fFace / 2) + n * halfFDepth;
-            final m4 = frameCenter + u * (mCenter - fFace / 2) + n * halfFDepth;
-            _addBox3D(tris, m1, m2, m3, m4, bottomZ, topZ, frameColor);
-          }
-
-          _buildSubdivisions3D(
-            tris: tris,
-            node: node.children[i],
-            frameCenter: frameCenter,
-            u: u,
-            n: n,
-            halfFDepth: halfFDepth,
-            glazingThick: glazingThick,
-          detailLevel: detailLevel,
-            fFace: fFace,
-            left: currentX,
-            right: childRight,
-            bottomZ: bottomZ,
-            topZ: topZ,
-            exteriorSign: exteriorSign,
-            kind: kind,
-          );
-
-          currentX = childRight;
-        }
-      } else {
-        // Horizontal transom splits
-        double currentZ = bottomZ;
-        for (int i = 0; i < node.children.length; i++) {
-          final h = curH * node.ratios[i];
-          final childTop = currentZ + h;
-
-          // Add horizontal transom bar between panes
-          if (i < node.children.length - 1) {
-            final tCenter = childTop;
-            final t1 = frameCenter + u * left - n * halfFDepth;
-            final t2 = frameCenter + u * right - n * halfFDepth;
-            final t3 = frameCenter + u * right + n * halfFDepth;
-            final t4 = frameCenter + u * left + n * halfFDepth;
-            _addBox3D(
-              tris,
-              t1,
-              t2,
-              t3,
-              t4,
-              tCenter - fFace / 2,
-              tCenter + fFace / 2,
-              frameColor,
-            );
-          }
-
-          _buildSubdivisions3D(
-            tris: tris,
-            node: node.children[i],
-            frameCenter: frameCenter,
-            u: u,
-            n: n,
-            halfFDepth: halfFDepth,
-            glazingThick: glazingThick,
-          detailLevel: detailLevel,
-            fFace: fFace,
-            left: left,
-            right: right,
-            bottomZ: currentZ,
-            topZ: childTop,
-            exteriorSign: exteriorSign,
-            kind: kind,
-          );
-
-          currentZ = childTop;
-        }
-      }
-      return;
-    }
 
     // Leaf Pane
     final pane = node.pane;
@@ -498,7 +451,8 @@ class Fenestration3dBuilder {
     if (detailLevel == FenestrationElevationDetail.full3D &&
         right - left > 2 * gasketW + 0.01 &&
         topZ - bottomZ > 2 * gasketW + 0.01) {
-      final halfGasket = halfGlass + 0.002; // Protrudes 2mm proud of glass on both faces
+      final halfGasket =
+          halfGlass + 0.002; // Protrudes 2mm proud of glass on both faces
 
       void addGasketStrip(double x1, double x2, double z1, double z2) {
         if (x2 <= x1 + 1e-4 || z2 <= z1 + 1e-4) return;
@@ -514,7 +468,12 @@ class Fenestration3dBuilder {
       // Right vertical gasket strip
       addGasketStrip(right - gasketW, right, bottomZ, topZ);
       // Bottom horizontal gasket strip
-      addGasketStrip(left + gasketW, right - gasketW, bottomZ, bottomZ + gasketW);
+      addGasketStrip(
+        left + gasketW,
+        right - gasketW,
+        bottomZ,
+        bottomZ + gasketW,
+      );
       // Top horizontal gasket strip
       addGasketStrip(left + gasketW, right - gasketW, topZ - gasketW, topZ);
     }
@@ -553,16 +512,7 @@ class Fenestration3dBuilder {
         final mb2 = frameCenter + u * right - n * mDepth;
         final mb3 = frameCenter + u * right + n * mDepth;
         final mb4 = frameCenter + u * left + n * mDepth;
-        _addBox3D(
-          tris,
-          mb1,
-          mb2,
-          mb3,
-          mb4,
-          cz - mHalf,
-          cz + mHalf,
-          sashColor,
-        );
+        _addBox3D(tris, mb1, mb2, mb3, mb4, cz - mHalf, cz + mHalf, sashColor);
       }
     }
   }
@@ -626,7 +576,7 @@ class Fenestration3dBuilder {
     final bZ = style.includeBottomCasing ? zBottom - cWidth : zBottom;
     final tZ = zTop + cWidth;
 
-    _addBoxFromPoints(tris, lc1, lc2, lc3, lc4, bZ, tZ, cColor);
+    _addBoxFromPoints(tris, lc1, lc2, lc3, lc4, zBottom, zTop, cColor);
 
     // Right Casing Ear: from (centerPos + u * halfW) to (centerPos + u * (halfW + cWidth))
     final rc1 = (extSurfaceBase + u * halfW);
@@ -634,7 +584,7 @@ class Fenestration3dBuilder {
     final rc3 = (extProjBase + u * (halfW + cWidth));
     final rc4 = (extProjBase + u * halfW);
 
-    _addBoxFromPoints(tris, rc1, rc2, rc3, rc4, bZ, tZ, cColor);
+    _addBoxFromPoints(tris, rc1, rc2, rc3, rc4, zBottom, zTop, cColor);
 
     // Lintel Casing Header (Горно обрамчване): spans between outer casing edges
     final tc1 = (extSurfaceBase - u * (halfW + cWidth));
@@ -762,17 +712,18 @@ class Fenestration3dBuilder {
     required Offset n,
     required double halfW,
     required double fFace,
-    required double wallThickness,
+    required double frameDepth,
     required double exteriorSign,
     required double zBottom,
     required double zTop,
     bool isHingeLeft = true,
   }) {
-    final halfThick = wallThickness / 2.0;
+    final halfThick = frameDepth / 2.0;
     // Interior face is opposite to exteriorSign
     final interiorDir = -exteriorSign;
     final hingeX = isHingeLeft ? -(halfW - fFace) : (halfW - fFace);
-    final hingePos = (frameCenter + u * hingeX) +
+    final hingePos =
+        (frameCenter + u * hingeX) +
         n * (interiorDir * halfThick + interiorDir * 0.012);
 
     final height = zTop - zBottom;
@@ -807,18 +758,22 @@ class Fenestration3dBuilder {
       for (var i = 0; i < segs; i++) {
         final pA = pts[i];
         final pB = pts[(i + 1) % segs];
-        tris.add(Triangle3D(
-          v0: cT,
-          v1: Vector3(pA.dx, pA.dy, zHMax),
-          v2: Vector3(pB.dx, pB.dy, zHMax),
-          color: capCol,
-        ));
-        tris.add(Triangle3D(
-          v0: cB,
-          v1: Vector3(pB.dx, pB.dy, zHMin),
-          v2: Vector3(pA.dx, pA.dy, zHMin),
-          color: capCol,
-        ));
+        tris.add(
+          Triangle3D(
+            v0: cT,
+            v1: Vector3(pA.dx, pA.dy, zHMax),
+            v2: Vector3(pB.dx, pB.dy, zHMax),
+            color: capCol,
+          ),
+        );
+        tris.add(
+          Triangle3D(
+            v0: cB,
+            v1: Vector3(pB.dx, pB.dy, zHMin),
+            v2: Vector3(pA.dx, pA.dy, zHMin),
+            color: capCol,
+          ),
+        );
       }
     }
 
@@ -937,14 +892,13 @@ class Fenestration3dBuilder {
     required bool isHingeLeft,
   }) {
     const hingeR = 0.009; // 9 mm radius (18 mm cylinder)
-    const halfH = 0.025;  // 50 mm total height
+    const halfH = 0.025; // 50 mm total height
     final zHMin = zCenter - halfH;
     final zHMax = zCenter + halfH;
 
     final interiorFacePos =
         frameCenter + u * hingeX + n * (interiorDir * halfFDepth);
-    final hingePos =
-        interiorFacePos + n * (interiorDir * (hingeR * 0.9));
+    final hingePos = interiorFacePos + n * (interiorDir * (hingeR * 0.9));
 
     const segs = 8;
     final pts = List.generate(segs, (i) {
@@ -972,28 +926,49 @@ class Fenestration3dBuilder {
     for (var i = 0; i < segs; i++) {
       final pA = pts[i];
       final pB = pts[(i + 1) % segs];
-      tris.add(Triangle3D(
-        v0: cT,
-        v1: Vector3(pA.dx, pA.dy, zHMax),
-        v2: Vector3(pB.dx, pB.dy, zHMax),
-        color: capCol,
-      ));
-      tris.add(Triangle3D(
-        v0: cB,
-        v1: Vector3(pB.dx, pB.dy, zHMin),
-        v2: Vector3(pA.dx, pA.dy, zHMin),
-        color: capCol,
-      ));
+      tris.add(
+        Triangle3D(
+          v0: cT,
+          v1: Vector3(pA.dx, pA.dy, zHMax),
+          v2: Vector3(pB.dx, pB.dy, zHMax),
+          color: capCol,
+        ),
+      );
+      tris.add(
+        Triangle3D(
+          v0: cB,
+          v1: Vector3(pB.dx, pB.dy, zHMin),
+          v2: Vector3(pA.dx, pA.dy, zHMin),
+          color: capCol,
+        ),
+      );
     }
 
     // Mounting bracket connecting barrel to sash stile
     final bracketSide = isHingeLeft ? -1.0 : 1.0;
-    final bP1 = interiorFacePos - u * (bracketSide * 0.012) - n * (interiorDir * 0.004);
-    final bP2 = interiorFacePos + u * (bracketSide * 0.012) - n * (interiorDir * 0.004);
-    final bP3 = interiorFacePos + u * (bracketSide * 0.012) + n * (interiorDir * (hingeR * 0.9));
-    final bP4 = interiorFacePos - u * (bracketSide * 0.012) + n * (interiorDir * (hingeR * 0.9));
+    final bP1 =
+        interiorFacePos - u * (bracketSide * 0.012) - n * (interiorDir * 0.004);
+    final bP2 =
+        interiorFacePos + u * (bracketSide * 0.012) - n * (interiorDir * 0.004);
+    final bP3 =
+        interiorFacePos +
+        u * (bracketSide * 0.012) +
+        n * (interiorDir * (hingeR * 0.9));
+    final bP4 =
+        interiorFacePos -
+        u * (bracketSide * 0.012) +
+        n * (interiorDir * (hingeR * 0.9));
 
-    _addBox3D(tris, bP1, bP2, bP3, bP4, zCenter - 0.015, zCenter + 0.015, capCol);
+    _addBox3D(
+      tris,
+      bP1,
+      bP2,
+      bP3,
+      bP4,
+      zCenter - 0.015,
+      zCenter + 0.015,
+      capCol,
+    );
   }
 
   static void _buildWindowHandle3D({
@@ -1014,7 +989,16 @@ class Fenestration3dBuilder {
     final r2 = facePos + u * 0.012;
     final r3 = facePos + u * 0.012 + n * (interiorDir * 0.008);
     final r4 = facePos - u * 0.012 + n * (interiorDir * 0.008);
-    _addBox3D(tris, r1, r2, r3, r4, handleZ - 0.028, handleZ + 0.028, handleRosetteColor);
+    _addBox3D(
+      tris,
+      r1,
+      r2,
+      r3,
+      r4,
+      handleZ - 0.028,
+      handleZ + 0.028,
+      handleRosetteColor,
+    );
 
     // 2. Neck
     final neckBase = facePos + n * (interiorDir * 0.008);
@@ -1023,13 +1007,31 @@ class Fenestration3dBuilder {
     final nk2 = neckBase + u * 0.007;
     final nk3 = neckOut + u * 0.007;
     final nk4 = neckOut - u * 0.007;
-    _addBox3D(tris, nk1, nk2, nk3, nk4, handleZ - 0.007, handleZ + 0.007, handleColor);
+    _addBox3D(
+      tris,
+      nk1,
+      nk2,
+      nk3,
+      nk4,
+      handleZ - 0.007,
+      handleZ + 0.007,
+      handleColor,
+    );
 
     // 3. Ergonomic lever pointing down
     final hLev1 = neckOut - u * 0.007;
     final hLev2 = neckOut + u * 0.007;
     final hLev3 = neckOut + u * 0.007 + n * (interiorDir * 0.012);
     final hLev4 = neckOut - u * 0.007 + n * (interiorDir * 0.012);
-    _addBox3D(tris, hLev1, hLev2, hLev3, hLev4, handleZ - 0.10, handleZ + 0.007, handleColor);
+    _addBox3D(
+      tris,
+      hLev1,
+      hLev2,
+      hLev3,
+      hLev4,
+      handleZ - 0.10,
+      handleZ + 0.007,
+      handleColor,
+    );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -66,7 +67,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
         ProjectBundlePreloadService.startPreloading(info);
       }
     } catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'ProjectViewerScreen._loadBundle');
+      AppErrorHandler.recordError(e, stack, context: 'ProjectViewerScreen._loadBundle',
+      );
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -76,7 +78,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
     }
   }
 
-  Future<void> _openProjectItem(ProjectFileEntry item, int index, {bool replace = false}) async {
+  Future<void> _openProjectItem(ProjectFileEntry item, int index, {bool replace = false,
+  }) async {
     if (_bundle == null) return;
 
     // Check if file is already extracted in cache
@@ -96,15 +99,18 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
           return PopScope(
             canPop: false,
             child: AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16),
+              ),
               content: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8,
+                ),
                 child: Row(
                   children: [
                     const SizedBox(
                       width: 32,
                       height: 32,
-                      child: CircularProgressIndicator(strokeWidth: 3, color: Colors.amber),
+                      child: CircularProgressIndicator(strokeWidth: 3, color: Colors.amber,
+                      ),
                     ),
                     const SizedBox(width: 18),
                     Expanded(
@@ -114,14 +120,16 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
                         children: [
                           Text(
                             context.l10n.extractingFile(item.fileName),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14,
+                            ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
                           Text(
                             item.formattedSize,
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            style: const TextStyle(fontSize: 12, color: Colors.grey,
+                            ),
                           ),
                         ],
                       ),
@@ -149,13 +157,15 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
         );
       }
     } catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'ProjectViewerScreen.extractFile');
+      AppErrorHandler.recordError(e, stack, context: 'ProjectViewerScreen.extractFile',
+      );
       if (dialogContext != null && dialogContext!.mounted) {
         Navigator.of(dialogContext!).pop();
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open file: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Could not open file: $e'), backgroundColor: Colors.red,
+          ),
         );
       }
       return;
@@ -253,9 +263,9 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
         ),
       );
     } else {
-      await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => viewerWidget),
-      );
+      await Navigator.of(context,
+      ).push(
+        MaterialPageRoute(builder: (_) => viewerWidget));
       if (mounted) {
         setState(() {});
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -284,7 +294,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
     setState(() {
       item.isHidden = newHidden;
     });
-    await ProjectBundleService.toggleFileHidden(_bundle!.archivePath, item, newHidden);
+    await ProjectBundleService.toggleFileHidden(_bundle!.archivePath, item, newHidden,
+    );
     if (mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -313,7 +324,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
       }
       _showHiddenOnly = false;
     });
-    await ProjectBundleService.unhideAllFiles(_bundle!.archivePath, _bundle!.files);
+    await ProjectBundleService.unhideAllFiles(_bundle!.archivePath, _bundle!.files,
+    );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -343,7 +355,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
     _saveCurrentOrder();
   }
 
-  void _moveFilteredItem(ProjectFileEntry item, bool moveUp, List<ProjectFileEntry> currentFiltered) {
+  void _moveFilteredItem(ProjectFileEntry item, bool moveUp, List<ProjectFileEntry> currentFiltered,
+  ) {
     if (_bundle == null) return;
     final files = _bundle!.files;
     final currentIndex = files.indexOf(item);
@@ -398,20 +411,20 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
           if (_bundle != null && _bundle!.files.isNotEmpty) ...[
             if (_bundle!.hiddenFilesCount > 0)
               IconButton(
-                icon: const Icon(Icons.visibility_rounded),
+                icon: const AppIcon(AppIconId.visible),
                 tooltip: context.l10n.unhideAllFiles,
                 onPressed: _unhideAll,
               ),
             IconButton(
-              icon: const Icon(Icons.sort_rounded),
-              tooltip: 'Групирай по категории',
+              icon: const AppIcon(AppIconId.sort),
+              tooltip: context.l10n.commandUiGroupByCategory,
               onPressed: _groupByCategory,
             ),
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: FilledButton.icon(
                 onPressed: _startPresentation,
-                icon: const Icon(Icons.slideshow_rounded, size: 20),
+                icon: const AppIcon(AppIconId.presentation, size: 20),
                 label: Text(context.l10n.presentationMode),
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.amber.shade700,
@@ -437,7 +450,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.folder_off_rounded, color: Colors.redAccent, size: 56),
+            const Icon(Icons.folder_off_rounded, color: Colors.redAccent, size: 56,
+            ),
             const SizedBox(height: 16),
             const Text(
               'Could not load project bundle',
@@ -448,8 +462,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _loadBundle,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
+              icon: const AppIcon(AppIconId.refresh),
+              label: Text(context.l10n.commandUiTryAgain),
             ),
           ],
         ),
@@ -480,11 +494,13 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: TextField(
             decoration: InputDecoration(
-              hintText: 'Search files in project...',
-              prefixIcon: const Icon(Icons.search),
+              hintText: context.l10n.commandUiSearchFilesInProject,
+              prefixIcon: const AppIcon(AppIconId.search),
               isDense: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10,
+              ),
             ),
             onChanged: (val) {
               setState(() {
@@ -499,14 +515,16 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
           child: Row(
             children: [
-              Icon(Icons.swap_vert_rounded, size: 15, color: Colors.grey.shade600),
+              Icon(Icons.swap_vert_rounded, size: 15, color: Colors.grey.shade600,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   isAllTab
                       ? 'Подредете с влачене или със стрелките за презентацията'
                       : 'Преподреждане в категорията (засяга презентацията)',
-                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600, fontWeight: FontWeight.w500,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -514,11 +532,14 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
               if (isAllTab)
                 TextButton.icon(
                   onPressed: _groupByCategory,
-                  icon: const Icon(Icons.sort_rounded, size: 14),
-                  label: const Text('По категории', style: TextStyle(fontSize: 11)),
+                  icon: const AppIcon(AppIconId.sort, size: 14),
+                  label: Text(
+                    context.l10n.commandUiByCategory, style: TextStyle(fontSize: 11),
+                  ),
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2,
+                    ),
                   ),
                 ),
             ],
@@ -531,12 +552,14 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
               ? Center(
                   child: Text(
                     _showHiddenOnly ? 'Няма скрити файлове' : 'No items in this category',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                    style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey,
+                    ),
                   ),
                 )
               : isAllTab
                   ? ReorderableListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8,
+                  ),
                       buildDefaultDragHandles: false,
                       onReorder: _onReorder,
                       itemCount: filtered.length,
@@ -565,7 +588,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
                       },
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8,
+                  ),
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
                         final item = filtered[index];
@@ -588,7 +612,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
     );
   }
 
-  Widget _buildOverviewBanner(ProjectBundleInfo bundle, ThemeData theme, bool isDark) {
+  Widget _buildOverviewBanner(ProjectBundleInfo bundle, ThemeData theme, bool isDark,
+  ) {
     final totalMb = (bundle.totalSizeBytes / (1024 * 1024)).toStringAsFixed(1);
 
     return Container(
@@ -613,7 +638,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
                   color: Colors.amber.shade700.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.inventory_2_rounded, color: Colors.amber.shade700, size: 28),
+                child: Icon(Icons.inventory_2_rounded, color: Colors.amber.shade700, size: 28,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -634,7 +660,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
                       bundle.hiddenFilesCount > 0
                           ? '${bundle.visibleFilesCount} в презентацията • ${bundle.hiddenFilesCount} скрити • $totalMb MB total'
                           : '${bundle.totalFiles} assets • $totalMb MB total',
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey,
+                      ),
                     ),
                   ],
                 ),
@@ -651,7 +678,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
               ),
               child: Text(
                 'Client: ${bundle.clientName}',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12,
+                ),
               ),
             ),
           ],
@@ -676,7 +704,7 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
               child: FilterChip(
                 selected: isSelected,
                 label: Text('${cat.shortLabel} ($count)'),
-                avatar: Icon(_getCategoryIcon(cat), size: 16),
+                avatar: AppIcon.fromMaterial(_getCategoryIcon(cat), size: 16),
                 onSelected: (_) {
                   setState(() {
                     _showHiddenOnly = false;
@@ -700,8 +728,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
                     fontWeight: _showHiddenOnly ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
-                avatar: Icon(
-                  Icons.visibility_off_rounded,
+                avatar: AppIcon(
+                  AppIconId.hidden,
                   size: 16,
                   color: _showHiddenOnly ? Colors.orange.shade800 : Colors.grey,
                 ),
@@ -773,7 +801,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
         ),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.only(left: 8, right: 4, top: 2, bottom: 2),
+        contentPadding: const EdgeInsets.only(left: 8, right: 4, top: 2, bottom: 2,
+        ),
         horizontalTitleGap: 8,
         minLeadingWidth: 0,
         leading: Row(
@@ -791,7 +820,9 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: isHidden
-                  ? Icon(Icons.visibility_off_rounded, size: 13, color: Colors.grey.shade600)
+                  ? AppIcon(
+                      AppIconId.hidden, size: 13, color: Colors.grey.shade600,
+                    )
                   : Text(
                       '${visiblePos ?? (presentationIndex + 1)}',
                       style: TextStyle(
@@ -807,10 +838,11 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: (isHidden ? Colors.grey : iconColor).withValues(alpha: 0.12),
+                color: (isHidden ? Colors.grey : iconColor).withValues(alpha: 0.12,
+                ),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
+              child: AppIcon.fromMaterial(
                 iconData,
                 color: isHidden ? Colors.grey.shade500 : iconColor,
                 size: 20,
@@ -870,7 +902,7 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: Icon(
+              icon: AppIcon.fromMaterial(
                 isHidden ? Icons.visibility_off_rounded : Icons.visibility_rounded,
                 size: 18,
                 color: isHidden
@@ -886,16 +918,16 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
               onPressed: () => _toggleHideItem(item),
             ),
             IconButton(
-              icon: const Icon(Icons.arrow_upward_rounded, size: 18),
-              tooltip: 'Премести нагоре',
+              icon: const AppIcon(AppIconId.up, size: 18),
+              tooltip: context.l10n.commandUiMoveUp,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 26, minHeight: 28),
               onPressed: onMoveUp,
             ),
             IconButton(
-              icon: const Icon(Icons.arrow_downward_rounded, size: 18),
-              tooltip: 'Премести надолу',
+              icon: const AppIcon(AppIconId.down, size: 18),
+              tooltip: context.l10n.commandUiMoveDown,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 26, minHeight: 28),
@@ -905,9 +937,10 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
               ReorderableDragStartListener(
                 index: listIndex,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                  child: Icon(
-                    Icons.drag_indicator_rounded,
+                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4,
+                  ),
+                  child: AppIcon(
+                    AppIconId.drag,
                     color: isDark ? Colors.white38 : Colors.grey.shade400,
                     size: 20,
                   ),

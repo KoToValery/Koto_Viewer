@@ -1,3 +1,5 @@
+import 'architect_annotation_layout.dart';
+import 'architect_line_presentation.dart';
 import '../models/architect_contour.dart';
 import '../models/architect_line_style.dart';
 import 'architect_hatch_geometry.dart';
@@ -17,6 +19,8 @@ import '../models/architect_project.dart';
 import '../models/architect_grid_axis.dart';
 import '../services/component_geometry_cache.dart';
 import '../services/component_library_service.dart';
+import '../services/architect_slab_geometry.dart';
+import '../services/architect_service_geometry.dart';
 import 'architect_2d_painter.dart';
 import 'architect_dimension_layout.dart';
 
@@ -117,6 +121,7 @@ class ArchitectElementsPainterHelper {
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectStorey storey,
+    ArchitectProject? project,
     required double zoomScale,
     String? selectedElementId,
   }) {
@@ -140,7 +145,8 @@ class ArchitectElementsPainterHelper {
               ..style = PaintingStyle.stroke)
           : slabBorderPaint;
 
-      final path = ArchitectContour.path(slab.polygon, slab.holes);
+      final path = ArchitectContour.path(slab.polygon,
+          ArchitectSlabGeometry.holes(storey, slab, project: project));
 
       if (isSelected) canvas.drawPath(path, slabFillPaint);
       canvas.drawPath(path, border);
@@ -150,11 +156,22 @@ class ArchitectElementsPainterHelper {
         canvas.save();
         canvas.translate(c.dx, c.dy);
         canvas.scale(ArchitectPaperStyle.annotationScale);
-        final tp = ArchitectTextPainter(elementId: slab.id, role: ArchitectAnnotationRole.ordinary, modelScale: ArchitectPaperStyle.annotationScale,
+        final tp = ArchitectTextPainter(
+          elementId: slab.id,
+          role: ArchitectAnnotationRole.ordinary,
+          modelScale: ArchitectPaperStyle.annotationScale,
           text: TextSpan(
             children: [
-              ArchitectAnnotationSpan(role: ArchitectAnnotationRole.ordinary, text: '${slab.label}\n'),
-              ArchitectAnnotationSpan(role: ArchitectAnnotationRole.area, text: ArchitectTextScope.current?.area(slab.area) ?? '${BimDistanceUnit.trimZeros(slab.area.toStringAsFixed(2))} m²'),
+              ArchitectAnnotationSpan(
+                role: ArchitectAnnotationRole.ordinary,
+                text: '${slab.label}\n',
+              ),
+              ArchitectAnnotationSpan(
+                role: ArchitectAnnotationRole.area,
+                text:
+                    ArchitectTextScope.current?.area(slab.area) ??
+                    '${BimDistanceUnit.trimZeros(slab.area.toStringAsFixed(2))} m²',
+              ),
             ],
             style: TextStyle(
               color: palette.foreground(const Color(0xFF37474F)),
@@ -191,10 +208,10 @@ class ArchitectElementsPainterHelper {
       final strokeW = isSelected
           ? 2.2
           : (isCut
-              ? ArchitectLineWeights.cutHeavy
-              : (isOverhead
-                  ? ArchitectLineWeights.overhead
-                  : ArchitectLineWeights.projection));
+                ? ArchitectLineWeights.cutHeavy
+                : (isOverhead
+                      ? ArchitectLineWeights.overhead
+                      : ArchitectLineWeights.projection));
 
       final paint = Paint()
         ..color = isSelected
@@ -222,9 +239,13 @@ class ArchitectElementsPainterHelper {
         canvas.translate(mid.dx, mid.dy);
         canvas.rotate(ArchitectDimensionLayout.textAngle(beam.unitVector));
         final scope = ArchitectTextScope.current;
-        final fontSize = scope?.fontSize(beam.id, ArchitectAnnotationRole.ordinary) ??
+        final fontSize =
+            scope?.fontSize(beam.id, ArchitectAnnotationRole.ordinary) ??
             11 * ArchitectPaperStyle.annotationScale;
-        final tp = ArchitectTextPainter(elementId: beam.id, role: ArchitectAnnotationRole.ordinary, modelScale: 1,
+        final tp = ArchitectTextPainter(
+          elementId: beam.id,
+          role: ArchitectAnnotationRole.ordinary,
+          modelScale: 1,
           text: TextSpan(
             text: beam.label,
             style: TextStyle(
@@ -239,9 +260,13 @@ class ArchitectElementsPainterHelper {
           textDirection: TextDirection.ltr,
         )..layout();
         // Like column lettering, fit the designation to the physical element.
-        final fit = math.min(1.0, math.min(
-          beam.width * .8 / math.max(tp.height, .0001),
-          beam.length * .8 / math.max(tp.width, .0001)));
+        final fit = math.min(
+          1.0,
+          math.min(
+            beam.width * .8 / math.max(tp.height, .0001),
+            beam.length * .8 / math.max(tp.width, .0001),
+          ),
+        );
         canvas.scale(fit);
         tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
         canvas.restore();
@@ -284,68 +309,40 @@ class ArchitectElementsPainterHelper {
     String? selectedElementId,
   }) {
     final borderPaint = Paint()
-      ..color = palette.foreground(const Color(0xFFBF360C))
-      ..strokeWidth = 1.4 / zoomScale
+      ..color = palette.foreground(ArchitectPaperStyle.ink)
+      ..strokeWidth = ArchitectLinePresentation.stroke(zoomScale, .25,
+          pixels: 1.2, canvas: canvas)
       ..style = PaintingStyle.stroke;
-
-    final crossPaint = Paint()
-      ..color = palette
-          .foreground(const Color(0xFFD84315))
-          .withValues(alpha: 0.7)
-      ..strokeWidth = 1.0 / zoomScale
+    final markPaint = Paint()
+      ..color = palette.foreground(ArchitectPaperStyle.rule)
+      ..strokeWidth = ArchitectLinePresentation.stroke(zoomScale, .13,
+          pixels: .65, canvas: canvas)
       ..style = PaintingStyle.stroke;
-
-    for (final op in storey.openings) {
-      architectDrawingSources(canvas, {op.id}, 'openings');
-      if (op.boundary.length < 3) continue;
-      final isSelected = op.id == selectedElementId;
-      final pBorder = isSelected
-          ? (Paint()
-              ..color = const Color(0xFF00E5FF)
-              ..strokeWidth = 2.4 / zoomScale
-              ..style = PaintingStyle.stroke)
-          : borderPaint;
-
-      final path = Path()..moveTo(op.boundary[0].dx, op.boundary[0].dy);
-      for (int i = 1; i < op.boundary.length; i++) {
-        path.lineTo(op.boundary[i].dx, op.boundary[i].dy);
+    for (final opening in storey.openings) {
+      if (opening.boundary.length < 3) continue;
+      architectDrawingSources(canvas, {opening.id}, 'openings');
+      final path = Path()..addPolygon(opening.boundary, true);
+      final selected = opening.id == selectedElementId;
+      canvas.drawPath(path, Paint()..color =
+          ArchitectLinePresentation.paper(canvas) ? Colors.white : palette.background);
+      canvas.drawPath(path, selected
+          ? (Paint()..color = const Color(0xff00e5ff)
+              ..style = PaintingStyle.stroke..strokeWidth = 2 / zoomScale)
+          : borderPaint);
+      final bounds = path.getBounds();
+      canvas.save();
+      canvas.clipPath(path);
+      if (opening.type == OpeningType.circular) {
+        final center = bounds.center;
+        final r = math.min(bounds.width, bounds.height) * .18;
+        canvas.drawLine(center - Offset(r, 0), center + Offset(r, 0), markPaint);
+        canvas.drawLine(center - Offset(0, r), center + Offset(0, r), markPaint);
+      } else {
+        final inset = bounds.deflate(math.min(bounds.width, bounds.height) * .12);
+        canvas.drawLine(inset.topLeft, inset.bottomRight, markPaint);
+        canvas.drawLine(inset.topRight, inset.bottomLeft, markPaint);
       }
-      path.close();
-
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = Colors.transparent
-          ..style = PaintingStyle.fill,
-      );
-      canvas.drawPath(path, pBorder);
-
-      // Diagonal X mark across opposite corners
-      if (op.boundary.length == 4) {
-        canvas.drawLine(op.boundary[0], op.boundary[2], crossPaint);
-        canvas.drawLine(op.boundary[1], op.boundary[3], crossPaint);
-      }
-
-      if (ArchitectTextScope.current != null || zoomScale > 12.0) {
-        final c = op.centroid;
-        canvas.save();
-        canvas.translate(c.dx, c.dy);
-        canvas.scale(ArchitectPaperStyle.annotationScale);
-        final tp = ArchitectTextPainter(elementId: op.id, role: ArchitectAnnotationRole.ordinary, modelScale: ArchitectPaperStyle.annotationScale,
-          text: TextSpan(
-            text: op.label,
-            style: TextStyle(
-              color: palette.foreground(const Color(0xFFBF360C)),
-              fontFamily: 'Roboto',
-              fontSize: 12.0,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
-        canvas.restore();
-      }
+      canvas.restore();
     }
   }
 
@@ -355,30 +352,59 @@ class ArchitectElementsPainterHelper {
 
   static void drawStairs({
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
-    required Canvas canvas, required ArchitectStorey storey,
-    required double zoomScale, String? selectedElementId,
-    ArchitectProject? project, AppLocalizations? l10n,
+    required Canvas canvas,
+    required ArchitectStorey storey,
+    required double zoomScale,
+    String? selectedElementId,
+    ArchitectProject? project,
+    AppLocalizations? l10n,
     ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
   }) {
     for (final stair in storey.stairs) {
-      drawStair(canvas: canvas, stair: stair, zoomScale: zoomScale,
-        storey: storey, project: project, cutHeight: storey.cutPlaneHeight,
-        l10n: l10n, dimensionScale: dimensionScale, background: palette.background,
-        color: stair.id == selectedElementId ? const Color(0xFF00E5FF) :
-          stair.design?.isDraft == true ? const Color(0xFFD32F2F) :
-          palette.foreground(const Color(0xFF1B5E20)));
+      drawStair(
+        canvas: canvas,
+        stair: stair,
+        zoomScale: zoomScale,
+        storey: storey,
+        project: project,
+        cutHeight: storey.cutPlaneHeight,
+        l10n: l10n,
+        dimensionScale: dimensionScale,
+        background: palette.background,
+        color: stair.id == selectedElementId
+            ? const Color(0xFF00E5FF)
+            : stair.design?.isDraft == true
+            ? const Color(0xFFD32F2F)
+            : palette.foreground(const Color(0xFF1B5E20)),
+      );
     }
   }
 
-  static void drawStair({required Canvas canvas, required ArchitectStair stair,
-    required double zoomScale, Color color = const Color(0xFF1B5E20),
-    Color background = Colors.white, double? cutHeight,
-    ArchitectStorey? storey, ArchitectProject? project, AppLocalizations? l10n,
+  static void drawStair({
+    required Canvas canvas,
+    required ArchitectStair stair,
+    required double zoomScale,
+    Color color = const Color(0xFF1B5E20),
+    Color background = Colors.white,
+    double? cutHeight,
+    ArchitectStorey? storey,
+    ArchitectProject? project,
+    AppLocalizations? l10n,
     bool labels = true,
     ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
-  }) => ArchitectStairPlanPainter.draw(canvas: canvas, stair: stair,
-    scale: zoomScale, color: color, background: background, cutHeight: cutHeight,
-    storey: storey, project: project, l10n: l10n, labels: labels, dimensionScale: dimensionScale);
+  }) => ArchitectStairPlanPainter.draw(
+    canvas: canvas,
+    stair: stair,
+    scale: zoomScale,
+    color: color,
+    background: background,
+    cutHeight: cutHeight,
+    storey: storey,
+    project: project,
+    l10n: l10n,
+    labels: labels,
+    dimensionScale: dimensionScale,
+  );
 
   // ===========================================================================
   // 7. DIMENSIONS
@@ -406,9 +432,12 @@ class ArchitectElementsPainterHelper {
       final points = dim.dimensionPoints;
       if (points.length < 2) continue;
       final scope = ArchitectTextScope.current;
-      final paperScale = ArchitectDrawingScale(scope?.denominator ?? dimensionScale.denominator);
+      final paperScale = ArchitectDrawingScale(
+        scope?.denominator ?? dimensionScale.denominator,
+      );
       final annotationScale = ArchitectDimensionScale.values.firstWhere(
-        (s) => s.denominator == paperScale.denominator);
+        (s) => s.denominator == paperScale.denominator,
+      );
 
       final tiers = ArchitectDimensionLayout.layoutTiers(
         dimension: dim,
@@ -423,7 +452,9 @@ class ArchitectElementsPainterHelper {
         ..color = isSelected
             ? const Color(0xFF00E5FF)
             : palette.foreground(const Color(0xFF37474F))
-        ..strokeWidth = isSelected ? 2 / zoomScale : paperScale.paperToModel(.125)
+        ..strokeWidth = isSelected
+            ? 2 / zoomScale
+            : paperScale.paperToModel(.125)
         ..style = PaintingStyle.stroke;
 
       final witnessPaint = Paint()
@@ -450,8 +481,11 @@ class ArchitectElementsPainterHelper {
       final outward = n * (dim.offsetDistance < 0 ? -1 : 1);
 
       // Paper-space size converted to model metres, independent of camera zoom.
-      final modelTextHeight = scope?.height(dim.id, ArchitectAnnotationRole.dimension) ?? annotationScale.textHeight;
-      final textScale = modelTextHeight / ArchitectDrawingScale.fontCapRatio / 11.0;
+      final modelTextHeight =
+          scope?.height(dim.id, ArchitectAnnotationRole.dimension) ??
+          annotationScale.textHeight;
+      final textScale =
+          modelTextHeight / ArchitectDrawingScale.fontCapRatio / 11.0;
 
       for (final tier in tiers) {
         // Dimension line
@@ -477,14 +511,22 @@ class ArchitectElementsPainterHelper {
           final text =
               isSingleSegment && dim.customText?.trim().isNotEmpty == true
               ? dim.customText!
-              : BimDistanceUnit.trimZeros(unit
-                    .toUnit((p2 - p1).distance)
-                    .toStringAsFixed(
-                      decimals ?? (unit == ArchitectUnit.centimeters ||
-                              unit == ArchitectUnit.millimeters ? 0 : 2),
-                    ));
+              : BimDistanceUnit.trimZeros(
+                  unit
+                      .toUnit((p2 - p1).distance)
+                      .toStringAsFixed(
+                        decimals ??
+                            (unit == ArchitectUnit.centimeters ||
+                                    unit == ArchitectUnit.millimeters
+                                ? 0
+                                : 2),
+                      ),
+                );
 
-          final tp = ArchitectTextPainter(elementId: dim.id, role: ArchitectAnnotationRole.dimension, modelScale: textScale,
+          final tp = ArchitectTextPainter(
+            elementId: dim.id,
+            role: ArchitectAnnotationRole.dimension,
+            modelScale: textScale,
             text: TextSpan(
               text: text,
               style: TextStyle(
@@ -521,8 +563,11 @@ class ArchitectElementsPainterHelper {
           }
           final lines = tp.computeLineMetrics();
           final multiline = lines.length > 1;
-          final halfHeight = multiline ? tp.height * textScale / 2 : modelTextHeight / 2;
-          final mid = center + outward * (halfHeight + paperScale.paperToModel(.4));
+          final halfHeight = multiline
+              ? tp.height * textScale / 2
+              : modelTextHeight / 2;
+          final mid =
+              center + outward * (halfHeight + paperScale.paperToModel(.4));
           canvas.save();
           canvas.translate(mid.dx, mid.dy);
           canvas.rotate(ArchitectDimensionLayout.textAngle(u));
@@ -556,29 +601,58 @@ class ArchitectElementsPainterHelper {
       final p = marker.position;
       final color = isSelected
           ? const Color(0xFF00E5FF)
-          : palette.foreground(const Color(0xFFD81B60));
-
+          : palette.foreground(const Color(0xFF212121));
       final markerPaint = Paint()
         ..color = color
-        ..strokeWidth = 1.2 / zoomScale
+        ..strokeWidth = 1.0 / zoomScale
         ..style = PaintingStyle.stroke;
+      final scope = ArchitectTextScope.current;
+      final paper = ArchitectDrawingScale(scope?.denominator ?? 100);
+      final s = paper.paperToModel(1.5);
+      final plan =
+          marker.symbol == ArchitectLevelSymbol.plan ||
+          marker.symbol == ArchitectLevelSymbol.automatic &&
+              !(scope?.view.startsWith('section:') == true ||
+                  scope?.view.startsWith('elevation:') == true ||
+                  storey.id.startsWith('view:'));
+      if (plan) {
+        canvas.drawCircle(p, s, markerPaint);
+        canvas.drawLine(
+          p - Offset(s * 1.4, 0),
+          p + Offset(s * 1.4, 0),
+          markerPaint,
+        );
+        canvas.drawLine(
+          p - Offset(0, s * 1.4),
+          p + Offset(0, s * 1.4),
+          markerPaint,
+        );
+      } else {
+        canvas.drawPath(
+          Path()
+            ..moveTo(p.dx, p.dy)
+            ..lineTo(p.dx - s, p.dy - s * 1.5)
+            ..lineTo(p.dx + s, p.dy - s * 1.5)
+            ..close(),
+          markerPaint,
+        );
+        canvas.drawLine(p, p + Offset(s * 5, 0), markerPaint);
+      }
 
-      // Architectural elevation arrowhead symbol
-      const s = 0.20;
-      final path = Path()
-        ..moveTo(p.dx, p.dy)
-        ..lineTo(p.dx - s, p.dy + s * 1.5)
-        ..lineTo(p.dx + s, p.dy + s * 1.5)
-        ..close();
-
-      canvas.drawPath(path, markerPaint);
-      canvas.drawLine(p, Offset(p.dx + s * 3.0, p.dy), markerPaint);
-
-      final label = ArchitectTextScope.current?.length(marker.elevation) ?? marker.formattedElevation;
+      final label =
+          scope?.level(
+            marker.elevation,
+            units: marker.units,
+            decimals: marker.decimals,
+          ) ??
+          marker.formattedElevation;
       canvas.save();
-      canvas.translate(p.dx + s * .4, p.dy - .02);
+      canvas.translate(p.dx + s * (plan ? 2 : 1.4), p.dy - s * .35);
       canvas.scale(1.0 / zoomScale);
-      final tp = ArchitectTextPainter(elementId: marker.id, role: ArchitectAnnotationRole.ordinary, modelScale: 1 / zoomScale,
+      final tp = ArchitectTextPainter(
+        elementId: marker.id,
+        role: ArchitectAnnotationRole.ordinary,
+        modelScale: 1 / zoomScale,
         text: TextSpan(
           text: marker.label != null ? '$label (${marker.label})' : label,
           style: TextStyle(
@@ -605,23 +679,15 @@ class ArchitectElementsPainterHelper {
     for (final ann in storey.annotations) {
       architectDrawingSources(canvas, {ann.id}, 'annotations');
       final isSelected = ann.id == selectedElementId;
+      final tp = ArchitectAnnotationLayout.painter(
+        ann,
+        color: isSelected
+            ? const Color(0xFF00E5FF)
+            : palette.foreground(Color(ann.colorValue)),
+      );
       canvas.save();
       canvas.translate(ann.position.dx, ann.position.dy);
-      canvas.scale(1.0 / zoomScale);
-      final tp = ArchitectTextPainter(elementId: ann.id, role: ArchitectAnnotationRole.ordinary, modelScale: 1 / zoomScale,
-        text: TextSpan(
-          text: ann.text,
-          style: TextStyle(
-            color: isSelected
-                ? const Color(0xFF00E5FF)
-                : palette.foreground(const Color(0xFF212121)),
-            fontFamily: 'Roboto',
-            fontSize: ann.fontSize * zoomScale,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
+      canvas.rotate(ann.rotationDeg * math.pi / 180);
       tp.paint(canvas, Offset.zero);
       canvas.restore();
     }
@@ -644,8 +710,18 @@ class ArchitectElementsPainterHelper {
     final unitsPerMm = ArchitectDrawingScale(
       ArchitectTextScope.current?.denominator ?? dimensionScale.denominator,
     ).paperToModel(1);
+    final patternUnits = ArchitectLinePresentation.patternUnits(
+      zoomScale,
+      unitsPerMm,
+      canvas: canvas,
+    );
+    final visible = ArchitectLinePresentation.paper(canvas)
+        ? null
+        : canvas.getLocalClipBounds().inflate(4 / zoomScale);
     for (final prim in storey.cadPrimitives) {
-      if (hatchesOnly != null && (prim.type == CadPrimitiveType.hatch) != hatchesOnly) continue;
+      if (hatchesOnly != null &&
+          (prim.type == CadPrimitiveType.hatch) != hatchesOnly)
+        continue;
       architectDrawingSources(canvas, {prim.id}, 'cadPrimitives');
       final isSelected = prim.id == selectedElementId;
       final paint = Paint()
@@ -667,7 +743,9 @@ class ArchitectElementsPainterHelper {
             architectDrawingSources(canvas, {prim.id}, 'cadFill');
             canvas.drawPath(
               boundary,
-              Paint()..color = color..style = PaintingStyle.fill,
+              Paint()
+                ..color = color
+                ..style = PaintingStyle.fill,
             );
           } else {
             canvas.drawPath(
@@ -680,22 +758,48 @@ class ArchitectElementsPainterHelper {
                 visibleBounds: canvas.getLocalClipBounds(),
                 origin: prim.polygonCorners.first,
               ),
-              Paint()..color = color..style = PaintingStyle.stroke
-                ..strokeWidth = .13 * unitsPerMm,
+              Paint()
+                ..color = color
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = ArchitectLinePresentation.stroke(
+                  zoomScale,
+                  .13,
+                  pixels: .8,
+                  canvas: canvas,
+                  denominator: dimensionScale.denominator,
+                ),
             );
           }
           canvas.restore();
         }
         architectDrawingSources(canvas, {prim.id}, 'cadPrimitives');
         if (prim.hatchBorder || isSelected) {
-          final borderColor = isSelected ? paint.color : prim.hatchPattern.isSolid
-              ? palette.foreground(ArchitectPaperStyle.rule) : color;
+          final borderColor = isSelected
+              ? paint.color
+              : prim.hatchPattern.isSolid
+              ? palette.foreground(ArchitectPaperStyle.rule)
+              : color;
           canvas.drawPath(
             prim.hatchBorder
-                ? ArchitectLinePattern.path(boundary, prim.lineStyle, unitsPerMm)
+                ? ArchitectLinePattern.path(
+                    boundary,
+                    prim.lineStyle,
+                    patternUnits,
+                    visibleBounds: visible,
+                  )
                 : boundary,
-            Paint()..color = borderColor..style = PaintingStyle.stroke
-              ..strokeWidth = isSelected ? paint.strokeWidth : .18 * unitsPerMm,
+            Paint()
+              ..color = borderColor
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = isSelected
+                  ? paint.strokeWidth
+                  : ArchitectLinePresentation.stroke(
+                      zoomScale,
+                      .18,
+                      pixels: 1,
+                      canvas: canvas,
+                      denominator: dimensionScale.denominator,
+                    ),
           );
         }
       } else if (prim.type == CadPrimitiveType.line ||
@@ -704,7 +808,8 @@ class ArchitectElementsPainterHelper {
           ArchitectLinePattern.path(
             Path()..addPolygon(prim.linePoints, false),
             prim.lineStyle,
-            unitsPerMm,
+            patternUnits,
+            visibleBounds: visible,
           ),
           paint,
         );
@@ -713,7 +818,8 @@ class ArchitectElementsPainterHelper {
           ArchitectLinePattern.path(
             ArchitectContour.path(prim.polygonCorners, prim.holes),
             prim.lineStyle,
-            unitsPerMm,
+            patternUnits,
+            visibleBounds: visible,
           ),
           paint,
         );
@@ -732,34 +838,59 @@ class ArchitectElementsPainterHelper {
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectStorey storey,
+    ArchitectProject? project,
     required double zoomScale,
     String? selectedElementId,
     Set<String> selectedElementIds = const {},
     bool layerVisible = true,
   }) {
-    if (!layerVisible || storey.components.isEmpty) return;
-
-    for (final comp in storey.components) {
-      if (!comp.isVisible) continue;
-      final def = ComponentLibraryService.instance.findDefinition(comp.definitionId);
+    final ownedIds = project == null ? const <String>{} : {
+      for (final floor in project.storeys.where((s) => s.id == storey.id))
+        for (final c in floor.components) c.id,
+    };
+    final components = project == null ? storey.components : [
+      ...storey.components.where((c) => !c.isServiceComponent),
+      ...ArchitectServiceGeometry.componentsOnLevel(project, storey).where((c) =>
+          !ownedIds.contains(c.id) ||
+          storey.components.any((own) => own.id == c.id)),
+    ];
+    for (final comp in components) {
+      if (!comp.isVisible || !layerVisible && !comp.isServiceComponent) continue;
+      architectDrawingSources(canvas, {comp.id}, 'components');
+      final def = ComponentLibraryService.instance.findDefinition(
+        comp.definitionId,
+      );
       if (def == null) continue;
-      final geo = ComponentGeometryCache.instance.getOrCompute(def, comp.parameters);
-      final isSelected = comp.id == selectedElementId || selectedElementIds.contains(comp.id);
+      final geo = ComponentGeometryCache.instance.getOrCompute(
+        def,
+        comp.parameters,
+      );
+      final isSelected =
+          comp.id == selectedElementId || selectedElementIds.contains(comp.id);
 
       canvas.save();
       canvas.translate(comp.position.dx, comp.position.dy);
       canvas.rotate(comp.rotation);
 
+      if (comp.isServiceComponent) {
+        canvas.drawPath(geo.block2d.boundsMask, Paint()..color =
+            ArchitectLinePresentation.paper(canvas) ? Colors.white : palette.background);
+      }
+
       // 2. Outer outline
       final outlinePaint = Paint()
-        ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF263238))
+        ..color = isSelected
+            ? const Color(0xFF00E5FF)
+            : palette.foreground(const Color(0xFF263238))
         ..strokeWidth = (isSelected ? 2.5 : 1.2) / zoomScale
         ..style = PaintingStyle.stroke;
       canvas.drawPath(geo.block2d.outline, outlinePaint);
 
       // 3. Inner detail linework
       final detailPaint = Paint()
-        ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF546E7A))
+        ..color = isSelected
+            ? const Color(0xFF00E5FF)
+            : palette.foreground(const Color(0xFF546E7A))
         ..strokeWidth = (isSelected ? 1.8 : 0.8) / zoomScale
         ..style = PaintingStyle.stroke;
       for (final p in geo.block2d.detailPaths) {
@@ -785,6 +916,7 @@ class ArchitectElementsPainterHelper {
   static void drawActiveElementsDrafting({
     required Canvas canvas,
     required ArchitectTool activeTool,
+    OpeningType openingType = OpeningType.shaft,
     required Offset? draftStart,
     required Offset? draftEnd,
     required double zoomScale,
@@ -819,14 +951,27 @@ class ArchitectElementsPainterHelper {
         activeTool == ArchitectTool.cadRect) {
       final rect = Rect.fromPoints(p1, p2);
       if (activeTool == ArchitectTool.opening) {
-        canvas.drawRect(rect, fillPreview);
-        canvas.drawRect(rect, previewPaint);
+        if (openingType == OpeningType.circular) {
+          final radius = math.min(rect.width, rect.height) / 2;
+          canvas.drawCircle(rect.center, radius, fillPreview);
+          canvas.drawCircle(rect.center, radius, previewPaint);
+        } else {
+          canvas.drawRect(rect, fillPreview);
+          canvas.drawRect(rect, previewPaint);
+        }
       } else {
         canvas.drawPath(
           ArchitectLinePattern.path(
             Path()..addRect(rect),
             lineStyle,
-            ArchitectDrawingScale(dimensionScale.denominator).paperToModel(1),
+            ArchitectLinePresentation.patternUnits(
+              zoomScale,
+              ArchitectDrawingScale(dimensionScale.denominator).paperToModel(1),
+              canvas: canvas,
+            ),
+            visibleBounds: ArchitectLinePresentation.paper(canvas)
+                ? null
+                : canvas.getLocalClipBounds(),
           ),
           previewPaint,
         );
@@ -852,9 +997,21 @@ class ArchitectElementsPainterHelper {
         drawStair(
           canvas: canvas,
           stair: stairPreview,
-        storey: stairStorey, project: stairProject, cutHeight: stairStorey?.cutPlaneHeight, labels: false,
+          storey: stairStorey,
+          project: stairProject,
+          cutHeight: stairStorey?.cutPlaneHeight,
+          labels: false,
           zoomScale: zoomScale,
           color: const Color(0xFF00897B),
+        );
+        // Keep the actual snapped insertion corner visible while aiming.
+        final anchor = stairPreview.placementCorner;
+        final first = stairPreview.plan.nosings.first;
+        canvas.drawLine(
+          first.$1, first.$2, previewPaint..strokeWidth = 2 / zoomScale,
+        );
+        canvas.drawCircle(
+          anchor, 4 / zoomScale, Paint()..color = const Color(0xFF00897B),
         );
       }
     } else if (activeTool == ArchitectTool.dimension) {
@@ -866,7 +1023,14 @@ class ArchitectElementsPainterHelper {
             ..moveTo(p1.dx, p1.dy)
             ..lineTo(p2.dx, p2.dy),
           lineStyle,
-          ArchitectDrawingScale(dimensionScale.denominator).paperToModel(1),
+          ArchitectLinePresentation.patternUnits(
+            zoomScale,
+            ArchitectDrawingScale(dimensionScale.denominator).paperToModel(1),
+            canvas: canvas,
+          ),
+          visibleBounds: ArchitectLinePresentation.paper(canvas)
+              ? null
+              : canvas.getLocalClipBounds(),
         ),
         previewPaint,
       );
@@ -883,9 +1047,14 @@ class ArchitectElementsPainterHelper {
           decimals: decimals,
         );
       }
-    } else if (activeTool == ArchitectTool.section || activeTool == ArchitectTool.elevation) {
+    } else if (activeTool == ArchitectTool.section ||
+        activeTool == ArchitectTool.elevation) {
       canvas.drawLine(p1, p2, previewPaint..strokeWidth = 2.0 / zoomScale);
-      canvas.drawCircle(p1, 4 / zoomScale, previewPaint..style = PaintingStyle.fill);
+      canvas.drawCircle(
+        p1,
+        4 / zoomScale,
+        previewPaint..style = PaintingStyle.fill,
+      );
       canvas.drawCircle(p2, 4 / zoomScale, previewPaint);
     } else if (activeTool == ArchitectTool.cadCircle) {
       final r = (p2 - p1).distance;

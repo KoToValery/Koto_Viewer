@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,20 +9,19 @@ enum EbookThemeMode {
   light,
   sepia,
   dark,
-  amoled,
-}
+  amoled }
 
 extension EbookThemeModeExtension on EbookThemeMode {
-  String get label {
+  String localizedLabel(AppLocalizations l) {
     switch (this) {
       case EbookThemeMode.light:
-        return 'Light';
+        return l.commandIconGalleryLight;
       case EbookThemeMode.sepia:
-        return 'Warm Sepia';
+        return l.commandOptionWarmSepia;
       case EbookThemeMode.dark:
-        return 'Dark Charcoal';
+        return l.commandOptionDarkCharcoal;
       case EbookThemeMode.amoled:
-        return 'Pure Black';
+        return l.commandOptionPureBlack;
     }
   }
 
@@ -81,18 +81,17 @@ extension EbookThemeModeExtension on EbookThemeMode {
 enum EbookFontFamily {
   serif,
   sans,
-  monospace,
-}
+  monospace }
 
 extension EbookFontFamilyExtension on EbookFontFamily {
-  String get label {
+  String localizedLabel(AppLocalizations l) {
     switch (this) {
       case EbookFontFamily.serif:
-        return 'Serif (Book)';
+        return l.commandOptionSerifBook;
       case EbookFontFamily.sans:
-        return 'Sans-Serif (Modern)';
+        return l.commandOptionSansSerifModern;
       case EbookFontFamily.monospace:
-        return 'Monospace (Clean)';
+        return l.commandOptionMonospaceClean;
     }
   }
 
@@ -134,25 +133,24 @@ extension EbookFontFamilyExtension on EbookFontFamily {
 
 enum EbookReadingMode {
   paginated,
-  continuous,
-}
+  continuous }
 
 extension EbookReadingModeExtension on EbookReadingMode {
-  String get label {
+  String localizedLabel(AppLocalizations l) {
     switch (this) {
       case EbookReadingMode.paginated:
-        return 'Paginated (Swipe)';
+        return l.commandOptionPaginatedSwipe;
       case EbookReadingMode.continuous:
-        return 'Continuous Scroll';
+        return l.continuousScroll;
     }
   }
 
-  String get shortLabel {
+  String localizedShortLabel(AppLocalizations l) {
     switch (this) {
       case EbookReadingMode.paginated:
-        return 'Pages';
+        return l.commandUiPages;
       case EbookReadingMode.continuous:
-        return 'Scroll';
+        return l.commandUiScroll;
     }
   }
 }

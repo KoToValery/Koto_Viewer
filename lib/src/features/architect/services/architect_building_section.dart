@@ -1,3 +1,4 @@
+import 'architect_drain_surface.dart';
 import 'architect_stair_floor_contact.dart';
 import '../models/architect_hatch_pattern.dart';
 import '../models/architect_wall_type.dart';
@@ -26,6 +27,7 @@ import '../models/architect_wall.dart';
 import 'architect_building_elevation.dart';
 import 'component_geometry_cache.dart';
 import 'component_library_service.dart';
+import 'architect_service_geometry.dart';
 
 class ArchitectSectionRegion {
   final String sourceId;
@@ -406,7 +408,7 @@ class ArchitectBuildingSection {
     /*
     for (final floor in project.storeys) {
       for (final slab in floor.slabs) {
-        final spans = ArchitectSlabGeometry.intervals(floor, slab, cut);
+        final spans = ArchitectSlabGeometry.intervals(floor, slab, cut, project: project);
         for (final surface in ArchitectSlabGeometry.surfaces(
           project,
           floor,
@@ -1035,6 +1037,28 @@ class ArchitectBuildingSection {
       }
 
       for (final drain in floor.floorDrains) {
+        final surface=ArchitectDrainSurface.of(drain);
+        final base=floor.elevation+floor.floorFinishThickness;
+        final finish=Path();
+        for(final (a,b,za,zb) in surface.section(cut.start,cut.end)) {
+          double station(Offset p) => (p-cut.start).dx*cut.axis.dx+(p-cut.start).dy*cut.axis.dy;
+          final sa=station(a),sb=station(b);
+          final patch=Path()..addPolygon([Offset(sa,base+za),Offset(sb,base+zb),Offset(sb,base-.05),Offset(sa,base-.05)],true);
+          finish.addPath(patch,Offset.zero);
+        }
+        if (!finish.getBounds().isEmpty) {
+          final clean=Path.combine(PathOperation.union,finish,Path());
+          for(var i=0;i<regions.length;i++) {
+            final r=regions[i];
+            if(!r.slab || r.roof) continue;
+            regions[i]=ArchitectSectionRegion(r.sourceId,r.material,
+              Path.combine(PathOperation.difference,r.path,clean),slab:r.slab,roof:r.roof,
+              timberCrossSectionPolygon:r.timberCrossSectionPolygon,customFillColor:r.customFillColor,
+              hatchPattern:r.hatchPattern,drawHatch:r.drawHatch,mergeOutline:r.mergeOutline);
+          }
+          regions.add(ArchitectSectionRegion(drain.id,SlabMaterial.tile,clean,slab:true));
+        }
+
         final sProj =
             (drain.position - cut.start).dx * cut.axis.dx +
             (drain.position - cut.start).dy * cut.axis.dy;
@@ -1047,8 +1071,7 @@ class ArchitectBuildingSection {
         );
         if (sProj >= -drain.halfWidth &&
             sProj <= cut.length + drain.halfWidth &&
-            (distToAxis <= drain.halfWidth + 0.08 ||
-                drain.containsPoint(ptOnCut))) {
+            distToAxis <= drain.halfWidth + 0.001) {
           final grateW = (drain.halfWidth * 2.0).clamp(0.08, 0.30);
           final sDrain = sProj
               .clamp(grateW / 2, math.max(grateW / 2, cut.length - grateW / 2))
@@ -1100,27 +1123,30 @@ class ArchitectBuildingSection {
         } else if (def != null) {
           final geo = ComponentGeometryCache.instance.getOrCompute(
             def,
-            comp.parameters,
+            ArchitectServiceGeometry.parameters(project, floor, comp),
           );
           final cosR = math.cos(comp.rotation);
           final sinR = math.sin(comp.rotation);
-          final zBase = floor.elevation + comp.elevationOffset;
+          final zBase = ArchitectServiceGeometry.baseElevation(project, floor, comp);
           Vector3 tr(Vector3 p) => Vector3(
             comp.position.dx + p.x * cosR - p.y * sinR,
             comp.position.dy + p.x * sinR + p.y * cosR,
             zBase + p.z,
           );
           final compPath = sliceMesh([
+            ...ArchitectServiceGeometry.flashing(project, floor, comp),
+            ...ArchitectServiceGeometry.terminal(project, floor, comp),
             for (final t in geo.mesh3d.triangles)
               Triangle3D(v0: tr(t.v0), v1: tr(t.v1), v2: tr(t.v2)),
-          ]);
+          ], exact: comp.isServiceComponent);
           if (compPath != null) {
             regions.add(
               ArchitectSectionRegion(
                 comp.id,
                 SlabMaterial.custom,
                 compPath,
-                customFillColor: const Color(0xFFCFD8DC),
+                customFillColor: comp.isServiceComponent
+                    ? const Color(0xFFF5F5F5) : const Color(0xFFCFD8DC),
               ),
             );
           }
@@ -1416,7 +1442,7 @@ class ArchitectBuildingSection {
     }
     for (final floor in project.storeys) {
       for (final slab in floor.slabs.where((s) => s.id == detail.slabId)) {
-        if (ArchitectSlabGeometry.intervals(floor, slab, cut).any(
+        if (ArchitectSlabGeometry.intervals(floor, slab, cut, project: project).any(
           (s) => detail.station >= s.$1 - 1e-8 && detail.station <= s.$2 + 1e-8,
         )) {
           return (storey: floor, slab: slab);

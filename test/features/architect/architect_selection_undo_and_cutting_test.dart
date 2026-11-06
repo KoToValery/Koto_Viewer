@@ -1,3 +1,4 @@
+import '../../support/command_icon_finders.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -8,7 +9,8 @@ import 'package:kotoview/src/features/architect/screens/architect_workspace_scre
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/bim_projects/controllers/bim_viewport_controller.dart';
 
-ArchitectCommandController seededController({List<ArchitectWall> walls = const []}) {
+ArchitectCommandController seededController({List<ArchitectWall> walls = const [],
+}) {
   return ArchitectCommandController(
     ArchitectProject(
       id: 'p',
@@ -20,9 +22,7 @@ ArchitectCommandController seededController({List<ArchitectWall> walls = const [
         ArchitectStorey(
           id: 's',
           name: 'Floor',
-          walls: walls,
-        ),
-      ],
+          walls: walls)],
     ),
   );
 }
@@ -41,8 +41,7 @@ Future<void> openWorkspace(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: ArchitectWorkspaceScreen(
-        commandController: commands,
-      ),
+        commandController: commands),
     ),
   );
   await tester.pumpAndSettle();
@@ -95,11 +94,11 @@ void main() {
         expect(widget.disabledColor, Colors.white38);
       }
       expect(
-        find.descendant(of: undo, matching: find.byIcon(Icons.undo)),
+        find.descendant(of: undo, matching: findCommandIcon(Icons.undo)),
         findsOneWidget,
       );
       expect(
-        find.descendant(of: redo, matching: find.byIcon(Icons.redo)),
+        find.descendant(of: redo, matching: findCommandIcon(Icons.redo)),
         findsOneWidget,
       );
 
@@ -151,7 +150,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Selection bar is visible
-      expect(find.byKey(const ValueKey('architect-clear-selection')), findsOneWidget);
+      expect(find.byKey(const ValueKey('architect-clear-selection')), findsOneWidget,
+      );
 
       // Tap the always-visible deselect button
       final deselectFinder = find.byKey(const ValueKey('architect-deselect'));
@@ -159,12 +159,14 @@ void main() {
       await tester.pumpAndSettle();
 
       // Selection bar is now gone
-      expect(find.byKey(const ValueKey('architect-clear-selection')), findsNothing);
+      expect(find.byKey(const ValueKey('architect-clear-selection')), findsNothing,
+      );
 
       // Select wall again with hold
       await tester.tapAt(screen(tester, const Offset(2, 0)));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('architect-clear-selection')), findsOneWidget);
+      expect(find.byKey(const ValueKey('architect-clear-selection')), findsOneWidget,
+      );
 
       // Tap in empty space (e.g. at (2, -0.5))
       final tapPos = screen(tester, const Offset(2, -0.5));
@@ -172,7 +174,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Selection is cleared!
-      expect(find.byKey(const ValueKey('architect-clear-selection')), findsNothing);
+      expect(find.byKey(const ValueKey('architect-clear-selection')), findsNothing,
+      );
     });
 
     testWidgets('Tapping on wall in cut mode splits the wall directly at that point', (tester) async {
@@ -210,12 +213,15 @@ void main() {
       await tester.pumpAndSettle();
 
       // Step 3: Pick selection side via HUD banner button
-      expect(find.byKey(const ValueKey('architect-split-side1-btn')), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('architect-split-side1-btn')));
+      expect(find.byKey(const ValueKey('architect-split-side1-btn')), findsOneWidget,
+        );
+      await tester.tap(find.byKey(const ValueKey('architect-split-side1-btn')),
+        );
       await tester.pumpAndSettle();
 
       // Wall is split into 2 walls!
       expect(model.project.activeStorey.walls.length, 2);
-    });
+    },
+    );
   });
 }

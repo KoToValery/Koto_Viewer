@@ -305,6 +305,8 @@ void main() {
     await editing.hold(tester, const Offset(2, 0));
     await tester.tap(find.byKey(const ValueKey('architect-selection-move')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('architect-move-free')));
+    await tester.pumpAndSettle();
     final jitter = await tester.startGesture(
       workspace.screen(tester, const Offset(2, 0)),
     );
@@ -326,6 +328,7 @@ void main() {
     );
     await hold.up();
     await tester.pump();
+    await editing.acceptGeometryCommand(tester);
     expect(
       model.project.activeStorey.walls.single.startPoint,
       const Offset(0, 1),
@@ -379,6 +382,7 @@ void main() {
       }
       await tester.tap(find.byKey(const ValueKey('wall-end')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(
         model.project.activeStorey.walls[0].startPoint.dy,
         closeTo(.63, 1e-9),
@@ -421,6 +425,7 @@ void main() {
       expect(identical(model.project, old), isTrue);
       await g.up();
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(model.project.activeStorey.walls, hasLength(4));
       expect(tester.takeException(), isNull);
     },
@@ -450,12 +455,14 @@ void main() {
         kind: PointerDeviceKind.mouse,
       );
       await tester.pump();
-      expect(model.project.activeStorey.walls, hasLength(4));
+      expect(model.project, same(old));
+      expect(workspace.overlay(tester).project.activeStorey.walls, hasLength(4));
       final trimmed = model.project;
       await g.up();
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
       await tester.pump();
       expect(identical(model.project, trimmed), isTrue);
+      await editing.acceptGeometryCommand(tester);
       expect(workspace.overlay(tester).selectedElementId, isNull);
       model.undo();
       expect(identical(model.project, old), isTrue);
@@ -563,6 +570,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('wall-end')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(
         model.project.activeStorey.walls.first.startPoint.dy,
         closeTo(.63, 1e-9),
@@ -583,6 +591,7 @@ void main() {
       await capture('docs/images/architect_wall_trim_phone.png');
       await g.up();
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(model.project.activeStorey.walls, hasLength(5));
       expect(tester.takeException(), isNull);
     },

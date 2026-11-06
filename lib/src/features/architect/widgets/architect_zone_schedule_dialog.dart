@@ -1,3 +1,6 @@
+import 'architect_dialog.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
+import 'architect_zone_presets_dialog.dart';
 import '../services/architect_apartment_zones.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -29,6 +32,7 @@ class ArchitectZoneScheduleDialog extends StatefulWidget {
   final ArchitectStorey storey;
   final ValueChanged<ArchitectZone> onZoneUpdated;
   final ValueChanged<Offset?> onTableOriginChanged;
+  final ValueChanged<ArchitectZonePresets>? onPresetsChanged;
 
   const ArchitectZoneScheduleDialog({
     super.key,
@@ -38,6 +42,7 @@ class ArchitectZoneScheduleDialog extends StatefulWidget {
     this.presets = const ArchitectZonePresets(),
     required this.onZoneUpdated,
     required this.onTableOriginChanged,
+    this.onPresetsChanged,
   });
 
   static Future<void> show({
@@ -48,6 +53,7 @@ class ArchitectZoneScheduleDialog extends StatefulWidget {
     ArchitectZonePresets presets = const ArchitectZonePresets(),
     required ValueChanged<ArchitectZone> onZoneUpdated,
     required ValueChanged<Offset?> onTableOriginChanged,
+    ValueChanged<ArchitectZonePresets>? onPresetsChanged,
   }) {
     return showDialog(
       context: context,
@@ -59,6 +65,7 @@ class ArchitectZoneScheduleDialog extends StatefulWidget {
         presets: presets,
         onZoneUpdated: onZoneUpdated,
         onTableOriginChanged: onTableOriginChanged,
+        onPresetsChanged: onPresetsChanged,
       ),
     );
   }
@@ -70,6 +77,7 @@ class ArchitectZoneScheduleDialog extends StatefulWidget {
 
 class _ArchitectZoneScheduleDialogState
     extends State<ArchitectZoneScheduleDialog> {
+  ColorScheme get colors => Theme.of(context).colorScheme;
   late List<ArchitectZone> _zones = List.of(widget.storey.zones);
   late String? _groupId = widget.initialApartmentId;
   late bool _placed = widget.storey.zoneScheduleOrigin != null;
@@ -101,9 +109,9 @@ class _ArchitectZoneScheduleDialogState
           room.name,
           widget.units.formatArea(room.area),
           widget.units.format(room.perimeter),
-          room.resolvedFloorFinish(l),
-          room.resolvedWallFinish(l),
-          room.resolvedCeilingFinish(l),
+          room.resolvedFloorFinish(l, widget.presets),
+          room.resolvedWallFinish(l, widget.presets),
+          room.resolvedCeilingFinish(l, widget.presets),
           widget.units.format(room.clearHeight),
         ].join('\t'),
       );
@@ -138,17 +146,17 @@ class _ArchitectZoneScheduleDialogState
     final floorController = TextEditingController(
       text: zone.floorFinish.isNotEmpty
           ? zone.floorFinish
-          : zone.resolvedFloorFinish(l10n),
+          : zone.resolvedFloorFinish(l10n, widget.presets),
     );
     final wallController = TextEditingController(
       text: zone.wallFinish.isNotEmpty
           ? zone.wallFinish
-          : zone.resolvedWallFinish(l10n),
+          : zone.resolvedWallFinish(l10n, widget.presets),
     );
     final ceilingController = TextEditingController(
       text: zone.ceilingFinish.isNotEmpty
           ? zone.ceilingFinish
-          : zone.resolvedCeilingFinish(l10n),
+          : zone.resolvedCeilingFinish(l10n, widget.presets),
     );
     final heightController = TextEditingController(
       text: BimDistanceUnit.trimZeros(zone.clearHeight.toStringAsFixed(2)),
@@ -156,8 +164,8 @@ class _ArchitectZoneScheduleDialogState
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E2230),
+      builder: (ctx) => architectAlertDialog(
+        backgroundColor: colors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -166,7 +174,7 @@ class _ArchitectZoneScheduleDialogState
             Expanded(
               child: Text(
                 '${zone.name} (${BimDistanceUnit.trimZeros(zone.area.toStringAsFixed(2))} m²)',
-                style: const TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: colors.onSurface, fontSize: 16),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -185,15 +193,12 @@ class _ArchitectZoneScheduleDialogState
                       width: 80,
                       child: TextField(
                         controller: numberController,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: colors.onSurface, fontSize: 14),
                         decoration: InputDecoration(
                           labelText: l10n.architectZoneScheduleColNo,
-                          labelStyle: const TextStyle(color: Colors.white70),
+                          labelStyle: TextStyle(color: colors.onSurfaceVariant),
                           filled: true,
-                          fillColor: const Color(0x33FFFFFF),
+                          fillColor: colors.surfaceContainerHigh,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -241,12 +246,12 @@ class _ArchitectZoneScheduleDialogState
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  style: TextStyle(color: colors.onSurface, fontSize: 14),
                   decoration: InputDecoration(
                     labelText: l10n.architectZoneClearHeight,
-                    labelStyle: const TextStyle(color: Colors.white70),
+                    labelStyle: TextStyle(color: colors.onSurfaceVariant),
                     filled: true,
-                    fillColor: const Color(0x33FFFFFF),
+                    fillColor: colors.surfaceContainerHigh,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -277,16 +282,17 @@ class _ArchitectZoneScheduleDialogState
                 name: nameController.text.trim(),
                 floorFinish:
                     floorController.text.trim() ==
-                        zone.resolvedFloorFinish(l10n)
+                        zone.resolvedFloorFinish(l10n, widget.presets)
                     ? zone.floorFinish
                     : floorController.text.trim(),
                 wallFinish:
-                    wallController.text.trim() == zone.resolvedWallFinish(l10n)
+                    wallController.text.trim() ==
+                        zone.resolvedWallFinish(l10n, widget.presets)
                     ? zone.wallFinish
                     : wallController.text.trim(),
                 ceilingFinish:
                     ceilingController.text.trim() ==
-                        zone.resolvedCeilingFinish(l10n)
+                        zone.resolvedCeilingFinish(l10n, widget.presets)
                     ? zone.ceilingFinish
                     : ceilingController.text.trim(),
                 clearHeight: newH,
@@ -318,9 +324,31 @@ class _ArchitectZoneScheduleDialogState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                l.architectZoneScheduleTitle,
-                style: Theme.of(context).textTheme.titleLarge,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l.architectZoneScheduleTitle,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  if (widget.onPresetsChanged != null)
+                    IconButton(
+                      icon: AppIcon(
+                        AppIconId.settings,
+                        color: Color(0xFF80CBC4),
+                        size: 20,
+                      ),
+                      tooltip: l.architectZonePresetsTooltip,
+                      onPressed: () {
+                        ArchitectZonePresetsDialog.show(
+                          context: context,
+                          presets: widget.presets,
+                          onSave: (p) => widget.onPresetsChanged?.call(p),
+                        );
+                      },
+                    ),
+                ],
               ),
               DropdownButton<String>(
                 key: const ValueKey('zone-schedule-group'),
@@ -350,8 +378,8 @@ class _ArchitectZoneScheduleDialogState
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: DataTable(
-                        dataTextStyle: const TextStyle(color: Colors.black87),
-                        headingTextStyle: const TextStyle(
+                        dataTextStyle: TextStyle(color: Colors.black87),
+                        headingTextStyle: TextStyle(
                           color: Colors.black87,
                           fontWeight: FontWeight.bold,
                         ),
@@ -394,15 +422,24 @@ class _ArchitectZoneScheduleDialogState
                                   Text(widget.units.format(room.perimeter)),
                                 ),
                                 DataCell(
-                                  Text(room.resolvedFloorFinish(l)),
+                                  Text(
+                                    room.resolvedFloorFinish(l, widget.presets),
+                                  ),
                                   onTap: () => _editZoneFinishes(room),
                                 ),
                                 DataCell(
-                                  Text(room.resolvedWallFinish(l)),
+                                  Text(
+                                    room.resolvedWallFinish(l, widget.presets),
+                                  ),
                                   onTap: () => _editZoneFinishes(room),
                                 ),
                                 DataCell(
-                                  Text(room.resolvedCeilingFinish(l)),
+                                  Text(
+                                    room.resolvedCeilingFinish(
+                                      l,
+                                      widget.presets,
+                                    ),
+                                  ),
                                   onTap: () => _editZoneFinishes(room),
                                 ),
                                 DataCell(

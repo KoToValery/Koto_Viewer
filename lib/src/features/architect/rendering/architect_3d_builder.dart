@@ -23,6 +23,7 @@ import 'architect_wall_solids.dart';
 import 'architect_stair_mesh.dart';
 import '../services/component_geometry_cache.dart';
 import '../services/component_library_service.dart';
+import '../services/architect_service_geometry.dart';
 
 /// Real-time 3D solid mesh builder for architectural projects.
 class Architect3dBuilder {
@@ -445,7 +446,7 @@ class Architect3dBuilder {
       for (final comp
           in previewGeometry
               ? storey.components
-              : const <ArchitectComponentInstance>[]) {
+              : storey.components.where((c) => c.isServiceComponent)) {
         if (!comp.isVisible) continue;
         final def = ComponentLibraryService.instance.findDefinition(
           comp.definitionId,
@@ -453,12 +454,12 @@ class Architect3dBuilder {
         if (def == null) continue;
         final geo = ComponentGeometryCache.instance.getOrCompute(
           def,
-          comp.parameters,
+          ArchitectServiceGeometry.parameters(project, storey, comp),
         );
         final first = allTris.length;
         final cosR = math.cos(comp.rotation);
         final sinR = math.sin(comp.rotation);
-        final zBase = storey.elevation + comp.elevationOffset;
+        final zBase = ArchitectServiceGeometry.baseElevation(project, storey, comp);
 
         Vector3 transform(Vector3 p) {
           final rx = p.x * cosR - p.y * sinR;
@@ -493,6 +494,8 @@ class Architect3dBuilder {
             ),
           );
         }
+        allTris.addAll(ArchitectServiceGeometry.flashing(project, storey, comp));
+        allTris.addAll(ArchitectServiceGeometry.terminal(project, storey, comp));
         mark(comp.id, first);
       }
     }

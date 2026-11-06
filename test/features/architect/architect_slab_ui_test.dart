@@ -76,18 +76,19 @@ void main() {
         find.byKey(const ValueKey('architect-selection-properties')),
       );
       await projection.settleProjection(tester);
-      await tester.tap(
-        find.byKey(const ValueKey('architect-property-slab-layers')),
-      );
-      await projection.settleProjection(tester);
+
       expect(find.byType(ArchitectSlabLayersDialog), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('slab-core-thickness')),
+        '220',
+      );
       await tester.tap(find.byKey(const ValueKey('slab-layers-save')));
       await projection.settleProjection(tester);
       expect(
         controller.project.activeStorey.slabs.single.assemblyId,
         isNotNull,
       );
-      expect(controller.project.activeStorey.slabs.single.thickness, .2);
+      expect(controller.project.activeStorey.slabs.single.thickness, .22);
       controller.undo();
       await projection.settleProjection(tester);
       expect(controller.project.activeStorey.slabs.single.assemblyId, isNull);

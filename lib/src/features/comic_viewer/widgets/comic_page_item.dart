@@ -1,3 +1,5 @@
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../models/comic_models.dart';
 
@@ -117,8 +119,7 @@ class _ComicPageItemState extends State<ComicPageItem> with SingleTickerProvider
     ).animate(
       CurvedAnimation(
         parent: _animController,
-        curve: Curves.easeOutCubic,
-      ),
+        curve: Curves.easeOutCubic),
     );
     _animController.forward(from: 0.0);
   }
@@ -257,10 +258,14 @@ class _ComicPageItemState extends State<ComicPageItem> with SingleTickerProvider
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                  const AppIcon(
+                    AppIconId.imageBroken, size: 48, color: Colors.grey,
+                  ),
                   const SizedBox(height: 8),
                   Text(
-                    'Error loading page ${widget.page.pageIndex + 1}',
+                    context.l10n.commandUiErrorLoadingPageValue(
+                      (widget.page.pageIndex + 1).toString(),
+                    ),
                     style: const TextStyle(color: Colors.white70),
                   ),
                 ],

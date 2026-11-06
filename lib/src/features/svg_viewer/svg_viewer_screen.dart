@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
@@ -11,18 +12,25 @@ import '../../core/services/recent_files_service.dart';
 
 /// Available canvas themes for the SVG viewer.
 enum SvgCanvasTheme {
-  lightStudio('Light Studio', Color(0xFFF2F2F6), Color(0xFFDCDCE4)),
-  darkStudio('Dark Studio', Color(0xFF1E1E24), Color(0xFF2C2C34)),
-  pureWhite('Pure White', Color(0xFFFFFFFF), Color(0xFFE5E5E5)),
-  pureBlack('Pure Black', Color(0xFF121212), Color(0xFF242424)),
-  darkCad('Dark CAD', Color(0xFF1E1E1E), Color(0xFF2E2E2E)),
-  blueprint('Blueprint', Color(0xFF0D253A), Color(0xFF194364));
-
-  final String label;
+  lightStudio(Color(0xFFF2F2F6), Color(0xFFDCDCE4)),
+  darkStudio(Color(0xFF1E1E24), Color(0xFF2C2C34)),
+  pureWhite(Color(0xFFFFFFFF), Color(0xFFE5E5E5)),
+  pureBlack(Color(0xFF121212), Color(0xFF242424)),
+  darkCad(Color(0xFF1E1E1E), Color(0xFF2E2E2E)),
+  blueprint(Color(0xFF0D253A), Color(0xFF194364));
   final Color background;
   final Color gridColor;
 
-  const SvgCanvasTheme(this.label, this.background, this.gridColor);
+  const SvgCanvasTheme(this.background, this.gridColor);
+
+  String localizedLabel(AppLocalizations l) => switch (this) {
+    SvgCanvasTheme.lightStudio => l.commandOptionLightStudio,
+    SvgCanvasTheme.darkStudio => l.commandOptionDarkStudio,
+    SvgCanvasTheme.pureWhite => l.commandOptionPureWhite,
+    SvgCanvasTheme.pureBlack => l.commandOptionPureBlack,
+    SvgCanvasTheme.darkCad => l.commandOptionDarkCad,
+    SvgCanvasTheme.blueprint => l.cad3dThemeBlueprint,
+  };
 
   bool get isDark => background.computeLuminance() < 0.5;
 }
@@ -159,7 +167,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
           _isLoading = false;
         });
 
-        debugPrint('[SVG_VIEWER] Loaded "${widget.filePath}": ${metadata.summary}, viewBox=${metadata.viewBox}, size=${metadata.width}x${metadata.height}');
+        debugPrint('[SVG_VIEWER] Loaded "${widget.filePath}": ${metadata.summary}, viewBox=${metadata.viewBox}, size=${metadata.width}x${metadata.height}',
+        );
 
         if (!_viewportSize.isEmpty) {
           _hasFittedInitial = true;
@@ -169,7 +178,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
         }
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'SvgViewer._loadSvgFile.fs');
+      AppErrorHandler.recordError(e, stack, context: 'SvgViewer._loadSvgFile.fs',
+      );
       try {
         await RecentFilesService.removeRecentFile(widget.filePath);
       } on Exception catch (_) {
@@ -183,7 +193,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'SvgViewer._loadSvgFile.format');
+      AppErrorHandler.recordError(e, stack, context: 'SvgViewer._loadSvgFile.format',
+      );
       try {
         await RecentFilesService.removeRecentFile(widget.filePath);
       } on Exception catch (_) {
@@ -275,10 +286,14 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
       }
     }
 
-    final pathCount = RegExp(r'<path\b', caseSensitive: false).allMatches(svg).length;
-    final shapeCount = RegExp(r'<(?:rect|circle|ellipse|line|polyline|polygon)\b', caseSensitive: false).allMatches(svg).length;
-    final textCount = RegExp(r'<text\b', caseSensitive: false).allMatches(svg).length;
-    final imageCount = RegExp(r'<image\b', caseSensitive: false).allMatches(svg).length;
+    final pathCount = RegExp(r'<path\b', caseSensitive: false,
+    ).allMatches(svg).length;
+    final shapeCount = RegExp(r'<(?:rect|circle|ellipse|line|polyline|polygon)\b', caseSensitive: false,
+    ).allMatches(svg).length;
+    final textCount = RegExp(r'<text\b', caseSensitive: false,
+    ).allMatches(svg).length;
+    final imageCount = RegExp(r'<image\b', caseSensitive: false,
+    ).allMatches(svg).length;
 
     return SvgMetadata(
       width: width,
@@ -316,7 +331,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
       ..scaleByDouble(scale, scale, 1.0, 1.0);
 
     _transformController.value = matrix;
-    debugPrint('[SVG_VIEWER] _fitToScreen: viewport=$_viewportSize, svg=${svgWidth.toStringAsFixed(1)}x${svgHeight.toStringAsFixed(1)}, scale=${scale.toStringAsFixed(4)}, dx=${dx.toStringAsFixed(1)}, dy=${dy.toStringAsFixed(1)}');
+    debugPrint('[SVG_VIEWER] _fitToScreen: viewport=$_viewportSize, svg=${svgWidth.toStringAsFixed(1)}x${svgHeight.toStringAsFixed(1)}, scale=${scale.toStringAsFixed(4)}, dx=${dx.toStringAsFixed(1)}, dy=${dy.toStringAsFixed(1)}',
+    );
   }
 
 
@@ -365,7 +381,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                 color: const Color(0xFFFF8C00).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.palette_rounded, color: Color(0xFFFF8C00)),
+              child: const Icon(Icons.palette_rounded, color: Color(0xFFFF8C00),
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -403,7 +420,7 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: Text(context.l10n.commandIconClose),
           ),
         ],
       ),
@@ -416,7 +433,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+          ),
           Text(value, style: const TextStyle(color: Colors.grey, fontSize: 13)),
         ],
       ),
@@ -431,32 +449,33 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
     return [
       // White Page Sheet Toggle
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _showWhitePage ? Icons.description : Icons.description_outlined,
           size: 20,
           color: _showWhitePage ? theme.colorScheme.primary : null,
         ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: _showWhitePage ? 'White Page: ON' : 'White Page: OFF (Transparent)',
+        tooltip: _showWhitePage ? context.l10n.commandUiWhitePageOn
+            : context.l10n.commandUiWhitePageOffTransparent,
         onPressed: () => setState(() => _showWhitePage = !_showWhitePage),
       ),
 
       // Fit to Screen Button
       IconButton(
-        icon: const Icon(Icons.fit_screen_outlined, size: 20),
+        icon: const AppIcon(AppIconId.fitView, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Fit to Screen',
+        tooltip: context.l10n.commandUiFitToScreen,
         onPressed: _svgContent.isNotEmpty ? _fitToScreen : null,
       ),
 
       // Theme Switcher Menu
       PopupMenuButton<SvgCanvasTheme>(
-        icon: const Icon(Icons.palette_outlined, size: 20),
+        icon: const AppIcon(AppIconId.palette, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Canvas Theme',
+        tooltip: context.l10n.commandUiCanvasTheme,
         onSelected: (t) => setState(() => _canvasTheme = t),
         itemBuilder: (context) => SvgCanvasTheme.values.map((t) {
           return PopupMenuItem<SvgCanvasTheme>(
@@ -473,10 +492,12 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Text(t.label),
+                Text(t.localizedLabel(context.l10n)),
                 if (_canvasTheme == t) ...[
                   const Spacer(),
-                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                  AppIcon(
+                    AppIconId.confirm, size: 18, color: theme.colorScheme.primary,
+                  ),
                 ],
               ],
             ),
@@ -486,32 +507,32 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
 
       // Grid Toggle Button
       IconButton(
-        icon: Icon(
+        icon: AppIcon.fromMaterial(
           _showGrid ? Icons.grid_on : Icons.grid_off,
           size: 20,
           color: _showGrid ? theme.colorScheme.primary : null,
         ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Grid',
+        tooltip: context.l10n.commandIconGrid,
         onPressed: () => setState(() => _showGrid = !_showGrid),
       ),
 
       // Info Dialog
       IconButton(
-        icon: const Icon(Icons.info_outline, size: 20),
+        icon: const AppIcon(AppIconId.info, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Information',
+        tooltip: context.l10n.commandIconInfo,
         onPressed: _showInfoDialog,
       ),
 
       // Share Button
       IconButton(
-        icon: const Icon(Icons.share_outlined, size: 20),
+        icon: const AppIcon(AppIconId.share, size: 20),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Share',
+        tooltip: context.l10n.commandIconShare,
         onPressed: _shareFile,
       ),
     ];
@@ -528,7 +549,7 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const AppIcon(AppIconId.back),
           onPressed: () => Navigator.of(context).pop(true),
         ),
         title: Text(
@@ -555,8 +576,7 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                   child: Row(
                     children: [
                       const Spacer(),
-                      ..._buildSvgActions(theme),
-                    ],
+                      ..._buildSvgActions(theme)],
                   ),
                 ),
               ),
@@ -594,7 +614,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                    const Icon(Icons.error_outline, size: 48, color: Colors.redAccent,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       _errorMessage!,
@@ -604,8 +625,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: _loadSvgFile,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
+                      icon: const AppIcon(AppIconId.refresh),
+                      label: Text(context.l10n.retry),
                     ),
                   ],
                 ),
@@ -674,7 +695,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                             padding: const EdgeInsets.all(16.0),
                             child: Text(
                               'Error rendering SVG: $strErr',
-                              style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                              style: const TextStyle(color: Colors.redAccent, fontSize: 12,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -691,7 +713,7 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                 right: 20,
                 child: _buildFloatingButton(
                   icon: Icons.fit_screen_outlined,
-                  tooltip: 'Fit to View (Center)',
+                  tooltip: context.l10n.commandUiFitToViewCenter,
                   onTap: _fitToScreen,
                   theme: theme,
                 ),
@@ -720,7 +742,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
           message: tooltip,
           child: Padding(
             padding: const EdgeInsets.all(10.0),
-            child: Icon(icon, size: 20, color: theme.colorScheme.onSurface),
+            child: AppIcon.fromMaterial(icon, size: 20, color: theme.colorScheme.onSurface,
+            ),
           ),
         ),
       ),
@@ -735,8 +758,7 @@ class _SvgGridPainter extends CustomPainter {
 
   _SvgGridPainter({
     required this.gridColor,
-    required this.scale,
-  });
+    required this.scale});
 
   @override
   void paint(Canvas canvas, Size size) {

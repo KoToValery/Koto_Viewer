@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -38,10 +39,10 @@ void main() {
     });
 
     test('Theme extensions return appropriate colors and labels', () {
-      expect(PdfReflowTheme.light.label, 'Light');
-      expect(PdfReflowTheme.sepia.label, 'Warm Sepia');
-      expect(PdfReflowTheme.dark.label, 'Dark Charcoal');
-      expect(PdfReflowTheme.amoled.label, 'Pure Black');
+      expect(PdfReflowTheme.light.localizedLabel(lookupAppLocalizations(const Locale('en'))), 'Light');
+      expect(PdfReflowTheme.sepia.localizedLabel(lookupAppLocalizations(const Locale('en'))), 'Warm Sepia');
+      expect(PdfReflowTheme.dark.localizedLabel(lookupAppLocalizations(const Locale('en'))), 'Dark Charcoal');
+      expect(PdfReflowTheme.amoled.localizedLabel(lookupAppLocalizations(const Locale('en'))), 'Pure Black');
 
       expect(PdfReflowTheme.sepia.backgroundColor, const Color(0xFFF4ECD8));
       expect(PdfReflowTheme.amoled.backgroundColor, const Color(0xFF000000));

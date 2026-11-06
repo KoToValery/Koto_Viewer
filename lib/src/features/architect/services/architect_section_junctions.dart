@@ -319,7 +319,7 @@ class ArchitectSectionJunctions {
 
     for (final floor in project.storeys) {
       for (final slab in floor.slabs) {
-        final spans = ArchitectSlabGeometry.intervals(floor, slab, cut);
+        final spans = ArchitectSlabGeometry.intervals(floor, slab, cut, project: project);
         if (spans.isEmpty) continue;
 
         final resolvedAssembly = resolveEffectiveSlabAssembly(

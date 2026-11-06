@@ -1,3 +1,4 @@
+import '../../support/command_icon_finders.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -49,7 +50,7 @@ void main() {
 
         await workspace.open(tester, model);
         await tool_ui.prepare(tester, Icons.near_me_outlined);
-        await tester.tap(find.byIcon(Icons.near_me_outlined));
+        await tester.tap(findCommandIcon(Icons.near_me_outlined));
         await tester.pumpAndSettle();
 
         // Select the dimension by tapping on it
@@ -58,7 +59,8 @@ void main() {
         expect(workspace.overlay(tester).selectedElementIds, {'dim1'});
 
         // Long press to open radial menu
-        final held = await tester.startGesture(workspace.screen(tester, dimCenter));
+        final held = await tester.startGesture(workspace.screen(tester, dimCenter),
+        );
         await tester.pump(const Duration(milliseconds: 750));
         await held.up();
         await tester.pumpAndSettle();
@@ -81,7 +83,8 @@ void main() {
         await tester.pumpAndSettle();
 
         // Dimension new-point button in the dimension bar should be visible and active
-        expect(find.byKey(const ValueKey('architect-dimension-new-point')), findsOneWidget);
+        expect(find.byKey(const ValueKey('architect-dimension-new-point')), findsOneWidget,
+        );
         expect(dimensions.preview(tester), isNotNull);
       },
     );
@@ -116,7 +119,7 @@ void main() {
 
         await workspace.open(tester, model);
         await tool_ui.prepare(tester, Icons.near_me_outlined);
-        await tester.tap(find.byIcon(Icons.near_me_outlined));
+        await tester.tap(findCommandIcon(Icons.near_me_outlined));
         await tester.pumpAndSettle();
 
         // Select the dimension
@@ -125,11 +128,14 @@ void main() {
         expect(workspace.overlay(tester).selectedElementIds, {'dim1'});
 
         // Verify both new point and add walls buttons exist in selection bar
-        expect(find.byKey(const ValueKey('architect-dimension-new-point')), findsOneWidget);
-        expect(find.byKey(const ValueKey('architect-dimension-add-walls')), findsOneWidget);
+        expect(find.byKey(const ValueKey('architect-dimension-new-point')), findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('architect-dimension-add-walls')), findsOneWidget,
+        );
 
         // Tapping new-point activates drafting preview
-        await tester.tap(find.byKey(const ValueKey('architect-dimension-new-point')));
+        await tester.tap(find.byKey(const ValueKey('architect-dimension-new-point')),
+        );
         await tester.pumpAndSettle();
         expect(dimensions.preview(tester), isNotNull);
       },
@@ -177,7 +183,8 @@ void main() {
       // Wall face joint intersections should exist with '@wall-face-joints'
       final faceJoints = snapGeom.alignmentPoints.where((p) => p.owner == '@wall-face-joints').toList();
       expect(faceJoints, isNotEmpty);
-    });
+    },
+    );
 
     test('ArchitectSnapHelper with excludeWallAxes: true ignores wall centerline and snaps to face intersection', () {
       const w1 = ArchitectWall(
@@ -215,7 +222,8 @@ void main() {
         excludeWallAxes: true,
       );
       expect(faceSnap.isSnapped, isTrue);
-      expect((faceSnap.point - const Offset(0.15, 0.15)).distance, lessThan(0.01));
+      expect((faceSnap.point - const Offset(0.15, 0.15)).distance, lessThan(0.01),
+        );
       expect(faceSnap.snapLabel, anyOf('Intersection', 'Vertex'));
 
       // Axial snap at (0, 0) should NOT snap to wall-axis line when excludeWallAxes: true
@@ -225,8 +233,11 @@ void main() {
         tolerance: 0.05,
         excludeWallAxes: true,
       );
-      expect(axisSnap.magneticGuides.any((g) => (g.$1 - const Offset(-2, 0)).distance < 0.01), isFalse);
-    });
+      expect(axisSnap.magneticGuides.any((g) => (g.$1 - const Offset(-2, 0)).distance < 0.01,
+          ), isFalse,
+        );
+    },
+    );
   });
 
   group('Dynamic 30 cm and 40 cm drag snapping', () {
@@ -250,7 +261,8 @@ void main() {
 
       // Select Dimension tool and switch to chain mode
       await editing.selectTool(tester, 'dimension');
-      await tester.tap(find.byKey(const ValueKey('architect-dimension-chain')));
+      await tester.tap(find.byKey(const ValueKey('architect-dimension-chain')),
+        );
       await tester.pumpAndSettle();
 
       // Tap on wall to draft dimension
@@ -258,23 +270,29 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap place button to enter _dimensionPlacing mode
-      await tester.tap(find.byKey(const ValueKey('architect-dimension-place')));
+      await tester.tap(find.byKey(const ValueKey('architect-dimension-place')),
+        );
       await tester.pumpAndSettle();
 
       // Move mouse pointer near 30 cm offset along normal (Y axis) from baseline (y = 2.0)
-      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
-      await gesture.addPointer(location: workspace.screen(tester, const Offset(1.0, 2.0)));
-      await gesture.moveTo(workspace.screen(tester, const Offset(1.0, 2.302)));
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse,
+        );
+      await gesture.addPointer(location: workspace.screen(tester, const Offset(1.0, 2.0)),
+        );
+      await gesture.moveTo(workspace.screen(tester, const Offset(1.0, 2.302)),
+        );
       await tester.pump();
 
       final overlay = workspace.overlay(tester);
       // Snap label should indicate 30 cm or 40 cm
       expect(
         overlay.activeSnapLabel,
-        anyOf(contains('30 cm'), contains('30 см'), contains('40 cm'), contains('40 см')),
+        anyOf(contains('30 cm'), contains('30 см'), contains('40 cm'), contains('40 см'),
+          ),
       );
       await gesture.removePointer();
-    });
+    },
+    );
 
     test('Snap labels localize in Bulgarian and English', () {
       final bg = lookupAppLocalizations(const Locale('bg'));

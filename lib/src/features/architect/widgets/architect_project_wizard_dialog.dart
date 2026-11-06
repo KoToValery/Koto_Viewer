@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_grid_preset.dart';
@@ -208,7 +209,7 @@ class _ArchitectProjectWizardDialogState
                   IconButton(
                     tooltip: l.close,
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
+                    icon: const AppIcon(AppIconId.close),
                   ),
                 ],
               ),
@@ -221,7 +222,7 @@ class _ArchitectProjectWizardDialogState
                         padding: const EdgeInsets.symmetric(horizontal: 2),
                         child: ChoiceChip(
                           key: ValueKey('architect-wizard-step-$i'),
-                          avatar: compact ? null : Icon(icons[i], size: 16),
+                          avatar: compact ? null : AppIcon.fromMaterial(icons[i], size: 16),
                           label: Text(
                             labels[i],
                             maxLines: 1,
@@ -344,7 +345,8 @@ class _ArchitectProjectWizardDialogState
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: Theme.of(context,
+                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.white24),
               ),
@@ -519,7 +521,7 @@ class _ArchitectProjectWizardDialogState
               TextButton.icon(
                 key: const ValueKey('architect-wizard-add-storey'),
                 onPressed: _addLevel,
-                icon: const Icon(Icons.add),
+                icon: const AppIcon(AppIconId.add),
                 label: Text(l.bimProjectAddStorey),
               ),
               const Spacer(),
@@ -527,7 +529,7 @@ class _ArchitectProjectWizardDialogState
                 IconButton(
                   key: const ValueKey('architect-wizard-remove-storey'),
                   tooltip: l.bimProjectDeleteStorey,
-                  icon: const Icon(Icons.remove_circle_outline),
+                  icon: const AppIcon(AppIconId.removeCircle),
                   onPressed: () =>
                       setState(() => _levels.removeLast().dispose()),
                 ),

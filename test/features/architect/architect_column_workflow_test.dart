@@ -1,5 +1,7 @@
+import '../../support/command_icon_finders.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_column.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
@@ -58,8 +60,8 @@ void main() {
               placed.depth / 2 * workspace.camera(tester).scale,
         ),
       );
-      final icon = tester.widget<Icon>(
-        find.descendant(of: cancel, matching: find.byIcon(Icons.close)),
+      final icon = tester.widget<AppIcon>(
+        find.descendant(of: cancel, matching: findCommandIcon(Icons.close)),
       );
       expect(icon.color, Colors.red);
 

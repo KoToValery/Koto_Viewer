@@ -1,3 +1,6 @@
+import '../../bim_editing/properties/bim_distance_unit.dart';
+import 'architect_level_format.dart';
+export 'architect_level_format.dart';
 import 'architect_contour.dart';
 import 'architect_line_style.dart';
 import 'architect_hatch_pattern.dart';
@@ -300,7 +303,8 @@ class ArchitectSlab {
         inside = !inside;
       }
     }
-    return inside && !holes.any((h) => (Path()..addPolygon(h, true)).contains(pt));
+    return inside &&
+        !holes.any((h) => (Path()..addPolygon(h, true)).contains(pt));
   }
 }
 
@@ -308,7 +312,7 @@ class ArchitectSlab {
 // 3. ARCHITECTURAL OPENING / SHAFT / VOID
 // ===========================================================================
 
-enum OpeningType { shaft, floorVoid, elevator }
+enum OpeningType { shaft, floorVoid, elevator, circular }
 
 class ArchitectOpening {
   final String id;
@@ -319,7 +323,7 @@ class ArchitectOpening {
   const ArchitectOpening({
     required this.id,
     required this.boundary,
-    this.label = 'Shaft',
+    this.label = '',
     this.type = OpeningType.shaft,
   });
 
@@ -365,7 +369,7 @@ class ArchitectOpening {
                 )
                 .toList() ??
             const [],
-        label: json['label'] as String? ?? 'Shaft',
+        label: json['label'] as String? ?? '',
         type: OpeningType.values.firstWhere(
           (t) => t.name == json['type'],
           orElse: () => OpeningType.shaft,
@@ -398,6 +402,37 @@ class ArchitectStair {
     this.design,
   }) : _stepCount = stepCount,
        _hasLanding = hasLanding;
+
+  /// Placement uses the outer end of the first riser. The stored axis remains
+  /// centred, so existing stairs and their editing/serialization stay stable.
+  factory ArchitectStair.fromCorner({
+    required String id,
+    required Offset corner,
+    required Offset directionPoint,
+    double width = 1.10,
+    int stepCount = 16,
+    ArchitectStairDesign? design,
+  }) {
+    final delta = directionPoint - corner;
+    final axis = delta.distance < .001
+        ? const Offset(1, 0)
+        : delta / delta.distance;
+    final inward =
+        Offset(-axis.dy, axis.dx) * (design?.turnLeft == true ? -1 : 1);
+    final start = corner + inward * (width / 2);
+    return ArchitectStair(
+      id: id,
+      startPoint: start,
+      endPoint: start + axis * (delta.distance < .001 ? 1 : delta.distance),
+      width: width,
+      stepCount: stepCount,
+      design: design,
+    );
+  }
+
+  Offset get placementCorner =>
+      startPoint -
+      normalVector * (width / 2) * (design?.turnLeft == true ? -1 : 1);
 
   double get length => (endPoint - startPoint).distance;
 
@@ -726,32 +761,46 @@ class ArchitectDimension {
 class ArchitectElevationMarker {
   final String id;
   final Offset position;
-  final double elevation; // in meters
-  final String? label; // optional note, e.g. "ГП" or "КК"
+  final double elevation;
+  final String? label;
+  final ArchitectLevelSymbol symbol;
+  final BimDistanceUnit? units;
+  final int? decimals;
 
   const ArchitectElevationMarker({
     required this.id,
     required this.position,
     required this.elevation,
     this.label,
+    this.symbol = ArchitectLevelSymbol.automatic,
+    this.units,
+    this.decimals,
   });
 
-  String get formattedElevation {
-    if (elevation.abs() < 1e-4) return '±0.00';
-    final sign = elevation > 0 ? '+' : '';
-    return '$sign${elevation.toStringAsFixed(2)}';
-  }
+  String get formattedElevation => formatArchitectLevel(
+    elevation,
+    units: units ?? BimDistanceUnit.meters,
+    decimals: decimals ?? 2,
+  );
 
   ArchitectElevationMarker copyWith({
     String? id,
     Offset? position,
     double? elevation,
     String? label,
+    ArchitectLevelSymbol? symbol,
+    BimDistanceUnit? units,
+    int? decimals,
+    bool inheritUnits = false,
+    bool inheritDecimals = false,
   }) => ArchitectElevationMarker(
     id: id ?? this.id,
     position: position ?? this.position,
     elevation: elevation ?? this.elevation,
     label: label ?? this.label,
+    symbol: symbol ?? this.symbol,
+    units: inheritUnits ? null : units ?? this.units,
+    decimals: inheritDecimals ? null : decimals ?? this.decimals,
   );
 
   Map<String, dynamic> toJson() => {
@@ -759,6 +808,9 @@ class ArchitectElevationMarker {
     'position': {'x': position.dx, 'y': position.dy},
     'elevation': elevation,
     'label': label,
+    'symbol': symbol.name,
+    if (units != null) 'levelUnits': units!.name,
+    if (decimals != null) 'levelDecimals': decimals,
   };
 
   factory ArchitectElevationMarker.fromJson(Map<String, dynamic> json) =>
@@ -768,8 +820,17 @@ class ArchitectElevationMarker {
           (json['position']['x'] as num).toDouble(),
           (json['position']['y'] as num).toDouble(),
         ),
-        elevation: (json['elevation'] as num?)?.toDouble() ?? 0.0,
+        elevation: (json['elevation'] as num?)?.toDouble() ?? 0,
         label: json['label'] as String?,
+        symbol:
+            ArchitectLevelSymbol.values
+                .where((s) => s.name == json['symbol'])
+                .firstOrNull ??
+            ArchitectLevelSymbol.automatic,
+        units: BimDistanceUnit.values
+            .where((u) => u.name == json['levelUnits'])
+            .firstOrNull,
+        decimals: (json['levelDecimals'] as num?)?.toInt().clamp(0, 4),
       );
 }
 
@@ -781,13 +842,26 @@ class ArchitectAnnotation {
   final String id;
   final Offset position;
   final String text;
-  final double fontSize; // in meters (default 0.30 m)
+
+  /// Legacy model-space font height. Paper sizes live in ArchitectDocument.
+  final double fontSize;
+  final double rotationDeg;
+  final TextAlign alignment;
+  final int fontWeight;
+  final bool italic, underline;
+  final int colorValue;
 
   const ArchitectAnnotation({
     required this.id,
     required this.position,
     required this.text,
-    this.fontSize = 0.30,
+    this.fontSize = .30,
+    this.rotationDeg = 0,
+    this.alignment = TextAlign.left,
+    this.fontWeight = 600,
+    this.italic = false,
+    this.underline = false,
+    this.colorValue = 0xFF212121,
   });
 
   ArchitectAnnotation copyWith({
@@ -795,11 +869,23 @@ class ArchitectAnnotation {
     Offset? position,
     String? text,
     double? fontSize,
+    double? rotationDeg,
+    TextAlign? alignment,
+    int? fontWeight,
+    bool? italic,
+    bool? underline,
+    int? colorValue,
   }) => ArchitectAnnotation(
     id: id ?? this.id,
     position: position ?? this.position,
     text: text ?? this.text,
     fontSize: fontSize ?? this.fontSize,
+    rotationDeg: rotationDeg ?? this.rotationDeg,
+    alignment: alignment ?? this.alignment,
+    fontWeight: fontWeight ?? this.fontWeight,
+    italic: italic ?? this.italic,
+    underline: underline ?? this.underline,
+    colorValue: colorValue ?? this.colorValue,
   );
 
   Map<String, dynamic> toJson() => {
@@ -807,6 +893,12 @@ class ArchitectAnnotation {
     'position': {'x': position.dx, 'y': position.dy},
     'text': text,
     'fontSize': fontSize,
+    'rotationDeg': rotationDeg,
+    'alignment': alignment.name,
+    'fontWeight': fontWeight,
+    'italic': italic,
+    'underline': underline,
+    'colorValue': colorValue,
   };
 
   factory ArchitectAnnotation.fromJson(Map<String, dynamic> json) =>
@@ -817,7 +909,20 @@ class ArchitectAnnotation {
           (json['position']['y'] as num).toDouble(),
         ),
         text: json['text'] as String? ?? '',
-        fontSize: (json['fontSize'] as num?)?.toDouble() ?? 0.30,
+        fontSize: (json['fontSize'] as num?)?.toDouble() ?? .30,
+        rotationDeg: (json['rotationDeg'] as num?)?.toDouble() ?? 0,
+        alignment:
+            TextAlign.values
+                .where((a) => a.name == json['alignment'])
+                .firstOrNull ??
+            TextAlign.left,
+        fontWeight: ((json['fontWeight'] as num?)?.toInt() ?? 600).clamp(
+          100,
+          900,
+        ),
+        italic: json['italic'] == true,
+        underline: json['underline'] == true,
+        colorValue: (json['colorValue'] as num?)?.toInt() ?? 0xFF212121,
       );
 }
 
@@ -837,8 +942,10 @@ class ArchitectCadPrimitive {
   final Offset endPoint;
   final int colorValue; // ARGB
   final String? colorPresetId;
-  ArchitectDrawingColor get drawingColor => ArchitectDrawingColor(colorValue, presetId: colorPresetId);
+  ArchitectDrawingColor get drawingColor =>
+      ArchitectDrawingColor(colorValue, presetId: colorPresetId);
   final List<Offset>? polygon;
+  final bool? closed;
   final double strokeWidth;
   final ArchitectLineStyle lineStyle;
   final ArchitectHatchPattern hatchPattern;
@@ -860,20 +967,38 @@ class ArchitectCadPrimitive {
     this.hatchAngle = 0,
     this.hatchBorder = true,
     this.polygon,
+    this.closed,
   });
 
   List<Offset> get polygonCorners {
+    if (isClosedPolyline) return contourPoints;
     if (polygon != null) return polygon!;
     final rect = Rect.fromPoints(startPoint, endPoint);
     return [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft];
   }
 
-  bool get isPolygon => type == CadPrimitiveType.rect || type == CadPrimitiveType.hatch;
+  bool get isClosedPolyline =>
+      type == CadPrimitiveType.polyline &&
+      (closed ??
+          (linePoints.length > 2 && linePoints.first == linePoints.last));
+  List<Offset> get contourPoints =>
+      isClosedPolyline && linePoints.first == linePoints.last
+      ? linePoints.sublist(0, linePoints.length - 1)
+      : linePoints;
+  bool get isPolygon =>
+      type == CadPrimitiveType.rect ||
+      type == CadPrimitiveType.hatch ||
+      isClosedPolyline;
 
-  /// Polylines reuse the persisted vertex list, but never imply a closing edge.
-  List<Offset> get linePoints => type == CadPrimitiveType.polyline
-      ? polygon ?? [startPoint, endPoint]
-      : [startPoint, endPoint];
+  /// Connected vertices; an explicit closed path exposes its closing segment.
+  List<Offset> get linePoints {
+    final points = type == CadPrimitiveType.polyline
+        ? polygon ?? [startPoint, endPoint]
+        : [startPoint, endPoint];
+    return closed == true && points.length > 2 && points.first != points.last
+        ? [...points, points.first]
+        : points;
+  }
 
   static void validatePolyline(List<Offset> points) {
     if (points.length < 2 ||
@@ -903,6 +1028,7 @@ class ArchitectCadPrimitive {
     double? hatchAngle,
     bool? hatchBorder,
     List<Offset>? polygon,
+    bool? closed,
   }) => ArchitectCadPrimitive(
     id: id ?? this.id,
     holes: holes ?? this.holes,
@@ -910,8 +1036,13 @@ class ArchitectCadPrimitive {
     startPoint: startPoint ?? this.startPoint,
     endPoint: endPoint ?? this.endPoint,
     colorValue: colorValue ?? this.colorValue,
-    colorPresetId: clearColorPreset || (colorValue != null && colorPresetId == null &&
-        (colorValue & 0xFFFFFF) != (this.colorValue & 0xFFFFFF)) ? null : colorPresetId ?? this.colorPresetId,
+    colorPresetId:
+        clearColorPreset ||
+            (colorValue != null &&
+                colorPresetId == null &&
+                (colorValue & 0xFFFFFF) != (this.colorValue & 0xFFFFFF))
+        ? null
+        : colorPresetId ?? this.colorPresetId,
     strokeWidth: strokeWidth ?? this.strokeWidth,
     lineStyle: lineStyle ?? this.lineStyle,
     hatchPattern: hatchPattern ?? this.hatchPattern,
@@ -919,12 +1050,14 @@ class ArchitectCadPrimitive {
     hatchAngle: hatchAngle ?? this.hatchAngle,
     hatchBorder: hatchBorder ?? this.hatchBorder,
     polygon: polygon ?? this.polygon,
+    closed: closed ?? this.closed ?? (isClosedPolyline ? true : null),
   );
 
   Map<String, dynamic> toJson() => {
     'id': id,
     if (holes.isNotEmpty) 'holes': ArchitectContour.write(holes),
     'type': type.name,
+    if (type == CadPrimitiveType.polyline) 'closed': isClosedPolyline,
     'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'colorValue': colorValue,
@@ -932,8 +1065,10 @@ class ArchitectCadPrimitive {
     'strokeWidth': strokeWidth,
     if (type != CadPrimitiveType.circle) 'lineStyle': lineStyle.toJson(),
     if (type == CadPrimitiveType.hatch) ...{
-      'hatchPattern': hatchPattern.toJson(), 'hatchScale': hatchScale,
-      'hatchAngle': hatchAngle, 'hatchBorder': hatchBorder,
+      'hatchPattern': hatchPattern.toJson(),
+      'hatchScale': hatchScale,
+      'hatchAngle': hatchAngle,
+      'hatchBorder': hatchBorder,
     },
     if (polygon != null)
       'polygon': [
@@ -945,6 +1080,7 @@ class ArchitectCadPrimitive {
       ArchitectCadPrimitive(
         id: json['id'] as String,
         holes: ArchitectContour.read(json['holes']),
+        closed: json['closed'] as bool?,
         type: CadPrimitiveType.values.firstWhere(
           (t) => t.name == json['type'],
           orElse: () => CadPrimitiveType.line,
@@ -960,8 +1096,11 @@ class ArchitectCadPrimitive {
         colorValue: (json['colorValue'] as num?)?.toInt() ?? 0xFF424242,
         colorPresetId: json['colorPresetId'] as String?,
         strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 1.0,
-        hatchPattern: json['hatchPattern'] is Map ? ArchitectHatchPattern.fromJson(
-          Map<String, dynamic>.from(json['hatchPattern'] as Map)) : ArchitectHatchPattern.diagonal,
+        hatchPattern: json['hatchPattern'] is Map
+            ? ArchitectHatchPattern.fromJson(
+                Map<String, dynamic>.from(json['hatchPattern'] as Map),
+              )
+            : ArchitectHatchPattern.diagonal,
         hatchScale: (json['hatchScale'] as num?)?.toDouble() ?? 1,
         hatchAngle: (json['hatchAngle'] as num?)?.toDouble() ?? 0,
         hatchBorder: json['hatchBorder'] as bool? ?? true,

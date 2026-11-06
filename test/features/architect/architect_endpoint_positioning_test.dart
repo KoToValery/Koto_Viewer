@@ -238,6 +238,7 @@ void main() {
       }
       await tester.tap(find.byKey(const ValueKey('wall-end')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(model.project.activeStorey.walls[0].endPoint, const Offset(4, 4));
       expect(
         model.project.activeStorey.walls[0].startPoint.dx,
@@ -249,7 +250,7 @@ void main() {
   );
 
   testWidgets(
-    'Magnet lives in Settings and Parallel supports a signed exact offset',
+    'Magnet lives in Settings and Move supports a signed exact offset',
     (tester) async {
       final model = editing.seeded(
         ArchitectStorey(
@@ -271,22 +272,28 @@ void main() {
       await selection.selectTool(tester);
       await workspace.wallTap(tester, const Offset(1, .75));
       await tester.pumpAndSettle();
-      final parallel = find.byKey(const ValueKey('architect-wall-parallel'));
+      final move = find.byKey(const ValueKey('architect-selection-move'));
+      expect(
+        find.byKey(const ValueKey('architect-wall-parallel')),
+        findsNothing,
+      );
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('architect-selection-bar')),
-          matching: parallel,
+          matching: move,
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('architect-wall-floating-actions')),
-          matching: parallel,
+          matching: move,
         ),
         findsNothing,
       );
-      await tester.longPress(parallel);
+      await tester.tap(move);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('architect-move-offset')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('architect-axis-value')),
@@ -295,6 +302,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('architect-axis-value-save')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       final wall = model.project.activeStorey.walls.single;
       expect((wall.unitVector - const Offset(.8, .6)).distance, lessThan(1e-8));
       expect(

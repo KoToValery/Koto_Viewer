@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../rendering/architect_2d_painter.dart';
@@ -15,23 +16,21 @@ class ArchitectProjectionDrawingMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = context.l10n;
     final tools = {
-      ArchitectTool.select: (Icons.near_me_outlined, l.architectToolSelect),
-      ArchitectTool.cadLine: (Icons.show_chart, l.architectToolCadLine),
-      ArchitectTool.cadRect: (Icons.crop_square, l.architectToolCadRect),
-      ArchitectTool.hatch: (Icons.texture, l.architectToolHatch),
-      ArchitectTool.cadCircle: (
-        Icons.circle_outlined,
-        l.architectToolCadCircle,
-      ),
-      ArchitectTool.text: (Icons.title, l.architectToolText),
-      ArchitectTool.dimension: (Icons.straighten, l.architectToolDimension),
-      ArchitectTool.level: (Icons.height, l.architectToolLevel),
-      ArchitectTool.measure: (Icons.square_foot, l.architectToolMeasure),
+      ArchitectTool.select: (AppIconId.select, l.architectToolSelect),
+      ArchitectTool.cadLine: (AppIconId.line, l.architectToolCadLine),
+      ArchitectTool.cadRect: (AppIconId.rectangle, l.architectToolCadRect),
+      ArchitectTool.hatch: (AppIconId.hatch, l.architectToolHatch),
+      ArchitectTool.cadCircle: (AppIconId.radioOff,
+        l.architectToolCadCircle),
+      ArchitectTool.text: (AppIconId.text, l.architectToolText),
+      ArchitectTool.dimension: (AppIconId.measure, l.architectToolDimension),
+      ArchitectTool.level: (AppIconId.level, l.architectToolLevel),
+      ArchitectTool.measure: (AppIconId.measure, l.architectToolMeasure),
     };
     return PopupMenuButton<String>(
       key: const ValueKey('architect-projection-drawing-tools'),
       tooltip: l.architectCategoryDrawing,
-      icon: const Icon(Icons.edit_outlined),
+      icon: const AppIcon(AppIconId.edit),
       onSelected: (value) {
         if (value == 'terrain') {
           onTerrain?.call();
@@ -45,7 +44,7 @@ class ArchitectProjectionDrawingMenu extends StatelessWidget {
             value: entry.key.name,
             child: Row(
               children: [
-                Icon(entry.value.$1, size: 20),
+                AppIcon(entry.value.$1, size: 20),
                 const SizedBox(width: 8),
                 Text(entry.value.$2),
               ],
@@ -56,7 +55,7 @@ class ArchitectProjectionDrawingMenu extends StatelessWidget {
             value: 'terrain',
             child: Row(
               children: [
-                const Icon(Icons.landscape_outlined, size: 20),
+                const AppIcon(AppIconId.terrain, size: 20),
                 const SizedBox(width: 8),
                 Text(l.architectTerrain),
               ],

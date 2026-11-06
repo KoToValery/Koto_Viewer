@@ -1,3 +1,4 @@
+import 'architect_zone_presets.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/generated/app_localizations.dart';
 import '../../bim_editing/geometry/bim_polygon_overlap.dart';
@@ -174,53 +175,24 @@ class ArchitectZone {
       customColorValue != null ? Color(customColorValue!) : category.color;
 
   /// Localized default or user-specified floor finish.
-  String resolvedFloorFinish(AppLocalizations l10n) {
+  String resolvedFloorFinish(AppLocalizations l10n, [ArchitectZonePresets? presets]) {
     if (floorFinish.trim().isNotEmpty) return floorFinish;
-    switch (category) {
-      case ArchitectZoneCategory.bathroom:
-        return l10n.architectZoneFloorTerracotta;
-      case ArchitectZoneCategory.kitchen:
-      case ArchitectZoneCategory.corridor:
-      case ArchitectZoneCategory.storage:
-        return l10n.architectZoneFloorGranite;
-      case ArchitectZoneCategory.terrace:
-        return l10n.architectZoneFloorGranite;
-      case ArchitectZoneCategory.living:
-      case ArchitectZoneCategory.bedroom:
-      case ArchitectZoneCategory.office:
-      case ArchitectZoneCategory.custom:
-        return l10n.architectZoneFloorLaminate;
-    }
+    if (presets != null) return presets.defaultFloorFinish(category, l10n);
+    return ArchitectZonePresets.builtInDefaultFloorFinish(category, l10n);
   }
 
   /// Localized default or user-specified wall finish.
-  String resolvedWallFinish(AppLocalizations l10n) {
+  String resolvedWallFinish(AppLocalizations l10n, [ArchitectZonePresets? presets]) {
     if (wallFinish.trim().isNotEmpty) return wallFinish;
-    switch (category) {
-      case ArchitectZoneCategory.bathroom:
-        return l10n.architectZoneWallFaience;
-      case ArchitectZoneCategory.kitchen:
-        return '${l10n.architectZoneWallLatex} / ${l10n.architectZoneWallFaience}';
-      case ArchitectZoneCategory.living:
-      case ArchitectZoneCategory.bedroom:
-      case ArchitectZoneCategory.corridor:
-      case ArchitectZoneCategory.office:
-      case ArchitectZoneCategory.storage:
-      case ArchitectZoneCategory.terrace:
-      case ArchitectZoneCategory.custom:
-        return l10n.architectZoneWallLatex;
-    }
+    if (presets != null) return presets.defaultWallFinish(category, l10n);
+    return ArchitectZonePresets.builtInDefaultWallFinish(category, l10n);
   }
 
   /// Localized default or user-specified ceiling finish.
-  String resolvedCeilingFinish(AppLocalizations l10n) {
+  String resolvedCeilingFinish(AppLocalizations l10n, [ArchitectZonePresets? presets]) {
     if (ceilingFinish.trim().isNotEmpty) return ceilingFinish;
-    switch (category) {
-      case ArchitectZoneCategory.bathroom:
-        return l10n.architectZoneCeilingGypsum;
-      default:
-        return l10n.architectZoneCeilingLatex;
-    }
+    if (presets != null) return presets.defaultCeilingFinish(category, l10n);
+    return ArchitectZonePresets.builtInDefaultCeilingFinish(category, l10n);
   }
 
   /// Standard floor finish presets for architectural schedules.

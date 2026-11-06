@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -69,7 +70,7 @@ class _StairSectionState extends State<ArchitectStairSectionScreen> {
             key: const ValueKey('stair-section-reset'),
             tooltip: l.stairSectionReset,
             onPressed: () => setState(reset),
-            icon: const Icon(Icons.restart_alt),
+            icon: const AppIcon(AppIconId.refresh),
           ),
         ],
       ),

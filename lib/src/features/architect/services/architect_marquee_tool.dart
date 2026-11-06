@@ -1,11 +1,13 @@
+import '../rendering/architect_annotation_layout.dart';
 import 'dart:math' as math;
-import 'dart:ui';
+import 'package:flutter/painting.dart';
 
 import '../../bim_editing/geometry/bim_polygon_geometry.dart';
 import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import '../models/architect_contour.dart';
+import '../rendering/architect_vector_scene.dart';
 import 'architect_selection.dart';
 
 /// Geometry mode for the architectural selection marquee tool.
@@ -23,6 +25,11 @@ enum ArchitectSelectionRelation { crossing, contained }
 
 /// Controller and geometric evaluator for Archicad-style marquee area selection.
 class ArchitectMarqueeTool {
+  // Text layout does not change while a frame moves. Keep it with the immutable
+  // project/storey snapshot; weak project keys release old editing revisions.
+  static final _annotationBounds =
+      Expando<Map<(ArchitectStorey, String), Map<String, Rect>>>();
+
   ArchitectSelectMode mode = ArchitectSelectMode.rectangle;
 
   /// Committed draft points for polygonal selection, or [start, end] for rectangular selection.
@@ -129,25 +136,29 @@ class ArchitectMarqueeTool {
     required List<Offset> polygon,
     bool includeComponents = true,
     ArchitectSelectionRelation relation = ArchitectSelectionRelation.crossing,
+    String? drawingViewKey,
   }) {
     if (!BimPolygonGeometry.valid(polygon)) return const {};
     final selected = <String>{};
     final marquee = Path()..addPolygon(polygon, true);
     final bounds = marquee.getBounds();
-    bool inside(Offset p) =>
-        marquee.contains(p) ||
-        List.generate(
-          polygon.length,
-          (i) =>
-              (p -
-                      BimLineGeometry.closest(
-                        p,
-                        polygon[i],
-                        polygon[(i + 1) % polygon.length],
-                      ))
-                  .distance <=
-              1e-7,
-        ).any((hit) => hit);
+    bool inside(Offset p) {
+      if (marquee.contains(p)) return true;
+      for (var i = 0; i < polygon.length; i++) {
+        if ((p -
+                    BimLineGeometry.closest(
+                      p,
+                      polygon[i],
+                      polygon[(i + 1) % polygon.length],
+                    ))
+                .distance <=
+            1e-7) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     bool segment(Offset a, Offset b) {
       if (relation == ArchitectSelectionRelation.contained) {
         if (!inside(a) || !inside(b)) return false;
@@ -257,8 +268,10 @@ class ArchitectMarqueeTool {
       if (primitive.type == CadPrimitiveType.line ||
           primitive.type == CadPrimitiveType.polyline) {
         final points = primitive.linePoints;
-        final hits = [for (var i = 1; i < points.length; i++)
-          segment(points[i - 1], points[i])];
+        final hits = [
+          for (var i = 1; i < points.length; i++)
+            segment(points[i - 1], points[i]),
+        ];
         if (relation == ArchitectSelectionRelation.contained
             ? hits.every((hit) => hit)
             : hits.any((hit) => hit)) {
@@ -291,6 +304,90 @@ class ArchitectMarqueeTool {
           : dimension.anchors.any((a) => inside(a.point)) ||
                 segment(dimension.lineStart, dimension.lineEnd);
       if (hit) selected.add(dimension.id);
+    }
+    // Use the same paper text profile, font and placement as the plan painter.
+    // Picking a text anchor alone would make "Inside" select clipped labels.
+    if (storey.annotations.isNotEmpty || storey.elevationMarkers.isNotEmpty) {
+      final viewKey = drawingViewKey ?? 'plan:${storey.id}';
+      final measured = (_annotationBounds[project] ??= {}).putIfAbsent((
+        storey,
+        viewKey,
+      ), () => {});
+      final scope = ArchitectTextScope(
+        project.document,
+        viewKey,
+        project.dimensionScale.denominator,
+        1,
+        units: project.units,
+        decimals: project.distanceDecimals,
+        levelUnits: project.levelUnits,
+        levelDecimals: project.levelDecimals,
+      );
+      Rect textBounds(
+        String id,
+        String text,
+        Offset origin, {
+        required FontWeight weight,
+        bool above = false,
+      }) => measured.putIfAbsent(
+        id,
+        () => scope.run(() {
+          final painter = ArchitectTextPainter(
+            elementId: id,
+            modelScale: 1,
+            text: TextSpan(
+              text: text,
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 12,
+                fontWeight: weight,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          return Rect.fromLTWH(
+            origin.dx,
+            origin.dy - (above ? painter.height : 0),
+            painter.width,
+            painter.height,
+          );
+        }),
+      );
+      for (final annotation in storey.annotations) {
+        if (region(
+          scope.run(() => ArchitectAnnotationLayout.outline(annotation)),
+        ))
+          selected.add(annotation.id);
+      }
+      for (final marker in storey.elevationMarkers) {
+        final p = marker.position;
+        final label = scope.level(
+          marker.elevation,
+          units: marker.units,
+          decimals: marker.decimals,
+        );
+        final path = Path()
+          ..moveTo(p.dx, p.dy)
+          ..lineTo(p.dx - .2, p.dy + .3)
+          ..lineTo(p.dx + .2, p.dy + .3)
+          ..close()
+          ..addRect(
+            textBounds(
+              marker.id,
+              marker.label != null ? '$label (${marker.label})' : label,
+              p + const Offset(.08, -.02),
+              weight: FontWeight.bold,
+              above: true,
+            ),
+          );
+        final shapeHit = region(path);
+        final leaderHit = segment(p, p + const Offset(.6, 0));
+        if (relation == ArchitectSelectionRelation.contained
+            ? shapeHit && leaderHit
+            : shapeHit || leaderHit) {
+          selected.add(marker.id);
+        }
+      }
     }
     for (final axis in project.gridAxes) {
       if (segment(axis.start, axis.end)) selected.add(axis.id);

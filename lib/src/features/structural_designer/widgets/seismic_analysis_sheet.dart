@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/seismic_analysis_models.dart';
@@ -11,7 +12,8 @@ class SeismicAnalysisSheet extends StatefulWidget {
   final VoidCallback? onEditLoads;
   final void Function(String storeyId, String elementId, bool isWall)? onLocateElement;
 
-  const SeismicAnalysisSheet({super.key, required this.report, this.onEditLoads, this.onLocateElement});
+  const SeismicAnalysisSheet({super.key, required this.report, this.onEditLoads, this.onLocateElement,
+  });
 
   @override
   State<SeismicAnalysisSheet> createState() => _SeismicAnalysisSheetState();
@@ -36,7 +38,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
   @override
   Widget build(BuildContext context) {
     final report = widget.report;
-    final canEvaluate = report.storeyChecks.isNotEmpty && report.storeyChecks.every((c) => c.hasSlabDiaphragm && c.hasLateralStiffness);
+    final canEvaluate = report.storeyChecks.isNotEmpty && report.storeyChecks.every((c) => c.hasSlabDiaphragm && c.hasLateralStiffness,
+        );
 
     return Container(
       decoration: const BoxDecoration(
@@ -66,8 +69,10 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
             // Header
             if (widget.onEditLoads != null)
               Align(alignment: Alignment.centerRight, child: TextButton.icon(
-                onPressed: widget.onEditLoads, icon: const Icon(Icons.tune),
-                label: Text(context.l10n.seismicLoadsTitle))),
+                onPressed: widget.onEditLoads, icon: const AppIcon(AppIconId.properties),
+                label: Text(context.l10n.seismicLoadsTitle),
+                ),
+              ),
             Row(
               children: [
                 Container(
@@ -77,7 +82,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.waves_rounded,
-                      color: Color(0xFFD500F9), size: 22),
+                      color: Color(0xFFD500F9), size: 22,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -105,7 +111,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white70),
+                  icon: const AppIcon(AppIconId.close, color: Colors.white70),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -113,7 +119,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
             const SizedBox(height: 10),
 
             Text(context.l10n.seismicModelAssumptions,
-              style: const TextStyle(color: Colors.white70, fontSize: 11)),
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
+            ),
             const SizedBox(height: 10),
             // Summary Metrics Cards
             Row(
@@ -173,14 +180,15 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
               indicatorColor: const Color(0xFFD500F9),
               labelColor: const Color(0xFFD500F9),
               unselectedLabelColor: Colors.white60,
-              labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
+              ),
               unselectedLabelStyle: const TextStyle(fontSize: 11),
               tabs: [
                 Tab(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.track_changes_rounded, size: 15),
+                      const AppIcon(AppIconId.magnet, size: 15),
                       const SizedBox(width: 4),
                       Text(context.l10n.seismicTabBalance),
                     ],
@@ -190,7 +198,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.line_weight_rounded, size: 15),
+                      const AppIcon(AppIconId.wall, size: 15),
                       const SizedBox(width: 4),
                       Text(context.l10n.seismicTabWalls),
                     ],
@@ -200,7 +208,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.vertical_align_bottom_rounded, size: 15),
+                      const AppIcon(AppIconId.alignBottom, size: 15),
                       const SizedBox(width: 4),
                       Text(context.l10n.seismicTabRegularity),
                     ],
@@ -210,7 +218,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.horizontal_rule_rounded, size: 15),
+                      const AppIcon(AppIconId.beam, size: 15),
                       const SizedBox(width: 4),
                       Text(context.l10n.seismicTabBeamsOpenings),
                     ],
@@ -283,39 +291,53 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
 
 
 
-  Widget _buildRegion(BuildContext context, DiaphragmRegionCheck region, int index) {
+  Widget _buildRegion(BuildContext context, DiaphragmRegionCheck region, int index,
+  ) {
     final check = region.check;
     final eccentricity = check?.eccentricityM;
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(context.l10n.seismicRegionTitle(index + 1, region.columnIds.length, region.wallIds.length),
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+        Text(context.l10n.seismicRegionTitle(index + 1, region.columnIds.length, region.wallIds.length,
+            ),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12,
+            ),
+          ),
         const SizedBox(height: 6),
         if (region.ambiguousSupportNames.isNotEmpty)
-          Text(context.l10n.seismicRegionSharedSupport(region.ambiguousSupportNames.join(', ')),
-            style: const TextStyle(color: Colors.amber, fontSize: 11))
+          Text(context.l10n.seismicRegionSharedSupport(region.ambiguousSupportNames.join(', '),
+              ),
+            style: const TextStyle(color: Colors.amber, fontSize: 11),
+            )
         else if (check != null) ...[
           Row(children: [
-            _buildSubmetric('A', '${check.floorAreaM2.toStringAsFixed(2)} m²'),
+            _buildSubmetric('A', '${check.floorAreaM2.toStringAsFixed(2)} m²',
+                ),
             _buildSubmetric(context.l10n.seismicEccentricityXLabel,
-              eccentricity == null ? '—' : '${eccentricity.dx.toStringAsFixed(3)} m'),
+              eccentricity == null ? '—' : '${eccentricity.dx.toStringAsFixed(3)} m',
+                ),
             _buildSubmetric(context.l10n.seismicEccentricityYLabel,
-              eccentricity == null ? '—' : '${eccentricity.dy.toStringAsFixed(3)} m'),
-          ]),
+              eccentricity == null ? '—' : '${eccentricity.dy.toStringAsFixed(3)} m',
+                ),
+          ],
+            ),
           const SizedBox(height: 6),
           Text(check.localizedRecommendation(context.l10n),
-            style: const TextStyle(color: Colors.white70, fontSize: 11)),
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+            ),
         ],
-      ]),
+      ],
+      ),
     );
   }
 
-  Widget _buildTorsionalTab(BuildContext context, SeismicAnalysisReport report) {
+  Widget _buildTorsionalTab(BuildContext context, SeismicAnalysisReport report,
+  ) {
     if (report.storeyChecks.isEmpty) {
       return Center(
         child: Text(context.l10n.seismicNoStoreys,
-            style: const TextStyle(color: Colors.white60, fontSize: 13)),
+            style: const TextStyle(color: Colors.white60, fontSize: 13),
+        ),
       );
     }
 
@@ -333,14 +355,15 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
             decoration: BoxDecoration(
               color: const Color(0xFF262626),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: color.withValues(alpha: 0.6), width: 1.2),
+              border: Border.all(color: color.withValues(alpha: 0.6), width: 1.2,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded, color: color, size: 20),
+                    const AppIcon(AppIconId.warning, color: color, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -353,7 +376,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(6),
@@ -374,8 +398,10 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildSubmetric(context.l10n.seismicEccentricityXLabel, context.l10n.seismicNoSlabEccentricity),
-                    _buildSubmetric(context.l10n.seismicEccentricityYLabel, context.l10n.seismicNoSlabEccentricity),
+                    _buildSubmetric(context.l10n.seismicEccentricityXLabel, context.l10n.seismicNoSlabEccentricity,
+                    ),
+                    _buildSubmetric(context.l10n.seismicEccentricityYLabel, context.l10n.seismicNoSlabEccentricity,
+                    ),
                     _buildSubmetric(context.l10n.seismicLimitEc8Label, '—'),
                   ],
                 ),
@@ -390,7 +416,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.info_outline, size: 16, color: color),
+                      const AppIcon(AppIconId.info, size: 16, color: color),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -407,7 +433,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                 if (check.diaphragmRegions.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(context.l10n.seismicRegionScope,
-                    style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
                   for (var i = 0; i < check.diaphragmRegions.length; i++)
                     _buildRegion(context, check.diaphragmRegions[i], i),
                 ],
@@ -443,7 +470,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
               // Header
               Row(
                 children: [
-                  Icon(Icons.track_changes_rounded, color: color, size: 20),
+                  AppIcon(AppIconId.magnet, color: color, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -456,7 +483,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(6),
@@ -479,8 +507,10 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildSubmetric(context.l10n.seismicEccentricityXLabel, '${eccX.toStringAsFixed(2)} m (${(check.eccentricityRatioX * 100).round()}%)'),
-                  _buildSubmetric(context.l10n.seismicEccentricityYLabel, '${eccY.toStringAsFixed(2)} m (${(check.eccentricityRatioY * 100).round()}%)'),
+                  _buildSubmetric(context.l10n.seismicEccentricityXLabel, '${eccX.toStringAsFixed(2)} m (${(check.eccentricityRatioX * 100).round()}%)',
+                  ),
+                  _buildSubmetric(context.l10n.seismicEccentricityYLabel, '${eccY.toStringAsFixed(2)} m (${(check.eccentricityRatioY * 100).round()}%)',
+                  ),
                   _buildSubmetric(
                     context.l10n.seismicLimitEc8Label,
                     check.torsionalRadiusX > 0 && check.torsionalRadiusY > 0
@@ -518,7 +548,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
+                    AppIcon.fromMaterial(
                       isSensitive ? Icons.error_outline_rounded : Icons.check_circle_outline,
                       size: 16,
                       color: color,
@@ -548,7 +578,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
     if (report.storeyChecks.isEmpty) {
       return Center(
         child: Text(context.l10n.seismicNoStoreys,
-            style: const TextStyle(color: Colors.white60, fontSize: 13)),
+            style: const TextStyle(color: Colors.white60, fontSize: 13),
+        ),
       );
     }
 
@@ -566,14 +597,15 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
             decoration: BoxDecoration(
               color: const Color(0xFF262626),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: cardColor.withValues(alpha: 0.6), width: 1.2),
+              border: Border.all(color: cardColor.withValues(alpha: 0.6), width: 1.2,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.line_weight_rounded, color: cardColor, size: 20),
+                    const AppIcon(AppIconId.wall, color: cardColor, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -586,7 +618,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: cardColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(6),
@@ -622,14 +655,15 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
           decoration: BoxDecoration(
             color: const Color(0xFF262626),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cardColor.withValues(alpha: 0.6), width: 1.2),
+            border: Border.all(color: cardColor.withValues(alpha: 0.6), width: 1.2,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.line_weight_rounded, color: cardColor, size: 20),
+                  AppIcon(AppIconId.wall, color: cardColor, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -642,7 +676,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: cardColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(6),
@@ -680,14 +715,16 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
               const SizedBox(height: 8),
 
               Text(
-                context.l10n.seismicWallRecommendationText(check.floorAreaM2.toStringAsFixed(0)),
+                context.l10n.seismicWallRecommendationText(check.floorAreaM2.toStringAsFixed(0),
+                ),
                 style: const TextStyle(color: Colors.white60, fontSize: 10),
               ),
 
               if (check.disconnectedWallNames.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0x33FFB300),
                     borderRadius: BorderRadius.circular(6),
@@ -695,12 +732,16 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline, size: 14, color: Color(0xFFFFB300)),
+                      const AppIcon(
+                        AppIconId.info, size: 14, color: Color(0xFFFFB300),
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          context.l10n.seismicWallsOutsideSlabWarning(check.disconnectedWallNames.length),
-                          style: const TextStyle(color: Color(0xFFFFB300), fontSize: 10, fontWeight: FontWeight.w600),
+                          context.l10n.seismicWallsOutsideSlabWarning(check.disconnectedWallNames.length,
+                          ),
+                          style: const TextStyle(color: Color(0xFFFFB300), fontSize: 10, fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -714,18 +755,26 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
     );
   }
 
-  Widget _elementLink(String storeyId, String id, bool wall, String text, Color color) {
+  Widget _elementLink(String storeyId, String id, bool wall, String text, Color color,
+  ) {
     return InkWell(onTap: widget.onLocateElement == null ? null
       : () => widget.onLocateElement!(storeyId, id, wall),
       child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Row(children: [
-        Expanded(child: Text(text, style: TextStyle(color: color, fontSize: 11))),
-        if(widget.onLocateElement != null) const Icon(Icons.my_location, color: Colors.cyan, size:18),
-      ])));
+        Expanded(child: Text(text, style: TextStyle(color: color, fontSize: 11)),
+            ),
+        if(widget.onLocateElement != null) const AppIcon(AppIconId.locate, color: Colors.cyan, size:18),
+      ],
+        ),
+      ),
+    );
   }
 
-  Widget _buildRegularityTab(BuildContext context, SeismicAnalysisReport report) {
-    final verticalAvailable = report.storeyChecks.every((s) => s.verticalOrderValid);
-    final hasRatios = report.storeyChecks.any((s) => s.stiffnessRatioXToAbove != null || s.stiffnessRatioYToAbove != null);
+  Widget _buildRegularityTab(BuildContext context, SeismicAnalysisReport report,
+  ) {
+    final verticalAvailable = report.storeyChecks.every((s) => s.verticalOrderValid,
+    );
+    final hasRatios = report.storeyChecks.any((s) => s.stiffnessRatioXToAbove != null || s.stiffnessRatioYToAbove != null,
+    );
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
@@ -733,7 +782,9 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
         children: [
           if (!verticalAvailable)
             Padding(padding: const EdgeInsets.all(12), child: Text(context.l10n.seismicElevationAmbiguous,
-              style: const TextStyle(color: Colors.amber))),
+              style: const TextStyle(color: Colors.amber),
+              ),
+            ),
           // 1. Floating Columns Warning Card
           Container(
             padding: const EdgeInsets.all(12),
@@ -752,8 +803,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.vertical_align_bottom_rounded,
+                    AppIcon(
+                      AppIconId.alignBottom,
                       color: !verticalAvailable ? Colors.amber : report.totalFloatingColumnsCount > 0
                           ? const Color(0xFFD500F9)
                           : const Color(0xFF00E676),
@@ -771,7 +822,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: (report.totalFloatingColumnsCount > 0
                                 ? const Color(0xFFD500F9)
@@ -780,7 +832,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        context.l10n.seismicCountFound(report.totalFloatingColumnsCount),
+                        context.l10n.seismicCountFound(report.totalFloatingColumnsCount,
+                        ),
                         style: TextStyle(
                           color: !verticalAvailable ? Colors.amber : report.totalFloatingColumnsCount > 0
                               ? const Color(0xFFEA80FC)
@@ -794,7 +847,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                 ),
                 const SizedBox(height: 8),
                 if (!verticalAvailable)
-                  Text(context.l10n.seismicNotEvaluated, style: const TextStyle(color: Colors.amber))
+                  Text(context.l10n.seismicNotEvaluated, style: const TextStyle(color: Colors.amber),
+                  )
                 else if (report.totalFloatingColumnsCount == 0)
                   Text(
                     context.l10n.seismicNoFloatingColumnsText,
@@ -806,7 +860,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                     style: const TextStyle(
                         color: Color(0xFFEA80FC),
                         fontSize: 11,
-                        fontWeight: FontWeight.bold),
+                        fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   for (final s in report.storeyChecks)
@@ -814,7 +869,9 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
                         child: _elementLink(s.storeyId, s.floatingColumnIds[i], false,
-                          context.l10n.seismicFloatingColItem(s.storeyName, s.floatingColumnNames[i]), Colors.white),
+                          context.l10n.seismicFloatingColItem(s.storeyName, s.floatingColumnNames[i],
+                          ), Colors.white,
+                        ),
                       ),
                 ],
               ],
@@ -826,24 +883,34 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: const Color(0xFF262626),
-              borderRadius: BorderRadius.circular(12)),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(context.l10n.seismicWallContinuityTitle,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold,
+                  ),
+                ),
               const SizedBox(height: 6),
               Text(context.l10n.seismicWallContinuityScope,
-                style: const TextStyle(color: Colors.white70, fontSize: 11)),
-              if (!report.storeyChecks.any((s) => s.wallVerticalChecks.isNotEmpty))
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+              if (!report.storeyChecks.any((s) => s.wallVerticalChecks.isNotEmpty,
+                ))
                 Text(context.l10n.seismicNotEvaluated,
-                  style: const TextStyle(color: Colors.amber, fontSize: 11)),
+                  style: const TextStyle(color: Colors.amber, fontSize: 11),
+                  ),
               for (final storey in report.storeyChecks)
                 for (final wall in storey.wallVerticalChecks)
                   Padding(padding: const EdgeInsets.only(top: 6), child: _elementLink(storey.storeyId, wall.wallId, true,
                     context.l10n.seismicWallContinuityItem(storey.storeyName, wall.wallName,
                       wall.coverage == null ? context.l10n.seismicNotEvaluated
-                        : '${(wall.coverage! * 100).toStringAsFixed(1)}%'),
-                    wall.isContinuous ? Colors.white70 : Colors.amber)),
-            ]),
+                        : '${(wall.coverage! * 100).toStringAsFixed(1)}%',
+                        ),
+                    wall.isContinuous ? Colors.white70 : Colors.amber,
+                      ),
+                    ),
+            ],
+            ),
           ),
           const SizedBox(height: 10),
           Container(
@@ -863,8 +930,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.layers_clear_rounded,
+                    AppIcon(
+                      AppIconId.layersOff,
                       color: !hasRatios ? Colors.amber : report.hasSoftStorey
                           ? const Color(0xFFFF1744)
                           : const Color(0xFF00E676),
@@ -900,13 +967,16 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                       : context.l10n.seismicSoftStoreyOkText,
                   style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
-                Text(context.l10n.seismicDirectionalScope, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                Text(context.l10n.seismicDirectionalScope, style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
                 for (final s in report.storeyChecks)
                   if(s.stiffnessRatioXToAbove != null || s.stiffnessRatioYToAbove != null)
                     Text('${s.storeyName}: X ${s.stiffnessRatioXToAbove?.toStringAsFixed(2) ?? '—'} · Y ${s.stiffnessRatioYToAbove?.toStringAsFixed(2) ?? '—'}',
-                      style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
                 const SizedBox(height: 10),
-                Text(context.l10n.seismicRegionTrackingTitle, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                Text(context.l10n.seismicRegionTrackingTitle, style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
                 for(final s in report.storeyChecks)
                   for(final link in s.regionLinksBelow)
                     Padding(padding: const EdgeInsets.only(top:6),child:Text(
@@ -918,7 +988,11 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                           RegionLinkKind.branching => context.l10n.seismicLinkBranching,
                           RegionLinkKind.unmatched => context.l10n.seismicLinkAbsent,
                           RegionLinkKind.unknown => context.l10n.seismicNotEvaluated,
-                        }),style: const TextStyle(color:Colors.white70,fontSize:11))),
+                        },
+                        ),style: const TextStyle(color:Colors.white70,fontSize:11,
+                        ),
+                      ),
+                    ),
               ],
             ),
           ),
@@ -927,7 +1001,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
     );
   }
 
-  Widget _buildBeamsAndOpeningsTab(BuildContext context, SeismicAnalysisReport report) {
+  Widget _buildBeamsAndOpeningsTab(BuildContext context, SeismicAnalysisReport report,
+  ) {
     if (report.beamChecks.isEmpty && report.openingChecks.isEmpty) {
       return Center(
         child: Text(
@@ -945,7 +1020,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
             padding: const EdgeInsets.only(bottom: 6),
             child: Text(
               context.l10n.seismicBeamSizingTitle,
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           for (final b in report.beamChecks)
@@ -966,16 +1042,21 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('${b.beamName} (${b.storeyName})',
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       Text(context.l10n.seismicSpanM(b.spanM.toStringAsFixed(2)),
-                          style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                          style: const TextStyle(color: Colors.white70, fontSize: 11,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(b.localizedRecommendation(context.l10n), style: TextStyle(
                     color: b.isDepthSufficient ? Colors.white70 : const Color(0xFFFFD54F),
                     fontSize: 11,
-                  )),
+                  ),
+                  ),
                 ],
               ),
             ),
@@ -986,7 +1067,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
             padding: const EdgeInsets.only(top: 8, bottom: 6),
             child: Text(
               context.l10n.seismicOpeningsProximityTitle,
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           for (final op in report.openingChecks)
@@ -1003,7 +1085,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
               child: Text(op.localizedRecommendation(context.l10n), style: TextStyle(
                 color: op.isTooClose ? const Color(0xFFFF8A80) : Colors.white70,
                 fontSize: 11,
-              )),
+              ),
+              ),
             ),
         ],
       ],
@@ -1039,7 +1122,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                 alignment: Alignment.centerRight,
                 child: Text(
                   valueText,
-                  style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -1076,7 +1160,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
             alignment: Alignment.centerLeft,
             child: Text(
               value,
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],

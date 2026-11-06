@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -202,8 +203,8 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                    tooltip: 'Close',
+                    icon: const AppIcon(AppIconId.close, size: 20),
+                    tooltip: context.l10n.commandIconClose,
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -561,10 +562,10 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.sync_rounded, size: 14),
+                          const AppIcon(AppIconId.sync, size: 14),
                           const SizedBox(width: 4),
                           Text(
-                            l10n?.checkForUpdates ?? 'Check',
+                            context.l10n.commandUiCheck,
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -679,8 +680,10 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
           ),
         );
       },
-      icon: const Icon(Icons.article_outlined, size: 16),
-      label: const Text('Licenses', style: TextStyle(fontSize: 12)),
+      icon: const AppIcon(AppIconId.file, size: 16),
+      label: Text(
+        context.l10n.commandUiLicenses, style: TextStyle(fontSize: 12),
+      ),
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -691,8 +694,8 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
   Widget _buildLogsButton(BuildContext context) {
     return OutlinedButton.icon(
       onPressed: () => ErrorLogDialog.show(context),
-      icon: const Icon(Icons.bug_report_outlined, size: 16),
-      label: const Text('Logs', style: TextStyle(fontSize: 12)),
+      icon: const AppIcon(AppIconId.bug, size: 16),
+      label: Text(context.l10n.commandUiLogs, style: TextStyle(fontSize: 12)),
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -703,8 +706,8 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
   Widget _buildGitHubButton() {
     return OutlinedButton.icon(
       onPressed: _openGitHub,
-      icon: const Icon(Icons.code_rounded, size: 16),
-      label: const Text('GitHub', style: TextStyle(fontSize: 12)),
+      icon: const AppIcon(AppIconId.code, size: 16),
+      label: Text(context.l10n.commandUiGithub, style: TextStyle(fontSize: 12)),
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

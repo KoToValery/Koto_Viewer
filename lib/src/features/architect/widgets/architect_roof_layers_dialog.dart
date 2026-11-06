@@ -1,4 +1,8 @@
+import 'architect_dialog.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:convert';
+import 'dart:async';
+import 'architect_properties_shell.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -10,6 +14,7 @@ import 'architect_roof_number_field.dart';
 import 'architect_roof_layer_editor.dart';
 import 'architect_roof_construction_preview.dart';
 import 'architect_roof_panel_fields.dart';
+import '../services/architect_roof_assemblies.dart';
 
 class ArchitectRoofLayersDialog extends StatefulWidget {
   final ArchitectRoofAssembly initialAssembly;
@@ -23,13 +28,16 @@ class ArchitectRoofLayersDialog extends StatefulWidget {
       initialBreakDistance;
   final bool initialAttachToWalls, initialIsMansard, canPickDownpipe;
   final ArchitectRoofDrainage initialDrainage;
+  final bool Function()? isCurrent;
   final ArchitectProject? project;
   final ArchitectRoofPlane? roof;
   final ValueChanged<ArchitectRoofLayersResult>? onApply;
   final bool Function(ArchitectRoofLayersResult)? onTryApply;
+  final ValueChanged<ArchitectRoofLayersResult>? onPreview;
   final int initialTab;
   const ArchitectRoofLayersDialog({
     super.key,
+    this.isCurrent,
     required this.initialAssembly,
     required this.initialSlopeDegrees,
     required this.initialEavesOverhang,
@@ -45,6 +53,7 @@ class ArchitectRoofLayersDialog extends StatefulWidget {
     this.onApply,
     this.onTryApply,
     this.initialTab = 0,
+    this.onPreview,
     this.initialIsMansard = false,
     this.initialUpperSlopeDegrees = 25,
     this.initialBreakDistance,
@@ -62,6 +71,19 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
     vsync: this,
     initialIndex: widget.initialTab,
   );
+  List<ArchitectRoofAssembly> _library = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLibrary();
+  }
+
+  Future<void> _loadLibrary() async {
+    final loaded = await ArchitectRoofLibrary.load();
+    if (mounted) setState(() => _library = loaded);
+  }
+
   late ArchitectRoofAssembly _assembly = widget.initialAssembly.copyWith();
   late double _slopeDegrees = widget.initialSlopeDegrees,
       _eavesOverhang = widget.initialEavesOverhang;
@@ -99,11 +121,96 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
 
   @override
   void dispose() {
+    _previewTimer?.cancel();
     _tabs.dispose();
     for (final c in _detailControllers.values) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _saveToLibrary() async {
+    final l = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final nameController = TextEditingController(text: _assembly.customName);
+    final chosenName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => architectAlertDialog(
+        title: Text(l.roofSaveLibrary),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: InputDecoration(labelText: l.roofCustomNamePrompt),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, nameController.text.trim()),
+            child: Text(l.save),
+          ),
+        ],
+      ),
+    );
+    if (chosenName != null && chosenName.isNotEmpty) {
+      final toSave = _assembly.copyWith(
+        id: _assembly.id.isNotEmpty ? _assembly.id : ArchitectElementId.next('roof_assembly'),
+        preset: ArchitectRoofPreset.custom,
+        customName: chosenName,
+      );
+      final ok = await ArchitectRoofLibrary.save(toSave);
+      await _loadLibrary();
+      setState(() => _assembly = toSave);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(ok ? l.roofLibrarySaved : l.slabLibraryFailed)),
+      );
+    }
+  }
+
+  Future<void> _deleteFromLibrary() async {
+    final l = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => architectAlertDialog(
+        title: Text(l.roofDeleteLibrary),
+        content: Text(l.roofDeleteConfirm(_assembly.label(l))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l.delete),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ArchitectRoofLibrary.delete(_assembly.id);
+      await _loadLibrary();
+      setState(() {
+        _assembly = ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles,
+        );
+      });
+      _queuePreview();
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.roofLibraryDeleted)));
+    }
+  }
+
+  void _selectLibraryAssembly(ArchitectRoofAssembly libAssembly) {
+    setState(() {
+      _assembly = libAssembly.copyWith();
+      _error = null;
+    });
+    _queuePreview();
   }
 
   void _selectPreset(ArchitectRoofPreset preset) {
@@ -355,7 +462,47 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
     return result;
   }
 
+  ArchitectRoofLayersResult _result({bool pickDownpipe = false}) =>
+      ArchitectRoofLayersResult(
+        assembly: _assembly,
+        slopeDegrees: _slopeDegrees,
+        eavesOverhang: _eavesOverhang,
+        eavesCut: _eavesCut,
+        baseElevationOffset: _baseElevationOffset,
+        attachToWalls: _attachToWalls,
+        manualSupportDistance: _manualSupport ? _supportDistance : null,
+        drainage: _drainage,
+        pickDownpipe: pickDownpipe,
+        upperSlopeDegrees: _upperSlope,
+        breakDistance: _breakDistance,
+        applyToGroup: _applyGroup,
+        saveForNewRoofs: widget.roof == null || _saveDefaults,
+        changes: _changes(),
+      );
+  Timer? _previewTimer;
+  bool _touched = false;
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _touched = true;
+    _queuePreview();
+  }
+
+  void _queuePreview() {
+    _previewTimer?.cancel();
+    _previewTimer = Timer(const Duration(milliseconds: 200), () {
+      if (mounted && widget.onPreview != null && _assemblyError == null) {
+        try {
+          widget.onPreview!(_result());
+        } on ArgumentError {
+          /* Last valid drawing remains visible. */
+        }
+      }
+    });
+  }
+
   void _save({bool pickDownpipe = false}) {
+    if(widget.isCurrent?.call()==false){setState(()=>_error=context.l10n.propertiesStale);return;}
     final invalid = _form.currentState!.validateGranularly();
     if (invalid.isNotEmpty) {
       final field = invalid.first;
@@ -383,22 +530,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       setState(() => _error = _assemblyError);
       return;
     }
-    final result = ArchitectRoofLayersResult(
-      assembly: _assembly,
-      slopeDegrees: _slopeDegrees,
-      eavesOverhang: _eavesOverhang,
-      eavesCut: _eavesCut,
-      baseElevationOffset: _baseElevationOffset,
-      attachToWalls: _attachToWalls,
-      manualSupportDistance: _manualSupport ? _supportDistance : null,
-      drainage: _drainage,
-      pickDownpipe: pickDownpipe,
-      upperSlopeDegrees: _upperSlope,
-      breakDistance: _breakDistance,
-      applyToGroup: _applyGroup,
-      saveForNewRoofs: widget.roof == null || _saveDefaults,
-      changes: _changes(),
-    );
+    final result = _result(pickDownpipe: pickDownpipe);
     if (widget.onTryApply != null) {
       if (!widget.onTryApply!(result)) {
         setState(() => _error = context.l10n.roofUiNumericInvalid);
@@ -418,24 +550,6 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    l.architectToolRoof,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                IconButton(
-                  tooltip: l.close,
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -466,7 +580,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
                 if (widget.roof != null)
                   Tooltip(
                     message: '${l.roofUiScopeHelp}\n${l.roofUiIndependentHelp}',
-                    child: const Icon(Icons.info_outline, size: 18),
+                    child: const AppIcon(AppIconId.info, size: 18),
                   ),
               ],
             ),
@@ -502,30 +616,27 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: Row(
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(l.cancel),
-                ),
-                const Spacer(),
-                FilledButton(
-                  key: const ValueKey('roof-layers-apply'),
-                  onPressed: _save,
-                  child: Text(l.save),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
-    if (MediaQuery.sizeOf(context).width < 600) {
-      return Dialog.fullscreen(child: SafeArea(child: body));
-    }
-    return Dialog(child: SizedBox(width: 640, height: 800, child: body));
+    return ArchitectPropertiesShell(
+      title: l.architectToolRoof,
+      initiallyExpanded: true,
+      onSave: _save,
+      isDirty: () => _touched || _changes().isNotEmpty,
+      content: body,
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.cancel),
+        ),
+        FilledButton(
+          key: const ValueKey('roof-layers-apply'),
+          onPressed: _save,
+          child: Text(l.save),
+        ),
+      ],
+    );
   }
 
   Widget _construction() => ArchitectRoofConstructionPreview(
@@ -560,7 +671,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
                     key: const ValueKey('roof-preview-close'),
                     tooltip: l.close,
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
+                    icon: const AppIcon(AppIconId.close),
                   ),
                 ],
               ),
@@ -584,7 +695,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
         child: TextButton.icon(
           key: const ValueKey('roof-preview'),
           onPressed: open,
-          icon: const Icon(Icons.zoom_in, size: 18),
+          icon: const AppIcon(AppIconId.zoomIn, size: 18),
           label: Text(label),
         ),
       );
@@ -740,23 +851,104 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          DropdownButtonFormField<ArchitectRoofPreset>(
-            key: ValueKey('roof-preset-${_assembly.preset.name}'),
-            initialValue: _assembly.preset,
-            isExpanded: true,
-            decoration: InputDecoration(labelText: l.roofUiAssembly),
-            items: [
-              for (final p in ArchitectRoofPreset.values)
-                if (p != ArchitectRoofPreset.custom || _assembly.preset == p)
-                  DropdownMenuItem(
-                    value: p,
-                    enabled: p != ArchitectRoofPreset.custom,
-                    child: Text(p.label(l), overflow: TextOverflow.ellipsis),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l.roofUiAssembly,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              PopupMenuButton<String>(
+                tooltip: l.propertiesMore,
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'library_save',
+                    child: AppMenuLabel(
+                      icon: AppIconId.save,
+                      child: Text(l.roofSaveLibrary),
+                    ),
                   ),
+                  if (_library.any((a) => a.id == _assembly.id))
+                    PopupMenuItem(
+                      value: 'library_delete',
+                      child: AppMenuLabel(
+                        icon: AppIconId.delete,
+                        child: Text(l.roofDeleteLibrary),
+                      ),
+                    ),
+                ],
+                onSelected: (action) async {
+                  if (action == 'library_save') {
+                    await _saveToLibrary();
+                  } else if (action == 'library_delete') {
+                    await _deleteFromLibrary();
+                  }
+                },
+              ),
             ],
-            onChanged: (p) {
-              if (p != null) _selectPreset(p);
-            },
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey(
+                    'roof-preset-${_library.any((a) => a.id == _assembly.id) ? _assembly.id : _assembly.preset.name}-${_library.length}',
+                  ),
+                  initialValue: _library.any((a) => a.id == _assembly.id)
+                      ? 'lib_${_assembly.id}'
+                      : (_assembly.preset == ArchitectRoofPreset.custom
+                          ? 'preset_custom'
+                          : 'preset_${_assembly.preset.name}'),
+                  isExpanded: true,
+                  decoration: InputDecoration(labelText: l.roofUiAssembly),
+                  items: [
+                    for (final p in ArchitectRoofPreset.values)
+                      if (p != ArchitectRoofPreset.custom ||
+                          (_assembly.preset == p && !_library.any((a) => a.id == _assembly.id)))
+                        DropdownMenuItem(
+                          value: 'preset_${p.name}',
+                          enabled: p != ArchitectRoofPreset.custom,
+                          child: Text(
+                            p.label(l),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    for (final libItem in _library)
+                      DropdownMenuItem(
+                        value: 'lib_${libItem.id}',
+                        child: Text(
+                          libItem.label(l),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (val) {
+                    if (val == null) return;
+                    if (val.startsWith('lib_')) {
+                      final id = val.substring(4);
+                      final found = _library.where((a) => a.id == id).firstOrNull;
+                      if (found != null) _selectLibraryAssembly(found);
+                    } else if (val.startsWith('preset_')) {
+                      final pName = val.substring(7);
+                      final foundPreset = ArchitectRoofPreset.values
+                          .where((p) => p.name == pName)
+                          .firstOrNull;
+                      if (foundPreset != null) _selectPreset(foundPreset);
+                    }
+                  },
+                ),
+              ),
+              if (_library.any((a) => a.id == _assembly.id))
+                IconButton(
+                  icon: const AppIcon(
+                    AppIconId.delete, color: Colors.redAccent,
+                  ),
+                  tooltip: l.roofDeleteLibrary,
+                  onPressed: _deleteFromLibrary,
+                ),
+            ],
           ),
           if (_assembly.panels != null)
             ArchitectRoofPanelFields(
@@ -773,7 +965,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
             TextButton.icon(
               key: const ValueKey('roof-add-layer'),
               onPressed: () => _editLayer(),
-              icon: const Icon(Icons.add),
+              icon: const AppIcon(AppIconId.add),
               label: Text(l.slabAddLayer),
             ),
           if (_assemblyError != null)
@@ -811,21 +1003,34 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
                 key: ValueKey('roof-layer-actions-${layer.id}'),
                 tooltip: l.roofUiLayerActions,
                 itemBuilder: (_) => [
-                  PopupMenuItem(value: 'edit', child: Text(l.roofUiLayerEdit)),
+                  PopupMenuItem(value: 'edit', child: AppMenuLabel(
+                      icon: AppIconId.edit,
+                      child: Text(l.roofUiLayerEdit),
+                    ),
+                  ),
                   PopupMenuItem(
                     value: 'up',
                     enabled: index > 0,
-                    child: Text(l.wallLayerUp),
+                    child: AppMenuLabel(
+                      icon: AppIconId.up,
+                      child: Text(l.wallLayerUp),
+                    ),
                   ),
                   PopupMenuItem(
                     value: 'down',
                     enabled: index + 1 < _assembly.layers.length,
-                    child: Text(l.wallLayerDown),
+                    child: AppMenuLabel(
+                      icon: AppIconId.down,
+                      child: Text(l.wallLayerDown),
+                    ),
                   ),
                   PopupMenuItem(
                     value: 'delete',
                     enabled: _assembly.layers.length > 1,
-                    child: Text(l.delete),
+                    child: AppMenuLabel(
+                      icon: AppIconId.delete,
+                      child: Text(l.delete),
+                    ),
                   ),
                 ],
                 onSelected: (v) {

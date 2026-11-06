@@ -1,3 +1,4 @@
+import '../../support/command_icon_finders.dart';
 import 'package:flutter/gestures.dart';
 import 'architect_tool_test_helper.dart' as tool_ui;
 import 'dart:io';
@@ -39,7 +40,7 @@ ArchitectStorey scene() => const ArchitectStorey(
 
 Future<void> selectTool(WidgetTester tester) async {
   await tool_ui.prepare(tester, Icons.near_me_outlined);
-  await tester.tap(find.byIcon(Icons.near_me_outlined));
+  await tester.tap(findCommandIcon(Icons.near_me_outlined));
   await tester.pumpAndSettle();
 }
 
@@ -127,7 +128,10 @@ void main() {
         {'other', 'wall'},
         {'other'},
       ]) {
-        await tester.tapAt(workspace.screen(tester, Offset.zero), kind: PointerDeviceKind.mouse);
+        await tester.tapAt(
+          workspace.screen(tester, Offset.zero),
+          kind: PointerDeviceKind.mouse,
+        );
         await tester.pumpAndSettle();
         expect(workspace.overlay(tester).selectedElementIds, expected);
       }
@@ -216,7 +220,8 @@ void main() {
         find.byKey(const ValueKey('architect-rotation-preset-90')),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('architect-rotation-apply')));
+      expect(model.undoCount, 0);
+      await editing.acceptGeometryCommand(tester);
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.columns.map((c) => c.rotationDeg), [
         90,

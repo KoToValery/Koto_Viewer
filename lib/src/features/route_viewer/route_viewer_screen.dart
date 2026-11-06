@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:archive/archive.dart';
@@ -26,8 +27,7 @@ class RouteViewerScreen extends StatefulWidget {
   const RouteViewerScreen({
     super.key,
     required this.filePath,
-    this.title,
-  });
+    this.title});
 
   @override
   State<RouteViewerScreen> createState() => _RouteViewerScreenState();
@@ -129,7 +129,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
         });
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'RouteViewer._loadRouteFile.fs');
+      AppErrorHandler.recordError(e, stack, context: 'RouteViewer._loadRouteFile.fs',
+      );
       if (mounted) {
         final l10n = AppLocalizations.of(context);
         setState(() {
@@ -138,7 +139,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
         });
       }
     } on ArchiveException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'RouteViewer._loadRouteFile.archive');
+      AppErrorHandler.recordError(e, stack, context: 'RouteViewer._loadRouteFile.archive',
+      );
       if (mounted) {
         final l10n = AppLocalizations.of(context);
         setState(() {
@@ -147,7 +149,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'RouteViewer._loadRouteFile.format');
+      AppErrorHandler.recordError(e, stack, context: 'RouteViewer._loadRouteFile.format',
+      );
       if (mounted) {
         final l10n = AppLocalizations.of(context);
         setState(() {
@@ -156,7 +159,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
         });
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'RouteViewer._loadRouteFile');
+      AppErrorHandler.recordError(e, stack, context: 'RouteViewer._loadRouteFile',
+      );
       if (mounted) {
         final l10n = AppLocalizations.of(context);
         setState(() {
@@ -228,15 +232,15 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
     } else if (state == LocationPermissionState.deniedForever) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Location permission is permanently denied. Please enable it in Settings.'),
+          content: Text('Location permission is permanently denied. Please enable it in Settings.',
+          ),
           backgroundColor: Colors.red,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Location permission was denied.'),
-        ),
+          content: Text('Location permission was denied.')),
       );
     }
   }
@@ -262,12 +266,14 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
       if (!mounted) return;
       setState(() => _currentPosition = pos);
       if (_followUser) {
-        _mapController.move(LatLng(pos.latitude, pos.longitude), _mapController.camera.zoom);
+        _mapController.move(LatLng(pos.latitude, pos.longitude), _mapController.camera.zoom,
+        );
       }
     });
 
     // Compass heading with deadband filtering (minDeltaDegrees: 2.5) to avoid excessive setState
-    _compassSub = LocationCompassService.getFilteredCompassStream(minDeltaDegrees: 2.5)?.listen((data) {
+    _compassSub = LocationCompassService.getFilteredCompassStream(minDeltaDegrees: 2.5,
+        )?.listen((data) {
       if (!mounted) return;
       setState(() {
         _currentHeading = data.heading;
@@ -295,7 +301,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.sync_problem_rounded, color: Colors.amberAccent, size: 20),
+            const Icon(Icons.sync_problem_rounded, color: Colors.amberAccent, size: 20,
+            ),
             const SizedBox(width: 8),
             Expanded(child: Text(message)),
           ],
@@ -350,9 +357,9 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
 
   void _shareRouteFile() {
     Share.shareXFiles(
-      [XFile(widget.filePath)],
-      subject: _document?.name ?? _fileName,
-    );
+      [XFile(widget.filePath),
+    ],
+      subject: _document?.name ?? _fileName);
   }
 
   @override
@@ -373,7 +380,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
             if (_document != null && _document!.totalDistanceMeters > 0)
               Text(
                 '${_document!.formattedDistance} • ${_document!.formattedElevationGain}',
-                style: TextStyle(fontSize: 11, color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 11, color: theme.colorScheme.primary, fontWeight: FontWeight.w600,
+                ),
               )
             else
               Text(
@@ -384,13 +392,13 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.info_outline_rounded),
-            tooltip: 'Route Details',
+            icon: const AppIcon(AppIconId.info),
+            tooltip: context.l10n.commandUiRouteDetails,
             onPressed: _document != null ? _showInfoSheet : null,
           ),
           IconButton(
-            icon: const Icon(Icons.share_rounded),
-            tooltip: 'Share Route',
+            icon: const AppIcon(AppIconId.share),
+            tooltip: context.l10n.commandUiShareRoute,
             onPressed: _shareRouteFile,
           ),
         ],
@@ -407,7 +415,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
           children: [
             CircularProgressIndicator(strokeWidth: 3),
             SizedBox(height: 16),
-            Text('Loading outdoor route & map...', style: TextStyle(fontSize: 14)),
+            Text('Loading outdoor route & map...', style: TextStyle(fontSize: 14),
+            ),
           ],
         ),
       );
@@ -420,7 +429,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline_rounded, color: Colors.red, size: 48),
+              const Icon(Icons.error_outline_rounded, color: Colors.red, size: 48,
+              ),
               const SizedBox(height: 16),
               Text(
                 _errorMessage!,
@@ -430,8 +440,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
               const SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: _loadRouteFile,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Try Again'),
+                icon: const AppIcon(AppIconId.refresh),
+                label: Text(context.l10n.commandUiTryAgain),
               ),
             ],
           ),
@@ -491,13 +501,11 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
 
             // Route Polylines
             PolylineLayer(
-              polylines: _buildPolylines(doc),
-            ),
+              polylines: _buildPolylines(doc)),
 
             // Route Markers (Start, End, Waypoints, Live Location)
             MarkerLayer(
-              markers: _buildMarkers(doc),
-            ),
+              markers: _buildMarkers(doc)),
 
             // Mandatory License & Attribution banner
             Align(
@@ -510,10 +518,12 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
                     borderRadius: BorderRadius.all(Radius.circular(4)),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3,
+                    ),
                     child: Text(
                       _buildAttributionText(),
-                      style: const TextStyle(fontSize: 9, color: Colors.black87),
+                      style: const TextStyle(fontSize: 9, color: Colors.black87,
+                      ),
                     ),
                   ),
                 ),
@@ -532,7 +542,7 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
               // Layers button
               _buildFloatingButton(
                 icon: Icons.layers_rounded,
-                tooltip: 'Map Overlays',
+                tooltip: context.l10n.commandUiMapOverlays,
                 onPressed: _showLayersSheet,
               ),
               const SizedBox(height: 10),
@@ -540,7 +550,7 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
               // Fit to route button
               _buildFloatingButton(
                 icon: Icons.center_focus_strong_rounded,
-                tooltip: 'Fit Route',
+                tooltip: context.l10n.commandUiFitRoute,
                 onPressed: _fitRouteBounds,
               ),
               const SizedBox(height: 10),
@@ -548,7 +558,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
               // GPS / My Location button
               _buildFloatingButton(
                 icon: _isLocationActive ? Icons.my_location_rounded : Icons.location_searching_rounded,
-                tooltip: _isLocationActive ? 'Center on Location' : 'Show My Location',
+                tooltip: _isLocationActive ? context.l10n.commandUiCenterOnLocation
+                    : context.l10n.commandUiShowMyLocation,
                 color: _isLocationActive ? const Color(0xFF2563EB) : null,
                 iconColor: _isLocationActive ? Colors.white : null,
                 onPressed: _toggleLocation,
@@ -559,7 +570,7 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
                 const SizedBox(height: 10),
                 _buildFloatingButton(
                   icon: Icons.sync_problem_rounded,
-                  tooltip: _isBulgarian ? 'Калибриране на компаса' : 'Calibrate Compass',
+                  tooltip: context.l10n.commandUiCalibrateCompass,
                   color: Colors.amber.shade700,
                   iconColor: Colors.white,
                   onPressed: () => CompassCalibrationDialog.show(context),
@@ -590,8 +601,10 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
 
   List<Polyline> _buildPolylines(GeoRouteDocument doc) {
     final List<Polyline> lines = [];
-    final trackColor = const Color(0xFFDC2626).withValues(alpha: _layersSettings.trackOpacity);
-    final casingColor = Colors.white.withValues(alpha: _layersSettings.trackOpacity * 0.85);
+    final trackColor = const Color(0xFFDC2626,
+    ).withValues(alpha: _layersSettings.trackOpacity);
+    final casingColor = Colors.white.withValues(alpha: _layersSettings.trackOpacity * 0.85,
+    );
 
     for (final track in doc.tracks) {
       for (final seg in track.segments) {
@@ -637,7 +650,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
             child: const CircleAvatar(
               radius: 14,
               backgroundColor: Color(0xFF16A34A),
-              child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
+              child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18,
+              ),
             ),
           ),
         );
@@ -656,7 +670,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
               child: const CircleAvatar(
                 radius: 14,
                 backgroundColor: Color(0xFFDC2626),
-                child: Icon(Icons.sports_score_rounded, color: Colors.white, size: 18),
+                child: Icon(Icons.sports_score_rounded, color: Colors.white, size: 18,
+                ),
               ),
             ),
           );
@@ -690,7 +705,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
 
     // 3. User Live GPS Marker with compass heading cone
     if (_currentPosition != null) {
-      final userLatLng = LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
+      final userLatLng = LatLng(_currentPosition!.latitude, _currentPosition!.longitude,
+      );
       markers.add(
         Marker(
           point: userLatLng,
@@ -756,8 +772,7 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
         ],
       ),
       child: Center(
-        child: Icon(icon, color: Colors.white, size: 14),
-      ),
+        child: Icon(icon, color: Colors.white, size: 14)),
     );
   }
 
@@ -779,7 +794,7 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
           message: tooltip,
           child: Padding(
             padding: const EdgeInsets.all(10.0),
-            child: Icon(
+            child: AppIcon.fromMaterial(
               icon,
               size: 22,
               color: iconColor ?? Colors.grey.shade800,
@@ -812,7 +827,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
                 color: const Color(0xFF2563EB),
               ),
               const Spacer(),
-              Container(width: 1, height: 28, color: Colors.grey.withValues(alpha: 0.3)),
+              Container(width: 1, height: 28, color: Colors.grey.withValues(alpha: 0.3),
+              ),
               const Spacer(),
 
               // Elevation gain badge
@@ -823,7 +839,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
                 color: const Color(0xFF16A34A),
               ),
               const Spacer(),
-              Container(width: 1, height: 28, color: Colors.grey.withValues(alpha: 0.3)),
+              Container(width: 1, height: 28, color: Colors.grey.withValues(alpha: 0.3),
+              ),
               const Spacer(),
 
               // Altitude Range badge
@@ -834,7 +851,7 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
                 color: const Color(0xFF7C3AED),
               ),
               const SizedBox(width: 6),
-              const Icon(Icons.expand_less_rounded, size: 20, color: Colors.grey),
+              const AppIcon(AppIconId.expandLess, size: 20, color: Colors.grey),
             ],
           ),
         ),
@@ -857,10 +874,12 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey)),
+            Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey),
+            ),
             Text(
               value,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color,
+              ),
             ),
           ],
         ),

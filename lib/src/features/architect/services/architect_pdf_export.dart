@@ -17,6 +17,12 @@ class ArchitectPdfExport {
     ArchitectPublicationSources sources = const ArchitectPublicationSources(),
   }) async {
     if (sheets.isEmpty) throw ArgumentError('No sheets');
+    final problems = [
+      for (final sheet in sheets)
+        for (final issue in ArchitectSheetComposer.issues(snapshot, sheet, l))
+          '${sheet.number}: $issue',
+    ];
+    if (problems.isNotEmpty) throw StateError(problems.join('\n'));
     final regular = (await rootBundle.load(
       'assets/fonts/NotoSans-Regular.ttf',
     )).buffer.asUint8List();
@@ -62,12 +68,18 @@ class ArchitectPdfExport {
               );
             case ArchitectVectorText():
               final isBold = op.weight.value >= 600;
-              final key = '${op.size}/$isBold';
+              final key = '${op.size}/$isBold/${op.fontStyle}/${op.decoration}';
               final font = fonts.putIfAbsent(
                 key,
                 () => PdfTrueTypeFont(
                   isBold ? bold : regular,
                   op.size * pointsPerMm,
+                  multiStyle: [
+                    if (isBold) PdfFontStyle.bold,
+                    if (op.fontStyle == FontStyle.italic) PdfFontStyle.italic,
+                    if (op.decoration.contains(TextDecoration.underline))
+                      PdfFontStyle.underline,
+                  ],
                 ),
               );
               graphics.translateTransform(

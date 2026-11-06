@@ -214,11 +214,11 @@ void main() {
           tester.widget<ElementPaletteBar>(find.byType(ElementPaletteBar));
       palette().onSelectTool(StructuralDrawTool.column);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.filter_alt_rounded));
+      await tester.tap(find.byKey(const ValueKey('structural-underlay-filter')));
       await tester.pumpAndSettle();
       expect(palette().activeTool, StructuralDrawTool.layers);
       expect(doc.layers['architecture']!.isVisible, isTrue);
-      await tester.tap(find.byIcon(Icons.filter_alt_outlined));
+      await tester.tap(find.byKey(const ValueKey('structural-underlay-filter')));
       await tester.pumpAndSettle();
       expect(palette().activeTool, StructuralDrawTool.layers);
       expect(doc.layers['architecture']!.isVisible, isFalse);

@@ -17,6 +17,7 @@ import 'package:kotoview/src/features/architect/services/architect_command_contr
 import 'package:kotoview/src/features/architect/services/architect_selection.dart';
 import 'architect_editing_test.dart' as editing;
 import 'architect_workspace_interaction_test.dart' as workspace;
+import 'architect_tool_test_helper.dart' as tool_ui;
 
 void main() {
   for (final reference in WallReferenceLine.values) {
@@ -147,7 +148,12 @@ void main() {
         ),
       );
       var next = model.project.activeStorey.walls;
-      expect(identical(next[0], base), isTrue);
+      // Model preparation may resolve exterior metadata, but the stationary
+      // support must keep every geometric and construction field.
+      expect(
+        next[0].copyWith(exteriorResolved: base.exteriorResolved).toJson(),
+        base.toJson(),
+      );
       expect(next[1].startPoint, const Offset(3, 0));
       expect(next[1].endPoint, const Offset(3, 3.5));
       expect(
@@ -174,7 +180,10 @@ void main() {
         ),
       );
       next = model.project.activeStorey.walls;
-      expect(next[0].toJson(), base.toJson());
+      expect(
+        next[0].copyWith(exteriorResolved: base.exteriorResolved).toJson(),
+        base.toJson(),
+      );
       expect(next[1].startPoint, const Offset(3, .5));
       expect(next[1].endPoint, const Offset(3, 3.5));
     },
@@ -243,7 +252,10 @@ void main() {
       expect(walls[1].connectEnd, isTrue);
       expect(walls[1].doors.single.wallId, walls[1].id);
       expect(walls[1].doors.single.offsetRatio, .5);
-      expect(walls.last.toJson(), c.toJson());
+      expect(
+        walls.last.copyWith(exteriorResolved: c.exteriorResolved).toJson(),
+        c.toJson(),
+      );
       model.undo();
       expect(identical(model.project, old), isTrue);
       model.redo();
@@ -365,11 +377,13 @@ void main() {
       await editing.hold(tester, const Offset(2, .2));
       await tester.tap(find.byKey(const ValueKey('wall-detach')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(model.project.activeStorey.walls.single.isDetached, isTrue);
       await tester.tap(find.byKey(const ValueKey('architect-wall-actions')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('wall-mirror')));
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(
         (model.project.activeStorey.walls.single.coreCenterStart -
                 w.coreCenterStart)
@@ -389,6 +403,7 @@ void main() {
       expect(workspace.overlay(tester).wallCutLine, isNotNull);
       await g.up();
       await tester.pumpAndSettle();
+      await editing.acceptGeometryCommand(tester);
       expect(model.project.activeStorey.walls, hasLength(2));
       expect(tester.takeException(), isNull);
     },
@@ -414,20 +429,28 @@ void main() {
       await workspace.open(tester, model);
       await editing.selectTool(tester, 'wall');
       await editing.hold(tester, const Offset(2, 2.5));
+      await tool_ui.selectionAction(tester, 'architect-selection-move');
+      await tool_ui.selectionAction(tester, 'architect-move-free');
       final old = model.project;
       final gesture = await tester.startGesture(
         workspace.screen(tester, const Offset(2, 2.5)),
       );
-      await tester.pump(const Duration(milliseconds: 281));
+      await tester.pump(const Duration(milliseconds: 451));
       await gesture.moveTo(workspace.screen(tester, const Offset(3, 3)));
       await tester.pump();
       final preview = workspace.overlay(tester).project;
-      expect(preview.activeStorey.walls[0].toJson(), base.toJson());
+      expect(
+        preview.activeStorey.walls[0]
+            .copyWith(exteriorResolved: base.exteriorResolved)
+            .toJson(),
+        base.toJson(),
+      );
       expect(preview.activeStorey.walls[1].startPoint, const Offset(3, 0));
       expect(preview.activeStorey.walls[1].endPoint, const Offset(3, 3.5));
       expect(identical(model.project, old), isTrue);
       await gesture.up();
       await tester.pump();
+      await editing.acceptGeometryCommand(tester);
       expect(model.project.toJson(), preview.toJson());
       final next = model.project.activeStorey.walls[1];
       expect(next.doors.single.offsetRatio * next.length, closeTo(2, 1e-9));
@@ -502,11 +525,10 @@ void main() {
     await workspace.wallTap(tester, const Offset(0, 1));
     await tester.pumpAndSettle();
     for (final id in [
-      'wall-detach',
       'architect-wall-actions',
       'architect-selection-properties',
       'architect-selection-move',
-      'architect-clear-selection',
+      'architect-selection-control-clear',
     ]) {
       final rect = tester.getRect(find.byKey(ValueKey(id)));
       expect(rect.left, greaterThanOrEqualTo(0));
@@ -514,6 +536,7 @@ void main() {
     }
     await tester.tap(find.byKey(const ValueKey('architect-wall-actions')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('wall-detach')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('wall-cut')));
     await tester.pumpAndSettle();
     await workspace.wallTap(tester, const Offset(0, -1.8));
@@ -539,6 +562,7 @@ void main() {
     }
     await gesture.up();
     await tester.pumpAndSettle();
+    await editing.acceptGeometryCommand(tester);
     expect(model.project.activeStorey.walls, hasLength(4));
   });
 }

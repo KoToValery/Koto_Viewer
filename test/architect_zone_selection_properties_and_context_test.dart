@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -16,12 +17,7 @@ void main() {
     number: '1',
     name: 'Living Room',
     category: ArchitectZoneCategory.living,
-    polygon: const [
-      Offset(0, 0),
-      Offset(5, 0),
-      Offset(5, 4),
-      Offset(0, 4),
-    ],
+    polygon: const [Offset(0, 0), Offset(5, 0), Offset(5, 4), Offset(0, 4)],
     floorFinish: 'Laminate',
     wallFinish: 'Latex paint',
     ceilingFinish: 'Latex paint',
@@ -57,10 +53,7 @@ void main() {
     final cmd = SetArchitectElementProperties(
       storeyId: 'storey-1',
       elementIds: {'zone-1'},
-      values: {
-        'clearHeight': 2.85,
-        'targetArea': 22.5,
-      },
+      values: {'clearHeight': 2.85, 'targetArea': 22.5},
       textValues: {
         'number': '102',
         'name': 'Master Bedroom',
@@ -73,7 +66,9 @@ void main() {
     );
 
     final updated = cmd.apply(testProject);
-    final updatedZone = updated.activeStorey.zones.firstWhere((z) => z.id == 'zone-1');
+    final updatedZone = updated.activeStorey.zones.firstWhere(
+      (z) => z.id == 'zone-1',
+    );
 
     expect(updatedZone.number, '102');
     expect(updatedZone.name, 'Master Bedroom');
@@ -86,78 +81,134 @@ void main() {
     expect(updatedZone.isAutoBoundary, false);
   });
 
-  test('BimEditAction.schedule has valid label and icon in EN and BG', () async {
-    final enL10n = await AppLocalizations.delegate.load(const Locale('en'));
-    final bgL10n = await AppLocalizations.delegate.load(const Locale('bg'));
+  test(
+    'BimEditAction.schedule has valid label and icon in EN and BG',
+    () async {
+      final enL10n = await AppLocalizations.delegate.load(const Locale('en'));
+      final bgL10n = await AppLocalizations.delegate.load(const Locale('bg'));
 
-    expect(BimEditActions.icon(BimEditAction.schedule), Icons.table_chart_rounded);
-    expect(BimEditActions.label(BimEditAction.schedule, enL10n), 'Room Schedule');
-    expect(BimEditActions.label(BimEditAction.schedule, bgL10n), 'Таблица на помещенията');
-  });
+      expect(
+        BimEditActions.icon(BimEditAction.schedule),
+        AppIconId.zoneSchedule,
+      );
+      expect(
+        BimEditActions.label(BimEditAction.schedule, enL10n),
+        'Room Schedule',
+      );
+      expect(
+        BimEditActions.label(BimEditAction.schedule, bgL10n),
+        'Таблица на помещенията',
+      );
+    },
+  );
 
-  testWidgets('ArchitectElementPropertiesDialog renders all zone properties and actions', (tester) async {
-    bool scheduleOpened = false;
+  testWidgets(
+    'ArchitectElementPropertiesDialog renders all zone properties and actions',
+    (tester) async {
+      bool scheduleOpened = false;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => ElevatedButton(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => ArchitectElementPropertiesDialog(
-                    project: testProject,
-                    elementIds: {'zone-1'},
-                    onScheduleTable: () => scheduleOpened = true,
-                    onApply: (v, t) => true,
-                  ),
-                );
-              },
-              child: const Text('Open'),
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => ArchitectElementPropertiesDialog(
+                      project: testProject,
+                      elementIds: {'zone-1'},
+                      onScheduleTable: () => scheduleOpened = true,
+                      onApply: (v, t) => true,
+                    ),
+                  );
+                },
+                child: const Text('Open'),
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    // Tap to open properties dialog
-    await tester.tap(find.text('Open'));
-    await tester.pumpAndSettle();
+      // Tap to open properties dialog
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
 
-    // Verify dialog title
-    expect(find.text('Properties'), findsOneWidget);
+      // Verify dialog title
+      expect(
+        find.text(
+          AppLocalizations.of(
+            tester.element(find.byType(ArchitectElementPropertiesDialog)),
+          )!.architectToolZone,
+        ),
+        findsOneWidget,
+      );
 
-    // Verify schedule table button
-    expect(find.byKey(const ValueKey('architect-property-schedule-table')), findsOneWidget);
+      // Verify schedule table button
+      expect(
+        find.byKey(const ValueKey('architect-property-schedule-table')),
+        findsOneWidget,
+      );
 
-    // Verify category dropdown
-    expect(find.byKey(const ValueKey('architect-property-category-living')), findsOneWidget);
+      // Verify category dropdown
+      expect(
+        find.byKey(const ValueKey('architect-property-category-living')),
+        findsOneWidget,
+      );
 
-    // Verify number and name fields
-    expect(find.byKey(const ValueKey('architect-property-number-1')), findsOneWidget);
-    expect(find.byKey(const ValueKey('architect-property-name-Living Room')), findsOneWidget);
+      // Verify number and name fields
+      expect(
+        find.byKey(const ValueKey('architect-property-number-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-property-name-Living Room')),
+        findsOneWidget,
+      );
 
-    // Verify clear height and target area number fields
-    expect(find.byKey(const ValueKey('architect-property-clearHeight')), findsOneWidget);
-    expect(find.byKey(const ValueKey('architect-property-targetArea')), findsOneWidget);
+      // Verify clear height and target area number fields
+      expect(
+        find.byKey(const ValueKey('architect-property-clearHeight')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-property-targetArea')),
+        findsOneWidget,
+      );
 
-    // Verify finish fields
-    expect(find.byKey(const ValueKey('architect-property-floorFinish-Laminate')), findsOneWidget);
-    expect(find.byKey(const ValueKey('architect-property-wallFinish-Latex paint')), findsOneWidget);
-    expect(find.byKey(const ValueKey('architect-property-ceilingFinish-Latex paint')), findsOneWidget);
+      // Verify finish fields
+      expect(
+        find.byKey(const ValueKey('architect-property-floorFinish-Laminate')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-property-wallFinish-Latex paint')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('architect-property-ceilingFinish-Latex paint'),
+        ),
+        findsOneWidget,
+      );
 
-    // Verify boundary auto switch
-    expect(find.byKey(const ValueKey('architect-property-isAutoBoundary')), findsOneWidget);
+      // Verify boundary auto switch
+      expect(
+        find.byKey(const ValueKey('architect-property-isAutoBoundary')),
+        findsOneWidget,
+      );
 
-    // Verify floating card is NOT used here
-    expect(find.byType(ArchitectZonePropertiesCard), findsNothing);
+      // Verify floating card is NOT used here
+      expect(find.byType(ArchitectZonePropertiesCard), findsNothing);
 
-    // Tap schedule table button
-    await tester.tap(find.byKey(const ValueKey('architect-property-schedule-table')));
-    await tester.pumpAndSettle();
-    expect(scheduleOpened, isTrue);
-  });
+      // Tap schedule table button
+      await tester.tap(
+        find.byKey(const ValueKey('architect-property-schedule-table')),
+      );
+      await tester.pumpAndSettle();
+      expect(scheduleOpened, isTrue);
+    },
+  );
 }

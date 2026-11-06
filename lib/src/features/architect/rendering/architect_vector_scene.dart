@@ -1,3 +1,4 @@
+import '../models/architect_level_format.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -17,6 +18,8 @@ class ArchitectTextScope {
   final double renderScale;
   final BimDistanceUnit units;
   final int decimals;
+  final BimDistanceUnit levelUnits;
+  final int levelDecimals;
   final bool publication;
   const ArchitectTextScope(
     this.document,
@@ -25,6 +28,8 @@ class ArchitectTextScope {
     this.renderScale, {
     this.units = BimDistanceUnit.meters,
     this.decimals = 2,
+    this.levelUnits = BimDistanceUnit.meters,
+    this.levelDecimals = 2,
     this.publication = false,
   });
   T run<T>(T Function() body) => runZoned(body, zoneValues: {_key: this});
@@ -34,6 +39,12 @@ class ArchitectTextScope {
       ).paperToModel(document.textMm(view, id, role, denominator));
   String length(double metres) =>
       BimDistanceUnit.trimZeros(units.format(metres, decimals: decimals));
+  String level(double metres, {BimDistanceUnit? units, int? decimals}) =>
+      formatArchitectLevel(
+        metres,
+        units: units ?? levelUnits,
+        decimals: decimals ?? levelDecimals,
+      );
   double fontSize(String id, ArchitectAnnotationRole role) =>
       height(id, role) / ArchitectDrawingScale.fontCapRatio;
   String number(double metres) =>
@@ -230,8 +241,11 @@ class ArchitectVectorPath extends ArchitectVectorOp {
     final bounds = path.getBounds().inflate(fill ? 0 : width / 2);
     if (clip == null) return bounds;
     final region = clip!.getBounds();
-    return bounds.overlaps(region) ? bounds.intersect(region) : region.topLeft & Size.zero;
+    return bounds.overlaps(region)
+        ? bounds.intersect(region)
+        : region.topLeft & Size.zero;
   }
+
   @override
   void paint(Canvas canvas) => canvas.drawPath(
     path,
@@ -249,6 +263,8 @@ class ArchitectVectorText extends ArchitectVectorOp {
   final double size, rotation;
   final Color color;
   final FontWeight weight;
+  final FontStyle fontStyle;
+  final TextDecoration decoration;
   ArchitectVectorText(
     this.text,
     this.position,
@@ -258,8 +274,10 @@ class ArchitectVectorText extends ArchitectVectorOp {
     this.weight,
     super.clip,
     super.sources,
-    super.role,
-  );
+    super.role, {
+    this.fontStyle = FontStyle.normal,
+    this.decoration = TextDecoration.none,
+  });
   TextPainter get painter => TextPainter(
     text: TextSpan(
       text: text,
@@ -268,6 +286,8 @@ class ArchitectVectorText extends ArchitectVectorOp {
         fontSize: size,
         color: color,
         fontWeight: weight,
+        fontStyle: fontStyle,
+        decoration: decoration,
         height: 1,
       ),
     ),
@@ -291,7 +311,13 @@ class ArchitectVectorText extends ArchitectVectorOp {
       canvas.text(
         text,
         Offset.zero,
-        TextStyle(fontSize: size, color: color, fontWeight: weight),
+        TextStyle(
+          fontSize: size,
+          color: color,
+          fontWeight: weight,
+          fontStyle: fontStyle,
+          decoration: decoration,
+        ),
         sources.length == 1 ? sources.first : null,
         ArchitectAnnotationRole.values.firstWhere(
           (e) => e.name == role,
@@ -371,6 +397,8 @@ class ArchitectVectorCanvas implements Canvas {
         _clip,
         id == null ? (_owners ?? sourceIds) : {id},
         role.name,
+        fontStyle: style.fontStyle ?? FontStyle.normal,
+        decoration: style.decoration ?? TextDecoration.none,
       ),
     );
   }
@@ -380,7 +408,8 @@ class ArchitectVectorCanvas implements Canvas {
     if (paint.color.a == 0) return;
     final transformed = path.transform(_matrix.storage);
     var color = paint.color;
-    if (paint.style == PaintingStyle.fill && _role != 'cadFill' &&
+    if (paint.style == PaintingStyle.fill &&
+        _role != 'cadFill' &&
         transformed.getBounds().size.width *
                 transformed.getBounds().size.height >
             2 &&

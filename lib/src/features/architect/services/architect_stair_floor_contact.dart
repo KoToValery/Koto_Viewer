@@ -20,7 +20,9 @@ class ArchitectStairFloorContact {
         stair.unitVector * math.max(.005, stair.design!.nosingProjection);
     var bottom = start;
     for (final slab in storey.slabs) {
-      if (!ArchitectSlabGeometry.contains(storey, slab, approach)) continue;
+      if (!ArchitectSlabGeometry.contains(storey, slab, approach, project: project)) {
+        continue;
+      }
       final surfaces = ArchitectSlabGeometry.surfaces(
         project,
         storey,

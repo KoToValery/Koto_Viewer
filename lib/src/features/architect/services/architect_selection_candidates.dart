@@ -3,6 +3,8 @@ import 'dart:ui';
 
 import '../models/architect_project.dart';
 import '../models/architect_elements.dart';
+import '../models/architect_wall.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 import '../rendering/architect_scene_geometry.dart';
 import 'architect_element_tool.dart';
@@ -51,7 +53,8 @@ class ArchitectSelectionCandidates {
       for (final e in s.floorDrains) e.id: ArchitectTool.floorDrain,
       for (final e in s.slabs) e.id: ArchitectTool.slab,
       for (final e in s.components.reversed)
-        if (e.isVisible) e.id: ArchitectTool.component,
+        if (e.isVisible) e.id: e.isServiceComponent
+            ? ArchitectTool.services : ArchitectTool.component,
       for (final e in s.zones) e.id: ArchitectTool.zone,
       for (final e in project.gridAxes) e.id: ArchitectTool.axis,
       for (final e in project.sections) e.id: ArchitectTool.section,
@@ -76,6 +79,10 @@ class ArchitectSelectionCandidates {
       scale,
     );
     final kinds = tools(nearby);
+    final curvedWalls = {
+      for (final wall in nearby.activeStorey.walls)
+        if (wall.isCurved) wall.id: wall,
+    };
     const symbols = {
       ArchitectTool.door,
       ArchitectTool.window,
@@ -105,6 +112,15 @@ class ArchitectSelectionCandidates {
           (!includeComponents && kind == ArchitectTool.component)) {
         continue;
       }
+      final curvedWall = curvedWalls[id];
+      if (curvedWall != null) {
+        if (wallHit(curvedWall, point, 1e-7)) {
+          exact.add(id);
+        } else if (wallHit(curvedWall, point, tolerance)) {
+          near.add(id);
+        }
+        continue;
+      }
       final path = ArchitectSelection.outline(project, id);
       final symbolic = symbols.contains(kind);
       final filled = !{
@@ -127,6 +143,26 @@ class ArchitectSelectionCandidates {
       }
     }
     return [...exact, ...near];
+  }
+
+  /// Exact annular-sector/cap distance, independent of drawing tessellation.
+  static bool wallHit(ArchitectWall wall, Offset point, double tolerance) {
+    if (!ArchitectSceneGeometry.wallBounds(
+      wall,
+    ).inflate(tolerance + .0001).contains(point)) {
+      return false;
+    }
+    final (ratio, distance) = wall.projectPoint(point);
+    if (ratio >= 0 && ratio <= 1) {
+      return distance <= wall.thickness / 2 + tolerance;
+    }
+    final end = ratio < 0 ? 0.0 : 1.0;
+    final center = wall.centerPointAt(end);
+    final half = wall.normalAt(end) * (wall.thickness / 2);
+    return (point -
+                BimLineGeometry.closest(point, center - half, center + half))
+            .distance <=
+        tolerance;
   }
 
   /// Tests contours, including open paths and hole boundaries. Recursive bounds

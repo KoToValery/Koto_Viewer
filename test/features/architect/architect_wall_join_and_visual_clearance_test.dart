@@ -47,6 +47,7 @@ void main() {
         await workspace.wallTap(tester, const Offset(5, 3));
         await tester.pumpAndSettle();
 
+        await editing.acceptGeometryCommand(tester);
         // Walls should now be joined at (5, 0)
         final storey = model.project.activeStorey;
         final joinedW1 = storey.walls.firstWhere((w) => w.id == 'w1');
@@ -85,7 +86,7 @@ void main() {
         expect(find.byKey(const ValueKey('architect-wall-join-banner')), findsOneWidget);
 
         // Tap close (X) icon in banner
-        await tester.tap(find.byKey(const ValueKey('architect-wall-join-cancel')));
+        await tester.tap(find.byKey(const ValueKey('architect-command-cancel')));
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('architect-wall-join-banner')), findsNothing);
       },
@@ -108,6 +109,8 @@ void main() {
 
         // Select both walls
         await workspace.wallTap(tester, const Offset(2, 0));
+        await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
+        await tester.pumpAndSettle();
         await workspace.wallTap(tester, const Offset(5, 3));
         await tester.pumpAndSettle();
         expect(workspace.overlay(tester).selectedElementIds, {'w1', 'w2'});
@@ -117,7 +120,8 @@ void main() {
         await tester.tap(joinButton);
         await tester.pumpAndSettle();
 
-        // Joined immediately at intersection (5, 0)
+        await editing.acceptGeometryCommand(tester);
+        // Accepted at intersection (5, 0)
         final storey = model.project.activeStorey;
         final joinedW1 = storey.walls.firstWhere((w) => w.id == 'w1');
         final joinedW2 = storey.walls.firstWhere((w) => w.id == 'w2');
@@ -291,6 +295,7 @@ void main() {
         await tester.tapAt(workspace.screen(tester, const Offset(3, 1)));
         await tester.pumpAndSettle();
 
+        await editing.acceptGeometryCommand(tester);
         final updatedStorey = model.project.activeStorey;
         final updatedW1 = updatedStorey.walls.firstWhere((w) => w.id == 'w1');
         final updatedW2 = updatedStorey.walls.firstWhere((w) => w.id == 'w2');
@@ -343,6 +348,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('architect-wall-ref-outer')));
         await tester.pumpAndSettle();
 
+        await editing.acceptGeometryCommand(tester);
         // Wall reference line should now be outer
         var wall = model.project.activeStorey.walls.firstWhere((w) => w.id == 'w1');
         expect(wall.referenceLine, WallReferenceLine.outer);
@@ -354,6 +360,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('architect-wall-ref-inner')));
         await tester.pumpAndSettle();
 
+        await editing.acceptGeometryCommand(tester);
         wall = model.project.activeStorey.walls.firstWhere((w) => w.id == 'w1');
         expect(wall.referenceLine, WallReferenceLine.inner);
         expect(find.descendant(of: refSelector, matching: find.text('Inside')), findsOneWidget);

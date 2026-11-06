@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,6 +22,9 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+localizationsDelegates: AppLocalizations.localizationsDelegates,
+supportedLocales: AppLocalizations.supportedLocales,
+locale: const Locale('en'),
           home: PcbImageZoomDialog(images: images, initialIndex: 0),
         ),
       );
@@ -57,6 +61,9 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+localizationsDelegates: AppLocalizations.localizationsDelegates,
+supportedLocales: AppLocalizations.supportedLocales,
+locale: const Locale('en'),
           home: Scaffold(
             body: Builder(
               builder: (context) => ElevatedButton(

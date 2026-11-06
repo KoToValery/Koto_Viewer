@@ -1,3 +1,4 @@
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,8 +12,7 @@ class FontViewerScreen extends StatefulWidget {
 
   const FontViewerScreen({
     super.key,
-    required this.filePath,
-  });
+    required this.filePath});
 
   @override
   State<FontViewerScreen> createState() => _FontViewerScreenState();
@@ -26,7 +26,8 @@ class _FontViewerScreenState extends State<FontViewerScreen> {
   String? _error;
   double _fontSize = 24.0;
   final TextEditingController _customTextController = TextEditingController(
-      text: 'The quick brown fox jumps over the lazy dog');
+      text: 'The quick brown fox jumps over the lazy dog',
+  );
 
   @override
   void initState() {
@@ -90,7 +91,7 @@ class _FontViewerScreenState extends State<FontViewerScreen> {
         title: Text(fileName),
         actions: [
           IconButton(
-            icon: const Icon(Icons.share),
+            icon: const AppIcon(AppIconId.share),
             onPressed: () {
               Share.shareXFiles([XFile(widget.filePath)]);
             },
@@ -162,9 +163,9 @@ class _FontViewerScreenState extends State<FontViewerScreen> {
               _buildSectionTitle('Custom Text'),
               TextField(
                 controller: _customTextController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   border: OutlineInputBorder(),
-                  labelText: 'Type here to preview',
+                  labelText: context.l10n.commandUiTypeHereToPreview,
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -233,7 +234,8 @@ class _FontViewerScreenState extends State<FontViewerScreen> {
               SizedBox(
                 width: 40,
                 child: Text('${size.round()}',
-                    style: const TextStyle(color: Colors.grey)),
+                    style: const TextStyle(color: Colors.grey),
+                ),
               ),
               Expanded(
                 child: Text(

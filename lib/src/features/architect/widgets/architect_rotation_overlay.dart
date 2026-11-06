@@ -1,3 +1,5 @@
+import 'architect_dialog.dart';
+import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -100,6 +102,7 @@ class _RotationState extends State<ArchitectRotationOverlay> {
       angle = degrees * math.pi / 180;
     });
     widget.onPreview(pivot, angle);
+    if (angle.abs() > 1e-8) widget.onApply(pivot, angle);
   }
 
   @override
@@ -136,7 +139,7 @@ class _RotationState extends State<ArchitectRotationOverlay> {
           ),
         ),
         Positioned(
-          top: 8,
+          bottom: 8,
           left: 8,
           right: 8,
           child: Material(
@@ -169,13 +172,7 @@ class _RotationState extends State<ArchitectRotationOverlay> {
                           });
                           widget.onPreview(pivot, 0);
                         },
-                        icon: const Icon(Icons.center_focus_strong),
-                      ),
-                      IconButton(
-                        tooltip: l.cancel,
-                        key: const ValueKey('architect-rotation-cancel'),
-                        onPressed: widget.onCancel,
-                        icon: const Icon(Icons.close),
+                        icon: const AppIcon(AppIconId.fitView),
                       ),
                     ],
                   ),
@@ -197,14 +194,6 @@ class _RotationState extends State<ArchitectRotationOverlay> {
                             '${(angle * 180 / math.pi).toStringAsFixed(1)}°',
                           ),
                         ),
-                      ),
-                      IconButton(
-                        key: const ValueKey('architect-rotation-apply'),
-                        tooltip: l.applyAction,
-                        onPressed: angle.abs() > 1e-8
-                            ? () => widget.onApply(pivot, angle)
-                            : null,
-                        icon: const Icon(Icons.check),
                       ),
                     ],
                   ),
@@ -311,7 +300,7 @@ class _RotationAngleDialogState extends State<_RotationAngleDialog> {
   @override
   Widget build(BuildContext context) {
     final value = double.tryParse(controller.text);
-    return AlertDialog(
+    return architectAlertDialog(
       constraints: const BoxConstraints(maxWidth: 300),
       title: Text(context.l10n.architectPropertyAngle),
       content: SingleChildScrollView(
