@@ -33,6 +33,27 @@ export '../models/architect_storey_copy_types.dart';
 export 'architect_storey_copy_service.dart';
 export 'architect_element_id.dart';
 
+// ============================================================================
+// MASTER ARCHITECT COMMAND CONTROLLER LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'architect_command_controller.index.md' for full command registry.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-BASE]     L36-L105   : [TAG:CMD_BASE] ArchitectModelCommand base interface
+// [SEC-02-GROUPS]   L106-L251  : [TAG:CMD_GROUPS] Offset, group & ungroup operations
+// [SEC-03-WALLS]    L252-L1023 : [TAG:CMD_WALLS] Wall creation, split, cut, trim, clearances
+// [SEC-04-ELEMENTS] L1024-L1066: [TAG:CMD_ELEMENTS] Columns, zones, candidate placement
+// [SEC-05-MOVE]     L1067-L1639: [TAG:CMD_MOVE] Move single & multi-elements with room sync
+// [SEC-06-EXTEND]   L1640-L1826: [TAG:CMD_EXTEND] Wall extensions, joints & dimension overrides
+// [SEC-07-CONTOURS] L1827-L1997: [TAG:CMD_CONTOURS] Contour cut openings, CAD primitives
+// [SEC-08-ROOFS]    L1998-L2079: [TAG:CMD_ROOFS] Roof planes, pitch updates & replacement
+// [SEC-09-POLYGONS] L2080-L2450: [TAG:CMD_POLYGONS] Polygon vertex insertion & edge manipulation
+// [SEC-10-CTRL]     L2451-L2598: [TAG:CMD_CONTROLLER] ArchitectCommandController Undo/Redo & transactions
+// [SEC-11-VIEWS]    L2599-L2726: [TAG:CMD_VIEWS] Sections, elevations & decorative element commands
+// [SEC-12-STOREYS]  L2727-L2778: [TAG:CMD_STOREYS] Storey copy, batch additions & deletion
+// ============================================================================
+
+// === SECTION: [SEC-01-BASE] ARCHITECT MODEL COMMAND BASE ===
 /// Commands accept model metres, never screen coordinates or a camera scale.
 abstract class ArchitectModelCommand {
   const ArchitectModelCommand();

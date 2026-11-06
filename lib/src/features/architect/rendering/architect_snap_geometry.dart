@@ -5,6 +5,7 @@ import 'dart:ui';
 import '../../bim_editing/scene/bim_point_index.dart';
 import '../../bim_editing/scene/bim_bounds_index.dart';
 import '../models/architect_column.dart';
+import '../models/architect_wall_arc.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import '../../bim_editing/geometry/bim_line_geometry.dart';
@@ -78,7 +79,27 @@ class ArchitectSnapGeometry {
         Offset(-1, 0),
         Offset(0, -1),
       ]) {
-        point(center + u * radius, 'Vertex', owner);
+        point(center + u * radius, 'Quadrant', owner);
+      }
+    }
+
+    void arcQuadrants(ArchitectWallArc arc, String owner) {
+      final c = arc.center;
+      final r = arc.radius;
+      final a0 = arc.startAngle;
+      final sweep = arc.sweep;
+      const twoPi = 2 * math.pi;
+      for (var i = 0; i < 4; i++) {
+        final theta = i * math.pi / 2;
+        final diff = sweep >= 0 ? (theta - a0) % twoPi : (a0 - theta) % twoPi;
+        final normDiff = diff < 0 ? diff + twoPi : diff;
+        if (normDiff <= sweep.abs() + 1e-6) {
+          point(
+            c + Offset(math.cos(theta), math.sin(theta)) * r,
+            'Quadrant',
+            owner,
+          );
+        }
       }
     }
 
@@ -106,6 +127,7 @@ class ArchitectSnapGeometry {
             );
           }
           point(wall.arc!.center, 'Center', wall.id);
+          if (wall.arc != null) arcQuadrants(wall.arc!, wall.id);
         } else {
           edge(wall.startPoint, wall.endPoint, '@wall-axis:${wall.id}');
         }
@@ -140,6 +162,7 @@ class ArchitectSnapGeometry {
           );
         }
         point(wall.arc!.center, 'Center', wall.id);
+        if (wall.arc != null) arcQuadrants(wall.arc!, wall.id);
         final paths = [
           (wall.facePolygon(0, 0), '@wall-axis:${wall.id}'),
           (wall.polygonCorners, wall.id),

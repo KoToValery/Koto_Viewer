@@ -77,24 +77,28 @@ import 'widgets/structural_3d_viewport.dart';
 import 'widgets/vertical_capacity_sheet.dart';
 
 // ============================================================================
-// TABLE OF CONTENTS (grep: "=== SECTION:")
-// 1.  === SECTION: WIDGET DECLARATION & PUBLIC API ===
-// 2.  === SECTION: STATE VARIABLES & LIFECYCLE ===
-// 3.  === SECTION: COORDINATE TRANSFORMATIONS & VIEWPORT ===
-// 4.  === SECTION: HIT TESTING & SELECTION HELPERS ===
-// 5.  === SECTION: ELEMENT ACTIONS (COLUMNS, WALLS, BEAMS) ===
-// 6.  === SECTION: OPENINGS & GRID AXES MANAGEMENT ===
-// 7.  === SECTION: SLAB CORRECTION & POLYGON EDITING ===
-// 8.  === SECTION: POINTER GESTURES & INTERACTION CONTROLLER ===
-// 9.  === SECTION: ELEMENT PLACEMENT & COMMIT LOGIC ===
-// 10. === SECTION: UNDERLAY FILTERING & CAD SETTINGS ===
-// 11. === SECTION: STOREY MANAGEMENT & ANALYSIS DIALOGS ===
-// 12. === SECTION: APPBAR & HUD ACTION BUILDERS ===
-// 13. === SECTION: MAIN BUILD METHOD & VIEWPORT CANVAS ===
-// 14. === SECTION: CONTEXTUAL BOTTOM DOCKS & ACTION BARS ===
+// MASTER STRUCTURAL DESIGNER LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'structural_designer_screen.index.md' for full method index & architecture.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-WIDGET]   L97-L126   : [TAG:STRUCT_WIDGET] Widget Declaration & Public API
+// [SEC-02-STATE]    L127-L767  : [TAG:STRUCT_STATE] State variables, controllers, initState, dispose
+// [SEC-03-XFORM]    L768-L872  : [TAG:STRUCT_XFORM] Coordinate transformations & matrix viewport
+// [SEC-04-HITS]     L873-L1196 : [TAG:STRUCT_HITS] Hit testing & selection helpers
+// [SEC-05-ACTIONS]  L1197-L1966: [TAG:STRUCT_ACTIONS] Element actions (columns, walls, beams)
+// [SEC-06-OPENINGS] L1967-L2992: [TAG:STRUCT_OPENINGS] Openings & grid axes management
+// [SEC-07-SLABS]    L2993-L3339: [TAG:STRUCT_SLABS] Slab correction & polygon editing
+// [SEC-08-POINTER]  L3340-L5740: [TAG:STRUCT_POINTER] Pointer gestures & interaction controller
+// [SEC-09-COMMITS]  L5741-L6282: [TAG:STRUCT_COMMITS] Element placement & commit logic
+// [SEC-10-UNDERLAY] L6283-L7126: [TAG:STRUCT_UNDERLAY] Underlay filtering & CAD settings
+// [SEC-11-STOREY]   L7127-L7363: [TAG:STRUCT_STOREY] Storey management & analysis dialogs
+// [SEC-12-APPBAR]   L7364-L7674: [TAG:STRUCT_APPBAR] AppBar & HUD action builders
+// [SEC-13-BUILD]    L7675-L8384: [TAG:STRUCT_BUILD] Main build method & viewport canvas
+// [SEC-14-DOCKS]    L8385-L9175: [TAG:STRUCT_DOCKS] Contextual bottom docks & action bars
 // ============================================================================
 
-// === SECTION: WIDGET DECLARATION & PUBLIC API ===
+// === SECTION: [SEC-01-WIDGET] WIDGET DECLARATION & PUBLIC API ===
 /// Main CAD/BIM Structural Designer workspace screen.
 /// Enables placing columns, shear walls, and slabs over DWG/DXF underlay,
 /// managing multi-storey buildings with ArchiCAD-like Trace Reference,
@@ -383,7 +387,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       );
     }
     if (!session.update(_duplicateContext, (axes) => BimAxisOperations.alignParallel(axes, updated),
-    )) return;
+    )) {
+      return;
+    }
     setState(() {
       _axisPreviewProject = _project.copyWithGridAxes(session.preview);
       _selectedGridAxis = updated;
@@ -3191,7 +3197,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       incomingDirection: incomingDirection,
           );
     // Preserve exact corners; perpendicular alignment beats nearest-edge snapping.
-    final exact = candidates.where((c) => c.type == DxfSnapType.endpoint || c.type == DxfSnapType.intersection,
+    final exact = candidates.where((c) => c.type == DxfSnapType.endpoint || c.type == DxfSnapType.intersection || c.type == DxfSnapType.apparentIntersection,
             ).toList()
       ..sort((a, b) => a.distance.compareTo(b.distance));
     if (exact.isNotEmpty) {
@@ -4737,7 +4743,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       point: point,
       type: switch (best.kind) {
         BimSnapKind.intersection => DxfSnapType.intersection,
+        BimSnapKind.apparentIntersection => DxfSnapType.apparentIntersection,
         BimSnapKind.midpoint => DxfSnapType.midpoint,
+        BimSnapKind.center => DxfSnapType.center,
+        BimSnapKind.quadrant => DxfSnapType.quadrant,
+        BimSnapKind.perpendicular => DxfSnapType.perpendicular,
         _ => DxfSnapType.endpoint,
       },
       distance: (point - cadPt).distance,

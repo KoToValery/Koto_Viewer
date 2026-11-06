@@ -62,7 +62,11 @@ class StructuralMeasurementSnap {
     candidates.sort((a, b) => a.distance.compareTo(b.distance));
     final exact = candidates.where(
       (c) =>
-          c.type == DxfSnapType.endpoint || c.type == DxfSnapType.intersection,
+          c.type == DxfSnapType.endpoint ||
+          c.type == DxfSnapType.intersection ||
+          c.type == DxfSnapType.apparentIntersection ||
+          c.type == DxfSnapType.quadrant ||
+          c.type == DxfSnapType.center,
     );
     if (exact.isNotEmpty) {
       final snap = exact.first;

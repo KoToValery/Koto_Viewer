@@ -190,7 +190,7 @@ void main() {
         entityStats: {'CIRCLE': 1},
       );
 
-      // Snap onto circle circumference at top (100, 150)
+      // Snap onto circle quadrant at top (100, 150)
       final snapCircleTop = DxfSnapHelper.findSnapPoint(
         document: doc,
         cadPoint: const Offset(100.0, 152.0),
@@ -199,7 +199,16 @@ void main() {
       expect(snapCircleTop, isNotNull);
       expect(snapCircleTop!.point.dx, closeTo(100.0, 1e-4));
       expect(snapCircleTop.point.dy, closeTo(150.0, 1e-4));
-      expect(snapCircleTop.type, DxfSnapType.nearest);
+      expect(snapCircleTop.type, DxfSnapType.quadrant);
+
+      // Snap onto arbitrary non-quadrant point on circle circumference (around 45°)
+      final snapCircleNearest = DxfSnapHelper.findSnapPoint(
+        document: doc,
+        cadPoint: const Offset(135.35, 137.35),
+        toleranceCad: 10.0,
+      );
+      expect(snapCircleNearest, isNotNull);
+      expect(snapCircleNearest!.type, DxfSnapType.nearest);
     });
 
     test('DxfSnapHelper geometric projection helper tests', () {

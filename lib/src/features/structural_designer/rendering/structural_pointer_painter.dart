@@ -439,8 +439,10 @@ class StructuralPointerPainter extends CustomPainter {
       final snapLabel = switch (snapType) {
         DxfSnapType.endpoint => l10n?.snapEndpoint,
         DxfSnapType.intersection => l10n?.snapIntersection,
+        DxfSnapType.apparentIntersection => l10n?.snapApparentIntersection,
         DxfSnapType.midpoint => l10n?.snapMidpoint,
         DxfSnapType.center => l10n?.snapCenter,
+        DxfSnapType.quadrant => l10n?.snapQuadrant,
         DxfSnapType.nearest => l10n?.snapNearest,
         DxfSnapType.perpendicular =>
           measurementParallel ? '∥' : l10n?.snapPerpendicular,

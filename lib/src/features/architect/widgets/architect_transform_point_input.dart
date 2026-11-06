@@ -166,7 +166,9 @@ class ArchitectTransformSnapPainter extends CustomPainter {
         'Endpoint' || 'Vertex' || 'Axis endpoint' => BimSnapGlyph.endpoint,
         'Midpoint' => BimSnapGlyph.midpoint,
         'Center' => BimSnapGlyph.center,
+        'Quadrant' => BimSnapGlyph.quadrant,
         'Intersection' || 'Axis intersection' => BimSnapGlyph.intersection,
+        'Apparent intersection' => BimSnapGlyph.apparentIntersection,
         'Perpendicular' => BimSnapGlyph.perpendicular,
         _ => BimSnapGlyph.nearest,
       }, color);

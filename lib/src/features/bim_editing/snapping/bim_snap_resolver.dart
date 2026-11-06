@@ -3,8 +3,10 @@ import 'dart:ui';
 enum BimSnapKind {
   endpoint(0),
   intersection(1),
+  apparentIntersection(1),
   center(2),
   midpoint(2),
+  quadrant(2),
   perpendicular(3),
   edge(4),
   alignment(5);

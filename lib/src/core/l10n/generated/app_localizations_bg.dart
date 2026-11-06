@@ -1072,6 +1072,12 @@ class AppLocalizationsBg extends AppLocalizations {
   String get snapCenter => 'Център';
 
   @override
+  String get snapQuadrant => 'Квадрант';
+
+  @override
+  String get snapApparentIntersection => 'Въображаемо пресичане';
+
+  @override
   String get snapNearest => 'Най-близка';
 
   @override

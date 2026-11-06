@@ -46,18 +46,22 @@ import '../structural_designer/services/structural_persistence_service.dart';
 import '../structural_designer/structural_designer_screen.dart';
 
 // ============================================================================
-// TABLE OF CONTENTS (grep: "=== SECTION:")
-// 1. === SECTION: WIDGET DECLARATION & PUBLIC API ===
-// 2. === SECTION: STATE & LIFECYCLE (LOAD, SETTINGS, TRANSFORM) ===
-// 3. === SECTION: MEASUREMENT CONTROLLER & SNAPPING ===
-// 4. === SECTION: ANNOTATIONS, EXPORT & AREA ACTIONS ===
-// 5. === SECTION: CANVAS GESTURES, MOUSE WHEEL & KEYBOARD ===
-// 6. === SECTION: FILE IMPORT, SHEETS & DIALOGS ===
-// 7. === SECTION: LAYOUT TABS & HUD BUILDERS ===
-// 8. === SECTION: MAIN BUILD METHOD & VIEWPORT CANVAS ===
+// MASTER DXF VIEWER SCREEN LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'dxf_viewer_screen.index.md' for full operations matrix.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-WIDGET]   L60-L84    : [TAG:DXF_WIDGET] DxfViewerScreen StatefulWidget & parameters
+// [SEC-02-STATE]    L85-L524   : [TAG:DXF_STATE] State variables, async DXF parsing & transforms
+// [SEC-03-MEASURE]  L525-L834  : [TAG:DXF_MEASURE] Distance measurement controller & snapping
+// [SEC-04-ACTIONS]  L835-L1157 : [TAG:DXF_ACTIONS] Area calculations, PDF export & screenshot
+// [SEC-05-GESTURES] L1158-L1446: [TAG:DXF_GESTURES] Pan/zoom, mouse wheel scaling & hotkeys
+// [SEC-06-DIALOGS]  L1447-L1730: [TAG:DXF_DIALOGS] Layer manager sheet, entity context dialogs
+// [SEC-07-HUD]      L1731-L2063: [TAG:DXF_HUD] Top bar, Layout/Model tabs & zoom extents HUD
+// [SEC-08-BUILD]    L2064-L2555: [TAG:DXF_BUILD] Main build method & interactive canvas viewport
 // ============================================================================
 
-// === SECTION: WIDGET DECLARATION & PUBLIC API ===
+// === SECTION: [SEC-01-WIDGET] WIDGET DECLARATION & PUBLIC API ===
 class DxfViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;

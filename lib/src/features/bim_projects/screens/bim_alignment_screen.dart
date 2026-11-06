@@ -1442,7 +1442,23 @@ class _ControlPointOverlayPainter extends CustomPainter {
         canvas.drawLine(p - const Offset(7, -7), p + const Offset(7, -7), snapPaint,
           );
         break;
-      case DxfSnapType.endpoint:
+        case DxfSnapType.apparentIntersection:
+          canvas.drawLine(
+            p - const Offset(7, 7),
+            p + const Offset(7, 7),
+            snapPaint,
+          );
+          canvas.drawLine(
+            p - const Offset(7, -7),
+            p + const Offset(7, -7),
+            snapPaint,
+          );
+          canvas.drawRect(
+            Rect.fromCenter(center: p, width: 10, height: 10),
+            snapPaint,
+          );
+          break;
+        case DxfSnapType.endpoint:
           canvas.drawRect(
             Rect.fromCenter(center: p, width: 14, height: 14),
             snapPaint,
@@ -1455,6 +1471,15 @@ class _ControlPointOverlayPainter extends CustomPainter {
             ..lineTo(p.dx - 8, p.dy + 7)
             ..close();
           canvas.drawPath(path, snapPaint);
+          break;
+        case DxfSnapType.quadrant:
+          final quadPath = Path()
+            ..moveTo(p.dx, p.dy - 8)
+            ..lineTo(p.dx + 8, p.dy)
+            ..lineTo(p.dx, p.dy + 8)
+            ..lineTo(p.dx - 8, p.dy)
+            ..close();
+          canvas.drawPath(quadPath, snapPaint);
           break;
         case DxfSnapType.center:
           canvas.drawCircle(p, 8, snapPaint);

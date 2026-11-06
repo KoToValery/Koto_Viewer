@@ -46,7 +46,9 @@ class ArchitectWallSnap {
             'Endpoint' || 'Vertex' || 'Axis endpoint' => 0,
             'Axis intersection' ||
             'Intersection' ||
+            'Apparent intersection' ||
             'Center' ||
+            'Quadrant' ||
             'Midpoint alignment' ||
             'Midpoint' => 1,
             _ => 3,

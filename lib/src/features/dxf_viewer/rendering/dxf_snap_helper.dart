@@ -8,8 +8,10 @@ import 'dxf_segment_snap.dart';
 enum DxfSnapType {
   endpoint(label: 'Endpoint'),
   intersection(label: 'Intersection'),
+  apparentIntersection(label: 'Apparent intersection'),
   midpoint(label: 'Midpoint'),
   center(label: 'Center'),
+  quadrant(label: 'Quadrant'),
   nearest(label: 'Nearest'),
   perpendicular(label: 'Perpendicular'),
   point(label: 'Point');
@@ -22,9 +24,11 @@ enum DxfSnapType {
 class DxfSnapResult {
   final Offset point;
   final DxfSnapType type;
+  final List<(Offset, Offset)> extensionGuides;
   final double distance;
 
   const DxfSnapResult({
+    this.extensionGuides = const [],
     required this.point,
     required this.type,
     required this.distance,
@@ -325,6 +329,10 @@ class DxfSnapHelper {
         testLandmark(entity.point, DxfSnapType.point);
       } else if (entity is DxfCircle) {
         testLandmark(entity.center, DxfSnapType.center);
+        testLandmark(Offset(entity.center.dx + entity.radius, entity.center.dy), DxfSnapType.quadrant);
+        testLandmark(Offset(entity.center.dx, entity.center.dy + entity.radius), DxfSnapType.quadrant);
+        testLandmark(Offset(entity.center.dx - entity.radius, entity.center.dy), DxfSnapType.quadrant);
+        testLandmark(Offset(entity.center.dx, entity.center.dy - entity.radius), DxfSnapType.quadrant);
         testCircleCurve(entity.center, entity.radius);
       } else if (entity is DxfArc) {
         testLandmark(entity.center, DxfSnapType.center);
@@ -350,6 +358,20 @@ class DxfSnapHelper {
         );
         testLandmark(pMid, DxfSnapType.midpoint);
 
+        for (final qDeg in const [0.0, 90.0, 180.0, 270.0]) {
+          double diff = (qDeg - entity.startAngleDeg) % 360.0;
+          if (diff < 0) diff += 360.0;
+          if (diff <= sweep + 1e-4) {
+            final qRad = qDeg * math.pi / 180.0;
+            testLandmark(
+              Offset(
+                entity.center.dx + entity.radius * math.cos(qRad),
+                entity.center.dy + entity.radius * math.sin(qRad),
+              ),
+              DxfSnapType.quadrant,
+            );
+          }
+        }
         testArcCurve(entity.center, entity.radius, entity.startAngleDeg, entity.endAngleDeg);
       } else if (entity is DxfEllipse) {
         testLandmark(entity.center, DxfSnapType.center);
@@ -492,7 +514,12 @@ class DxfSnapHelper {
             } else if (child is DxfCircle) {
               final c = transformPt(child.center);
               testLandmark(c, DxfSnapType.center);
-              testCircleCurve(c, child.radius * entity.scaleX.abs());
+              final r = child.radius * entity.scaleX.abs();
+              testLandmark(Offset(c.dx + r, c.dy), DxfSnapType.quadrant);
+              testLandmark(Offset(c.dx, c.dy + r), DxfSnapType.quadrant);
+              testLandmark(Offset(c.dx - r, c.dy), DxfSnapType.quadrant);
+              testLandmark(Offset(c.dx, c.dy - r), DxfSnapType.quadrant);
+              testCircleCurve(c, r);
             } else if (child is DxfArc) {
               final c = transformPt(child.center);
               testLandmark(c, DxfSnapType.center);
@@ -514,6 +541,19 @@ class DxfSnapHelper {
       if (intersection != null) {
         return DxfSnapResult(point: intersection, type: DxfSnapType.intersection,
           distance: (intersection-cadPoint).distance);
+      }
+      final ext = DxfSegmentSnap.nearestExtendedIntersection(
+        document: document, point: cadPoint, tolerance: toleranceCad);
+      if (ext != null && (bestEndpointSnap == null || bestEndpointSnap!.distance > (ext.point - cadPoint).distance)) {
+        return DxfSnapResult(
+          point: ext.point,
+          type: DxfSnapType.apparentIntersection,
+          distance: (ext.point - cadPoint).distance,
+          extensionGuides: [
+            if (ext.guide1 != null) ext.guide1!,
+            if (ext.guide2 != null) ext.guide2!,
+          ],
+        );
       }
     }
 

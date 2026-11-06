@@ -325,42 +325,34 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 
 
 // ============================================================================
-
-// TABLE OF CONTENTS (grep: "=== SECTION:")
-
-// 1.  === SECTION: WIDGET DECLARATION & PUBLIC API ===
-
-// 2.  === SECTION: STATE & TOOL CONTROLLERS ===
-
-// 3.  === SECTION: COORDINATE TRANSFORMS (SCREEN <-> MODEL) ===
-
-// 4.  === SECTION: 2D POINTER & TOUCH HANDLING (TOOL INPUT FROM ARCHITECT VIEWPORT) ===
-
-// 5.  === SECTION: ZONE EDITING & MUTATION HANDLERS ===
-
-// 6.  === SECTION: WALL & DOOR CONCEPT DRAFTING ===
-
-// 7.  === SECTION: WALL SPLIT, SURFACE DETECTION & CLEARANCES ===
-
-// 8.  === SECTION: FENESTRATION (DOORS, WINDOWS) & RADIAL ACTIONS ===
-
-// 9.  === SECTION: SELECTION ACTIONS, BARS & TOOLBARS ===
-
-// 10. === SECTION: DYNAMIC GRID AXES ACTIONS ===
-
-// 11. === SECTION: MAIN BUILD METHOD & WORKSPACE LAYOUT ===
-
-// 12. === SECTION: DIAGNOSTIC LOGS DIALOG (ARCHITECT LOGGER) ===
-
-// 13. === SECTION: 2D CANVAS VIEWPORT (LAYERED MODEL SPACE) ===
-
-// 14. === SECTION: 3D SOLID VIEWPORT ===
-
+// MASTER ARCHITECT WORKSPACE LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'architect_workspace_screen.index.md' for full method index & architecture.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-WIDGET]  L363-L434    : [TAG:WIDGET_API] Screen Widget Declaration & Public API
+// [SEC-02-STATE]   L435-L6794   : [TAG:STATE_CORE] State declarations, controllers, tool caches & lifecycle
+//   ↳ [SUB-02A]    L437-L3000   : [TAG:STATE_FIELDS] Active tool flags, drafting caches, preview points
+//   ↳ [SUB-02B]    L3001-L5500  : [TAG:STATE_PRESETS] Wall/opening style caches, command controllers
+//   ↳ [SUB-02C]    L6540-L6794  : [TAG:STATE_LIFECYCLE] initState(), _initTransform(), dispose()
+// [SEC-03-XFORM]   L6795-L7020  : [TAG:XFORM_COORDS] Coordinate transforms (_screenToModel, _modelToScreen, hit tests)
+// [SEC-04-TOUCH]   L7021-L13444 : [TAG:TOUCH_INPUT] 2D Pointer & touch handling for all 23 tools
+//   ↳ [SUB-04A]    L7025-L8042  : [TAG:TOUCH_DOWN] _onPointerDown: drag initiation, tool start, hit checks
+//   ↳ [SUB-04B]    L8043-L10561 : [TAG:TOUCH_MOVE] _onPointerMove: hover preview, rubber-banding, snaps
+//   ↳ [SUB-04C]    L10576-L13444: [TAG:TOUCH_UP] _onPointerUp: tool commits, geometry insertion, history
+// [SEC-05-ZONES]   L13445-L13949: [TAG:ZONE_LOGIC] Zone editing, finish presets, room schedule dialogs
+// [SEC-06-WALLS]   L13950-L14463: [TAG:WALL_DRAFT] Wall concept drafting, segment chain grouping, commit
+// [SEC-07-SPLIT]   L14464-L17225: [TAG:WALL_SPLIT] Wall split, cut sessions, clearance detection, corner joints
+// [SEC-08-FENEST]  L17226-L22439: [TAG:FENEST_RADIAL] Doors, windows, vitrines, radial actions menu, opening hover
+// [SEC-09-SELECT]  L22440-L25613: [TAG:SELECTION_BAR] Selection HUD action bars, layer dialogs, thickness editors
+// [SEC-10-GRIDS]   L25614-L25927: [TAG:GRID_AXIS] Dynamic grid axis offsets, resequence, alignments
+// [SEC-11-LAYOUT]  L25928-L27747: [TAG:BUILD_LAYOUT] Build layout: Scaffold, HUD bars, sheets, 2D/3D toggle
+// [SEC-12-LOGS]    L27748-L27955: [TAG:LOGGER_UI] Diagnostic logs modal dialog (_showDebugLogsDialog)
+// [SEC-13-VIEW2D]  L27956-L31249: [TAG:CANVAS_2D] 2D Canvas Viewport, CustomPainter dispatch, draft overlays
+// [SEC-14-VIEW3D]  L31250-L31298: [TAG:VIEW_3D] 3D solid rendering viewport & preview painter
 // ============================================================================
 
-
-
-// === SECTION: WIDGET DECLARATION & PUBLIC API ===
+// === SECTION: [SEC-01-WIDGET] WIDGET DECLARATION & PUBLIC API ===
 
 /// The primary unified workspace for architectural concept drafting in 2D and 3D.
 
@@ -432,7 +424,8 @@ class _ArchitectSurfaceHit {
 
 
 
-// === SECTION: STATE & TOOL CONTROLLERS ===
+// === SECTION: [SEC-02-STATE] STATE & TOOL CONTROLLERS ===
+// --- SUBSECTION: [TAG:STATE_FIELDS] State Declarations & Tool Flags ---
 
 class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
@@ -6535,6 +6528,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  // --- SUBSECTION: [TAG:STATE_LIFECYCLE] Lifecycle: initState & dispose ---
   @override
 
   void initState() {
@@ -6792,7 +6786,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  // === SECTION: COORDINATE TRANSFORMS (SCREEN <-> MODEL) ===
+  // === SECTION: [SEC-03-XFORM] COORDINATE TRANSFORMS (SCREEN <-> MODEL) ===
+  // --- SUBSECTION: [TAG:XFORM_COORDS] Screen <-> Model Space & Snapping ---
 
 
 
@@ -7018,7 +7013,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  // === SECTION: 2D POINTER & TOUCH HANDLING (TOOL INPUT FROM ARCHITECT VIEWPORT) ===
+  // === SECTION: [SEC-04-TOUCH] 2D POINTER & TOUCH HANDLING (TOOL INPUT FROM ARCHITECT VIEWPORT) ===
+  // --- SUBSECTION: [TAG:TOUCH_DOWN] _onPointerDown Input Dispatch ---
 
 
 
@@ -8040,6 +8036,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  // --- SUBSECTION: [TAG:TOUCH_MOVE] _onPointerMove Input Dispatch & Previews ---
   void _onPointerMove(PointerMoveEvent event) {
     if (_commandReady) return;
     if (_interactionMode == ArchitectInteractionMode.navigation && !_terrainDrafting) return;
@@ -10338,8 +10335,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         snap.snapLabel == 'Midpoint alignment';
 
     final objectSnap = snap.isSnapped && const {
-      'Endpoint', 'Vertex', 'Intersection', 'Axis endpoint',
-      'Axis intersection', 'Center', 'Midpoint',
+      'Endpoint', 'Vertex', 'Intersection', 'Apparent intersection', 'Axis endpoint',
+      'Axis intersection', 'Center', 'Midpoint', 'Quadrant',
     }.contains(snap.snapLabel);
     final closesDraft = isPolyMode && points.length >= 3 &&
         (raw - points.first).distance <= math.min(18 / _currentScale, 0.35);
@@ -10573,6 +10570,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  // --- SUBSECTION: [TAG:TOUCH_UP] _onPointerUp Input Dispatch & Tool Commits ---
   void _onPointerUp(PointerUpEvent event) {
     if (_commandReady) return;
     if (_interactionMode == ArchitectInteractionMode.navigation && !_terrainDrafting) {
@@ -13442,7 +13440,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  // === SECTION: ZONE EDITING & MUTATION HANDLERS ===
+  // === SECTION: [SEC-05-ZONES] ZONE EDITING & MUTATION HANDLERS ===
+  // --- SUBSECTION: [TAG:ZONE_LOGIC] Zone Updates, Schedules & Presets ---
 
 
 
@@ -13947,7 +13946,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  // === SECTION: WALL & DOOR CONCEPT DRAFTING ===
+  // === SECTION: [SEC-06-WALLS] WALL & DOOR CONCEPT DRAFTING ===
+  // --- SUBSECTION: [TAG:WALL_DRAFT] Wall Concept Drafting & Chain Grouping ---
 
 
 
@@ -14461,7 +14461,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  // === SECTION: WALL SPLIT, SURFACE DETECTION & CLEARANCES ===
+  // === SECTION: [SEC-07-SPLIT] WALL SPLIT, SURFACE DETECTION & CLEARANCES ===
+  // --- SUBSECTION: [TAG:WALL_SPLIT] Wall Splitting, Cut Sessions & Clearances ---
 
   void _startCutSession(Set<String> wallIds) {
     _beginGeometryCommand(ArchitectRadialAction.cut);
@@ -17223,7 +17224,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  // === SECTION: FENESTRATION (DOORS, WINDOWS) & RADIAL ACTIONS ===
+  // === SECTION: [SEC-08-FENEST] FENESTRATION (DOORS, WINDOWS) & RADIAL ACTIONS ===
+  // --- SUBSECTION: [TAG:FENEST_RADIAL] Door/Window Placement & Radial Context Menus ---
 
 
 
@@ -22437,7 +22439,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  // === SECTION: SELECTION ACTIONS, BARS & TOOLBARS ===
+  // === SECTION: [SEC-09-SELECT] SELECTION ACTIONS, BARS & TOOLBARS ===
+  // --- SUBSECTION: [TAG:SELECTION_BAR] Selection HUD, Action Bars & Layer Modals ---
 
 
 
@@ -25611,7 +25614,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  // === SECTION: DYNAMIC GRID AXES ACTIONS ===
+  // === SECTION: [SEC-10-GRIDS] DYNAMIC GRID AXES ACTIONS ===
+  // --- SUBSECTION: [TAG:GRID_AXIS] Grid Axes Alignments, Offsets & Numbering ---
 
 
 
@@ -25925,7 +25929,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  // === SECTION: MAIN BUILD METHOD & WORKSPACE LAYOUT ===
+  // === SECTION: [SEC-11-LAYOUT] MAIN BUILD METHOD & WORKSPACE LAYOUT ===
+  // --- SUBSECTION: [TAG:BUILD_LAYOUT] Scaffold, Top/Bottom Bars & Sheet Panels ---
 
 
 
@@ -27745,7 +27750,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  // === SECTION: DIAGNOSTIC LOGS DIALOG (ARCHITECT LOGGER) ===
+  // === SECTION: [SEC-12-LOGS] DIAGNOSTIC LOGS DIALOG (ARCHITECT LOGGER) ===
+  // --- SUBSECTION: [TAG:LOGGER_UI] Diagnostic Logger Dialog Modal ---
 
 
 
@@ -27953,7 +27959,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  // === SECTION: 2D CANVAS VIEWPORT (LAYERED MODEL SPACE) ===
+  // === SECTION: [SEC-13-VIEW2D] 2D CANVAS VIEWPORT (LAYERED MODEL SPACE) ===
+  // --- SUBSECTION: [TAG:CANVAS_2D] 2D CustomPainter Canvas, Viewport & Draft Overlays ---
 
 
 
@@ -28791,9 +28798,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                               'Axis intersection' => DxfSnapType.intersection,
 
+                              'Apparent intersection' => DxfSnapType.apparentIntersection,
+
                               'Midpoint' => DxfSnapType.midpoint,
 
                               'Center' => DxfSnapType.center,
+                              'Quadrant' => DxfSnapType.quadrant,
 
                               'Perpendicular' => DxfSnapType.perpendicular,
 
@@ -30767,8 +30777,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       'Midpoint alignment' => l10n.snapMidpointAlignment,
 
       'Center' => l10n.snapCenter,
+      'Quadrant' => l10n.snapQuadrant,
 
       'Intersection' || 'Axis intersection' => l10n.snapIntersection,
+
+      'Apparent intersection' => l10n.snapApparentIntersection,
 
       'Edge' => l10n.snapNearest,
 
@@ -31247,7 +31260,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  // === SECTION: 3D SOLID VIEWPORT ===
+  // === SECTION: [SEC-14-VIEW3D] 3D SOLID VIEWPORT ===
+  // --- SUBSECTION: [TAG:VIEW_3D] 3D Solid Viewport & Publication Preview ---
 
 
 

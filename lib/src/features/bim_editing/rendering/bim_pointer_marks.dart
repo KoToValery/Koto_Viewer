@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 enum BimSnapGlyph {
   endpoint,
   intersection,
+  apparentIntersection,
   midpoint,
   center,
+  quadrant,
   nearest,
   perpendicular,
   point,
@@ -167,6 +169,26 @@ class BimPointerMarks {
           snapPaint,
         );
         break;
+      case BimSnapGlyph.apparentIntersection:
+        canvas.drawLine(
+          pos - const Offset(7, 7),
+          pos + const Offset(7, 7),
+          snapPaint,
+        );
+        canvas.drawLine(
+          pos - const Offset(7, -7),
+          pos + const Offset(7, -7),
+          snapPaint,
+        );
+        const double b = 5.0;
+        canvas.drawRect(
+          Rect.fromCenter(center: pos, width: b * 2, height: b * 2),
+          Paint()
+            ..color = color.withValues(alpha: 0.6)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.0,
+        );
+        break;
       case BimSnapGlyph.endpoint:
         canvas.drawRect(
           Rect.fromCenter(center: pos, width: s * 2, height: s * 2),
@@ -178,6 +200,15 @@ class BimPointerMarks {
           ..moveTo(pos.dx, pos.dy - s)
           ..lineTo(pos.dx + s, pos.dy + s)
           ..lineTo(pos.dx - s, pos.dy + s)
+          ..close();
+        canvas.drawPath(path, snapPaint);
+        break;
+      case BimSnapGlyph.quadrant:
+        final path = Path()
+          ..moveTo(pos.dx, pos.dy - s)
+          ..lineTo(pos.dx + s, pos.dy)
+          ..lineTo(pos.dx, pos.dy + s)
+          ..lineTo(pos.dx - s, pos.dy)
           ..close();
         canvas.drawPath(path, snapPaint);
         break;

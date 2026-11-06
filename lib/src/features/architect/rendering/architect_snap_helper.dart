@@ -102,8 +102,10 @@ class ArchitectSnapHelper {
     'Door jamb' ||
     'Window jamb' => BimSnapKind.endpoint,
     'Intersection' || 'Axis intersection' => BimSnapKind.intersection,
+    'Apparent intersection' => BimSnapKind.apparentIntersection,
     'Center' => BimSnapKind.center,
     'Midpoint' => BimSnapKind.midpoint,
+    'Quadrant' => BimSnapKind.quadrant,
     'Perpendicular' => BimSnapKind.perpendicular,
     'Alignment' => BimSnapKind.alignment,
     'Midpoint alignment' => BimSnapKind.alignment,
@@ -293,6 +295,70 @@ class ArchitectSnapHelper {
         if (p != null) consider(p, 'Intersection');
       }
     }
+    final apparentGuides = <Offset, List<(Offset, Offset)>>{};
+    const maxExtension = 20.0;
+    final extendedCandidates = <({Offset a, Offset b, String owner})>[];
+    for (final edge in geometry.nearbyEdges(raw, maxExtension)) {
+      if (excluded(edge.owner) ||
+          edge.owner == '@wall-joints' ||
+          edge.owner == '@wall-face-joints') {
+        continue;
+      }
+      final u = edge.b - edge.a;
+      final lenSq = u.dx * u.dx + u.dy * u.dy;
+      if (lenSq < 1e-8) continue;
+      final cross = ((raw.dx - edge.a.dx) * u.dy - (raw.dy - edge.a.dy) * u.dx).abs();
+      if (cross * cross <= radius * radius * lenSq) {
+        extendedCandidates.add((a: edge.a, b: edge.b, owner: edge.owner));
+      }
+    }
+    if (underlay != null && includedIds == null) {
+      final cadTolerance = radius * frame.unitsPerMeter;
+      final cadMaxExt = maxExtension * frame.unitsPerMeter;
+      final cadRaw = frame.toCad(raw);
+      var dxfIdx = 0;
+      for (final e in DxfSegmentSnap.nearby(
+        document: underlay,
+        point: cadRaw,
+        radius: cadMaxExt,
+        layerVisibility: visibility,
+      )) {
+        final u = e.$2 - e.$1;
+        final lenSq = u.dx * u.dx + u.dy * u.dy;
+        if (lenSq < 1e-8) continue;
+        final cross = ((cadRaw.dx - e.$1.dx) * u.dy - (cadRaw.dy - e.$1.dy) * u.dx).abs();
+        if (cross * cross <= cadTolerance * cadTolerance * lenSq) {
+          extendedCandidates.add((
+            a: frame.toModel(e.$1),
+            b: frame.toModel(e.$2),
+            owner: '@dxf:${dxfIdx++}',
+          ));
+        }
+      }
+    }
+    String elementId(String owner) =>
+        owner.startsWith('@wall-axis:') ? owner.substring(11) : owner;
+    for (var i = 0; i < extendedCandidates.length; i++) {
+      final e1 = extendedCandidates[i];
+      final id1 = elementId(e1.owner);
+      for (var j = i + 1; j < extendedCandidates.length; j++) {
+        final e2 = extendedCandidates[j];
+        final id2 = elementId(e2.owner);
+        if (id1 == id2) continue;
+        final ext = DxfSegmentSnap.extendedIntersection(
+          (e1.a, e1.b),
+          (e2.a, e2.b),
+          maxExtension: maxExtension,
+        );
+        if (ext != null && (ext.point - raw).distance <= radius) {
+          apparentGuides[ext.point] = [
+            if (ext.guide1 != null) ext.guide1!,
+            if (ext.guide2 != null) ext.guide2!,
+          ];
+          consider(ext.point, 'Apparent intersection');
+        }
+      }
+    }
     final circles = geometry
         .nearbyCircles(raw, radius)
         .where(
@@ -348,11 +414,17 @@ class ArchitectSnapHelper {
     }
     final best = intersections.best ?? resolver.best;
     if (best != null) {
+      final guides = <(Offset, Offset)>[];
+      if (anchor != null) guides.add((anchor, best.point));
+      if (best.source == 'Apparent intersection' &&
+          apparentGuides.containsKey(best.point)) {
+        guides.addAll(apparentGuides[best.point]!);
+      }
       return ArchitectSnapResult(
         point: best.point,
         isSnapped: true,
         snapLabel: best.source,
-        magneticGuides: anchor == null ? [] : [(anchor, best.point)],
+        magneticGuides: guides,
       );
     }
     final tracked = ArchitectMidpointTracking.align(

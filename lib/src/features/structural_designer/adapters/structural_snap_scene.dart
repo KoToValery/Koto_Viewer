@@ -64,9 +64,22 @@ class StructuralSnapScene {
       }
       // Construction deliberately snaps columns only at their corners.
       for (final column in floor.columns) {
-        for (final vertex in column.polygonVertices) {
+        if (column.shape == ColumnShape.circular) {
+          final r = column.width / 2.0;
+          for (final u in const [
+            Offset(1, 0),
+            Offset(0, 1),
+            Offset(-1, 0),
+            Offset(0, -1),
+          ]) {
+            point(column.center + u * r, BimSnapKind.quadrant, column.id);
+          }
+          point(column.center, BimSnapKind.center, column.id);
+        } else {
+          for (final vertex in column.polygonVertices) {
           point(vertex, BimSnapKind.endpoint, column.id);
         }
+      }
       }
       for (final wall in floor.shearWalls) {
         point(wall.start, BimSnapKind.endpoint, wall.id);

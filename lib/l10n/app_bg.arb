@@ -316,6 +316,8 @@
   "snapOpeningCenter": "Център на отвор",
   "snapModuleStep": "Модулна стъпка",
   "snapCenter": "Център",
+  "snapQuadrant": "Квадрант",
+  "snapApparentIntersection": "Въображаемо пресичане",
   "snapNearest": "Най-близка",
   "snapPerpendicular": "Перпендикуляр",
   "snapPoint": "Точка",

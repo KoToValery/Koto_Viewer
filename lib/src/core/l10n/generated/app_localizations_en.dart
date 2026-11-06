@@ -1067,6 +1067,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get snapCenter => 'Center';
 
   @override
+  String get snapQuadrant => 'Quadrant';
+
+  @override
+  String get snapApparentIntersection => 'Apparent intersection';
+
+  @override
   String get snapNearest => 'Nearest';
 
   @override

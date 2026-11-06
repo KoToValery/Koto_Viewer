@@ -154,6 +154,11 @@ class DxfMeasurePointerPainter extends CustomPainter {
         canvas.drawLine(pos - const Offset(7, 7), pos + const Offset(7, 7), snapLinePaint);
         canvas.drawLine(pos - const Offset(7, -7), pos + const Offset(7, -7), snapLinePaint);
         break;
+      case DxfSnapType.apparentIntersection:
+        canvas.drawLine(pos - const Offset(7, 7), pos + const Offset(7, 7), snapLinePaint);
+        canvas.drawLine(pos - const Offset(7, -7), pos + const Offset(7, -7), snapLinePaint);
+        canvas.drawRect(Rect.fromCenter(center: pos, width: 9, height: 9), snapLinePaint);
+        break;
       case DxfSnapType.endpoint:
       case DxfSnapType.point:
         // Diamond ◇
@@ -183,6 +188,18 @@ class DxfMeasurePointerPainter extends CustomPainter {
         canvas.drawCircle(pos, snapSize, snapHaloPaint);
         canvas.drawCircle(pos, snapSize, snapLinePaint);
         canvas.drawCircle(pos, 2.5, Paint()..color = const Color(0xFF00E5FF)..style = PaintingStyle.fill);
+        break;
+
+      case DxfSnapType.quadrant:
+        // Diamond ◇ (Classic CAD Quadrant indicator)
+        final quadDiamond = Path()
+          ..moveTo(pos.dx, pos.dy - snapSize)
+          ..lineTo(pos.dx + snapSize, pos.dy)
+          ..lineTo(pos.dx, pos.dy + snapSize)
+          ..lineTo(pos.dx - snapSize, pos.dy)
+          ..close();
+        canvas.drawPath(quadDiamond, snapHaloPaint);
+        canvas.drawPath(quadDiamond, snapLinePaint);
         break;
 
       case DxfSnapType.nearest:
@@ -223,7 +240,10 @@ class DxfMeasurePointerPainter extends CustomPainter {
         case DxfSnapType.intersection:
           titleText += ' • Intersection';
           break;
-        case DxfSnapType.endpoint:
+        case DxfSnapType.apparentIntersection:
+          titleText += ' • Apparent Intersection';
+          break;
+      case DxfSnapType.endpoint:
           titleText += ' • Endpoint';
           break;
         case DxfSnapType.midpoint:
@@ -231,6 +251,9 @@ class DxfMeasurePointerPainter extends CustomPainter {
           break;
         case DxfSnapType.center:
           titleText += ' • Center';
+          break;
+        case DxfSnapType.quadrant:
+          titleText += ' • Quadrant';
           break;
         case DxfSnapType.point:
           titleText += ' • Node';

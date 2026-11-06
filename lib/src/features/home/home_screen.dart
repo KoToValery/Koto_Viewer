@@ -25,18 +25,22 @@ import '../bim_projects/bim_project_library_screen.dart';
 import '../architect/screens/architect_workspace_screen.dart';
 
 // ============================================================================
-// TABLE OF CONTENTS (grep: "=== SECTION:")
-// 1. === SECTION: FILE TYPE ICONS & BADGES ===
-// 2. === SECTION: HOME SCREEN WIDGET DECLARATION ===
-// 3. === SECTION: STATE & FILE SCANNING LOGIC ===
-// 4. === SECTION: FOLDER PICKING & DIRECTORY MANAGEMENT ===
-// 5. === SECTION: FILE ACTIONS & NAVIGATION ===
-// 6. === SECTION: DIALOGS (DONATION, ABOUT, SETTINGS) ===
-// 7. === SECTION: HEADER, CATEGORIES & SEARCH BAR ===
-// 8. === SECTION: MAIN BUILD & FILE LIST VIEW ===
+// MASTER HOME SCREEN LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'home_screen.index.md' for full navigation & routing matrix.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-ICONS]   L39-L1635  : [TAG:HOME_ICONS] File type icons, badges & format previews
+// [SEC-02-WIDGET]  L1636-L1650: [TAG:HOME_WIDGET] HomeScreen StatefulWidget declaration
+// [SEC-03-STATE]   L1651-L1749: [TAG:HOME_STATE] State variables, file scanning & directory cache
+// [SEC-04-FOLDERS] L1750-L2046: [TAG:HOME_FOLDERS] Folder picker & directory management
+// [SEC-05-ACTIONS] L2047-L2230: [TAG:HOME_ACTIONS] File opening actions & viewer navigation
+// [SEC-06-DIALOGS] L2231-L2572: [TAG:HOME_DIALOGS] Settings, donation, app info dialogs
+// [SEC-07-HEADER]  L2573-L3064: [TAG:HOME_HEADER] Top header, search bar & category filters
+// [SEC-08-BUILD]   L3065-L3691: [TAG:HOME_BUILD] Main build method, file list/grid & empty states
 // ============================================================================
 
-// === SECTION: FILE TYPE ICONS & BADGES ===
+// === SECTION: [SEC-01-ICONS] FILE TYPE ICONS & BADGES ===
 class FileTypeIcon extends StatelessWidget {
   final KotoFileType type;
   final double width;

@@ -1963,6 +1963,18 @@ abstract class AppLocalizations {
   /// **'Center'**
   String get snapCenter;
 
+  /// Snap type quadrant (0°, 90°, 180°, 270° on circle or arc)
+  ///
+  /// In en, this message translates to:
+  /// **'Quadrant'**
+  String get snapQuadrant;
+
+  /// Snap type apparent or extended intersection of two lines
+  ///
+  /// In en, this message translates to:
+  /// **'Apparent intersection'**
+  String get snapApparentIntersection;
+
   /// Snap type nearest
   ///
   /// In en, this message translates to:

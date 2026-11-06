@@ -10,20 +10,24 @@ import 'dxf_math.dart';
 import 'dxf_snap_helper.dart';
 
 // ============================================================================
-// TABLE OF CONTENTS (grep: "=== SECTION:")
-// 1.  === SECTION: ENUMS & PAINT STATS MODELS ===
-// 2.  === SECTION: PAINTER DECLARATION & MAIN PAINT LOOP ===
-// 3.  === SECTION: CANVAS & STROKE DRAWING HELPERS ===
-// 4.  === SECTION: BASIC GEOMETRIC ENTITIES (LINES, ARCS, POLYLINES, SPLINES) ===
-// 5.  === SECTION: TEXT & MULTILINE TEXT RENDERING ===
-// 6.  === SECTION: SOLIDS, HATCHES & PATTERN FILLS ===
-// 7.  === SECTION: BLOCKS & INSERT ENTITIES ===
-// 8.  === SECTION: DIMENSIONS, LEADERS & ARROWHEADS ===
-// 9.  === SECTION: SNAPPING, HIGHLIGHTS & ANNOTATIONS ===
-// 10. === SECTION: MEASUREMENT TOOLS & BADGES ===
+// MASTER DXF PAINTER LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'dxf_painter.index.md' for full entity render directory.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-ENUMS]    L26-L140   : [TAG:PAINTER_ENUMS] Enums, theme presets & paint stats models
+// [SEC-02-LOOP]     L141-L748  : [TAG:PAINTER_LOOP] DxfPainter declaration & main paint loop
+// [SEC-03-STROKES]  L749-L874  : [TAG:PAINTER_STROKES] Canvas & stroke drawing helpers, pen colors
+// [SEC-04-GEOMETRY] L875-L1472 : [TAG:PAINTER_GEOM] Lines, arcs, circles, polylines, splines
+// [SEC-05-TEXT]     L1473-L1808: [TAG:PAINTER_TEXT] Single-line TEXT & multiline MTEXT rendering
+// [SEC-06-HATCH]    L1809-L2157: [TAG:PAINTER_HATCH] Solids, hatches & pattern fills
+// [SEC-07-BLOCKS]   L2158-L2342: [TAG:PAINTER_BLOCKS] Blocks & INSERT entities expansion
+// [SEC-08-DIMS]     L2343-L2978: [TAG:PAINTER_DIMS] Dimensions, leaders & arrowheads
+// [SEC-09-SNAPS]    L2979-L3091: [TAG:PAINTER_SNAPS] Snapping, magnetic highlights & annotations
+// [SEC-10-MEASURE]  L3092-L3835: [TAG:PAINTER_MEASURE] Interactive measurement tools & badges
 // ============================================================================
 
-// === SECTION: ENUMS & PAINT STATS MODELS ===
+// === SECTION: [SEC-01-ENUMS] ENUMS & PAINT STATS MODELS ===
 /// Theme presets for the CAD viewer background.
 enum DxfCanvasTheme {
   darkCad(
@@ -3003,6 +3007,11 @@ class DxfPainter extends CustomPainter {
         canvas.drawLine(pos - Offset(size, size), pos + Offset(size, size), markerPaint);
         canvas.drawLine(pos - Offset(size, -size), pos + Offset(size, -size), markerPaint);
         break;
+      case DxfSnapType.apparentIntersection:
+        canvas.drawLine(pos - Offset(size, size), pos + Offset(size, size), markerPaint);
+        canvas.drawLine(pos - Offset(size, -size), pos + Offset(size, -size), markerPaint);
+        canvas.drawRect(Rect.fromCenter(center: pos, width: size * 1.2, height: size * 1.2), markerPaint);
+        break;
       case DxfSnapType.endpoint:
       case DxfSnapType.point:
         // Diamond marker ◇
@@ -3033,6 +3042,18 @@ class DxfPainter extends CustomPainter {
         canvas.drawCircle(pos, size * 0.85, markerPaint);
         break;
 
+      case DxfSnapType.quadrant:
+        // Diamond marker ◇
+        final quadPath = Path()
+          ..moveTo(pos.dx, pos.dy - size)
+          ..lineTo(pos.dx + size, pos.dy)
+          ..lineTo(pos.dx, pos.dy + size)
+          ..lineTo(pos.dx - size, pos.dy)
+          ..close();
+        canvas.drawPath(quadPath, fillPaint);
+        canvas.drawPath(quadPath, markerPaint);
+        break;
+
       case DxfSnapType.nearest:
         // Hourglass marker ⧖
         final double s = size * 0.75;
@@ -3060,6 +3081,23 @@ class DxfPainter extends CustomPainter {
         canvas.drawPath(path, fillPaint);
         canvas.drawPath(path, markerPaint);
         break;
+    }
+
+    if (snap.extensionGuides.isNotEmpty) {
+      final guidePaint = Paint()
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.75)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeW;
+      for (final guide in snap.extensionGuides) {
+        final p1 = toCanvas(guide.$1);
+        final p2 = toCanvas(guide.$2);
+        final path = DxfLinetypeHelper.createDashedLine(
+          p1,
+          p2,
+          [6.0 / scale, 4.0 / scale],
+        );
+        canvas.drawPath(path, guidePaint);
+      }
     }
   }
 
