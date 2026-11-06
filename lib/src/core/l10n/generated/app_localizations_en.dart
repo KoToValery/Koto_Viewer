@@ -11633,4 +11633,121 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectLayerDrainage => 'Site & Drainage';
+
+  @override
+  String get architectFindAndSelect => 'Find & Select';
+
+  @override
+  String get architectFindAndSelectHelp =>
+      'Filter elements by criteria across storeys and batch modify properties';
+
+  @override
+  String get architectScopeAllStoreys => 'All storeys';
+
+  @override
+  String get architectScopeActiveStorey => 'Active storey';
+
+  @override
+  String get architectScopeSpecificStorey => 'Specific storey';
+
+  @override
+  String get architectSampleFromSelection => 'Pick from selected';
+
+  @override
+  String get architectSampleFromSelectionTooltip =>
+      'Populate criteria matching the currently selected element';
+
+  @override
+  String get architectFilterCriteria => 'Criteria';
+
+  @override
+  String architectFilterMatchesCount(int count, int storeys) {
+    String _temp0 = intl.Intl.pluralLogic(
+      storeys,
+      locale: localeName,
+      other: '$storeys storeys',
+      one: '1 storey',
+    );
+    return '$count elements found ($_temp0)';
+  }
+
+  @override
+  String architectFilterMatchesSimple(int count) {
+    return '$count matching elements';
+  }
+
+  @override
+  String get architectBatchModify => 'Batch Modify';
+
+  @override
+  String architectBatchModifyApply(int count) {
+    return 'Apply changes to $count elements';
+  }
+
+  @override
+  String get architectSkinOnly => 'Keep current dimensions (Skin only)';
+
+  @override
+  String get architectSkinOnlyDesc =>
+      'Applies new raster/skin without altering opening width, height, or sill';
+
+  @override
+  String get architectTargetRasterStyle => 'New raster / style';
+
+  @override
+  String get architectCreateCustomRaster => 'Design custom raster...';
+
+  @override
+  String get architectChangeDimensions => 'Change dimensions';
+
+  @override
+  String get architectChangeSpecId => 'Change specification mark';
+
+  @override
+  String get architectNewWidth => 'New width';
+
+  @override
+  String get architectNewHeight => 'New height';
+
+  @override
+  String get architectNewSillHeight => 'New sill height';
+
+  @override
+  String get architectNewSpecId => 'New mark (spec ID)';
+
+  @override
+  String get architectSelectMatching => 'Select on current storey';
+
+  @override
+  String get architectSwitchStoreyAndSelect => 'Go to storey & select';
+
+  @override
+  String get architectOperatorExact => 'Equal (=)';
+
+  @override
+  String get architectOperatorGreater => 'Greater (>)';
+
+  @override
+  String get architectOperatorLess => 'Less (<)';
+
+  @override
+  String get architectOperatorAny => 'Any';
+
+  @override
+  String get architectFilterAnyStyle => 'Any raster / style';
+
+  @override
+  String architectBatchModifySuccess(int count, int storeys) {
+    String _temp0 = intl.Intl.pluralLogic(
+      storeys,
+      locale: localeName,
+      other: '$storeys storeys',
+      one: '1 storey',
+    );
+    return 'Successfully modified $count elements across $_temp0';
+  }
+
+  @override
+  String get architectPreserveDimensionsTooltip =>
+      'Keep existing dimensions when changing style';
 }

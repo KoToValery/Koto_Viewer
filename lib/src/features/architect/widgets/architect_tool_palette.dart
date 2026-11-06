@@ -36,6 +36,7 @@ class ArchitectToolPalette extends StatefulWidget {
   final ArchitectTool? selectionTool;
   final VoidCallback? onDrawSelection;
   final VoidCallback? onSelectAll;
+  final VoidCallback? onFindAndSelect;
   final VoidCallback? onTerrain;
   final ValueChanged<ArchitectTool> onToolChanged;
   final bool multiSelect;
@@ -147,6 +148,7 @@ class ArchitectToolPalette extends StatefulWidget {
     this.selectionTool,
     this.onDrawSelection,
     this.onSelectAll,
+    this.onFindAndSelect,
     this.onTerrain,
     required this.onToolChanged,
     this.multiSelect = false,
@@ -521,6 +523,19 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                       tooltip: l10n.architectSelectSimilarHelp,
                                       selected: false,
                                       onPressed: widget.onSelectAll,
+                                    ),
+                                  if (widget.onFindAndSelect != null)
+                                    _buildToolButton(
+                                      tool: ArchitectTool.select,
+                                      buttonKey: 'architect-find-and-select',
+                                      icon: AppIconId.filter,
+                                      label: l10n.architectFindAndSelect,
+                                      iconOnly:
+                                          MediaQuery.sizeOf(context).width <
+                                          600,
+                                      tooltip: l10n.architectFindAndSelectHelp,
+                                      selected: false,
+                                      onPressed: widget.onFindAndSelect,
                                     ),
                                   if (widget.selectionTool != null &&
                                       widget.onDrawSelection != null)

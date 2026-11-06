@@ -21191,6 +21191,192 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Site & Drainage'**
   String get architectLayerDrainage;
+
+  /// Title and tool name for criteria-based selection
+  ///
+  /// In en, this message translates to:
+  /// **'Find & Select'**
+  String get architectFindAndSelect;
+
+  /// Tooltip explaining find and select tool
+  ///
+  /// In en, this message translates to:
+  /// **'Filter elements by criteria across storeys and batch modify properties'**
+  String get architectFindAndSelectHelp;
+
+  /// Search scope option for all storeys
+  ///
+  /// In en, this message translates to:
+  /// **'All storeys'**
+  String get architectScopeAllStoreys;
+
+  /// Search scope option for current active storey
+  ///
+  /// In en, this message translates to:
+  /// **'Active storey'**
+  String get architectScopeActiveStorey;
+
+  /// Search scope option for a selected storey
+  ///
+  /// In en, this message translates to:
+  /// **'Specific storey'**
+  String get architectScopeSpecificStorey;
+
+  /// Button to populate criteria from selected element
+  ///
+  /// In en, this message translates to:
+  /// **'Pick from selected'**
+  String get architectSampleFromSelection;
+
+  /// Tooltip for pick from selected element
+  ///
+  /// In en, this message translates to:
+  /// **'Populate criteria matching the currently selected element'**
+  String get architectSampleFromSelectionTooltip;
+
+  /// Header for filter criteria section
+  ///
+  /// In en, this message translates to:
+  /// **'Criteria'**
+  String get architectFilterCriteria;
+
+  /// Counter of matching elements across storeys
+  ///
+  /// In en, this message translates to:
+  /// **'{count} elements found ({storeys, plural, one{1 storey} other{{storeys} storeys}})'**
+  String architectFilterMatchesCount(int count, int storeys);
+
+  /// Simple match counter
+  ///
+  /// In en, this message translates to:
+  /// **'{count} matching elements'**
+  String architectFilterMatchesSimple(int count);
+
+  /// Tab and action label for batch property modification
+  ///
+  /// In en, this message translates to:
+  /// **'Batch Modify'**
+  String get architectBatchModify;
+
+  /// Commit button label for batch modify
+  ///
+  /// In en, this message translates to:
+  /// **'Apply changes to {count} elements'**
+  String architectBatchModifyApply(int count);
+
+  /// Checkbox to replace raster/skin while keeping dimensions intact
+  ///
+  /// In en, this message translates to:
+  /// **'Keep current dimensions (Skin only)'**
+  String get architectSkinOnly;
+
+  /// Description for skin only option
+  ///
+  /// In en, this message translates to:
+  /// **'Applies new raster/skin without altering opening width, height, or sill'**
+  String get architectSkinOnlyDesc;
+
+  /// Label for selecting replacement raster or style
+  ///
+  /// In en, this message translates to:
+  /// **'New raster / style'**
+  String get architectTargetRasterStyle;
+
+  /// Button to open fenestration editor for custom raster
+  ///
+  /// In en, this message translates to:
+  /// **'Design custom raster...'**
+  String get architectCreateCustomRaster;
+
+  /// Section header for optional dimension changes
+  ///
+  /// In en, this message translates to:
+  /// **'Change dimensions'**
+  String get architectChangeDimensions;
+
+  /// Checkbox for updating specification mark
+  ///
+  /// In en, this message translates to:
+  /// **'Change specification mark'**
+  String get architectChangeSpecId;
+
+  /// Input field for new width
+  ///
+  /// In en, this message translates to:
+  /// **'New width'**
+  String get architectNewWidth;
+
+  /// Input field for new height
+  ///
+  /// In en, this message translates to:
+  /// **'New height'**
+  String get architectNewHeight;
+
+  /// Input field for new sill height
+  ///
+  /// In en, this message translates to:
+  /// **'New sill height'**
+  String get architectNewSillHeight;
+
+  /// Input field for new spec ID mark
+  ///
+  /// In en, this message translates to:
+  /// **'New mark (spec ID)'**
+  String get architectNewSpecId;
+
+  /// Button to select matching elements on active storey
+  ///
+  /// In en, this message translates to:
+  /// **'Select on current storey'**
+  String get architectSelectMatching;
+
+  /// Button to switch storey and select matching items
+  ///
+  /// In en, this message translates to:
+  /// **'Go to storey & select'**
+  String get architectSwitchStoreyAndSelect;
+
+  /// Filter operator for exact equality
+  ///
+  /// In en, this message translates to:
+  /// **'Equal (=)'**
+  String get architectOperatorExact;
+
+  /// Filter operator for greater than
+  ///
+  /// In en, this message translates to:
+  /// **'Greater (>)'**
+  String get architectOperatorGreater;
+
+  /// Filter operator for less than
+  ///
+  /// In en, this message translates to:
+  /// **'Less (<)'**
+  String get architectOperatorLess;
+
+  /// Filter operator for any value
+  ///
+  /// In en, this message translates to:
+  /// **'Any'**
+  String get architectOperatorAny;
+
+  /// Option to match any fenestration style
+  ///
+  /// In en, this message translates to:
+  /// **'Any raster / style'**
+  String get architectFilterAnyStyle;
+
+  /// Snackbar notification after batch modification
+  ///
+  /// In en, this message translates to:
+  /// **'Successfully modified {count} elements across {storeys, plural, one{1 storey} other{{storeys} storeys}}'**
+  String architectBatchModifySuccess(int count, int storeys);
+
+  /// Tooltip explaining dimension preservation on style change
+  ///
+  /// In en, this message translates to:
+  /// **'Keep existing dimensions when changing style'**
+  String get architectPreserveDimensionsTooltip;
 }
 
 class _AppLocalizationsDelegate

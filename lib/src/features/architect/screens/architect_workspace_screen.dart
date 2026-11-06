@@ -53,6 +53,7 @@ import '../services/architect_chamfer_fillet.dart';
 import '../widgets/architect_chamfer_fillet_dialog.dart';
 import '../widgets/architect_layers_dialog.dart';
 import '../widgets/architect_element_layer_dialog.dart';
+import '../widgets/architect_find_and_select_dialog.dart';
 
 import '../services/architect_offset.dart';
 import '../services/architect_rotation.dart';
@@ -20830,6 +20831,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         break;
 
+      case ArchitectRadialAction.chamfer:
+      case ArchitectRadialAction.fillet:
+        break;
+
     }
 
   }
@@ -24095,6 +24100,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     HapticFeedback.selectionClick();
   }
 
+  void _openFindAndSelectDialog() {
+    showArchitectFindAndSelectDialog(
+      context: context,
+      project: _modelCommands.project,
+      selectedIds: _effectiveSelection,
+      onSelect: (ids) {
+        setState(() {
+          _selectionIds..clear()..addAll(ids);
+          _selectedElementId = ids.length == 1 ? ids.single : null;
+          _multiSelect = ids.length > 1;
+        });
+      },
+      onSwitchStorey: (storeyId) {
+        _selectWorkspaceView(ArchitectWorkspaceView.plan, storeyId);
+      },
+      onApplyCommand: (command) {
+        _commands.execute(command);
+        _saveBiMProjectIfAttached();
+        setState(() {});
+      },
+    );
+  }
+
   Widget _buildDimensionBar() {
 
     final l = context.l10n;
@@ -24539,7 +24567,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final options = await showArchitectChamferFilletDialog(
       context,
-      unitToMeters: _project.units.scale,
+      unitToMeters: _project.units.scaleToMeters,
       unitSymbol: _project.units.symbol,
       initialIsFillet: isFillet,
       canApplyToAll: canApplyToAll,
@@ -24575,7 +24603,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }).toList();
     storey = storey.copyWith(slabs: updatedSlabs);
 
-    final updatedPrimitives = storey.cadPrimitives.map((prim) {
+    final updatedPrimitives = storey.cadPrimitives.map<ArchitectCadPrimitive>((prim) {
       if (!ids.contains(prim.id)) return prim;
       if (prim.type == CadPrimitiveType.polyline || prim.isPolygon) {
         final pts = prim.isPolygon ? prim.polygonCorners : prim.linePoints;
@@ -24595,9 +24623,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               );
         if (newPts.length >= 2) {
           changed = true;
-          return prim.type == CadPrimitiveType.polyline
-              ? prim.copyWith(linePoints: newPts, polygon: newPts)
-              : prim.copyWith(polygon: newPts);
+          return prim.copyWith(
+            polygon: newPts,
+            startPoint: newPts.first,
+            endPoint: newPts.last,
+          );
         }
       }
       return prim;
@@ -24875,9 +24905,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           color: accent,
           desktopWidth: 32,
         ),
+        action(
+          'architect-find-and-select',
+          l.architectFindAndSelect,
+          Icons.filter_alt_outlined,
+          _openFindAndSelectDialog,
+          color: accent,
+          desktopWidth: 32,
+        ),
       ]);
     } else if (onlyWindows) {
-      actions.add(
+      actions.addAll([
         action(
           'architect-window-flip-side',
           l.architectWindowFlipSide,
@@ -24886,7 +24924,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           color: accent,
           desktopWidth: 32,
         ),
-      );
+        action(
+          'architect-find-and-select',
+          l.architectFindAndSelect,
+          Icons.filter_alt_outlined,
+          _openFindAndSelectDialog,
+          color: accent,
+          desktopWidth: 32,
+        ),
+      ]);
     } else {
       if (section != null) {
         actions.addAll([
@@ -25007,6 +25053,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         );
       }
+      actions.add(
+        action(
+          'architect-find-and-select',
+          l.architectFindAndSelect,
+          Icons.filter_alt_outlined,
+          _openFindAndSelectDialog,
+          color: accent,
+          tooltip: l.architectFindAndSelectHelp,
+        ),
+      );
     }
 
     if (!generic || !_selectionHasAutoZones) {
@@ -25837,6 +25893,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             _redoModel,
 
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+            _openFindAndSelectDialog,
+
+        const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
+            _openFindAndSelectDialog,
+
         const SingleActivator(LogicalKeyboardKey.escape): _cancelDrafting,
 
       },
@@ -26435,7 +26497,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   interactionMode: _interactionMode,
                   selectionTool: _selectionDrawingTool ?? _quickDrawingTool,
                   onSelectAll: _effectiveSelection.isEmpty ? null : _selectSimilarElements,
-                          onDrawSelection: _startDrawingFromSelection,
+                  onFindAndSelect: _openFindAndSelectDialog,
+                  onDrawSelection: _startDrawingFromSelection,
 
                   onToolChanged: _changeTool,
 

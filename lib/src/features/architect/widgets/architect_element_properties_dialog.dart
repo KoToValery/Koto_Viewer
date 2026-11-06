@@ -85,6 +85,7 @@ class _ArchitectElementPropertiesDialogState
   ArchitectHatchPattern? _hatchPattern;
   ArchitectDrawingColor? _hatchColor;
   bool? _hatchBorder;
+  bool _preserveDimensionsOnStyleChange = true;
   bool get _supportsHatch => widget.elementIds.every(
     (id) => widget.project.activeStorey.cadPrimitives.any(
       (p) => p.id == id && p.type == CadPrimitiveType.hatch,
@@ -928,7 +929,7 @@ class _ArchitectElementPropertiesDialogState
       widget.project.levelDecimals;
 
   List<Widget> _textFields(AppLocalizations l) {
-    final heights = [
+    final heights = {
       for (final id in widget.elementIds)
         widget.project.document.textMm(
           _viewKey,
@@ -936,7 +937,7 @@ class _ArchitectElementPropertiesDialogState
           ArchitectAnnotationRole.ordinary,
           _scale,
         ),
-    ].toSet();
+    };
     return [
       TextFormField(
         key: ValueKey('architect-property-paper-text-$_resetTextSize'),
@@ -1249,17 +1250,35 @@ class _ArchitectElementPropertiesDialogState
                 if (val != null) {
                   setState(() {
                     texts['styleId'] = val;
-                    final s = FenestrationLibraryService.instance.getStyleById(
-                      val,
-                    );
-                    if (s != null) {
-                      values['width'] = s.defaultWidth;
-                      values['height'] = s.defaultHeight;
-                      values['sillHeight'] = s.defaultSillHeight;
+                    if (!_preserveDimensionsOnStyleChange) {
+                      final s = FenestrationLibraryService.instance.getStyleById(
+                        val,
+                      );
+                      if (s != null) {
+                        values['width'] = s.defaultWidth;
+                        values['height'] = s.defaultHeight;
+                        values['sillHeight'] = s.defaultSillHeight;
+                      }
                     }
                   });
                 }
               },
+            ),
+            CheckboxListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: Text(
+                l.architectSkinOnly,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              subtitle: Text(
+                l.architectSkinOnlyDesc,
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+              value: _preserveDimensionsOnStyleChange,
+              onChanged: (v) =>
+                  setState(() => _preserveDimensionsOnStyleChange = v ?? true),
             ),
             const SizedBox(height: 8),
           ],

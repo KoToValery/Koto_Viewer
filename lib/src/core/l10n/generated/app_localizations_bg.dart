@@ -11679,4 +11679,122 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectLayerDrainage => 'Терен и отводняване';
+
+  @override
+  String get architectFindAndSelect => 'Селектиране по признаци';
+
+  @override
+  String get architectFindAndSelectHelp =>
+      'Филтриране на елементи по признаци по етажи и групова промяна';
+
+  @override
+  String get architectScopeAllStoreys => 'Всички етажи';
+
+  @override
+  String get architectScopeActiveStorey => 'Текущ етаж';
+
+  @override
+  String get architectScopeSpecificStorey => 'Конкретен етаж';
+
+  @override
+  String get architectSampleFromSelection => 'Вземи от избрания';
+
+  @override
+  String get architectSampleFromSelectionTooltip =>
+      'Зареждане на признаците на маркирания на чертежа елемент';
+
+  @override
+  String get architectFilterCriteria => 'Признаци за търсене';
+
+  @override
+  String architectFilterMatchesCount(int count, int storeys) {
+    String _temp0 = intl.Intl.pluralLogic(
+      storeys,
+      locale: localeName,
+      other: '$storeys етажа',
+      one: '1 етаж',
+    );
+    return 'Намерени $count елемента ($_temp0)';
+  }
+
+  @override
+  String architectFilterMatchesSimple(int count) {
+    return '$count съвпадащи елемента';
+  }
+
+  @override
+  String get architectBatchModify => 'Групова промяна';
+
+  @override
+  String architectBatchModifyApply(int count) {
+    return 'Приложи промените на $count елемента';
+  }
+
+  @override
+  String get architectSkinOnly =>
+      'Запази зададените размери (Само скин подмяна)';
+
+  @override
+  String get architectSkinOnlyDesc =>
+      'Прилага новия растер/скин без да променя ширината, височината и парапета';
+
+  @override
+  String get architectTargetRasterStyle => 'Нов растер / стил';
+
+  @override
+  String get architectCreateCustomRaster => 'Създай нов растер...';
+
+  @override
+  String get architectChangeDimensions => 'Промяна на размери';
+
+  @override
+  String get architectChangeSpecId => 'Промяна на марка';
+
+  @override
+  String get architectNewWidth => 'Нова ширина';
+
+  @override
+  String get architectNewHeight => 'Нова височина';
+
+  @override
+  String get architectNewSillHeight => 'Нов парапет';
+
+  @override
+  String get architectNewSpecId => 'Нова марка (Спецификация)';
+
+  @override
+  String get architectSelectMatching => 'Селектирай на текущия етаж';
+
+  @override
+  String get architectSwitchStoreyAndSelect => 'Отиди на етажа и селектирай';
+
+  @override
+  String get architectOperatorExact => 'Равно (=)';
+
+  @override
+  String get architectOperatorGreater => 'По-голямо (>)';
+
+  @override
+  String get architectOperatorLess => 'По-малко (<)';
+
+  @override
+  String get architectOperatorAny => 'Без значение';
+
+  @override
+  String get architectFilterAnyStyle => 'Всички растери / стилове';
+
+  @override
+  String architectBatchModifySuccess(int count, int storeys) {
+    String _temp0 = intl.Intl.pluralLogic(
+      storeys,
+      locale: localeName,
+      other: '$storeys етажа',
+      one: '1 етаж',
+    );
+    return 'Успешно променени $count елемента на $_temp0';
+  }
+
+  @override
+  String get architectPreserveDimensionsTooltip =>
+      'Запази текущите размери при избор на стил';
 }
