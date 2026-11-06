@@ -5,6 +5,7 @@ import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
 import '../services/architect_element_id.dart';
 import '../services/architect_wall_compositions.dart';
+import '../services/architect_wall_library.dart';
 import 'architect_wall_composition_editor.dart';
 import 'architect_wall_type_picker.dart';
 import 'architect_wall_type_label.dart';
@@ -167,7 +168,7 @@ class _TypesState extends State<ArchitectWallTypesManager> {
   }
 
   Future<void> newType() async {
-    final templates = ArchitectWallType.standardCatalog(includeSpecial: true);
+    final templates = ArchitectWallLibrary.available(const []);
     final result = await showArchitectWallTypePicker(
       context,
       types: templates,

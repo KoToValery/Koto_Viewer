@@ -15,6 +15,7 @@ import 'architect_roof_layer_editor.dart';
 import 'architect_roof_construction_preview.dart';
 import 'architect_roof_panel_fields.dart';
 import '../services/architect_roof_assemblies.dart';
+import 'architect_composition_controls.dart';
 
 class ArchitectRoofLayersDialog extends StatefulWidget {
   final ArchitectRoofAssembly initialAssembly;
@@ -28,6 +29,7 @@ class ArchitectRoofLayersDialog extends StatefulWidget {
       initialBreakDistance;
   final bool initialAttachToWalls, initialIsMansard, canPickDownpipe;
   final ArchitectRoofDrainage initialDrainage;
+  final ArchitectParapet initialParapet;
   final bool Function()? isCurrent;
   final ArchitectProject? project;
   final ArchitectRoofPlane? roof;
@@ -47,6 +49,7 @@ class ArchitectRoofLayersDialog extends StatefulWidget {
     this.initialManualSupportDistance,
     this.maxSupportDistance,
     this.initialDrainage = const ArchitectRoofDrainage(),
+    this.initialParapet = const ArchitectParapet(),
     this.project,
     this.roof,
     this.canPickDownpipe = false,
@@ -99,6 +102,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
   late double _supportDistance =
       widget.initialManualSupportDistance ?? widget.initialEavesOverhang;
   late ArchitectRoofDrainage _drainage = widget.initialDrainage;
+  late ArchitectParapet _parapet = widget.roof?.parapet ?? widget.initialParapet;
   bool _applyGroup = false, _saveDefaults = false;
   String? _error;
   final _detailControllers = <String, ExpansibleController>{};
@@ -156,7 +160,9 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
     );
     if (chosenName != null && chosenName.isNotEmpty) {
       final toSave = _assembly.copyWith(
-        id: _assembly.id.isNotEmpty ? _assembly.id : ArchitectElementId.next('roof_assembly'),
+        id: _assembly.id.isNotEmpty
+            ? _assembly.id
+            : ArchitectElementId.next('roof_assembly'),
         preset: ArchitectRoofPreset.custom,
         customName: chosenName,
       );
@@ -165,8 +171,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       setState(() => _assembly = toSave);
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(
-          content: Text(ok ? l.roofLibrarySaved : l.slabLibraryFailed)),
+        SnackBar(content: Text(ok ? l.roofLibrarySaved : l.slabLibraryFailed)),
       );
     }
   }
@@ -195,13 +200,13 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       await ArchitectRoofLibrary.delete(_assembly.id);
       await _loadLibrary();
       setState(() {
-        _assembly = ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles,
+        _assembly = ArchitectRoofAssembly.fromPreset(
+          ArchitectRoofPreset.pitchedTiles,
         );
       });
       _queuePreview();
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text(l.roofLibraryDeleted)));
+      messenger.showSnackBar(SnackBar(content: Text(l.roofLibraryDeleted)));
     }
   }
 
@@ -233,9 +238,11 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
         } else if (_slopeDegrees < spec.minimumSlope) {
           _slopeDegrees = 6;
         }
-      } else if (_drainage.position == ArchitectGutterPosition.internal) {
+      } else if (preset == ArchitectRoofPreset.flatWarm && widget.roof == null) {
+        _parapet = _parapet.copyWith(enabled: true);
         _drainage = _drainage.copyWith(
-          position: ArchitectGutterPosition.external,
+          position: ArchitectGutterPosition.internal,
+          showGutter: true,
         );
       }
     });
@@ -285,6 +292,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
         layer: layer,
         layers: _assembly.layers,
         index: index,
+        unit: _unit,
       ),
     );
     if (!mounted || result == null) return;
@@ -338,6 +346,55 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
         layers: next,
       );
     });
+  }
+
+  void _setLayerThickness(int index, double thickness) {
+    final layer = _assembly.layers[index];
+    if (layer.thickness == thickness) return;
+    setState(() {
+      var timber = _assembly.timber;
+      switch (layer.role) {
+        case ArchitectRoofLayerRole.battens:
+          timber = timber.copyWith(battenHeight: thickness);
+        case ArchitectRoofLayerRole.counterBattens:
+          timber = timber.copyWith(counterBattenHeight: thickness);
+        case ArchitectRoofLayerRole.rafters:
+          timber = timber.copyWith(rafterHeight: thickness);
+        default:
+          break;
+      }
+      _assembly = _assembly.copyWith(
+        preset: ArchitectRoofPreset.custom,
+        layers: [
+          for (var i = 0; i < _assembly.layers.length; i++)
+            i == index
+                ? layer.copyWith(thickness: thickness)
+                : _assembly.layers[i],
+        ],
+        timber: timber,
+      );
+    });
+    _queuePreview();
+  }
+
+  void _copyLayer(int index) {
+    final layer = _assembly.layers[index];
+    if (layer.isBetweenRafters ||
+        layer.role == ArchitectRoofLayerRole.rafters) {
+      return;
+    }
+    setState(() {
+      final next = [..._assembly.layers];
+      next.insert(
+        index + 1,
+        layer.copyWith(id: ArchitectElementId.next('roof_layer')),
+      );
+      _assembly = _assembly.copyWith(
+        preset: ArchitectRoofPreset.custom,
+        layers: next,
+      );
+    });
+    _queuePreview();
   }
 
   void _moveLayer(int index, int delta) {
@@ -459,6 +516,12 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       jsonEncode(d.downpipes.map((p) => p.toJson()).toList()),
       jsonEncode(_drainage.downpipes.map((p) => p.toJson()).toList()),
     );
+    final initialP = widget.roof?.parapet ?? widget.initialParapet;
+    check(
+      ArchitectRoofSetting.parapet,
+      jsonEncode(initialP.toJson()),
+      jsonEncode(_parapet.toJson()),
+    );
     return result;
   }
 
@@ -472,6 +535,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
         attachToWalls: _attachToWalls,
         manualSupportDistance: _manualSupport ? _supportDistance : null,
         drainage: _drainage,
+        parapet: _parapet,
         pickDownpipe: pickDownpipe,
         upperSlopeDegrees: _upperSlope,
         breakDistance: _breakDistance,
@@ -502,7 +566,10 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
   }
 
   void _save({bool pickDownpipe = false}) {
-    if(widget.isCurrent?.call()==false){setState(()=>_error=context.l10n.propertiesStale);return;}
+    if (widget.isCurrent?.call() == false) {
+      setState(() => _error = context.l10n.propertiesStale);
+      return;
+    }
     final invalid = _form.currentState!.validateGranularly();
     if (invalid.isNotEmpty) {
       final field = invalid.first;
@@ -656,7 +723,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
   Widget _preview() {
     final l = context.l10n;
     final label =
-        '${l.roofUiPreview} · ${roofNumber(_assembly.totalThickness * 1000)} mm';
+        '${l.roofUiPreview} · ${architectCompositionLength(_assembly.totalThickness, _unit)}';
     void open() => showDialog<void>(
       context: context,
       builder: (context) => Dialog.fullscreen(
@@ -844,6 +911,52 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
     );
   }
 
+  Future<void> _chooseAssembly() async {
+    final l = context.l10n;
+    final chosen = await showArchitectCompositionPicker<String>(
+      context,
+      title: l.roofUiAssembly,
+      preferenceKey: 'architect_roof_catalog_favorites',
+      selectedId: _library.any((a) => a.id == _assembly.id)
+          ? 'lib_${_assembly.id}'
+          : 'preset_${_assembly.preset.name}',
+      choices: [
+        for (final preset in ArchitectRoofPreset.values)
+          if (preset != ArchitectRoofPreset.custom)
+            ArchitectCompositionChoice(
+              id: 'preset_${preset.name}',
+              label: preset.label(l),
+              detail: ArchitectRoofAssembly.fromPreset(
+                preset,
+              ).layers.map((layer) => layer.material.label(l)).join(' · '),
+              value: 'preset_${preset.name}',
+            ),
+        for (final item in _library)
+          ArchitectCompositionChoice(
+            id: 'lib_${item.id}',
+            label: item.label(l),
+            detail: item.layers
+                .map((layer) => layer.material.label(l))
+                .join(' · '),
+            value: 'lib_${item.id}',
+          ),
+      ],
+    );
+    if (chosen == null || !mounted) return;
+    if (chosen.startsWith('lib_')) {
+      final found = _library.where((a) => 'lib_${a.id}' == chosen).firstOrNull;
+      if (found != null) _selectLibraryAssembly(found);
+    } else {
+      final preset = ArchitectRoofPreset.values
+          .where((p) => 'preset_${p.name}' == chosen)
+          .firstOrNull;
+      if (preset != null) {
+        _selectPreset(preset);
+        _queuePreview();
+      }
+    }
+  }
+
   Widget _layers() {
     final l = context.l10n;
     return SingleChildScrollView(
@@ -851,104 +964,39 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l.roofUiAssembly,
-                  style: Theme.of(context).textTheme.titleSmall,
+          ArchitectCompositionHeader(
+            key: const ValueKey('roof-composition-header'),
+            title: _assembly.label(l),
+            summary:
+                '${l.compositionTotal}: ${architectCompositionLength(_assembly.totalThickness, _unit)}',
+            onChoose: _chooseAssembly,
+            trailing: PopupMenuButton<String>(
+              tooltip: l.propertiesMore,
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'library_save',
+                  child: AppMenuLabel(
+                    icon: AppIconId.save,
+                    child: Text(l.roofSaveLibrary),
+                  ),
                 ),
-              ),
-              PopupMenuButton<String>(
-                tooltip: l.propertiesMore,
-                itemBuilder: (_) => [
+                if (_library.any((a) => a.id == _assembly.id))
                   PopupMenuItem(
-                    value: 'library_save',
+                    value: 'library_delete',
                     child: AppMenuLabel(
-                      icon: AppIconId.save,
-                      child: Text(l.roofSaveLibrary),
+                      icon: AppIconId.delete,
+                      child: Text(l.roofDeleteLibrary),
                     ),
                   ),
-                  if (_library.any((a) => a.id == _assembly.id))
-                    PopupMenuItem(
-                      value: 'library_delete',
-                      child: AppMenuLabel(
-                        icon: AppIconId.delete,
-                        child: Text(l.roofDeleteLibrary),
-                      ),
-                    ),
-                ],
-                onSelected: (action) async {
-                  if (action == 'library_save') {
-                    await _saveToLibrary();
-                  } else if (action == 'library_delete') {
-                    await _deleteFromLibrary();
-                  }
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey(
-                    'roof-preset-${_library.any((a) => a.id == _assembly.id) ? _assembly.id : _assembly.preset.name}-${_library.length}',
-                  ),
-                  initialValue: _library.any((a) => a.id == _assembly.id)
-                      ? 'lib_${_assembly.id}'
-                      : (_assembly.preset == ArchitectRoofPreset.custom
-                          ? 'preset_custom'
-                          : 'preset_${_assembly.preset.name}'),
-                  isExpanded: true,
-                  decoration: InputDecoration(labelText: l.roofUiAssembly),
-                  items: [
-                    for (final p in ArchitectRoofPreset.values)
-                      if (p != ArchitectRoofPreset.custom ||
-                          (_assembly.preset == p && !_library.any((a) => a.id == _assembly.id)))
-                        DropdownMenuItem(
-                          value: 'preset_${p.name}',
-                          enabled: p != ArchitectRoofPreset.custom,
-                          child: Text(
-                            p.label(l),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    for (final libItem in _library)
-                      DropdownMenuItem(
-                        value: 'lib_${libItem.id}',
-                        child: Text(
-                          libItem.label(l),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: (val) {
-                    if (val == null) return;
-                    if (val.startsWith('lib_')) {
-                      final id = val.substring(4);
-                      final found = _library.where((a) => a.id == id).firstOrNull;
-                      if (found != null) _selectLibraryAssembly(found);
-                    } else if (val.startsWith('preset_')) {
-                      final pName = val.substring(7);
-                      final foundPreset = ArchitectRoofPreset.values
-                          .where((p) => p.name == pName)
-                          .firstOrNull;
-                      if (foundPreset != null) _selectPreset(foundPreset);
-                    }
-                  },
-                ),
-              ),
-              if (_library.any((a) => a.id == _assembly.id))
-                IconButton(
-                  icon: const AppIcon(
-                    AppIconId.delete, color: Colors.redAccent,
-                  ),
-                  tooltip: l.roofDeleteLibrary,
-                  onPressed: _deleteFromLibrary,
-                ),
-            ],
+              ],
+              onSelected: (action) async {
+                if (action == 'library_save') {
+                  await _saveToLibrary();
+                } else if (action == 'library_delete') {
+                  await _deleteFromLibrary();
+                }
+              },
+            ),
           ),
           if (_assembly.panels != null)
             ArchitectRoofPanelFields(
@@ -984,72 +1032,74 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
     ArchitectRoofLayer layer,
   ) {
     final l = context.l10n;
-    return Column(
-      children: [
-        const Divider(height: 1),
-        ListTile(
-          key: ValueKey('roof-layer-${layer.id}'),
-          contentPadding: EdgeInsets.zero,
-          title: Text(layer.material.label(l)),
-          subtitle: Text(
-            '${layer.role.label(l)}${layer.isBetweenRafters ? ' · ${l.roofUiBetween}' : ''}',
+    return ArchitectCompositionLayerRow(
+      key: ValueKey('roof-layer-${layer.id}'),
+      title: layer.material.label(l),
+      detail:
+          '${layer.role.label(l)}${layer.isBetweenRafters ? ' · ${l.roofUiBetween}' : ''}',
+      thickness: architectCompositionLength(layer.thickness, _unit),
+      thicknessEditor: ArchitectCompositionThicknessField(
+        key: ValueKey('roof-inline-thickness-${layer.id}'),
+        value: layer.thickness,
+        unit: _unit,
+        onChanged: (value) => _setLayerThickness(index, value),
+      ),
+      onEdit: () => _editLayer(index),
+      actions: PopupMenuButton<String>(
+        key: ValueKey('roof-layer-actions-${layer.id}'),
+        tooltip: l.roofUiLayerActions,
+        itemBuilder: (_) => [
+          PopupMenuItem(
+            value: 'edit',
+            child: AppMenuLabel(
+              icon: AppIconId.edit,
+              child: Text(l.roofUiLayerEdit),
+            ),
           ),
-          onTap: () => _editLayer(index),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('${roofNumber(layer.thickness * 1000)} mm'),
-              PopupMenuButton<String>(
-                key: ValueKey('roof-layer-actions-${layer.id}'),
-                tooltip: l.roofUiLayerActions,
-                itemBuilder: (_) => [
-                  PopupMenuItem(value: 'edit', child: AppMenuLabel(
-                      icon: AppIconId.edit,
-                      child: Text(l.roofUiLayerEdit),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'up',
-                    enabled: index > 0,
-                    child: AppMenuLabel(
-                      icon: AppIconId.up,
-                      child: Text(l.wallLayerUp),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'down',
-                    enabled: index + 1 < _assembly.layers.length,
-                    child: AppMenuLabel(
-                      icon: AppIconId.down,
-                      child: Text(l.wallLayerDown),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    enabled: _assembly.layers.length > 1,
-                    child: AppMenuLabel(
-                      icon: AppIconId.delete,
-                      child: Text(l.delete),
-                    ),
-                  ),
-                ],
-                onSelected: (v) {
-                  switch (v) {
-                    case 'edit':
-                      _editLayer(index);
-                    case 'up':
-                      _moveLayer(index, -1);
-                    case 'down':
-                      _moveLayer(index, 1);
-                    case 'delete':
-                      _removeLayer(index);
-                  }
-                },
-              ),
-            ],
+          PopupMenuItem(
+            value: 'up',
+            enabled: index > 0,
+            child: AppMenuLabel(icon: AppIconId.up, child: Text(l.wallLayerUp)),
           ),
-        ),
-      ],
+          PopupMenuItem(
+            value: 'down',
+            enabled: index + 1 < _assembly.layers.length,
+            child: AppMenuLabel(
+              icon: AppIconId.down,
+              child: Text(l.wallLayerDown),
+            ),
+          ),
+          PopupMenuItem(
+            value: 'copy',
+            enabled:
+                !layer.isBetweenRafters &&
+                layer.role != ArchitectRoofLayerRole.rafters,
+            child: AppMenuLabel(
+              icon: AppIconId.duplicate,
+              child: Text(l.slabDuplicate),
+            ),
+          ),
+          PopupMenuItem(
+            value: 'delete',
+            enabled: _assembly.layers.length > 1,
+            child: AppMenuLabel(icon: AppIconId.delete, child: Text(l.delete)),
+          ),
+        ],
+        onSelected: (v) {
+          switch (v) {
+            case 'edit':
+              _editLayer(index);
+            case 'up':
+              _moveLayer(index, -1);
+            case 'down':
+              _moveLayer(index, 1);
+            case 'copy':
+              _copyLayer(index);
+            case 'delete':
+              _removeLayer(index);
+          }
+        },
+      ),
     );
   }
 
@@ -1083,6 +1133,80 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
               ],
             ),
           ExpansionTile(
+            key: const ValueKey('roof-parapet-section'),
+            controller: _detailControllers.putIfAbsent(
+              'parapet',
+              ExpansibleController.new,
+            ),
+            maintainState: true,
+            tilePadding: EdgeInsets.zero,
+            title: Text(l.roofParapet),
+            children: [
+              SwitchListTile.adaptive(
+                key: const ValueKey('roof-parapet-enable'),
+                title: Text(l.roofParapetEnable),
+                value: _parapet.enabled,
+                onChanged: (v) =>
+                    setState(() => _parapet = _parapet.copyWith(enabled: v)),
+              ),
+              if (_parapet.enabled) ...[
+                ArchitectRoofNumberField(
+                  label: l.roofParapetHeight,
+                  value: _unit.toUnit(_parapet.height),
+                  unit: _unit.symbol,
+                  min: 5,
+                  max: 200,
+                  onChanged: (v) => setState(() =>
+                      _parapet = _parapet.copyWith(height: _unit.fromUnit(v))),
+                ),
+                ArchitectRoofNumberField(
+                  label: l.roofParapetCore,
+                  value: _unit.toUnit(_parapet.coreThickness),
+                  unit: _unit.symbol,
+                  min: 5,
+                  max: 100,
+                  onChanged: (v) => setState(() => _parapet =
+                      _parapet.copyWith(coreThickness: _unit.fromUnit(v))),
+                ),
+                ArchitectRoofNumberField(
+                  label: l.roofParapetInsulation,
+                  value: _unit.toUnit(_parapet.exteriorInsulationThickness),
+                  unit: _unit.symbol,
+                  min: 0,
+                  max: 50,
+                  onChanged: (v) => setState(() => _parapet = _parapet
+                      .copyWith(exteriorInsulationThickness: _unit.fromUnit(v))),
+                ),
+                ArchitectRoofNumberField(
+                  label: l.roofParapetInteriorFinish,
+                  value: _unit.toUnit(_parapet.interiorFinishThickness),
+                  unit: _unit.symbol,
+                  min: 0,
+                  max: 10,
+                  onChanged: (v) => setState(() => _parapet = _parapet
+                      .copyWith(interiorFinishThickness: _unit.fromUnit(v))),
+                ),
+                SwitchListTile.adaptive(
+                  key: const ValueKey('roof-parapet-coping'),
+                  title: Text(l.roofParapetCoping),
+                  value: _parapet.hasCoping,
+                  onChanged: (v) =>
+                      setState(() => _parapet = _parapet.copyWith(hasCoping: v)),
+                ),
+                if (_parapet.hasCoping)
+                  ArchitectRoofNumberField(
+                    label: l.roofParapetCopingProjection,
+                    value: _unit.toUnit(_parapet.copingProjection),
+                    unit: _unit.symbol,
+                    min: 1,
+                    max: 20,
+                    onChanged: (v) => setState(() => _parapet =
+                        _parapet.copyWith(copingProjection: _unit.fromUnit(v))),
+                  ),
+              ],
+            ],
+          ),
+          ExpansionTile(
             key: const ValueKey('roof-drainage-section'),
             controller: _detailControllers.putIfAbsent(
               'drainage',
@@ -1095,7 +1219,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
               _RoofDetailScope(
                 controller: _detailControllers['drainage']!,
                 child: ArchitectRoofDrainageEditor(
-                  allowInternal: _assembly.panels != null,
+                  allowInternal: true,
                   value: _drainage,
                   project: widget.project,
                   roof: widget.roof,
@@ -1133,7 +1257,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
           _buildTimberCard(
             title: l.architectRoofBattensLabel,
             subtitle:
-                '${roofNumber(t.battenWidth * 100)}×${roofNumber(t.battenHeight * 100)} cm · ${l.architectRoofStepLabel} ${roofNumber(t.battenSpacing * 100)} cm',
+                '${architectCompositionNumber(t.battenWidth, _unit)}×${architectCompositionLength(t.battenHeight, _unit)} · ${l.architectRoofStepLabel} ${architectCompositionLength(t.battenSpacing, _unit)}',
             enabled: t.hasBattens,
             onToggle: (v) => _updateTimber(t.copyWith(hasBattens: v)),
             children: [
@@ -1186,7 +1310,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
           _buildTimberCard(
             title: l.architectRoofCounterBattensLabel,
             subtitle:
-                '${roofNumber(t.counterBattenWidth * 100)}×${roofNumber(t.counterBattenHeight * 100)} cm',
+                '${architectCompositionNumber(t.counterBattenWidth, _unit)}×${architectCompositionLength(t.counterBattenHeight, _unit)}',
             enabled: t.hasCounterBattens,
             onToggle: (v) => _updateTimber(t.copyWith(hasCounterBattens: v)),
             children: [
@@ -1228,7 +1352,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
           _buildTimberCard(
             title: l.architectRoofRaftersLabel,
             subtitle:
-                '${roofNumber(t.rafterWidth * 100)}×${roofNumber(t.rafterHeight * 100)} cm · ${l.architectRoofStepLabel} ${roofNumber(t.rafterSpacing * 100)} cm',
+                '${architectCompositionNumber(t.rafterWidth, _unit)}×${architectCompositionLength(t.rafterHeight, _unit)} · ${l.architectRoofStepLabel} ${architectCompositionLength(t.rafterSpacing, _unit)}',
             enabled: t.hasRafters,
             onToggle: (v) => _updateTimber(t.copyWith(hasRafters: v)),
             children: [
@@ -1281,7 +1405,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
           _buildTimberCard(
             title: l.architectRoofWallPlateLabel,
             subtitle:
-                '${roofNumber(t.wallPlateWidth * 100)}×${roofNumber(t.wallPlateHeight * 100)} cm',
+                '${architectCompositionNumber(t.wallPlateWidth, _unit)}×${architectCompositionLength(t.wallPlateHeight, _unit)}',
             enabled: t.hasWallPlate,
             onToggle: (v) => _updateTimber(t.copyWith(hasWallPlate: v)),
             children: [
@@ -1321,7 +1445,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
           _buildTimberCard(
             title: l.architectRoofRingBeamLabel,
             subtitle:
-                '${l.architectPropertyHeight}: ${roofNumber(t.ringBeamHeight * 100)} cm',
+                '${l.architectPropertyHeight}: ${architectCompositionLength(t.ringBeamHeight, _unit)}',
             enabled: t.hasRingBeam,
             onToggle: (v) => _updateTimber(t.copyWith(hasRingBeam: v)),
             children: [
@@ -1342,7 +1466,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
           _buildTimberCard(
             title: l.architectRoofRidgePurlinLabel,
             subtitle:
-                '${roofNumber(t.ridgePurlinWidth * 100)}×${roofNumber(t.ridgePurlinHeight * 100)} cm',
+                '${architectCompositionNumber(t.ridgePurlinWidth, _unit)}×${architectCompositionLength(t.ridgePurlinHeight, _unit)}',
             enabled: t.hasRidgePurlin,
             onToggle: (v) => _updateTimber(t.copyWith(hasRidgePurlin: v)),
             children: [
@@ -1383,7 +1507,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
           // 6. Fascia Board & Metal Flashing (Челна дъска и метална обшивка)
           _buildTimberCard(
             title: l.architectRoofFasciaLabel,
-            subtitle: '${roofNumber(t.fasciaThickness * 1000)} mm',
+            subtitle: architectCompositionLength(t.fasciaThickness, _unit),
             enabled: t.hasFasciaBoard,
             onToggle: (v) => _updateTimber(t.copyWith(hasFasciaBoard: v)),
             children: [
@@ -1451,11 +1575,12 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
     required ValueChanged<double> onChanged,
     String unit = 'cm',
   }) => ArchitectRoofNumberField(
-    value: value,
+    value: _unit.toUnit(unit == 'mm' ? value / 1000 : value / 100),
     label: label,
-    unit: unit,
-    min: .000001,
-    onChanged: onChanged,
+    unit: _unit.symbol,
+    min: _unit.toUnit(.000000001),
+    onChanged: (v) =>
+        onChanged(_unit.fromUnit(v) * (unit == 'mm' ? 1000 : 100)),
   );
 }
 

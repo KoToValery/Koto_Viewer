@@ -18,7 +18,7 @@ class ArchitectRoofBar extends StatelessWidget {
   final ValueChanged<double>? onSelectedRoofSlopeChanged,
       onSelectedRoofOverhangChanged;
   final ValueChanged<ArchitectRoofQuickValue>? onApplySlope, onApplyOverhang;
-  final VoidCallback? onToggleSlopeLocked, onMatchRidgeHeight, onToggleMansard;
+  final VoidCallback? onToggleSlopeLocked, onMatchRidgeHeight, onToggleMansard, onToggleParapet;
   final ValueChanged<double>? onSelectedRoofUpperSlopeChanged,
       onSelectedRoofBreakDistanceChanged;
   final VoidCallback? onFinishPolygon, onUndoDraftPoint, onCancelDraft;
@@ -42,6 +42,7 @@ class ArchitectRoofBar extends StatelessWidget {
     this.onToggleSlopeLocked,
     this.onMatchRidgeHeight,
     this.onToggleMansard,
+    this.onToggleParapet,
     this.onSelectedRoofUpperSlopeChanged,
     this.onSelectedRoofBreakDistanceChanged,
     this.onFinishPolygon,
@@ -278,6 +279,7 @@ class ArchitectRoofBar extends StatelessWidget {
                       'rotate' => onSwitchEavesEdge?.call(),
                       'flip' => onFlipSlopeDirection?.call(),
                       'mansard' => onToggleMansard?.call(),
+                      'parapet' => onToggleParapet?.call(),
                       'lock' => onToggleSlopeLocked?.call(),
                       'ridge' => onMatchRidgeHeight?.call(),
                       _ => null,
@@ -309,6 +311,16 @@ class ArchitectRoofBar extends StatelessWidget {
                           child: AppMenuLabel(
                             icon: AppIconId.roofMansard,
                             child: Text(l.architectRoofIsMansard),
+                          ),
+                        ),
+                      if (onToggleParapet != null)
+                        CheckedPopupMenuItem(
+                          key: const ValueKey('roof-toggle-parapet'),
+                          value: 'parapet',
+                          checked: roof.parapet.enabled,
+                          child: AppMenuLabel(
+                            icon: AppIconId.wall,
+                            child: Text(l.roofParapet),
                           ),
                         ),
                       if (roof.roofGroupId != null &&

@@ -93,6 +93,44 @@ class ArchitectSnapGeometry {
                     : floor.walls));
 
     for (final wall in referenceWalls) {
+      if (wall.railing != null) {
+        if (wall.isCurved) {
+          final axis = wall.facePolygon(0, 0);
+          final count = axis.length ~/ 2;
+          for (var i = 0; i + 1 < count; i++) {
+            edge(
+              axis[i],
+              axis[i + 1],
+              '@wall-axis:${wall.id}',
+              includeMidpoint: false,
+            );
+          }
+          point(wall.arc!.center, 'Center', wall.id);
+        } else {
+          edge(wall.startPoint, wall.endPoint, '@wall-axis:${wall.id}');
+        }
+        for (final ratio in [0.0, .5, 1.0]) {
+          point(
+            wall.referencePointAt(ratio),
+            ratio == .5 ? 'Midpoint' : 'Endpoint',
+            wall.id,
+          );
+        }
+        for (final contour in ArchitectWallGeometry.physicalPolygons(
+          wall,
+          referenceWalls,
+        )) {
+          for (var i = 0; i < contour.length; i++) {
+            edge(
+              contour[i],
+              contour[(i + 1) % contour.length],
+              wall.id,
+              includeMidpoint: false,
+            );
+          }
+        }
+        continue;
+      }
       if (wall.isCurved) {
         for (final ratio in [0.0, .5, 1.0]) {
           point(
@@ -155,9 +193,9 @@ class ArchitectSnapGeometry {
     // Intersections between wall faces (outer finish lines and core lines)
     for (var i = 0; i < referenceWalls.length; i++) {
       final a = referenceWalls[i];
-      if (a.length < 1e-4) continue;
+      if (a.length < 1e-4 || a.isOpenRailing) continue;
       for (final b in referenceWalls.skip(i + 1)) {
-        if (b.length < 1e-4) continue;
+        if (b.length < 1e-4 || b.isOpenRailing) continue;
         if (a.isCurved || b.isCurved) {
           for (final p in a.intersections(b)) {
             point(p, 'Intersection', '@wall-face-joints');
@@ -216,9 +254,14 @@ class ArchitectSnapGeometry {
     }
     for (final slab in floor.slabs) {
       polygon(slab.polygon, slab.id);
-      for (final h in slab.holes) { polygon(h, slab.id); }
+      for (final h in slab.holes) {
+        polygon(h, slab.id);
+      }
     }
     for (final roof in floor.roofs) {
+      if (roof.points.length >= 3) {
+        polygon(roof.points, roof.id);
+      }
       for (final contour in ArchitectPathSolid.contours(
         ArchitectRoofJunctions.of(floor, project: project).footprint(roof),
       )) {
@@ -268,7 +311,9 @@ class ArchitectSnapGeometry {
         case CadPrimitiveType.rect:
         case CadPrimitiveType.hatch:
           polygon(primitive.polygonCorners, primitive.id);
-          for (final h in primitive.holes) { polygon(h, primitive.id); }
+          for (final h in primitive.holes) {
+            polygon(h, primitive.id);
+          }
           point(
             Rect.fromPoints(primitive.startPoint, primitive.endPoint).center,
             'Center',

@@ -802,6 +802,8 @@ class ArchitectElementTool extends ChangeNotifier {
       cadPrimitives: storey.cadPrimitives
           .where((c) => c.id != elementId)
           .toList(),
+      components: storey.components.where((c) => c.id != elementId).toList(),
+      zones: storey.zones.where((z) => z.id != elementId).toList(),
     );
   }
 
@@ -1627,11 +1629,35 @@ class ArchitectElementTool extends ChangeNotifier {
     ArchitectStorey storey,
     Set<String> elementIds,
   ) {
-    var currentStorey = storey;
-    for (final id in elementIds) {
-      currentStorey = deleteElementById(currentStorey, id);
-    }
-    return currentStorey;
+    if (elementIds.isEmpty) return storey;
+    return storey.copyWith(
+      walls: storey.walls
+          .where((w) => !elementIds.contains(w.id))
+          .map(
+            (w) => w.copyWith(
+              doors: w.doors.where((d) => !elementIds.contains(d.id)).toList(),
+              windows: w.windows.where((win) => !elementIds.contains(win.id)).toList(),
+            ),
+          )
+          .toList(),
+      columns: storey.columns.where((c) => !elementIds.contains(c.id)).toList(),
+      beams: storey.beams.where((b) => !elementIds.contains(b.id)).toList(),
+      slabs: storey.slabs.where((s) => !elementIds.contains(s.id)).toList(),
+      roofs: storey.roofs.where((r) => !elementIds.contains(r.id)).toList(),
+      openings: storey.openings.where((o) => !elementIds.contains(o.id)).toList(),
+      stairs: storey.stairs.where((s) => !elementIds.contains(s.id)).toList(),
+      dimensions: storey.dimensions.where((d) => !elementIds.contains(d.id)).toList(),
+      elevationMarkers: storey.elevationMarkers
+          .where((e) => !elementIds.contains(e.id))
+          .toList(),
+      annotations: storey.annotations.where((a) => !elementIds.contains(a.id)).toList(),
+      floorDrains: storey.floorDrains.where((d) => !elementIds.contains(d.id)).toList(),
+      cadPrimitives: storey.cadPrimitives
+          .where((c) => !elementIds.contains(c.id))
+          .toList(),
+      components: storey.components.where((c) => !elementIds.contains(c.id)).toList(),
+      zones: storey.zones.where((z) => !elementIds.contains(z.id)).toList(),
+    );
   }
 
   Set<String> findConnectedWallChain(

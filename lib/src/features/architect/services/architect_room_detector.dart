@@ -66,6 +66,7 @@ class ArchitectRoomDetector {
     required List<ArchitectWall> walls,
     double targetCellSize = 0.05, // 5 cm grid resolution
   }) {
+    walls = walls.where((w) => w.participatesInRoomEnclosure).toList();
     if (walls.length < 3) return null;
 
     // Use the same physical junctions as the plan. Individual wall bodies can

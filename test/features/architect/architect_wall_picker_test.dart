@@ -78,6 +78,17 @@ void main() {
             find.byKey(const ValueKey('wall-category-interior')),
           );
           await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.byKey(
+              const ValueKey('architect-wall-type-bearing_25_concrete'),
+            ),
+            120,
+            scrollable: find.descendant(
+              of: find.byKey(const ValueKey('wall-catalog-list')),
+              matching: find.byType(Scrollable),
+            ),
+          );
+          await tester.pumpAndSettle();
           await tester.tap(
             find.byKey(
               const ValueKey('architect-wall-type-bearing_25_concrete'),
@@ -143,6 +154,7 @@ void main() {
             ),
       );
       addTearDown(model.dispose);
+      final initialTypeCount = model.project.wallTypes.length;
       await workspace.open(tester, model);
       await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pumpAndSettle();
@@ -181,10 +193,10 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('wall-composition-save')));
       await tester.pumpAndSettle();
       expect(model.project.wallTypes.any((t) => t.id == first.id), isTrue);
-      expect(model.project.wallTypes.length, 7);
+      expect(model.project.wallTypes.length, initialTypeCount + 2);
       model.undo();
       await tester.pumpAndSettle();
-      expect(model.project.wallTypes.length, 6);
+      expect(model.project.wallTypes.length, initialTypeCount + 1);
       expect(model.project.wallTypes.last.id, first.id);
       expect(tester.takeException(), isNull);
     },

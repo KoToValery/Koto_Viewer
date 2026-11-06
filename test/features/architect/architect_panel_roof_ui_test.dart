@@ -115,7 +115,10 @@ void main() {
               matching: find.byType(TextFormField),
             );
             await tester.ensureVisible(thickness);
-            await tester.enterText(thickness, '120');
+            await tester.enterText(
+              thickness,
+              fixture.panelRoofProject().units.toUnit(.12).toString(),
+            );
             await tester.pumpAndSettle();
             expect(tester.takeException(), isNull);
             await capture(

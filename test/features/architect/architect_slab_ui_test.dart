@@ -80,7 +80,7 @@ void main() {
       expect(find.byType(ArchitectSlabLayersDialog), findsOneWidget);
       await tester.enterText(
         find.byKey(const ValueKey('slab-core-thickness')),
-        '220',
+        '.22',
       );
       await tester.tap(find.byKey(const ValueKey('slab-layers-save')));
       await projection.settleProjection(tester);
@@ -149,10 +149,14 @@ void main() {
       expect(tester.takeException(), isNull);
       final xps = find.widgetWithText(ListTile, 'XPS');
       await tester.ensureVisible(xps);
-      await tester.tap(xps);
+      await tester.tap(find.descendant(of: xps, matching: find.text('XPS')));
       await projection.settleProjection(tester);
       expect(
-        find.text(locale == 'bg' ? 'Дебелина (mm)' : 'Thickness (mm)'),
+        find.text(
+          AppLocalizations.of(
+            tester.element(find.byType(ArchitectSlabLayersDialog)),
+          )!.architectPropertyThickness,
+        ),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);

@@ -83,15 +83,20 @@ class ArchitectRoofDrainageGeometry {
 
   /// Keep the rolled back lip outside the fascia, with the drip apron above
   /// the open channel. The fascia must never pass through the gutter wall.
-  static double gutterOffset(ArchitectRoofPlane roof) =>
-      roof.drainage.position==ArchitectGutterPosition.internal
-      ? -(roof.drainage.gutterWidth/2+ArchitectPanelRoofGeometry.internalInset)
-      :
-      roof.drainage.gutterWidth / 2 +
-      (roof.assembly.timber.hasFasciaBoard
-          ? roof.assembly.timber.fasciaThickness
-          : 0) +
-      .005;
+  static double gutterOffset(ArchitectRoofPlane roof) {
+    if (roof.drainage.position == ArchitectGutterPosition.internal) {
+      final inset = roof.parapet.enabled
+          ? (roof.parapet.totalThickness + roof.drainage.gutterWidth / 2)
+          : (roof.drainage.gutterWidth / 2 +
+              ArchitectPanelRoofGeometry.internalInset);
+      return -inset;
+    }
+    return roof.drainage.gutterWidth / 2 +
+        (roof.assembly.timber.hasFasciaBoard
+            ? roof.assembly.timber.fasciaThickness
+            : 0) +
+        .005;
+  }
 
   /// The channel catches water at the covering, above the rafter/fascia foot.
   /// Keep a small drop below the drip edge, shared by the channel and outlet.
@@ -227,8 +232,9 @@ class ArchitectRoofDrainageGeometry {
     ArchitectRoofPlane roof,
     ArchitectDownpipe pipe,
   ) {
-    if(roof.drainage.position==ArchitectGutterPosition.internal) {
-      return _internalRoute(project,floor,roof,pipe);
+    if (pipe.isInternal ||
+        roof.drainage.position == ArchitectGutterPosition.internal) {
+      return _internalRoute(project, floor, roof, pipe);
     }
     final direct = _route(project, floor, roof, pipe);
     if (direct.status == ArchitectDownpipeStatus.ready ||
@@ -306,47 +312,44 @@ class ArchitectRoofDrainageGeometry {
     if(!visibleEaves(project,floor,roof).any((e)=>(BimLineGeometry.closest(edge,e.$1,e.$2)-edge).distance<1e-5)) {
       return fail(ArchitectDownpipeStatus.outsideEaves);
     }
-    final top=gutterElevation(floor,roof,edge)-roof.drainage.gutterDepth;
-    if(roof.assembly.panels==null||pipe.waypoints.isNotEmpty||pipe.diameter>roof.drainage.gutterWidth-.01||
-      pipe.offset<r||pipe.offset>length-r||top<=pipe.outletElevation+.1||
-      roof.drainage.downpipes.any((p)=>p.id!=pipe.id&&p.visible&&(p.offset-pipe.offset).abs()<(p.diameter+pipe.diameter)/2+.02)) {
+    final top = gutterElevation(floor, roof, edge) - roof.drainage.gutterDepth;
+    if (pipe.waypoints.isNotEmpty ||
+        pipe.diameter > roof.drainage.gutterWidth + 0.05 ||
+        top <= pipe.outletElevation + 0.1 ||
+        roof.drainage.downpipes.any((p) =>
+            p.id != pipe.id &&
+            p.visible &&
+            (p.offset - pipe.offset).abs() <
+                (p.diameter + pipe.diameter) / 2 + 0.02)) {
       return fail(ArchitectDownpipeStatus.blocked);
     }
-    bool intersects(Path path,double bottom,double upper) {
-      if(upper<pipe.outletElevation||bottom>top)return false;
-      if(path.contains(origin))return true;
-      return ArchitectPathSolid.contours(path).any((loop)=>List.generate(loop.length,(i)=>i)
-        .any((i)=>(BimLineGeometry.closest(origin,loop[i],loop[(i+1)%loop.length])-origin).distance<r));
+    bool intersects(Path path, double bottom, double upper) {
+      if (upper < pipe.outletElevation || bottom > top) return false;
+      if (path.contains(origin)) return true;
+      return ArchitectPathSolid.contours(path).any((loop) =>
+          List.generate(loop.length, (i) => i).any((i) =>
+              (BimLineGeometry.closest(
+                          origin, loop[i], loop[(i + 1) % loop.length]) -
+                      origin)
+                  .distance <
+              r));
     }
-    for(final f in project.storeys) {
-      for(final w in f.walls) {
-        if(intersects(Path()..addPolygon(w.polygonCorners,true),f.elevation+w.baseOffset,
-          f.elevation+w.baseOffset+w.effectiveHeight(f.height))) {
+
+    for (final f in project.storeys) {
+      for (final c in f.columns) {
+        if (intersects(
+            Path()..addPolygon(ArchitectPanelSupports.corners(c), true),
+            f.elevation + c.baseOffset,
+            f.elevation + c.baseOffset + (c.height ?? f.height))) {
           return fail(ArchitectDownpipeStatus.blocked);
         }
       }
-      for(final c in f.columns) {
-        if(intersects(Path()..addPolygon(ArchitectPanelSupports.corners(c),true),f.elevation+c.baseOffset,
-          f.elevation+c.baseOffset+(c.height??f.height))) {
-          return fail(ArchitectDownpipeStatus.blocked);
-        }
-      }
-      for(final beam in f.beams) {
-        if(intersects(Path()..addPolygon(beam.polygonCorners,true),f.elevation+beam.baseOffset,
-          f.elevation+beam.baseOffset+beam.depth)) {
-          return fail(ArchitectDownpipeStatus.blocked);
-        }
-      }
-      for(final slab in f.slabs) {
-        var plan=Path()..addPolygon(slab.polygon,true);
-        for(final hole in f.openings) {plan=Path.combine(PathOperation.difference,plan,Path()..addPolygon(hole.boundary,true));}
-        for(final layer in ArchitectSlabGeometry.surfaces(project,f,slab)) {
-          if(intersects(plan,layer.bottomAt(origin),layer.topAt(origin)))return fail(ArchitectDownpipeStatus.blocked);
-        }
-      }
-      for(final other in f.roofs) {
-        if(other.id!=roof.id&&intersects(ArchitectRoofJunctions.of(f,project:project).footprint(other),
-          f.elevation+other.undersideElevationAt(origin),f.elevation+other.topElevationAt(origin))) {
+      for (final other in f.roofs) {
+        if (other.id != roof.id &&
+            intersects(
+                ArchitectRoofJunctions.of(f, project: project).footprint(other),
+                f.elevation + other.undersideElevationAt(origin),
+                f.elevation + other.topElevationAt(origin))) {
           return fail(ArchitectDownpipeStatus.blocked);
         }
       }

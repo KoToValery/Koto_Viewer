@@ -2,6 +2,7 @@ import 'architect_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_roof.dart';
+import '../models/architect_project.dart' show ArchitectUnit;
 import 'architect_roof_number_field.dart';
 
 class RoofLayerEditResult {
@@ -14,11 +15,13 @@ class RoofLayerEditorDialog extends StatefulWidget {
   final ArchitectRoofLayer layer;
   final List<ArchitectRoofLayer> layers;
   final int? index;
+  final ArchitectUnit unit;
   const RoofLayerEditorDialog({
     super.key,
     required this.layer,
     required this.layers,
     this.index,
+    this.unit = ArchitectUnit.millimeters,
   });
   @override
   State<RoofLayerEditorDialog> createState() => _LayerState();
@@ -28,7 +31,7 @@ class _LayerState extends State<RoofLayerEditorDialog> {
   final form = GlobalKey<FormState>();
   late ArchitectRoofLayerRole role = widget.layer.role;
   late ArchitectRoofMaterial material = widget.layer.material;
-  late double thickness = widget.layer.thickness * 1000;
+  late double thickness = widget.unit.toUnit(widget.layer.thickness);
   late bool between = widget.layer.isBetweenRafters;
   late int position = widget.index ?? widget.layers.length;
   int get otherZone {
@@ -84,7 +87,7 @@ class _LayerState extends State<RoofLayerEditorDialog> {
                 key: const ValueKey('roof-layer-thickness-input'),
                 value: thickness,
                 label: l.architectPropertyThickness,
-                unit: 'mm',
+                unit: widget.unit.symbol,
                 min: .000001,
                 onChanged: (v) => setState(() => thickness = v),
               ),
@@ -149,7 +152,7 @@ class _LayerState extends State<RoofLayerEditorDialog> {
                 widget.layer.copyWith(
                   role: role,
                   material: material,
-                  thickness: thickness / 1000,
+                  thickness: widget.unit.fromUnit(thickness),
                   isBetweenRafters: between,
                 ),
                 between && otherZone >= 0 ? otherZone : position,

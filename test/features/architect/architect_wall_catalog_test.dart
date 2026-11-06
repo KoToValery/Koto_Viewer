@@ -16,46 +16,43 @@ import 'architect_wall_compositions_test.dart' as data;
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  test(
-    'Groups preserve identity, core materials and parapet finishes',
-    () {
-      final catalog = ArchitectWallType.standardCatalog();
-      final insulated = catalog.first;
-      final other = insulated.copyWith(
-        id: 'other',
-        insulationThickness: .15,
-        totalThickness: .40,
-      );
-      final groups = ArchitectWallCatalogGroup.build([
-        insulated,
-        other,
-        catalog[2],
-        catalog[3],
-        catalog.last,
-        catalog.last.copyWith(
-          id: 'handrail',
-          parapetFinish: ParapetFinish.handrailPipes,
-        ),
-      ]);
-      expect(groups.first.types.map((t) => t.id), [
-        insulated.id,
-        'other',
-        catalog[2].id,
-      ]);
-      expect(groups.length, 4);
-      expect(
-        ArchitectWallCategory.of(catalog[3]),
-        ArchitectWallCategory.interior,
-      );
-      expect(
-        ArchitectWallCategory.of(
-          catalog[3].copyWith(location: ArchitectWallLocation.exterior),
-        ),
-        ArchitectWallCategory.exterior,
-      );
-      expect(groups.expand((g) => g.types).length, 6);
-    },
-  );
+  test('Groups preserve identity, core materials and parapet finishes', () {
+    final catalog = ArchitectWallType.standardCatalog();
+    final insulated = catalog.first;
+    final other = insulated.copyWith(
+      id: 'other',
+      insulationThickness: .15,
+      totalThickness: .40,
+    );
+    final groups = ArchitectWallCatalogGroup.build([
+      insulated,
+      other,
+      catalog[2],
+      catalog[3],
+      catalog.last,
+      catalog.last.copyWith(
+        id: 'handrail',
+        parapetFinish: ParapetFinish.handrailPipes,
+      ),
+    ]);
+    expect(groups.first.types.map((t) => t.id), [
+      insulated.id,
+      'other',
+      catalog[2].id,
+    ]);
+    expect(groups.length, 4);
+    expect(
+      ArchitectWallCategory.of(catalog[3]),
+      ArchitectWallCategory.interior,
+    );
+    expect(
+      ArchitectWallCategory.of(
+        catalog[3].copyWith(location: ArchitectWallLocation.exterior),
+      ),
+      ArchitectWallCategory.exterior,
+    );
+    expect(groups.expand((g) => g.types).length, 6);
+  });
 
   test(
     'Unused unnamed project variants survive later edits and JSON; only orphan local drafts are removed',
@@ -298,7 +295,7 @@ void main() {
       final l = AppLocalizations.of(
         tester.element(find.byType(ArchitectWallCompositionEditor)),
       )!;
-      expect(find.text(l.wallTypeApply(2)), findsNWidgets(2));
+      expect(find.text(l.compositionScopeType(2)), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('wall-composition-save')));
       await tester.pumpAndSettle();
       expect(
@@ -444,7 +441,7 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('wall-layer-coatings')));
       await tester.pumpAndSettle();
-      expect(find.text('Total: 39 cm'), findsOneWidget);
+      expect(find.textContaining('Total: 39 cm'), findsOneWidget);
       await tester.ensureVisible(find.byKey(const ValueKey('wall-layer-add')));
       await tester.tap(find.byKey(const ValueKey('wall-layer-add')));
       await tester.pumpAndSettle();

@@ -20291,6 +20291,396 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open Ø110 roof vent with weather collar and flashing. Automatic height and the above-roof extension can be adjusted.'**
   String get architectServiceVentOutletHelp;
+
+  /// No description provided for @architectNewPointDistanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'From end {endpoint}'**
+  String architectNewPointDistanceTitle(int endpoint);
+
+  /// No description provided for @architectNewPointDistanceHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance along the wall from end {endpoint}. Tap to enter an exact value.'**
+  String architectNewPointDistanceHelp(int endpoint);
+
+  /// No description provided for @architectNewPointDistanceInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Place the point within the wall, away from ends and openings.'**
+  String get architectNewPointDistanceInvalid;
+
+  /// No description provided for @wallFamilyBrick.
+  ///
+  /// In en, this message translates to:
+  /// **'Brick'**
+  String get wallFamilyBrick;
+
+  /// No description provided for @wallFamilyAerated.
+  ///
+  /// In en, this message translates to:
+  /// **'Aerated concrete'**
+  String get wallFamilyAerated;
+
+  /// No description provided for @wallFamilyConcrete.
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete'**
+  String get wallFamilyConcrete;
+
+  /// No description provided for @wallFamilyPlasterboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Plasterboard'**
+  String get wallFamilyPlasterboard;
+
+  /// No description provided for @wallFamilyBrickEps.
+  ///
+  /// In en, this message translates to:
+  /// **'Brick + EPS'**
+  String get wallFamilyBrickEps;
+
+  /// No description provided for @wallFamilyBrickWool.
+  ///
+  /// In en, this message translates to:
+  /// **'Brick + wool'**
+  String get wallFamilyBrickWool;
+
+  /// No description provided for @wallFamilyAeratedWool.
+  ///
+  /// In en, this message translates to:
+  /// **'Aerated concrete + wool'**
+  String get wallFamilyAeratedWool;
+
+  /// No description provided for @wallFamilyConcreteWool.
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete + wool'**
+  String get wallFamilyConcreteWool;
+
+  /// No description provided for @wallFamilySandwich.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandwich panel'**
+  String get wallFamilySandwich;
+
+  /// No description provided for @wallFamilyLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Round logs'**
+  String get wallFamilyLogs;
+
+  /// No description provided for @compositionDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get compositionDetails;
+
+  /// No description provided for @compositionTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Composition'**
+  String get compositionTab;
+
+  /// No description provided for @compositionPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get compositionPreset;
+
+  /// No description provided for @compositionTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get compositionTotal;
+
+  /// No description provided for @compositionScopeType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type ({count})'**
+  String compositionScopeType(int count);
+
+  /// No description provided for @compositionScopeSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected ({count})'**
+  String compositionScopeSelection(int count);
+
+  /// No description provided for @compositionScopeThis.
+  ///
+  /// In en, this message translates to:
+  /// **'Only this'**
+  String get compositionScopeThis;
+
+  /// No description provided for @compositionFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get compositionFavorites;
+
+  /// No description provided for @compositionNoMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches'**
+  String get compositionNoMatches;
+
+  /// No description provided for @railingModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get railingModel;
+
+  /// No description provided for @railingLegacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Current parapet'**
+  String get railingLegacy;
+
+  /// No description provided for @railingSolidCap.
+  ///
+  /// In en, this message translates to:
+  /// **'Solid'**
+  String get railingSolidCap;
+
+  /// No description provided for @railingSolidStainless.
+  ///
+  /// In en, this message translates to:
+  /// **'Solid + stainless'**
+  String get railingSolidStainless;
+
+  /// No description provided for @railingGlassChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Glass · channel'**
+  String get railingGlassChannel;
+
+  /// No description provided for @railingGlassPosts.
+  ///
+  /// In en, this message translates to:
+  /// **'Glass · posts'**
+  String get railingGlassPosts;
+
+  /// No description provided for @railingVerticalBars.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical bars'**
+  String get railingVerticalBars;
+
+  /// No description provided for @railingVerticalSlats.
+  ///
+  /// In en, this message translates to:
+  /// **'Slats'**
+  String get railingVerticalSlats;
+
+  /// No description provided for @railingHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get railingHeight;
+
+  /// No description provided for @railingSolidHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Solid part'**
+  String get railingSolidHeight;
+
+  /// No description provided for @railingTotalHeightHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Total height, including the handrail.'**
+  String get railingTotalHeightHelp;
+
+  /// No description provided for @railingMount.
+  ///
+  /// In en, this message translates to:
+  /// **'Mounting'**
+  String get railingMount;
+
+  /// No description provided for @railingMountTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Top'**
+  String get railingMountTop;
+
+  /// No description provided for @railingMountSide.
+  ///
+  /// In en, this message translates to:
+  /// **'Fascia'**
+  String get railingMountSide;
+
+  /// No description provided for @railingHandrailDiameter.
+  ///
+  /// In en, this message translates to:
+  /// **'Handrail Ø'**
+  String get railingHandrailDiameter;
+
+  /// No description provided for @railingPostSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Post'**
+  String get railingPostSize;
+
+  /// No description provided for @railingPostSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum bay'**
+  String get railingPostSpacing;
+
+  /// No description provided for @railingGlassThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Glass'**
+  String get railingGlassThickness;
+
+  /// No description provided for @railingPanelWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum panel'**
+  String get railingPanelWidth;
+
+  /// No description provided for @railingPanelGap.
+  ///
+  /// In en, this message translates to:
+  /// **'Joint'**
+  String get railingPanelGap;
+
+  /// No description provided for @railingBottomGap.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom gap'**
+  String get railingBottomGap;
+
+  /// No description provided for @railingInfillSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Spacing'**
+  String get railingInfillSpacing;
+
+  /// No description provided for @railingInfillWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get railingInfillWidth;
+
+  /// No description provided for @railingInfillDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Depth'**
+  String get railingInfillDepth;
+
+  /// No description provided for @railingCopingThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Coping'**
+  String get railingCopingThickness;
+
+  /// No description provided for @railingChannelWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel width'**
+  String get railingChannelWidth;
+
+  /// No description provided for @railingChannelHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel height'**
+  String get railingChannelHeight;
+
+  /// No description provided for @railingInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the railing dimensions.'**
+  String get railingInvalid;
+
+  /// No description provided for @railingHasOpenings.
+  ///
+  /// In en, this message translates to:
+  /// **'Move or remove the wall’s doors and windows first.'**
+  String get railingHasOpenings;
+
+  /// No description provided for @railingUnsupportedOpenings.
+  ///
+  /// In en, this message translates to:
+  /// **'This railing cannot host doors or windows.'**
+  String get railingUnsupportedOpenings;
+
+  /// No description provided for @roofParapet.
+  ///
+  /// In en, this message translates to:
+  /// **'Parapet'**
+  String get roofParapet;
+
+  /// No description provided for @roofParapetEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Parapet (Attic Wall)'**
+  String get roofParapetEnable;
+
+  /// No description provided for @roofParapetAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Parapet'**
+  String get roofParapetAdd;
+
+  /// No description provided for @roofParapetRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Parapet'**
+  String get roofParapetRemove;
+
+  /// No description provided for @roofParapetHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Parapet Height'**
+  String get roofParapetHeight;
+
+  /// No description provided for @roofParapetCore.
+  ///
+  /// In en, this message translates to:
+  /// **'Structural Core'**
+  String get roofParapetCore;
+
+  /// No description provided for @roofParapetInsulation.
+  ///
+  /// In en, this message translates to:
+  /// **'Exterior Insulation'**
+  String get roofParapetInsulation;
+
+  /// No description provided for @roofParapetInteriorFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Interior Finish'**
+  String get roofParapetInteriorFinish;
+
+  /// No description provided for @roofParapetCoping.
+  ///
+  /// In en, this message translates to:
+  /// **'Coping Cap'**
+  String get roofParapetCoping;
+
+  /// No description provided for @roofParapetCopingProjection.
+  ///
+  /// In en, this message translates to:
+  /// **'Coping Drip Overhang'**
+  String get roofParapetCopingProjection;
+
+  /// No description provided for @roofDownpipeType.
+  ///
+  /// In en, this message translates to:
+  /// **'Discharge Route'**
+  String get roofDownpipeType;
+
+  /// No description provided for @roofDownpipeExternal.
+  ///
+  /// In en, this message translates to:
+  /// **'External on Facade'**
+  String get roofDownpipeExternal;
+
+  /// No description provided for @roofDownpipeInternal.
+  ///
+  /// In en, this message translates to:
+  /// **'Internal Vertical Shaft (VT)'**
+  String get roofDownpipeInternal;
 }
 
 class _AppLocalizationsDelegate

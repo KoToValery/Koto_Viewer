@@ -149,7 +149,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('roof-layers-apply')));
         await tester.pumpAndSettle();
         expect(applied, 0);
-        await tester.enterText(width, '18');
+        await tester.enterText(width, project.units.toUnit(.18).toString());
         await tester.pumpAndSettle();
         final pipe = find.text('${l.architectDrainagePipe} 1');
         await tester.ensureVisible(pipe);
@@ -159,7 +159,10 @@ void main() {
           TextFormField,
           l.architectDrainageOffset,
         );
-        await tester.enterText(offset, '2,5');
+        await tester.enterText(
+          offset,
+          project.units.toUnit(2.5).toString().replaceAll('.', ','),
+        );
         await tester.tap(find.widgetWithText(FilledButton, l.save).last);
         await tester.pumpAndSettle();
         expect(find.text(l.architectDrainageReady), findsOneWidget);

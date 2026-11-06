@@ -16,6 +16,7 @@ class ArchitectRoofPanelFields extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n, p = value;
+    final unit = project?.units ?? ArchitectUnit.centimeters;
     Widget number(
       String key,
       String label,
@@ -27,11 +28,11 @@ class ArchitectRoofPanelFields extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: ArchitectRoofNumberField(
         key: ValueKey('roof-panel-$key'),
-        value: degrees ? v : v * 1000,
+        value: degrees ? v : unit.toUnit(v),
         label: label,
-        unit: degrees ? '°' : 'mm',
-        min: min,
-        onChanged: (v) => onChanged(update(degrees ? v : v / 1000)),
+        unit: degrees ? '°' : unit.symbol,
+        min: degrees ? min : unit.toUnit(min / 1000),
+        onChanged: (v) => onChanged(update(degrees ? v : unit.fromUnit(v))),
       ),
     );
     return Column(

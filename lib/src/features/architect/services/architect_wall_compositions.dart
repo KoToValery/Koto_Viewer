@@ -4,6 +4,11 @@ import '../models/architect_wall.dart';
 import 'architect_command_controller.dart';
 import 'architect_wall_connection_policy.dart';
 
+/// Kept distinct so the editor can explain a refused conversion precisely.
+class ArchitectRailingOpeningsError extends ArgumentError {
+  ArchitectRailingOpeningsError() : super('Railing cannot host openings');
+}
+
 class SetArchitectWallPlinth extends ArchitectModelCommand {
   final String storeyId;
   final Set<String> wallIds;
@@ -46,6 +51,9 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
   final ArchitectWallPlinth? plinth;
   final ArchitectWallPlinthPatch? plinthPatch;
   final bool preserveComposition;
+
+  /// An explicitly edited instance height. Shared type edits preserve heights.
+  final double? railingHeight;
   const SetArchitectWallComposition({
     required this.type,
     this.replaceTypeId,
@@ -54,10 +62,14 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
     this.plinth,
     this.plinthPatch,
     this.preserveComposition = false,
+    this.railingHeight,
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
-    ArchitectMaterialLayer.validate(type.resolvedLayers);
+    if (type.railing == null || type.railing!.hasSolidBody) {
+      ArchitectMaterialLayer.validate(type.resolvedLayers);
+    }
+    type.railing?.validate(type.customHeight ?? 1.05);
     type.system.validate(type.totalThickness);
     plinth?.validate();
     if (type.id.isEmpty) throw ArgumentError('Empty wall type ID');
@@ -75,10 +87,23 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
                   : (s.id == storeyId && wallIds.contains(wall.id)))
                 () {
                   found.add(wall.id);
+                  if (!preserveComposition &&
+                      type.railing != null &&
+                      (wall.doors.isNotEmpty || wall.windows.isNotEmpty)) {
+                    throw ArchitectRailingOpeningsError();
+                  }
                   final composed = preserveComposition
                       ? wall
                       : wall.copyWith(
                           system: type.system,
+                          railing: type.railing,
+                          clearRailing: type.railing == null,
+                          height: replaceTypeId == null && type.railing != null
+                              ? railingHeight
+                              : null,
+                          followStoreyHeight: type.railing != null
+                              ? false
+                              : wall.followStoreyHeight,
                           systemPlacement: wall.system.kind == type.system.kind
                               ? wall.systemPlacement
                               : const ArchitectWallSystemPlacement(),
@@ -86,8 +111,10 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
                           thickness: type.totalThickness,
                           insulationThicknessOverride: type.insulationThickness,
                           wallTypeId: type.id,
-                          location: wall.locationMode == WallResolutionMode.manual
-                              ? wall.location : type.resolvedLocation,
+                          location:
+                              wall.locationMode == WallResolutionMode.manual
+                              ? wall.location
+                              : type.resolvedLocation,
                           parapet: type.isParapet,
                           parapetFinish: type.isParapet
                               ? type.parapetFinish
@@ -97,7 +124,10 @@ class SetArchitectWallComposition extends ArchitectModelCommand {
                   final region =
                       plinthPatch?.apply(wall.plinth) ?? plinth ?? wall.plinth;
                   return composed.copyWith(
-                    plinth: composed.isExterior && !composed.system.isLog
+                    plinth:
+                        composed.isExterior &&
+                            !composed.system.isLog &&
+                            composed.railing == null
                         ? region
                         : region.copyWith(enabled: false),
                   );

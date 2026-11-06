@@ -11,9 +11,13 @@ import 'package:kotoview/src/features/architect/rendering/architect_roof_painter
 import 'package:kotoview/src/features/architect/rendering/architect_snap_geometry.dart';
 import 'package:kotoview/src/features/architect/services/architect_building_section.dart';
 import 'package:kotoview/src/features/architect/services/architect_polygon_dimensions.dart';
+import 'package:kotoview/src/features/architect/models/architect_roof_drainage.dart';
 import 'package:kotoview/src/features/architect/services/architect_polygon_geometry.dart';
+import 'package:kotoview/src/features/architect/services/architect_roof_drainage_geometry.dart';
 import 'package:kotoview/src/features/architect/services/architect_roof_geometry.dart';
 import 'package:kotoview/src/features/architect/services/architect_roof_tool.dart';
+import 'package:kotoview/src/features/bim_editing/geometry/bim_polygon_geometry.dart';
+import 'package:kotoview/src/features/bim_editing/interaction/bim_polygon_editor.dart';
 
 void main() {
   group('ArchitectRoofPlane Model & Serialization', () {
@@ -1132,6 +1136,276 @@ void main() {
       expect(multiPlanes, isNotNull);
       expect(multiPlanes!.length, greaterThanOrEqualTo(2));
       expect(tool.isDrafting, isFalse);
+    });
+  });
+
+  group('Roof Parapet Model & Layered Geometry', () {
+    test('ArchitectParapet default values and totalThickness computation', () {
+      const defaultParapet = ArchitectParapet();
+      expect(defaultParapet.enabled, isFalse);
+      expect(defaultParapet.height, closeTo(0.45, 1e-4));
+      expect(defaultParapet.coreThickness, closeTo(0.25, 1e-4));
+      expect(defaultParapet.exteriorInsulationThickness, closeTo(0.10, 1e-4));
+      expect(defaultParapet.interiorFinishThickness, closeTo(0.02, 1e-4));
+      expect(defaultParapet.hasCoping, isTrue);
+      expect(defaultParapet.copingProjection, closeTo(0.05, 1e-4));
+
+      // totalThickness = 0.25 + 0.10 + 0.02 = 0.37m (37cm)
+      expect(defaultParapet.totalThickness, closeTo(0.37, 1e-4));
+    });
+
+    test('ArchitectParapet serializes and deserializes cleanly', () {
+      const original = ArchitectParapet(
+        enabled: true,
+        height: 0.60,
+        coreThickness: 0.20,
+        exteriorInsulationThickness: 0.12,
+        interiorFinishThickness: 0.03,
+        hasCoping: false,
+        copingProjection: 0.08,
+      );
+
+      final json = original.toJson();
+      final restored = ArchitectParapet.fromJson(json);
+
+      expect(restored.enabled, isTrue);
+      expect(restored.height, closeTo(0.60, 1e-4));
+      expect(restored.coreThickness, closeTo(0.20, 1e-4));
+      expect(restored.exteriorInsulationThickness, closeTo(0.12, 1e-4));
+      expect(restored.interiorFinishThickness, closeTo(0.03, 1e-4));
+      expect(restored.hasCoping, isFalse);
+      expect(restored.copingProjection, closeTo(0.08, 1e-4));
+      expect(restored.totalThickness, closeTo(0.35, 1e-4));
+    });
+
+    test('ArchitectRoofPlane stores and serializes parapet configuration', () {
+      final plane = ArchitectRoofPlane(
+        id: 'flat_roof_1',
+        storeyId: 's_roof',
+        points: const [
+          Offset(0, 0),
+          Offset(8, 0),
+          Offset(8, 6),
+          Offset(0, 6),
+        ],
+        slopeDegrees: 2.0,
+        parapet: const ArchitectParapet(
+          enabled: true,
+          height: 0.50,
+          coreThickness: 0.25,
+          exteriorInsulationThickness: 0.10,
+          interiorFinishThickness: 0.02,
+        ),
+      );
+
+      expect(plane.parapet.enabled, isTrue);
+      expect(plane.parapet.height, closeTo(0.50, 1e-4));
+
+      final json = plane.toJson();
+      final restored = ArchitectRoofPlane.fromJson(json);
+      expect(restored.parapet.enabled, isTrue);
+      expect(restored.parapet.height, closeTo(0.50, 1e-4));
+      expect(restored.parapet.coreThickness, closeTo(0.25, 1e-4));
+      expect(restored.parapet.exteriorInsulationThickness, closeTo(0.10, 1e-4));
+      expect(restored.parapet.interiorFinishThickness, closeTo(0.02, 1e-4));
+    });
+
+    test('generateAutoRoof for flat roof preset configures default parapet', () {
+      final wall = ArchitectWall(
+        id: 'w1',
+        startPoint: const Offset(0, 0),
+        endPoint: const Offset(10, 0),
+        thickness: 0.25,
+      );
+      final storey = ArchitectStorey(
+        id: 's1',
+        name: 'Storey 1',
+        elevation: 0.0,
+        height: 2.80,
+        walls: [
+          wall,
+          ArchitectWall(id: 'w2', startPoint: const Offset(10, 0), endPoint: const Offset(10, 8), thickness: 0.25),
+          ArchitectWall(id: 'w3', startPoint: const Offset(10, 8), endPoint: const Offset(0, 8), thickness: 0.25),
+          ArchitectWall(id: 'w4', startPoint: const Offset(0, 8), endPoint: const Offset(0, 0), thickness: 0.25),
+        ],
+      );
+      final project = ArchitectProject(
+        id: 'p_flat',
+        name: 'Flat Project',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: [storey],
+        activeStoreyId: 's1',
+      );
+
+      final planes = ArchitectRoofGeometry.generateAutoRoof(
+        project: project,
+        type: AutoRoofType.flat,
+      );
+
+      expect(planes.isNotEmpty, isTrue);
+      expect(planes.first.parapet.enabled, isTrue);
+      expect(planes.first.slopeDegrees, closeTo(1.5, 1e-4));
+    });
+  });
+
+  group('Internal Drainage & Downpipe Penetrators', () {
+    test('ArchitectDownpipe supports internal vertical pipes descending through building', () {
+      const pipe = ArchitectDownpipe(
+        id: 'downpipe_int',
+        offset: 3.0,
+        isInternal: true,
+      );
+
+      expect(pipe.isInternal, isTrue);
+      final json = pipe.toJson();
+      expect(json['isInternal'], isTrue);
+
+      final restored = ArchitectDownpipe.fromJson(json);
+      expect(restored.isInternal, isTrue);
+      expect(restored.offset, closeTo(3.0, 1e-4));
+    });
+
+    test('routes internal downpipe through intermediate storeys straight down to ground', () {
+      final project = ArchitectProject(
+        id: 'p_drain',
+        name: 'Drain Project',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: const [
+          ArchitectStorey(id: 's0', name: 'Ground', elevation: 0.0, height: 2.80),
+          ArchitectStorey(id: 's1', name: 'Floor 1', elevation: 2.80, height: 2.80),
+          ArchitectStorey(id: 's2', name: 'Roof Level', elevation: 5.60, height: 2.80),
+        ],
+        activeStoreyId: 's2',
+      );
+
+      final roof = ArchitectRoofPlane(
+        id: 'flat_roof',
+        storeyId: 's2',
+        points: const [
+          Offset(0, 0),
+          Offset(10, 0),
+          Offset(10, 8),
+          Offset(0, 8),
+        ],
+        assembly: ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.flatWarm),
+        parapet: const ArchitectParapet(enabled: true),
+      );
+
+      const pipe = ArchitectDownpipe(
+        id: 'vt_1',
+        offset: 5.0,
+        isInternal: true,
+      );
+
+      final floor = project.storeys.last;
+      final route = ArchitectRoofDrainageGeometry.route(
+        project,
+        floor,
+        roof,
+        pipe,
+      );
+
+      expect(route.status, ArchitectDownpipeStatus.ready);
+      expect(route.points.isNotEmpty, isTrue);
+      // Descends straight down to ground level outlet elevation (z = 0.15)
+      expect(route.points.last.z, closeTo(0.15, 1e-4));
+      // X and Y stay vertical in internal downpipe
+      expect(route.points.last.x, closeTo(route.points.first.x, 1e-3));
+      expect(route.points.last.y, closeTo(route.points.first.y, 1e-3));
+    });
+  });
+
+  group('Multi-Edge Overhang Dragging & Inter-Roof Edge Snapping', () {
+    test('hitTestEdgeIndex detects edge both directly and via offset overhang handle', () {
+      final roof = ArchitectRoofPlane(
+        id: 'roof_test',
+        storeyId: 's1',
+        points: const [
+          Offset(0, 0),
+          Offset(10, 0),
+          Offset(10, 6),
+          Offset(0, 6),
+        ],
+      );
+
+      // Hit directly on bottom edge (5, 0)
+      final directHit = ArchitectRoofTool.hitTestEdgeIndex(
+        roof,
+        const Offset(5, 0.05),
+        scale: 1.0,
+      );
+      expect(directHit, 0);
+
+      // Hit at offset handle location calculated for edge 0
+      final handlePos = BimPolygonEditor.offsetEdgeHandle(
+        roof.points,
+        0,
+        1.0,
+        50.0,
+      );
+      final handleHit = ArchitectRoofTool.hitTestEdgeIndex(
+        roof,
+        handlePos,
+        scale: 1.0,
+      );
+      expect(handleHit, 0);
+
+      // Hit far away returns null
+      final miss = ArchitectRoofTool.hitTestEdgeIndex(
+        roof,
+        const Offset(20, 20),
+        scale: 1.0,
+      );
+      expect(miss, isNull);
+    });
+
+    test('BimPolygonEditor snaps dragged edge collinear to neighboring reference edge', () {
+      final editor = BimPolygonEditor<Offset>(
+        pointOf: (p) => p,
+        isSnapped: (p) => p != Offset.zero,
+      );
+
+      // Polygon 1: (0,0) to (10,0) to (10,5) to (0,5)
+      // Dragging edge 2 (top edge: (10,5) -> (0,5))
+      final poly = const [
+        Offset(0, 0),
+        Offset(10, 0),
+        Offset(10, 5),
+        Offset(0, 5),
+      ];
+
+      // Neighboring reference roof edge has a parallel ridge line at y = 8.0
+      const referenceTargetY = 8.0;
+
+      final started = editor.startEdge(
+        'roof_1',
+        poly,
+        2, // edge (10,5) -> (0,5)
+        const Offset(5, 5),
+        1.0,
+        mode: BimPolygonEdgeMode.extendCatheti,
+      );
+      expect(started, isTrue);
+
+      // User drags towards y = 7.95 (close to 8.0 within mergeRadius of 0.25m)
+      editor.update(
+        const Offset(5, 7.95),
+        (moving) {
+          // Snap function simulates snapping to reference roof line y = 8.0
+          if ((moving.dy - referenceTargetY).abs() < 0.2) {
+            return Offset(moving.dx, referenceTargetY);
+          }
+          return Offset.zero;
+        },
+        0.25, // mergeRadius
+      );
+
+      expect(editor.preview, isNotNull);
+      // Edge 2 vertices should snap cleanly to y = 8.0
+      expect(editor.preview![2].dy, closeTo(referenceTargetY, 1e-4));
+      expect(editor.preview![3].dy, closeTo(referenceTargetY, 1e-4));
     });
   });
 }

@@ -23,6 +23,7 @@ import '../models/architect_zone.dart';
 import 'dart:async';
 import '../services/architect_properties_session.dart';
 import '../services/architect_wall_compositions.dart';
+import '../services/architect_wall_library.dart';
 import 'architect_properties_shell.dart';
 import 'architect_property_number_field.dart';
 import 'architect_properties_plan_preview.dart';
@@ -675,12 +676,19 @@ class _ArchitectElementPropertiesDialogState
       textValues: _patch,
     ).apply(widget.project);
     if (_composition != null) {
+      final originalWall = widget.project.activeStorey.walls
+          .firstWhere((wall) => widget.elementIds.contains(wall.id));
+      final compositionHeight = _composition!.customHeight;
+      final heightEdited = _composition!.railing != null &&
+          compositionHeight != null &&
+          (compositionHeight - originalWall.height).abs() > 1e-9;
       next = SetArchitectWallComposition(
         type: _composition!,
         storeyId: widget.project.activeStoreyId,
         wallIds: widget.elementIds,
         plinthPatch: _region,
         preserveComposition: !_compositionChanged,
+        railingHeight: heightEdited ? compositionHeight : null,
       ).apply(next);
     }
     if (_flipMixed) {
@@ -726,6 +734,9 @@ class _ArchitectElementPropertiesDialogState
       if (notify) widget.onPreview?.call(_draft);
       super.setState(() => _error = null);
       return true;
+    } on ArchitectRailingOpeningsError {
+      super.setState(() => _error = context.l10n.railingHasOpenings);
+      return false;
     } on ArgumentError {
       super.setState(() => _error = context.l10n.propertiesInvalid);
       return false;
@@ -822,6 +833,8 @@ class _ArchitectElementPropertiesDialogState
       system: w.system,
       totalThickness: w.thickness,
       parapetFinish: w.parapetFinish,
+      railing: w.railing,
+      customHeight: w.height,
       usage: w.isParapet
           ? WallUsage.parapet
           : w.isExterior
@@ -836,10 +849,8 @@ class _ArchitectElementPropertiesDialogState
   Future<void> _pickType() async {
     final result = await showArchitectWallTypePicker(
       context,
-      types: [
-        ...ArchitectWallType.standardCatalog(includeSpecial: true),
-        ...widget.project.wallTypes.where((t) => t.isCatalogType),
-      ].where((t) => t.isParapet == _wallType().isParapet).toList(),
+      types: ArchitectWallLibrary.available(widget.project.wallTypes)
+          .where((t) => t.isParapet == _wallType().isParapet).toList(),
       activeType: _composition ?? _wallType(),
       unit: widget.project.units,
       projectId: widget.project.id,
@@ -1657,6 +1668,7 @@ class _ArchitectElementPropertiesDialogState
           .map(
             (w) => jsonEncode([
               w.system.toJson(),
+              w.railing?.toJson(),
               w.resolvedLayers.map((l) => l.toJson()..remove('id')).toList(),
             ]),
           )

@@ -747,6 +747,89 @@ class ArchitectRoofAssembly {
 
 // === SECTION: ROOF PLANE MODEL ===
 
+// === SECTION: ROOF PARAPET (БОРД) ===
+
+/// Layered parapet / attic wall for flat and low-pitch roofs.
+class ArchitectParapet {
+  final bool enabled;
+
+  /// Height of parapet above the roof deck (metres, e.g. 0.45 = 45 cm).
+  final double height;
+
+  /// Structural core thickness (metres, e.g. 0.25 = 25 cm).
+  final double coreThickness;
+
+  /// Exterior insulation thickness (metres, e.g. 0.10 = 10 cm, to align flush with facade).
+  final double exteriorInsulationThickness;
+
+  /// Interior finishing layer thickness (metres, e.g. 0.02 = 2 cm).
+  final double interiorFinishThickness;
+
+  /// Whether the parapet is capped with a stone/sheet metal coping cap (шапка).
+  final bool hasCoping;
+
+  /// Coping drip edge projection beyond the parapet faces (metres, e.g. 0.05 = 5 cm).
+  final double copingProjection;
+
+  const ArchitectParapet({
+    this.enabled = false,
+    this.height = 0.45,
+    this.coreThickness = 0.25,
+    this.exteriorInsulationThickness = 0.10,
+    this.interiorFinishThickness = 0.02,
+    this.hasCoping = true,
+    this.copingProjection = 0.05,
+  });
+
+  double get totalThickness =>
+      coreThickness + exteriorInsulationThickness + interiorFinishThickness;
+
+  ArchitectParapet copyWith({
+    bool? enabled,
+    double? height,
+    double? coreThickness,
+    double? exteriorInsulationThickness,
+    double? interiorFinishThickness,
+    bool? hasCoping,
+    double? copingProjection,
+  }) => ArchitectParapet(
+    enabled: enabled ?? this.enabled,
+    height: height ?? this.height,
+    coreThickness: coreThickness ?? this.coreThickness,
+    exteriorInsulationThickness:
+        exteriorInsulationThickness ?? this.exteriorInsulationThickness,
+    interiorFinishThickness:
+        interiorFinishThickness ?? this.interiorFinishThickness,
+    hasCoping: hasCoping ?? this.hasCoping,
+    copingProjection: copingProjection ?? this.copingProjection,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'enabled': enabled,
+    'height': height,
+    'coreThickness': coreThickness,
+    'exteriorInsulationThickness': exteriorInsulationThickness,
+    'interiorFinishThickness': interiorFinishThickness,
+    'hasCoping': hasCoping,
+    'copingProjection': copingProjection,
+  };
+
+  factory ArchitectParapet.fromJson(Map json) {
+    double numVal(Object? v, double fallback) =>
+        v is num && v.isFinite ? v.toDouble() : fallback;
+    return ArchitectParapet(
+      enabled: json['enabled'] == true,
+      height: numVal(json['height'], 0.45),
+      coreThickness: numVal(json['coreThickness'], 0.25),
+      exteriorInsulationThickness:
+          numVal(json['exteriorInsulationThickness'], 0.10),
+      interiorFinishThickness: numVal(json['interiorFinishThickness'], 0.02),
+      hasCoping: json['hasCoping'] != false,
+      copingProjection: numVal(json['copingProjection'], 0.05),
+    );
+  }
+}
+
 /// A single sloped or flat roof plane (покривен скат) in 2D plan and 3D space.
 ///
 /// The reference surface `elevationAt(pt)` is the bearing underside of the rafters
@@ -778,6 +861,9 @@ class ArchitectRoofPlane {
   bool isSlopeLocked;
   final ArchitectRoofDrainage drainage;
 
+  /// Integrated parapet (борд) for flat roofs.
+  final ArchitectParapet parapet;
+
   /// Whether this plane has a broken Mansard (Gambrel / пречупен) pitch.
   final bool isMansard;
 
@@ -806,6 +892,7 @@ class ArchitectRoofPlane {
     this.roofGroupId,
     this.isSlopeLocked = true,
     this.drainage = const ArchitectRoofDrainage(),
+    this.parapet = const ArchitectParapet(),
     this.isMansard = false,
     this.upperSlopeDegrees = 25.0,
     this.breakDistance,
@@ -1112,6 +1199,7 @@ class ArchitectRoofPlane {
     String? roofGroupId,
     bool? isSlopeLocked,
     ArchitectRoofDrainage? drainage,
+    ArchitectParapet? parapet,
     bool? isMansard,
     double? upperSlopeDegrees,
     double? breakDistance,
@@ -1136,6 +1224,7 @@ class ArchitectRoofPlane {
     roofGroupId: roofGroupId ?? this.roofGroupId,
     isSlopeLocked: isSlopeLocked ?? this.isSlopeLocked,
     drainage: drainage ?? this.drainage,
+    parapet: parapet ?? this.parapet,
     isMansard: isMansard ?? this.isMansard,
     upperSlopeDegrees: upperSlopeDegrees ?? this.upperSlopeDegrees,
     breakDistance: clearBreakDistance
@@ -1164,6 +1253,7 @@ class ArchitectRoofPlane {
     'roofGroupId': roofGroupId,
     'isSlopeLocked': isSlopeLocked,
     'drainage': drainage.toJson(),
+    if (parapet.enabled) 'parapet': parapet.toJson(),
     'isMansard': isMansard,
     'upperSlopeDegrees': upperSlopeDegrees,
     if (breakDistance != null) 'breakDistance': breakDistance,
@@ -1200,6 +1290,9 @@ class ArchitectRoofPlane {
       roofGroupId: json['roofGroupId'] as String?,
       isSlopeLocked: json['isSlopeLocked'] as bool? ?? true,
       drainage: ArchitectRoofDrainage.fromJson(json['drainage'] as Map? ?? {}),
+      parapet: json['parapet'] != null
+          ? ArchitectParapet.fromJson(json['parapet'] as Map)
+          : const ArchitectParapet(),
       isMansard: json['isMansard'] as bool? ?? false,
       upperSlopeDegrees:
           (json['upperSlopeDegrees'] as num?)?.toDouble() ?? 25.0,

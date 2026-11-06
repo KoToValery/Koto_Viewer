@@ -624,6 +624,10 @@ void main() {
           final drag = await tester.startGesture(grip);
           await drag.moveTo(target);
           await tester.pump();
+          // The preview must track the finger, rather than jump on release.
+          expect(workspace.overlay(tester).newPointCandidate!.dx,
+            closeTo(x, .01));
+          expect(model.project, same(original));
           await drag.up();
           await tester.pumpAndSettle();
           expect(model.project, same(original));

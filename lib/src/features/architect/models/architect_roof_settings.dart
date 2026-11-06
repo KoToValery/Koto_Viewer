@@ -18,6 +18,7 @@ enum ArchitectRoofSetting {
   gutterWidth,
   gutterDepth,
   pipes,
+  parapet,
 }
 
 /// A settings snapshot plus the fields explicitly changed by the editor.
@@ -28,6 +29,7 @@ class ArchitectRoofLayersResult {
   final double? baseElevationOffset, manualSupportDistance, breakDistance;
   final bool attachToWalls, pickDownpipe, applyToGroup, saveForNewRoofs;
   final ArchitectRoofDrainage drainage;
+  final ArchitectParapet parapet;
   final Set<ArchitectRoofSetting> changes;
   const ArchitectRoofLayersResult({
     required this.assembly,
@@ -38,6 +40,7 @@ class ArchitectRoofLayersResult {
     this.attachToWalls = true,
     this.manualSupportDistance,
     this.drainage = const ArchitectRoofDrainage(),
+    this.parapet = const ArchitectParapet(),
     this.pickDownpipe = false,
     this.applyToGroup = false,
     this.saveForNewRoofs = false,

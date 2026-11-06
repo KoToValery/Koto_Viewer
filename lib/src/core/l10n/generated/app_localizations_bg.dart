@@ -11203,4 +11203,211 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectServiceVentOutletHelp =>
       'Отворен отдушник Ø110 над покрива с водоплътен борд и обшивка. Автоматичната височина и излизането над покрива могат да се променят.';
+
+  @override
+  String architectNewPointDistanceTitle(int endpoint) {
+    return 'От край $endpoint';
+  }
+
+  @override
+  String architectNewPointDistanceHelp(int endpoint) {
+    return 'Разстояние по стената от край $endpoint. Докоснете за точна стойност.';
+  }
+
+  @override
+  String get architectNewPointDistanceInvalid =>
+      'Точката трябва да е в стената, извън краища и отвори.';
+
+  @override
+  String get wallFamilyBrick => 'Тухла';
+
+  @override
+  String get wallFamilyAerated => 'Газобетон';
+
+  @override
+  String get wallFamilyConcrete => 'Бетон';
+
+  @override
+  String get wallFamilyPlasterboard => 'Гипсокартон';
+
+  @override
+  String get wallFamilyBrickEps => 'Тухла + EPS';
+
+  @override
+  String get wallFamilyBrickWool => 'Тухла + вата';
+
+  @override
+  String get wallFamilyAeratedWool => 'Газобетон + вата';
+
+  @override
+  String get wallFamilyConcreteWool => 'Бетон + вата';
+
+  @override
+  String get wallFamilySandwich => 'Сандвич';
+
+  @override
+  String get wallFamilyLogs => 'Трупи';
+
+  @override
+  String get compositionDetails => 'Детайли';
+
+  @override
+  String get compositionTab => 'Състав';
+
+  @override
+  String get compositionPreset => 'Тип';
+
+  @override
+  String get compositionTotal => 'Общо';
+
+  @override
+  String compositionScopeType(int count) {
+    return 'Типът ($count)';
+  }
+
+  @override
+  String compositionScopeSelection(int count) {
+    return 'Избраните ($count)';
+  }
+
+  @override
+  String get compositionScopeThis => 'Само тази';
+
+  @override
+  String get compositionFavorites => 'Любими';
+
+  @override
+  String get compositionNoMatches => 'Няма съвпадения';
+
+  @override
+  String get railingModel => 'Модел';
+
+  @override
+  String get railingLegacy => 'Текущ парапет';
+
+  @override
+  String get railingSolidCap => 'Плътен';
+
+  @override
+  String get railingSolidStainless => 'Плътен + инокс';
+
+  @override
+  String get railingGlassChannel => 'Стъкло · профил';
+
+  @override
+  String get railingGlassPosts => 'Стъкло · стойки';
+
+  @override
+  String get railingVerticalBars => 'Вертикален';
+
+  @override
+  String get railingVerticalSlats => 'Ламели';
+
+  @override
+  String get railingHeight => 'Височина';
+
+  @override
+  String get railingSolidHeight => 'Плътна част';
+
+  @override
+  String get railingTotalHeightHelp =>
+      'Обща височина, включително ръкохватката.';
+
+  @override
+  String get railingMount => 'Монтаж';
+
+  @override
+  String get railingMountTop => 'Отгоре';
+
+  @override
+  String get railingMountSide => 'Челно';
+
+  @override
+  String get railingHandrailDiameter => 'Ръкохватка Ø';
+
+  @override
+  String get railingPostSize => 'Стойка';
+
+  @override
+  String get railingPostSpacing => 'Поле до';
+
+  @override
+  String get railingGlassThickness => 'Стъкло';
+
+  @override
+  String get railingPanelWidth => 'Пано до';
+
+  @override
+  String get railingPanelGap => 'Фуга';
+
+  @override
+  String get railingBottomGap => 'Долен просвет';
+
+  @override
+  String get railingInfillSpacing => 'Стъпка';
+
+  @override
+  String get railingInfillWidth => 'Ширина';
+
+  @override
+  String get railingInfillDepth => 'Дълбочина';
+
+  @override
+  String get railingCopingThickness => 'Шапка';
+
+  @override
+  String get railingChannelWidth => 'Ширина профил';
+
+  @override
+  String get railingChannelHeight => 'Височина профил';
+
+  @override
+  String get railingInvalid => 'Провери размерите на парапета.';
+
+  @override
+  String get railingHasOpenings =>
+      'Първо премести или премахни вратите и прозорците от стената.';
+
+  @override
+  String get railingUnsupportedOpenings =>
+      'Този парапет не приема врати или прозорци.';
+
+  @override
+  String get roofParapet => 'Борд';
+
+  @override
+  String get roofParapetEnable => 'Борд (Парапет)';
+
+  @override
+  String get roofParapetAdd => 'Добави борд';
+
+  @override
+  String get roofParapetRemove => 'Премахни борд';
+
+  @override
+  String get roofParapetHeight => 'Височина на борд';
+
+  @override
+  String get roofParapetCore => 'Конструктивен слой';
+
+  @override
+  String get roofParapetInsulation => 'Външна изолация';
+
+  @override
+  String get roofParapetInteriorFinish => 'Вътрешен слой';
+
+  @override
+  String get roofParapetCoping => 'Шапка на борд';
+
+  @override
+  String get roofParapetCopingProjection => 'Надстърчане на шапка';
+
+  @override
+  String get roofDownpipeType => 'Тип спускане';
+
+  @override
+  String get roofDownpipeExternal => 'Външно по фасада';
+
+  @override
+  String get roofDownpipeInternal => 'Вътрешно през плочи (ВТ)';
 }

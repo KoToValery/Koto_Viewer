@@ -252,6 +252,15 @@ class ArchitectRoofGeometry {
       eavesOverhang: overhang,
       assembly: assembly.copyWith(),
       roofGroupId: groupId,
+      parapet: type == AutoRoofType.flat
+          ? const ArchitectParapet(enabled: true)
+          : const ArchitectParapet(),
+      drainage: type == AutoRoofType.flat
+          ? const ArchitectRoofDrainage(
+              position: ArchitectGutterPosition.internal,
+              showGutter: true,
+            )
+          : const ArchitectRoofDrainage(),
     );
 
     switch (type) {

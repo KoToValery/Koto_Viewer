@@ -75,6 +75,10 @@ import '../widgets/architect_wall_composition_editor.dart';
 import '../widgets/architect_wall_arc_dimension_dialog.dart';
 import '../widgets/architect_wall_arc_dimension_overlay.dart';
 import '../services/architect_wall_arc_editing.dart';
+import '../services/architect_new_point_measure.dart';
+import '../services/architect_wall_library.dart';
+import '../widgets/architect_new_point_overlay.dart';
+import '../widgets/architect_new_point_distance_dialog.dart';
 
 
 import '../services/architect_wall_compositions.dart';
@@ -200,6 +204,8 @@ import '../rendering/architect_midpoint_tracking.dart';
 import '../rendering/architect_wall_snap.dart';
 
 import '../rendering/architect_column_snap.dart';
+import '../rendering/architect_service_snap.dart';
+import '../components/definitions/service_components.dart';
 
 import '../rendering/architect_wall_geometry.dart';
 
@@ -3042,6 +3048,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             location: wall.location,
             customHeight: wall.height,
             parapetFinish: wall.parapetFinish,
+            railing: wall.railing,
           );
           _wallThickness = wall.thickness;
           _wallReference = wall.referenceLine;
@@ -4054,13 +4061,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _activeTool == ArchitectTool.window ||
 
-        _activeTool == ArchitectTool.column) {
+        _activeTool == ArchitectTool.column ||
+
+        _activeTool == ArchitectTool.services ||
+
+        _activeTool == ArchitectTool.opening) {
 
       _activeTool = ArchitectTool.pan;
 
       _cursorModel = null;
 
       _columnPreviewPoint = null;
+
+      _servicePreviewPoint = null;
 
     }
 
@@ -4075,6 +4088,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _selectedElementId = null;
 
       _selectedSectionRoofId = null;
+
+      _columnPreviewPoint = null;
+
+      _servicePreviewPoint = null;
 
     });
 
@@ -4221,6 +4238,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _selectedSectionRoofId = null;
 
+      _radialMenuScreenPosition = null;
+
+      _radialMenuElementId = null;
+
       _axisTool.deselect();
 
       _zoneTool.cancelEditingZone();
@@ -4281,17 +4302,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   static const _wallTypePreference = 'architect_wall_type';
 
-  List<ArchitectWallType> get _availableWallTypes {
-    final types = _project.wallTypes.where((t) => t.isCatalogType).toList();
-    if (types.isEmpty) return ArchitectWallType.standardCatalog(includeSpecial: true);
-    return [
-      ...types,
-      for (final preset in ArchitectWallType.standardCatalog(includeSpecial: true,
-      ))
-        if (preset.system.isSpecial &&
-            !types.any((t) => t.system.kind == preset.system.kind)) preset,
-    ];
-  }
+  List<ArchitectWallType> get _availableWallTypes =>
+      ArchitectWallLibrary.available(_project.wallTypes);
 
 
 
@@ -4303,13 +4315,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       (type) => type.id == _preferredWallTypeId,
 
-      orElse: () => types.firstWhere(
-
-        (type) => type.usage == WallUsage.exterior && type.hasInsulation,
-
-        orElse: () => types.first,
-
-      ),
+      orElse: () => _project.wallTypes.where((type) => type.isCatalogType &&
+          type.usage == WallUsage.exterior && type.hasInsulation).firstOrNull ??
+          types.firstWhere(
+            (type) => type.usage == WallUsage.exterior && type.hasInsulation,
+            orElse: () => types.first,
+          ),
 
     );
 
@@ -4468,6 +4479,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       exteriorSideMode: _wallExteriorSideMode,
       system: _activeWallType?.system ?? const ArchitectWallSystem(),
       layers: _activeWallType?.resolvedLayers ?? const [],
+      railing: _activeWallType?.railing,
+      height: _activeWallType?.customHeight ?? _project.activeStorey.height,
       wallTypeId: _activeWallType?.id,
       insulationThicknessOverride: _activeWallType?.insulationThickness,
     );
@@ -4625,7 +4638,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   final _polygonEditor = ArchitectPolygonEditor();
 
-  ArchitectPolygonEdgeMode _polygonEdgeMode = ArchitectPolygonEdgeMode.pull;
+  ArchitectPolygonEdgeMode _polygonEdgeMode = ArchitectPolygonEdgeMode.move;
 
   String? _polygonEditId;
 
@@ -4914,6 +4927,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool get _commandCanConfirm =>
       _commandReady ||
       _commandLiveCandidate != null ||
+      (_elementMovePreview != null && _elementMoveDelta != null && _elementMoveDelta != Offset.zero) ||
       (_newPointTargetId != null && _newPointValid) ||
       (_commandAction == ArchitectRadialAction.cutOpening &&
           _canConfirmContour);
@@ -5019,6 +5033,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _newPointDragOffset = Offset.zero;
     _newPointHoleIndex = null;
     _newPointLeaderLine = null;
+    _newPointDistanceEditorOpen = false;
+    _newPointExactPlacement = false;
     _polygonEditId = null;
     _polygonSelectedEdge = null;
     _cutOpeningTargetId = null;
@@ -5058,6 +5074,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     if (_commandLiveCandidate case final candidate?) {
       _commands.commit(candidate);
+    } else if (_elementMovePreview != null) {
+      _commands.commit(_elementMovePreview!);
     }
     if (!_commandReady &&
         _commandAction == ArchitectRadialAction.cutOpening &&
@@ -5246,6 +5264,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   (Offset, Offset)? _newPointLeaderLine;
   ArchitectStorey? _newPointSource;
   bool _newPointValid = false;
+  bool _newPointDistanceEditorOpen = false;
+  bool _newPointExactPlacement = false;
   Offset _newPointDragOffset = Offset.zero;
   Offset _newPointGripDirection = const Offset(0, -1);
 
@@ -6091,6 +6111,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   double _columnPreviewRotation = 0.0;
 
+  Offset? _servicePreviewPoint;
+
+  double _servicePreviewRotation = 0.0;
+
   bool get _columnPreviewIsOccupied =>
 
       _columnPreviewPoint != null &&
@@ -6314,6 +6338,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (normalized != null) {
 
       _elementMoveSession?.update(_elementMoveContext, (_) => normalized);
+
+      if (_commandPreview != null) {
+        _captureGeometryPreview(normalized);
+      }
 
     }
 
@@ -6954,6 +6982,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (_newPointTargetId != null) {
+      if (_newPointDistanceEditorOpen) return;
+      _newPointExactPlacement = false;
       _touchPosition = null;
       _placingWithHold = false;
       final grip = _newPointGrip;
@@ -7092,7 +7122,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_polygonDistanceOpen) return;
 
     _selectPolygonContour(rawModel);
-    if (_polygonEditId != null) _selectPolygonEdge(rawModel);
+    if (_polygonEditId != null || _selectedRoof != null) {
+      _selectPolygonEdge(rawModel);
+    }
 
     if (_linearDraftTool &&
 
@@ -7212,15 +7244,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             !polygon.any((p) => (p - rawModel).distance < 10 / _currentScale)
 
-        ? ArchitectPolygonDimensions.hitEdge(
-
-            polygon,
-
-            rawModel,
-
-            18 / _currentScale,
-
-          )
+        ? () {
+            final direct = ArchitectPolygonDimensions.hitEdge(
+              polygon,
+              rawModel,
+              20 / _currentScale,
+            );
+            if (direct != null) return direct;
+            if (_handleOffsetLength > 0) {
+              var best = 28 / _currentScale;
+              int? hitHandle;
+              for (var i = 0; i < polygon.length; i++) {
+                final handle = ArchitectPolygonEditor.offsetEdgeHandle(
+                  polygon,
+                  i,
+                  _currentScale,
+                  _handleOffsetLength,
+                );
+                final distance = (rawModel - handle).distance;
+                if (distance <= best) {
+                  hitHandle = i;
+                  best = distance;
+                }
+              }
+              return hitHandle;
+            }
+            return null;
+          }()
 
         : null;
 
@@ -7268,14 +7318,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           ? ArchitectPolygonEdgeMode.extendCatheti
 
-                          : ArchitectPolygonEdgeMode.pull)
+                          : _polygonEdgeMode)
 
                     : _polygonEdgeMode,
 
                 offsetLengthPx: _handleOffsetLength,
 
               ))) {
-
+      if (movableEdge != null) {
+        _polygonSelectedEdge = movableEdge;
+      }
       _elementMoveOriginal = _project;
 
       _elementMovePreview = _project;
@@ -8242,6 +8294,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    if (_activeTool == ArchitectTool.services && _servicePreviewPoint != null) {
+      return _servicePreviewPoint;
+    }
+
+    if (_activeTool == ArchitectTool.column && _columnPreviewPoint != null) {
+      return _columnPreviewPoint;
+    }
+
     return _draftEnd ?? raw;
 
   }
@@ -8416,6 +8476,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   (Offset, double) _snapComponent(Offset rawModel, ArchitectComponentDefinition def,
   ) {
+
+    if (def.category == ArchitectComponentCategory.services || def is ServiceComponentDefinition) {
+      if (_servicePreviewPoint != null) {
+        return (_servicePreviewPoint!, _servicePreviewRotation * math.pi / 180.0);
+      }
+      final activeParams = ComponentLibraryService.instance.activeParameters;
+      final (w, d) = def is ServiceComponentDefinition
+          ? def.footprint(activeParams)
+          : (0.4, 0.4);
+      final snap = ArchitectServiceSnap.resolve(
+        raw: rawModel,
+        project: _project,
+        width: w,
+        depth: d,
+        currentRotationDeg: _servicePreviewRotation,
+        tolerance: (_touchInput ? 16 : 10) / _currentScale,
+        magnetic: _magnetEnabled,
+        underlay: _currentUnderlayDoc,
+        frame: widget.underlayFrame,
+      );
+      return (snap.point, (snap.angleDeg ?? _servicePreviewRotation) * math.pi / 180.0);
+    }
 
     if (def.placementMode == ComponentPlacementMode.wallAttached) {
 
@@ -9040,6 +9122,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final rawModel = _screenToModel(screenPosition);
 
+    // An active edit command takes priority over the adopted drawing tool.
+    // Otherwise an idle Wall tool consumes movement before the point preview.
+    if (_newPointTargetId != null) {
+      if (!_newPointDistanceEditorOpen && !_newPointExactPlacement) {
+        _updateNewPointCandidate(
+          rawModel + _newPointDragOffset / _currentScale, isTouch: _touchInput,
+        );
+      }
+      return;
+    }
+
     if (_offsetOptions != null) {
 
       _previewOffset(rawModel);
@@ -9214,7 +9307,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       final snap = _polygonEditor.activeSnap;
 
-      _activeSnapLabel = snap?.snapLabel;
+      _activeSnapLabel = _selectedRoof != null ? null : snap?.snapLabel;
 
       _activeMagneticGuides = snap?.magneticGuides ?? [];
 
@@ -9470,6 +9563,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       return;
 
+    }
+
+    if (_activeTool == ArchitectTool.services && !_isActivelyDraggingHandle) {
+      final activeDef = ComponentLibraryService.instance.activeDefinition;
+      final activeParams = ComponentLibraryService.instance.activeParameters;
+      final (w, d) = activeDef is ServiceComponentDefinition
+          ? activeDef.footprint(activeParams)
+          : (0.4, 0.4);
+      final snap = ArchitectServiceSnap.resolve(
+        raw: rawModel,
+        project: _project,
+        width: w,
+        depth: d,
+        currentRotationDeg: _servicePreviewRotation,
+        tolerance: (_touchInput ? 16 : 10) / _currentScale,
+        magnetic: _magnetEnabled,
+        underlay: _currentUnderlayDoc,
+        frame: widget.underlayFrame,
+      );
+      _servicePreviewPoint = snap.point;
+      _servicePreviewRotation = snap.angleDeg ?? 0.0;
+      _activeSnapLabel = snap.snapLabel;
+      _activeMagneticGuides = snap.magneticGuides;
+      _cursorModel = _servicePreviewPoint;
+      _repaintPreview();
+      return;
     }
 
 
@@ -10063,15 +10182,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    if (_newPointTargetId != null) {
-      _updateNewPointCandidate(
-        rawModel + _newPointDragOffset / _currentScale, isTouch: _touchInput,
-      );
-      return;
-    }
-
-
-
     // 7. Slab or Roof drafting candidate
 
     if ((_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain) &&
@@ -10432,6 +10542,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (_newPointTargetId != null) {
+      if (_newPointDistanceEditorOpen || _newPointExactPlacement) return;
       _updateNewPointCandidate(
         _screenToModel(event.localPosition + _newPointDragOffset), isTouch: _touchInput,
       );
@@ -10986,11 +11097,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (preview != null) {
 
-        _commands.commit(preview);
+        if (_commandPreview != null) {
+          _captureGeometryPreview(preview);
+        } else {
+          _commands.commit(preview);
 
-        _saveBiMProjectIfAttached();
+          _saveBiMProjectIfAttached();
 
-        _syncAutoZones(preview.activeStorey);
+          _syncAutoZones(preview.activeStorey);
+        }
 
       }
 
@@ -11347,12 +11462,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    if (_polygonEditId != null) {
-
+    if (_polygonEditId != null || _selectedRoof != null) {
       _selectPolygonEdge(rawModel);
-
       return;
-
     }
 
     if (_wallCutIds.isNotEmpty) {
@@ -12534,6 +12646,41 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     // 6B. In Component tool
 
     if (_activeTool.usesComponent) {
+      final hitComp = _project.activeStorey.components.reversed.where((c) {
+        if (!c.isVisible) return false;
+        return c.containsPoint(rawModel);
+      }).firstOrNull;
+
+      if (hitComp != null) {
+        _selectAt(rawModel);
+        return;
+      }
+
+      if (_activeTool == ArchitectTool.services) {
+        final activeDef = ComponentLibraryService.instance.activeDefinition;
+        final activeParams = ComponentLibraryService.instance.activeParameters;
+        final (w, d) = activeDef is ServiceComponentDefinition
+            ? activeDef.footprint(activeParams)
+            : (0.4, 0.4);
+        final snap = ArchitectServiceSnap.resolve(
+          raw: rawModel,
+          project: _project,
+          width: w,
+          depth: d,
+          currentRotationDeg: _servicePreviewRotation,
+          tolerance: (_touchInput ? 16 : 10) / _currentScale,
+          magnetic: _magnetEnabled,
+          underlay: _currentUnderlayDoc,
+          frame: widget.underlayFrame,
+        );
+        setState(() {
+          _servicePreviewPoint = snap.point;
+          _servicePreviewRotation = snap.angleDeg ?? 0.0;
+          _cursorModel = snap.point;
+        });
+        _repaintPreview();
+        return;
+      }
 
       final activeDef = ComponentLibraryService.instance.activeDefinition;
 
@@ -12588,6 +12735,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     if (_activeTool == ArchitectTool.column) {
+      if (_project.activeStorey.columns.any(
+        (column) => column.containsPoint(rawModel, tolerance: 10 / _currentScale),
+      )) {
+        _selectAt(rawModel);
+        return;
+      }
 
       final snap = _snapColumn(rawModel);
 
@@ -12607,62 +12760,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       }
 
-      final rot = snap.angleDeg ?? _columnPreviewRotation;
-
-      final (_, newCol) = _elementTool.placeColumn(
-
-        storey: _project.activeStorey,
-
-        point: pt,
-
-        rotationDeg: rot,
-
-        existingColumns: _project.storeys.expand((s) => s.columns),
-
-      );
-
       setState(() {
-
-        _commands.execute(
-
-          PlaceArchitectColumn(
-
-            storeyId: _project.activeStorey.id,
-
-            column: newCol,
-
-          ),
-      applyDraftingDefaults: true,
-    );
-
+        _columnPreviewPoint = pt;
+        _columnPreviewRotation = snap.angleDeg ?? _columnPreviewRotation;
+        _cursorModel = pt;
       });
-
-      _saveBiMProjectIfAttached();
-
-      HapticFeedback.lightImpact();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-
-        SnackBar(
-
-          content: Text(
-
-            context.l10n.architectColumnPlaced(
-
-              '${(newCol.width * 100).round()}x${(newCol.depth * 100).round()}',
-
-            ),
-
-          ),
-
-          duration: const Duration(seconds: 1),
-
-        ),
-
-      );
-
+      _repaintPreview();
       return;
-
     }
 
 
@@ -14051,6 +14155,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       wallTypeId: _activeWallType?.id,
 
       parapetFinish: _activeWallType?.parapetFinish,
+      railing: _activeWallType?.railing,
 
       parapet: _activeWallType?.isParapet,
 
@@ -14069,7 +14174,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _placeDraftSegment(
 
-        CreateArchitectWall(storeyId: _project.activeStorey.id, wall: newWall), newWall.id,
+        CreateArchitectWall(storeyId: _project.activeStorey.id, wall: newWall,
+          wallType: _activeWallType), newWall.id,
 
         continueChain ?? (_wallMode == WallDraftingMode.chained),
 
@@ -15506,6 +15612,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       animation: Listenable.merge([_viewport, _previewRevision, UiSettingsService.contextMenu,
       ]),
       builder: (context, child) {
+        if (_newPointTargetId != null) return const SizedBox.shrink();
         final columnGaps = _commands.isPlan && _effectiveSelection.length == 1
             ? ArchitectColumnClearance.forColumn(_elementMovePreview ?? _project, _effectiveSelection.single) : const <ArchitectColumnClearance>[];
         final clearances = [..._wallClearances, for(final gap in columnGaps)
@@ -15737,34 +15844,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     );
 
-    if (edge == null) {
-
-      var best = 18 / _currentScale;
-
+    if (edge == null && _handleOffsetLength > 0) {
+      var best = 28 / _currentScale;
       for (var i = 0; i < polygon.length; i++) {
-
         final handle = ArchitectPolygonEditor.offsetEdgeHandle(
-
           polygon,
-
           i,
-
           _currentScale,
-
+          _handleOffsetLength,
         );
-
         final distance = (point - handle).distance;
-
         if (distance <= best) {
-
           edge = i;
-
           best = distance;
-
         }
-
       }
-
     }
 
     if (edge != null) {
@@ -19076,6 +19170,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _newPointValid = false;
       _newPointDragOffset = Offset.zero;
       _newPointLeaderLine = null;
+      _newPointDistanceEditorOpen = false;
+      _newPointExactPlacement = false;
       _radialMenuScreenPosition = null;
       _activeSnapLabel = null;
     });
@@ -19110,6 +19206,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _newPointCandidate = null;
 
       _newPointLeaderLine = null;
+
+      _newPointDistanceEditorOpen = false;
+      _newPointExactPlacement = false;
 
       _activeSnapLabel = null;
 
@@ -19739,6 +19838,60 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _repaintPreview();
   }
 
+  ArchitectWall? get _newPointWall => _newPointTargetId == null ? null
+      : (_newPointSource ?? _project.activeStorey).walls
+          .where((wall) => wall.id == _newPointTargetId).firstOrNull;
+
+  Future<void> _editNewPointDistance(int endpoint) async {
+    final wall = _newPointWall;
+    final candidate = _newPointCandidate;
+    final source = _newPointSource;
+    if (wall == null || candidate == null || source == null ||
+        _newPointDistanceEditorOpen) {
+      return;
+    }
+    final session = _commandPreview;
+    final commandContext = _commandContext;
+    final oldLabel = _activeSnapLabel;
+    final oldGuides = _activeMagneticGuides;
+    final oldExact = _newPointExactPlacement;
+    bool current() => mounted && identical(_commandPreview, session) &&
+        _commandContext == commandContext && identical(_newPointSource, source) &&
+        _newPointTargetId == wall.id;
+    Offset point(double distance) =>
+        ArchitectNewPointMeasure.pointAtDistance(wall, endpoint, distance);
+    bool accepts(double distance) {
+      if (!current()) return false;
+      try {
+        return InsertArchitectElementPoint.canInsert(source, wall.id, point(distance));
+      } on ArgumentError { return false; }
+    }
+    _newPointDistanceEditorOpen = true;
+    double? result;
+    try {
+      result = await showDialog<double>(context: context,
+        builder: (_) => ArchitectNewPointDistanceDialog(
+          project: _project, endpoint: endpoint,
+          distance: ArchitectNewPointMeasure(wall, candidate).distanceFrom(endpoint),
+          accepts: accepts,
+          onPreview: (distance) {
+            if (accepts(distance)) _setNewPointCandidate(point(distance), null, const []);
+          },
+        ));
+    } finally {
+      if (current()) {
+        _newPointDistanceEditorOpen = false;
+        if (result != null && accepts(result)) {
+          _setNewPointCandidate(point(result), null, const []);
+          _newPointExactPlacement = true;
+        } else {
+          _setNewPointCandidate(candidate, oldLabel, oldGuides);
+          _newPointExactPlacement = oldExact;
+        }
+      }
+    }
+  }
+
   void _commitNewPoint() {
 
     if (_newPointTargetId == null) return;
@@ -19820,6 +19973,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _newPointCandidate = null;
 
       _newPointLeaderLine = null;
+
+      _newPointDistanceEditorOpen = false;
+      _newPointExactPlacement = false;
 
       _activeSnapLabel = null;
 
@@ -20530,79 +20686,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
       case ArchitectRadialAction.delete:
-        if (_project.sections.any((s) => s.id == id)) {
-          _modelCommands.commit(
-            _project.copyWith(
-              sections: _project.sections.where((s) => s.id != id).toList(),
-            ),
-          );
-          _saveBiMProjectIfAttached();
-          setState(() {
-            _selectedElementId = null;
-            _selectionIds.remove(id);
-          });
-          HapticFeedback.heavyImpact();
-          break;
+        if (_selectionIds.isNotEmpty && _selectionIds.contains(id)) {
+          _deleteSelection();
+        } else {
+          _selectedElementId = id;
+          _selectionIds.add(id);
+          _deleteSelection();
         }
-        if (_project.elevations.any((e) => e.id == id)) {
-          _modelCommands.commit(
-            _project.copyWith(
-              elevations: _project.elevations.where((e) => e.id != id).toList(),
-            ),
-          );
-          _saveBiMProjectIfAttached();
-          setState(() {
-            _selectedElementId = null;
-            _selectionIds.remove(id);
-          });
-          HapticFeedback.heavyImpact();
-          break;
-        }
-        var storey = _project.activeStorey;
-
-        storey = _elementTool.deleteElementById(storey, id);
-
-        _commands.commit(
-
-          _project
-
-              .updateActiveStorey(
-
-                storey.copyWith(
-
-                  zones: storey.zones.where((z) => z.id != id).toList(),
-
-                  components: storey.components.where((c) => c.id != id).toList(),
-
-                ),
-
-              )
-
-              .copyWithGridAxes(
-
-                _project.gridAxes.where((a) => a.id != id).toList(),
-
-              ),
-
-        );
-
-        _saveBiMProjectIfAttached();
-
-        setState(() {
-
-          _selectedElementId = null;
-
-          _selectedZoneId = null;
-
-          _selectionIds.remove(id);
-
-        });
-
         HapticFeedback.heavyImpact();
-
         break;
-
-
 
       case ArchitectRadialAction.rename:
 
@@ -20748,13 +20840,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       //    (and a second tap on the already-selected edge sets it as the eaves edge).
 
       final edgeIdx = ArchitectRoofTool.hitTestEdgeIndex(
-
         selectedRoof,
-
         point,
-
         tolerance: math.min(18.0 / _currentScale, 0.35),
-
+        scale: _currentScale,
+        handleOffsetLength: _handleOffsetLength,
       );
 
       if (edgeIdx != null) {
@@ -20795,7 +20885,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-
+    if (selectedRoof != null && selectedRoof.containsPoint(point)) {
+      return;
+    }
 
     if (!_selectAt(point, toggle: _multiSelect)) _clearSelection();
 
@@ -21288,6 +21380,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         initialEavesOverhang: target?.eavesOverhang ?? _roofTool.eavesOverhang,
         initialEavesCut: target?.eavesCut ?? _roofTool.eavesCut,
         initialDrainage: target?.drainage ?? _roofTool.drainage,
+        initialParapet: target?.parapet ?? const ArchitectParapet(),
         initialBaseElevationOffset:
             target?.baseElevationOffset ??
             _roofTool.baseElevationOffset ??
@@ -21820,9 +21913,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           : ArchitectWallLocation.interior,
 
-      customHeight: previous?.customHeight,
+      customHeight: wall.height,
 
       parapetFinish: wall.parapetFinish,
+      railing: wall.railing,
 
     );
 
@@ -21888,6 +21982,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 preserveComposition: !changed,
 
+                railingHeight: next.railing != null && next.customHeight != wall.height
+                    ? next.customHeight : null,
+
               ),
 
             ]);
@@ -21895,6 +21992,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _saveBiMProjectIfAttached();
 
             return true;
+
+          } on ArchitectRailingOpeningsError {
+
+            rethrow;
 
           } on ArgumentError {
 
@@ -22294,9 +22395,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   : ArchitectWallLocation.interior,
 
-              customHeight: previous?.customHeight,
+              customHeight: next.height,
 
               parapetFinish: next.parapetFinish,
+              railing: next.railing,
 
             );
 
@@ -23129,7 +23231,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _deleteSelection() {
     _discardGeometryCommand();
 
-    final ids = _effectiveSelection;
+    final ids = _selectionIds.isNotEmpty ? Set<String>.of(_selectionIds) : _effectiveSelection;
 
     if (ids.isEmpty) return;
 
@@ -23138,9 +23240,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final storey = _elementTool.deleteElementsByIds(_project.activeStorey, ids);
 
     final nextStorey = storey.copyWith(
-
       zones: storey.zones.where((z) => !ids.contains(z.id)).toList(),
-
+      components: storey.components.where((c) => !ids.contains(c.id)).toList(),
     );
 
     final nextProject = _project
@@ -23158,6 +23259,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _saveBiMProjectIfAttached();
 
     _clearSelection();
+    setState(() {
+      _radialMenuScreenPosition = null;
+      _radialMenuElementId = null;
+    });
 
 
 
@@ -26782,6 +26887,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             HapticFeedback.selectionClick();
                           },
 
+                          onToggleParapet: () {
+                            final sel = _selectedRoof;
+                            if (sel == null) return;
+                            final next = sel.copyWith(
+                              parapet: sel.parapet.copyWith(enabled: !sel.parapet.enabled),
+                            );
+                            setState(() {
+                              _commands.execute(
+                                UpdateArchitectRoofPlane(
+                                  storeyId: _project.activeStoreyId,
+                                  roof: next,
+                                ),
+                              );
+                            });
+                            _saveBiMProjectIfAttached();
+                            HapticFeedback.selectionClick();
+                          },
+
                           onSelectedRoofUpperSlopeChanged: (upperSlopeDeg) {
                             final sel = _selectedRoof;
                             if (sel == null) return;
@@ -27311,6 +27434,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    if (_activeTool == ArchitectTool.services && _effectiveSelection.isEmpty) {
+      final center = _servicePreviewPoint ?? _cursorModel;
+      if (center == null) return null;
+      final activeDef = ComponentLibraryService.instance.activeDefinition;
+      final activeParams = ComponentLibraryService.instance.activeParameters;
+      final (w, d) = activeDef is ServiceComponentDefinition
+          ? activeDef.footprint(activeParams)
+          : (0.4, 0.4);
+      final halfWidth = w / 2;
+      final halfDepth = d / 2;
+      final angle = _servicePreviewRotation * math.pi / 180;
+      final cosine = math.cos(angle).abs();
+      final sine = math.sin(angle).abs();
+      return center + Offset(
+        halfWidth * cosine + halfDepth * sine,
+        -(halfWidth * sine + halfDepth * cosine),
+      );
+    }
+
+    if (_activeTool == ArchitectTool.opening && _draftStart != null && _draftEnd != null) {
+      return _draftEnd!;
+    }
+
     if (_activeTool == ArchitectTool.door ||
 
         _activeTool == ArchitectTool.window) {
@@ -27396,10 +27542,105 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool get _canConfirmDraft => _canConfirmDimension || _canConfirmRoofDraft ||
+      _canConfirmContour || _canConfirmZone ||
+      (_activeTool == ArchitectTool.services && _servicePreviewPoint != null) ||
+      (_activeTool == ArchitectTool.column && _columnPreviewPoint != null && !_columnPreviewIsOccupied) ||
+      (_activeTool == ArchitectTool.opening && _draftStart != null && _draftEnd != null);
 
-      _canConfirmContour || _canConfirmZone;
+  void _commitColumnPlacement() {
+    final pt = _columnPreviewPoint ?? _cursorModel;
+    if (pt == null || _columnPreviewIsOccupied) return;
+    final rot = _columnPreviewRotation;
+    final (_, newCol) = _elementTool.placeColumn(
+      storey: _project.activeStorey,
+      point: pt,
+      rotationDeg: rot,
+      existingColumns: _project.storeys.expand((s) => s.columns),
+    );
+    setState(() {
+      _commands.execute(
+        PlaceArchitectColumn(
+          storeyId: _project.activeStorey.id,
+          column: newCol,
+        ),
+        applyDraftingDefaults: true,
+      );
+      _columnPreviewPoint = null;
+    });
+    _saveBiMProjectIfAttached();
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.l10n.architectColumnPlaced(
+            '${(newCol.width * 100).round()}x${(newCol.depth * 100).round()}',
+          ),
+        ),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
 
+  void _commitServicePlacement() {
+    final pt = _servicePreviewPoint ?? _cursorModel;
+    if (pt == null) return;
+    final activeDef = ComponentLibraryService.instance.activeDefinition;
+    final activeParams = ComponentLibraryService.instance.activeParameters;
+    final rot = _servicePreviewRotation * math.pi / 180.0;
+    final newComp = ArchitectComponentInstance(
+      id: "comp_${DateTime.now().millisecondsSinceEpoch}",
+      definitionId: activeDef.id,
+      position: pt,
+      rotation: rot,
+      parameters: Map.of(activeParams),
+    );
+    final updatedComponents = [..._project.activeStorey.components, newComp];
+    final updatedStorey = _project.activeStorey.copyWith(
+      components: updatedComponents,
+    );
+    setState(() {
+      _commands.commit(
+        _project.copyWith(
+          storeys: [
+            for (final s in _project.storeys)
+              if (s.id == updatedStorey.id) updatedStorey else s,
+          ],
+        ),
+        applyDraftingDefaults: true,
+      );
+      _servicePreviewPoint = null;
+    });
+    _saveBiMProjectIfAttached();
+    HapticFeedback.lightImpact();
+  }
 
+  void _commitOpeningPlacement() {
+    if (_draftStart == null || _draftEnd == null) return;
+    final res = _elementTool.placeOpening(
+      storey: _project.activeStorey,
+      p1: _draftStart!,
+      p2: _draftEnd!,
+    );
+    if (res != null) {
+      setState(() {
+        _commands.commit(
+          _project.updateActiveStorey(res.$1),
+          applyDraftingDefaults: true,
+        );
+        _draftStart = null;
+        _draftEnd = null;
+        _wallArcEnd = null;
+      });
+      _saveBiMProjectIfAttached();
+      HapticFeedback.mediumImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectOpeningPlaced),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
 
   void _onConfirmDraft() {
 
@@ -27409,6 +27650,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       return;
 
+    }
+
+    if (_activeTool == ArchitectTool.services && _servicePreviewPoint != null) {
+      _commitServicePlacement();
+      return;
+    }
+
+    if (_activeTool == ArchitectTool.column && _columnPreviewPoint != null && !_columnPreviewIsOccupied) {
+      _commitColumnPlacement();
+      return;
+    }
+
+    if (_activeTool == ArchitectTool.opening && _draftStart != null && _draftEnd != null) {
+      _commitOpeningPlacement();
+      return;
     }
 
     if (_canConfirmContour) {
@@ -27808,10 +28064,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             : null,
 
-        onEditTap: _polygonEditId == null
-
+        onEditTap: (_polygonEditId == null && _selectedRoof == null)
             ? null
-
             : (position) => _selectPolygonEdge(_screenToModel(position)),
 
         isDraggingHandle: () => _selectionBoxDown != null || _newPointTargetId != null || _isActivelyDraggingHandle,
@@ -28587,6 +28841,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _buildShapeDimensionOverlay(),
 
+      _buildOpeningDimensionOverlay(),
+
       if (_activeTool == ArchitectTool.dimension &&
 
           !_multiSelect &&
@@ -28615,6 +28871,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           child: _buildSplitPromptBanner(),
 
         ),
+
+      if (_newPointTargetId != null && _newPointWall != null)
+        Positioned.fill(child: AnimatedBuilder(
+          animation: Listenable.merge([_viewport, _previewRevision]),
+          builder: (_, _) {
+            final wall = _newPointWall;
+            final candidate = _newPointCandidate;
+            if (wall == null || candidate == null) return const SizedBox.shrink();
+            return ArchitectNewPointOverlay(wall: wall, candidate: candidate,
+              darkCanvas: _canvasPalette.isDark,
+              gripOffset: _newPointGripOffset, valid: _newPointValid,
+              snapLabel: _localizedSnapLabel(_activeSnapLabel),
+              toScreen: _viewport.toScreen, toModel: _screenToModel,
+              format: _project.formatLength,
+              obstacles: ArchitectClearanceObstacles.forWalls(_project.activeStorey.walls),
+              onEdit: _editNewPointDistance);
+          },
+        )),
 
       if (_newPointTargetId != null)
 
@@ -29743,6 +30017,78 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   );
 
+  Widget _buildOpeningDimensionOverlay() => Positioned.fill(
+    child: ValueListenableBuilder<int>(
+      valueListenable: _previewRevision,
+      builder: (_, revision, child) {
+        if (_activeTool != ArchitectTool.opening || _draftStart == null || _draftEnd == null) {
+          return const SizedBox.shrink();
+        }
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final position = _viewport.toScreen(_draftEnd!);
+            final width = math.min(260.0, constraints.maxWidth - 16);
+            final left = (position.dx + 16).clamp(
+              8.0,
+              math.max(8.0, constraints.maxWidth - width - 8),
+            );
+            final top = (position.dy + 24).clamp(
+              8.0,
+              math.max(8.0, constraints.maxHeight - 265),
+            );
+            final delta = _draftEnd! - _draftStart!;
+            final circular = _elementTool.openingType == OpeningType.circular;
+            final values = circular
+                ? [math.max(delta.dx.abs(), delta.dy.abs())]
+                : [delta.dx.abs(), delta.dy.abs()];
+
+            return Stack(
+              children: [
+                Positioned(
+                  left: left.toDouble(),
+                  top: top.toDouble(),
+                  width: width,
+                  child: ArchitectShapeDimensionPanel(
+                    key: ValueKey((_draftStart, _elementTool.openingType)),
+                    values: [for (final v in values) _project.units.toUnit(v)],
+                    labels: circular
+                        ? [context.l10n.propertiesDiameter]
+                        : [
+                            context.l10n.architectShapeWidth,
+                            context.l10n.architectShapeHeight,
+                          ],
+                    unit: _project.units.symbol,
+                    decimals: _project.distanceDecimals,
+                    minimum: _project.units.toUnit(circular ? 0.02 : 0.15),
+                    onChanged: (index, value) {
+                      final meters = _project.units.fromUnit(value);
+                      final current = _draftEnd! - _draftStart!;
+                      if (circular) {
+                        final signX = current.dx < 0 ? -1.0 : 1.0;
+                        final signY = current.dy < 0 ? -1.0 : 1.0;
+                        _draftEnd = _draftStart! + Offset(signX * meters, signY * meters);
+                      } else {
+                        _draftEnd = _draftStart! + Offset(
+                          index == 0 ? (current.dx < 0 ? -meters : meters) : current.dx,
+                          index == 1 ? (current.dy < 0 ? -meters : meters) : current.dy,
+                        );
+                      }
+                      _activeMagneticGuides = [];
+                      _activeSnapLabel = null;
+                      _repaintPreview();
+                    },
+                    onSave: _commitOpeningPlacement,
+                    onCancel: _cancelDrafting,
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ),
+  );
+
 
 
   String? _localizedSnapLabel(String? label) {
@@ -29834,6 +30180,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       'Door jamb' => l10n.snapDoorJamb,
 
       'Window jamb' => l10n.snapWindowJamb,
+
+      'Opening jamb' => l10n.snapOpeningEdge,
+
+      'Corner' || 'Wall corner' => l10n.snapCorner,
+
+      'Wall face' => l10n.snapEdge,
 
       _ => label,
 
@@ -30161,6 +30513,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     activeWallInsulation: _activeWallType?.insulationThickness,
 
     activeWallTypeId: _activeWallType?.id,
+    activeWallRailing: _activeWallType?.railing,
+    activeWallHeight: _activeWallType?.customHeight,
 
     activeWallArcEnd: _wallArcEnd,
     activeWallArcBulge: _wallArcEnd == null ? null : _draftArcBulge,

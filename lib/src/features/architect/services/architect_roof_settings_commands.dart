@@ -106,6 +106,7 @@ class ApplyArchitectRoofSettings extends ArchitectModelCommand {
           ? false
           : null,
       drainage: drainage,
+      parapet: c.contains(ArchitectRoofSetting.parapet) ? s.parapet : null,
     );
     if (!next.slopeDegrees.isFinite ||
         next.slopeDegrees < 0 ||

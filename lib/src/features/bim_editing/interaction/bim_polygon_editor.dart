@@ -157,11 +157,13 @@ class BimPolygonEditor<TSnap> {
 
     // 3. Offset vertex handle check (outward leader handles)
     if (offsetLengthPx > 0) {
+      var offsetBest = hit != null ? best : offsetRadius;
       for (var i = 0; i < polygon.length; i++) {
         final h = offsetVertexHandle(polygon, i, scale, offsetLengthPx);
         final d = (raw - h).distance;
-        if (d < offsetRadius && d < best) {
+        if (d < offsetBest) {
           hit = i;
+          offsetBest = d;
           best = d;
           hitIsEdge = false;
           hitIsOffset = true;
@@ -173,8 +175,9 @@ class BimPolygonEditor<TSnap> {
       for (var i = 0; i < polygon.length; i++) {
         final h = offsetEdgeHandle(polygon, i, scale, offsetLengthPx);
         final d = (raw - h).distance;
-        if (d < offsetRadius && d < best) {
+        if (d < offsetBest) {
           hit = i;
+          offsetBest = d;
           best = d;
           hitIsEdge = true;
           hitIsOffset = true;
@@ -253,7 +256,7 @@ class BimPolygonEditor<TSnap> {
         if (!isSnapped(result)) continue;
         final correction = pointOf(result) - moving;
         final along = BimPolygonGeometry.dot(correction, n);
-        if ((correction - n * along).distance > 1e-7 || along.abs() >= best) {
+        if (along.abs() >= best || along.abs() > mergeRadius) {
           continue;
         }
         best = along.abs();

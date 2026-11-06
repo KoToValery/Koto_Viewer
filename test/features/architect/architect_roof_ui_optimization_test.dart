@@ -338,10 +338,19 @@ void main() {
           tester.element(find.byType(ArchitectRoofLayersDialog)),
         )!;
         await tester.tap(
-          find.byKey(ValueKey('roof-preset-${r.assembly.preset.name}')),
+          find.descendant(
+            of: find.byKey(const ValueKey('roof-composition-header')),
+            matching: find.byType(OutlinedButton),
+          ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text(l.architectRoofPresetFlatWarm).last);
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('composition-choice-preset_flatWarm')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('composition-choice-preset_flatWarm')),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.text(l.roofUiShape));
         await tester.pumpAndSettle();
@@ -447,7 +456,10 @@ void main() {
         await show(p.activeStorey.roofs.first, edge: 1);
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('roof-overhang-menu')), findsNothing);
-        expect(find.byKey(const ValueKey('roof-open-assembly')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('roof-open-assembly')),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull);
         tool.setDrawMode(RoofDrawMode.polygon);
         for (final point in const [Offset(0, 0), Offset(4, 0), Offset(4, 4)]) {

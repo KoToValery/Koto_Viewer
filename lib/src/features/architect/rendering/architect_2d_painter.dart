@@ -1,4 +1,5 @@
 import 'architect_selection_painter.dart';
+import 'architect_roof_drainage_painter.dart';
 import '../models/architect_line_style.dart';
 import '../services/architect_polyline_editing.dart';
 import '../models/architect_hatch_pattern.dart';
@@ -40,6 +41,7 @@ import 'architect_overhang_painter_helper.dart';
 import '../services/architect_roof_tool.dart';
 import 'architect_service_plan_painter.dart';
 import 'architect_roof_painter_helper.dart';
+import 'architect_railing_geometry.dart';
 
 enum ArchitectPaintLayer { all, model, interaction }
 
@@ -104,6 +106,8 @@ class Architect2dPainter extends CustomPainter {
   final double activeWallThickness;
   final WallReferenceLine activeWallReference;
   final String? activeWallTypeId;
+  final ArchitectRailingDesign? activeWallRailing;
+  final double? activeWallHeight;
   final WallExteriorSide activeWallExteriorSide;
   final bool activeWallIsExterior, activeWallSideManual;
   final Set<String> wallExteriorReviewIds;
@@ -245,6 +249,8 @@ class Architect2dPainter extends CustomPainter {
     this.activeWallThickness = 0.25,
     this.activeWallReference = WallReferenceLine.center,
     this.activeWallTypeId,
+    this.activeWallRailing,
+    this.activeWallHeight,
     this.activeWallExteriorSide = WallExteriorSide.left,
     this.activeWallIsExterior = true,
     this.activeWallSideManual = false,
@@ -455,6 +461,12 @@ class Architect2dPainter extends CustomPainter {
       if (!_project.activeStorey.isRoof) {
         ArchitectRoofPainterHelper.paintOverhead(canvas: canvas, project: _project,
           scale: zoomScale, color: palette.foreground(Colors.black));
+        ArchitectRoofDrainagePainter.paintStoreyPenetrations(
+          canvas,
+          _project,
+          _elementLayerStorey,
+          zoomScale,
+        );
       }
       ArchitectRoofPainterHelper.paintRoofs(
         canvas: canvas,
@@ -511,17 +523,17 @@ class Architect2dPainter extends CustomPainter {
       }
       if(marqueePoints.isEmpty) _drawPolygonEditing(canvas);
       _drawWallEndpointLeaderLine(canvas);
-      _drawNewPointPreview(canvas);
       _drawActiveDrafting(canvas);
-      final directionIds = {...wallExteriorReviewIds, ...selectedElementIds,
-        ?selectedElementId};
+      final directionIds = newPointCandidate != null ? const <String>{}
+          : {...wallExteriorReviewIds, ...selectedElementIds, ?selectedElementId};
       for (final wall in project.activeStorey.walls) {
         if (directionIds.contains(wall.id)) {
           ArchitectWallExteriorPainter.draw(canvas, wall, zoomScale,
             palette.foreground(Colors.black87));
         }
       }
-      for(final id in selectionPreviewActive?selectionPreviewIds:selectedElementIds) {
+      for(final id in newPointCandidate != null ? const <String>[]
+          : selectionPreviewActive?selectionPreviewIds:selectedElementIds) {
         final outline=ArchitectSelection.outline(project,id);
         if(selectionPreviewActive && selectionPreviewAddedIds.contains(id)) {
           ArchitectSelectionPainter.preview(canvas,outline,zoomScale,palette);
@@ -641,6 +653,8 @@ class Architect2dPainter extends CustomPainter {
             ..strokeWidth = 1.5 / zoomScale,
         );
       }
+      // This marker must remain above general cursor and selection graphics.
+      _drawNewPointPreview(canvas);
     }
     canvas.restore();
   }
@@ -678,6 +692,7 @@ class Architect2dPainter extends CustomPainter {
   }
 
   void _drawSelectedElement(Canvas canvas) {
+    if (newPointCandidate != null) return;
     if (selectedElementId == null) return;
     final walls = project.activeStorey.walls.where(
       (w) => w.id == selectedElementId,
@@ -691,7 +706,7 @@ class Architect2dPainter extends CustomPainter {
           ..color = Colors.cyan
           ..strokeWidth = 2 / zoomScale,
       );
-      _drawSelectedWallHandles(canvas, wall);
+      if (newPointCandidate == null) _drawSelectedWallHandles(canvas, wall);
       return;
     }
     final selected = _filterElements(project.activeStorey, selectedOnly: true);
@@ -938,17 +953,29 @@ class Architect2dPainter extends CustomPainter {
       _drawTouchGrip(canvas, to, draftingScale, candidateColor);
     }
 
-    // Direct candidate point dot
+    // A white knockout and crosshair remain legible on either canvas palette.
     canvas.drawCircle(
       newPointCandidate!,
-      5.0 / draftingScale,
-      Paint()..color = const Color(0x66000000),
+      8.0 / draftingScale,
+      Paint()..color = Colors.white,
     );
     canvas.drawCircle(
       newPointCandidate!,
-      4.0 / draftingScale,
-      Paint()..color = candidateColor,
+      7.0 / draftingScale,
+      Paint()..color = candidateColor..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6 / draftingScale,
     );
+    final center = newPointCandidate!;
+    final line = Paint()..color = candidateColor..strokeWidth = 1.5 / draftingScale;
+    final radius = (newPointValid ? 11.0 : 4.0) / draftingScale;
+    if (newPointValid) {
+      canvas.drawLine(center - Offset(radius, 0), center + Offset(radius, 0), line);
+      canvas.drawLine(center - Offset(0, radius), center + Offset(0, radius), line);
+      canvas.drawCircle(center, 2.0 / draftingScale, Paint()..color = candidateColor);
+    } else {
+      canvas.drawLine(center - Offset(radius, radius), center + Offset(radius, radius), line);
+      canvas.drawLine(center - Offset(radius, -radius), center + Offset(radius, -radius), line);
+    }
   }
 
   void _drawPolygonEditing(Canvas canvas) {
@@ -1199,8 +1226,18 @@ class Architect2dPainter extends CustomPainter {
       ..strokeWidth = 0.8 / draftingScale;
 
     for (final wall in activeStorey.walls) {
+      if (wall.railing != null) {
+        final railingPaint = Paint()
+          ..color = palette.foreground(const Color(0xff424242))
+          ..strokeWidth = ArchitectLineWeights.cutThin / zoomScale
+          ..style = PaintingStyle.stroke;
+        for (final path in ArchitectRailingGeometry.planPaths(wall, walls: activeStorey.walls)) {
+          canvas.drawPath(path, railingPaint);
+        }
+      }
       final isSelected =
-          wall.id == selectedElementId || selectedElementIds.contains(wall.id);
+          newPointCandidate == null &&
+          (wall.id == selectedElementId || selectedElementIds.contains(wall.id));
       final borderPaint = isSelected
           ? (Paint()
               ..color = const Color(0xFF00E5FF)
@@ -1660,7 +1697,7 @@ class Architect2dPainter extends CustomPainter {
         Paint()..color = const Color(0xFFFF9100),
       );
     }
-    if (cursorPosition != null &&
+    if (newPointCandidate == null && cursorPosition != null &&
         (activeTool == ArchitectTool.wall ||
             activeTool == ArchitectTool.cadLine ||
             activeTool == ArchitectTool.select ||
@@ -1712,7 +1749,7 @@ class Architect2dPainter extends CustomPainter {
       ArchitectSelectionPainter.marquee(canvas, marqueePolygon, marqueePoints, zoomScale, palette,
         contained:marqueeContained,candidate:marqueeCandidate);
     }
-    if (activeTool == ArchitectTool.wall &&
+    if (newPointCandidate == null && activeTool == ArchitectTool.wall &&
         cursorPosition != null &&
         showWallCursor) {
       final target = activeDraftEnd ?? cursorPosition!;
@@ -1765,6 +1802,8 @@ class Architect2dPainter extends CustomPainter {
         thickness: activeWallThickness,
         referenceLine: activeWallReference,
         wallTypeId: activeWallTypeId,
+        railing: activeWallRailing,
+        height: activeWallHeight ?? project.activeStorey.height,
         exteriorSide: activeWallExteriorSide,
         insulationThicknessOverride: activeWallInsulation,
       );
@@ -1777,6 +1816,13 @@ class Architect2dPainter extends CustomPainter {
           ..style = PaintingStyle.stroke,
         hatchColor: const Color(0xFF00B8CC),
       );
+      if (wall.railing != null) {
+        for (final path in ArchitectRailingGeometry.planPaths(wall)) {
+          canvas.drawPath(path, Paint()..color = const Color(0xff006e91)
+            ..strokeWidth = ArchitectLineWeights.cutThin / zoomScale
+            ..style = PaintingStyle.stroke);
+        }
+      }
       ArchitectWallExteriorPainter.draw(canvas, wall, zoomScale,
         palette.foreground(Colors.black87), provisional: !activeWallSideManual);
 

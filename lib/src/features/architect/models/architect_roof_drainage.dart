@@ -13,6 +13,7 @@ class ArchitectDownpipe {
   final double diameter, wallClearance, bendAngle, outletElevation;
   final String? facadeWallId;
   final bool visible;
+  final bool isInternal;
 
   /// Optional intermediate points: inward distance from outlet / world Z.
   final List<Offset> waypoints;
@@ -25,6 +26,7 @@ class ArchitectDownpipe {
     this.outletElevation = .15,
     this.facadeWallId,
     this.visible = true,
+    this.isInternal = false,
     this.waypoints = const [],
   });
   ArchitectDownpipe copyWith({
@@ -36,6 +38,7 @@ class ArchitectDownpipe {
     String? facadeWallId,
     bool clearFacade = false,
     bool? visible,
+    bool? isInternal,
     List<Offset>? waypoints,
   }) => ArchitectDownpipe(
     id: id,
@@ -46,6 +49,7 @@ class ArchitectDownpipe {
     outletElevation: outletElevation ?? this.outletElevation,
     facadeWallId: clearFacade ? null : facadeWallId ?? this.facadeWallId,
     visible: visible ?? this.visible,
+    isInternal: isInternal ?? this.isInternal,
     waypoints: waypoints ?? this.waypoints,
   );
   void validate() {
@@ -74,6 +78,7 @@ class ArchitectDownpipe {
     'outletElevation': outletElevation,
     'facadeWallId': facadeWallId,
     'visible': visible,
+    'isInternal': isInternal,
     'waypoints': [
       for (final p in waypoints) [p.dx, p.dy],
     ],
@@ -87,6 +92,7 @@ class ArchitectDownpipe {
     outletElevation: _number(json['outletElevation'], .15),
     facadeWallId: json['facadeWallId'] as String?,
     visible: json['visible'] != false,
+    isInternal: json['isInternal'] == true,
     waypoints: [
       for (final p in json['waypoints'] as List? ?? [])
         Offset((p[0] as num).toDouble(), (p[1] as num).toDouble()),

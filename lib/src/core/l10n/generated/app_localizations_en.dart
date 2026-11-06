@@ -11159,4 +11159,210 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectServiceVentOutletHelp =>
       'Open Ø110 roof vent with weather collar and flashing. Automatic height and the above-roof extension can be adjusted.';
+
+  @override
+  String architectNewPointDistanceTitle(int endpoint) {
+    return 'From end $endpoint';
+  }
+
+  @override
+  String architectNewPointDistanceHelp(int endpoint) {
+    return 'Distance along the wall from end $endpoint. Tap to enter an exact value.';
+  }
+
+  @override
+  String get architectNewPointDistanceInvalid =>
+      'Place the point within the wall, away from ends and openings.';
+
+  @override
+  String get wallFamilyBrick => 'Brick';
+
+  @override
+  String get wallFamilyAerated => 'Aerated concrete';
+
+  @override
+  String get wallFamilyConcrete => 'Concrete';
+
+  @override
+  String get wallFamilyPlasterboard => 'Plasterboard';
+
+  @override
+  String get wallFamilyBrickEps => 'Brick + EPS';
+
+  @override
+  String get wallFamilyBrickWool => 'Brick + wool';
+
+  @override
+  String get wallFamilyAeratedWool => 'Aerated concrete + wool';
+
+  @override
+  String get wallFamilyConcreteWool => 'Concrete + wool';
+
+  @override
+  String get wallFamilySandwich => 'Sandwich panel';
+
+  @override
+  String get wallFamilyLogs => 'Round logs';
+
+  @override
+  String get compositionDetails => 'Details';
+
+  @override
+  String get compositionTab => 'Composition';
+
+  @override
+  String get compositionPreset => 'Type';
+
+  @override
+  String get compositionTotal => 'Total';
+
+  @override
+  String compositionScopeType(int count) {
+    return 'Type ($count)';
+  }
+
+  @override
+  String compositionScopeSelection(int count) {
+    return 'Selected ($count)';
+  }
+
+  @override
+  String get compositionScopeThis => 'Only this';
+
+  @override
+  String get compositionFavorites => 'Favorites';
+
+  @override
+  String get compositionNoMatches => 'No matches';
+
+  @override
+  String get railingModel => 'Model';
+
+  @override
+  String get railingLegacy => 'Current parapet';
+
+  @override
+  String get railingSolidCap => 'Solid';
+
+  @override
+  String get railingSolidStainless => 'Solid + stainless';
+
+  @override
+  String get railingGlassChannel => 'Glass · channel';
+
+  @override
+  String get railingGlassPosts => 'Glass · posts';
+
+  @override
+  String get railingVerticalBars => 'Vertical bars';
+
+  @override
+  String get railingVerticalSlats => 'Slats';
+
+  @override
+  String get railingHeight => 'Height';
+
+  @override
+  String get railingSolidHeight => 'Solid part';
+
+  @override
+  String get railingTotalHeightHelp => 'Total height, including the handrail.';
+
+  @override
+  String get railingMount => 'Mounting';
+
+  @override
+  String get railingMountTop => 'Top';
+
+  @override
+  String get railingMountSide => 'Fascia';
+
+  @override
+  String get railingHandrailDiameter => 'Handrail Ø';
+
+  @override
+  String get railingPostSize => 'Post';
+
+  @override
+  String get railingPostSpacing => 'Maximum bay';
+
+  @override
+  String get railingGlassThickness => 'Glass';
+
+  @override
+  String get railingPanelWidth => 'Maximum panel';
+
+  @override
+  String get railingPanelGap => 'Joint';
+
+  @override
+  String get railingBottomGap => 'Bottom gap';
+
+  @override
+  String get railingInfillSpacing => 'Spacing';
+
+  @override
+  String get railingInfillWidth => 'Width';
+
+  @override
+  String get railingInfillDepth => 'Depth';
+
+  @override
+  String get railingCopingThickness => 'Coping';
+
+  @override
+  String get railingChannelWidth => 'Channel width';
+
+  @override
+  String get railingChannelHeight => 'Channel height';
+
+  @override
+  String get railingInvalid => 'Check the railing dimensions.';
+
+  @override
+  String get railingHasOpenings =>
+      'Move or remove the wall’s doors and windows first.';
+
+  @override
+  String get railingUnsupportedOpenings =>
+      'This railing cannot host doors or windows.';
+
+  @override
+  String get roofParapet => 'Parapet';
+
+  @override
+  String get roofParapetEnable => 'Parapet (Attic Wall)';
+
+  @override
+  String get roofParapetAdd => 'Add Parapet';
+
+  @override
+  String get roofParapetRemove => 'Remove Parapet';
+
+  @override
+  String get roofParapetHeight => 'Parapet Height';
+
+  @override
+  String get roofParapetCore => 'Structural Core';
+
+  @override
+  String get roofParapetInsulation => 'Exterior Insulation';
+
+  @override
+  String get roofParapetInteriorFinish => 'Interior Finish';
+
+  @override
+  String get roofParapetCoping => 'Coping Cap';
+
+  @override
+  String get roofParapetCopingProjection => 'Coping Drip Overhang';
+
+  @override
+  String get roofDownpipeType => 'Discharge Route';
+
+  @override
+  String get roofDownpipeExternal => 'External on Facade';
+
+  @override
+  String get roofDownpipeInternal => 'Internal Vertical Shaft (VT)';
 }

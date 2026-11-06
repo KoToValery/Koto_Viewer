@@ -3,6 +3,23 @@ import '../models/architect_wall_type.dart';
 import 'architect_material_layer_label.dart';
 import '../models/architect_project.dart' show ArchitectUnit;
 import '../services/architect_wall_catalog.dart';
+import '../services/architect_wall_library.dart';
+import 'architect_railing_label.dart';
+
+extension ArchitectWallFamilyLabel on ArchitectWallFamily {
+  String label(AppLocalizations l) => switch (this) {
+    ArchitectWallFamily.brick => l.wallFamilyBrick,
+    ArchitectWallFamily.aerated => l.wallFamilyAerated,
+    ArchitectWallFamily.concrete => l.wallFamilyConcrete,
+    ArchitectWallFamily.plasterboard => l.wallFamilyPlasterboard,
+    ArchitectWallFamily.brickEps => l.wallFamilyBrickEps,
+    ArchitectWallFamily.brickWool => l.wallFamilyBrickWool,
+    ArchitectWallFamily.aeratedWool => l.wallFamilyAeratedWool,
+    ArchitectWallFamily.concreteWool => l.wallFamilyConcreteWool,
+    ArchitectWallFamily.sandwich => l.wallFamilySandwich,
+    ArchitectWallFamily.logs => l.wallFamilyLogs,
+  };
+}
 
 extension ArchitectWallSystemLabel on ArchitectWallSystemKind {
   String label(AppLocalizations l) => switch (this) {
@@ -31,6 +48,9 @@ extension ArchitectWallTypeLabel on ArchitectWallType {
       : l.wallParapetHandrail;
 
   String catalogGroupLabel(AppLocalizations l, ArchitectUnit unit) {
+    if (railing != null) return railing!.kind.label(l);
+    final template = ArchitectWallLibrary.descriptorFor(this);
+    if (template != null) return template.family.label(l);
     if (system.isSpecial) {
       return l.wallMaterialThickness(
         system.kind.label(l),
@@ -62,6 +82,9 @@ extension ArchitectWallTypeLabel on ArchitectWallType {
     ArchitectUnit unit, {
     bool includeCore = true,
   }) {
+    if (railing != null) {
+      return '${railing!.kind.label(l)} · ${architectWallLength(customHeight ?? 1.05, unit)}';
+    }
     if (system.isLog) {
       return '${system.kind.label(l)} · ${l.wallLogSize(architectWallLength(totalThickness, unit))}';
     }
@@ -89,6 +112,12 @@ extension ArchitectWallTypeLabel on ArchitectWallType {
     bool grouped = false,
   }) {
     if (!isFactoryPreset && name.isNotEmpty) return name;
+    if (railing != null) return railing!.kind.label(l);
+    final template = ArchitectWallLibrary.descriptorFor(this);
+    if (template != null) {
+      final variant = factoryVariantLabel(unit);
+      return grouped ? variant : '${template.family.label(l)} · $variant';
+    }
     if (isParapet) {
       final composition = compositionLabel(l, unit);
       return grouped ? composition : '${parapetFinishLabel(l)} · $composition';
@@ -109,6 +138,13 @@ extension ArchitectWallTypeLabel on ArchitectWallType {
   }
 
   String compactLabel(AppLocalizations l10n) {
+    if (railing != null) {
+      return name.isNotEmpty ? name : railing!.kind.label(l10n);
+    }
+    final template = ArchitectWallLibrary.descriptorFor(this);
+    if (template != null && name.isEmpty) {
+      return '${template.family.label(l10n)} · ${factoryVariantLabel(ArchitectUnit.centimeters)}';
+    }
     if (system.isLog) return '${system.kind.label(l10n)} Ø$_composition';
     if (system.isSpecial) return '${system.kind.label(l10n)} $_composition';
     if (!isFactoryPreset && name.isNotEmpty) return name;
@@ -137,7 +173,20 @@ extension ArchitectWallTypeLabel on ArchitectWallType {
     };
   }
 
+  String factoryVariantLabel(ArchitectUnit unit) {
+    if (system.isLog) return 'Ø${architectWallLength(totalThickness, unit)}';
+    if (system.isFrame) return architectWallLength(totalThickness, unit);
+    if (system.isPanel) {
+      return architectWallLength(totalThickness - system.additionalDepth, unit);
+    }
+    final values = [brickThickness, if (hasInsulation) insulationThickness];
+    return '${values.map((v) => ArchitectUnit.trimZeros(unit.toUnit(v).toStringAsFixed(6))).join(' + ')} ${unit.symbol}';
+  }
+
   String pickerHelp(AppLocalizations l10n) {
+    if (railing != null) {
+      return compositionLabel(l10n, ArchitectUnit.centimeters);
+    }
     if (system.isSpecial) {
       return switch (system.kind) {
         ArchitectWallSystemKind.roundLogs => l10n.wallLogHelp,

@@ -73,6 +73,19 @@ class ArchitectWallSnap {
       ArchitectWallAttachment? attachment;
       var bestDistance = double.infinity;
       for (final wall in project.activeStorey.walls) {
+        if (wall.isOpenRailing) {
+          final ratio = wall.projectPoint(result.point).$1.clamp(0.0, 1.0);
+          final axis = wall.referencePointAt(ratio);
+          if ((axis - result.point).distance < 1e-7 &&
+              (axis - raw).distance < bestDistance) {
+            bestDistance = (axis - raw).distance;
+            attachment = ArchitectWallAttachment(
+              wall,
+              WallReferenceLine.center,
+            );
+          }
+          continue;
+        }
         if (wall.isCurved) {
           final r = wall.arc!.parameter(result.point).clamp(0.0, 1.0),
               n = wall.normalAt(r) * wall.exteriorSign;
@@ -395,7 +408,7 @@ class ArchitectWallSnap {
     double bestDist = tolerance;
 
     for (final wall in walls) {
-      if (wall.isCurved) continue;
+      if (wall.isCurved || wall.isOpenRailing) continue;
       if ((wall.startPoint - anchor).distance < 1e-3 ||
           (wall.endPoint - anchor).distance < 1e-3) {
         continue;

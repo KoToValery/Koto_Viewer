@@ -82,6 +82,12 @@ class ServiceComponentDefinition extends ArchitectComponentDefinition {
     ServiceComponentKind.fireplace => (.55, .60, 2.64),
   };
 
+  (double, double) footprint([Map<String, dynamic>? params]) {
+    final w = (params?['width'] as num?)?.toDouble() ?? nominalSize.$1;
+    final d = (params?['depth'] as num?)?.toDouble() ?? nominalSize.$2;
+    return (w, d);
+  }
+
   @override
   List<ParametricFieldSchema> get schema => [
     for (final entry in {

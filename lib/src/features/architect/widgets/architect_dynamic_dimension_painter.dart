@@ -6,7 +6,11 @@ import '../rendering/architect_dynamic_dimension_layout.dart';
 /// Temporary editing dimensions; never sent to the publication scene.
 class ArchitectDynamicDimensionPainter extends CustomPainter {
   final List<ArchitectDynamicDimensionLayout> dimensions;
-  const ArchitectDynamicDimensionPainter(this.dimensions);
+  final bool darkCanvas;
+  const ArchitectDynamicDimensionPainter(
+    this.dimensions, {
+    this.darkCanvas = false,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -14,7 +18,11 @@ class ArchitectDynamicDimensionPainter extends CustomPainter {
     canvas.clipRect(Offset.zero & size);
     for (final dim in dimensions) {
       final paint = Paint()
-        ..color = dim.active ? const Color(0xff006e91) : const Color(0xff545b62)
+        ..color = dim.active
+            ? const Color(0xff006e91)
+            : darkCanvas
+            ? const Color(0xffbcc3ca)
+            : const Color(0xff545b62)
         ..strokeWidth = dim.active ? 1.2 : .85
         ..style = PaintingStyle.stroke;
       void line(Offset a, Offset b, {bool continued = false}) {
@@ -70,6 +78,7 @@ class ArchitectDynamicDimensionPainter extends CustomPainter {
             text: '${dim.endpoint}',
             style: const TextStyle(
               color: Colors.black87,
+              fontFamily: 'Roboto',
               fontSize: 10,
               fontWeight: FontWeight.w600,
             ),
@@ -84,5 +93,6 @@ class ArchitectDynamicDimensionPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant ArchitectDynamicDimensionPainter oldDelegate) =>
-      oldDelegate.dimensions != dimensions;
+      oldDelegate.dimensions != dimensions ||
+      oldDelegate.darkCanvas != darkCanvas;
 }

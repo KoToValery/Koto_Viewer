@@ -7,9 +7,11 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
 import '../services/architect_wall_catalog.dart';
+import '../services/architect_wall_library.dart';
 import 'architect_wall_layer_preview.dart';
 import 'architect_wall_system_preview.dart';
 import 'architect_wall_type_label.dart';
+import 'architect_railing_fields.dart' show ArchitectRailingPreview;
 
 enum ArchitectWallPickerAction { select, variant, manage }
 
@@ -111,18 +113,23 @@ class ArchitectWallCatalogBrowser extends StatefulWidget {
 }
 
 class _BrowserState extends State<ArchitectWallCatalogBrowser> {
+  static String groupKey(ArchitectWallType type) {
+    final template = ArchitectWallLibrary.descriptorFor(type);
+    return template == null
+        ? ArchitectWallCatalogGroup.keyOf(type)
+        : 'factory/${ArchitectWallCategory.of(type).name}/${template.family.name}';
+  }
+
   late ArchitectWallSystemKind systemKind = widget.activeType.system.kind;
   late ArchitectWallCategory category = ArchitectWallCategory.of(
     widget.activeType,
   );
   late final expanded = <ArchitectWallCategory, String>{
-    category: ArchitectWallCatalogGroup.keyOf(widget.activeType),
+    category: groupKey(widget.activeType),
   };
   final favorites = <String>{};
   final query = TextEditingController();
-  bool search = false,
-      favoritesOnly = false,
-      dirty = false;
+  bool search = false, favoritesOnly = false, dirty = false;
   Future<void> writes = Future.value();
   String get preferenceKey => 'architect_wall_catalog_${widget.projectId}';
   @override
@@ -136,11 +143,10 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
     super.didUpdateWidget(oldWidget);
     if (widget.manage &&
         (oldWidget.activeType.id != widget.activeType.id ||
-            ArchitectWallCatalogGroup.keyOf(oldWidget.activeType) !=
-                ArchitectWallCatalogGroup.keyOf(widget.activeType))) {
+            groupKey(oldWidget.activeType) != groupKey(widget.activeType))) {
       category = ArchitectWallCategory.of(widget.activeType);
       systemKind = widget.activeType.system.kind;
-      expanded[category] = ArchitectWallCatalogGroup.keyOf(widget.activeType);
+      expanded[category] = groupKey(widget.activeType);
     }
   }
 
@@ -214,9 +220,15 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
   );
 
   Widget _body(BuildContext context, {required bool scrollAll}) {
-    final l = context.l10n,
-        types = visible,
-        groups = ArchitectWallCatalogGroup.build(types);
+    final l = context.l10n, types = visible;
+    final grouped = <String, List<ArchitectWallType>>{};
+    for (final type in types) {
+      (grouped[groupKey(type)] ??= []).add(type);
+    }
+    final groups = [
+      for (final entry in grouped.entries)
+        ArchitectWallCatalogGroup(entry.key, entry.value),
+    ];
     final base =
         widget.types
             .where(
@@ -247,7 +259,9 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
             leading: SizedBox(
               width: 28,
               height: 32,
-              child: first.system.isSpecial
+              child: first.railing != null
+                  ? ArchitectRailingPreview(kind: first.railing!.kind)
+                  : first.system.isSpecial
                   ? ArchitectWallSystemPreview(
                       system: first.system,
                       layers: first.resolvedLayers,
@@ -255,9 +269,9 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                   : ArchitectWallLayerPreview(layers: first.resolvedLayers),
             ),
             title: Text(first.catalogGroupLabel(l, widget.unit)),
-            subtitle: Text(
-              l.wallVariantCount(group.types.length)),
-            trailing: AppIcon.fromMaterial(open ? Icons.expand_less : Icons.expand_more,
+            subtitle: Text(l.wallVariantCount(group.types.length)),
+            trailing: AppIcon.fromMaterial(
+              open ? Icons.expand_less : Icons.expand_more,
             ),
             onTap: () {
               setState(() => expanded[category] = open ? '' : group.key);
@@ -341,9 +355,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                   )) {
                     category = ArchitectWallCategory.of(matching);
                   }
-                  expanded[category] = ArchitectWallCatalogGroup.keyOf(
-                    matching,
-                  );
+                  expanded[category] = groupKey(matching);
                 });
               },
             ),
@@ -382,7 +394,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                                   .where(
                                     (t) => ArchitectWallCategory.of(t) == c,
                                   )
-                                  .map(ArchitectWallCatalogGroup.keyOf)
+                                  .map(groupKey)
                                   .firstOrNull ??
                               '',
                         );
@@ -476,7 +488,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
   Widget _type(ArchitectWallType type, {required bool grouped}) {
     final l = context.l10n, selected = type.id == widget.activeType.id;
     final showTotal =
-        type.resolvedLayers.length > 1 ||
+        (type.hasSolidWallBody && type.resolvedLayers.length > 1) ||
         (!type.isFactoryPreset && type.name.isNotEmpty) ||
         (grouped && !type.isParapet);
     return Padding(
@@ -497,8 +509,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                 ),
                 borderRadius: BorderRadius.circular(8),
                 onTap: () {
-                  expanded[ArchitectWallCategory.of(type)] =
-                      ArchitectWallCatalogGroup.keyOf(type);
+                  expanded[ArchitectWallCategory.of(type)] = groupKey(type);
                   _persist();
                   widget.onSelect(type);
                 },
@@ -513,7 +524,11 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                         SizedBox(
                           width: 24,
                           height: 30,
-                          child: type.system.isSpecial
+                          child: type.railing != null
+                              ? ArchitectRailingPreview(
+                                  kind: type.railing!.kind,
+                                )
+                              : type.system.isSpecial
                               ? ArchitectWallSystemPreview(
                                   system: type.system,
                                   layers: type.resolvedLayers,
@@ -573,7 +588,9 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
               PopupMenuButton<String>(
                 tooltip: l.wallTypeDetails,
                 itemBuilder: (_) => [
-                  PopupMenuItem(value: 'copy', child: AppMenuLabel(
+                  PopupMenuItem(
+                    value: 'copy',
+                    child: AppMenuLabel(
                       icon: AppIconId.duplicate,
                       child: Text(l.wallTypeCopy),
                     ),
@@ -613,7 +630,9 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                   key: ValueKey('wall-delete-${type.id}'),
                   tooltip: l.delete,
                   icon: const AppIcon(
-                    AppIconId.delete, color: Colors.redAccent, size: 20,
+                    AppIconId.delete,
+                    color: Colors.redAccent,
+                    size: 20,
                   ),
                   onPressed: () {
                     Navigator.maybePop(context);

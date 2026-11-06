@@ -1,4 +1,5 @@
 import '../services/architect_stair_floor_contact.dart';
+import '../../bim_editing/geometry/bim_contour_drafting_geometry.dart';
 import 'architect_roof_drainage_mesh.dart';
 import 'architect_floor_drain_mesh.dart';
 import 'architect_solid_shell.dart';
@@ -400,6 +401,14 @@ class Architect3dBuilder {
       var ordinaryRoofIndex = 0;
       for (final roof in storey.roofs.where((r) => r.assembly.panels == null)) {
         roofSolids.add((roof.id, roofMeshes[ordinaryRoofIndex++], null));
+      }
+      for (final roof in storey.roofs) {
+        if (roof.parapet.enabled) {
+          final parapetMesh = _buildParapetMesh(storey, roof);
+          if (parapetMesh.isNotEmpty) {
+            roofSolids.add((roof.id, parapetMesh, 'construction:roof:${roof.id}:parapet'));
+          }
+        }
       }
 
       for (final beam in ridgeBeams) {
@@ -1313,6 +1322,59 @@ class Architect3dBuilder {
       addTri(aB, bB, bT, sideColor);
       addTri(aB, bT, aT, sideColor);
     }
+  }
+
+  static List<Triangle3D> _buildParapetMesh(
+    ArchitectStorey storey,
+    ArchitectRoofPlane roof,
+  ) {
+    if (!roof.parapet.enabled || roof.points.length < 3) return const [];
+    final p = roof.parapet;
+    final outer = roof.points;
+    final inner = BimContourDraftingGeometry.offsetPolygon(outer, -p.totalThickness);
+    if (inner.length < 3) return const [];
+
+    final wallPath = Path.combine(
+      PathOperation.difference,
+      Path()..addPolygon(outer, true),
+      Path()..addPolygon(inner, true),
+    );
+    if (wallPath.getBounds().isEmpty) return const [];
+
+    const wallColor = Color(0xFFCFD8DC);
+    const copingColor = Color(0xFF90A4AE);
+
+    final wallTriangles = _roofPrism(
+      wallPath,
+      (pt) => storey.elevation + roof.topElevationAt(pt),
+      (pt) => storey.elevation + roof.topElevationAt(pt) + p.height,
+      wallColor,
+      wallColor,
+      wallColor,
+    );
+
+    if (!p.hasCoping) return wallTriangles;
+
+    final copingOuter = BimContourDraftingGeometry.offsetPolygon(outer, p.copingProjection);
+    final copingInner = BimContourDraftingGeometry.offsetPolygon(inner, -p.copingProjection);
+    if (copingOuter.length < 3 || copingInner.length < 3) return wallTriangles;
+
+    final copingPath = Path.combine(
+      PathOperation.difference,
+      Path()..addPolygon(copingOuter, true),
+      Path()..addPolygon(copingInner, true),
+    );
+
+    final copingTriangles = _roofPrism(
+      copingPath,
+      (pt) => storey.elevation + roof.topElevationAt(pt) + p.height,
+      (pt) => storey.elevation + roof.topElevationAt(pt) + p.height + 0.04,
+      copingColor,
+      copingColor,
+      copingColor,
+    );
+
+    return [...wallTriangles, ...copingTriangles];
   }
 
   static List<Triangle3D> _roofPrism(

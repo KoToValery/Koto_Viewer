@@ -22,6 +22,7 @@ import 'architect_command_controller.dart';
 import 'architect_stair_rules.dart';
 import 'architect_panel_supports.dart';
 import '../rendering/architect_special_wall_geometry.dart';
+import '../rendering/architect_railing_selection.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 
 /// A shared property schema for all persisted architectural element kinds.
@@ -138,6 +139,9 @@ class ArchitectSelection {
     }
     for (final w in s.walls) {
       if (w.id == id) {
+        if (w.railing != null) {
+          return ArchitectRailingSelection.envelope(w, s.walls).getBounds();
+        }
         return ArchitectSceneGeometry.boundsOf(
           ArchitectSpecialWallGeometry.physicalPlanCorners(w, s.walls),
         );
@@ -255,6 +259,7 @@ class ArchitectSelection {
     }
     for (final w in s.walls) {
       if (w.id == id) {
+        if (w.railing != null) return ArchitectRailingSelection.envelope(w, s.walls);
         return path..addPolygon(
           ArchitectSpecialWallGeometry.physicalPlanCorners(w, s.walls),
           true,

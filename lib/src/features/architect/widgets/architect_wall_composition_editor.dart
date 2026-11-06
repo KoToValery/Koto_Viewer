@@ -6,12 +6,16 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
 import '../services/architect_element_id.dart';
+import '../services/architect_wall_library.dart';
+import '../services/architect_wall_compositions.dart';
+import 'architect_composition_controls.dart';
 import 'architect_material_layer_label.dart';
 import 'architect_wall_type_label.dart';
 import 'architect_wall_type_picker.dart';
 import 'architect_wall_layer_preview.dart';
 import 'architect_wall_system_fields.dart';
 import 'architect_wall_system_preview.dart';
+import 'architect_railing_fields.dart';
 
 class _LayerDraft {
   ArchitectMaterialLayer layer;
@@ -95,6 +99,34 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
   late ArchitectWallSystem system = widget.type.system;
   late ParapetFinish parapetFinish =
       widget.type.parapetFinish ?? ParapetFinish.cap;
+  ArchitectRailingDesign? railingDraft;
+  bool railingEdited = false;
+  ArchitectRailingDesign? get currentRailing =>
+      railingEdited ? railingDraft : source.railing;
+  double get railingHeight => widget.project.units.fromUnit(
+    _parse(defaultHeight.text) ?? widget.project.units.toUnit(1.05),
+  );
+
+  void changeRailing(ArchitectRailingDesign value) {
+    railingDraft = value;
+    railingEdited = true;
+    system = const ArchitectWallSystem();
+    if (value.hasSolidBody && drafts.isEmpty) {
+      drafts.add(
+        _LayerDraft(
+          const ArchitectMaterialLayer(
+            id: 'core',
+            material: ArchitectMaterial.concrete,
+            role: ArchitectLayerRole.core,
+            thickness: .12,
+          ),
+          widget.project.units,
+        ),
+      );
+    }
+    changed();
+  }
+
   late final defaultHeight = TextEditingController(
     text: _number(
       widget.project.units.toUnit(widget.type.customHeight ?? 1.05),
@@ -133,6 +165,8 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
   ArchitectWallType get source => pickedType ?? widget.type;
   ArchitectWallType get currentType => source.copyWith(
     system: system,
+    railing: currentRailing,
+    totalThickness: total,
     layers: layers,
     name: name.text.trim(),
     location: location,
@@ -175,21 +209,45 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
     changed();
   }
 
-  double get total =>
-      system.additionalDepth +
-      drafts.fold<double>(
-        0,
-        (v, d) => v + widget.project.units.fromUnit(_parse(d.input.text) ?? 0),
-      );
+  double get total => currentRailing != null && !currentRailing!.hasSolidBody
+      ? switch (currentRailing!.kind) {
+          ArchitectRailingKind.glassChannel => [
+            currentRailing!.channelWidth,
+            currentRailing!.glassThickness,
+            currentRailing!.handrailDiameter,
+          ].reduce((a, b) => a > b ? a : b),
+          ArchitectRailingKind.verticalSlats => [
+            currentRailing!.postSize,
+            currentRailing!.infillDepth,
+            currentRailing!.handrailDiameter,
+          ].reduce((a, b) => a > b ? a : b),
+          _ => [
+            currentRailing!.postSize,
+            currentRailing!.handrailDiameter,
+            currentRailing!.glassThickness,
+          ].reduce((a, b) => a > b ? a : b),
+        }
+      : system.additionalDepth +
+            drafts.fold<double>(
+              0,
+              (v, d) =>
+                  v + widget.project.units.fromUnit(_parse(d.input.text) ?? 0),
+            );
   bool invalidNumber(_LayerDraft d) =>
       _parse(d.input.text) == null || _parse(d.input.text)! <= 0;
-  List<ArchitectMaterialLayer> get layers => [
-    for (final d in drafts)
-      d.layer.copyWith(
-        thickness: widget.project.units.fromUnit(_parse(d.input.text) ?? 0),
-      ),
-  ];
+  List<ArchitectMaterialLayer> get layers =>
+      currentRailing != null && !currentRailing!.hasSolidBody
+      ? const []
+      : [
+          for (final d in drafts)
+            d.layer.copyWith(
+              thickness: widget.project.units.fromUnit(
+                _parse(d.input.text) ?? 0,
+              ),
+            ),
+        ];
   String? get layerError {
+    if (currentRailing != null && !currentRailing!.hasSolidBody) return null;
     if (drafts.any(invalidNumber)) {
       return context.l10n.architectWallInvalidThickness;
     }
@@ -245,7 +303,7 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
       return false;
     }
     if (source.isParapet &&
-        widget.typeUseCount != null &&
+        (widget.typeUseCount != null || currentRailing != null) &&
         (_parse(defaultHeight.text) == null ||
             _parse(defaultHeight.text)! <= 0)) {
       if (!preview) setState(() => error = context.l10n.wallInvalidHeight);
@@ -292,6 +350,8 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
       }
       final type = source.copyWith(
         system: system,
+        railing: currentRailing,
+        totalThickness: total,
         id: pickedType != null && detailsChanged ? widget.type.id : source.id,
         layers: layers,
         location: location,
@@ -308,10 +368,13 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
             ? source.isCatalogType
             : saveToCatalog,
         parapetFinish: source.isParapet ? parapetFinish : null,
-        customHeight: source.isParapet && widget.typeUseCount != null
+        customHeight:
+            source.isParapet &&
+                (widget.typeUseCount != null || currentRailing != null)
             ? widget.project.units.fromUnit(_parse(defaultHeight.text)!)
             : null,
       );
+      type.railing?.validate(type.customHeight ?? railingHeight);
       if (preview) {
         widget.onDraftChanged?.call(type, region, compositionChanged);
         return true;
@@ -319,15 +382,25 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
       if (widget.onApply(type, region, compositionChanged)) {
         Navigator.pop(context);
       }
+    } on ArchitectRailingOpeningsError {
+      if (!preview) setState(() => error = context.l10n.railingHasOpenings);
     } on ArgumentError {
-      if (!preview) setState(() => error = context.l10n.wallLayerInvalid);
+      if (!preview) {
+        setState(
+          () => error = currentRailing != null
+              ? context.l10n.railingInvalid
+              : context.l10n.wallLayerInvalid,
+        );
+      }
     }
     return false;
   }
 
   Future<void> pickType() async {
     final types = {
-      for (final t in ArchitectWallType.standardCatalog(includeSpecial: true))
+      for (final t in ArchitectWallLibrary.available(
+        ArchitectWallType.standardCatalog(includeSpecial: true),
+      ))
         if (t.system.kind == system.kind && t.isParapet == source.isParapet)
           t.id: t,
       for (final t in widget.project.wallTypes)
@@ -347,6 +420,8 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
     if (result == null || !mounted) return;
     setState(() {
       pickedType = result.type;
+      railingEdited = false;
+      railingDraft = null;
       system = result.type.system;
       compositionChanged = true;
       detailsChanged = false;
@@ -534,6 +609,11 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    final scopeLabel = widget.isNewType
+        ? l.wallNewTypeScope
+        : widget.typeUseCount == null
+        ? l.wallSelectedScope
+        : l.compositionScopeType(widget.typeUseCount!);
     widget.editorHandle?.isDirty = () =>
         compositionChanged || detailsChanged || editedRegionFields.isNotEmpty;
     widget.editorHandle?.validate = () {
@@ -555,170 +635,186 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (!source.isParapet) ...[
-                DropdownButtonFormField<ArchitectWallSystemKind>(
-                  key: ValueKey('wall-system-kind-${system.kind.name}'),
-                  initialValue: system.kind,
-                  isExpanded: true,
-                  decoration: InputDecoration(labelText: l.wallSystem),
-                  items: [
-                    for (final kind in ArchitectWallSystemKind.values)
-                      DropdownMenuItem(value: kind, child: Text(kind.label(l))),
-                  ],
-                  onChanged: (kind) {
-                    if (kind == null || kind == system.kind) return;
-                    setState(() => switchSystem(kind));
-                  },
+              ArchitectCompositionHeader(
+                key: const ValueKey('wall-composition-type'),
+                title: currentType.catalogLabel(l, widget.project.units),
+                onChoose: widget.allowTypeSelection ? pickType : null,
+                scope: widget.embedded
+                    ? Text(
+                        scopeLabel,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      )
+                    : null,
+                summary: currentType.hasSolidWallBody
+                    ? '${l.wallLayerCore}: ${architectWallLength(currentType.brickThickness, widget.project.units)} · '
+                          '${l.compositionTotal}: ${architectWallLength(total, widget.project.units)}'
+                    : '',
+              ),
+              if (source.isParapet) ...[
+                const SizedBox(height: 10),
+                ArchitectRailingFields(
+                  key: ValueKey('wall-railing-fields-${source.id}'),
+                  design: currentRailing,
+                  totalHeight: railingHeight,
+                  unit: widget.project.units,
+                  onChanged: (value) => setState(() => changeRailing(value)),
+                  onHeightChanged: (value) => setState(() {
+                    defaultHeight.text = _number(
+                      widget.project.units.toUnit(value),
+                    );
+                    changed();
+                  }),
+                ),
+              ],
+              if (currentType.hasSolidWallBody) ...[
+                const SizedBox(height: 8),
+                if (!system.isLog)
+                  Text(
+                    location == ArchitectWallLocation.exterior
+                        ? l.wallLayerOutsideInside
+                        : l.wallLayerSides,
+                  ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  height: 54,
+                  child: system.isSpecial
+                      ? ArchitectWallSystemPreview(
+                          system: system,
+                          layers: layers,
+                        )
+                      : ArchitectWallLayerPreview(
+                          layers: [
+                            for (final d in drafts)
+                              d.layer.copyWith(
+                                thickness: widget.project.units.fromUnit(
+                                  (_parse(d.input.text) ?? 0).clamp(
+                                    .000001,
+                                    double.infinity,
+                                  ),
+                                ),
+                              ),
+                          ],
+                          selectedIndex: drafts.indexWhere(
+                            (d) => d.layer.id == expandedLayer,
+                          ),
+                          onSelected: (index) => setState(
+                            () => expandedLayer = drafts[index].layer.id,
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 12),
-              ],
-              if (widget.allowTypeSelection)
-                OutlinedButton(
-                  key: const ValueKey('wall-composition-type'),
-                  onPressed: pickType,
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(l.wallChooseType)),
-                      const AppIcon(AppIconId.expandMore),
-                    ],
-                  ),
-                ),
-              Text(
-                l.architectWallTotalThickness(
-                  architectWallLength(total, widget.project.units),
-                ),
-                key: const ValueKey('wall-composition-total'),
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                currentType.compositionLabel(l, widget.project.units),
-                key: const ValueKey('wall-active-composition'),
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 8),
-              if (!system.isLog)
-                Text(
-                  location == ArchitectWallLocation.exterior
-                      ? l.wallLayerOutsideInside
-                      : l.wallLayerSides,
-                ),
-              const SizedBox(height: 6),
-              SizedBox(
-                height: 54,
-                child: system.isSpecial
-                    ? ArchitectWallSystemPreview(system: system, layers: layers)
-                    : ArchitectWallLayerPreview(
-                        layers: [
-                          for (final d in drafts)
-                            d.layer.copyWith(
-                              thickness: widget.project.units.fromUnit(
-                                (_parse(d.input.text) ?? 0).clamp(
-                                  .000001,
-                                  double.infinity,
-                                ),
-                              ),
-                            ),
-                        ],
-                        selectedIndex: drafts.indexWhere(
-                          (d) => d.layer.id == expandedLayer,
-                        ),
-                        onSelected: (index) => setState(
-                          () => expandedLayer = drafts[index].layer.id,
-                        ),
-                      ),
-              ),
-              const SizedBox(height: 12),
-              if (system.isLog)
-                TextFormField(
-                  key: ValueKey(
-                    'wall-layer-thickness-${drafts.first.layer.id}',
-                  ),
-                  controller: drafts.first.input,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: l.wallLogDiameter,
-                    suffixText: widget.project.units.symbol,
-                  ),
-                  onChanged: (_) => setState(changed),
-                  validator: (_) => invalidNumber(drafts.first)
-                      ? l.architectWallInvalidThickness
-                      : null,
-                )
-              else
-                for (var i = 0; i < drafts.length; i++) _row(i),
-              Wrap(
-                spacing: 8,
-                children: [
-                  if (!system.isLog)
-                    TextButton.icon(
-                      key: const ValueKey('wall-layer-add'),
-                      onPressed: addLayer,
-                      icon: const AppIcon(AppIconId.add),
-                      label: Text(l.wallLayerAdd),
+                if (system.isLog)
+                  TextFormField(
+                    key: ValueKey(
+                      'wall-layer-thickness-${drafts.first.layer.id}',
                     ),
-                  if (!system.isLog &&
-                      !drafts.any(
-                        (d) => d.layer.role == ArchitectLayerRole.finish,
-                      ))
-                    TextButton.icon(
-                      key: const ValueKey('wall-layer-coatings'),
-                      onPressed: addCoatings,
-                      icon: const AppIcon(AppIconId.add),
-                      label: Text(l.wallLayerCoatings),
+                    controller: drafts.first.input,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
                     ),
-                  if (location == ArchitectWallLocation.interior &&
-                      drafts.first.layer.role == ArchitectLayerRole.finish &&
-                      drafts.last.layer.role != ArchitectLayerRole.finish)
-                    TextButton(
-                      key: const ValueKey('wall-copy-finish'),
-                      onPressed: () => setState(() {
-                        final copies = drafts
-                            .takeWhile(
-                              (d) => d.layer.role == ArchitectLayerRole.finish,
-                            )
-                            .toList()
-                            .reversed;
-                        if (drafts.length + copies.length > 20) {
-                          error = l.wallLayerLimit;
-                          return;
-                        }
-                        final values = [
-                          for (final d in copies)
-                            _LayerDraft(
-                              d.layer.copyWith(
-                                id: ArchitectElementId.next('layer'),
-                                thickness: widget.project.units.fromUnit(
-                                  _parse(d.input.text) ?? 0,
-                                ),
-                              ),
-                              widget.project.units,
-                            ),
-                        ];
-                        changed();
-                        drafts.addAll(values);
-                      }),
-                      child: Tooltip(
-                        message: l.wallCopyFinishHelp,
-                        child: Text(l.wallCopyFinish),
-                      ),
+                    decoration: InputDecoration(
+                      labelText: l.wallLogDiameter,
+                      suffixText: widget.project.units.symbol,
                     ),
-                ],
-              ),
-              if (layerError != null)
-                Text(
-                  layerError!,
-                  key: const ValueKey('wall-layer-validation'),
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              if (system.isSpecial)
-                ExpansionTile(
-                  key: ValueKey('wall-system-options-${system.kind.name}'),
-                  tilePadding: EdgeInsets.zero,
-                  title: Text(l.wallSystemOptions),
+                    onChanged: (_) => setState(changed),
+                    validator: (_) => invalidNumber(drafts.first)
+                        ? l.architectWallInvalidThickness
+                        : null,
+                  )
+                else
+                  for (var i = 0; i < drafts.length; i++) _row(i),
+                Wrap(
+                  spacing: 8,
                   children: [
+                    if (!system.isLog)
+                      TextButton.icon(
+                        key: const ValueKey('wall-layer-add'),
+                        onPressed: addLayer,
+                        icon: const AppIcon(AppIconId.add),
+                        label: Text(l.wallLayerAdd),
+                      ),
+                    if (!system.isLog &&
+                        !drafts.any(
+                          (d) => d.layer.role == ArchitectLayerRole.finish,
+                        ))
+                      TextButton.icon(
+                        key: const ValueKey('wall-layer-coatings'),
+                        onPressed: addCoatings,
+                        icon: const AppIcon(AppIconId.add),
+                        label: Text(l.wallLayerCoatings),
+                      ),
+                    if (location == ArchitectWallLocation.interior &&
+                        drafts.first.layer.role == ArchitectLayerRole.finish &&
+                        drafts.last.layer.role != ArchitectLayerRole.finish)
+                      TextButton(
+                        key: const ValueKey('wall-copy-finish'),
+                        onPressed: () => setState(() {
+                          final copies = drafts
+                              .takeWhile(
+                                (d) =>
+                                    d.layer.role == ArchitectLayerRole.finish,
+                              )
+                              .toList()
+                              .reversed;
+                          if (drafts.length + copies.length > 20) {
+                            error = l.wallLayerLimit;
+                            return;
+                          }
+                          final values = [
+                            for (final d in copies)
+                              _LayerDraft(
+                                d.layer.copyWith(
+                                  id: ArchitectElementId.next('layer'),
+                                  thickness: widget.project.units.fromUnit(
+                                    _parse(d.input.text) ?? 0,
+                                  ),
+                                ),
+                                widget.project.units,
+                              ),
+                          ];
+                          changed();
+                          drafts.addAll(values);
+                        }),
+                        child: Tooltip(
+                          message: l.wallCopyFinishHelp,
+                          child: Text(l.wallCopyFinish),
+                        ),
+                      ),
+                  ],
+                ),
+                if (layerError != null)
+                  Text(
+                    layerError!,
+                    key: const ValueKey('wall-layer-validation'),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+              ],
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: Text(l.wallTypeDetails),
+                children: [
+                  if (!source.isParapet)
+                    DropdownButtonFormField<ArchitectWallSystemKind>(
+                      key: ValueKey('wall-system-kind-${system.kind.name}'),
+                      initialValue: system.kind,
+                      isExpanded: true,
+                      decoration: InputDecoration(labelText: l.wallSystem),
+                      items: [
+                        for (final kind in ArchitectWallSystemKind.values)
+                          DropdownMenuItem(
+                            value: kind,
+                            child: Text(kind.label(l)),
+                          ),
+                      ],
+                      onChanged: (kind) {
+                        if (kind != null && kind != system.kind) {
+                          setState(() => switchSystem(kind));
+                        }
+                      },
+                    ),
+                  if (system.isSpecial && currentType.hasSolidWallBody)
                     ArchitectWallSystemFields(
                       key: ValueKey(
                         'wall-system-fields-${source.id}-${system.kind.name}',
@@ -731,12 +827,6 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                         changed();
                       }),
                     ),
-                  ],
-                ),
-              ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                title: Text(l.wallTypeDetails),
-                children: [
                   TextFormField(
                     controller: name,
                     onChanged: (_) => changed(),
@@ -784,7 +874,9 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                       },
                     ),
                   ],
-                  if (source.isParapet && widget.typeUseCount != null) ...[
+                  if (source.isParapet &&
+                      widget.typeUseCount != null &&
+                      currentRailing == null) ...[
                     DropdownButtonFormField<ParapetFinish>(
                       initialValue: parapetFinish,
                       isExpanded: true,
@@ -836,7 +928,8 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                     ),
                 ],
               ),
-              if (!system.isLog &&
+              if (currentRailing == null &&
+                  !system.isLog &&
                   widget.plinth != null &&
                   location == ArchitectWallLocation.exterior)
                 _plinth(),
@@ -853,7 +946,7 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
     if (widget.embedded) return content;
     return ArchitectPropertiesShell(
       title: widget.isNewType ? l.wallNewVariant : l.wallCompositionAction,
-      subtitle: widget.isNewType ? l.wallNewTypeScope : l.wallSelectedScope,
+      subtitle: scopeLabel,
       initiallyExpanded: true,
       onSave: save,
       isDirty: () =>

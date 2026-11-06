@@ -24,7 +24,7 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
     this.roof,
     this.onPlace,
     this.embedded = false,
-    this.allowInternal=false,
+    this.allowInternal = false,
   });
 
   String _status(BuildContext context, ArchitectDownpipe pipe) {
@@ -50,9 +50,15 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
 
   Future<void> _edit(BuildContext context, [int? index]) async {
     final pipe = index == null
-        ? ArchitectDownpipe(id: ArchitectElementId.next('downpipe'),
-            offset: roof == null ? .3 : project == null
-                ? (ArchitectRoofDrainageGeometry.eaves(roof!).$2 - ArchitectRoofDrainageGeometry.eaves(roof!).$1).distance / 2
+        ? ArchitectDownpipe(
+            id: ArchitectElementId.next('downpipe'),
+            offset: roof == null
+                ? .3
+                : project == null
+                ? (ArchitectRoofDrainageGeometry.eaves(roof!).$2 -
+                              ArchitectRoofDrainageGeometry.eaves(roof!).$1)
+                          .distance /
+                      2
                 : ArchitectRoofDrainageGeometry.initialOffset(project!, roof!),
           )
         : value.downpipes[index];
@@ -73,22 +79,41 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    final unit = project?.units ?? ArchitectUnit.centimeters;
     return ListView(
       shrinkWrap: embedded,
       physics: embedded ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.all(12),
       children: [
-        if(allowInternal)Tooltip(message:l.roofGutterInternalHelp,child:DropdownButtonFormField<ArchitectGutterPosition>(
-          key:ValueKey('roof-gutter-position-${value.position.name}'),initialValue:value.position,isExpanded:true,
-          decoration:InputDecoration(labelText:l.roofGutterPosition),items:[
-            DropdownMenuItem(value:ArchitectGutterPosition.external,child:Text(l.roofGutterExternal),
+        if (allowInternal)
+          Tooltip(
+            message: l.roofGutterInternalHelp,
+            child: DropdownButtonFormField<ArchitectGutterPosition>(
+              key: ValueKey('roof-gutter-position-${value.position.name}'),
+              initialValue: value.position,
+              isExpanded: true,
+              decoration: InputDecoration(labelText: l.roofGutterPosition),
+              items: [
+                DropdownMenuItem(
+                  value: ArchitectGutterPosition.external,
+                  child: Text(l.roofGutterExternal),
                 ),
-            DropdownMenuItem(value:ArchitectGutterPosition.internal,child:Text(l.roofGutterInternal),
+                DropdownMenuItem(
+                  value: ArchitectGutterPosition.internal,
+                  child: Text(l.roofGutterInternal),
                 ),
               ],
-          onChanged:(v){if(v!=null)onChanged(value.copyWith(position:v,profile:v==ArchitectGutterPosition.internal?ArchitectGutterProfile.box:null,
+              onChanged: (v) {
+                if (v != null) {
+                  onChanged(
+                    value.copyWith(
+                      position: v,
+                      profile: v == ArchitectGutterPosition.internal
+                          ? ArchitectGutterProfile.box
+                          : null,
                     ),
                   );
+                }
               },
             ),
           ),
@@ -104,24 +129,25 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
           value: value.showDownpipes,
           onChanged: (v) => onChanged(value.copyWith(showDownpipes: v)),
         ),
-        if(value.position!=ArchitectGutterPosition.internal) DropdownButtonFormField<ArchitectGutterProfile>(
-          initialValue: value.profile,
-          decoration: InputDecoration(labelText: l.architectDrainageProfile),
-          items: [
-            for (final p in ArchitectGutterProfile.values)
-              DropdownMenuItem(
-                value: p,
-                child: Text(
-                  p == ArchitectGutterProfile.halfRound
-                      ? l.architectDrainageHalfRound
-                      : l.architectDrainageBox,
+        if (value.position != ArchitectGutterPosition.internal)
+          DropdownButtonFormField<ArchitectGutterProfile>(
+            initialValue: value.profile,
+            decoration: InputDecoration(labelText: l.architectDrainageProfile),
+            items: [
+              for (final p in ArchitectGutterProfile.values)
+                DropdownMenuItem(
+                  value: p,
+                  child: Text(
+                    p == ArchitectGutterProfile.halfRound
+                        ? l.architectDrainageHalfRound
+                        : l.architectDrainageBox,
+                  ),
                 ),
-              ),
-          ],
-          onChanged: (v) {
-            if (v != null) onChanged(value.copyWith(profile: v));
-          },
-        ),
+            ],
+            onChanged: (v) {
+              if (v != null) onChanged(value.copyWith(profile: v));
+            },
+          ),
         DropdownButtonFormField<ArchitectDrainageMaterial>(
           initialValue: value.material,
           decoration: InputDecoration(labelText: l.architectDrainageMaterial),
@@ -145,19 +171,21 @@ class ArchitectRoofDrainageEditor extends StatelessWidget {
         ),
         _Number(
           label: l.architectDrainageWidth,
-          value: value.gutterWidth * 100,
-          min: 8,
-          max: 50,
-          unit: 'cm',
-          onChanged: (v) => onChanged(value.copyWith(gutterWidth: v / 100)),
+          value: unit.toUnit(value.gutterWidth),
+          min: unit.toUnit(.08),
+          max: unit.toUnit(.50),
+          unit: unit.symbol,
+          onChanged: (v) =>
+              onChanged(value.copyWith(gutterWidth: unit.fromUnit(v))),
         ),
         _Number(
           label: l.architectDrainageDepth,
-          value: value.gutterDepth * 100,
-          min: 4,
-          max: 30,
-          unit: 'cm',
-          onChanged: (v) => onChanged(value.copyWith(gutterDepth: v / 100)),
+          value: unit.toUnit(value.gutterDepth),
+          min: unit.toUnit(.04),
+          max: unit.toUnit(.30),
+          unit: unit.symbol,
+          onChanged: (v) =>
+              onChanged(value.copyWith(gutterDepth: unit.fromUnit(v))),
         ),
         const SizedBox(height: 12),
         for (var i = 0; i < value.downpipes.length; i++)
@@ -267,6 +295,7 @@ class _PipeDialog extends StatefulWidget {
 class _PipeDialogState extends State<_PipeDialog> {
   late ArchitectDownpipe pipe = widget.pipe;
   final form = GlobalKey<FormState>();
+  ArchitectUnit get unit => widget.project?.units ?? ArchitectUnit.centimeters;
   late final waypoints = TextEditingController(
     text: [
       for (final p in pipe.waypoints)
@@ -311,31 +340,56 @@ class _PipeDialogState extends State<_PipeDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                DropdownButtonFormField<bool>(
+                  initialValue: pipe.isInternal,
+                  decoration: InputDecoration(
+                    labelText: l.roofDownpipeType,
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                      value: false,
+                      child: Text(l.roofDownpipeExternal),
+                    ),
+                    DropdownMenuItem(
+                      value: true,
+                      child: Text(l.roofDownpipeInternal),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() => pipe = pipe.copyWith(isInternal: v));
+                    }
+                  },
+                ),
                 _Number(
                   label: l.architectDrainageOffset,
-                  value: pipe.offset,
+                  value: unit.toUnit(pipe.offset),
                   min: 0,
-                  max: 10000,
-                  unit: 'm',
-                  onChanged: (v) => pipe = pipe.copyWith(offset: v),
+                  max: unit.toUnit(10000),
+                  unit: unit.symbol,
+                  onChanged: (v) =>
+                      pipe = pipe.copyWith(offset: unit.fromUnit(v)),
                 ),
                 _Number(
                   label: l.architectDrainageDiameter,
-                  value: pipe.diameter * 100,
-                  min: 4,
-                  max: 40,
-                  unit: 'cm',
-                  onChanged: (v) => pipe = pipe.copyWith(diameter: v / 100),
-                ),
-                _Number(
-                  label: l.architectDrainageClearance,
-                  value: pipe.wallClearance * 100,
-                  min: 1,
-                  max: 100,
-                  unit: 'cm',
+                  value: unit.toUnit(pipe.diameter),
+                  min: unit.toUnit(.04),
+                  max: unit.toUnit(.40),
+                  unit: unit.symbol,
                   onChanged: (v) =>
-                      pipe = pipe.copyWith(wallClearance: v / 100),
+                      pipe = pipe.copyWith(diameter: unit.fromUnit(v)),
                 ),
+                if (!pipe.isInternal) ...[
+                  _Number(
+                    label: l.architectDrainageClearance,
+                    value: unit.toUnit(pipe.wallClearance),
+                    min: unit.toUnit(.01),
+                    max: unit.toUnit(1),
+                    unit: unit.symbol,
+                    onChanged: (v) =>
+                        pipe = pipe.copyWith(wallClearance: unit.fromUnit(v)),
+                  ),
+                ],
                 _Number(
                   label: l.architectDrainageOutlet,
                   value: pipe.outletElevation,
@@ -344,43 +398,45 @@ class _PipeDialogState extends State<_PipeDialog> {
                   unit: 'm',
                   onChanged: (v) => pipe = pipe.copyWith(outletElevation: v),
                 ),
-                DropdownButtonFormField<double>(
-                  initialValue: pipe.bendAngle,
-                  decoration: InputDecoration(
-                    labelText: l.architectDrainageBend,
-                  ),
-                  items: [
-                    for (final a in [45.0, 67.5])
-                      DropdownMenuItem(value: a, child: Text('$a°')),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) pipe = pipe.copyWith(bendAngle: v);
-                  },
-                ),
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: walls.any((w) => w.id == pipe.facadeWallId)
-                      ? pipe.facadeWallId
-                      : '',
-                  decoration: InputDecoration(
-                    labelText: l.architectDrainageFacade,
-                  ),
-                  items: [
-                    DropdownMenuItem(
-                      value: '',
-                      child: Text(l.architectDrainageAuto),
+                if (!pipe.isInternal) ...[
+                  DropdownButtonFormField<double>(
+                    initialValue: pipe.bendAngle,
+                    decoration: InputDecoration(
+                      labelText: l.architectDrainageBend,
                     ),
-                    for (var i = 0; i < walls.length; i++)
-                      DropdownMenuItem(
-                        value: walls[i].id,
-                        child: Text('${l.architectDrainageWall} ${i + 1}'),
-                      ),
-                  ],
-                  onChanged: (v) => pipe = pipe.copyWith(
-                    facadeWallId: v,
-                    clearFacade: v == '',
+                    items: [
+                      for (final a in [45.0, 67.5])
+                        DropdownMenuItem(value: a, child: Text('$a°')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) pipe = pipe.copyWith(bendAngle: v);
+                    },
                   ),
-                ),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: walls.any((w) => w.id == pipe.facadeWallId)
+                        ? pipe.facadeWallId
+                        : '',
+                    decoration: InputDecoration(
+                      labelText: l.architectDrainageFacade,
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                        value: '',
+                        child: Text(l.architectDrainageAuto),
+                      ),
+                      for (var i = 0; i < walls.length; i++)
+                        DropdownMenuItem(
+                          value: walls[i].id,
+                          child: Text('${l.architectDrainageWall} ${i + 1}'),
+                        ),
+                    ],
+                    onChanged: (v) => pipe = pipe.copyWith(
+                      facadeWallId: v,
+                      clearFacade: v == '',
+                    ),
+                  ),
+                ],
                 TextFormField(
                   controller: waypoints,
                   minLines: 2,

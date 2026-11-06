@@ -2,9 +2,11 @@
 // 1. RoofDrawMode (Rectangle 2-point vs. Polygon multi-point drafting)
 // 2. ArchitectRoofTool (Interactive state machine, drafting points, auto-roof & eaves edge switching)
 
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/architect_project.dart';
 import 'architect_element_id.dart';
+import 'architect_polygon_editor.dart';
 import 'architect_roof_geometry.dart';
 
 // === SECTION: ROOF DRAW MODE ===
@@ -249,11 +251,13 @@ class ArchitectRoofTool extends ChangeNotifier {
   );
 
   /// Finds if [worldPoint] taps near an edge of [roof] (within [tolerance] metres)
-  /// so the user can switch which edge is the eaves with 1 tap!
+  /// or near its offset handle, so the user can switch or drag edges immediately!
   static int? hitTestEdgeIndex(
     ArchitectRoofPlane roof,
     Offset worldPoint, {
     double tolerance = 0.35,
+    double scale = 1.0,
+    double handleOffsetLength = 50.0,
   }) {
     if (roof.points.length < 3) return null;
     var bestIdx = -1;
@@ -265,6 +269,24 @@ class ArchitectRoofTool extends ChangeNotifier {
       if (d <= bestDist) {
         bestDist = d;
         bestIdx = i;
+      }
+    }
+    if (bestIdx >= 0) return bestIdx;
+    if (scale > 0 && handleOffsetLength > 0) {
+      final handleTol = math.max(28.0 / scale, 0.45);
+      var bestHandleDist = handleTol;
+      for (var i = 0; i < roof.points.length; i++) {
+        final h = ArchitectPolygonEditor.offsetEdgeHandle(
+          roof.points,
+          i,
+          scale,
+          handleOffsetLength,
+        );
+        final d = (worldPoint - h).distance;
+        if (d <= bestHandleDist) {
+          bestHandleDist = d;
+          bestIdx = i;
+        }
       }
     }
     return bestIdx >= 0 ? bestIdx : null;

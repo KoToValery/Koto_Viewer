@@ -247,10 +247,11 @@ class AddArchitectGroupMembers extends ArchitectModelCommand {
 class CreateArchitectWall extends ArchitectModelCommand {
   final String storeyId;
   final ArchitectWall wall;
-  const CreateArchitectWall({required this.storeyId, required this.wall});
+  final ArchitectWallType? wallType;
+  const CreateArchitectWall({required this.storeyId, required this.wall, this.wallType});
   @override
   ArchitectProject apply(ArchitectProject project) {
-    if (wall.layers.isNotEmpty) {
+    if (wall.hasSolidWallBody && wall.layers.isNotEmpty) {
       ArchitectMaterialLayer.validate(wall.layers);
       final total =
           wall.system.additionalDepth +
@@ -269,8 +270,15 @@ class CreateArchitectWall extends ArchitectModelCommand {
     }
     ArchitectModelCommand.newId(project, wall.id);
     final s = ArchitectModelCommand.storey(project, storeyId);
+    if (wallType != null && wallType!.id != wall.wallTypeId) {
+      throw ArgumentError('Wall type does not match the placed wall');
+    }
+    final withType = wallType != null &&
+            !project.wallTypes.any((type) => type.id == wallType!.id)
+        ? project.copyWith(wallTypes: [...project.wallTypes, wallType!])
+        : project;
     return ArchitectModelCommand.replace(
-      project,
+      withType,
       s.copyWith(walls: [...s.walls, wall]),
     );
   }
@@ -292,7 +300,7 @@ class UpdateArchitectWall extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     final s = ArchitectModelCommand.storey(project, storeyId);
     final previous = s.walls.firstWhere((w) => w.id == wall.id);
-    if (wall.layers.isNotEmpty) {
+    if (wall.hasSolidWallBody && wall.layers.isNotEmpty) {
       ArchitectMaterialLayer.validate(wall.layers);
       final total =
           wall.system.additionalDepth +
@@ -1476,6 +1484,13 @@ class MoveArchitectElements extends ArchitectModelCommand {
               insulationThicknessOverride: source.insulationThicknessOverride,
               wallTypeId: source.wallTypeId,
               parapetFinish: source.parapetFinish,
+              parapet: source.parapet,
+              railing: source.railing,
+              layers: source.layers,
+              system: source.system,
+              systemPlacement: source.systemPlacement,
+              baseOffset: source.baseOffset,
+              followStoreyHeight: source.followStoreyHeight,
               connectStart: true,
               connectEnd: true,
             );
@@ -1554,10 +1569,12 @@ class MoveArchitectElements extends ArchitectModelCommand {
 
 List<(Offset, Offset)> _wallConnectionFaces(ArchitectWall wall) => [
   (wall.startPoint, wall.endPoint),
+  if (!wall.isOpenRailing) ...[
   (wall.polygonCorners[0], wall.polygonCorners[1]),
   (wall.polygonCorners[3], wall.polygonCorners[2]),
   (wall.coreCorners[0], wall.coreCorners[1]),
   (wall.coreCorners[3], wall.coreCorners[2]),
+  ],
 ];
 
 ArchitectWall _wallOpeningsAfterEdit(ArchitectWall old, ArchitectWall next) {

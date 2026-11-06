@@ -1,5 +1,6 @@
 import 'architect_roof_drainage_painter.dart';
 import 'architect_vector_scene.dart';
+import '../../bim_editing/geometry/bim_contour_drafting_geometry.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. Committed Roof Planes 2D Painter (Hatch, Eaves Overhang Dashed Line, Ridge/Hip Edges, Slope Arrow & Badge)
 // 2. Interactive Roof Drafting Preview (Rubber-band Polygon, Edge Dimensions, Snap Guides)
@@ -346,6 +347,54 @@ class ArchitectRoofPainterHelper {
               ..strokeWidth = strokeW
               ..strokeCap = StrokeCap.round,
           );
+        }
+      }
+
+      // 4b. Parapet (борд) inner boundary, insulation interface & coping cap
+      if (roof.parapet.enabled && !isGhost && roof.points.length >= 3) {
+        final p = roof.parapet;
+        final innerOutline = BimContourDraftingGeometry.offsetPolygon(
+          roof.points,
+          -p.totalThickness,
+        );
+        if (innerOutline.length >= 3) {
+          final innerPaint = Paint()
+            ..color = baseColor.withValues(alpha: isLowerLevel ? 0.5 : 0.85)
+            ..strokeWidth = 1.4 / scale
+            ..style = PaintingStyle.stroke;
+          canvas.drawPath(Path()..addPolygon(innerOutline, true), innerPaint);
+        }
+
+        if (p.exteriorInsulationThickness > 0.01) {
+          final insulOutline = BimContourDraftingGeometry.offsetPolygon(
+            roof.points,
+            -p.exteriorInsulationThickness,
+          );
+          if (insulOutline.length >= 3) {
+            final insulPaint = Paint()
+              ..color = baseColor.withValues(alpha: 0.45)
+              ..strokeWidth = 0.8 / scale
+              ..style = PaintingStyle.stroke;
+            canvas.drawPath(Path()..addPolygon(insulOutline, true), insulPaint);
+          }
+        }
+
+        if (p.hasCoping && p.copingProjection > 0.01) {
+          final copingOutline = BimContourDraftingGeometry.offsetPolygon(
+            roof.points,
+            p.copingProjection,
+          );
+          if (copingOutline.length >= 3) {
+            final copingPaint = Paint()
+              ..color = baseColor.withValues(alpha: 0.40)
+              ..strokeWidth = 0.9 / scale
+              ..style = PaintingStyle.stroke;
+            for (var k = 0; k < copingOutline.length; k++) {
+              final ca = copingOutline[k];
+              final cb = copingOutline[(k + 1) % copingOutline.length];
+              _drawDashedLine(canvas, ca, cb, copingPaint, dashLength: 0.15, gapLength: 0.10);
+            }
+          }
         }
       }
 
