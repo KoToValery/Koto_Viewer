@@ -12,7 +12,9 @@ import '../components/definitions/service_components.dart';
 import 'component_dimensions_dialog.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_column.dart';
+import '../models/architect_decorative_element.dart';
 import '../models/architect_elements.dart';
+import 'architect_decorative_bar.dart';
 import '../models/architect_wall_type.dart';
 import '../models/architect_zone.dart';
 import '../models/architect_zone_presets.dart';
@@ -119,6 +121,23 @@ class ArchitectToolPalette extends StatefulWidget {
   final OpeningType openingType;
   final ValueChanged<OpeningType>? onOpeningTypeChanged;
 
+  // Decorative 3D options
+  final double decorativeDepth;
+  final ValueChanged<double>? onDecorativeDepthChanged;
+  final double decorativeSpanLength;
+  final ValueChanged<double>? onDecorativeSpanLengthChanged;
+  final double decorativeFrameWidth;
+  final ValueChanged<double>? onDecorativeFrameWidthChanged;
+  final double decorativeNormalOffset;
+  final ValueChanged<double>? onDecorativeNormalOffsetChanged;
+  final ArchitectDecorativeMaterial decorativeMaterial;
+  final ValueChanged<ArchitectDecorativeMaterial>? onDecorativeMaterialChanged;
+  final ArchitectDecorativeElement? activeDecorativePreset;
+  final ValueChanged<ArchitectDecorativeElement?>? onDecorativePresetChanged;
+  final bool showDecorativeOnPlan;
+  final ValueChanged<bool>? onShowDecorativeOnPlanChanged;
+  final VoidCallback? onOpenDecorativeStudio;
+
   const ArchitectToolPalette({
     super.key,
     this.zonePresets = const ArchitectZonePresets(),
@@ -192,6 +211,21 @@ class ArchitectToolPalette extends StatefulWidget {
     this.onStairStepsChanged,
     this.openingType = OpeningType.shaft,
     this.onOpeningTypeChanged,
+    this.decorativeDepth = 0.05,
+    this.onDecorativeDepthChanged,
+    this.decorativeSpanLength = 2.00,
+    this.onDecorativeSpanLengthChanged,
+    this.decorativeFrameWidth = 0.12,
+    this.onDecorativeFrameWidthChanged,
+    this.decorativeNormalOffset = 0.0,
+    this.onDecorativeNormalOffsetChanged,
+    this.decorativeMaterial = ArchitectDecorativeMaterial.eps,
+    this.onDecorativeMaterialChanged,
+    this.activeDecorativePreset,
+    this.onDecorativePresetChanged,
+    this.showDecorativeOnPlan = false,
+    this.onShowDecorativeOnPlanChanged,
+    this.onOpenDecorativeStudio,
   });
 
   @override
@@ -232,10 +266,15 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
       widget.onToolChanged(result.tool!);
       if (result.tool!.usesComponent) {
         widget.onOpenComponentLibrary?.call();
+      } else if (result.tool == ArchitectTool.decorativeLibrary) {
+        widget.onOpenDecorativeStudio?.call();
       }
     } else if (result.category == ArchitectToolCategory.furnishing) {
       widget.onToolChanged(ArchitectTool.component);
       widget.onOpenComponentLibrary?.call();
+    } else if (result.category == ArchitectToolCategory.decorative &&
+        !activeTool.isDecorativeTool) {
+      widget.onToolChanged(ArchitectTool.decorativeProfile);
     } else if (ArchitectToolCategory.of(activeTool) != category &&
         mode == ArchitectInteractionMode.drawing) {
       widget.onToolChanged(ArchitectTool.pan);
@@ -250,10 +289,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
         widget.activeTool != ArchitectTool.select) {
       category = ArchitectToolCategory.of(widget.activeTool);
     }
-    if (widget.drawingOnly &&
-        category != ArchitectToolCategory.selection &&
-        category != ArchitectToolCategory.annotations &&
-        category != ArchitectToolCategory.drawing) {
+    if (widget.drawingOnly && !category.availableInDrawing) {
       category = ArchitectToolCategory.drawing;
     }
   }
@@ -375,6 +411,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   _buildComponentSubBar(context)
                 else if (activeTool == ArchitectTool.opening)
                   _buildOpeningSubBar(context)
+                else if (activeTool.isDecorativeTool)
+                  _buildDecorativeSubBar(context)
                 else if (activeTool == ArchitectTool.section ||
                     activeTool == ArchitectTool.elevation)
                   _buildViewsSubBar(context),
@@ -565,6 +603,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                     onToolChanged(tool);
                     if (tool.usesComponent) {
                       widget.onOpenComponentLibrary?.call();
+                    } else if (tool == ArchitectTool.decorativeLibrary) {
+                      widget.onOpenDecorativeStudio?.call();
                     }
                   }
                 },
@@ -1477,6 +1517,28 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildDecorativeSubBar(BuildContext context) {
+    return ArchitectDecorativeBar(
+      activeTool: activeTool,
+      unit: widget.wallUnit,
+      depth: widget.decorativeDepth,
+      spanLength: widget.decorativeSpanLength,
+      frameWidth: widget.decorativeFrameWidth,
+      normalOffset: widget.decorativeNormalOffset,
+      material: widget.decorativeMaterial,
+      activePreset: widget.activeDecorativePreset,
+      showOnPlan: widget.showDecorativeOnPlan,
+      onDepthChanged: widget.onDecorativeDepthChanged,
+      onSpanLengthChanged: widget.onDecorativeSpanLengthChanged,
+      onFrameWidthChanged: widget.onDecorativeFrameWidthChanged,
+      onNormalOffsetChanged: widget.onDecorativeNormalOffsetChanged,
+      onMaterialChanged: widget.onDecorativeMaterialChanged,
+      onPresetChanged: widget.onDecorativePresetChanged,
+      onShowOnPlanChanged: widget.onShowDecorativeOnPlanChanged,
+      onOpenStudio: widget.onOpenDecorativeStudio,
     );
   }
 

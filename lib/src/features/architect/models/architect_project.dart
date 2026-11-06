@@ -25,7 +25,9 @@ import 'architect_zone.dart';
 import 'architect_fenestration_style.dart';
 import 'architect_component.dart';
 import 'architect_floor_drain.dart';
+import 'architect_decorative_element.dart';
 export 'architect_component.dart';
+export 'architect_decorative_element.dart';
 
 typedef ArchitectUnit = BimDistanceUnit;
 
@@ -65,6 +67,7 @@ class ArchitectStorey {
     ...cadPrimitives.map((e) => e.id),
     ...components.map((e) => e.id),
     ...floorDrains.map((e) => e.id),
+    ...decorativeElements.map((e) => e.id),
     ...zones.where((e) => !e.isAutoBoundary).map((e) => e.id),
   };
   List<ArchitectElementGroup> get groups => _groups.isEmpty
@@ -103,6 +106,7 @@ class ArchitectStorey {
   final List<ArchitectCadPrimitive> cadPrimitives;
   final List<ArchitectComponentInstance> components;
   final List<ArchitectFloorDrain> floorDrains;
+  final List<ArchitectDecorativeElement> decorativeElements;
   final Offset? zoneScheduleOrigin;
   final bool isRoof;
 
@@ -129,6 +133,7 @@ class ArchitectStorey {
     this.cadPrimitives = const [],
     this.components = const [],
     this.floorDrains = const [],
+    this.decorativeElements = const [],
     this.zoneScheduleOrigin,
   }) : _zones = zones,
        _groups = groups;
@@ -162,6 +167,7 @@ class ArchitectStorey {
     List<ArchitectCadPrimitive>? cadPrimitives,
     List<ArchitectComponentInstance>? components,
     List<ArchitectFloorDrain>? floorDrains,
+    List<ArchitectDecorativeElement>? decorativeElements,
     Offset? zoneScheduleOrigin,
     bool clearZoneScheduleOrigin = false,
   }) => ArchitectStorey(
@@ -192,6 +198,7 @@ class ArchitectStorey {
     cadPrimitives: cadPrimitives ?? this.cadPrimitives,
     components: components ?? this.components,
     floorDrains: floorDrains ?? this.floorDrains,
+    decorativeElements: decorativeElements ?? this.decorativeElements,
     zoneScheduleOrigin: clearZoneScheduleOrigin
         ? null
         : (zoneScheduleOrigin ?? this.zoneScheduleOrigin),
@@ -223,6 +230,8 @@ class ArchitectStorey {
     'components': components.map((c) => c.toJson()).toList(),
     if (floorDrains.isNotEmpty)
       'floorDrains': floorDrains.map((d) => d.toJson()).toList(),
+    if (decorativeElements.isNotEmpty)
+      'decorativeElements': decorativeElements.map((d) => d.toJson()).toList(),
     if (zoneScheduleOrigin != null)
       'zoneScheduleOrigin': {
         'x': zoneScheduleOrigin!.dx,
@@ -319,6 +328,11 @@ class ArchitectStorey {
         if (d is Map)
           ArchitectFloorDrain.fromJson(Map<String, dynamic>.from(d)),
     ],
+    decorativeElements: [
+      for (final d in json['decorativeElements'] as List? ?? const [])
+        if (d is Map)
+          ArchitectDecorativeElement.fromJson(Map<String, dynamic>.from(d)),
+    ],
     components:
         (json['components'] as List<dynamic>?)
             ?.map(
@@ -371,6 +385,7 @@ class ArchitectProject {
   final List<ArchitectElevation> elevations;
   final ArchitectNorthSymbol? northSymbol;
   final Map<String, int> slabCompositionNumbers;
+  final bool showDecorativeOnPlan;
 
   const ArchitectProject({
     required this.id,
@@ -396,6 +411,7 @@ class ArchitectProject {
     this.elevations = const [],
     this.northSymbol,
     this.slabCompositionNumbers = const {},
+    this.showDecorativeOnPlan = false,
   });
 
   String formatLength(double meters) =>
@@ -518,6 +534,7 @@ class ArchitectProject {
     ArchitectNorthSymbol? northSymbol,
     bool clearNorthSymbol = false,
     Map<String, int>? slabCompositionNumbers,
+    bool? showDecorativeOnPlan,
   }) => ArchitectProject(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -543,6 +560,7 @@ class ArchitectProject {
     northSymbol: clearNorthSymbol ? null : northSymbol ?? this.northSymbol,
     slabCompositionNumbers:
         slabCompositionNumbers ?? this.slabCompositionNumbers,
+    showDecorativeOnPlan: showDecorativeOnPlan ?? this.showDecorativeOnPlan,
   );
 
   Map<String, dynamic> toJson() => {
@@ -569,6 +587,7 @@ class ArchitectProject {
     'elevations': elevations.map((a) => a.toJson()).toList(),
     if (northSymbol != null) 'northSymbol': northSymbol!.toJson(),
     'slabCompositionNumbers': slabCompositionNumbers,
+    if (showDecorativeOnPlan) 'showDecorativeOnPlan': true,
   };
 
   factory ArchitectProject.fromJson(
@@ -637,6 +656,7 @@ class ArchitectProject {
     slabCompositionNumbers: (json['slabCompositionNumbers'] as Map? ?? {}).map(
       (k, v) => MapEntry(k as String, (v as num).toInt()),
     ),
+    showDecorativeOnPlan: json['showDecorativeOnPlan'] as bool? ?? false,
     gridAxes:
         (json['gridAxes'] as List<dynamic>?)
             ?.map((a) => StructuralGridAxis.fromJson(a as Map<String, dynamic>))

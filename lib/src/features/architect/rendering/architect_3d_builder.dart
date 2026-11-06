@@ -26,6 +26,7 @@ import 'architect_railing_geometry.dart';
 import '../services/component_geometry_cache.dart';
 import '../services/component_library_service.dart';
 import '../services/architect_service_geometry.dart';
+import '../services/architect_decorative_geometry.dart';
 
 /// Real-time 3D solid mesh builder for architectural projects.
 class Architect3dBuilder {
@@ -541,6 +542,23 @@ class Architect3dBuilder {
           ArchitectServiceGeometry.terminal(project, storey, comp),
         );
         mark(comp.id, first);
+      }
+
+      // Add 3D architectural decorative elements (cornices, frames, brackets, reliefs)
+      for (final decor in storey.decorativeElements) {
+        final first = allTris.length;
+        final mesh = ArchitectDecorativeGeometry.buildWorldMesh(
+          project,
+          storey,
+          decor,
+        );
+        allTris.addAll(mesh);
+        mark(decor.id, first);
+        if (silhouetteGroups != null) {
+          for (var i = first; i < allTris.length; i++) {
+            silhouetteGroups[allTris[i]] = 'decor:${decor.id}';
+          }
+        }
       }
     }
 

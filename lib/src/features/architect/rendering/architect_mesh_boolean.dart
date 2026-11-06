@@ -161,6 +161,45 @@ class ArchitectMeshBoolean {
             ),
     ];
   }
+
+  static List<Triangle3D> intersect(
+    List<Triangle3D> subject,
+    List<Triangle3D> clipMesh,
+  ) {
+    if (subject.isEmpty || clipMesh.isEmpty) return const [];
+    BoundingBox3D bounds(List<Triangle3D> mesh) => BoundingBox3D.fromPoints([
+      for (final t in mesh) ...[t.v0, t.v1, t.v2],
+    ]);
+    final sa = bounds(subject), sb = bounds(clipMesh);
+    if (!sa.intersects(sb)) return const [];
+    List<_Polygon> polygons(List<Triangle3D> mesh) => [
+      for (final t in mesh)
+        if ((t.v1 - t.v0).cross(t.v2 - t.v0).length > 1e-12)
+          _Polygon([t.v0, t.v1, t.v2]),
+    ];
+    final a = _Node(polygons(subject)), b = _Node(polygons(clipMesh));
+    a.invert();
+    b.clipTo(a);
+    b.invert();
+    a.clipTo(b);
+    b.clipTo(a);
+    a.build(b.all());
+    a.invert();
+    return simplify([
+      for (final polygon in a.all())
+        for (var i = 1; i + 1 < polygon.vertices.length; i++)
+          if ((polygon.vertices[i] - polygon.vertices.first)
+                  .cross(polygon.vertices[i + 1] - polygon.vertices.first)
+                  .length >
+              1e-12)
+            Triangle3D(
+              v0: polygon.vertices.first,
+              v1: polygon.vertices[i],
+              v2: polygon.vertices[i + 1],
+              color: subject.first.color,
+            ),
+    ]);
+  }
 }
 
 class _ContactPlane {

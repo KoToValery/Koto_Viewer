@@ -29,6 +29,7 @@ import 'architect_building_elevation.dart';
 import 'component_geometry_cache.dart';
 import 'component_library_service.dart';
 import 'architect_service_geometry.dart';
+import 'architect_decorative_geometry.dart';
 
 class ArchitectSectionRegion {
   final String sourceId;
@@ -1208,6 +1209,69 @@ class ArchitectBuildingSection {
               ),
             );
           }
+        }
+      }
+
+      // 6. Cut 3D Decorative Elements with boolean-clean junctions against walls/roofs/slabs
+      for (final decor in floor.decorativeElements) {
+        final decorMesh = ArchitectDecorativeGeometry.buildWorldMesh(
+          project,
+          floor,
+          decor,
+        );
+        var decorPath = sliceMesh(decorMesh, exact: true);
+        if (decorPath == null || decorPath.getBounds().isEmpty) continue;
+
+        if (decor.normalOffset < -1e-4) {
+          // Recessed decorative element / rustication cuts into host wall finish
+          for (var i = 0; i < regions.length; i++) {
+            final r = regions[i];
+            if (r.slab || r.roof || !r.path.getBounds().overlaps(decorPath.getBounds())) {
+              continue;
+            }
+            try {
+              regions[i] = ArchitectSectionRegion(
+                r.sourceId,
+                r.material,
+                Path.combine(PathOperation.difference, r.path, decorPath),
+                slab: r.slab,
+                roof: r.roof,
+                timberCrossSectionPolygon: r.timberCrossSectionPolygon,
+                customFillColor: r.customFillColor,
+                hatchPattern: r.hatchPattern,
+                drawHatch: r.drawHatch,
+                mergeOutline: r.mergeOutline,
+                occludesProjection: r.occludesProjection,
+              );
+            } catch (_) {}
+          }
+        } else {
+          // Protruding or flush profile (e.g. eaves cornice/bracket): trim against existing structural regions
+          for (final r in regions) {
+            if (!r.path.getBounds().overlaps(decorPath!.getBounds())) continue;
+            try {
+              decorPath = Path.combine(
+                PathOperation.difference,
+                decorPath,
+                r.path,
+              );
+            } catch (_) {}
+          }
+        }
+
+        if (decorPath != null && !decorPath.getBounds().isEmpty) {
+          regions.add(
+            ArchitectSectionRegion(
+              decor.id,
+              decor.material.sectionMaterial,
+              decorPath,
+              customFillColor: decor.effectiveColor,
+              hatchPattern: ArchitectSectionHatch.preset(
+                decor.material.defaultHatchId,
+              ),
+              mergeOutline: false,
+            ),
+          );
         }
       }
     }

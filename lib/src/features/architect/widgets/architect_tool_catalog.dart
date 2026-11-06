@@ -6,6 +6,7 @@ import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 enum ArchitectToolCategory {
   plan,
   build,
+  decorative,
   structure,
   services,
   furnishing,
@@ -18,6 +19,7 @@ enum ArchitectToolCategory {
     selection => l.architectCategoryEdit,
     plan => l.architectCategoryPlan,
     build => l.architectCategoryBuild,
+    decorative => l.architectCategoryDecorative,
     structure => l.architectCategoryStructure,
     services => l.architectCategoryServices,
     furnishing => l.architectFurnishing,
@@ -30,6 +32,7 @@ enum ArchitectToolCategory {
     selection => AppIconId.select,
     plan => AppIconId.zone,
     build => AppIconId.wall,
+    decorative => AppIconId.roundedCorner,
     structure => AppIconId.beam,
     services => AppIconId.component,
     furnishing => AppIconId.furniture,
@@ -39,7 +42,10 @@ enum ArchitectToolCategory {
   };
 
   bool get availableInDrawing =>
-      this == selection || this == annotations || this == drawing;
+      this == selection ||
+      this == annotations ||
+      this == drawing ||
+      this == decorative;
 
   // A tool has one home. Sanitary fittings belong to furnishing; roofs are
   // architectural building elements rather than structural analysis tools.
@@ -51,6 +57,11 @@ enum ArchitectToolCategory {
     ArchitectTool.window ||
     ArchitectTool.stair ||
     ArchitectTool.roof => build,
+    ArchitectTool.decorativeProfile ||
+    ArchitectTool.decorativeFrame ||
+    ArchitectTool.decorativeArc ||
+    ArchitectTool.decorativeVoid ||
+    ArchitectTool.decorativeLibrary => decorative,
     ArchitectTool.opening || ArchitectTool.services => services,
     ArchitectTool.component || ArchitectTool.floorDrain => furnishing,
     ArchitectTool.column ||
@@ -105,6 +116,26 @@ extension ArchitectToolCatalogLabel on ArchitectTool {
     ArchitectTool.elevation => (AppIconId.elevation, l.architectToolElevation),
     ArchitectTool.axis => (AppIconId.axis, l.architectToolAxis),
     ArchitectTool.measure => (AppIconId.measure, l.architectToolMeasure),
+    ArchitectTool.decorativeProfile => (
+      AppIconId.polygon,
+      l.architectToolDecorativeProfile,
+    ),
+    ArchitectTool.decorativeFrame => (
+      AppIconId.offset,
+      l.architectToolDecorativeFrame,
+    ),
+    ArchitectTool.decorativeArc => (
+      AppIconId.arc,
+      l.architectToolDecorativeArc,
+    ),
+    ArchitectTool.decorativeVoid => (
+      AppIconId.cutOpening,
+      l.architectToolDecorativeVoid,
+    ),
+    ArchitectTool.decorativeLibrary => (
+      AppIconId.library,
+      l.architectToolDecorativeLibrary,
+    ),
   };
 }
 

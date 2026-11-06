@@ -17,6 +17,9 @@ import '../../bim_editing/commands/bim_edit_history.dart';
 import '../../../core/services/ui_settings_service.dart';
 
 import '../models/architect_floor_drain.dart';
+import '../services/architect_decorative_library_service.dart';
+import '../widgets/architect_decorative_drafting_overlay.dart';
+import 'decorative_editor_screen.dart';
 
 import '../services/architect_floor_drain_commands.dart';
 
@@ -1480,6 +1483,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           <String, Path>{};
 
+      if (_activeTool.isDecorativeTool) {
+        return ArchitectDecorativeDraftingOverlay(
+          key: ValueKey(
+            'workspace-decor-draft:$_workspaceViewKey:${_activeTool.name}',
+          ),
+          controller: _modelCommands,
+          elementTool: _elementTool,
+          activeTool: _activeTool,
+          paths: paths,
+          roofProfiles: _sectionGeometry?.roofProfiles ?? const {},
+          elevation: _commands.view == ArchitectWorkspaceView.elevation,
+          origin: facade?.centre ?? cut?.drawingOrigin ?? Offset.zero,
+          right: facade?.right ?? cut?.drawingRight ?? const Offset(1, 0),
+          inward:
+              facade?.viewDirection ??
+              cut?.viewDirection ??
+              const Offset(0, 1),
+          scale: _viewport.scale,
+          toView: (p) => _modelToSection(_screenToModel(p)),
+          toScreen: (p) => _viewport.toScreen(Offset(p.dx, -p.dy)),
+          onNavigate: (delta, factor, focal) => _viewport.navigate(
+            previousFocal: focal - delta,
+            focal: focal,
+            scaleFactor: factor,
+          ),
+          onOpenStudio: () => _openDecorativeStudio(),
+        );
+      }
+
       return ArchitectProjectionEditor(
                           onPropertiesPreview: (next) {
                             if (identical(_propertiesModelPreview, next)) return;
@@ -1520,6 +1552,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
 
         onMissTap: (p) => _handleTap(_screenToModel(p)),
+        onOpenDecorativeStudio: _openDecorativeStudio,
 
       );
 
@@ -1819,6 +1852,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ArchitectTool.zone => storey.zones.any((z) => z.id == id),
       ArchitectTool.section => _project.sections.any((s) => s.id == id),
       ArchitectTool.elevation => _project.elevations.any((e) => e.id == id),
+      ArchitectTool.decorativeProfile ||
+      ArchitectTool.decorativeFrame ||
+      ArchitectTool.decorativeArc ||
+      ArchitectTool.decorativeVoid ||
+      ArchitectTool.decorativeLibrary =>
+        storey.decorativeElements.any((d) => d.id == id),
 
       _ => false,
 
@@ -6510,6 +6549,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     _roofTool = ArchitectRoofTool()..addListener(_repaintPreview);
+    ArchitectDecorativeLibraryService.instance.init();
 
     FenestrationLibraryService.instance.init().then((_) {
 
@@ -17316,6 +17356,41 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  Future<void> _openDecorativeStudio([
+    ArchitectDecorativeElement? initialElement,
+    String? storeyId,
+  ]) async {
+    final result = await Navigator.push<ArchitectDecorativeElement>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DecorativeEditorScreen(
+          initialElement:
+              initialElement ?? _elementTool.activeDecorativePreset,
+          unit: _project.units,
+          decimals: _project.distanceDecimals,
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      if (initialElement != null && storeyId != null) {
+        _commands.execute(
+          UpdateArchitectDecorativeElement(
+            storeyId: storeyId,
+            element: result,
+          ),
+        );
+        _saveBiMProjectIfAttached();
+      } else {
+        setState(() {
+          _elementTool.setDecorativeParams(preset: result);
+          if (_activeTool == ArchitectTool.decorativeLibrary) {
+            _activeTool = ArchitectTool.decorativeProfile;
+          }
+        });
+      }
+    }
+  }
+
   void _openFenestrationEditor() async {
 
     final kind = _activeTool == ArchitectTool.door
@@ -26252,6 +26327,38 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   openingType: _elementTool.openingType,
 
                   onOpeningTypeChanged: (ot) => _elementTool.setOpeningType(ot),
+                  decorativeDepth: _elementTool.decorativeDepth,
+                  onDecorativeDepthChanged: (d) =>
+                      setState(() => _elementTool.setDecorativeParams(depth: d)),
+                  decorativeSpanLength: _elementTool.decorativeSpanLength,
+                  onDecorativeSpanLengthChanged: (l) => setState(
+                    () => _elementTool.setDecorativeParams(spanLength: l),
+                  ),
+                  decorativeFrameWidth: _elementTool.decorativeFrameWidth,
+                  onDecorativeFrameWidthChanged: (fw) => setState(
+                    () => _elementTool.setDecorativeParams(frameWidth: fw),
+                  ),
+                  decorativeNormalOffset: _elementTool.decorativeNormalOffset,
+                  onDecorativeNormalOffsetChanged: (no) => setState(
+                    () => _elementTool.setDecorativeParams(normalOffset: no),
+                  ),
+                  decorativeMaterial: _elementTool.decorativeMaterial,
+                  onDecorativeMaterialChanged: (m) => setState(
+                    () => _elementTool.setDecorativeParams(material: m),
+                  ),
+                  activeDecorativePreset: _elementTool.activeDecorativePreset,
+                  onDecorativePresetChanged: (p) => setState(
+                    () => _elementTool.setDecorativeParams(
+                      preset: p,
+                      clearPreset: p == null,
+                    ),
+                  ),
+                  showDecorativeOnPlan: _project.showDecorativeOnPlan,
+                  onShowDecorativeOnPlanChanged: (v) {
+                    _commands.execute(SetArchitectShowDecorativeOnPlan(v));
+                    _saveBiMProjectIfAttached();
+                  },
+                  onOpenDecorativeStudio: () => _openDecorativeStudio(),
 
                   componentRotation: _componentRotation,
 
@@ -29570,7 +29677,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (!_commands.isPlan &&
 
-          (_canAdoptPickedTool || _interactionMode == ArchitectInteractionMode.singleSelect) &&
+          (_activeTool.isDecorativeTool ||
+              _canAdoptPickedTool ||
+              _interactionMode == ArchitectInteractionMode.singleSelect) &&
 
           _effectiveSelection.isEmpty)
 

@@ -84,6 +84,7 @@ abstract class ArchitectModelCommand {
             ...s.cadPrimitives.map((e) => e.id),
             ...s.components.map((e) => e.id),
             ...s.floorDrains.map((e) => e.id),
+            ...s.decorativeElements.map((e) => e.id),
             ...s.walls.expand(
               (w) => [
                 ...w.doors.map((e) => e.id),
@@ -1215,6 +1216,10 @@ class MoveArchitectElement extends ArchitectModelCommand {
       floorDrains: [
         for (final e in s.floorDrains) matches(e.id) ? e.translate(delta) : e,
       ],
+      decorativeElements: [
+        for (final e in s.decorativeElements)
+          matches(e.id) ? e.translatedInPlan(delta) : e,
+      ],
     );
     final axes = [
       for (final e in project.gridAxes)
@@ -1545,9 +1550,21 @@ class MoveArchitectElements extends ArchitectModelCommand {
         }
       }
     }
+    final movedWallIds = movedWalls.map((w) => w.id).toSet();
     var result = ArchitectModelCommand.replace(
       project,
-      storey.copyWith(walls: nextWalls.values.toList()),
+      storey.copyWith(
+        walls: nextWalls.values.toList(),
+        decorativeElements: [
+          for (final d in storey.decorativeElements)
+            if (!elementIds.contains(d.id) &&
+                d.hostWallId != null &&
+                movedWallIds.contains(d.hostWallId))
+              d.translatedInPlan(delta)
+            else
+              d,
+        ],
+      ),
     );
     final carried = {
       for (final w in movedWalls) ...[
@@ -2615,4 +2632,84 @@ class UpdateArchitectElevation extends ArchitectModelCommand {
       ],
     );
   }
+}
+
+class CreateArchitectDecorativeElement extends ArchitectModelCommand {
+  final String storeyId;
+  final ArchitectDecorativeElement element;
+  const CreateArchitectDecorativeElement({
+    required this.storeyId,
+    required this.element,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectModelCommand.point(element.origin);
+    ArchitectModelCommand.positive(element.spanLength);
+    ArchitectModelCommand.positive(element.depth);
+    ArchitectModelCommand.newId(project, element.id);
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(
+        decorativeElements: [...floor.decorativeElements, element],
+      ),
+    );
+  }
+}
+
+class UpdateArchitectDecorativeElement extends ArchitectModelCommand {
+  final String storeyId;
+  final ArchitectDecorativeElement element;
+  const UpdateArchitectDecorativeElement({
+    required this.storeyId,
+    required this.element,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectModelCommand.point(element.origin);
+    ArchitectModelCommand.positive(element.spanLength);
+    ArchitectModelCommand.positive(element.depth);
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    if (!floor.decorativeElements.any((e) => e.id == element.id)) {
+      throw ArgumentError('Unknown decorative element: ${element.id}');
+    }
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(
+        decorativeElements: [
+          for (final d in floor.decorativeElements)
+            d.id == element.id ? element : d,
+        ],
+      ),
+    );
+  }
+}
+
+class DeleteArchitectDecorativeElement extends ArchitectModelCommand {
+  final String storeyId;
+  final String elementId;
+  const DeleteArchitectDecorativeElement({
+    required this.storeyId,
+    required this.elementId,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(
+        decorativeElements: floor.decorativeElements
+            .where((d) => d.id != elementId)
+            .toList(),
+      ),
+    );
+  }
+}
+
+class SetArchitectShowDecorativeOnPlan extends ArchitectModelCommand {
+  final bool showOnPlan;
+  const SetArchitectShowDecorativeOnPlan(this.showOnPlan);
+  @override
+  ArchitectProject apply(ArchitectProject project) =>
+      project.copyWith(showDecorativeOnPlan: showOnPlan);
 }

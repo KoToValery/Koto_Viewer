@@ -47,6 +47,10 @@ class ArchitectProjectionEditor extends StatefulWidget {
   final Offset Function(Offset) toView, toScreen;
   final void Function(Offset, double, Offset)? onNavigate;
   final ValueChanged<Offset>? onMissTap;
+  final Future<void> Function(
+    ArchitectDecorativeElement element,
+    String storeyId,
+  )? onOpenDecorativeStudio;
   final double scale;
   const ArchitectProjectionEditor({
     super.key,
@@ -62,6 +66,7 @@ class ArchitectProjectionEditor extends StatefulWidget {
     required this.scale,
     this.onNavigate,
     this.onMissTap,
+    this.onOpenDecorativeStudio,
   });
   @override
   State<ArchitectProjectionEditor> createState() => _ProjectionEditorState();
@@ -102,15 +107,22 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
   Timer? _contextHold;
   Offset? _contextDown;
   int _pipeSelectionRevision = 0;
+  bool? _stretchingIsLeft;
   final measureRects = <ArchitectOpeningMeasure, Rect>{};
   void updateDrag(Offset point) {
     final raw = point - dragStart!;
-    delta = Offset(widget.elevation ? raw.dx : 0, raw.dy);
+    if (_stretchingIsLeft != null) {
+      delta = Offset(raw.dx, 0);
+      snapContact = null;
+      return;
+    }
+    final allowHorizontal = widget.elevation || selected?.isDecorative == true;
+    delta = Offset(allowHorizontal ? raw.dx : 0, raw.dy);
     final snap = roofSnapEnabled
         ? roofSnap?.resolve(
             delta,
             10 / widget.scale,
-            horizontal: widget.elevation,
+            horizontal: allowHorizontal,
           )
         : null;
     snapContact = snap?.contact;
@@ -398,6 +410,47 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
     );
   }
 
+  bool? _hitDecorativeStretchHandle(Offset localPosition) {
+    final ref = selected;
+    if (ref == null || !ref.isDecorative) return null;
+    final path = widget.paths[ref.id];
+    if (path == null) return null;
+    final b = path.getBounds();
+    final leftHandle = widget.toScreen(Offset(b.left, b.center.dy));
+    final rightHandle = widget.toScreen(Offset(b.right, b.center.dy));
+    if ((localPosition - leftHandle).distance <= 22) return true;
+    if ((localPosition - rightHandle).distance <= 22) return false;
+    return null;
+  }
+
+  Future<void> _editDecorativeNumber(
+    String title,
+    double currentMetres,
+    ArchitectDecorativeElement Function(
+      ArchitectDecorativeElement d,
+      double metres,
+    )
+    updater, {
+    bool signed = false,
+  }) async {
+    final ref = selected;
+    if (ref == null || !ref.isDecorative) return;
+    final val = await number(title, currentMetres, signed: signed);
+    if (val == null || !mounted) return;
+    final freshRef = selected;
+    if (freshRef == null || !freshRef.isDecorative) return;
+    final decor = freshRef.storey.decorativeElements.firstWhere(
+      (d) => d.id == freshRef.id,
+    );
+    final metres = project.units.fromUnit(val);
+    apply(
+      () => UpdateArchitectDecorativeElement(
+        storeyId: freshRef.storey.id,
+        element: updater(decor, metres),
+      ).apply(project),
+    );
+  }
+
   void startPitch() {
     if (_candidates != null) setState(() => _candidates = null);
     final ref = selected;
@@ -516,12 +569,21 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                 }
               });
               _pointerDownView = widget.toView(event.localPosition);
-              _pointerDownHit = ArchitectProjectionEditing.pick(
-                project,
-                widget.paths,
-                _pointerDownView!,
-                10 / widget.scale,
+              final stretchHit = _hitDecorativeStretchHandle(
+                event.localPosition,
               );
+              if (stretchHit != null) {
+                _stretchingIsLeft = stretchHit;
+                _pointerDownHit = id;
+              } else {
+                _stretchingIsLeft = null;
+                _pointerDownHit = ArchitectProjectionEditing.pick(
+                  project,
+                  widget.paths,
+                  _pointerDownView!,
+                  10 / widget.scale,
+                );
+              }
             }
             _pointers.add(event.pointer);
           },
@@ -662,18 +724,32 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                     if (dragStart != null &&
                         id != null &&
                         delta.distance > .0001) {
-                      apply(
-                        () => ArchitectProjectionEditing.move(
-                          project,
-                          id!,
-                          delta,
-                          widget.right,
-                          elevation: widget.elevation,
-                        ),
-                      );
+                      if (_stretchingIsLeft != null) {
+                        final isLeft = _stretchingIsLeft!;
+                        apply(
+                          () => ArchitectProjectionEditing.stretchDecorative(
+                            project,
+                            id!,
+                            delta.dx,
+                            widget.right,
+                            isLeft: isLeft,
+                          ),
+                        );
+                      } else {
+                        apply(
+                          () => ArchitectProjectionEditing.move(
+                            project,
+                            id!,
+                            delta,
+                            widget.right,
+                            elevation: widget.elevation,
+                          ),
+                        );
+                      }
                     }
                     setState(() {
                       dragStart = null;
+                      _stretchingIsLeft = null;
                       delta = Offset.zero;
                       snapContact = null;
                       roofSnap = null;
@@ -693,8 +769,10 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                 measureRects,
                 project.units,
                 Theme.of(context).textTheme.bodyMedium?.fontFamily,
-                ref?.isOpening == true && widget.elevation,
+                (ref?.hasFacadeClearances == true) && widget.elevation,
                 snapContact: snapContact,
+                showStretchHandles: ref?.isDecorative == true,
+                stretchingIsLeft: _stretchingIsLeft,
               ),
             ),
           ),
@@ -796,14 +874,14 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                               icon: const AppIcon(AppIconId.gridOff),
                               selectedIcon: const AppIcon(AppIconId.grid),
                             ),
-                          if (widget.elevation)
+                          if (widget.elevation || ref.isDecorative)
                             IconButton(
                               key: const ValueKey('projection-move-x'),
                               tooltip: l.architectProjectionHorizontal,
                               onPressed: () => moveNumber(true),
                               icon: const AppIcon(AppIconId.swapHorizontal),
                             ),
-                          if (ref.isOpening && widget.elevation)
+                          if (ref.hasFacadeClearances && widget.elevation)
                             PopupMenuButton<String>(
                               tooltip: l.architectWallAlign,
                               icon: const AppIcon(AppIconId.alignLeft),
@@ -840,6 +918,41 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                                 ),
                               ],
                             ),
+                          if (ref.isDecorative &&
+                              widget.onOpenDecorativeStudio != null)
+                            TextButton.icon(
+                              key: const ValueKey('projection-decor-studio'),
+                              onPressed: () {
+                                final decor = ref.storey.decorativeElements
+                                    .firstWhere((d) => d.id == ref.id);
+                                widget.onOpenDecorativeStudio!(
+                                  decor,
+                                  ref.storey.id,
+                                );
+                              },
+                              icon: const Icon(Icons.view_in_ar, size: 18),
+                              label: Text(l.architectDecorativeEditStudio),
+                            ),
+                          if (ref.isDecorative)
+                            IconButton(
+                              key: const ValueKey('projection-decor-delete'),
+                              tooltip: l.delete,
+                              onPressed: () {
+                                final targetId = ref.id;
+                                final storeyId = ref.storey.id;
+                                setState(() {
+                                  id = null;
+                                  error = null;
+                                });
+                                apply(
+                                  () => DeleteArchitectDecorativeElement(
+                                    storeyId: storeyId,
+                                    elementId: targetId,
+                                  ).apply(project),
+                                );
+                              },
+                              icon: const AppIcon(AppIconId.delete),
+                            ),
                           IconButton(
                             tooltip: l.architectDeselect,
                             onPressed: () => setState(() {
@@ -850,7 +963,54 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                           ),
                         ],
                       ),
-                      if (ref.isOpening)
+                      if (ref.isDecorative)
+                        Builder(
+                          builder: (context) {
+                            final decor = ref.storey.decorativeElements
+                                .firstWhere((d) => d.id == ref.id);
+                            return Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 4,
+                              children: [
+                                TextButton(
+                                  key: const ValueKey('projection-decor-span'),
+                                  onPressed: () => _editDecorativeNumber(
+                                    l.architectDecorativeLength,
+                                    decor.spanLength,
+                                    (d, m) => d.withWidth(m),
+                                  ),
+                                  child: Text(
+                                    '${l.architectDecorativeLength} ${project.formatLength(decor.spanLength)}',
+                                  ),
+                                ),
+                                TextButton(
+                                  key: const ValueKey('projection-decor-depth'),
+                                  onPressed: () => _editDecorativeNumber(
+                                    l.architectDecorativeDepth,
+                                    decor.depth,
+                                    (d, m) => d.withDepth(m),
+                                  ),
+                                  child: Text(
+                                    '${l.architectDecorativeDepth} ${project.formatLength(decor.depth)}',
+                                  ),
+                                ),
+                                TextButton(
+                                  key: const ValueKey('projection-decor-offset'),
+                                  onPressed: () => _editDecorativeNumber(
+                                    l.architectDecorativeNormalOffset,
+                                    decor.normalOffset,
+                                    (d, m) => d.copyWith(normalOffset: m),
+                                    signed: true,
+                                  ),
+                                  child: Text(
+                                    '${l.architectDecorativeNormalOffset} ${project.formatLength(decor.normalOffset)}',
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      if (ref.hasFacadeClearances)
                         Wrap(
                           alignment: WrapAlignment.center,
                           spacing: 4,
@@ -902,6 +1062,8 @@ class _ProjectionSelectionPainter extends CustomPainter {
   final String? fontFamily;
   final bool horizontal;
   final Offset? snapContact;
+  final bool showStretchHandles;
+  final bool? stretchingIsLeft;
   _ProjectionSelectionPainter(
     this.path,
     this.delta,
@@ -912,14 +1074,17 @@ class _ProjectionSelectionPainter extends CustomPainter {
     this.fontFamily,
     this.horizontal, {
     this.snapContact,
+    this.showStretchHandles = false,
+    this.stretchingIsLeft,
   });
   @override
   void paint(Canvas canvas, Size size) {
     rects.clear();
     if (path == null) return;
-    final origin = screen(delta),
-        x = screen(delta + const Offset(1, 0)) - origin,
-        y = screen(delta + const Offset(0, 1)) - origin;
+    final effectiveDelta = stretchingIsLeft == null ? delta : Offset.zero;
+    final origin = screen(effectiveDelta),
+        x = screen(effectiveDelta + const Offset(1, 0)) - origin,
+        y = screen(effectiveDelta + const Offset(0, 1)) - origin;
     final matrix = Matrix4.identity()
       ..setEntry(0, 0, x.dx)
       ..setEntry(1, 0, x.dy)
@@ -939,6 +1104,48 @@ class _ProjectionSelectionPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
+    if (showStretchHandles) {
+      final b = path!.getBounds();
+      final leftView = Offset(
+        b.left + (stretchingIsLeft == true ? delta.dx : 0),
+        b.center.dy,
+      );
+      final rightView = Offset(
+        b.right + (stretchingIsLeft == false ? delta.dx : 0),
+        b.center.dy,
+      );
+      if (stretchingIsLeft != null) {
+        final previewRect = Rect.fromPoints(
+          screen(Offset(leftView.dx, b.top)),
+          screen(Offset(rightView.dx, b.bottom)),
+        );
+        canvas.drawRect(
+          previewRect,
+          Paint()
+            ..color = Colors.cyan
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+      }
+      for (final handlePos in [screen(leftView), screen(rightView)]) {
+        canvas.drawCircle(handlePos, 8, Paint()..color = Colors.white);
+        canvas.drawCircle(
+          handlePos,
+          8,
+          Paint()
+            ..color = const Color(0xFF0097A7)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.2,
+        );
+        canvas.drawLine(
+          handlePos - const Offset(3.5, 0),
+          handlePos + const Offset(3.5, 0),
+          Paint()
+            ..color = const Color(0xFF0097A7)
+            ..strokeWidth = 1.8,
+        );
+      }
+    }
     if (snapContact != null) {
       final at = screen(snapContact!);
       final paint = Paint()

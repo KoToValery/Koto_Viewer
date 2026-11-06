@@ -12,6 +12,7 @@ import 'dart:math' as math;
 import 'architect_wall_arc_editing.dart';
 import '../models/architect_column.dart';
 import '../models/architect_project.dart';
+import 'architect_decorative_geometry.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_door.dart';
@@ -47,6 +48,9 @@ class ArchitectSelection {
     'baseOffset',
     'clearHeight',
     'targetArea',
+    'spanLength',
+    'normalOffset',
+    'frameWidth',
   };
   static Iterable<Map<String, dynamic>> records(
     Map<String, dynamic> json,
@@ -133,6 +137,13 @@ class ArchitectSelection {
     }
     for (final component in s.components) {
       if (component.id == id) return component.worldBoundingRect;
+    }
+    for (final decor in s.decorativeElements) {
+      if (decor.id == id) {
+        return ArchitectDecorativeGeometry.planFootprintPath(
+          decor,
+        ).getBounds().inflate(.01);
+      }
     }
     for (final stair in s.stairs) {
       if (stair.id == id) return stair.plan.bounds;
@@ -248,6 +259,11 @@ class ArchitectSelection {
     for (final component in s.components) {
       if (component.id == id) {
         return path..addPolygon(component.worldPolygonCorners, true);
+      }
+    }
+    for (final decor in s.decorativeElements) {
+      if (decor.id == id) {
+        return ArchitectDecorativeGeometry.planFootprintPath(decor);
       }
     }
     for (final d in s.dimensions) {
@@ -393,6 +409,9 @@ class ArchitectSelection {
     final hatchCount = s.cadPrimitives
         .where((c) => ids.contains(c.id) && c.type == CadPrimitiveType.hatch)
         .length;
+    final decorCount = s.decorativeElements
+        .where((d) => ids.contains(d.id))
+        .length;
 
     final parts = <String>[];
     if (wallCount > 0) parts.add(l.architectSelectionWallsCount(wallCount));
@@ -401,6 +420,9 @@ class ArchitectSelection {
     if (slabCount > 0) parts.add(l.architectSelectionSlabsCount(slabCount));
     if (drainCount > 0) parts.add(l.architectSelectionDrainsCount(drainCount));
     if (roofCount > 0) parts.add('${l.architectRoofs}: $roofCount');
+    if (decorCount > 0) {
+      parts.add('${l.architectCategoryDecorative}: $decorCount');
+    }
     if (doorCount > 0) parts.add(l.architectSelectionDoorsCount(doorCount));
     if (winCount > 0) parts.add(l.architectSelectionWindowsCount(winCount));
     if (zoneCount > 0) parts.add(l.architectSelectionZonesCount(zoneCount));
@@ -465,10 +487,12 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
             'elevation',
             'offsetDistance',
             'baseOffset',
+            'normalOffset',
           }.contains(entry.key) &&
           value <
               (entry.key == 'sillHeight' ||
-                      entry.key == 'insulationThicknessOverride'
+                      entry.key == 'insulationThicknessOverride' ||
+                      entry.key == 'frameWidth'
                   ? 0
                   : .001)) {
         throw ArgumentError('Invalid dimension');
@@ -704,8 +728,23 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
               'wallFinish',
               'ceilingFinish',
               'isAutoBoundary',
+              'material',
+              'showOnPlan',
             }.contains(value.key)) {
           throw ArgumentError('Unsupported property');
+        }
+        if (value.key == 'material' &&
+            !ArchitectDecorativeMaterial.values.any(
+              (m) => m.name == value.value,
+            )) {
+          throw ArgumentError('Invalid decorative material');
+        }
+        if (value.key == 'showOnPlan') {
+          if (!{'true', 'false'}.contains(value.value)) {
+            throw ArgumentError('Invalid boolean value');
+          }
+          e['showOnPlan'] = value.value == 'true';
+          continue;
         }
         if (value.key == 'category' &&
             !ArchitectZoneCategory.values.any((c) => c.name == value.value)) {

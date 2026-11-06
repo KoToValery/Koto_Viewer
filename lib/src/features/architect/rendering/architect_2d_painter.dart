@@ -33,6 +33,7 @@ import '../models/architect_door.dart';
 import '../models/architect_window.dart';
 import 'architect_dimension_layout.dart';
 import '../services/architect_selection.dart';
+import '../services/architect_decorative_geometry.dart';
 import '../services/architect_wall_relations.dart';
 import '../services/architect_wall_overshoot_detector.dart';
 import '../models/architect_overhang.dart';
@@ -72,9 +73,21 @@ enum ArchitectTool {
   section,
   elevation,
   pan,
-  services;
+  services,
+  decorativeProfile,
+  decorativeFrame,
+  decorativeArc,
+  decorativeVoid,
+  decorativeLibrary;
 
   bool get usesComponent => this == component || this == services;
+
+  bool get isDecorativeTool =>
+      this == decorativeProfile ||
+      this == decorativeFrame ||
+      this == decorativeArc ||
+      this == decorativeVoid ||
+      this == decorativeLibrary;
 }
 
 enum WallDraftingMode { singleLine, chained }
@@ -513,6 +526,7 @@ class Architect2dPainter extends CustomPainter {
           layerVisible: true,
         );
       }
+      _drawDecorativeElements(canvas, _elementLayerStorey);
     }
     if (layer != ArchitectPaintLayer.model) {
       if (layer == ArchitectPaintLayer.interaction) {
@@ -687,6 +701,9 @@ class Architect2dPainter extends CustomPainter {
           .toList(),
       cadPrimitives: storey.cadPrimitives.where((e) => keep(e.id) || (!selectedOnly && e.type == CadPrimitiveType.hatch)).toList(),
       floorDrains: storey.floorDrains.where((e) => keep(e.id)).toList(),
+      decorativeElements: storey.decorativeElements
+          .where((e) => keep(e.id))
+          .toList(),
       zones: selectedOnly ? [] : storey.zones,
     );
   }
@@ -747,6 +764,10 @@ class Architect2dPainter extends CustomPainter {
         scale: zoomScale,
         selectedIds: {selectedElementId!},
       );
+      return;
+    }
+    if (selected.decorativeElements.isNotEmpty) {
+      _drawDecorativeElements(canvas, selected);
       return;
     }
     final polyline = selected.cadPrimitives
@@ -833,6 +854,42 @@ class Architect2dPainter extends CustomPainter {
       zoomScale: zoomScale,
       selectedElementId: selectedElementId,
     ).paint(canvas, Size.zero);
+  }
+
+  void _drawDecorativeElements(Canvas canvas, ArchitectStorey storey) {
+    final draftingScale = math.max(zoomScale, 40.0);
+    for (final decor in storey.decorativeElements) {
+      final isSelected =
+          decor.id == selectedElementId ||
+          selectedElementIds.contains(decor.id);
+      if (!decor.showOnPlan &&
+          !_project.showDecorativeOnPlan &&
+          !activeTool.isDecorativeTool &&
+          !isSelected) {
+        continue;
+      }
+      final footprint = ArchitectDecorativeGeometry.planFootprintPath(decor);
+      final fillColor = isSelected
+          ? const Color(0x2400BCD4)
+          : const Color(0x0D607D8B);
+      canvas.drawPath(footprint, Paint()..color = fillColor);
+      final strokePaint = Paint()
+        ..color = isSelected
+            ? const Color(0xFF00BCD4)
+            : palette.foreground(const Color(0xFF546E7A))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (isSelected ? 1.8 : 1.0) / draftingScale;
+      for (final metric in footprint.computeMetrics()) {
+        double d = 0.0;
+        final dash = 6.0 / draftingScale;
+        final gap = 4.0 / draftingScale;
+        while (d < metric.length) {
+          final next = math.min(d + dash, metric.length);
+          canvas.drawPath(metric.extractPath(d, next), strokePaint);
+          d = next + gap;
+        }
+      }
+    }
   }
 
   void _drawSelectedWallHandles(Canvas canvas, ArchitectWall wall) {

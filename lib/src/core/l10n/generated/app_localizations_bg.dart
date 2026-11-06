@@ -11410,4 +11410,149 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get roofDownpipeInternal => 'Вътрешно през плочи (ВТ)';
+
+  @override
+  String get architectCategoryDecorative => '3D Декорации';
+
+  @override
+  String get architectToolDecorativeProfile => 'Профил';
+
+  @override
+  String get architectToolDecorativeFrame => 'Рамка / Пано';
+
+  @override
+  String get architectToolDecorativeArc => 'Дъга / Кръг';
+
+  @override
+  String get architectToolDecorativeVoid => 'Отвор';
+
+  @override
+  String get architectToolDecorativeLibrary => '3D Студио';
+
+  @override
+  String get architectDecorativeDepth => 'Дебелина';
+
+  @override
+  String get architectDecorativeLength => 'Дължина';
+
+  @override
+  String get architectDecorativeWidth => 'Ширина';
+
+  @override
+  String get architectDecorativeHeight => 'Височина';
+
+  @override
+  String get architectDecorativeFrameWidth => 'Рамка';
+
+  @override
+  String get architectDecorativeSolid => 'Плътно';
+
+  @override
+  String get architectDecorativeNormalOffset => 'Отстояние';
+
+  @override
+  String get architectDecorativeMaterial => 'Материал';
+
+  @override
+  String get architectDecorativeShowOnPlan => 'Показвай в план';
+
+  @override
+  String get architectDecorativeShowAllOnPlan => '3D декорации в план';
+
+  @override
+  String get architectDecorativeStudioTitle =>
+      '3D Студио за декоративни елементи';
+
+  @override
+  String get architectDecorativeTabFront => 'Отпред (Фасада)';
+
+  @override
+  String get architectDecorativeTabProfile => 'Профил (Разрез)';
+
+  @override
+  String get architectDecorativeTab3D => '3D Изглед';
+
+  @override
+  String get architectDecorativeAddHole => 'Изрежи отвор';
+
+  @override
+  String get architectDecorativeClearHoles => 'Изчисти отвори';
+
+  @override
+  String get architectDecorativeSaveLibrary => 'Запази в библиотека';
+
+  @override
+  String get architectDecorativeSavedMsg =>
+      '3D декоративният елемент е запазен в библиотеката.';
+
+  @override
+  String get architectDecorativeTemplates => 'Шаблони';
+
+  @override
+  String get architectDecorativePresetCornice => 'Подстрешен корниз';
+
+  @override
+  String get architectDecorativePresetWindowFrame => 'Прозоречна рамка';
+
+  @override
+  String get architectDecorativePresetWindowSill => 'Подпрозоречен перваз';
+
+  @override
+  String get architectDecorativePresetBracket => 'Конзола под стреха';
+
+  @override
+  String get architectDecorativePresetKeystone => 'Ключов камък';
+
+  @override
+  String get architectDecorativePresetPilaster => 'Пиластър';
+
+  @override
+  String get architectDecorativePresetPerforatedPanel => 'Перфорирано пано';
+
+  @override
+  String get architectDecorativeMaterialEps => 'Фасаден профил (EPS)';
+
+  @override
+  String get architectDecorativeMaterialPlaster => 'Мазилка';
+
+  @override
+  String get architectDecorativeMaterialStone => 'Камък';
+
+  @override
+  String get architectDecorativeMaterialTimber => 'Дърво';
+
+  @override
+  String get architectDecorativeMaterialConcrete => 'Бетон';
+
+  @override
+  String get architectDecorativeMaterialMetal => 'Метал';
+
+  @override
+  String get architectDecorativeStretchLeft => 'Изтегли наляво';
+
+  @override
+  String get architectDecorativeStretchRight => 'Изтегли надясно';
+
+  @override
+  String get architectDecorativeEditStudio => '3D Редактор';
+
+  @override
+  String get architectDecorativeHintSection =>
+      'Начертайте профил в разреза. Докоснете началната точка за затваряне.';
+
+  @override
+  String get architectDecorativeHintFacade =>
+      'Начертайте декоративна форма по фасадата.';
+
+  @override
+  String get architectDecorativeHintFrame =>
+      'Изберете два диагонални ъгъла за рамка или пано.';
+
+  @override
+  String get architectDecorativeHintArc =>
+      'Изберете център и радиус за кръгъл детайл.';
+
+  @override
+  String get architectDecorativeHintVoid =>
+      'Изберете два ъгъла върху декоративен елемент за отвор.';
 }

@@ -20681,6 +20681,282 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Internal Vertical Shaft (VT)'**
   String get roofDownpipeInternal;
+
+  /// No description provided for @architectCategoryDecorative.
+  ///
+  /// In en, this message translates to:
+  /// **'3D Decor'**
+  String get architectCategoryDecorative;
+
+  /// No description provided for @architectToolDecorativeProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get architectToolDecorativeProfile;
+
+  /// No description provided for @architectToolDecorativeFrame.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame'**
+  String get architectToolDecorativeFrame;
+
+  /// No description provided for @architectToolDecorativeArc.
+  ///
+  /// In en, this message translates to:
+  /// **'Arc / Circle'**
+  String get architectToolDecorativeArc;
+
+  /// No description provided for @architectToolDecorativeVoid.
+  ///
+  /// In en, this message translates to:
+  /// **'Cutout'**
+  String get architectToolDecorativeVoid;
+
+  /// No description provided for @architectToolDecorativeLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'3D Studio'**
+  String get architectToolDecorativeLibrary;
+
+  /// No description provided for @architectDecorativeDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Thickness'**
+  String get architectDecorativeDepth;
+
+  /// No description provided for @architectDecorativeLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Length'**
+  String get architectDecorativeLength;
+
+  /// No description provided for @architectDecorativeWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get architectDecorativeWidth;
+
+  /// No description provided for @architectDecorativeHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get architectDecorativeHeight;
+
+  /// No description provided for @architectDecorativeFrameWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame'**
+  String get architectDecorativeFrameWidth;
+
+  /// No description provided for @architectDecorativeSolid.
+  ///
+  /// In en, this message translates to:
+  /// **'Solid'**
+  String get architectDecorativeSolid;
+
+  /// No description provided for @architectDecorativeNormalOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Offset'**
+  String get architectDecorativeNormalOffset;
+
+  /// No description provided for @architectDecorativeMaterial.
+  ///
+  /// In en, this message translates to:
+  /// **'Material'**
+  String get architectDecorativeMaterial;
+
+  /// No description provided for @architectDecorativeShowOnPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Show on plan'**
+  String get architectDecorativeShowOnPlan;
+
+  /// No description provided for @architectDecorativeShowAllOnPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'3D decor on plan'**
+  String get architectDecorativeShowAllOnPlan;
+
+  /// No description provided for @architectDecorativeStudioTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'3D Decorative Detail Studio'**
+  String get architectDecorativeStudioTitle;
+
+  /// No description provided for @architectDecorativeTabFront.
+  ///
+  /// In en, this message translates to:
+  /// **'Front (Facade)'**
+  String get architectDecorativeTabFront;
+
+  /// No description provided for @architectDecorativeTabProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile (Section)'**
+  String get architectDecorativeTabProfile;
+
+  /// No description provided for @architectDecorativeTab3D.
+  ///
+  /// In en, this message translates to:
+  /// **'3D View'**
+  String get architectDecorativeTab3D;
+
+  /// No description provided for @architectDecorativeAddHole.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut opening'**
+  String get architectDecorativeAddHole;
+
+  /// No description provided for @architectDecorativeClearHoles.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear openings'**
+  String get architectDecorativeClearHoles;
+
+  /// No description provided for @architectDecorativeSaveLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to library'**
+  String get architectDecorativeSaveLibrary;
+
+  /// No description provided for @architectDecorativeSavedMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'3D decorative element saved to library.'**
+  String get architectDecorativeSavedMsg;
+
+  /// No description provided for @architectDecorativeTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Presets'**
+  String get architectDecorativeTemplates;
+
+  /// No description provided for @architectDecorativePresetCornice.
+  ///
+  /// In en, this message translates to:
+  /// **'Eaves cornice'**
+  String get architectDecorativePresetCornice;
+
+  /// No description provided for @architectDecorativePresetWindowFrame.
+  ///
+  /// In en, this message translates to:
+  /// **'Window frame'**
+  String get architectDecorativePresetWindowFrame;
+
+  /// No description provided for @architectDecorativePresetWindowSill.
+  ///
+  /// In en, this message translates to:
+  /// **'Window sill'**
+  String get architectDecorativePresetWindowSill;
+
+  /// No description provided for @architectDecorativePresetBracket.
+  ///
+  /// In en, this message translates to:
+  /// **'Eaves bracket'**
+  String get architectDecorativePresetBracket;
+
+  /// No description provided for @architectDecorativePresetKeystone.
+  ///
+  /// In en, this message translates to:
+  /// **'Keystone'**
+  String get architectDecorativePresetKeystone;
+
+  /// No description provided for @architectDecorativePresetPilaster.
+  ///
+  /// In en, this message translates to:
+  /// **'Pilaster'**
+  String get architectDecorativePresetPilaster;
+
+  /// No description provided for @architectDecorativePresetPerforatedPanel.
+  ///
+  /// In en, this message translates to:
+  /// **'Perforated panel'**
+  String get architectDecorativePresetPerforatedPanel;
+
+  /// No description provided for @architectDecorativeMaterialEps.
+  ///
+  /// In en, this message translates to:
+  /// **'EPS profile'**
+  String get architectDecorativeMaterialEps;
+
+  /// No description provided for @architectDecorativeMaterialPlaster.
+  ///
+  /// In en, this message translates to:
+  /// **'Plaster'**
+  String get architectDecorativeMaterialPlaster;
+
+  /// No description provided for @architectDecorativeMaterialStone.
+  ///
+  /// In en, this message translates to:
+  /// **'Stone'**
+  String get architectDecorativeMaterialStone;
+
+  /// No description provided for @architectDecorativeMaterialTimber.
+  ///
+  /// In en, this message translates to:
+  /// **'Timber'**
+  String get architectDecorativeMaterialTimber;
+
+  /// No description provided for @architectDecorativeMaterialConcrete.
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete'**
+  String get architectDecorativeMaterialConcrete;
+
+  /// No description provided for @architectDecorativeMaterialMetal.
+  ///
+  /// In en, this message translates to:
+  /// **'Metal'**
+  String get architectDecorativeMaterialMetal;
+
+  /// No description provided for @architectDecorativeStretchLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Stretch left'**
+  String get architectDecorativeStretchLeft;
+
+  /// No description provided for @architectDecorativeStretchRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Stretch right'**
+  String get architectDecorativeStretchRight;
+
+  /// No description provided for @architectDecorativeEditStudio.
+  ///
+  /// In en, this message translates to:
+  /// **'3D Editor'**
+  String get architectDecorativeEditStudio;
+
+  /// No description provided for @architectDecorativeHintSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw profile in section. Tap start point to close.'**
+  String get architectDecorativeHintSection;
+
+  /// No description provided for @architectDecorativeHintFacade.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw decorative shape on facade.'**
+  String get architectDecorativeHintFacade;
+
+  /// No description provided for @architectDecorativeHintFrame.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap two corners to place frame or panel.'**
+  String get architectDecorativeHintFrame;
+
+  /// No description provided for @architectDecorativeHintArc.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap center and radius (or 3 arc points).'**
+  String get architectDecorativeHintArc;
+
+  /// No description provided for @architectDecorativeHintVoid.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap two corners on a decorative element to cut an opening.'**
+  String get architectDecorativeHintVoid;
 }
 
 class _AppLocalizationsDelegate

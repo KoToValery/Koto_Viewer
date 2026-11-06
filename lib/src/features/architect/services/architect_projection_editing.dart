@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
+import 'architect_decorative_geometry.dart';
 import 'architect_selection.dart';
 import 'architect_selection_candidates.dart';
 import 'architect_slab_geometry.dart';
@@ -10,6 +11,7 @@ import 'architect_command_controller.dart';
 enum ArchitectProjectionKind {
   door,
   window,
+  decorative,
   roof,
   stair,
   column,
@@ -26,7 +28,11 @@ class ArchitectProjectedElement {
   final ArchitectProjectionKind kind;
   final ArchitectWall? host;
   const ArchitectProjectedElement(this.id, this.storey, this.kind, [this.host]);
-  bool get isOpening => host != null;
+  bool get isOpening =>
+      kind == ArchitectProjectionKind.door ||
+      kind == ArchitectProjectionKind.window;
+  bool get isDecorative => kind == ArchitectProjectionKind.decorative;
+  bool get hasFacadeClearances => isOpening || isDecorative;
 }
 
 class ArchitectOpeningMeasure {
@@ -58,6 +64,19 @@ class ArchitectProjectionEditing {
         }
         if (w.id == id) {
           return ArchitectProjectedElement(id, s, ArchitectProjectionKind.wall);
+        }
+      }
+      for (final d in s.decorativeElements) {
+        if (d.id == id) {
+          final host = d.hostWallId == null
+              ? null
+              : s.walls.where((w) => w.id == d.hostWallId).firstOrNull;
+          return ArchitectProjectedElement(
+            id,
+            s,
+            ArchitectProjectionKind.decorative,
+            host,
+          );
         }
       }
       if (s.roofs.any((e) => e.id == id)) {
@@ -156,7 +175,17 @@ class ArchitectProjectionEditing {
     Offset right,
   ) {
     final ref = find(p, id);
-    if (ref == null || !ref.isOpening) return null;
+    if (ref == null) return null;
+    if (ref.isDecorative) {
+      final decor = ref.storey.decorativeElements.firstWhere((d) => d.id == id);
+      return ArchitectDecorativeGeometry.viewBounds(
+        ref.storey,
+        decor,
+        origin,
+        right,
+      );
+    }
+    if (!ref.isOpening) return null;
     final host = ref.host!, data = _record(p, ref);
     final centre =
         host.centerStart +
@@ -274,10 +303,23 @@ class ArchitectProjectionEditing {
     final ref = find(p, id);
     if (ref == null) throw ArgumentError('Unknown element');
     final s = ref.storey;
-    final dx = elevation ? delta.dx : 0.0, dz = delta.dy;
+    final dx = (elevation || ref.isDecorative) ? delta.dx : 0.0, dz = delta.dy;
     final horizontal = right * dx;
     ArchitectStorey result;
-    if (ref.isOpening) {
+    if (ref.isDecorative) {
+      result = s.copyWith(
+        decorativeElements: [
+          for (final d in s.decorativeElements)
+            if (d.id == id)
+              d.copyWith(
+                origin: d.origin + horizontal,
+                baseOffset: d.baseOffset + dz,
+              )
+            else
+              d,
+        ],
+      );
+    } else if (ref.isOpening) {
       final host = ref.host!, data = _record(p, ref);
       final factor =
           host.unitVector.dx * right.dx + host.unitVector.dy * right.dy;
@@ -397,7 +439,11 @@ class ArchitectProjectionEditing {
     Set<String>? visible,
   }) {
     final ref = find(p, id);
-    if (ref == null || !ref.isOpening) return [];
+    if (ref == null) return [];
+    if (ref.isDecorative) {
+      return _decorativeMeasures(p, ref, origin, right);
+    }
+    if (!ref.isOpening) return [];
     final host = ref.host!, data = _record(p, ref);
     final factor =
         host.unitVector.dx * right.dx + host.unitVector.dy * right.dy;
@@ -533,5 +579,134 @@ class ArchitectProjectionEditing {
       right,
       elevation: true,
     );
+  }
+
+  static List<ArchitectOpeningMeasure> _decorativeMeasures(
+    ArchitectProject p,
+    ArchitectProjectedElement ref,
+    Offset origin,
+    Offset right,
+  ) {
+    final decor = ref.storey.decorativeElements.firstWhere(
+      (d) => d.id == ref.id,
+    );
+    final bounds = ArchitectDecorativeGeometry.viewBounds(
+      ref.storey,
+      decor,
+      origin,
+      right,
+    );
+    final left = bounds.left;
+    final rightEdge = bounds.right;
+    final bottom = bounds.top;
+    final top = bounds.bottom;
+    final centreX = bounds.center.dx;
+    final floorZ = ref.storey.elevation;
+    final topZ = floorZ + (ref.host?.effectiveHeight(ref.storey.height) ?? ref.storey.height);
+    final distSill = (bottom - floorZ).abs() < 1e-4 ? 0.0 : bottom - floorZ;
+    final distHead = (topZ - top).abs() < 1e-4 ? 0.0 : topZ - top;
+
+    final result = <ArchitectOpeningMeasure>[];
+    if (ref.host != null) {
+      final host = ref.host!;
+      double x(Offset pt) =>
+          (pt.dx - origin.dx) * right.dx + (pt.dy - origin.dy) * right.dy;
+      final factor =
+          (host.unitVector.dx * right.dx + host.unitVector.dy * right.dy).abs();
+      if (factor >= 0.1) {
+        final leftX = math.min(x(host.centerStart), x(host.centerEnd));
+        final rightX = math.max(x(host.centerStart), x(host.centerEnd));
+        final distLeft = (left - leftX).abs() < 1e-4 ? 0.0 : left - leftX;
+        final distRight = (rightX - rightEdge).abs() < 1e-4
+            ? 0.0
+            : rightX - rightEdge;
+        if (distLeft >= -1e-3) {
+          result.add(
+            ArchitectOpeningMeasure(
+              ArchitectOpeningDistance.left,
+              math.max(0.0, distLeft),
+              Offset(leftX, bottom),
+              Offset(left, bottom),
+            ),
+          );
+        }
+        if (distRight >= -1e-3) {
+          result.add(
+            ArchitectOpeningMeasure(
+              ArchitectOpeningDistance.right,
+              math.max(0.0, distRight),
+              Offset(rightEdge, bottom),
+              Offset(rightX, bottom),
+            ),
+          );
+        }
+      }
+    }
+    if (distSill >= 0) {
+      result.add(
+        ArchitectOpeningMeasure(
+          ArchitectOpeningDistance.sill,
+          distSill,
+          Offset(centreX, floorZ),
+          Offset(centreX, bottom),
+        ),
+      );
+    }
+    if (distHead >= 0) {
+      result.add(
+        ArchitectOpeningMeasure(
+          ArchitectOpeningDistance.head,
+          distHead,
+          Offset(centreX, top),
+          Offset(centreX, topZ),
+        ),
+      );
+    }
+    return result;
+  }
+
+  /// Stretches the horizontal span (or depth if viewed edge-on) of a decorative
+  /// element when dragging its left or right handle in a projection view.
+  static ArchitectProject stretchDecorative(
+    ArchitectProject p,
+    String id,
+    double deltaX,
+    Offset right, {
+    required bool isLeft,
+  }) {
+    final ref = find(p, id);
+    if (ref == null || !ref.isDecorative) {
+      throw ArgumentError('Not a decorative element');
+    }
+    final decor = ref.storey.decorativeElements.firstWhere((d) => d.id == id);
+    final dotU = decor.tangent.dx * right.dx + decor.tangent.dy * right.dy;
+    ArchitectDecorativeElement updated;
+    if (dotU.abs() >= 0.5) {
+      final newSpan = (decor.spanLength + (isLeft ? -deltaX : deltaX)).clamp(
+        0.05,
+        50.0,
+      );
+      final anchorRight = dotU >= 0 ? isLeft : !isLeft;
+      updated = decor.withWidth(newSpan, anchorRight: anchorRight);
+    } else {
+      final dotV = decor.normal.dx * right.dx + decor.normal.dy * right.dy;
+      final newDepth = (decor.depth + (isLeft ? -deltaX : deltaX)).clamp(
+        0.01,
+        10.0,
+      );
+      final shiftOrigin = (dotV >= 0 && isLeft) || (dotV < 0 && !isLeft);
+      final actualDelta = newDepth - decor.depth;
+      updated = decor
+          .withDepth(newDepth)
+          .copyWith(
+            origin: shiftOrigin
+                ? decor.origin - decor.normal * actualDelta
+                : decor.origin,
+          );
+    }
+    return UpdateArchitectDecorativeElement(
+      storeyId: ref.storey.id,
+      element: updated,
+    ).apply(p);
   }
 }

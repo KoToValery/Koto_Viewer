@@ -11,6 +11,7 @@ import 'architect_element_id.dart';
 import '../adapters/architect_element_adapters.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
+import 'architect_decorative_geometry.dart';
 import '../rendering/architect_dimension_layout.dart';
 import '../models/architect_project.dart';
 import '../models/architect_grid_axis.dart';
@@ -50,6 +51,15 @@ class ArchitectElementTool extends ChangeNotifier {
 
   // Opening options
   OpeningType openingType = OpeningType.shaft;
+
+  // Decorative 3D element options
+  double decorativeDepth = 0.05;
+  double decorativeSpanLength = 2.00;
+  double decorativeFrameWidth = 0.12;
+  double decorativeNormalOffset = 0.0;
+  ArchitectDecorativeMaterial decorativeMaterial =
+      ArchitectDecorativeMaterial.eps;
+  ArchitectDecorativeElement? activeDecorativePreset;
 
   // Slab drafting state
   final List<Offset> slabDraftPoints = [];
@@ -109,6 +119,32 @@ class ArchitectElementTool extends ChangeNotifier {
 
   void setOpeningType(OpeningType type) {
     openingType = type;
+    notifyListeners();
+  }
+
+  void setDecorativeParams({
+    double? depth,
+    double? spanLength,
+    double? frameWidth,
+    double? normalOffset,
+    ArchitectDecorativeMaterial? material,
+    ArchitectDecorativeElement? preset,
+    bool clearPreset = false,
+  }) {
+    if (depth != null) decorativeDepth = depth;
+    if (spanLength != null) decorativeSpanLength = spanLength;
+    if (frameWidth != null) decorativeFrameWidth = frameWidth;
+    if (normalOffset != null) decorativeNormalOffset = normalOffset;
+    if (material != null) decorativeMaterial = material;
+    if (clearPreset) {
+      activeDecorativePreset = null;
+    } else if (preset != null) {
+      activeDecorativePreset = preset;
+      decorativeDepth = preset.depth;
+      decorativeSpanLength = preset.spanLength;
+      decorativeFrameWidth = preset.frameWidth ?? 0.0;
+      decorativeMaterial = preset.material;
+    }
     notifyListeners();
   }
 
@@ -479,6 +515,9 @@ class ArchitectElementTool extends ChangeNotifier {
       components: tool.usesComponent ? storey.components.where((c) =>
           c.isServiceComponent == (tool == ArchitectTool.services)).toList() : [],
       floorDrains: tool == ArchitectTool.floorDrain ? storey.floorDrains : [],
+      decorativeElements: tool.isDecorativeTool
+          ? storey.decorativeElements
+          : [],
       zones: tool == ArchitectTool.zone ? storey.zones : [],
       cadPrimitives: storey.cadPrimitives
           .where(
@@ -751,6 +790,17 @@ class ArchitectElementTool extends ChangeNotifier {
         yield slab.id;
       }
     }
+
+    // Check Decorative Elements (when shown on plan)
+    final showDecorAll = annotationProject?.showDecorativeOnPlan ?? false;
+    for (final decor in storey.decorativeElements) {
+      if (!decor.showOnPlan && !showDecorAll) continue;
+      final fp = ArchitectDecorativeGeometry.planFootprintPath(decor);
+      if (fp.contains(point) ||
+          fp.getBounds().inflate(tolerance).contains(point)) {
+        yield decor.id;
+      }
+    }
   }
 
   // ===========================================================================
@@ -799,6 +849,9 @@ class ArchitectElementTool extends ChangeNotifier {
           .toList(),
       annotations: storey.annotations.where((a) => a.id != elementId).toList(),
       floorDrains: storey.floorDrains.where((d) => d.id != elementId).toList(),
+      decorativeElements: storey.decorativeElements
+          .where((d) => d.id != elementId)
+          .toList(),
       cadPrimitives: storey.cadPrimitives
           .where((c) => c.id != elementId)
           .toList(),
@@ -952,6 +1005,23 @@ class ArchitectElementTool extends ChangeNotifier {
       return (storey.copyWith(beams: [...storey.beams, newBeam]), newId);
     }
 
+    // 7. Decorative Element
+    final decorIndex = storey.decorativeElements.indexWhere(
+      (d) => d.id == elementId,
+    );
+    if (decorIndex != -1) {
+      final decor = storey.decorativeElements[decorIndex];
+      final newDecor = decor
+          .copyWith(id: newId, clearHostWallId: true)
+          .translatedInPlan(offset);
+      return (
+        storey.copyWith(
+          decorativeElements: [...storey.decorativeElements, newDecor],
+        ),
+        newId,
+      );
+    }
+
     return (storey, null);
   }
 
@@ -1073,6 +1143,20 @@ class ArchitectElementTool extends ChangeNotifier {
         endPoint: mid + perp,
       );
       return storey.copyWith(cadPrimitives: newCad);
+    }
+
+    final decorIndex = storey.decorativeElements.indexWhere(
+      (d) => d.id == elementId,
+    );
+    if (decorIndex != -1) {
+      final decor = storey.decorativeElements[decorIndex];
+      final newDecor = List<ArchitectDecorativeElement>.from(
+        storey.decorativeElements,
+      );
+      newDecor[decorIndex] = decor
+          .copyWith(clearHostWallId: true)
+          .rotatedInPlan(decor.origin, math.pi / 2);
+      return storey.copyWith(decorativeElements: newDecor);
     }
 
     return storey;
@@ -1575,6 +1659,31 @@ class ArchitectElementTool extends ChangeNotifier {
       }
     }
 
+    // 13. Decorative Element
+    final decorIndex = storey.decorativeElements.indexWhere(
+      (d) => d.id == elementId,
+    );
+    if (decorIndex != -1) {
+      final decor = storey.decorativeElements[decorIndex];
+      final newDecor = decor
+          .copyWith(id: targetId, clearHostWallId: true)
+          .mirroredInPlan(origin, direction);
+      if (isDuplicate) {
+        return (
+          storey.copyWith(
+            decorativeElements: [...storey.decorativeElements, newDecor],
+          ),
+          targetId,
+        );
+      } else {
+        final decors = List<ArchitectDecorativeElement>.from(
+          storey.decorativeElements,
+        );
+        decors[decorIndex] = newDecor;
+        return (storey.copyWith(decorativeElements: decors), targetId);
+      }
+    }
+
     return (storey, null);
   }
 
@@ -1652,6 +1761,9 @@ class ArchitectElementTool extends ChangeNotifier {
           .toList(),
       annotations: storey.annotations.where((a) => !elementIds.contains(a.id)).toList(),
       floorDrains: storey.floorDrains.where((d) => !elementIds.contains(d.id)).toList(),
+      decorativeElements: storey.decorativeElements
+          .where((d) => !elementIds.contains(d.id))
+          .toList(),
       cadPrimitives: storey.cadPrimitives
           .where((c) => !elementIds.contains(c.id))
           .toList(),

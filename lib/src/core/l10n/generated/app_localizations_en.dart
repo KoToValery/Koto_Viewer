@@ -11365,4 +11365,148 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roofDownpipeInternal => 'Internal Vertical Shaft (VT)';
+
+  @override
+  String get architectCategoryDecorative => '3D Decor';
+
+  @override
+  String get architectToolDecorativeProfile => 'Profile';
+
+  @override
+  String get architectToolDecorativeFrame => 'Frame';
+
+  @override
+  String get architectToolDecorativeArc => 'Arc / Circle';
+
+  @override
+  String get architectToolDecorativeVoid => 'Cutout';
+
+  @override
+  String get architectToolDecorativeLibrary => '3D Studio';
+
+  @override
+  String get architectDecorativeDepth => 'Thickness';
+
+  @override
+  String get architectDecorativeLength => 'Length';
+
+  @override
+  String get architectDecorativeWidth => 'Width';
+
+  @override
+  String get architectDecorativeHeight => 'Height';
+
+  @override
+  String get architectDecorativeFrameWidth => 'Frame';
+
+  @override
+  String get architectDecorativeSolid => 'Solid';
+
+  @override
+  String get architectDecorativeNormalOffset => 'Offset';
+
+  @override
+  String get architectDecorativeMaterial => 'Material';
+
+  @override
+  String get architectDecorativeShowOnPlan => 'Show on plan';
+
+  @override
+  String get architectDecorativeShowAllOnPlan => '3D decor on plan';
+
+  @override
+  String get architectDecorativeStudioTitle => '3D Decorative Detail Studio';
+
+  @override
+  String get architectDecorativeTabFront => 'Front (Facade)';
+
+  @override
+  String get architectDecorativeTabProfile => 'Profile (Section)';
+
+  @override
+  String get architectDecorativeTab3D => '3D View';
+
+  @override
+  String get architectDecorativeAddHole => 'Cut opening';
+
+  @override
+  String get architectDecorativeClearHoles => 'Clear openings';
+
+  @override
+  String get architectDecorativeSaveLibrary => 'Save to library';
+
+  @override
+  String get architectDecorativeSavedMsg =>
+      '3D decorative element saved to library.';
+
+  @override
+  String get architectDecorativeTemplates => 'Presets';
+
+  @override
+  String get architectDecorativePresetCornice => 'Eaves cornice';
+
+  @override
+  String get architectDecorativePresetWindowFrame => 'Window frame';
+
+  @override
+  String get architectDecorativePresetWindowSill => 'Window sill';
+
+  @override
+  String get architectDecorativePresetBracket => 'Eaves bracket';
+
+  @override
+  String get architectDecorativePresetKeystone => 'Keystone';
+
+  @override
+  String get architectDecorativePresetPilaster => 'Pilaster';
+
+  @override
+  String get architectDecorativePresetPerforatedPanel => 'Perforated panel';
+
+  @override
+  String get architectDecorativeMaterialEps => 'EPS profile';
+
+  @override
+  String get architectDecorativeMaterialPlaster => 'Plaster';
+
+  @override
+  String get architectDecorativeMaterialStone => 'Stone';
+
+  @override
+  String get architectDecorativeMaterialTimber => 'Timber';
+
+  @override
+  String get architectDecorativeMaterialConcrete => 'Concrete';
+
+  @override
+  String get architectDecorativeMaterialMetal => 'Metal';
+
+  @override
+  String get architectDecorativeStretchLeft => 'Stretch left';
+
+  @override
+  String get architectDecorativeStretchRight => 'Stretch right';
+
+  @override
+  String get architectDecorativeEditStudio => '3D Editor';
+
+  @override
+  String get architectDecorativeHintSection =>
+      'Draw profile in section. Tap start point to close.';
+
+  @override
+  String get architectDecorativeHintFacade =>
+      'Draw decorative shape on facade.';
+
+  @override
+  String get architectDecorativeHintFrame =>
+      'Tap two corners to place frame or panel.';
+
+  @override
+  String get architectDecorativeHintArc =>
+      'Tap center and radius (or 3 arc points).';
+
+  @override
+  String get architectDecorativeHintVoid =>
+      'Tap two corners on a decorative element to cut an opening.';
 }
