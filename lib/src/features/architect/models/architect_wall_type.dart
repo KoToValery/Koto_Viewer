@@ -2,6 +2,8 @@ import 'architect_material_layer.dart';
 export 'architect_material_layer.dart';
 import 'architect_wall_system.dart';
 export 'architect_wall_system.dart';
+import 'architect_railing_design.dart';
+export 'architect_railing_design.dart';
 // === SECTION: ARCHITECTURAL WALL TYPE MODELS ===
 import 'dart:ui';
 import '../../../core/l10n/generated/app_localizations.dart';
@@ -48,6 +50,7 @@ class ArchitectWallType {
   final double _insulationThickness; // in meters (e.g. 0.12 m EPS or 0.0)
   final double? customHeight; // used for parapets (e.g. 1.05 m or 1.20 m)
   final ParapetFinish? parapetFinish;
+  final ArchitectRailingDesign? railing;
   final int colorValue;
 
   const ArchitectWallType({
@@ -62,6 +65,7 @@ class ArchitectWallType {
     double insulationThickness = 0.0,
     this.customHeight,
     this.parapetFinish,
+    this.railing,
     this.colorValue = 0xFF78909C,
     this.layers = const [],
     this.location,
@@ -69,17 +73,22 @@ class ArchitectWallType {
        _brickThickness = brickThickness,
        _insulationThickness = insulationThickness;
 
-  double get totalThickness =>
-      system.additionalDepth +
-      (layers.isEmpty
-          ? _totalThickness
-          : layers.fold<double>(0, (v, l) => v + l.thickness));
-  double get brickThickness => layers.isEmpty
+  double get totalThickness => railing != null && !railing!.hasSolidBody
+      ? _totalThickness
+      : system.additionalDepth +
+            (layers.isEmpty
+                ? _totalThickness
+                : layers.fold<double>(0, (v, l) => v + l.thickness));
+  double get brickThickness => !hasSolidWallBody
+      ? 0
+      : layers.isEmpty
       ? _brickThickness
       : layers
             .where((l) => l.role == ArchitectLayerRole.core)
             .fold(0, (v, l) => v + l.thickness);
-  double get insulationThickness => layers.isEmpty
+  double get insulationThickness => !hasSolidWallBody
+      ? 0
+      : layers.isEmpty
       ? _insulationThickness
       : layers
             .where((l) => l.role == ArchitectLayerRole.insulation)
@@ -89,7 +98,9 @@ class ArchitectWallType {
       (usage == WallUsage.exterior || usage == WallUsage.parapet
           ? ArchitectWallLocation.exterior
           : ArchitectWallLocation.interior);
-  List<ArchitectMaterialLayer> get resolvedLayers => layers.isNotEmpty
+  List<ArchitectMaterialLayer> get resolvedLayers => !hasSolidWallBody
+      ? const []
+      : layers.isNotEmpty
       ? layers
       : [
           if (insulationThickness > 0)
@@ -119,9 +130,13 @@ class ArchitectWallType {
         'parapet_12',
       }.contains(id);
   bool get isParapet => usage == WallUsage.parapet;
+  bool get hasSolidWallBody => railing == null || railing!.hasSolidBody;
+  bool get canHostOpenings => railing == null;
   bool get hasInsulation => insulationThickness > 0.001;
 
-  Color get color => layers.isEmpty
+  Color get color => !hasSolidWallBody
+      ? const Color(0xFFAAB2B8)
+      : layers.isEmpty
       ? Color(colorValue)
       : layers
             .firstWhere((l) => l.role == ArchitectLayerRole.core)
@@ -328,6 +343,8 @@ class ArchitectWallType {
     double? insulationThickness,
     double? customHeight,
     ParapetFinish? parapetFinish,
+    ArchitectRailingDesign? railing,
+    bool clearRailing = false,
     int? colorValue,
     List<ArchitectMaterialLayer>? layers,
     ArchitectWallLocation? location,
@@ -345,6 +362,7 @@ class ArchitectWallType {
     insulationThickness: insulationThickness ?? this.insulationThickness,
     customHeight: customHeight ?? this.customHeight,
     parapetFinish: parapetFinish ?? this.parapetFinish,
+    railing: clearRailing ? null : railing ?? this.railing,
     colorValue: colorValue ?? this.colorValue,
   );
 
@@ -362,6 +380,7 @@ class ArchitectWallType {
     'insulationThickness': insulationThickness,
     'customHeight': customHeight,
     'parapetFinish': parapetFinish?.name,
+    if (railing != null) 'railing': railing!.toJson(),
     'colorValue': colorValue,
   };
 
@@ -395,6 +414,11 @@ class ArchitectWallType {
         insulationThickness:
             (json['insulationThickness'] as num?)?.toDouble() ?? 0.0,
         customHeight: (json['customHeight'] as num?)?.toDouble(),
+        railing: json['railing'] == null
+            ? null
+            : ArchitectRailingDesign.fromJson(
+                Map<String, dynamic>.from(json['railing'] as Map),
+              ),
         parapetFinish: json['parapetFinish'] != null
             ? ParapetFinish.values.firstWhere(
                 (p) => p.name == json['parapetFinish'],

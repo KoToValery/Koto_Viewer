@@ -20,6 +20,7 @@ import '../models/architect_slab_assembly.dart';
 import '../rendering/architect_stair_mesh.dart';
 import '../rendering/architect_path_solid.dart';
 import '../rendering/architect_wall_solids.dart';
+import '../rendering/architect_railing_geometry.dart';
 import 'architect_roof_geometry.dart';
 import 'architect_slab_geometry.dart';
 import 'architect_stair_section.dart';
@@ -42,6 +43,7 @@ class ArchitectSectionRegion {
   final ArchitectHatchPattern? hatchPattern;
   final bool drawHatch;
   final bool mergeOutline;
+  final bool occludesProjection;
 
   const ArchitectSectionRegion(
     this.sourceId,
@@ -54,6 +56,7 @@ class ArchitectSectionRegion {
     this.hatchPattern,
     this.drawHatch = true,
     this.mergeOutline = true,
+    this.occludesProjection = true,
   });
 }
 
@@ -131,6 +134,7 @@ class ArchitectBuildingSection {
             hatchPattern: r.hatchPattern,
             drawHatch: r.drawHatch,
             mergeOutline: r.mergeOutline,
+            occludesProjection: r.occludesProjection,
           ),
       ],
       box(bounds),
@@ -196,6 +200,7 @@ class ArchitectBuildingSection {
         customFillColor: previous.customFillColor,
         hatchPattern: previous.hatchPattern ?? effectiveHatch,
         drawHatch: previous.drawHatch,
+        occludesProjection: previous.occludesProjection,
       );
     }
     return result;
@@ -307,6 +312,7 @@ class ArchitectBuildingSection {
               hatchPattern: r.hatchPattern,
               drawHatch: r.drawHatch,
               mergeOutline: r.mergeOutline,
+              occludesProjection: r.occludesProjection,
               timberCrossSectionPolygon: r.timberCrossSectionPolygon
                   ?.map((p) => p + shift)
                   .toList(),
@@ -507,6 +513,7 @@ class ArchitectBuildingSection {
 
       final useCompositions = floor.walls.any(
         (w) =>
+            w.hasRailingDesign ||
             w.system.isSpecial ||
             w.layers.isNotEmpty ||
             w.hasInsulation ||
@@ -523,6 +530,27 @@ class ArchitectBuildingSection {
             )
           : const <ArchitectWallSolid>[];
       for (final wall in floor.walls) {
+        for (final part in ArchitectRailingGeometry.components(
+          wall,
+          storeyElevation: floor.elevation,
+          walls: floor.walls,
+        )) {
+          final path = sliceMesh(part.triangles, exact: true);
+          if (path == null || path.getBounds().isEmpty) continue;
+          regions.add(
+            ArchitectSectionRegion(
+              wall.id,
+              SlabMaterial.custom,
+              path,
+              drawHatch: false,
+              mergeOutline: false,
+              occludesProjection: part.occludesProjection,
+              customFillColor: part.occludesProjection
+                  ? ArchitectRailingGeometry.metal
+                  : const Color(0x00000000),
+            ),
+          );
+        }
         final baseWallHeight = wall.effectiveHeight(floor.height);
         final canExtendToRoof = activeRoofSlices.isNotEmpty && !wall.isParapet;
         final prismHeight = canExtendToRoof
@@ -1023,6 +1051,7 @@ class ArchitectBuildingSection {
               hatchPattern: r.hatchPattern,
               drawHatch: r.drawHatch,
               mergeOutline: r.mergeOutline,
+              occludesProjection: r.occludesProjection,
             );
           } catch (_) {}
         }
@@ -1037,26 +1066,50 @@ class ArchitectBuildingSection {
       }
 
       for (final drain in floor.floorDrains) {
-        final surface=ArchitectDrainSurface.of(drain);
-        final base=floor.elevation+floor.floorFinishThickness;
-        final finish=Path();
-        for(final (a,b,za,zb) in surface.section(cut.start,cut.end)) {
-          double station(Offset p) => (p-cut.start).dx*cut.axis.dx+(p-cut.start).dy*cut.axis.dy;
-          final sa=station(a),sb=station(b);
-          final patch=Path()..addPolygon([Offset(sa,base+za),Offset(sb,base+zb),Offset(sb,base-.05),Offset(sa,base-.05)],true);
-          finish.addPath(patch,Offset.zero);
+        final surface = ArchitectDrainSurface.of(drain);
+        final base = floor.elevation + floor.floorFinishThickness;
+        final finish = Path();
+        for (final (a, b, za, zb) in surface.section(cut.start, cut.end)) {
+          double station(Offset p) =>
+              (p - cut.start).dx * cut.axis.dx +
+              (p - cut.start).dy * cut.axis.dy;
+          final sa = station(a), sb = station(b);
+          final patch = Path()
+            ..addPolygon([
+              Offset(sa, base + za),
+              Offset(sb, base + zb),
+              Offset(sb, base - .05),
+              Offset(sa, base - .05),
+            ], true);
+          finish.addPath(patch, Offset.zero);
         }
         if (!finish.getBounds().isEmpty) {
-          final clean=Path.combine(PathOperation.union,finish,Path());
-          for(var i=0;i<regions.length;i++) {
-            final r=regions[i];
-            if(!r.slab || r.roof) continue;
-            regions[i]=ArchitectSectionRegion(r.sourceId,r.material,
-              Path.combine(PathOperation.difference,r.path,clean),slab:r.slab,roof:r.roof,
-              timberCrossSectionPolygon:r.timberCrossSectionPolygon,customFillColor:r.customFillColor,
-              hatchPattern:r.hatchPattern,drawHatch:r.drawHatch,mergeOutline:r.mergeOutline);
+          final clean = Path.combine(PathOperation.union, finish, Path());
+          for (var i = 0; i < regions.length; i++) {
+            final r = regions[i];
+            if (!r.slab || r.roof) continue;
+            regions[i] = ArchitectSectionRegion(
+              r.sourceId,
+              r.material,
+              Path.combine(PathOperation.difference, r.path, clean),
+              slab: r.slab,
+              roof: r.roof,
+              timberCrossSectionPolygon: r.timberCrossSectionPolygon,
+              customFillColor: r.customFillColor,
+              hatchPattern: r.hatchPattern,
+              drawHatch: r.drawHatch,
+              mergeOutline: r.mergeOutline,
+              occludesProjection: r.occludesProjection,
+            );
           }
-          regions.add(ArchitectSectionRegion(drain.id,SlabMaterial.tile,clean,slab:true));
+          regions.add(
+            ArchitectSectionRegion(
+              drain.id,
+              SlabMaterial.tile,
+              clean,
+              slab: true,
+            ),
+          );
         }
 
         final sProj =
@@ -1127,7 +1180,11 @@ class ArchitectBuildingSection {
           );
           final cosR = math.cos(comp.rotation);
           final sinR = math.sin(comp.rotation);
-          final zBase = ArchitectServiceGeometry.baseElevation(project, floor, comp);
+          final zBase = ArchitectServiceGeometry.baseElevation(
+            project,
+            floor,
+            comp,
+          );
           Vector3 tr(Vector3 p) => Vector3(
             comp.position.dx + p.x * cosR - p.y * sinR,
             comp.position.dy + p.x * sinR + p.y * cosR,
@@ -1146,7 +1203,8 @@ class ArchitectBuildingSection {
                 SlabMaterial.custom,
                 compPath,
                 customFillColor: comp.isServiceComponent
-                    ? const Color(0xFFF5F5F5) : const Color(0xFFCFD8DC),
+                    ? const Color(0xFFF5F5F5)
+                    : const Color(0xFFCFD8DC),
               ),
             );
           }
@@ -1183,6 +1241,7 @@ class ArchitectBuildingSection {
           hatchPattern: r.hatchPattern,
           drawHatch: r.drawHatch,
           mergeOutline: r.mergeOutline,
+          occludesProjection: r.occludesProjection,
           timberCrossSectionPolygon: r.timberCrossSectionPolygon,
         );
       }
@@ -1192,7 +1251,8 @@ class ArchitectBuildingSection {
     // large union creates artificial strips at every other member's X station.
     final cutMasks = [
       for (final maskPath in [
-        for (final region in regions) region.path,
+        for (final region in regions)
+          if (region.occludesProjection) region.path,
         ...extraCutMaskPaths,
       ])
         for (final t in ArchitectPathSolid.extrude(
@@ -1283,6 +1343,7 @@ class ArchitectBuildingSection {
               hatchPattern: r.hatchPattern,
               drawHatch: r.drawHatch,
               mergeOutline: r.mergeOutline,
+              occludesProjection: r.occludesProjection,
               timberCrossSectionPolygon: r.timberCrossSectionPolygon
                   ?.map((p) => p + shift)
                   .toList(),
@@ -1442,7 +1503,12 @@ class ArchitectBuildingSection {
     }
     for (final floor in project.storeys) {
       for (final slab in floor.slabs.where((s) => s.id == detail.slabId)) {
-        if (ArchitectSlabGeometry.intervals(floor, slab, cut, project: project).any(
+        if (ArchitectSlabGeometry.intervals(
+          floor,
+          slab,
+          cut,
+          project: project,
+        ).any(
           (s) => detail.station >= s.$1 - 1e-8 && detail.station <= s.$2 + 1e-8,
         )) {
           return (storey: floor, slab: slab);

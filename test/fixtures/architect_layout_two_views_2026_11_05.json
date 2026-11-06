@@ -1,0 +1,2035 @@
+{
+  "id": "bim_1793720672836_cd05c4",
+  "name": "Architectural Project",
+  "createdAt": "2026-11-03T17:44:32.836679",
+  "updatedAt": "2026-11-05T15:53:51.705939",
+  "units": "centimeters",
+  "distanceDecimals": 1,
+  "levelUnits": "meters",
+  "levelDecimals": 2,
+  "dimensionScale": 100,
+  "document": {
+    "version": 1,
+    "viewScales": {
+      "plan:storey_0": 100
+    },
+    "profileMm": {},
+    "overrideMm": {},
+    "drawings": [
+      {
+        "id": "plan:storey_0",
+        "sourceId": "storey_0",
+        "kind": "plan",
+        "name": "±0.00",
+        "scale": 100,
+        "sourceNumber": 1,
+        "roof": false,
+        "visibility": {}
+      }
+    ],
+    "sheets": [
+      {
+        "id": "1793886697654954",
+        "name": "",
+        "number": "A-01",
+        "templateId": "standard",
+        "author": "",
+        "date": "",
+        "widthMm": 297.0,
+        "heightMm": 420.0,
+        "marginMm": 10.0,
+        "placements": [
+          {
+            "id": "1793886716186093",
+            "drawingId": "plan:storey_0",
+            "number": "1",
+            "frame": [
+              19.17694475448772,
+              25.10775047258977,
+              241.02040160633655,
+              240.11265716329217
+            ],
+            "anchor": [
+              -12.538620360940696,
+              -3.4452046202495694
+            ],
+            "scale": 100,
+            "rotation": 0.0,
+            "locked": false,
+            "showTitle": true
+          },
+          {
+            "id": "1793886730867632",
+            "drawingId": "plan:storey_0",
+            "number": "2",
+            "frame": [
+              136.74489959841577,
+              242.09102445577128,
+              120.5102008031684,
+              120.05632858164586
+            ],
+            "anchor": [
+              -12.538620360940696,
+              -3.4452046202495694
+            ],
+            "scale": 200,
+            "rotation": 0.0,
+            "locked": false,
+            "showTitle": true
+          }
+        ]
+      }
+    ],
+    "templates": [
+      {
+        "id": "standard",
+        "name": "",
+        "items": [
+          {
+            "id": "project",
+            "rect": [
+              0.0,
+              0.0,
+              180.0,
+              10.0
+            ],
+            "field": "project",
+            "text": "",
+            "textMm": 3.3,
+            "border": true
+          },
+          {
+            "id": "drawing",
+            "rect": [
+              0.0,
+              10.0,
+              180.0,
+              10.0
+            ],
+            "field": "drawing",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "number",
+            "rect": [
+              0.0,
+              20.0,
+              40.0,
+              10.0
+            ],
+            "field": "number",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "scale",
+            "rect": [
+              40.0,
+              20.0,
+              40.0,
+              10.0
+            ],
+            "field": "scale",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "author",
+            "rect": [
+              80.0,
+              20.0,
+              60.0,
+              10.0
+            ],
+            "field": "author",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          },
+          {
+            "id": "date",
+            "rect": [
+              140.0,
+              20.0,
+              40.0,
+              10.0
+            ],
+            "field": "date",
+            "text": "",
+            "textMm": 2.2,
+            "border": true
+          }
+        ]
+      }
+    ]
+  },
+  "storeys": [
+    {
+      "id": "storey_0",
+      "name": "±0.00",
+      "elevation": 0.0,
+      "height": 3.0,
+      "cutPlaneHeight": 1.2,
+      "floorFinishThickness": 0.05,
+      "walls": [
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": false,
+          "id": "wall_element_388d683c_1793720688057042_0",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 0.0,
+            "y": 4.625
+          },
+          "endPoint": {
+            "x": 4.5,
+            "y": 4.625
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720690761847_1",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 4.5,
+            "y": 4.625
+          },
+          "endPoint": {
+            "x": 4.5,
+            "y": -0.025167785234899043
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720694175452_2",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 4.5,
+            "y": -0.025167785234899043
+          },
+          "endPoint": {
+            "x": 9.75,
+            "y": 0.004194630872483174
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720698436517_3",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 9.75,
+            "y": 0.0041946308724831755
+          },
+          "endPoint": {
+            "x": 9.75,
+            "y": 9.0
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720703883230_4",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 9.75,
+            "y": 9.0
+          },
+          "endPoint": {
+            "x": 0.0,
+            "y": 9.0
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [
+            {
+              "id": "door_element_334a5c4d_1793820432581897_0",
+              "wallId": "wall_element_388d683c_1793720703883230_4",
+              "offsetRatio": 0.49651282051282064,
+              "width": 0.9,
+              "height": 2.0,
+              "sillHeight": 0.0,
+              "frameThickness": 0.04,
+              "leafThickness": 0.04,
+              "isHingeLeft": false,
+              "openInward": false,
+              "openAngleDeg": 90.0,
+              "specId": "1",
+              "uuid": "UUID_element_334a5c4d_1793820432581897_0",
+              "styleId": "door_interior_standard",
+              "style": {
+                "id": "door_interior_standard",
+                "name": "Интериорна врата 90/200",
+                "kind": "door",
+                "defaultWidth": 0.9,
+                "defaultHeight": 2.0,
+                "defaultSillHeight": 0.0,
+                "frameDepth": 0.05,
+                "frameFaceWidth": 0.04,
+                "centerInCore": true,
+                "glazingType": "double",
+                "glazingThickness": 0.024,
+                "glassColorValue": 2286928887,
+                "hasCasing": false,
+                "casingWidth": 0.1,
+                "casingProjection": 0.03,
+                "casingPlacement": "exterior",
+                "casingColorValue": 4293718001,
+                "includeBottomCasing": false,
+                "rootSubdivision": {
+                  "id": "root",
+                  "isSplit": false,
+                  "isVertical": true,
+                  "ratios": [
+                    1.0
+                  ],
+                  "children": [],
+                  "pane": {
+                    "id": "p_door",
+                    "paneType": "doorLeaf",
+                    "sashProfileWidth": 0.06,
+                    "hasHandle": false
+                  }
+                }
+              }
+            }
+          ],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720709103395_5",
+          "layers": [
+            {
+              "id": "insulation",
+              "material": "eps",
+              "role": "insulation",
+              "thickness": 0.12
+            },
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 0.0,
+            "y": 9.0
+          },
+          "endPoint": {
+            "x": 0.0,
+            "y": 4.625
+          },
+          "thickness": 0.37,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.12,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "ext_25_12_eps",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720929042262_6",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 2.25,
+            "y": 4.75
+          },
+          "endPoint": {
+            "x": 2.25,
+            "y": 6.875
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "left",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_68002f2f_1793790425552405_0",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 3.584,
+            "y": 6.625
+          },
+          "endPoint": {
+            "x": 3.584,
+            "y": 9.0
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "left",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": false,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793720983830113_7",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 4.625,
+            "y": 4.625
+          },
+          "endPoint": {
+            "x": 9.625,
+            "y": 4.625
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793721152568698_8",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 2.25,
+            "y": 6.875
+          },
+          "endPoint": {
+            "x": 9.75,
+            "y": 6.875
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "inner",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793721175865694_9",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 5.521,
+            "y": 11.301
+          },
+          "endPoint": {
+            "x": 8.401897087334515,
+            "y": 11.301
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793721178726878_10",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 8.401897087334515,
+            "y": 11.301
+          },
+          "endPoint": {
+            "x": 8.401897087334515,
+            "y": 13.5
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793721181726494_11",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 8.401897087334515,
+            "y": 13.5
+          },
+          "endPoint": {
+            "x": 5.521,
+            "y": 13.5
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "wall_element_388d683c_1793721187925636_12",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 5.521,
+            "y": 13.5
+          },
+          "endPoint": {
+            "x": 5.521,
+            "y": 11.301
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": false,
+          "id": "wall_element_388d683c_1793725709209760_13",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.12
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": -0.125,
+            "y": 4.5
+          },
+          "endPoint": {
+            "x": -0.125,
+            "y": 2.875
+          },
+          "thickness": 0.12,
+          "height": 1.05,
+          "baseOffset": 0.0,
+          "followStoreyHeight": false,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "outer",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "parapet_12",
+          "parapetFinish": "cap",
+          "parapet": true,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": false,
+          "id": "wall_element_388d683c_1793725714524095_14",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.12
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": -0.125,
+            "y": 2.875
+          },
+          "endPoint": {
+            "x": 4.5,
+            "y": 2.875
+          },
+          "thickness": 0.12,
+          "height": 1.05,
+          "baseOffset": 0.0,
+          "followStoreyHeight": false,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "outer",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "parapet_12",
+          "parapetFinish": "cap",
+          "parapet": true,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "mirror_6f44721d_1793733124093273_2",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 2.375,
+            "y": 14.716718385426752
+          },
+          "endPoint": {
+            "x": 9.000000000000002,
+            "y": 14.716718385426752
+          },
+          "thickness": 0.25,
+          "height": 1.05,
+          "baseOffset": 0.0,
+          "followStoreyHeight": false,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "inner",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": "cap",
+          "parapet": true,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "automatic",
+          "exteriorResolved": true,
+          "id": "mirror_6f44721d_1793733318653897_3",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 2.375,
+            "y": 14.40975764222506
+          },
+          "endPoint": {
+            "x": 9.0,
+            "y": 14.40975764222506
+          },
+          "thickness": 0.25,
+          "height": 1.05,
+          "baseOffset": 0.0,
+          "followStoreyHeight": false,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "inner",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": "cap",
+          "parapet": true,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "manual",
+          "exteriorResolved": true,
+          "id": "wall_element_68002f2f_1793791504668362_6",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.12
+            }
+          ],
+          "location": "exterior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 0.125,
+            "y": 1.438928992419596
+          },
+          "endPoint": {
+            "x": 2.375,
+            "y": 1.438928992419596
+          },
+          "thickness": 0.12,
+          "height": 1.05,
+          "baseOffset": 0.0,
+          "followStoreyHeight": false,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "center",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "parapet_12",
+          "parapetFinish": "cap",
+          "parapet": true,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        },
+        {
+          "locationMode": "automatic",
+          "exteriorSideMode": "manual",
+          "exteriorResolved": true,
+          "id": "mirror_68002f2f_1793791533179924_7",
+          "layers": [
+            {
+              "id": "core",
+              "material": "brick",
+              "role": "core",
+              "thickness": 0.25
+            }
+          ],
+          "location": "interior",
+          "plinth": {
+            "enabled": false,
+            "baseElevation": 0.0,
+            "height": 0.5,
+            "finish": "render"
+          },
+          "startPoint": {
+            "x": 2.25,
+            "y": 12.125
+          },
+          "endPoint": {
+            "x": 9.749999999999996,
+            "y": 12.125
+          },
+          "thickness": 0.25,
+          "height": 3.0,
+          "baseOffset": 0.0,
+          "followStoreyHeight": true,
+          "coreMaterial": "brick",
+          "insulationMaterial": "eps",
+          "referenceLine": "outer",
+          "exteriorSide": "right",
+          "insulationThicknessOverride": 0.0,
+          "connectStart": true,
+          "connectEnd": true,
+          "wallTypeId": "int_25_brick",
+          "parapetFinish": null,
+          "parapet": false,
+          "cutDisplayMode": "auto",
+          "doors": [],
+          "windows": []
+        }
+      ],
+      "zones": [
+        {
+          "id": "zone_element_6bdaf3e_1793808182360113_0",
+          "kind": "room",
+          "number": "1",
+          "name": "Bedroom",
+          "category": "bedroom",
+          "polygon": [
+            {
+              "x": 0.125,
+              "y": 4.75
+            },
+            {
+              "x": 2.125,
+              "y": 4.75
+            },
+            {
+              "x": 2.125,
+              "y": 6.875
+            },
+            {
+              "x": 3.4590001106262207,
+              "y": 6.875
+            },
+            {
+              "x": 3.4590001106262207,
+              "y": 8.875
+            },
+            {
+              "x": 0.125,
+              "y": 8.875
+            }
+          ],
+          "floorFinish": "лам",
+          "wallFinish": "ги",
+          "ceilingFinish": "т",
+          "clearHeight": 2.6,
+          "isAutoBoundary": true,
+          "seedPoint": {
+            "x": 1.4557029562658543,
+            "y": 7.59981231152963
+          },
+          "targetArea": null,
+          "customColorValue": null
+        },
+        {
+          "id": "zone_element_6bdaf3e_1793808198008166_1",
+          "kind": "room",
+          "number": "2",
+          "name": "Bathroom / WC",
+          "category": "bathroom",
+          "polygon": [
+            {
+              "x": 3.7090001106262207,
+              "y": 6.875
+            },
+            {
+              "x": 9.625,
+              "y": 6.875000476837158
+            },
+            {
+              "x": 9.625,
+              "y": 8.875
+            },
+            {
+              "x": 3.7090001106262207,
+              "y": 8.875
+            }
+          ],
+          "floorFinish": "Terracotta",
+          "wallFinish": "Faience",
+          "ceilingFinish": "Suspended Ceiling",
+          "clearHeight": 2.6,
+          "isAutoBoundary": true,
+          "seedPoint": {
+            "x": 7.240509794401554,
+            "y": 7.808836788543516
+          },
+          "targetArea": null,
+          "customColorValue": null
+        },
+        {
+          "id": "zone_element_6bdaf3e_1793808205836595_2",
+          "kind": "room",
+          "number": "3",
+          "name": "Storage / Utility",
+          "category": "storage",
+          "polygon": [
+            {
+              "x": 2.375,
+              "y": 4.75
+            },
+            {
+              "x": 9.625,
+              "y": 4.75
+            },
+            {
+              "x": 9.625,
+              "y": 6.625
+            },
+            {
+              "x": 2.375,
+              "y": 6.625
+            }
+          ],
+          "floorFinish": "",
+          "wallFinish": "",
+          "ceilingFinish": "",
+          "clearHeight": 2.6,
+          "isAutoBoundary": true,
+          "seedPoint": {
+            "x": 7.4296834776527,
+            "y": 5.915488148996567
+          },
+          "targetArea": null,
+          "customColorValue": null
+        },
+        {
+          "id": "zone_element_334a5c4d_1793822455003456_1",
+          "kind": "room",
+          "number": "4",
+          "name": "Living Room",
+          "category": "living",
+          "polygon": [
+            {
+              "x": 4.625,
+              "y": 0.10053327529630529
+            },
+            {
+              "x": 9.625,
+              "y": 0.12849748022215124
+            },
+            {
+              "x": 9.625,
+              "y": 4.5
+            },
+            {
+              "x": 4.625,
+              "y": 4.5
+            }
+          ],
+          "floorFinish": "",
+          "wallFinish": "",
+          "ceilingFinish": "",
+          "clearHeight": 2.6,
+          "isAutoBoundary": true,
+          "seedPoint": {
+            "x": 5.7609495788345955,
+            "y": 1.4693403659684245
+          },
+          "targetArea": null,
+          "customColorValue": null
+        },
+        {
+          "id": "zone_element_334a5c4d_1793822757870700_2",
+          "kind": "room",
+          "number": "5",
+          "name": "Custom Spa",
+          "category": "custom",
+          "polygon": [
+            {
+              "x": -7.315049195513795,
+              "y": 11.459684557286563
+            },
+            {
+              "x": -7.720142441573001,
+              "y": 7.970648339564466
+            },
+            {
+              "x": -4.315175561305665,
+              "y": 7.970648339564466
+            },
+            {
+              "x": -3.955371722531961,
+              "y": 11.069610459938628
+            }
+          ],
+          "floorFinish": "",
+          "wallFinish": "",
+          "ceilingFinish": "",
+          "clearHeight": 2.6,
+          "isAutoBoundary": false,
+          "targetArea": null,
+          "customColorValue": null
+        }
+      ],
+      "columns": [
+        {
+          "id": "col_element_6bdaf3e_1793809253934217_12",
+          "position": {
+            "x": 6.185749565552227,
+            "y": 0.0
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "depth": 0.25,
+          "rotationDeg": 0.0,
+          "height": null,
+          "baseOffset": 0.0,
+          "cutDisplayMode": "auto",
+          "label": "C1"
+        },
+        {
+          "id": "col_element_6bdaf3e_1793809262485938_13",
+          "position": {
+            "x": 7.450239337252622,
+            "y": -0.008667565227893512
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "depth": 0.25,
+          "rotationDeg": 0.0,
+          "height": null,
+          "baseOffset": 0.0,
+          "cutDisplayMode": "auto",
+          "label": "C2"
+        },
+        {
+          "id": "col_element_6bdaf3e_1793809265992702_14",
+          "position": {
+            "x": 8.669642752052782,
+            "y": 0.0
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "depth": 0.25,
+          "rotationDeg": 0.0,
+          "height": null,
+          "baseOffset": 0.0,
+          "cutDisplayMode": "auto",
+          "label": "C3"
+        }
+      ],
+      "beams": [],
+      "slabs": [],
+      "roofs": [],
+      "openings": [
+        {
+          "id": "op_element_6bdaf3e_1793809027485362_11",
+          "boundary": [
+            {
+              "x": 6.833,
+              "y": 1.378928992419596
+            },
+            {
+              "x": 7.040661477536015,
+              "y": 1.378928992419596
+            },
+            {
+              "x": 7.040661477536015,
+              "y": 1.857
+            },
+            {
+              "x": 6.833,
+              "y": 1.857
+            }
+          ],
+          "label": "Opening 1",
+          "type": "shaft"
+        }
+      ],
+      "stairs": [
+        {
+          "id": "stair_6bdaf3e_1793808778003100_8",
+          "startPoint": {
+            "x": 4.625,
+            "y": 0.10053327488724406
+          },
+          "endPoint": {
+            "x": 4.625,
+            "y": 3.3009498896719167
+          },
+          "width": 1.2,
+          "stepCount": 18,
+          "hasLanding": true,
+          "design": {
+            "rulesVersion": "BG-2025.1",
+            "shape": "halfTurn",
+            "code": "bulgaria",
+            "use": "common",
+            "evacuation": "unspecified",
+            "rise": 3.0,
+            "startOffset": 0.0,
+            "followStoreys": true,
+            "upperStoreyId": null,
+            "manualRisers": null,
+            "manualGoing": null,
+            "landingDepth": 1.2,
+            "innerRadius": 0.6,
+            "sweepDegrees": 270.0,
+            "winderSteps": false,
+            "cornerRiser": false,
+            "manualWinderSteps": null,
+            "manualWinderRadius": null,
+            "turnLeft": false,
+            "isDraft": false,
+            "showRailing": true,
+            "showLabel": true,
+            "guardHeight": 1.2,
+            "handrailHeight": 0.9,
+            "construction": "concrete",
+            "treadThickness": 0.04,
+            "stringerWidth": 0.06,
+            "stringerDepth": 0.24,
+            "concreteThickness": 0.15,
+            "finishThickness": 0.02,
+            "nosingProjection": 0.03
+          }
+        },
+        {
+          "id": "stair_6bdaf3e_1793808790609928_9",
+          "startPoint": {
+            "x": 5.928187473185503,
+            "y": -2.6162047734658302
+          },
+          "endPoint": {
+            "x": 9.348767677984716,
+            "y": -2.61620477346583
+          },
+          "width": 1.2,
+          "stepCount": 18,
+          "hasLanding": true,
+          "design": {
+            "rulesVersion": "BG-2025.1",
+            "shape": "halfTurn",
+            "code": "bulgaria",
+            "use": "common",
+            "evacuation": "unspecified",
+            "rise": 3.0,
+            "startOffset": 0.0,
+            "followStoreys": true,
+            "upperStoreyId": null,
+            "manualRisers": null,
+            "manualGoing": null,
+            "landingDepth": 1.2,
+            "innerRadius": 0.6,
+            "sweepDegrees": 270.0,
+            "winderSteps": false,
+            "cornerRiser": false,
+            "manualWinderSteps": null,
+            "manualWinderRadius": null,
+            "turnLeft": false,
+            "isDraft": false,
+            "showRailing": true,
+            "showLabel": true,
+            "guardHeight": 1.2,
+            "handrailHeight": 0.9,
+            "construction": "concrete",
+            "treadThickness": 0.04,
+            "stringerWidth": 0.06,
+            "stringerDepth": 0.24,
+            "concreteThickness": 0.15,
+            "finishThickness": 0.02,
+            "nosingProjection": 0.03
+          }
+        },
+        {
+          "id": "stair_6bdaf3e_1793808901206606_10",
+          "startPoint": {
+            "x": 7.761086461867453,
+            "y": 2.078928992419596
+          },
+          "endPoint": {
+            "x": 10.654120007084561,
+            "y": 2.078928992419596
+          },
+          "width": 1.2,
+          "stepCount": 18,
+          "hasLanding": true,
+          "design": {
+            "rulesVersion": "BG-2025.1",
+            "shape": "halfTurn",
+            "code": "bulgaria",
+            "use": "common",
+            "evacuation": "unspecified",
+            "rise": 3.0,
+            "startOffset": 0.0,
+            "followStoreys": true,
+            "upperStoreyId": null,
+            "manualRisers": null,
+            "manualGoing": null,
+            "landingDepth": 1.2,
+            "innerRadius": 0.6,
+            "sweepDegrees": 270.0,
+            "winderSteps": false,
+            "cornerRiser": false,
+            "manualWinderSteps": null,
+            "manualWinderRadius": null,
+            "turnLeft": false,
+            "isDraft": false,
+            "showRailing": true,
+            "showLabel": true,
+            "guardHeight": 1.2,
+            "handrailHeight": 0.9,
+            "construction": "concrete",
+            "treadThickness": 0.04,
+            "stringerWidth": 0.06,
+            "stringerDepth": 0.24,
+            "concreteThickness": 0.15,
+            "finishThickness": 0.02,
+            "nosingProjection": 0.03
+          }
+        }
+      ],
+      "dimensions": [],
+      "elevationMarkers": [
+        {
+          "id": "elev_element_6bdaf3e_1793812688642605_15",
+          "position": {
+            "x": 6.185749565552227,
+            "y": 2.334437287734248
+          },
+          "elevation": 0.0,
+          "label": null,
+          "symbol": "automatic"
+        },
+        {
+          "id": "elev_element_6bdaf3e_1793812694687040_16",
+          "position": {
+            "x": 6.185749565552227,
+            "y": 1.7555978279579794
+          },
+          "elevation": 0.0,
+          "label": null,
+          "symbol": "automatic"
+        }
+      ],
+      "annotations": [
+        {
+          "id": "ann_element_6bdaf3e_1793813364296778_17",
+          "position": {
+            "x": 7.325239337252622,
+            "y": 5.734244130073784
+          },
+          "text": "йхйдкдхдйдк",
+          "fontSize": 0.25,
+          "rotationDeg": 0.0,
+          "alignment": "left",
+          "fontWeight": 600,
+          "italic": false,
+          "underline": false,
+          "colorValue": 4280361249
+        }
+      ],
+      "cadPrimitives": [
+        {
+          "id": "cad_6bdaf3e_1793814104291074_18",
+          "type": "line",
+          "startPoint": {
+            "x": -0.5245942931905292,
+            "y": 12.125
+          },
+          "endPoint": {
+            "x": 0.6412644312604019,
+            "y": 10.105673454803544
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_6bdaf3e_1793814106736560_19",
+          "type": "line",
+          "startPoint": {
+            "x": 0.6412644312604019,
+            "y": 10.105673454803544
+          },
+          "endPoint": {
+            "x": 2.8615017120444586,
+            "y": 10.105673454803544
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_6bdaf3e_1793814110012943_20",
+          "type": "line",
+          "startPoint": {
+            "x": 2.8615017120444586,
+            "y": 10.105673454803544
+          },
+          "endPoint": {
+            "x": 2.5294572137296076,
+            "y": 11.428608660251067
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_6bdaf3e_1793814115532251_21",
+          "type": "line",
+          "startPoint": {
+            "x": 2.5294572137296076,
+            "y": 11.428608660251067
+          },
+          "endPoint": {
+            "x": 0.7174100330539646,
+            "y": 12.125
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_6bdaf3e_1793814118474311_22",
+          "type": "line",
+          "startPoint": {
+            "x": 0.7174100330539646,
+            "y": 12.125
+          },
+          "endPoint": {
+            "x": -0.5245942931905292,
+            "y": 12.125
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        },
+        {
+          "id": "cad_element_6bdaf3e_1793814166631536_23",
+          "type": "rect",
+          "startPoint": {
+            "x": -1.731,
+            "y": 12.515
+          },
+          "endPoint": {
+            "x": -0.6756845572865624,
+            "y": 11.459684557286563
+          },
+          "colorValue": 4288585374,
+          "strokeWidth": 1.0,
+          "lineStyle": {
+            "id": "solid"
+          }
+        }
+      ],
+      "components": [],
+      "floorDrains": [
+        {
+          "id": "drain_6bdaf3e_1793808533641826_3",
+          "polygon": [
+            {
+              "x": -0.004999999888241291,
+              "y": 2.994999885559082
+            },
+            {
+              "x": 4.255000114440918,
+              "y": 2.994999885559082
+            },
+            {
+              "x": 4.255000114440918,
+              "y": 4.380000114440918
+            },
+            {
+              "x": -0.004999999888241291,
+              "y": 4.380000114440918
+            }
+          ],
+          "shape": "round",
+          "position": {
+            "x": 0.6950000001117588,
+            "y": 3.6949998855590795
+          },
+          "angle": 0.0,
+          "size": 0.15,
+          "width": 0.08,
+          "slopePercent": 1.5
+        },
+        {
+          "id": "drain_6bdaf3e_1793808551724980_4",
+          "polygon": [
+            {
+              "x": 3.7090001106262207,
+              "y": 6.875
+            },
+            {
+              "x": 9.625,
+              "y": 6.875000476837158
+            },
+            {
+              "x": 9.625,
+              "y": 8.875
+            },
+            {
+              "x": 3.7090001106262207,
+              "y": 8.875
+            }
+          ],
+          "shape": "round",
+          "position": {
+            "x": 4.709000110626217,
+            "y": 7.8749999999999964
+          },
+          "angle": 0.0,
+          "size": 0.15,
+          "width": 0.08,
+          "slopePercent": 1.5
+        }
+      ],
+      "zoneScheduleOrigin": {
+        "x": -12.329620446163414,
+        "y": 2.662088087257138
+      }
+    }
+  ],
+  "activeStoreyId": "storey_0",
+  "gridAxes": [
+    {
+      "id": "axis_x_1",
+      "name": "1",
+      "start": {
+        "dx": 0.0,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 0.0,
+        "dy": 15.0
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_x_2",
+      "name": "2",
+      "start": {
+        "dx": 4.5,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 4.5,
+        "dy": 15.0
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_x_3",
+      "name": "3",
+      "start": {
+        "dx": 9.0,
+        "dy": -1.5
+      },
+      "end": {
+        "dx": 9.0,
+        "dy": 15.0
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_0",
+      "name": "A",
+      "start": {
+        "dx": -1.5,
+        "dy": 0.0
+      },
+      "end": {
+        "dx": 10.5,
+        "dy": 0.0
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_1",
+      "name": "B",
+      "start": {
+        "dx": -1.5,
+        "dy": 4.5
+      },
+      "end": {
+        "dx": 10.5,
+        "dy": 4.5
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_2",
+      "name": "C",
+      "start": {
+        "dx": -1.5,
+        "dy": 9.0
+      },
+      "end": {
+        "dx": 10.5,
+        "dy": 9.0
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    },
+    {
+      "id": "axis_y_3",
+      "name": "D",
+      "start": {
+        "dx": -1.5,
+        "dy": 13.5
+      },
+      "end": {
+        "dx": 10.5,
+        "dy": 13.5
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true
+    }
+  ],
+  "wallTypes": [
+    {
+      "id": "ext_25_12_eps",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "exterior",
+      "layers": [],
+      "location": "exterior",
+      "totalThickness": 0.37,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.12,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4293874512
+    },
+    {
+      "id": "int_12_partition",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "interior",
+      "layers": [],
+      "location": "interior",
+      "totalThickness": 0.12,
+      "brickThickness": 0.12,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4294944550
+    },
+    {
+      "id": "ext_25_brick",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "exterior",
+      "layers": [],
+      "location": "exterior",
+      "totalThickness": 0.25,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4294930499
+    },
+    {
+      "id": "bearing_25_concrete",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "interior",
+      "layers": [
+        {
+          "id": "core",
+          "material": "concrete",
+          "role": "core",
+          "thickness": 0.25
+        }
+      ],
+      "location": "interior",
+      "totalThickness": 0.25,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4286091420
+    },
+    {
+      "id": "int_25_brick",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "interior",
+      "layers": [
+        {
+          "id": "core",
+          "material": "brick",
+          "role": "core",
+          "thickness": 0.25
+        }
+      ],
+      "location": "interior",
+      "totalThickness": 0.25,
+      "brickThickness": 0.25,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4286091420
+    },
+    {
+      "id": "int_10_aerated",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "interior",
+      "layers": [
+        {
+          "id": "core",
+          "material": "aeratedConcrete",
+          "role": "core",
+          "thickness": 0.1
+        }
+      ],
+      "location": "interior",
+      "totalThickness": 0.1,
+      "brickThickness": 0.1,
+      "insulationThickness": 0.0,
+      "customHeight": null,
+      "parapetFinish": null,
+      "colorValue": 4286091420
+    },
+    {
+      "id": "parapet_12",
+      "name": "",
+      "isCatalogType": true,
+      "usage": "parapet",
+      "layers": [],
+      "location": "exterior",
+      "totalThickness": 0.12,
+      "brickThickness": 0.12,
+      "insulationThickness": 0.0,
+      "customHeight": 1.05,
+      "parapetFinish": "cap",
+      "colorValue": 4280723098
+    }
+  ],
+  "lineStyles": [],
+  "hatchPatterns": [],
+  "openingStyles": [],
+  "slabAssemblies": [],
+  "sections": [],
+  "sectionVisibility": {},
+  "elevations": [],
+  "slabCompositionNumbers": {}
+}

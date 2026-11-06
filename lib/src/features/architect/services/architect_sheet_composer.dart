@@ -108,6 +108,7 @@ class ArchitectSheetComposer {
       if (blockers.isNotEmpty) throw StateError(blockers.join('\n'));
     }
     final canvas = ArchitectVectorCanvas();
+    canvas.sources(const {}, 'sheet-paper');
     if (!previewOutsideSheet) {
       canvas.clipRect(Rect.fromLTWH(0, 0, sheet.widthMm, sheet.heightMm));
     }
@@ -195,6 +196,7 @@ class ArchitectSheetComposer {
         .where((e) => e.id == sheet.templateId)
         .firstOrNull;
     if (template != null && template.items.isNotEmpty) {
+      canvas.sources(const {}, 'sheet-title-block');
       final width = template.items.map((e) => e.rect.right).reduce(math.max);
       final height = template.items.map((e) => e.rect.bottom).reduce(math.max);
       final origin = Offset(

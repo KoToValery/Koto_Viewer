@@ -25,6 +25,12 @@ class ArchitectWallNetwork {
     List<ArchitectWall> walls, {
     Map<String, (double, double)>? faceOffsets,
   }) {
+    if (walls.any((w) => w.hasRailingDesign)) {
+      walls = [
+        for (final w in walls)
+          if (w.solidBodyWall != null) w.solidBodyWall!,
+      ];
+    }
     final cached = faceOffsets == null ? _cache[walls] : null;
     if (cached != null) return cached;
     final juncs = junctions(walls, faceOffsets: faceOffsets);
@@ -98,6 +104,12 @@ class ArchitectWallNetwork {
     bool solidOnly = false,
     Map<String, (double, double)>? faceOffsets,
   }) {
+    if (walls.any((w) => w.hasRailingDesign)) {
+      walls = [
+        for (final w in walls)
+          if (w.solidBodyWall != null) w.solidBodyWall!,
+      ];
+    }
     final result = <(List<Offset>, double)>[];
     for (var i = 0; i < walls.length; i++) {
       final a = walls[i];
@@ -172,20 +184,23 @@ class ArchitectWallNetwork {
           finite: true,
         );
         final faceContact = [
-              if (a.connectStart) (a.startPoint, b),
-              if (a.connectEnd) (a.endPoint, b),
-              if (b.connectStart) (b.startPoint, a),
-              if (b.connectEnd) (b.endPoint, a),
-            ].any((contact) => inside(contact.$2, contact.$1));
+          if (a.connectStart) (a.startPoint, b),
+          if (a.connectEnd) (a.endPoint, b),
+          if (b.connectStart) (b.startPoint, a),
+          if (b.connectEnd) (b.endPoint, a),
+        ].any((contact) => inside(contact.$2, contact.$1));
         // A recognized corner survives movement of an inner/outer leading line
         // during an orientation flip; its physical core has not moved.
-        final coreFallback = finiteNode == null && !faceContact &&
+        final coreFallback =
+            finiteNode == null &&
+            !faceContact &&
             (a.exteriorResolved || b.exteriorResolved) &&
             ArchitectWallConnectionPolicy.coreJunction(a, b) != null;
         if (finiteNode == null && !faceContact && !coreFallback) {
           continue;
         }
-        if (solidOnly && !coreFallback &&
+        if (solidOnly &&
+            !coreFallback &&
             [a, b].every(
               (w) =>
                   (node - w.startPoint).distance > 1e-8 &&

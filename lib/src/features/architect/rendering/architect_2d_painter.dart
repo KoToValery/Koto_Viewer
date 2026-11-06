@@ -85,6 +85,8 @@ class Architect2dPainter extends CustomPainter {
   final BimViewportController? viewport;
   final ArchitectPaintLayer layer;
   final bool paintGrid;
+  /// Publication can share physical wall geometry between annotation scales.
+  final ArchitectWallLayers? publicationWallLayers;
   final String? drawingViewKey;
   final ArchitectCanvasPalette palette;
   final AppLocalizations? l10n;
@@ -219,6 +221,7 @@ class Architect2dPainter extends CustomPainter {
     this.l10n,
     this.layer = ArchitectPaintLayer.all,
     this.paintGrid = true,
+    this.publicationWallLayers,
     this.drawingViewKey,
     this.palette = const ArchitectCanvasPalette.light(),
     this.activeOvershoot,
@@ -1185,7 +1188,7 @@ class Architect2dPainter extends CustomPainter {
       ..strokeWidth = ArchitectLineWeights.cutHeavy / zoomScale
       ..style = PaintingStyle.stroke;
 
-    final layers = ArchitectWallLayers.forProject(_project);
+    final layers = publicationWallLayers ?? ArchitectWallLayers.forProject(_project);
     _drawWallLayers(canvas, layers, wallBorderPaint);
     final midDotPaint = Paint()
       ..color = const Color(0x99B0BEC5)

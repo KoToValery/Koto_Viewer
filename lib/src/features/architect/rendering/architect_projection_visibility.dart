@@ -9,6 +9,7 @@ typedef ProjectionTriangle = ({
   int? color,
   String? source,
   String? silhouette,
+  bool occludes,
 });
 typedef ProjectionAperture = ({String id, List<Vector3> points});
 
@@ -80,14 +81,16 @@ ArchitectProjectionContours solveArchitectProjection(
     final points = [for (final p in polygon) Offset(p.x, p.y)];
     if (!_hasArea(points)) continue;
     final key =
-        '${(u * 1e6).round()}:${(v * 1e6).round()}:${(w * 1e6).round()}:${triangle.color}:${triangle.silhouette ?? ''}';
+        '${(u * 1e6).round()}:${(v * 1e6).round()}:${(w * 1e6).round()}:${triangle.color}:${triangle.silhouette ?? ''}:${triangle.occludes}';
     final plane = groups.putIfAbsent(
       key,
-      () => _Plane(u, v, w, triangle.silhouette),
+      () => _Plane(u, v, w, triangle.silhouette, occludes: triangle.occludes),
     );
     plane.add(points, triangle.source);
   }
-  final index = _OcclusionIndex(groups.values.toList());
+  final index = _OcclusionIndex(
+    groups.values.where((p) => p.occludes).toList(),
+  );
   final masks = [
     for (final mask in input.masks)
       if (_hasArea(mask)) (mask, _bounds(mask)),
@@ -280,10 +283,11 @@ List<Vector3> _clip3(List<Vector3> input, double Function(Vector3) distance) {
 class _Plane {
   final double u, v, w;
   final String? silhouette;
+  final bool occludes;
   Rect bounds = Rect.zero;
   final sources = <String>{};
   final pieces = <({List<Offset> points, String? source})>[];
-  _Plane(this.u, this.v, this.w, this.silhouette);
+  _Plane(this.u, this.v, this.w, this.silhouette, {this.occludes = true});
   double depth(Offset p) => u * p.dx + v * p.dy + w;
   void add(List<Offset> points, String? source) {
     final box = _bounds(points);

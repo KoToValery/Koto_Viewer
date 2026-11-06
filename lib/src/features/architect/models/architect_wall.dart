@@ -10,6 +10,7 @@ import 'architect_wall_type.dart';
 import 'architect_window.dart';
 import 'architect_wall_arc.dart';
 import '../rendering/architect_path_solid.dart';
+import '../rendering/architect_railing_geometry.dart';
 export 'architect_wall_arc.dart';
 
 /// Legacy left/right retain their saved physical placement.
@@ -91,6 +92,7 @@ class ArchitectWall {
   final bool connectEnd;
   final String? wallTypeId;
   final ParapetFinish? parapetFinish;
+  final ArchitectRailingDesign? railing;
 
   /// New walls carry explicit semantics; legacy projects retain their fallback.
   final bool? parapet;
@@ -124,6 +126,7 @@ class ArchitectWall {
     this.connectEnd = true,
     this.wallTypeId,
     this.parapetFinish,
+    this.railing,
     this.parapet,
     this.cutDisplayMode = ArchitectCutDisplayMode.auto,
     this.doors = const [],
@@ -131,10 +134,28 @@ class ArchitectWall {
   });
 
   bool get isParapet =>
-      parapet ??
-      (!system.isSpecial &&
-          (height < 1.50 ||
-          (wallTypeId != null && wallTypeId!.contains('parapet'))));
+      railing != null ||
+      (parapet ??
+          (!system.isSpecial &&
+              (height < 1.50 ||
+                  (wallTypeId != null && wallTypeId!.contains('parapet')))));
+
+  bool get hasRailingDesign => railing != null;
+  bool get isOpenRailing => railing != null && !railing!.hasSolidBody;
+  bool get hasSolidWallBody => !isOpenRailing;
+  double get solidBodyHeight => railing?.solidHeightAt(height) ?? height;
+  bool get canHostOpenings => railing == null;
+  bool get participatesInRoomEnclosure => !isOpenRailing;
+  ArchitectWall? get solidBodyWall => !hasSolidWallBody
+      ? null
+      : railing == null
+      ? this
+      : copyWith(
+          height: solidBodyHeight,
+          clearRailing: true,
+          followStoreyHeight: false,
+          parapet: true,
+        );
 
   bool isCutAt(double storeyCutPlane) {
     return switch (cutDisplayMode) {
@@ -165,26 +186,27 @@ class ArchitectWall {
       : system.isSpecial
       ? WallCoreMaterial.panel
       : (layers.isNotEmpty
-          ? WallCoreMaterial.values
-                .where(
-                  (m) =>
-                      m.name ==
-                      layers
-                          .firstWhere((l) => l.role == ArchitectLayerRole.core)
-                          .material
-                          .name,
-                )
-                .firstOrNull
-          : null) ??
-      coreMaterialOverride ??
-      (wallTypeId == 'bearing_25_concrete'
-          ? WallCoreMaterial.concrete
-          : WallCoreMaterial.brick);
+                ? WallCoreMaterial.values
+                      .where(
+                        (m) =>
+                            m.name ==
+                            layers
+                                .firstWhere(
+                                  (l) => l.role == ArchitectLayerRole.core,
+                                )
+                                .material
+                                .name,
+                      )
+                      .firstOrNull
+                : null) ??
+            coreMaterialOverride ??
+            (wallTypeId == 'bearing_25_concrete'
+                ? WallCoreMaterial.concrete
+                : WallCoreMaterial.brick);
 
   bool get isCurved => arcBulge.abs() > 1e-8;
   static final _arcs = Expando<ArchitectWallArc>();
-  static final _facePolygons =
-      Expando<Map<(double, double), List<Offset>>>();
+  static final _facePolygons = Expando<Map<(double, double), List<Offset>>>();
   ArchitectWallArc? get arc => isCurved
       ? (_arcs[this] ??= ArchitectWallArc(startPoint, endPoint, arcBulge))
       : null;
@@ -213,28 +235,34 @@ class ArchitectWall {
     double from = 0,
     double to = 1,
   }) {
-    List<Offset> build() => arc?.face(
-        low,
-        high,
-        from: from,
-        to: to,
-        envelopeOffset: centerLineOffset.abs() + thickness / 2,
-      ) ??
-      [
-        referencePointAt(from) + normalVector * low,
-        referencePointAt(to) + normalVector * low,
-        referencePointAt(to) + normalVector * high,
-        referencePointAt(from) + normalVector * high,
-      ];
+    List<Offset> build() =>
+        arc?.face(
+          low,
+          high,
+          from: from,
+          to: to,
+          envelopeOffset: centerLineOffset.abs() + thickness / 2,
+        ) ??
+        [
+          referencePointAt(from) + normalVector * low,
+          referencePointAt(to) + normalVector * low,
+          referencePointAt(to) + normalVector * high,
+          referencePointAt(from) + normalVector * high,
+        ];
     // Full skins are immutable and shared by drawing, hit testing and snaps.
     // Partial/extended skins are transient and must not grow an unbounded cache.
     if (!isCurved || from != 0 || to != 1) return build();
-    return (_facePolygons[this] ??= {}).putIfAbsent(
-      (low, high),
-      () => List<Offset>.unmodifiable(build()),
-    );
+    return (_facePolygons[this] ??= {}).putIfAbsent((
+      low,
+      high,
+    ), () => List<Offset>.unmodifiable(build()));
   }
+
   void validateGeometry() {
+    railing?.validate(height);
+    if (railing != null && (doors.isNotEmpty || windows.isNotEmpty)) {
+      throw ArgumentError('Railings cannot host openings');
+    }
     system.validate(thickness);
     systemPlacement.validate();
     if (system.isSpecial && isCurved) {
@@ -303,14 +331,14 @@ class ArchitectWall {
       return arc!.arcIntersections(other.arc!, finite: finite).toList();
     }
     if (isCurved) {
-      return arc!.lineIntersections(
-        other.startPoint,
-        other.endPoint,
-        finite: finite,
-      ).toList();
+      return arc!
+          .lineIntersections(other.startPoint, other.endPoint, finite: finite)
+          .toList();
     }
     if (other.isCurved) {
-      return other.arc!.lineIntersections(startPoint, endPoint, finite: finite).toList();
+      return other.arc!
+          .lineIntersections(startPoint, endPoint, finite: finite)
+          .toList();
     }
     final p = BimLineGeometry.intersection(
       startPoint,
@@ -358,11 +386,11 @@ class ArchitectWall {
   bool get isInterior => !isExterior;
   bool get isExterior => location == null
       ? !{
-          'int_12_partition',
-          'bearing_25_concrete',
-          'int_25_brick',
-          'int_10_aerated',
-        }.contains(wallTypeId) &&
+              'int_12_partition',
+              'bearing_25_concrete',
+              'int_25_brick',
+              'int_10_aerated',
+            }.contains(wallTypeId) &&
             (hasInsulation ||
                 isParapet ||
                 (wallTypeId != null &&
@@ -371,7 +399,9 @@ class ArchitectWall {
                         wallTypeId!.contains('exterior') ||
                         wallTypeId!.contains('parapet'))))
       : location == ArchitectWallLocation.exterior;
-  List<ArchitectMaterialLayer> get resolvedLayers => layers.isNotEmpty
+  List<ArchitectMaterialLayer> get resolvedLayers => !hasSolidWallBody
+      ? const []
+      : layers.isNotEmpty
       ? layers
       : [
           if (insulationThickness > 0)
@@ -480,6 +510,8 @@ class ArchitectWall {
     bool? connectEnd,
     String? wallTypeId,
     ParapetFinish? parapetFinish,
+    ArchitectRailingDesign? railing,
+    bool clearRailing = false,
     bool? parapet,
     ArchitectCutDisplayMode? cutDisplayMode,
     List<ArchitectDoor>? doors,
@@ -511,6 +543,7 @@ class ArchitectWall {
     connectEnd: connectEnd ?? this.connectEnd,
     wallTypeId: wallTypeId ?? this.wallTypeId,
     parapetFinish: parapetFinish ?? this.parapetFinish,
+    railing: clearRailing ? null : railing ?? this.railing,
     parapet: parapet ?? this.parapet,
     cutDisplayMode: cutDisplayMode ?? this.cutDisplayMode,
     doors: doors ?? this.doors,
@@ -640,6 +673,7 @@ class ArchitectWall {
     'connectEnd': connectEnd,
     'wallTypeId': wallTypeId,
     'parapetFinish': parapetFinish?.name,
+    if (railing != null) 'railing': railing!.toJson(),
     if (parapet != null) 'parapet': parapet,
     'cutDisplayMode': cutDisplayMode.name,
     'doors': doors.map((d) => d.toJson()).toList(),
@@ -715,6 +749,11 @@ class ArchitectWall {
     connectEnd: json['connectEnd'] as bool? ?? true,
     wallTypeId: json['wallTypeId'] as String?,
     parapet: json['parapet'] as bool?,
+    railing: json['railing'] == null
+        ? null
+        : ArchitectRailingDesign.fromJson(
+            Map<String, dynamic>.from(json['railing'] as Map),
+          ),
     parapetFinish: json['parapetFinish'] != null
         ? ParapetFinish.values.firstWhere(
             (p) => p.name == json['parapetFinish'],
@@ -772,6 +811,13 @@ class ArchitectWall {
     double storeyElevation, {
     Set<String> suppressedOpeningIds = const {},
   }) {
+    if (railing != null) {
+      return solidBodyWall?.materialSlices(
+            storeyElevation,
+            suppressedOpeningIds: suppressedOpeningIds,
+          ) ??
+          const [];
+    }
     final result = <ArchitectWallMaterialSlice>[];
     final composition = resolvedLayers;
     final firstCore = composition.indexWhere(
@@ -867,6 +913,24 @@ class ArchitectWall {
     Set<String> suppressedOpeningIds = const {},
     Map<String, FenestrationElevationDetail> openingDetailLevels = const {},
   }) {
+    if (railing != null) {
+      return [
+        if (includeSolid)
+          ...?solidBodyWall?.build3D(
+            storeyElevation: storeyElevation,
+            sources: sources,
+            resolveComposition: resolveComposition,
+            solidColor: solidColor,
+            includeOpeningMeshes: false,
+          ),
+        if (includeSolid)
+          for (final component in ArchitectRailingGeometry.components(
+            this,
+            storeyElevation: storeyElevation,
+          ))
+            ...component.triangles,
+      ];
+    }
     if (resolveComposition && (layers.isNotEmpty || plinth.enabled)) {
       return [
         if (includeSolid)

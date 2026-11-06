@@ -16,6 +16,7 @@ import 'architect_path_solid.dart';
 import 'architect_mesh_section.dart';
 import 'architect_wall_solids.dart';
 import 'architect_panel_roof_geometry.dart';
+import 'architect_railing_selection.dart';
 
 class ArchitectWallComponent {
   final ArchitectWall wall;
@@ -130,6 +131,10 @@ class ArchitectSpecialWallGeometry {
     List<ArchitectWall> walls,
     Offset point,
   ) {
+    if (wall.railing != null &&
+        ArchitectRailingSelection.envelope(wall, walls).contains(point)) {
+      return true;
+    }
     if (wall.containsPoint(point)) return true;
     return wall.system.isLog &&
         (Path()..addPolygon(physicalPlanCorners(wall, walls), true)).contains(

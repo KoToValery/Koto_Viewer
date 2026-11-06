@@ -20,6 +20,7 @@ class ArchitectWallCatalogGroup {
   ArchitectWallCatalogGroup(this.key, this.types);
 
   static String keyOf(ArchitectWallType type) {
+    if (type.railing != null) return 'railing/${type.railing!.signature}';
     final core = type.resolvedLayers.where(
       (l) => l.role == ArchitectLayerRole.core,
     );

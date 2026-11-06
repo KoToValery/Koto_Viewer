@@ -6847,6 +6847,77 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectSheetExport => 'Export PDF';
 
   @override
+  String get architectExportTitle => 'Export';
+
+  @override
+  String get architectExportDxfViews => 'DXF drawings';
+
+  @override
+  String get architectExportDxfSheets => 'DXF sheets';
+
+  @override
+  String get architectExportIfc => 'IFC model';
+
+  @override
+  String get architectExportChooseViews => 'Select drawings';
+
+  @override
+  String get architectExportIfcSchema => 'IFC version';
+
+  @override
+  String get architectExportRun => 'Export';
+
+  @override
+  String get architectExportPreparing => 'Preparing…';
+
+  @override
+  String get architectExportFailed =>
+      'Export did not complete. Check geometry and the selected sources.';
+
+  @override
+  String get architectExportComplete => 'Export is ready.';
+
+  @override
+  String get architectExportIfcHint =>
+      'IFC retains BIM classes and materials. Editability also depends on the Revit or Archicad import settings.';
+
+  @override
+  String architectExportIfcReport(int parametric, int fallback) {
+    return 'Parametric: $parametric. Geometric: $fallback.';
+  }
+
+  @override
+  String get architectExportFallback =>
+      'Exact geometry; editability depends on the importer.';
+
+  @override
+  String get architectExportProxy =>
+      'Component without a specialized IFC class.';
+
+  @override
+  String get architectExportSurfaceFallback =>
+      'Surface representation without a closed volume.';
+
+  @override
+  String get architectExportMissingGeometry =>
+      'No geometric body. Element properties have been retained.';
+
+  @override
+  String get architectExportUnhostedOpening =>
+      'Opening without a slab to cut. Its boundary and properties have been retained.';
+
+  @override
+  String architectExportElementFailed(String elementId) {
+    return 'Invalid geometry in element $elementId.';
+  }
+
+  @override
+  String get architectExportReport => 'Report';
+
+  @override
+  String get architectExportSave => 'Save';
+
+  @override
   String get architectSheetPrint => 'Print';
 
   @override

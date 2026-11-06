@@ -129,12 +129,17 @@ class ArchitectWallSolids {
     final nominalTops = {
       for (final w in storey.walls)
         w.id:
-            storey.elevation + w.baseOffset + w.effectiveHeight(storey.height),
+            storey.elevation +
+            w.baseOffset +
+            (w.railing == null
+                ? w.effectiveHeight(storey.height)
+                : w.solidBodyHeight),
     };
     final walls = [
-      for (final w in storey.walls)
-        if (!w.system.isSpecial)
+      for (final original in storey.walls)
+        if (!original.system.isSpecial && original.hasSolidWallBody)
           () {
+            final w = original.solidBodyWall!;
             var height = w.effectiveHeight(storey.height);
             if (w.followStoreyHeight && !w.isParapet) {
               for (final (floor, roof) in roofEnvelopes) {

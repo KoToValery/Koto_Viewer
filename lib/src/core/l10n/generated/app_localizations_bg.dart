@@ -6876,6 +6876,76 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectSheetExport => 'Експорт PDF';
 
   @override
+  String get architectExportTitle => 'Експорт';
+
+  @override
+  String get architectExportDxfViews => 'DXF чертежи';
+
+  @override
+  String get architectExportDxfSheets => 'DXF листове';
+
+  @override
+  String get architectExportIfc => 'IFC модел';
+
+  @override
+  String get architectExportChooseViews => 'Избери чертежи';
+
+  @override
+  String get architectExportIfcSchema => 'IFC версия';
+
+  @override
+  String get architectExportRun => 'Експортирай';
+
+  @override
+  String get architectExportPreparing => 'Подготовка…';
+
+  @override
+  String get architectExportFailed =>
+      'Експортът не е завършен. Провери геометрията и избраните източници.';
+
+  @override
+  String get architectExportComplete => 'Експортът е готов.';
+
+  @override
+  String get architectExportIfcHint =>
+      'IFC запазва BIM класовете и материалите. Редактируемостта зависи и от настройките за импорт в Revit или Archicad.';
+
+  @override
+  String architectExportIfcReport(int parametric, int fallback) {
+    return 'Параметрични: $parametric. Геометрични: $fallback.';
+  }
+
+  @override
+  String get architectExportFallback =>
+      'Точна геометрия; редактируемостта зависи от импорта.';
+
+  @override
+  String get architectExportProxy => 'Компонент без специализиран IFC клас.';
+
+  @override
+  String get architectExportSurfaceFallback =>
+      'Повърхностно представяне; липсва затворен обем.';
+
+  @override
+  String get architectExportMissingGeometry =>
+      'Няма геометрично тяло. Свойствата на елемента са запазени.';
+
+  @override
+  String get architectExportUnhostedOpening =>
+      'Отвор без плоча за изрязване. Контурът и свойствата са запазени.';
+
+  @override
+  String architectExportElementFailed(String elementId) {
+    return 'Невалидна геометрия на елемент $elementId.';
+  }
+
+  @override
+  String get architectExportReport => 'Отчет';
+
+  @override
+  String get architectExportSave => 'Запази';
+
+  @override
   String get architectSheetPrint => 'Печат';
 
   @override

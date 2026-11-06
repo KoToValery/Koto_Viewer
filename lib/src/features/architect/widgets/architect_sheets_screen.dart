@@ -16,6 +16,7 @@ import '../services/architect_pdf_export.dart';
 import '../services/architect_sheet_layout.dart';
 import '../services/architect_sheet_geometry.dart';
 import 'architect_sheet_viewport.dart';
+import 'architect_exchange_export_dialog.dart';
 
 String _paperFormat(double width, double height) {
   for (final e in {
@@ -65,6 +66,32 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
   Object? sceneRevision;
   AppLocalizations? sceneLabels;
   ArchitectPublicationSources? sceneSources;
+  Object? preflightRevision;
+  List<String> preflightIssues = const [];
+
+  List<String> layoutIssues(ArchitectSheet value, AppLocalizations l) {
+    final key = (
+      ArchitectDrawingPublisher.sourceRevision(project),
+      document,
+      value,
+      l.localeName,
+    );
+    if (key != preflightRevision) {
+      preflightRevision = key;
+      preflightIssues = ArchitectSheetComposer.issues(project, value, l);
+    }
+    return preflightIssues;
+  }
+
+  Future<void> exchange(ArchitectExchangeFormat format) =>
+      showArchitectExchangeExport(
+        context,
+        project: project,
+        format: format,
+        drawings: _sourceOptions(),
+        sources: widget.sources,
+        initialSheetId: sheet?.id,
+      );
 
   void fitSheet() => viewportKey.currentState?.fitSheet();
 
@@ -81,8 +108,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
   Future<void> checkLayout() async {
     final s = sheet;
     if (s == null) return;
-    final l = context.l10n,
-        problems = ArchitectSheetComposer.issues(project, s, context.l10n);
+    final l = context.l10n, problems = layoutIssues(s, l);
     await showDialog<void>(
       context: context,
       builder: (c) => architectAlertDialog(
@@ -763,8 +789,14 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
               icon: const AppIcon(AppIconId.pdf),
             ),
             PopupMenuButton<String>(
-              enabled: !busy && !editing && s != null,
+              key: const ValueKey('architect-sheet-more'),
+              enabled: !busy && !editing,
               onSelected: (v) {
+                if (v == 'dxfViews') exchange(ArchitectExchangeFormat.dxfViews);
+                if (v == 'dxfSheets') {
+                  exchange(ArchitectExchangeFormat.dxfSheets);
+                }
+                if (v == 'ifc') exchange(ArchitectExchangeFormat.ifc);
                 if (v == 'properties') sheetProperties();
                 if (v == 'template') template();
                 if (v == 'pdf') output();
@@ -786,6 +818,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
               itemBuilder: (_) => [
                 PopupMenuItem(
                   value: 'properties',
+                  enabled: s != null,
                   child: AppMenuLabel(
                     icon: AppIconId.properties,
                     child: Text(l.architectSheetProperties),
@@ -793,6 +826,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                 ),
                 PopupMenuItem(
                   value: 'template',
+                  enabled: s != null,
                   child: AppMenuLabel(
                     icon: AppIconId.layoutGrid,
                     child: Text(l.architectSheetTemplate),
@@ -800,6 +834,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                 ),
                 PopupMenuItem(
                   value: 'pdf',
+                  enabled: s != null,
                   child: AppMenuLabel(
                     icon: AppIconId.pdf,
                     child: Text(l.architectSheetExport),
@@ -807,6 +842,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                 ),
                 PopupMenuItem(
                   value: 'print',
+                  enabled: s != null,
                   child: AppMenuLabel(
                     icon: AppIconId.print,
                     child: Text(l.architectSheetPrint),
@@ -814,9 +850,36 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                 ),
                 PopupMenuItem(
                   value: 'delete',
+                  enabled: s != null,
                   child: AppMenuLabel(
                     icon: AppIconId.delete,
                     child: Text(l.architectSheetDelete),
+                  ),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'dxfViews',
+                  key: const ValueKey('architect-sheet-export-dxf-views'),
+                  child: AppMenuLabel(
+                    icon: AppIconId.file,
+                    child: Text(l.architectExportDxfViews),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'dxfSheets',
+                  enabled: s != null,
+                  key: const ValueKey('architect-sheet-export-dxf-sheets'),
+                  child: AppMenuLabel(
+                    icon: AppIconId.layoutGrid,
+                    child: Text(l.architectExportDxfSheets),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'ifc',
+                  key: const ValueKey('architect-sheet-export-ifc'),
+                  child: AppMenuLabel(
+                    icon: AppIconId.building,
+                    child: Text(l.architectExportIfc),
                   ),
                 ),
               ],
@@ -902,7 +965,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                         key: const ValueKey('architect-sheet-preflight'),
                         onPressed: editing ? null : checkLayout,
                         child: Text(
-                          ArchitectSheetComposer.issues(project, s, l).isEmpty
+                          layoutIssues(s, l).isEmpty
                               ? l.architectSheetReady
                               : l.architectSheetCheck,
                         ),
@@ -1051,6 +1114,19 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                       key: viewportKey,
                       sheet: s,
                       buildScene: buildScene,
+                      buildPaper: (preview) => buildScene(
+                        preview,
+                        excludePlacements: preview.placements
+                            .map((p) => p.id)
+                            .toSet(),
+                      ),
+                      paperRevision: (project, l.localeName, pendingDrawing),
+                      contentRevision: (
+                        revision,
+                        document.drawings,
+                        l.localeName,
+                        widget.sources,
+                      ),
                       buildBackground: (preview, excluded) =>
                           buildScene(preview, excludePlacements: {excluded}),
                       buildContent: (value) =>

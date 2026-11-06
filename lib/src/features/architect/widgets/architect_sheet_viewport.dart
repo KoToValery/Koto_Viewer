@@ -11,6 +11,7 @@ import '../../bim_editing/interaction/bim_transform_navigation.dart';
 import '../../bim_editing/widgets/bim_editing_viewport.dart';
 import '../models/architect_project.dart';
 import '../rendering/architect_vector_scene.dart';
+import '../rendering/architect_picture_cache.dart';
 import '../services/architect_sheet_geometry.dart';
 import '../services/architect_sheet_layout.dart';
 
@@ -23,6 +24,9 @@ class ArchitectSheetViewport extends StatefulWidget {
     required this.buildScene,
     this.buildContent,
     this.buildBackground,
+    this.buildPaper,
+    this.contentRevision,
+    this.paperRevision,
     this.selectedId,
     required this.onSelect,
     required this.onMove,
@@ -42,6 +46,17 @@ class ArchitectSheetViewport extends StatefulWidget {
   final ArchitectVectorScene Function(ArchitectSheet) buildScene;
   final ArchitectVectorScene Function(ArchitectDrawingPlacement)? buildContent;
   final ArchitectVectorScene Function(ArchitectSheet, String)? buildBackground;
+
+  /// Supplying paper and content enables separately retained drawing layers.
+  /// Content is requested with an uncropped, unrotated placement at the origin.
+  /// Paper operations tagged `sheet-title-block` stay above placed drawings.
+  final ArchitectVectorScene Function(ArchitectSheet)? buildPaper;
+
+  /// Changes when source geometry, scale styles, visibility or language changes.
+  final Object? contentRevision;
+
+  /// Changes when paper/template metadata changes, independently of selection.
+  final Object? paperRevision;
   final String? selectedId;
   final ValueChanged<String?> onSelect;
   final ValueChanged<ArchitectDrawingPlacement> onMove, onPlace, onCrop;
@@ -98,6 +113,15 @@ class ArchitectSheetViewportState extends State<ArchitectSheetViewport> {
   ArchitectVectorScene? _cachedScene;
   String? _cachedActiveId;
   ArchitectVectorScene? _cachedContent;
+  ArchitectVectorScene? _paperScene;
+  ArchitectVectorScene? _paperForegroundScene;
+  final _pictures = ArchitectPictureCache();
+  final _titleHeights = <(String, double), double>{};
+
+  @visibleForTesting
+  int get debugPictureRecordings => _pictures.recordings;
+  @visibleForTesting
+  int get debugPictureBytes => _pictures.totalBytes;
 
   ArchitectDrawingPlacement? get selected => widget.sheet.placements
       .where((p) => p.id == widget.selectedId)
@@ -151,6 +175,14 @@ class ArchitectSheetViewportState extends State<ArchitectSheetViewport> {
     // A source, locale or annotation profile may change without replacing the
     // sheet object. The parent owns those source-scene cache dependencies.
     _cachedSheet = null;
+    if (widget.paperRevision == null ||
+        oldWidget.paperRevision != widget.paperRevision ||
+        !identical(oldWidget.sheet, widget.sheet) ||
+        oldWidget.pendingPlacement != widget.pendingPlacement) {
+      _paperScene = null;
+      _paperForegroundScene = null;
+    }
+    if (oldWidget.contentRevision != widget.contentRevision) _pictures.clear();
     final changedSheet = oldWidget.sheet.id != widget.sheet.id;
     if (!identical(oldWidget.sheet, widget.sheet)) {
       _clearGesture();
@@ -211,13 +243,34 @@ class ArchitectSheetViewportState extends State<ArchitectSheetViewport> {
   String _label(ArchitectDrawingPlacement p) =>
       widget.drawingLabel?.call(p) ?? '${p.number}  1:${p.scale}';
 
+  double _titleWidth(ArchitectDrawingPlacement place) =>
+      (place.frame.width * 1000000).round() / 1000000;
+
+  Rect? _titleRect(ArchitectDrawingPlacement place) {
+    if (!place.showTitle) return null;
+    final label = _label(place), width = _titleWidth(place);
+    final key = (label, width);
+    if (_titleHeights.length >= 512 && !_titleHeights.containsKey(key)) {
+      _titleHeights.remove(_titleHeights.keys.first);
+    }
+    final height = _titleHeights.putIfAbsent(
+      key,
+      () => ArchitectSheetLayout.titleHeight(label, width),
+    );
+    return Rect.fromLTWH(
+      place.frame.left,
+      place.frame.bottom,
+      place.frame.width,
+      height,
+    );
+  }
+
   bool _hit(ArchitectDrawingPlacement p, Offset point) {
     if (!ArchitectSheetGeometry.valid(p)) {
       return p.frame.isFinite && !p.frame.isEmpty && p.frame.contains(point);
     }
     return ArchitectSheetGeometry.clipPath(p).contains(point) ||
-        (ArchitectSheetLayout.titleRect(p, _label(p))?.contains(point) ??
-            false);
+        (_titleRect(p)?.contains(point) ?? false);
   }
 
   (List<double>, List<double>) _targets() {
@@ -519,6 +572,210 @@ class ArchitectSheetViewportState extends State<ArchitectSheetViewport> {
     ],
   );
 
+  bool _visible(ArchitectDrawingPlacement place, Rect view) {
+    final title = _titleRect(place);
+    return view.overlaps(place.frame) ||
+        (title != null && view.overlaps(title));
+  }
+
+  Object _contentKey(ArchitectDrawingPlacement place) {
+    final visibility = place.visibilityOverrides.keys.toList()..sort();
+    return (
+      widget.contentRevision ?? widget.buildContent,
+      place.drawingId,
+      place.scale,
+      [
+        for (final key in visibility) '$key:${place.visibilityOverrides[key]}',
+      ].join('/'),
+    );
+  }
+
+  ArchitectCachedPicture _contentPicture(ArchitectDrawingPlacement place) =>
+      _pictures.obtain(
+        _contentKey(place),
+        () => widget.buildContent!(
+          place.copyWith(
+            frame: Rect.fromLTWH(0, 0, place.frame.width, place.frame.height),
+            anchor: Offset.zero,
+            rotation: 0,
+            clearCrop: true,
+          ),
+        ),
+      );
+
+  ArchitectCachedPicture _titlePicture(ArchitectDrawingPlacement place) {
+    // Rect.shift can change the last floating-point bit of width. Such paper
+    // differences must not lay out an unchanged title during a drag.
+    final label = _label(place);
+    final width = _titleWidth(place);
+    return _pictures.obtain(('title', label, width), () {
+      final canvas = ArchitectVectorCanvas();
+      ArchitectSheetLayout.textPainter(
+        label,
+        2.2,
+        width,
+      ).paint(canvas, const Offset(0, 1));
+      return ArchitectVectorScene(canvas.operations, 1);
+    });
+  }
+
+  Widget _display(
+    ArchitectSheet shown,
+    bool layered,
+    ArchitectDrawingPlacement? active,
+    ArchitectDrawingPlacement? original,
+  ) {
+    final matrix = transform.value;
+    final inverse = Matrix4.inverted(matrix);
+    final view = MatrixUtils.transformRect(inverse, Offset.zero & _size);
+    final optimized = widget.buildPaper != null && widget.buildContent != null;
+    _pictures.beginFrame();
+    final layers = <Widget>[];
+    ArchitectCachedPicture? content, activeTitle;
+    if (optimized) {
+      if (_paperScene == null) {
+        final paper = widget.buildPaper!(shown);
+        final foreground = paper.operations
+            .where((op) => op.role == 'sheet-title-block')
+            .toList(growable: false);
+        _paperScene = foreground.isEmpty
+            ? paper
+            : ArchitectVectorScene(
+                paper.operations
+                    .where((op) => op.role != 'sheet-title-block')
+                    .toList(growable: false),
+                paper.denominator,
+              );
+        _paperForegroundScene = foreground.isEmpty
+            ? null
+            : ArchitectVectorScene(foreground, paper.denominator);
+      }
+      final paper = _pictures.obtain(_paperScene!, () => _paperScene!);
+      if (view.overlaps(paper.bounds)) {
+        layers.add(
+          _PaperDisplayLayer(
+            rect: paper.bounds,
+            matrix: matrix,
+            child: CustomPaint(
+              painter: _RecordedScenePainter(
+                paper,
+                origin: paper.bounds.topLeft,
+              ),
+            ),
+          ),
+        );
+      }
+      for (final place in shown.placements) {
+        if (!_visible(place, view)) continue;
+        final drawing = _contentPicture(place);
+        layers.add(
+          _PaperDisplayLayer(
+            key: ValueKey('sheet-content-${place.id}'),
+            rect: place.frame,
+            matrix: matrix,
+            child: ClipPath(
+              clipper: _PlacementCropClipper(place),
+              child: CustomPaint(
+                painter: _PlacementContentPainter(drawing, place),
+              ),
+            ),
+          ),
+        );
+        if (place.showTitle) {
+          final title = _titlePicture(place);
+          final rect = _titleRect(place)!;
+          layers.add(
+            _PaperDisplayLayer(
+              key: ValueKey('sheet-title-${place.id}'),
+              rect: rect,
+              matrix: matrix,
+              child: CustomPaint(painter: _RecordedScenePainter(title)),
+            ),
+          );
+        }
+      }
+      // The title block is composed after drawings for print, and retains the
+      // same order while temporary placements overlap it in the editor.
+      if (_paperForegroundScene case final foregroundScene?) {
+        final foreground = _pictures.obtain(
+          foregroundScene,
+          () => foregroundScene,
+        );
+        if (view.overlaps(foreground.bounds)) {
+          layers.add(
+            _PaperDisplayLayer(
+              key: const ValueKey('sheet-title-block'),
+              rect: foreground.bounds,
+              matrix: matrix,
+              child: CustomPaint(
+                painter: _RecordedScenePainter(
+                  foreground,
+                  origin: foreground.bounds.topLeft,
+                ),
+              ),
+            ),
+          );
+        }
+      }
+    } else {
+      final background = _pictures.obtain(_cachedScene!, () => _cachedScene!);
+      if (view.overlaps(background.bounds)) {
+        layers.add(
+          _PaperDisplayLayer(
+            rect: background.bounds,
+            matrix: matrix,
+            child: CustomPaint(
+              painter: _RecordedScenePainter(
+                background,
+                origin: background.bounds.topLeft,
+              ),
+            ),
+          ),
+        );
+      }
+      if (layered && active != null && _visible(active, view)) {
+        content = _pictures.obtain(_cachedContent!, () => _cachedContent!);
+        if (active.showTitle) activeTitle = _titlePicture(active);
+      }
+    }
+    _pictures.endFrame();
+    layers.add(
+      Positioned.fill(
+        child: CustomPaint(
+          key: const ValueKey('architect-sheet-canvas'),
+          painter: _SheetViewportPainter(
+            sheet: shown,
+            matrix: matrix,
+            selectedId: widget.selectedId,
+            crop: _boundary,
+            rectangle: _rectangle,
+            invalid: _invalid,
+            vertex: _vertex,
+            edge: _edge,
+            guideX: _guideX,
+            guideY: _guideY,
+            pendingId: _pending?.id,
+            color: Theme.of(context).colorScheme.primary,
+            content: content,
+            contentOffset: layered && _cropOriginal == null
+                ? active!.frame.topLeft - original!.frame.topLeft
+                : Offset.zero,
+            activePlacement: content == null ? null : active,
+            activeTitle: activeTitle,
+          ),
+        ),
+      ),
+    );
+    return ColoredBox(
+      color: const Color(0xffe5e7eb),
+      child: Stack(
+        fit: StackFit.expand,
+        clipBehavior: Clip.none,
+        children: layers,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
@@ -529,7 +786,10 @@ class ArchitectSheetViewportState extends State<ArchitectSheetViewport> {
     final active = _moving ?? _cropDraft ?? _pending;
     final layered =
         original != null && active != null && widget.buildContent != null;
-    if (layered) {
+    final optimized = widget.buildPaper != null && widget.buildContent != null;
+    if (optimized) {
+      // Individual source display lists are reused independently of sheet frames.
+    } else if (layered) {
       if (!identical(_cachedSheet, widget.sheet) ||
           _cachedActiveId != original.id) {
         _cachedSheet = widget.sheet;
@@ -590,32 +850,7 @@ class ArchitectSheetViewportState extends State<ArchitectSheetViewport> {
               onToolCancel: _cancelGesture,
               child: AnimatedBuilder(
                 animation: transform,
-                builder: (_, _) => CustomPaint(
-                  key: const ValueKey('architect-sheet-canvas'),
-                  painter: _SheetViewportPainter(
-                    scene: _cachedScene!,
-                    sheet: shown,
-                    matrix: transform.value,
-                    selectedId: widget.selectedId,
-                    crop: _boundary,
-                    rectangle: _rectangle,
-                    invalid: _invalid,
-                    vertex: _vertex,
-                    edge: _edge,
-                    guideX: _guideX,
-                    guideY: _guideY,
-                    pendingId: _pending?.id,
-                    color: Theme.of(context).colorScheme.primary,
-                    content: layered ? _cachedContent : null,
-                    contentOffset: layered && _cropOriginal == null
-                        ? active.frame.topLeft - original.frame.topLeft
-                        : Offset.zero,
-                    activePlacement: layered ? active : null,
-                    activeTitle: layered && active.showTitle
-                        ? _label(active)
-                        : null,
-                  ),
-                ),
+                builder: (_, _) => _display(shown, layered, active, original),
               ),
             ),
           ),
@@ -756,14 +991,95 @@ class ArchitectSheetViewportState extends State<ArchitectSheetViewport> {
 
   @override
   void dispose() {
+    _pictures.dispose();
     transform.dispose();
     super.dispose();
   }
 }
 
+/// The native layer transform moves retained display lists without asking the
+/// source painter to record again. Bounds include off-sheet staged drawings.
+class _PaperDisplayLayer extends StatelessWidget {
+  const _PaperDisplayLayer({
+    super.key,
+    required this.rect,
+    required this.matrix,
+    required this.child,
+  });
+  final Rect rect;
+  final Matrix4 matrix;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (rect.isEmpty || !rect.isFinite) return const SizedBox.shrink();
+    return Transform(
+      transform: matrix,
+      alignment: Alignment.topLeft,
+      child: OverflowBox(
+        alignment: Alignment.topLeft,
+        minWidth: rect.width,
+        maxWidth: rect.width,
+        minHeight: rect.height,
+        maxHeight: rect.height,
+        child: Transform.translate(
+          offset: rect.topLeft,
+          child: RepaintBoundary(child: SizedBox.expand(child: child)),
+        ),
+      ),
+    );
+  }
+}
+
+class _RecordedScenePainter extends CustomPainter {
+  _RecordedScenePainter(this.entry, {this.origin = Offset.zero});
+  final ArchitectCachedPicture entry;
+  final Offset origin;
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.translate(-origin.dx, -origin.dy);
+    canvas.drawPicture(entry.picture);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RecordedScenePainter old) =>
+      !identical(entry, old.entry) || origin != old.origin;
+}
+
+class _PlacementContentPainter extends CustomPainter {
+  _PlacementContentPainter(this.entry, this.place);
+  final ArchitectCachedPicture entry;
+  final ArchitectDrawingPlacement place;
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.rotate(place.rotation * math.pi / 180);
+    final unit = 1000 / place.scale;
+    canvas.translate(-place.anchor.dx * unit, -place.anchor.dy * unit);
+    canvas.drawPicture(entry.picture);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PlacementContentPainter old) =>
+      !identical(entry, old.entry) ||
+      place.rotation != old.place.rotation ||
+      place.anchor != old.place.anchor ||
+      place.scale != old.place.scale;
+}
+
+class _PlacementCropClipper extends CustomClipper<Path> {
+  _PlacementCropClipper(this.place);
+  final ArchitectDrawingPlacement place;
+  @override
+  Path getClip(Size size) =>
+      Path()..addPolygon(ArchitectSheetGeometry.localContour(place), true);
+  @override
+  bool shouldReclip(covariant _PlacementCropClipper old) =>
+      place.frame.size != old.place.frame.size ||
+      !identical(place.crop, old.place.crop);
+}
+
 class _SheetViewportPainter extends CustomPainter {
   _SheetViewportPainter({
-    required this.scene,
     required this.sheet,
     required this.matrix,
     required this.selectedId,
@@ -781,7 +1097,6 @@ class _SheetViewportPainter extends CustomPainter {
     this.activePlacement,
     this.activeTitle,
   });
-  final ArchitectVectorScene scene;
   final ArchitectSheet sheet;
   final Matrix4 matrix;
   final String? selectedId, pendingId;
@@ -790,33 +1105,38 @@ class _SheetViewportPainter extends CustomPainter {
   final int? vertex, edge;
   final double? guideX, guideY;
   final Color color;
-  final ArchitectVectorScene? content;
+  final ArchitectCachedPicture? content;
   final Offset contentOffset;
   final ArchitectDrawingPlacement? activePlacement;
-  final String? activeTitle;
+  final ArchitectCachedPicture? activeTitle;
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawColor(const Color(0xffe5e7eb), BlendMode.src);
     canvas.save();
     canvas.transform(matrix.storage);
-    scene.paint(canvas);
     if (content != null && activePlacement != null) {
       canvas.save();
       canvas.clipPath(ArchitectSheetGeometry.clipPath(activePlacement!));
       canvas.translate(contentOffset.dx, contentOffset.dy);
-      content!.paint(canvas);
+      canvas.drawPicture(content!.picture);
       canvas.restore();
       if (activeTitle != null) {
-        ArchitectSheetLayout.textPainter(
-          activeTitle!,
-          2.2,
-          activePlacement!.frame.width,
-        ).paint(canvas, activePlacement!.frame.bottomLeft + const Offset(0, 1));
+        canvas.save();
+        canvas.translate(
+          activePlacement!.frame.left,
+          activePlacement!.frame.bottom,
+        );
+        canvas.drawPicture(activeTitle!.picture);
+        canvas.restore();
       }
     }
     final zoom = matrix.getMaxScaleOnAxis();
+    final visiblePaper = MatrixUtils.transformRect(
+      Matrix4.inverted(matrix),
+      Offset.zero & size,
+    );
     for (final p in sheet.placements) {
+      if (!visiblePaper.overlaps(p.frame)) continue;
       final selected = p.id == selectedId || p.id == pendingId;
       canvas.drawPath(
         ArchitectSheetGeometry.clipPath(p),

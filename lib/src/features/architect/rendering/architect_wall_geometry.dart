@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_wall.dart';
 import 'architect_wall_network.dart';
+import 'architect_railing_geometry.dart';
+import 'architect_path_solid.dart';
 
 /// Physical body and material boundaries, independent of the reference line.
 class ArchitectWallGeometry {
@@ -9,6 +11,21 @@ class ArchitectWallGeometry {
   final List<Offset> corners;
   const ArchitectWallGeometry(this.edges, this.corners);
   static final _cache = Expando<ArchitectWallGeometry>();
+  static Iterable<List<Offset>> physicalPolygons(
+    ArchitectWall wall,
+    List<ArchitectWall> walls,
+  ) sync* {
+    if (wall.railing == null) {
+      yield wall.polygonCorners;
+      yield wall.coreCorners;
+      return;
+    }
+    if (wall.hasSolidWallBody) yield wall.polygonCorners;
+    for (final path in ArchitectRailingGeometry.planPaths(wall, walls: walls)) {
+      yield* ArchitectPathSolid.contours(path, tolerance: .0001);
+    }
+  }
+
   static ArchitectWallGeometry of(List<ArchitectWall> walls) {
     final cached = _cache[walls];
     if (cached != null) return cached;
@@ -17,23 +34,39 @@ class ArchitectWallGeometry {
     final coreFaces = <String, (double, double)>{};
     for (final wall in walls) {
       if (wall.length < 1e-8) continue;
-      if(!wall.isCurved) {
+      if (wall.railing != null) {
+        if (!wall.isCurved) edges.add((wall.startPoint, wall.endPoint));
+        corners.addAll([wall.startPoint, wall.endPoint]);
+        for (final polygon in physicalPolygons(wall, walls)) {
+          corners.addAll(polygon);
+          for (var i = 0; i < polygon.length; i++) {
+            edges.add((polygon[i], polygon[(i + 1) % polygon.length]));
+          }
+        }
+        continue;
+      }
+      if (!wall.isCurved) {
         edges.add((wall.startPoint, wall.endPoint));
         edges.add((wall.coreCenterStart, wall.coreCenterEnd));
       } else {
-        final path=wall.facePolygon(0,0),count=path.length~/2;
-        for(var i=0;i+1<count;i++) {
-          edges.add((path[i],path[i+1]));
+        final path = wall.facePolygon(0, 0), count = path.length ~/ 2;
+        for (var i = 0; i + 1 < count; i++) {
+          edges.add((path[i], path[i + 1]));
         }
-        corners.addAll([wall.startPoint,wall.endPoint,wall.referencePointAt(.5)]);
+        corners.addAll([
+          wall.startPoint,
+          wall.endPoint,
+          wall.referencePointAt(.5),
+        ]);
       }
       for (final polygon in [wall.polygonCorners, wall.coreCorners]) {
-        if(!wall.isCurved)corners.addAll(polygon);
+        if (!wall.isCurved) corners.addAll(polygon);
         for (var i = 0; i < polygon.length; i++) {
           edges.add((polygon[i], polygon[(i + 1) % polygon.length]));
         }
       }
-      final c = wall.centerLineOffset-wall.exteriorSign*wall.coreAsymmetry/2;
+      final c =
+          wall.centerLineOffset - wall.exteriorSign * wall.coreAsymmetry / 2;
       coreFaces[wall.id] = (
         c - wall.coreThickness / 2,
         c + wall.coreThickness / 2,
@@ -44,9 +77,13 @@ class ArchitectWallGeometry {
       ...ArchitectWallNetwork.junctions(walls),
       ...ArchitectWallNetwork.junctions(walls, faceOffsets: coreFaces),
     ]) {
-      for(var i=0;i<junction.$1.length;i++) {
-        final a=junction.$1[i]-junction.$1[(i+junction.$1.length-1)%junction.$1.length],b=junction.$1[(i+1)%junction.$1.length]-junction.$1[i];
-        if((a.dx*b.dy-a.dy*b.dx).abs()>.05*a.distance*b.distance)corners.add(junction.$1[i]);
+      for (var i = 0; i < junction.$1.length; i++) {
+        final a =
+                junction.$1[i] -
+                junction.$1[(i + junction.$1.length - 1) % junction.$1.length],
+            b = junction.$1[(i + 1) % junction.$1.length] - junction.$1[i];
+        if ((a.dx * b.dy - a.dy * b.dx).abs() > .05 * a.distance * b.distance)
+          corners.add(junction.$1[i]);
       }
       for (var i = 0; i < junction.$1.length; i++) {
         edges.add((junction.$1[i], junction.$1[(i + 1) % junction.$1.length]));
@@ -71,7 +108,10 @@ class ArchitectWallAlignment {
     (Offset, Offset)? guide;
     for (final wall in walls) {
       if (wall.isCurved) continue;
-      for (final corner in [...wall.polygonCorners, ...wall.coreCorners]) {
+      for (final corner in ArchitectWallGeometry.physicalPolygons(
+        wall,
+        walls,
+      ).expand((polygon) => polygon)) {
         for (final direction in [wall.unitVector, wall.normalVector]) {
           final along = dot(raw - corner, direction);
           final projected = corner + direction * along;
@@ -81,8 +121,14 @@ class ArchitectWallAlignment {
             snapped = projected;
             final overshoot = math.max(0.4, 20.0 / scale);
             final (p1, p2) = along >= 0
-                ? (corner - direction * overshoot, projected + direction * overshoot)
-                : (projected - direction * overshoot, corner + direction * overshoot);
+                ? (
+                    corner - direction * overshoot,
+                    projected + direction * overshoot,
+                  )
+                : (
+                    projected - direction * overshoot,
+                    corner + direction * overshoot,
+                  );
             guide = (p1, p2);
           }
         }
@@ -117,8 +163,14 @@ class ArchitectWallAlignment {
           if (a.isCurved || b.isCurved) continue;
           final angle = dot(a.unitVector, b.unitVector).abs();
           if (angle > 1e-6 && (1 - angle).abs() > 1e-6) continue;
-          for (final p in [...a.polygonCorners, ...a.coreCorners]) {
-            for (final q in [...b.polygonCorners, ...b.coreCorners]) {
+          for (final p in ArchitectWallGeometry.physicalPolygons(
+            a,
+            walls,
+          ).expand((polygon) => polygon)) {
+            for (final q in ArchitectWallGeometry.physicalPolygons(
+              b,
+              walls,
+            ).expand((polygon) => polygon)) {
               final shifted = p + result;
               final c = dot(q - shifted, axis);
               if (c.abs() < distance) {

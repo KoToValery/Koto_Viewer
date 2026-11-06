@@ -63,6 +63,12 @@ class ArchitectWallLayers {
     ArchitectStorey? storey,
     ArchitectProject? project,
   }) {
+    if (walls.any((w) => w.hasRailingDesign)) {
+      walls = [
+        for (final w in walls)
+          if (w.solidBodyWall != null) w.solidBodyWall!,
+      ];
+    }
     if (walls.any((w) => w.system.isSpecial)) {
       final ordinary = build(
         walls.where((w) => !w.system.isSpecial).toList(),

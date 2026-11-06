@@ -48,12 +48,14 @@ class ArchitectBuildingElevation {
     );
     final sources = <Triangle3D, String>{};
     final silhouetteGroups = <Triangle3D, String>{};
+    final projectionOcclusion = <Triangle3D, bool>{};
     final mesh = Architect3dBuilder.buildProjectMesh(
       project,
       previewGeometry: false,
       sources: sources,
       cleanDrainage: true,
       silhouetteGroups: silhouetteGroups,
+      projectionOcclusion: projectionOcclusion,
       sectionVisibility: sectionVisibility,
       suppressedOpeningIds: classification.suppressedOpeningIds,
       openingDetailLevels: classification.openingDetailLevels,
@@ -64,6 +66,7 @@ class ArchitectBuildingElevation {
         view,
         sources: sources,
         silhouetteGroups: silhouetteGroups,
+        projectionOcclusion: projectionOcclusion,
         project: project,
         occlusionMasks: occlusionMasks,
         suppressedOpeningIds: classification.suppressedOpeningIds,
@@ -90,11 +93,13 @@ class ArchitectBuildingElevation {
       occlusionMasks: occlusionMasks,
     );
     final sources = <Triangle3D, String>{}, groups = <Triangle3D, String>{};
+    final projectionOcclusion = <Triangle3D, bool>{};
     final mesh = await Architect3dBuilder.buildProjectMeshAsync(
       project,
       previewGeometry: false,
       sources: sources,
       silhouetteGroups: groups,
+      projectionOcclusion: projectionOcclusion,
       cleanDrainage: true,
       sectionVisibility: sectionVisibility,
       suppressedOpeningIds: classification.suppressedOpeningIds,
@@ -106,6 +111,7 @@ class ArchitectBuildingElevation {
         local,
         sources: sources,
         silhouetteGroups: groups,
+        projectionOcclusion: projectionOcclusion,
         project: project,
         occlusionMasks: occlusionMasks,
         suppressedOpeningIds: classification.suppressedOpeningIds,
@@ -388,7 +394,16 @@ class ArchitectBuildingElevation {
     List<Triangle3D> triangles,
     ArchitectElevation view, {
     Map<Triangle3D, String> sources = const {},
-  }) => withTerrain(_fromTriangles(triangles, view, sources: sources), view);
+    Map<Triangle3D, bool> projectionOcclusion = const {},
+  }) => withTerrain(
+    _fromTriangles(
+      triangles,
+      view,
+      sources: sources,
+      projectionOcclusion: projectionOcclusion,
+    ),
+    view,
+  );
 
   static void validateTerrain(List<Offset> points) {
     if (points.isNotEmpty && points.length < 2) {
@@ -477,6 +492,7 @@ class ArchitectBuildingElevation {
     ArchitectElevation view, {
     Map<Triangle3D, String> sources = const {},
     Map<Triangle3D, String> silhouetteGroups = const {},
+    Map<Triangle3D, bool> projectionOcclusion = const {},
     ArchitectProject? project,
     List<List<Offset>> occlusionMasks = const [],
     Set<String> suppressedOpeningIds = const {},
@@ -499,6 +515,7 @@ class ArchitectBuildingElevation {
           ),
           sources: sources,
           silhouetteGroups: silhouetteGroups,
+          projectionOcclusion: projectionOcclusion,
           project: project,
           suppressedOpeningIds: suppressedOpeningIds,
           openingDetailLevels: openingDetailLevels,
@@ -558,6 +575,7 @@ class ArchitectBuildingElevation {
       view,
       sources: sources,
       silhouetteGroups: silhouetteGroups,
+      projectionOcclusion: projectionOcclusion,
       project: project,
       occlusionMasks: occlusionMasks,
       suppressedOpeningIds: suppressedOpeningIds,
@@ -580,6 +598,7 @@ class ArchitectBuildingElevation {
     ArchitectElevation view, {
     Map<Triangle3D, String> sources = const {},
     Map<Triangle3D, String> silhouetteGroups = const {},
+    Map<Triangle3D, bool> projectionOcclusion = const {},
     ArchitectProject? project,
     List<List<Offset>> occlusionMasks = const [],
     Set<String> suppressedOpeningIds = const {},
@@ -602,6 +621,7 @@ class ArchitectBuildingElevation {
               color: t.color?.toARGB32(),
               source: sources[t],
               silhouette: silhouetteGroups[t],
+              occludes: projectionOcclusion[t] ?? true,
             ),
         ],
         centre: view.centre,

@@ -121,13 +121,18 @@ class ArchitectStairRailings {
     final bounds = stair.plan.bounds.inflate(.08);
     for (final floor in project?.storeys ?? [storey]) {
       for (final wall in floor.walls) {
+        if (!wall.hasSolidWallBody) continue;
         final rect = Rect.fromPoints(
           wall.centerStart,
           wall.centerEnd,
         ).inflate(wall.thickness / 2 + .05);
         if (!rect.overlaps(bounds)) continue;
         candidates.add((
-          wall.copyWith(height: wall.effectiveHeight(floor.height)),
+          wall.solidBodyWall!.copyWith(
+            height: wall.railing == null
+                ? wall.effectiveHeight(floor.height)
+                : wall.solidBodyHeight,
+          ),
           floor.elevation + wall.baseOffset - storey.elevation,
         ));
       }

@@ -12161,6 +12161,126 @@ abstract class AppLocalizations {
   /// **'Export PDF'**
   String get architectSheetExport;
 
+  /// No description provided for @architectExportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get architectExportTitle;
+
+  /// No description provided for @architectExportDxfViews.
+  ///
+  /// In en, this message translates to:
+  /// **'DXF drawings'**
+  String get architectExportDxfViews;
+
+  /// No description provided for @architectExportDxfSheets.
+  ///
+  /// In en, this message translates to:
+  /// **'DXF sheets'**
+  String get architectExportDxfSheets;
+
+  /// No description provided for @architectExportIfc.
+  ///
+  /// In en, this message translates to:
+  /// **'IFC model'**
+  String get architectExportIfc;
+
+  /// No description provided for @architectExportChooseViews.
+  ///
+  /// In en, this message translates to:
+  /// **'Select drawings'**
+  String get architectExportChooseViews;
+
+  /// No description provided for @architectExportIfcSchema.
+  ///
+  /// In en, this message translates to:
+  /// **'IFC version'**
+  String get architectExportIfcSchema;
+
+  /// No description provided for @architectExportRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get architectExportRun;
+
+  /// No description provided for @architectExportPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing…'**
+  String get architectExportPreparing;
+
+  /// No description provided for @architectExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export did not complete. Check geometry and the selected sources.'**
+  String get architectExportFailed;
+
+  /// No description provided for @architectExportComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Export is ready.'**
+  String get architectExportComplete;
+
+  /// No description provided for @architectExportIfcHint.
+  ///
+  /// In en, this message translates to:
+  /// **'IFC retains BIM classes and materials. Editability also depends on the Revit or Archicad import settings.'**
+  String get architectExportIfcHint;
+
+  /// No description provided for @architectExportIfcReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Parametric: {parametric}. Geometric: {fallback}.'**
+  String architectExportIfcReport(int parametric, int fallback);
+
+  /// No description provided for @architectExportFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact geometry; editability depends on the importer.'**
+  String get architectExportFallback;
+
+  /// No description provided for @architectExportProxy.
+  ///
+  /// In en, this message translates to:
+  /// **'Component without a specialized IFC class.'**
+  String get architectExportProxy;
+
+  /// No description provided for @architectExportSurfaceFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Surface representation without a closed volume.'**
+  String get architectExportSurfaceFallback;
+
+  /// No description provided for @architectExportMissingGeometry.
+  ///
+  /// In en, this message translates to:
+  /// **'No geometric body. Element properties have been retained.'**
+  String get architectExportMissingGeometry;
+
+  /// No description provided for @architectExportUnhostedOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening without a slab to cut. Its boundary and properties have been retained.'**
+  String get architectExportUnhostedOpening;
+
+  /// No description provided for @architectExportElementFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid geometry in element {elementId}.'**
+  String architectExportElementFailed(String elementId);
+
+  /// No description provided for @architectExportReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Report'**
+  String get architectExportReport;
+
+  /// No description provided for @architectExportSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get architectExportSave;
+
   /// No description provided for @architectSheetPrint.
   ///
   /// In en, this message translates to:

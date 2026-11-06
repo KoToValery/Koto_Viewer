@@ -21,6 +21,7 @@ import '../models/architect_section_visibility.dart';
 import 'architect_wall_network.dart';
 import 'architect_wall_solids.dart';
 import 'architect_stair_mesh.dart';
+import 'architect_railing_geometry.dart';
 import '../services/component_geometry_cache.dart';
 import '../services/component_library_service.dart';
 import '../services/architect_service_geometry.dart';
@@ -35,6 +36,7 @@ class Architect3dBuilder {
     Map<Triangle3D, String>? sources,
     bool cleanDrainage = false,
     Map<Triangle3D, String>? silhouetteGroups,
+    Map<Triangle3D, bool>? projectionOcclusion,
     ArchitectSectionVisibility? sectionVisibility,
     Set<String> suppressedOpeningIds = const {},
     Map<String, FenestrationElevationDetail> openingDetailLevels = const {},
@@ -54,6 +56,7 @@ class Architect3dBuilder {
       sources: sources,
       cleanDrainage: cleanDrainage,
       silhouetteGroups: silhouetteGroups,
+      projectionOcclusion: projectionOcclusion,
       sectionVisibility: sectionVisibility,
       suppressedOpeningIds: suppressedOpeningIds,
       openingDetailLevels: openingDetailLevels,
@@ -67,6 +70,7 @@ class Architect3dBuilder {
     Map<Triangle3D, String>? sources,
     bool cleanDrainage = false,
     Map<Triangle3D, String>? silhouetteGroups,
+    Map<Triangle3D, bool>? projectionOcclusion,
     ArchitectSectionVisibility? sectionVisibility,
     Set<String> suppressedOpeningIds = const {},
     Map<String, FenestrationElevationDetail> openingDetailLevels = const {},
@@ -84,10 +88,13 @@ class Architect3dBuilder {
     for (final storey in project.storeys) {
       final walls = [
         for (final wall in storey.walls)
-          wall.copyWith(height: wall.effectiveHeight(storey.height)),
+          wall.height == wall.effectiveHeight(storey.height)
+              ? wall
+              : wall.copyWith(height: wall.effectiveHeight(storey.height)),
       ];
       final composed = walls.any(
         (w) =>
+            w.hasRailingDesign ||
             w.system.isSpecial ||
             w.layers.isNotEmpty ||
             w.plinth.enabled ||
@@ -169,6 +176,23 @@ class Architect3dBuilder {
           ),
         );
         mark(wall.id, first);
+        final railingGroup = wall.railing == null
+            ? null
+            : ArchitectRailingGeometry.metalGroupId(wall, storey.walls);
+        for (final part in ArchitectRailingGeometry.components(
+          wall,
+          storeyElevation: storey.elevation,
+          walls: storey.walls,
+        )) {
+          allTris.addAll(part.triangles);
+          for (final triangle in part.triangles) {
+            sources?[triangle] = wall.id;
+            silhouetteGroups?[triangle] = part.occludesProjection
+                ? railingGroup!
+                : part.id;
+            projectionOcclusion?[triangle] = part.occludesProjection;
+          }
+        }
       }
 
       // Fill physical mitres at the same junctions used by the plan view.
@@ -215,7 +239,10 @@ class Architect3dBuilder {
           ...ArchitectStairMesh.body(
             stair,
             firstRiserBottom: ArchitectStairFloorContact.firstRiserBottom(
-              project, storey, stair),
+              project,
+              storey,
+              stair,
+            ),
           ),
           ...ArchitectStairMesh.railings(
             stair,
@@ -459,7 +486,11 @@ class Architect3dBuilder {
         final first = allTris.length;
         final cosR = math.cos(comp.rotation);
         final sinR = math.sin(comp.rotation);
-        final zBase = ArchitectServiceGeometry.baseElevation(project, storey, comp);
+        final zBase = ArchitectServiceGeometry.baseElevation(
+          project,
+          storey,
+          comp,
+        );
 
         Vector3 transform(Vector3 p) {
           final rx = p.x * cosR - p.y * sinR;
@@ -494,8 +525,12 @@ class Architect3dBuilder {
             ),
           );
         }
-        allTris.addAll(ArchitectServiceGeometry.flashing(project, storey, comp));
-        allTris.addAll(ArchitectServiceGeometry.terminal(project, storey, comp));
+        allTris.addAll(
+          ArchitectServiceGeometry.flashing(project, storey, comp),
+        );
+        allTris.addAll(
+          ArchitectServiceGeometry.terminal(project, storey, comp),
+        );
         mark(comp.id, first);
       }
     }
@@ -523,6 +558,31 @@ class Architect3dBuilder {
       }
     }
     return Mesh3D(name: project.name, triangles: allTris);
+  }
+
+  /// Original per-roof body for BIM exchange, before scene-wide removal of
+  /// hidden faces. Exporters must not use the open projection/preview shell.
+  static List<Triangle3D> buildRoofBody(
+    ArchitectProject project,
+    ArchitectStorey storey,
+    ArchitectRoofPlane roof,
+  ) {
+    final footprint = ArchitectRoofJunctions.of(storey, project: project).footprint(roof);
+    final ridges = ArchitectRoofRidgeBeam.build(storey, project: project);
+    final plates = ArchitectRoofWallPlate.build(storey, project: project)
+        .where((p) => p.roofId == roof.id).toList();
+    final result = _buildRoofMesh(storey, roof, detailed: true,
+        ridgeSeats: ridges, wallPlates: plates, footprint: footprint);
+    for (final ridge in ridges.where((r) => r.roofIds.contains(roof.id))) {
+      result.addAll(ridge.mesh(planClip: footprint));
+      for (final bearing in ridge.bearings(storey,
+          ArchitectRoofGeometry.supportingWallStorey(project, storey))) {
+        result.addAll(ArchitectPathSolid.extrude(
+            Path.combine(PathOperation.intersect, bearing.footprint, footprint),
+            bearing.bottom, bearing.top, const Color(0xffb0bec5)));
+      }
+    }
+    return result;
   }
 
   static List<Triangle3D> _buildRoofMesh(

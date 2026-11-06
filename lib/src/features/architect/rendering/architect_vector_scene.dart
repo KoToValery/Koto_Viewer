@@ -237,7 +237,8 @@ class ArchitectVectorPath extends ArchitectVectorOp {
     super.role,
   );
   @override
-  Rect get bounds {
+  late final Rect bounds = _measureBounds();
+  Rect _measureBounds() {
     final bounds = path.getBounds().inflate(fill ? 0 : width / 2);
     if (clip == null) return bounds;
     final region = clip!.getBounds();
@@ -278,28 +279,46 @@ class ArchitectVectorText extends ArchitectVectorOp {
     this.fontStyle = FontStyle.normal,
     this.decoration = TextDecoration.none,
   });
-  TextPainter get painter => TextPainter(
-    text: TextSpan(
-      text: text,
-      style: TextStyle(
-        fontFamily: 'ArchitectNoto',
-        fontSize: size,
-        color: color,
-        fontWeight: weight,
-        fontStyle: fontStyle,
-        decoration: decoration,
-        height: 1,
+  TextPainter? _painter;
+  Size? _measuredSize;
+  int _layoutCount = 0;
+  @visibleForTesting
+  int get debugLayoutCount => _layoutCount;
+  TextPainter get painter {
+    if (_painter != null) return _painter!;
+    _layoutCount++;
+    final result = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          fontFamily: 'ArchitectNoto',
+          fontSize: size,
+          color: color,
+          fontWeight: weight,
+          fontStyle: fontStyle,
+          decoration: decoration,
+          height: 1,
+        ),
       ),
-    ),
-    textDirection: TextDirection.ltr,
-  )..layout();
+      textDirection: TextDirection.ltr,
+    )..layout();
+    _measuredSize ??= result.size;
+    return _painter = result;
+  }
+
+  void releasePainter() {
+    _painter?.dispose();
+    _painter = null;
+  }
+
   @override
-  Rect get bounds {
-    final tp = painter;
+  late final Rect bounds = _measureBounds();
+  Rect _measureBounds() {
+    final measured = _measuredSize ?? painter.size;
     final transform = Matrix4.identity()
       ..translateByDouble(position.dx, position.dy, 0, 1)
       ..rotateZ(rotation);
-    return MatrixUtils.transformRect(transform, Offset.zero & tp.size);
+    return MatrixUtils.transformRect(transform, Offset.zero & measured);
   }
 
   @override
@@ -336,15 +355,25 @@ class ArchitectVectorText extends ArchitectVectorOp {
 }
 
 class ArchitectVectorScene {
+  static final _bounds = Expando<Rect>();
   final List<ArchitectVectorOp> operations;
   final int denominator;
   const ArchitectVectorScene(this.operations, this.denominator);
-  Rect get bounds {
+  Rect get bounds => _bounds[this] ??= _measureBounds();
+  Rect _measureBounds() {
     Rect? result;
     for (final op in operations) {
       result = result?.expandToInclude(op.bounds) ?? op.bounds;
     }
     return result ?? const Rect.fromLTWH(0, 0, 10, 10);
+  }
+
+  /// Publication/export still consumes semantic vector operations. The screen
+  /// display cache releases only transient text layout resources after record.
+  void releaseTextPainters() {
+    for (final op in operations) {
+      if (op is ArchitectVectorText) op.releasePainter();
+    }
   }
 
   void paint(Canvas canvas) {

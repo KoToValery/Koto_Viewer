@@ -68,7 +68,7 @@ class ArchitectWallClearance {
     List<ArchitectWall> walls, {
     bool includeParallel = false,
   }) {
-    if(wall.isCurved)return const [];
+    if (wall.isCurved || wall.isOpenRailing) return const [];
     double dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
     double cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
     final result = <ArchitectWallClearance>[];
@@ -79,6 +79,7 @@ class ArchitectWallClearance {
       final bestBySide = <int, ArchitectWallClearance>{};
       for (final support in ordered) {
         if (support.id == wall.id ||
+            support.isOpenRailing ||
             support.isDetached ||
             !support.connectsAt(point) ||
             cross(support.unitVector, wall.unitVector).abs() < 1e-5) {
@@ -214,7 +215,10 @@ class ArchitectWallClearance {
           if (rawClearance < -1e-5) continue;
           final clearDistance = math.max(0.0, rawClearance);
 
-          final station = dot(visualEnd - target.centerStart, target.unitVector);
+          final station = dot(
+            visualEnd - target.centerStart,
+            target.unitVector,
+          );
           if (station < -target.thickness / 2 - .01 ||
               station > target.length + target.thickness / 2 + .01) {
             continue;
@@ -246,12 +250,14 @@ class ArchitectWallClearance {
     ArchitectWall wall,
     List<ArchitectWall> walls,
   ) {
-    if(wall.isCurved)return const [];
+    if (wall.isCurved || wall.isOpenRailing) return const [];
     double dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
     final nearest = <int, ArchitectWallClearance>{};
     final origin = wall.centerStart, u = wall.unitVector, n = wall.normalVector;
     for (final other in walls) {
-      if (other.isCurved || other.id == wall.id ||
+      if (other.isCurved ||
+          other.isOpenRailing ||
+          other.id == wall.id ||
           (dot(u, other.unitVector).abs() - 1).abs() > 1e-7) {
         continue;
       }
@@ -293,9 +299,12 @@ class ArchitectWallTrimSpan {
   final ArchitectWall wall;
   final double from, to;
   const ArchitectWallTrimSpan(this.wall, this.from, this.to);
-  Offset get start =>
-      wall.isCurved?wall.referencePointAt(from):wall.coreCenterStart + wall.unitVector * (from * wall.length);
-  Offset get end => wall.isCurved?wall.referencePointAt(to):wall.coreCenterStart + wall.unitVector * (to * wall.length);
+  Offset get start => wall.isCurved
+      ? wall.referencePointAt(from)
+      : wall.coreCenterStart + wall.unitVector * (from * wall.length);
+  Offset get end => wall.isCurved
+      ? wall.referencePointAt(to)
+      : wall.coreCenterStart + wall.unitVector * (to * wall.length);
 
   /// The picked interval is bounded by real wall crossings or wall ends.
   static ArchitectWallTrimSpan at(
@@ -305,11 +314,16 @@ class ArchitectWallTrimSpan {
   ) {
     final cuts = <double>[0, 1];
     for (final other in walls) {
-      if (other.id == wall.id) continue;
-      if(wall.isCurved||other.isCurved) {
-        for(final p in wall.intersections(other)) {
-          final ratio=wall.isCurved?wall.arc!.parameter(p):wall.projectPoint(p).$1;
-          if(ratio*wall.length>.001&&(1-ratio)*wall.length>.001&&cuts.every((c)=>(c-ratio).abs()>1e-8))cuts.add(ratio);
+      if (other.id == wall.id || other.isOpenRailing) continue;
+      if (wall.isCurved || other.isCurved) {
+        for (final p in wall.intersections(other)) {
+          final ratio = wall.isCurved
+              ? wall.arc!.parameter(p)
+              : wall.projectPoint(p).$1;
+          if (ratio * wall.length > .001 &&
+              (1 - ratio) * wall.length > .001 &&
+              cuts.every((c) => (c - ratio).abs() > 1e-8))
+            cuts.add(ratio);
         }
         continue;
       }
@@ -336,9 +350,11 @@ class ArchitectWallTrimSpan {
     }
     cuts.sort();
     final d = pick - wall.coreCenterStart;
-    final ratio = wall.isCurved ? wall.arc!.parameter(pick).clamp(0.0,1.0) :
-        ((d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy) / wall.length)
-            .clamp(0.0, 1.0);
+    final ratio = wall.isCurved
+        ? wall.arc!.parameter(pick).clamp(0.0, 1.0)
+        : ((d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy) /
+                  wall.length)
+              .clamp(0.0, 1.0);
     for (var i = 0; i < cuts.length - 1; i++) {
       if (ratio < cuts[i + 1] - 1e-8 || i == cuts.length - 2) {
         return ArchitectWallTrimSpan(wall, cuts[i], cuts[i + 1]);
@@ -399,7 +415,7 @@ class ArchitectOpeningClearance {
     required double openingWidth,
   }) {
     final len = wall.length;
-    if (len < 1e-4) return const [];
+    if (len < 1e-4 || !wall.canHostOpenings) return const [];
     final centerAlong = offsetRatio * len;
     final halfW = wall.openingArcSpan(openingWidth) / 2.0;
     final leftJamb = centerAlong - halfW;
@@ -426,10 +442,12 @@ class ArchitectOpeningClearance {
     bool isModular(double d) =>
         d > 1e-4 && (d / step - (d / step).round()).abs() < 1e-3;
 
-    Offset at(double station,double extra) {
-      final r=station/len;
-      return wall.centerPointAt(r)+wall.normalAt(r)*wall.exteriorSign*(wall.thickness/2+extra);
+    Offset at(double station, double extra) {
+      final r = station / len;
+      return wall.centerPointAt(r) +
+          wall.normalAt(r) * wall.exteriorSign * (wall.thickness / 2 + extra);
     }
+
     Offset reference(double station, ArchitectOpeningBoundaryKind kind) {
       if (kind != ArchitectOpeningBoundaryKind.intersectingWall) {
         return at(station, 0);
@@ -438,8 +456,15 @@ class ArchitectOpeningClearance {
       return wall.centerPointAt(r) -
           wall.normalAt(r) * wall.exteriorSign * wall.coreAsymmetry / 2;
     }
-    final leftRefPt=reference(leftStation,leftKind),leftJambPt=at(leftJamb,0),leftStart=at(leftStation,.22),leftEnd=at(leftJamb,.22);
-    final rightRefPt=reference(rightStation,rightKind),rightJambPt=at(rightJamb,0),rightStart=at(rightJamb,.22),rightEnd=at(rightStation,.22);
+
+    final leftRefPt = reference(leftStation, leftKind),
+        leftJambPt = at(leftJamb, 0),
+        leftStart = at(leftStation, .22),
+        leftEnd = at(leftJamb, .22);
+    final rightRefPt = reference(rightStation, rightKind),
+        rightJambPt = at(rightJamb, 0),
+        rightStart = at(rightJamb, .22),
+        rightEnd = at(rightStation, .22);
 
     return [
       ArchitectOpeningClearance(
@@ -517,8 +542,7 @@ class ArchitectOpeningPlacementResult {
     this.isHingeLeft = true,
   });
 
-  Offset get centerPoint =>
-      wall.centerPointAt(offsetRatio);
+  Offset get centerPoint => wall.centerPointAt(offsetRatio);
 }
 
 /// Constructive masonry placement and snapping engine for hosted doors & windows.
@@ -540,12 +564,15 @@ class ArchitectOpeningPlacement {
     if (len < 1e-4) return const [];
     final u = wall.unitVector;
 
-    final obstacles = <({
-      double start,
-      double end,
-      ArchitectOpeningBoundaryKind kind,
-      String id,
-    })>[];
+    final obstacles =
+        <
+          ({
+            double start,
+            double end,
+            ArchitectOpeningBoundaryKind kind,
+            String id,
+          })
+        >[];
 
     // 1. Hosted doors & windows on the same wall
     for (final d in wall.doors) {
@@ -579,20 +606,35 @@ class ArchitectOpeningPlacement {
 
     // 2. Intersecting (cross / T-junction / corner) walls
     for (final other in walls) {
-      if (other.id == wall.id || other.isDetached) continue;
-      if(wall.isCurved||other.isCurved) {
-        for(final p in wall.intersections(other)) {
-          final ratio=wall.isCurved?wall.arc!.parameter(p):wall.projectPoint(p).$1,otherRatio=other.isCurved?other.arc!.parameter(p):other.projectPoint(p).$1;
-          final a=wall.tangentAt(ratio),b=other.tangentAt(otherRatio),sin=(a.dx*b.dy-a.dy*b.dx).abs();
-          if(sin<.15)continue;
-          final station=ratio*len,half=other.coreThickness/2/sin;
-          final from=(station-half).clamp(0.0,len),to=(station+half).clamp(0.0,len);
-          if(to>from+1e-5)obstacles.add((start:from,end:to,kind:ArchitectOpeningBoundaryKind.intersectingWall,id:other.id));
+      if (other.id == wall.id || other.isDetached || !other.hasSolidWallBody)
+        continue;
+      if (wall.isCurved || other.isCurved) {
+        for (final p in wall.intersections(other)) {
+          final ratio = wall.isCurved
+                  ? wall.arc!.parameter(p)
+                  : wall.projectPoint(p).$1,
+              otherRatio = other.isCurved
+                  ? other.arc!.parameter(p)
+                  : other.projectPoint(p).$1;
+          final a = wall.tangentAt(ratio),
+              b = other.tangentAt(otherRatio),
+              sin = (a.dx * b.dy - a.dy * b.dx).abs();
+          if (sin < .15) continue;
+          final station = ratio * len, half = other.coreThickness / 2 / sin;
+          final from = (station - half).clamp(0.0, len),
+              to = (station + half).clamp(0.0, len);
+          if (to > from + 1e-5)
+            obstacles.add((
+              start: from,
+              end: to,
+              kind: ArchitectOpeningBoundaryKind.intersectingWall,
+              id: other.id,
+            ));
         }
         continue;
       }
-      final sinTheta =
-          (u.dx * other.unitVector.dy - u.dy * other.unitVector.dx).abs();
+      final sinTheta = (u.dx * other.unitVector.dy - u.dy * other.unitVector.dx)
+          .abs();
       if (sinTheta < 0.15) continue;
 
       final inter = ArchitectWallNetwork.intersection(
@@ -636,14 +678,17 @@ class ArchitectOpeningPlacement {
     obstacles.sort((a, b) => a.start.compareTo(b.start));
 
     // Merge overlapping obstacles
-    final merged = <({
-      double start,
-      double end,
-      ArchitectOpeningBoundaryKind leftKind,
-      String leftId,
-      ArchitectOpeningBoundaryKind rightKind,
-      String rightId,
-    })>[];
+    final merged =
+        <
+          ({
+            double start,
+            double end,
+            ArchitectOpeningBoundaryKind leftKind,
+            String leftId,
+            ArchitectOpeningBoundaryKind rightKind,
+            String rightId,
+          })
+        >[];
 
     for (final obs in obstacles) {
       if (merged.isEmpty || obs.start > merged.last.end + 1e-5) {
@@ -716,11 +761,14 @@ class ArchitectOpeningPlacement {
     required double openingWidth,
     String? excludeOpeningId,
   }) {
-    final spans = freeSpansForWall(
-      wall: wall,
-      walls: walls,
-      excludeOpeningId: excludeOpeningId,
-    ).where((s) => s.length >= wall.openingArcSpan(openingWidth) - 1e-5).toList();
+    final spans =
+        freeSpansForWall(
+              wall: wall,
+              walls: walls,
+              excludeOpeningId: excludeOpeningId,
+            )
+            .where((s) => s.length >= wall.openingArcSpan(openingWidth) - 1e-5)
+            .toList();
     if (spans.isEmpty) return null;
 
     ArchitectOpeningFreeSpan? best;
@@ -754,16 +802,21 @@ class ArchitectOpeningPlacement {
     if (host == null) {
       var bestDist = double.infinity;
       for (final wall in walls) {
-        if (wall.length < openingWidth - 1e-5) continue;
+        if (!wall.canHostOpenings || wall.length < openingWidth - 1e-5)
+          continue;
         final (_, dist) = wall.projectPoint(rawPoint);
-        final maxSnapDist = wall.thickness / 2.0 + math.max(openingWidth * 1.5, 1.20);
+        final maxSnapDist =
+            wall.thickness / 2.0 + math.max(openingWidth * 1.5, 1.20);
         if (dist <= maxSnapDist && dist < bestDist) {
           bestDist = dist;
           host = wall;
         }
       }
     }
-    if (host == null || host.length < openingWidth - 1e-5) return null;
+    if (host == null ||
+        !host.canHostOpenings ||
+        host.length < openingWidth - 1e-5)
+      return null;
 
     final len = host.length;
     final (rawRatio, _) = host.projectPoint(rawPoint);
@@ -844,11 +897,13 @@ class ArchitectOpeningPlacement {
 
     final toCursor = rawPoint - host.centerPointAt(ratio);
     final normalDot =
-        toCursor.dx * host.normalAt(ratio).dx + toCursor.dy * host.normalAt(ratio).dy;
+        toCursor.dx * host.normalAt(ratio).dx +
+        toCursor.dy * host.normalAt(ratio).dy;
     final openInward = normalDot.abs() < 1e-3 ? true : normalDot >= 0;
 
     final alongDot =
-        toCursor.dx * host.tangentAt(ratio).dx + toCursor.dy * host.tangentAt(ratio).dy;
+        toCursor.dx * host.tangentAt(ratio).dx +
+        toCursor.dy * host.tangentAt(ratio).dy;
     final isHingeLeft = alongDot.abs() > 0.03
         ? alongDot < 0
         : (defaultHingeLeft ?? true);
@@ -966,4 +1021,3 @@ class ArchitectOpeningPlacement {
     return false;
   }
 }
-

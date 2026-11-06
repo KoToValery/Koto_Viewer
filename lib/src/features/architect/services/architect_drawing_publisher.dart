@@ -6,6 +6,7 @@ import '../models/architect_project.dart';
 import '../rendering/architect_2d_painter.dart';
 import '../rendering/architect_vector_scene.dart';
 import '../rendering/architect_elements_painter_helper.dart';
+import '../rendering/architect_wall_layers.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../bim_projects/models/bim_coordinate_frame.dart';
 import '../widgets/architect_building_sections_screen.dart';
@@ -27,6 +28,59 @@ class ArchitectPublicationSources {
 /// Shared scene generation for the working print preview, sheet and PDF.
 class ArchitectDrawingPublisher {
   static final _cache = Expando<Map<String, ArchitectVectorScene>>();
+  static final _geometry = Expando<_PublicationGeometry>();
+
+  static _PublicationGeometry _physical(ArchitectProject p) =>
+      _geometry[p] ??= _PublicationGeometry();
+
+  static ArchitectWallLayers _wallLayers(ArchitectProject p, String storeyId) {
+    final cache = _physical(p);
+    return cache.wallLayers.putIfAbsent(storeyId, () {
+      cache.builds++;
+      // Keep the selected physical project alive with its layers. Annotation
+      // visibility and scale only belong to the separate painter snapshot.
+      final selected = p.activeStoreyId == storeyId
+          ? p
+          : p.copyWith(activeStoreyId: storeyId);
+      cache.storeyProjects[storeyId] = selected;
+      return ArchitectWallLayers.forProject(selected);
+    });
+  }
+
+  static ArchitectBuildingSection _section(ArchitectProject p, String id) {
+    final cache = _physical(p);
+    return cache.sections.putIfAbsent(id, () {
+      cache.builds++;
+      final cut = p.sections.firstWhere((s) => s.id == id);
+      return ArchitectBuildingSection.build(p, cut).forView(cut);
+    });
+  }
+
+  static ArchitectBuildingElevation _elevation(ArchitectProject p, String id) {
+    final cache = _physical(p);
+    return cache.elevations.putIfAbsent(id, () {
+      cache.builds++;
+      return ArchitectBuildingElevation.build(
+        p,
+        p.elevations.firstWhere((s) => s.id == id),
+      );
+    });
+  }
+
+  @visibleForTesting
+  static Object? debugPhysicalGeometry(
+    ArchitectProject p,
+    ArchitectSavedDrawing drawing,
+  ) => switch (drawing.kind) {
+    ArchitectDrawingKind.plan => _geometry[p]?.wallLayers[drawing.sourceId],
+    ArchitectDrawingKind.section => _geometry[p]?.sections[drawing.sourceId],
+    ArchitectDrawingKind.elevation =>
+      _geometry[p]?.elevations[drawing.sourceId],
+  };
+
+  @visibleForTesting
+  static int debugPhysicalGeometryBuilds(ArchitectProject p) =>
+      _geometry[p]?.builds ?? 0;
 
   /// Source inputs are immutable model values. Paper-only document edits do not
   /// invalidate expensive drawing scenes; geometry and annotation edits do.
@@ -188,6 +242,7 @@ class ArchitectDrawingPublisher {
         }
         Architect2dPainter(
           project: plan,
+          publicationWallLayers: _wallLayers(p, drawing.sourceId),
           l10n: l,
           layer: ArchitectPaintLayer.model,
           paintGrid: false,
@@ -201,10 +256,7 @@ class ArchitectDrawingPublisher {
           final cut = scaled.sections.firstWhere(
             (s) => s.id == drawing.sourceId,
           );
-          final geometry = ArchitectBuildingSection.build(
-            scaled,
-            cut,
-          ).forView(cut);
+          final geometry = _section(p, drawing.sourceId);
           final data = ArchitectSectionDrawing(
             scaled,
             cut,
@@ -224,7 +276,7 @@ class ArchitectDrawingPublisher {
           final view = scaled.elevations.firstWhere(
             (s) => s.id == drawing.sourceId,
           );
-          final geometry = ArchitectBuildingElevation.build(scaled, view);
+          final geometry = _elevation(p, view.id);
           bounds = geometry.bounds;
           painter = ArchitectFacadePainter(
             geometry,
@@ -297,6 +349,15 @@ class ArchitectDrawingPublisher {
       denominator,
     );
   }
+}
+
+/// Weakly owned by the immutable source project, independent of paper scale.
+class _PublicationGeometry {
+  final wallLayers = <String, ArchitectWallLayers>{};
+  final storeyProjects = <String, ArchitectProject>{};
+  final sections = <String, ArchitectBuildingSection>{};
+  final elevations = <String, ArchitectBuildingElevation>{};
+  int builds = 0;
 }
 
 class ArchitectStyledPainter extends CustomPainter {
