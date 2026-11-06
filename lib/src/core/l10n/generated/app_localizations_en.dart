@@ -11750,4 +11750,174 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectPreserveDimensionsTooltip =>
       'Keep existing dimensions when changing style';
+
+  @override
+  String get architectCopyElementsByStorey => 'Copy Elements by Storeys...';
+
+  @override
+  String get architectCopyToStoreys => 'Copy to Storeys...';
+
+  @override
+  String get architectCopyToStoreysTooltip =>
+      'Copy selected elements to other building storeys';
+
+  @override
+  String get architectManageStoreys => 'Storey Manager...';
+
+  @override
+  String get architectStoreysScreenTitle => 'Building Storeys & Typical Floors';
+
+  @override
+  String get architectCopySourceStorey => 'Source Storey (Template)';
+
+  @override
+  String get architectCopyTargetStoreys => 'Target Storeys';
+
+  @override
+  String get architectCopyAllStoreyElements => 'Entire storey layout';
+
+  @override
+  String architectCopySelectedOnly(int count) {
+    return 'Selected elements only ($count)';
+  }
+
+  @override
+  String get architectCopyModeTitle => 'Transfer Mode';
+
+  @override
+  String get architectCopyModeReplace => 'Replace existing';
+
+  @override
+  String get architectCopyModeReplaceHelp =>
+      'Clear existing elements of selected types on target storeys';
+
+  @override
+  String get architectCopyModeMerge => 'Append / Merge';
+
+  @override
+  String get architectCopyModeMergeHelp =>
+      'Keep existing elements on target storeys and append new copies';
+
+  @override
+  String get architectAdjustWallHeightsToStorey =>
+      'Adapt wall heights to target storey';
+
+  @override
+  String get architectAdjustElevationMarkers =>
+      'Recalculate elevation markers to target level';
+
+  @override
+  String get architectPreserveGroups => 'Preserve element groups';
+
+  @override
+  String get architectSelectAllAbove => 'All above current';
+
+  @override
+  String get architectSelectAllStoreys => 'All storeys';
+
+  @override
+  String get architectClearStoreySelection => 'Clear';
+
+  @override
+  String get architectBatchAddStoreys => 'Generate Typical Storeys...';
+
+  @override
+  String get architectBatchAddCount => 'Number of storeys';
+
+  @override
+  String get architectBatchAddHeight => 'Storey height (m)';
+
+  @override
+  String get architectBatchAddPrefix => 'Name prefix';
+
+  @override
+  String get architectBatchAddButton => 'Generate Storeys';
+
+  @override
+  String get architectCopyElementsButton => 'Copy Elements';
+
+  @override
+  String architectCopySuccess(int count, int storeys) {
+    String _temp0 = intl.Intl.pluralLogic(
+      storeys,
+      locale: localeName,
+      other: '$storeys storeys',
+      one: '1 storey',
+    );
+    return 'Successfully copied $count elements across $_temp0';
+  }
+
+  @override
+  String get architectNoTargetStoreysSelected =>
+      'Please select at least one target storey';
+
+  @override
+  String get architectNoElementsSelected => 'No elements selected to copy';
+
+  @override
+  String get architectCategoryWalls => 'Walls, Doors & Windows';
+
+  @override
+  String get architectCategoryColumns => 'Columns';
+
+  @override
+  String get architectCategoryBeams => 'Beams';
+
+  @override
+  String get architectCategorySlabs => 'Slabs';
+
+  @override
+  String get architectCategoryZones => 'Zones & Rooms';
+
+  @override
+  String get architectCategoryStairsOpenings => 'Stairs & Voids';
+
+  @override
+  String get architectCategoryDimensions => 'Dimensions & Levels';
+
+  @override
+  String get architectCategoryDrafting2D => '2D CAD & Annotations';
+
+  @override
+  String get architectCategoryComponents => 'Components & Fixtures';
+
+  @override
+  String get architectCategoryRoofs => 'Roofs';
+
+  @override
+  String get architectStoreyElevationLabel => 'Elevation';
+
+  @override
+  String get architectStoreyHeightLabel => 'Height';
+
+  @override
+  String architectStoreyElementsCount(int count) {
+    return '$count elements';
+  }
+
+  @override
+  String get architectAddStoreyAbove => 'Add storey above';
+
+  @override
+  String architectDeleteStoreyConfirm(String name) {
+    return 'Delete storey $name? All elements on it will be removed.';
+  }
+
+  @override
+  String get architectTypicalFloorBadge => 'Typical Floor';
+
+  @override
+  String get architectPlanPreviewTitle => 'Floor Plan Preview';
+
+  @override
+  String get architectStoreyStackTab => 'Storey Stack';
+
+  @override
+  String get architectCopyStoreyTab => 'Copy Elements';
+
+  @override
+  String get architectCopyCategoriesTitle => 'Transfer Categories';
+
+  @override
+  String get architectNoDrawnElements => 'No elements drawn on this storey';
 }

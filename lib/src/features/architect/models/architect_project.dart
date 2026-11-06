@@ -80,8 +80,9 @@ class ArchitectStorey {
   Set<String> expandGroups(Set<String> selection) {
     final result = Set<String>.of(selection);
     for (final group in groups) {
-      if (group.elementIds.any(selection.contains))
+      if (group.elementIds.any(selection.contains)) {
         result.addAll(group.elementIds);
+      }
     }
     return result;
   }
@@ -525,6 +526,108 @@ class ArchitectProject {
         for (final s in storeys) s.isRoof ? s.copyWith(elevation: target) : s,
       ],
     );
+  }
+
+  /// Appends a new storey above the highest normal storey.
+  ArchitectProject addStoreyAbove({
+    String? name,
+    double height = 2.80,
+  }) {
+    final normal = storeys.where((s) => !s.isRoof).toList()
+      ..sort((a, b) => a.elevation.compareTo(b.elevation));
+    final top = normal.isNotEmpty ? normal.last : null;
+    final elev = top != null ? (top.elevation + top.height) : 0.0;
+    final index = normal.length + 1;
+    final elevLabel = elev.abs() < 1e-4
+        ? '±0.00'
+        : (elev > 0 ? '+${elev.toStringAsFixed(2)}' : elev.toStringAsFixed(2));
+    final storeyName = name?.trim().isNotEmpty == true
+        ? name!.trim()
+        : 'Етаж $index · $elevLabel';
+    final newStorey = ArchitectStorey(
+      id: 'storey_${DateTime.now().millisecondsSinceEpoch}_${normal.length}',
+      name: storeyName,
+      elevation: elev,
+      height: height,
+    );
+    final nextNormal = [...normal, newStorey];
+    final roof = roofStorey;
+    final updatedStoreys = roof != null ? [...nextNormal, roof] : nextNormal;
+    return copyWith(storeys: updatedStoreys).syncRoofElevation();
+  }
+
+  /// Batch adds N consecutive typical storeys above the current top normal storey.
+  ArchitectProject batchAddTypicalStoreys({
+    required int count,
+    double typicalHeight = 2.80,
+    String namePrefix = 'Етаж',
+  }) {
+    if (count <= 0) return this;
+    var current = this;
+    for (var i = 0; i < count; i++) {
+      final normal = current.storeys.where((s) => !s.isRoof).toList()
+        ..sort((a, b) => a.elevation.compareTo(b.elevation));
+      final top = normal.isNotEmpty ? normal.last : null;
+      final elev = top != null ? (top.elevation + top.height) : 0.0;
+      final num = normal.length + 1;
+      final elevLabel = elev.abs() < 1e-4
+          ? '±0.00'
+          : (elev > 0 ? '+${elev.toStringAsFixed(2)}' : elev.toStringAsFixed(2));
+      final name = '$namePrefix $num · $elevLabel';
+      current = current.addStoreyAbove(name: name, height: typicalHeight);
+    }
+    return current;
+  }
+
+  /// Recalculates consecutive floor elevations based on heights, from lowest to highest.
+  ArchitectProject recalculateStoreyElevations() {
+    final normal = storeys.where((s) => !s.isRoof).toList()
+      ..sort((a, b) => a.elevation.compareTo(b.elevation));
+    if (normal.isEmpty) return this;
+
+    final updated = <ArchitectStorey>[];
+    var currentElev = normal.first.elevation;
+    for (var i = 0; i < normal.length; i++) {
+      final s = normal[i];
+      if (i == 0) {
+        updated.add(s);
+        currentElev += s.height;
+      } else {
+        updated.add(s.copyWith(elevation: currentElev));
+        currentElev += s.height;
+      }
+    }
+    final roof = roofStorey;
+    final all = roof != null ? [...updated, roof] : updated;
+    return copyWith(storeys: all).syncRoofElevation();
+  }
+
+  /// Updates a storey, optionally recalculating elevations of all storeys above it.
+  ArchitectProject updateStorey(ArchitectStorey updated, {bool recalculateAbove = true}) {
+    final updatedList =
+        storeys.map((s) => s.id == updated.id ? updated : s).toList();
+    final p = copyWith(storeys: updatedList);
+    return recalculateAbove
+        ? p.recalculateStoreyElevations()
+        : p.syncRoofElevation();
+  }
+
+  /// Deletes a storey. Disallows deleting the last remaining normal storey.
+  ArchitectProject deleteStorey(String storeyId) {
+    final normal = storeys.where((s) => !s.isRoof).toList();
+    if (normal.length <= 1 && normal.any((s) => s.id == storeyId)) {
+      return this;
+    }
+    final remaining = storeys.where((s) => s.id != storeyId).toList();
+    var nextActiveId = activeStoreyId;
+    if (activeStoreyId == storeyId) {
+      final remainingNormal = remaining.where((s) => !s.isRoof).toList();
+      nextActiveId = remainingNormal.isNotEmpty
+          ? remainingNormal.first.id
+          : (remaining.firstOrNull?.id ?? 'default');
+    }
+    return copyWith(storeys: remaining, activeStoreyId: nextActiveId)
+        .recalculateStoreyElevations();
   }
 
   static const _emptyStorey = ArchitectStorey(

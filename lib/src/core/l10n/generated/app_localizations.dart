@@ -21377,6 +21377,306 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep existing dimensions when changing style'**
   String get architectPreserveDimensionsTooltip;
+
+  /// Menu action to copy elements across building storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Elements by Storeys...'**
+  String get architectCopyElementsByStorey;
+
+  /// Selection action button to copy selected elements to other storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Copy to Storeys...'**
+  String get architectCopyToStoreys;
+
+  /// Tooltip for copying selected elements to other storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Copy selected elements to other building storeys'**
+  String get architectCopyToStoreysTooltip;
+
+  /// Menu action to open full storey manager
+  ///
+  /// In en, this message translates to:
+  /// **'Storey Manager...'**
+  String get architectManageStoreys;
+
+  /// Title of the storeys management and copying screen
+  ///
+  /// In en, this message translates to:
+  /// **'Building Storeys & Typical Floors'**
+  String get architectStoreysScreenTitle;
+
+  /// Header for source storey picker
+  ///
+  /// In en, this message translates to:
+  /// **'Source Storey (Template)'**
+  String get architectCopySourceStorey;
+
+  /// Header for target storeys picker
+  ///
+  /// In en, this message translates to:
+  /// **'Target Storeys'**
+  String get architectCopyTargetStoreys;
+
+  /// Option to copy all elements from source storey
+  ///
+  /// In en, this message translates to:
+  /// **'Entire storey layout'**
+  String get architectCopyAllStoreyElements;
+
+  /// Option to copy only active selection
+  ///
+  /// In en, this message translates to:
+  /// **'Selected elements only ({count})'**
+  String architectCopySelectedOnly(int count);
+
+  /// Title for copy mode selection
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer Mode'**
+  String get architectCopyModeTitle;
+
+  /// Mode to replace existing elements on target storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Replace existing'**
+  String get architectCopyModeReplace;
+
+  /// Explanation of replace mode
+  ///
+  /// In en, this message translates to:
+  /// **'Clear existing elements of selected types on target storeys'**
+  String get architectCopyModeReplaceHelp;
+
+  /// Mode to append elements to target storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Append / Merge'**
+  String get architectCopyModeMerge;
+
+  /// Explanation of merge mode
+  ///
+  /// In en, this message translates to:
+  /// **'Keep existing elements on target storeys and append new copies'**
+  String get architectCopyModeMergeHelp;
+
+  /// Checkbox to adapt wall heights based on target storey height
+  ///
+  /// In en, this message translates to:
+  /// **'Adapt wall heights to target storey'**
+  String get architectAdjustWallHeightsToStorey;
+
+  /// Checkbox to shift elevation markers to target storey elevation
+  ///
+  /// In en, this message translates to:
+  /// **'Recalculate elevation markers to target level'**
+  String get architectAdjustElevationMarkers;
+
+  /// Checkbox to maintain grouping on target storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Preserve element groups'**
+  String get architectPreserveGroups;
+
+  /// Quick select button for all storeys above active
+  ///
+  /// In en, this message translates to:
+  /// **'All above current'**
+  String get architectSelectAllAbove;
+
+  /// Quick select button for all target storeys
+  ///
+  /// In en, this message translates to:
+  /// **'All storeys'**
+  String get architectSelectAllStoreys;
+
+  /// Clear target storey selections
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get architectClearStoreySelection;
+
+  /// Button to batch generate typical storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Typical Storeys...'**
+  String get architectBatchAddStoreys;
+
+  /// Input for number of typical storeys to create
+  ///
+  /// In en, this message translates to:
+  /// **'Number of storeys'**
+  String get architectBatchAddCount;
+
+  /// Input for storey floor-to-floor height
+  ///
+  /// In en, this message translates to:
+  /// **'Storey height (m)'**
+  String get architectBatchAddHeight;
+
+  /// Input for storey name prefix
+  ///
+  /// In en, this message translates to:
+  /// **'Name prefix'**
+  String get architectBatchAddPrefix;
+
+  /// Button to submit batch storey creation
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Storeys'**
+  String get architectBatchAddButton;
+
+  /// Primary button to trigger element copying
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Elements'**
+  String get architectCopyElementsButton;
+
+  /// Snackbar notification after copying elements
+  ///
+  /// In en, this message translates to:
+  /// **'Successfully copied {count} elements across {storeys, plural, one{1 storey} other{{storeys} storeys}}'**
+  String architectCopySuccess(int count, int storeys);
+
+  /// Validation error when no target storey is selected
+  ///
+  /// In en, this message translates to:
+  /// **'Please select at least one target storey'**
+  String get architectNoTargetStoreysSelected;
+
+  /// Validation error when no elements match criteria
+  ///
+  /// In en, this message translates to:
+  /// **'No elements selected to copy'**
+  String get architectNoElementsSelected;
+
+  /// Category chip for walls, doors, and windows
+  ///
+  /// In en, this message translates to:
+  /// **'Walls, Doors & Windows'**
+  String get architectCategoryWalls;
+
+  /// Category chip for columns
+  ///
+  /// In en, this message translates to:
+  /// **'Columns'**
+  String get architectCategoryColumns;
+
+  /// Category chip for beams
+  ///
+  /// In en, this message translates to:
+  /// **'Beams'**
+  String get architectCategoryBeams;
+
+  /// Category chip for floor slabs
+  ///
+  /// In en, this message translates to:
+  /// **'Slabs'**
+  String get architectCategorySlabs;
+
+  /// Category chip for rooms and apartment zones
+  ///
+  /// In en, this message translates to:
+  /// **'Zones & Rooms'**
+  String get architectCategoryZones;
+
+  /// Category chip for stairs and floor slab openings
+  ///
+  /// In en, this message translates to:
+  /// **'Stairs & Voids'**
+  String get architectCategoryStairsOpenings;
+
+  /// Category chip for dimension chains and elevation markers
+  ///
+  /// In en, this message translates to:
+  /// **'Dimensions & Levels'**
+  String get architectCategoryDimensions;
+
+  /// Category chip for lines, hatches, and text annotations
+  ///
+  /// In en, this message translates to:
+  /// **'2D CAD & Annotations'**
+  String get architectCategoryDrafting2D;
+
+  /// Category chip for component instances and floor drains
+  ///
+  /// In en, this message translates to:
+  /// **'Components & Fixtures'**
+  String get architectCategoryComponents;
+
+  /// Category chip for roof planes
+  ///
+  /// In en, this message translates to:
+  /// **'Roofs'**
+  String get architectCategoryRoofs;
+
+  /// Label for storey elevation
+  ///
+  /// In en, this message translates to:
+  /// **'Elevation'**
+  String get architectStoreyElevationLabel;
+
+  /// Label for storey height
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get architectStoreyHeightLabel;
+
+  /// Storey total element count
+  ///
+  /// In en, this message translates to:
+  /// **'{count} elements'**
+  String architectStoreyElementsCount(int count);
+
+  /// Button to append a single storey above
+  ///
+  /// In en, this message translates to:
+  /// **'Add storey above'**
+  String get architectAddStoreyAbove;
+
+  /// Confirmation message when deleting a storey
+  ///
+  /// In en, this message translates to:
+  /// **'Delete storey {name}? All elements on it will be removed.'**
+  String architectDeleteStoreyConfirm(String name);
+
+  /// Badge indicating typical storey repetition
+  ///
+  /// In en, this message translates to:
+  /// **'Typical Floor'**
+  String get architectTypicalFloorBadge;
+
+  /// Title for floor plan preview panel
+  ///
+  /// In en, this message translates to:
+  /// **'Floor Plan Preview'**
+  String get architectPlanPreviewTitle;
+
+  /// Tab label for storey stack view
+  ///
+  /// In en, this message translates to:
+  /// **'Storey Stack'**
+  String get architectStoreyStackTab;
+
+  /// Tab label for element copy view
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Elements'**
+  String get architectCopyStoreyTab;
+
+  /// Header for categories to transfer across storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer Categories'**
+  String get architectCopyCategoriesTitle;
+
+  /// Placeholder shown in storey mini-map preview when storey has no elements
+  ///
+  /// In en, this message translates to:
+  /// **'No elements drawn on this storey'**
+  String get architectNoDrawnElements;
 }
 
 class _AppLocalizationsDelegate

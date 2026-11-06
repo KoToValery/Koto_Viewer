@@ -27,6 +27,10 @@ import 'architect_stair_rules.dart';
 import 'architect_panel_supports.dart';
 import 'architect_wall_connection_policy.dart';
 import 'architect_wall_exterior_resolver.dart';
+import '../models/architect_storey_copy_types.dart';
+import 'architect_storey_copy_service.dart';
+export '../models/architect_storey_copy_types.dart';
+export 'architect_storey_copy_service.dart';
 export 'architect_element_id.dart';
 
 /// Commands accept model metres, never screen coordinates or a camera scale.
@@ -2718,4 +2722,57 @@ class SetArchitectShowDecorativeOnPlan extends ArchitectModelCommand {
   @override
   ArchitectProject apply(ArchitectProject project) =>
       project.copyWith(showDecorativeOnPlan: showOnPlan);
+}
+
+class CopyArchitectElementsAcrossStoreys extends ArchitectModelCommand {
+  final StoreyCopyOptions options;
+  const CopyArchitectElementsAcrossStoreys(this.options);
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final (updated, _) =
+        ArchitectStoreyCopyService.copyElements(project, options);
+    return updated;
+  }
+}
+
+class AddArchitectStoreysBatch extends ArchitectModelCommand {
+  final int count;
+  final double typicalHeight;
+  final String namePrefix;
+  const AddArchitectStoreysBatch({
+    required this.count,
+    this.typicalHeight = 2.80,
+    this.namePrefix = 'Етаж',
+  });
+
+  @override
+  ArchitectProject apply(ArchitectProject project) =>
+      project.batchAddTypicalStoreys(
+        count: count,
+        typicalHeight: typicalHeight,
+        namePrefix: namePrefix,
+      );
+}
+
+class UpdateArchitectStoreyProperties extends ArchitectModelCommand {
+  final ArchitectStorey storey;
+  final bool recalculateAbove;
+  const UpdateArchitectStoreyProperties(
+    this.storey, {
+    this.recalculateAbove = true,
+  });
+
+  @override
+  ArchitectProject apply(ArchitectProject project) =>
+      project.updateStorey(storey, recalculateAbove: recalculateAbove);
+}
+
+class DeleteArchitectStorey extends ArchitectModelCommand {
+  final String storeyId;
+  const DeleteArchitectStorey(this.storeyId);
+
+  @override
+  ArchitectProject apply(ArchitectProject project) =>
+      project.deleteStorey(storeyId);
 }

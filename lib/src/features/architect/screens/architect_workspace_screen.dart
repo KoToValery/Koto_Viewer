@@ -115,6 +115,8 @@ import '../widgets/architect_building_sections_screen.dart';
 import '../widgets/architect_section_visibility_dialog.dart';
 
 import '../widgets/architect_elevations_screen.dart';
+import '../widgets/architect_storeys_screen.dart';
+import '../widgets/architect_copy_storey_dialog.dart';
 
 import '../widgets/architect_workspace_view_placement.dart';
 import '../widgets/architect_view_direction_picker.dart';
@@ -930,6 +932,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
+    if (mode == 'copy_by_storey') {
+      _openCopyStoreyDialog();
+      return;
+    }
+
     if (mode == 'visibility' && type == ArchitectWorkspaceView.section) {
 
       showArchitectSectionVisibility(context, _modelCommands, sectionId: id);
@@ -1132,6 +1139,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _cancelDrafting();
 
+    if (type == ArchitectWorkspaceView.plan) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ArchitectStoreysScreen(
+            controller: _modelCommands,
+            initialSelectedStoreyId: _modelCommands.project.activeStoreyId,
+          ),
+        ),
+      );
+      setState(() {});
+      return;
+    }
+
     String? selected = _lastViewIds[type];
 
     ArchitectTool? draftTool;
@@ -1184,6 +1204,34 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+  }
+
+  Future<void> _openCopyStoreyDialog({Set<String>? selectedElementIds}) async {
+    final options = await ArchitectCopyStoreyDialog.show(
+      context,
+      project: _project,
+      initialSourceStoreyId: _project.activeStoreyId,
+      selectedElementIds: selectedElementIds,
+    );
+    if (options != null) {
+      final (_, result) =
+          ArchitectStoreyCopyService.copyElements(_project, options);
+      _modelCommands.execute(CopyArchitectElementsAcrossStoreys(options));
+      _saveBiMProjectIfAttached();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.l10n.architectCopySuccess(
+                result.totalCopied,
+                result.targetStoreyCount,
+              ),
+            ),
+            backgroundColor: const Color(0xFF00897B),
+          ),
+        );
+      }
+    }
   }
 
 
@@ -25151,6 +25199,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _showProperties();
         },
         primary: true,
+      ),
+    );
+    actions.add(
+      action(
+        'architect-selection-copy-to-storeys',
+        l.architectCopyToStoreys,
+        Icons.copy_all_rounded,
+        () => _openCopyStoreyDialog(selectedElementIds: ids),
+        color: accent,
+        tooltip: l.architectCopyToStoreysTooltip,
       ),
     );
 

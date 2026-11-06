@@ -74,6 +74,7 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                     'step',
                     'straight',
                     'visibility',
+                    'copy_by_storey',
                   ].contains(id)) {
                     onDraft?.call(
                       type,
@@ -140,6 +141,21 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                           ],
                         ),
                       ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'copy_by_storey',
+                      child: AppMenuLabel(
+                        icon: AppIconId.duplicate,
+                        child: Text(l.architectCopyElementsByStorey),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'manage',
+                      child: AppMenuLabel(
+                        icon: AppIconId.properties,
+                        child: Text(l.architectManageStoreys),
+                      ),
+                    ),
                   ],
                   if (type == ArchitectWorkspaceView.elevation)
                     for (var i = 0; i < project.elevations.length; i++)

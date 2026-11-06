@@ -11797,4 +11797,175 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectPreserveDimensionsTooltip =>
       'Запази текущите размери при избор на стил';
+
+  @override
+  String get architectCopyElementsByStorey =>
+      'Копиране на елементи по етажите...';
+
+  @override
+  String get architectCopyToStoreys => 'Копирай по етажи...';
+
+  @override
+  String get architectCopyToStoreysTooltip =>
+      'Копиране на избраните елементи към други етажи';
+
+  @override
+  String get architectManageStoreys => 'Управление на етажи...';
+
+  @override
+  String get architectStoreysScreenTitle => 'Етажи и типови разпределения';
+
+  @override
+  String get architectCopySourceStorey => 'Изходен етаж (Шаблон)';
+
+  @override
+  String get architectCopyTargetStoreys => 'Целеви етажи';
+
+  @override
+  String get architectCopyAllStoreyElements => 'Цяло етажно разпределение';
+
+  @override
+  String architectCopySelectedOnly(int count) {
+    return 'Само избраните елементи ($count)';
+  }
+
+  @override
+  String get architectCopyModeTitle => 'Режим на пренос';
+
+  @override
+  String get architectCopyModeReplace => 'Замяна на съществуващите';
+
+  @override
+  String get architectCopyModeReplaceHelp =>
+      'Изчиства старите елементи от избраните типове на целевите етажи';
+
+  @override
+  String get architectCopyModeMerge => 'Обединяване (добавяне)';
+
+  @override
+  String get architectCopyModeMergeHelp =>
+      'Запазва съществуващите елементи и добавя новите към тях';
+
+  @override
+  String get architectAdjustWallHeightsToStorey =>
+      'Адаптирай височината на стените към етажа';
+
+  @override
+  String get architectAdjustElevationMarkers =>
+      'Преизчисли височинните коти към целевото ниво';
+
+  @override
+  String get architectPreserveGroups => 'Запази групите от елементи';
+
+  @override
+  String get architectSelectAllAbove => 'Всички над текущия';
+
+  @override
+  String get architectSelectAllStoreys => 'Всички етажи';
+
+  @override
+  String get architectClearStoreySelection => 'Изчисти';
+
+  @override
+  String get architectBatchAddStoreys => 'Генерирай типови етажи...';
+
+  @override
+  String get architectBatchAddCount => 'Брой етажи';
+
+  @override
+  String get architectBatchAddHeight => 'Височина на етаж (m)';
+
+  @override
+  String get architectBatchAddPrefix => 'Префикс на името';
+
+  @override
+  String get architectBatchAddButton => 'Генерирай етажи';
+
+  @override
+  String get architectCopyElementsButton => 'Копирай елементи';
+
+  @override
+  String architectCopySuccess(int count, int storeys) {
+    String _temp0 = intl.Intl.pluralLogic(
+      storeys,
+      locale: localeName,
+      other: '$storeys етажа',
+      one: '1 етаж',
+    );
+    return 'Успешно копирани $count елемента към $_temp0';
+  }
+
+  @override
+  String get architectNoTargetStoreysSelected =>
+      'Моля, изберете поне един целеви етаж';
+
+  @override
+  String get architectNoElementsSelected => 'Няма избрани елементи за копиране';
+
+  @override
+  String get architectCategoryWalls => 'Стени, врати и прозорци';
+
+  @override
+  String get architectCategoryColumns => 'Колони';
+
+  @override
+  String get architectCategoryBeams => 'Греди';
+
+  @override
+  String get architectCategorySlabs => 'Плочи';
+
+  @override
+  String get architectCategoryZones => 'Зони и помещения';
+
+  @override
+  String get architectCategoryStairsOpenings => 'Стълби и отвори';
+
+  @override
+  String get architectCategoryDimensions => 'Оразмеряване и коти';
+
+  @override
+  String get architectCategoryDrafting2D => '2D CAD и текстове';
+
+  @override
+  String get architectCategoryComponents => 'Компоненти и сифони';
+
+  @override
+  String get architectCategoryRoofs => 'Покриви';
+
+  @override
+  String get architectStoreyElevationLabel => 'Кота';
+
+  @override
+  String get architectStoreyHeightLabel => 'Височина';
+
+  @override
+  String architectStoreyElementsCount(int count) {
+    return '$count елемента';
+  }
+
+  @override
+  String get architectAddStoreyAbove => 'Добави горен етаж';
+
+  @override
+  String architectDeleteStoreyConfirm(String name) {
+    return 'Изтриване на етаж $name? Всички елементи на него ще бъдат изтрити.';
+  }
+
+  @override
+  String get architectTypicalFloorBadge => 'Типов етаж';
+
+  @override
+  String get architectPlanPreviewTitle => 'Преглед на разпределението';
+
+  @override
+  String get architectStoreyStackTab => 'Етажен стек';
+
+  @override
+  String get architectCopyStoreyTab => 'Копиране';
+
+  @override
+  String get architectCopyCategoriesTitle => 'Категории за пренос';
+
+  @override
+  String get architectNoDrawnElements => 'Няма начертани елементи';
 }
