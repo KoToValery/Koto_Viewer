@@ -12,6 +12,7 @@ class ArchitectLineEditing {
     endPoint: line.endPoint,
     thickness: .001,
     wallTypeId: line.id,
+    arcBulge: line.arcBulge,
   );
 
   static ArchitectProject geometry(ArchitectProject project, String storeyId) {
@@ -97,12 +98,14 @@ class _EditLines extends ArchitectModelCommand {
       (result[source.id] ??= []).add(
         wall.id == source.id &&
                 wall.startPoint == source.startPoint &&
-                wall.endPoint == source.endPoint
+                wall.endPoint == source.endPoint &&
+                wall.arcBulge == source.arcBulge
             ? source
             : source.copyWith(
                 id: wall.id,
                 startPoint: wall.startPoint,
                 endPoint: wall.endPoint,
+                arcBulge: wall.arcBulge,
               ),
       );
     }

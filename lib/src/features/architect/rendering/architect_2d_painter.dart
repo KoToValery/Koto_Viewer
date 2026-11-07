@@ -67,6 +67,12 @@ enum ArchitectTool {
   cadLine,
   cadRect,
   cadCircle,
+  cadArc,
+  mask,
+  leader,
+  spline,
+  cadEllipse,
+  roofSlope,
   measure,
   hatch,
   floorDrain,
@@ -627,6 +633,27 @@ class Architect2dPainter extends CustomPainter {
             ArchitectCadPrimitive(id: 'hatch-preview', type: CadPrimitiveType.hatch,
               startPoint: bounds.topLeft, endPoint: bounds.bottomRight,
               polygon: points, hatchPattern: activeHatchPattern, colorValue: activeHatchColorValue),
+          ]), zoomScale: zoomScale, dimensionScale: _project.dimensionScale);
+      }
+      if (activeTool == ArchitectTool.mask && slabDraftPoints.length >= 2 &&
+          (slabCandidatePoint != null || slabDraftPoints.length >= 3)) {
+        final points = [...slabDraftPoints, ?slabCandidatePoint];
+        final bounds = ArchitectSceneGeometry.boundsOf(points);
+        ArchitectElementsPainterHelper.drawCadPrimitives(canvas: canvas,
+          storey: ArchitectStorey(id: 'preview', name: '', cadPrimitives: [
+            ArchitectCadPrimitive(id: 'mask-preview', type: CadPrimitiveType.mask,
+              startPoint: bounds.topLeft, endPoint: bounds.bottomRight,
+              polygon: points, maskBorder: true),
+          ]), zoomScale: zoomScale, dimensionScale: _project.dimensionScale);
+      }
+      if (activeTool == ArchitectTool.spline && slabDraftPoints.isNotEmpty && slabCandidatePoint != null) {
+        final points = [...slabDraftPoints, slabCandidatePoint!];
+        final bounds = ArchitectSceneGeometry.boundsOf(points);
+        ArchitectElementsPainterHelper.drawCadPrimitives(canvas: canvas,
+          storey: ArchitectStorey(id: 'preview', name: '', cadPrimitives: [
+            ArchitectCadPrimitive(id: 'spline-preview', type: CadPrimitiveType.spline,
+              startPoint: bounds.topLeft, endPoint: bounds.bottomRight,
+              polygon: points, colorValue: 0xFF00E5FF, lineStyle: ArchitectLineStyle.dashed),
           ]), zoomScale: zoomScale, dimensionScale: _project.dimensionScale);
       }
       ArchitectElementsPainterHelper.drawSlabDrafting(
@@ -1989,6 +2016,111 @@ class Architect2dPainter extends CustomPainter {
       );
       tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
       canvas.restore();
+    }
+
+    if ((activeTool == ArchitectTool.cadLine || activeTool == ArchitectTool.cadArc) &&
+        activeDraftStart != null &&
+        activeDraftEnd != null) {
+      final p1 = activeDraftStart!;
+      final p2 = activeWallArcEnd ?? activeDraftEnd!;
+      final delta = p2 - p1;
+      if (delta.distance >= 1e-4) {
+        final bulge = activeWallArcEnd == null
+            ? 0.0
+            : activeWallArcBulge ?? ArchitectWallArc.through(p1, p2, activeDraftEnd!);
+        final prim = ArchitectCadPrimitive(
+          id: 'cad-preview',
+          type: (activeTool == ArchitectTool.cadArc || bulge.abs() > 1e-6)
+              ? CadPrimitiveType.arc
+              : CadPrimitiveType.line,
+          startPoint: p1,
+          endPoint: p2,
+          arcBulge: bulge,
+          colorValue: 0xFF00E5FF,
+          lineStyle: ArchitectLineStyle.dashed,
+        );
+        ArchitectElementsPainterHelper.drawCadPrimitives(
+          canvas: canvas,
+          storey: ArchitectStorey(id: 'preview', name: '', cadPrimitives: [prim]),
+          zoomScale: zoomScale,
+          dimensionScale: _project.dimensionScale,
+        );
+      }
+    }
+
+    if (activeTool == ArchitectTool.cadEllipse &&
+        activeDraftStart != null &&
+        activeDraftEnd != null) {
+      final center = activeDraftStart!;
+      final delta = activeDraftEnd! - center;
+      final rx = delta.distance;
+      if (rx >= 1e-4) {
+        final ry = rx * 0.6;
+        final rot = math.atan2(delta.dy, delta.dx) * 180 / math.pi;
+        final prim = ArchitectCadPrimitive(
+          id: 'ellipse-preview',
+          type: CadPrimitiveType.ellipse,
+          startPoint: center - Offset(rx, ry),
+          endPoint: center + Offset(rx, ry),
+          radiusX: rx,
+          radiusY: ry,
+          rotationDeg: rot,
+          colorValue: 0xFF00E5FF,
+          lineStyle: ArchitectLineStyle.dashed,
+        );
+        ArchitectElementsPainterHelper.drawCadPrimitives(
+          canvas: canvas,
+          storey: ArchitectStorey(id: 'preview', name: '', cadPrimitives: [prim]),
+          zoomScale: zoomScale,
+          dimensionScale: _project.dimensionScale,
+        );
+      }
+    }
+
+    if (activeTool == ArchitectTool.leader &&
+        activeDraftStart != null &&
+        activeDraftEnd != null) {
+      final p1 = activeDraftStart!;
+      final p2 = activeDraftEnd!;
+      if ((p2 - p1).distance >= 1e-4) {
+        final annot = ArchitectAnnotation(
+          id: 'leader-preview',
+          position: p2,
+          text: '',
+          hasLeader: true,
+          leaderArrowPoint: p1,
+          leaderLandingPoint: p2,
+          leaderLandingLength: 0.30,
+        );
+        ArchitectElementsPainterHelper.drawAnnotations(
+          palette: palette,
+          canvas: canvas,
+          storey: ArchitectStorey(id: 'preview', name: '', annotations: [annot]),
+          zoomScale: zoomScale,
+        );
+      }
+    }
+
+    if (activeTool == ArchitectTool.roofSlope && cursorPosition != null) {
+      for (final plane in _project.activeStorey.roofs) {
+        if (plane.containsPoint(cursorPosition!)) {
+          final arrow = ArchitectRoofSlopeArrow(
+            id: 'preview-arrow',
+            roofPlaneId: plane.id,
+            position: cursorPosition!,
+            direction: RoofSlopeDirection.downslope,
+            format: RoofSlopeFormat.percent,
+          );
+          ArchitectRoofPainterHelper.drawPlacedSlopeArrow(
+            canvas: canvas,
+            roof: plane,
+            arrow: arrow,
+            scale: zoomScale,
+            color: const Color(0xFF00E5FF),
+          );
+          break;
+        }
+      }
     }
   }
 

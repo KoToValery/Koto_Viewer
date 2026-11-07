@@ -7,6 +7,7 @@ import '../models/architect_column.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_scene_geometry.dart';
 import 'architect_wall_network.dart';
+import '../services/architect_spline_geometry.dart';
 
 /// View-only silhouettes of the nearest floors. They do not enter hit testing,
 /// snapping, project geometry, or the model's Undo history.
@@ -115,6 +116,30 @@ class ArchitectGhostStoreyPainter extends CustomPainter {
             canvas.drawCircle(
               primitive.startPoint,
               (primitive.endPoint - primitive.startPoint).distance,
+              stroke,
+            );
+          case CadPrimitiveType.arc:
+            final arc = primitive.arc;
+            if (arc != null) {
+              canvas.drawPath(arc.toPath(), stroke);
+            } else {
+              canvas.drawLine(primitive.startPoint, primitive.endPoint, stroke);
+            }
+          case CadPrimitiveType.mask:
+            polygon(primitive.polygonCorners);
+          case CadPrimitiveType.spline:
+            canvas.drawPath(
+              ArchitectSplineGeometry.generatePath(primitive.linePoints, closed: primitive.closed == true),
+              stroke,
+            );
+          case CadPrimitiveType.ellipse:
+            final center = (primitive.startPoint + primitive.endPoint) * 0.5;
+            canvas.drawOval(
+              Rect.fromCenter(
+                center: center,
+                width: (primitive.radiusX ?? 1.0) * 2,
+                height: (primitive.radiusY ?? 0.6) * 2,
+              ),
               stroke,
             );
         }

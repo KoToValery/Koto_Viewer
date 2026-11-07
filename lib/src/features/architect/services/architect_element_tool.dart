@@ -4,6 +4,7 @@ import '../rendering/architect_special_wall_geometry.dart';
 import 'architect_roof_drainage_geometry.dart';
 import 'architect_roof_junctions.dart';
 import '../models/architect_line_style.dart';
+import 'architect_spline_geometry.dart';
 // === SECTION: ARCHITECTURAL ELEMENT TOOL ===
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
@@ -442,8 +443,26 @@ class ArchitectElementTool extends ChangeNotifier {
     int colorValue = 0xFF9E9E9E,
     double strokeWidth = 1.0,
     ArchitectLineStyle lineStyle = ArchitectLineStyle.solid,
+    List<Offset>? polygon,
+    bool? closed,
+    double? arcBulge,
+    List<double>? bulges,
+    double? customWidth,
+    bool? maskBorder,
+    double? radiusX,
+    double? radiusY,
+    double? rotationDeg,
+    bool? isArc,
+    double? startAngleDeg,
+    double? endAngleDeg,
+    ArchitectLineEndCap startCap = ArchitectLineEndCap.none,
+    ArchitectLineEndCap endCap = ArchitectLineEndCap.none,
+    double capSize = 2.5,
   }) {
-    if ((end - start).distance < .001) {
+    if (type != CadPrimitiveType.spline &&
+        type != CadPrimitiveType.mask &&
+        type != CadPrimitiveType.polyline &&
+        (end - start).distance < .001) {
       return null;
     }
     final now = ArchitectElementId.next('element');
@@ -455,6 +474,21 @@ class ArchitectElementTool extends ChangeNotifier {
       colorValue: colorValue,
       strokeWidth: strokeWidth,
       lineStyle: lineStyle,
+      polygon: polygon,
+      closed: closed,
+      arcBulge: arcBulge,
+      bulges: bulges,
+      customWidth: customWidth,
+      maskBorder: maskBorder,
+      radiusX: radiusX,
+      radiusY: radiusY,
+      rotationDeg: rotationDeg,
+      isArc: isArc,
+      startAngleDeg: startAngleDeg,
+      endAngleDeg: endAngleDeg,
+      startCap: startCap,
+      endCap: endCap,
+      capSize: capSize,
     );
 
     return (
@@ -508,7 +542,9 @@ class ArchitectElementTool extends ChangeNotifier {
       openings: tool == ArchitectTool.opening ? storey.openings : [],
       stairs: tool == ArchitectTool.stair ? storey.stairs : [],
       dimensions: tool == ArchitectTool.dimension ? storey.dimensions : [],
-      annotations: tool == ArchitectTool.text ? storey.annotations : [],
+      annotations: (tool == ArchitectTool.text || tool == ArchitectTool.leader)
+          ? storey.annotations
+          : [],
       elevationMarkers: tool == ArchitectTool.level
           ? storey.elevationMarkers
           : [],
@@ -527,6 +563,10 @@ class ArchitectElementTool extends ChangeNotifier {
                     p.type == CadPrimitiveType.polyline,
               ArchitectTool.cadRect => p.type == CadPrimitiveType.rect,
               ArchitectTool.cadCircle => p.type == CadPrimitiveType.circle,
+              ArchitectTool.cadArc => p.type == CadPrimitiveType.arc,
+              ArchitectTool.mask => p.type == CadPrimitiveType.mask,
+              ArchitectTool.spline => p.type == CadPrimitiveType.spline,
+              ArchitectTool.cadEllipse => p.type == CadPrimitiveType.ellipse,
               ArchitectTool.hatch => p.type == CadPrimitiveType.hatch,
               _ => false,
             },
@@ -710,12 +750,45 @@ class ArchitectElementTool extends ChangeNotifier {
     for (final prim in storey.cadPrimitives) {
       if (prim.type == CadPrimitiveType.line ||
           prim.type == CadPrimitiveType.polyline) {
-        final points = prim.linePoints;
-        for (var i = 1; i < points.length; i++) {
-          if (_pointToSegmentDistance(point, points[i - 1], points[i]) <=
-              tolerance) {
+        if (prim.isCurved && prim.arc != null) {
+          final arc = prim.arc!;
+          final d = (point - arc.center).distance;
+          final param = arc.parameter(point);
+          if ((d - arc.radius).abs() <= tolerance && param >= -0.05 && param <= 1.05) {
             yield prim.id;
-            break;
+          }
+        } else {
+          final points = prim.linePoints;
+          for (var i = 1; i < points.length; i++) {
+            if (_pointToSegmentDistance(point, points[i - 1], points[i]) <=
+                tolerance) {
+              yield prim.id;
+              break;
+            }
+          }
+        }
+      } else if (prim.type == CadPrimitiveType.arc && prim.arc != null) {
+        final arc = prim.arc!;
+        final d = (point - arc.center).distance;
+        final param = arc.parameter(point);
+        if ((d - arc.radius).abs() <= tolerance && param >= -0.05 && param <= 1.05) {
+          yield prim.id;
+        }
+      } else if (prim.type == CadPrimitiveType.spline) {
+        if (ArchitectSplineGeometry.distanceToPoint(prim.linePoints, point, closed: prim.closed == true) <= tolerance) {
+          yield prim.id;
+        }
+      } else if (prim.type == CadPrimitiveType.ellipse) {
+        final rx = prim.radiusX ?? (prim.endPoint - prim.startPoint).distance;
+        final ry = prim.radiusY ?? (rx * 0.6);
+        if (rx > 1e-4 && ry > 1e-4) {
+          final rot = (prim.rotationDeg ?? 0) * math.pi / 180;
+          final delta = point - prim.startPoint;
+          final localX = delta.dx * math.cos(-rot) - delta.dy * math.sin(-rot);
+          final localY = delta.dx * math.sin(-rot) + delta.dy * math.cos(-rot);
+          final normD = (localX * localX) / (rx * rx) + (localY * localY) / (ry * ry);
+          if ((normD - 1.0).abs() <= (tolerance / math.min(rx, ry))) {
+            yield prim.id;
           }
         }
       } else if (prim.isPolygon) {

@@ -5,6 +5,8 @@ import 'architect_contour.dart';
 import 'architect_line_style.dart';
 import 'architect_hatch_pattern.dart';
 import 'architect_drawing_color.dart';
+import 'architect_wall_arc.dart';
+export 'architect_wall_arc.dart';
 // === SECTION: ARCHITECTURAL ELEMENT MODELS ===
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -838,6 +840,74 @@ class ArchitectElevationMarker {
 // 7. ARCHITECTURAL TEXT ANNOTATION
 // ===========================================================================
 
+enum ArchitectLineEndCap {
+  none,
+  arrowFilled,
+  arrowOpen,
+  dotFilled,
+  dotOpen,
+  tick,
+}
+
+enum RoofSlopeFormat { percent, degree, both }
+enum RoofSlopeDirection { downslope, upslope }
+
+class ArchitectRoofSlopeArrow {
+  final String id;
+  final String roofPlaneId;
+  final Offset position;
+  final RoofSlopeFormat format;
+  final RoofSlopeDirection direction;
+  final double arrowLength;
+
+  const ArchitectRoofSlopeArrow({
+    required this.id,
+    required this.roofPlaneId,
+    required this.position,
+    this.format = RoofSlopeFormat.percent,
+    this.direction = RoofSlopeDirection.downslope,
+    this.arrowLength = 1.2,
+  });
+
+  ArchitectRoofSlopeArrow copyWith({
+    String? id,
+    String? roofPlaneId,
+    Offset? position,
+    RoofSlopeFormat? format,
+    RoofSlopeDirection? direction,
+    double? arrowLength,
+  }) => ArchitectRoofSlopeArrow(
+    id: id ?? this.id,
+    roofPlaneId: roofPlaneId ?? this.roofPlaneId,
+    position: position ?? this.position,
+    format: format ?? this.format,
+    direction: direction ?? this.direction,
+    arrowLength: arrowLength ?? this.arrowLength,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'roofPlaneId': roofPlaneId,
+    'position': {'x': position.dx, 'y': position.dy},
+    'format': format.name,
+    'direction': direction.name,
+    'arrowLength': arrowLength,
+  };
+
+  factory ArchitectRoofSlopeArrow.fromJson(Map<String, dynamic> json) =>
+      ArchitectRoofSlopeArrow(
+        id: json['id'] as String,
+        roofPlaneId: json['roofPlaneId'] as String? ?? '',
+        position: Offset(
+          (json['position']['x'] as num).toDouble(),
+          (json['position']['y'] as num).toDouble(),
+        ),
+        format: RoofSlopeFormat.values.where((f) => f.name == json['format']).firstOrNull ?? RoofSlopeFormat.percent,
+        direction: RoofSlopeDirection.values.where((d) => d.name == json['direction']).firstOrNull ?? RoofSlopeDirection.downslope,
+        arrowLength: (json['arrowLength'] as num?)?.toDouble() ?? 1.2,
+      );
+}
+
 class ArchitectAnnotation {
   final String id;
   final Offset position;
@@ -851,6 +921,14 @@ class ArchitectAnnotation {
   final bool italic, underline;
   final int colorValue;
 
+  /// Multileader extensions
+  final bool hasLeader;
+  final Offset? leaderArrowPoint;
+  final Offset? leaderLandingPoint;
+  final ArchitectLineEndCap leaderArrowStyle;
+  final double leaderArrowSize;
+  final double leaderLandingLength;
+
   const ArchitectAnnotation({
     required this.id,
     required this.position,
@@ -862,6 +940,12 @@ class ArchitectAnnotation {
     this.italic = false,
     this.underline = false,
     this.colorValue = 0xFF212121,
+    this.hasLeader = false,
+    this.leaderArrowPoint,
+    this.leaderLandingPoint,
+    this.leaderArrowStyle = ArchitectLineEndCap.arrowFilled,
+    this.leaderArrowSize = 2.5,
+    this.leaderLandingLength = 0.8,
   });
 
   ArchitectAnnotation copyWith({
@@ -875,6 +959,12 @@ class ArchitectAnnotation {
     bool? italic,
     bool? underline,
     int? colorValue,
+    bool? hasLeader,
+    Offset? leaderArrowPoint,
+    Offset? leaderLandingPoint,
+    ArchitectLineEndCap? leaderArrowStyle,
+    double? leaderArrowSize,
+    double? leaderLandingLength,
   }) => ArchitectAnnotation(
     id: id ?? this.id,
     position: position ?? this.position,
@@ -886,6 +976,12 @@ class ArchitectAnnotation {
     italic: italic ?? this.italic,
     underline: underline ?? this.underline,
     colorValue: colorValue ?? this.colorValue,
+    hasLeader: hasLeader ?? this.hasLeader,
+    leaderArrowPoint: leaderArrowPoint ?? this.leaderArrowPoint,
+    leaderLandingPoint: leaderLandingPoint ?? this.leaderLandingPoint,
+    leaderArrowStyle: leaderArrowStyle ?? this.leaderArrowStyle,
+    leaderArrowSize: leaderArrowSize ?? this.leaderArrowSize,
+    leaderLandingLength: leaderLandingLength ?? this.leaderLandingLength,
   );
 
   Map<String, dynamic> toJson() => {
@@ -899,6 +995,16 @@ class ArchitectAnnotation {
     'italic': italic,
     'underline': underline,
     'colorValue': colorValue,
+    if (hasLeader) ...{
+      'hasLeader': true,
+      if (leaderArrowPoint != null)
+        'leaderArrowPoint': {'x': leaderArrowPoint!.dx, 'y': leaderArrowPoint!.dy},
+      if (leaderLandingPoint != null)
+        'leaderLandingPoint': {'x': leaderLandingPoint!.dx, 'y': leaderLandingPoint!.dy},
+      'leaderArrowStyle': leaderArrowStyle.name,
+      'leaderArrowSize': leaderArrowSize,
+      'leaderLandingLength': leaderLandingLength,
+    },
   };
 
   factory ArchitectAnnotation.fromJson(Map<String, dynamic> json) =>
@@ -923,14 +1029,43 @@ class ArchitectAnnotation {
         italic: json['italic'] == true,
         underline: json['underline'] == true,
         colorValue: (json['colorValue'] as num?)?.toInt() ?? 0xFF212121,
+        hasLeader: json['hasLeader'] == true,
+        leaderArrowPoint: json['leaderArrowPoint'] is Map
+            ? Offset(
+                (json['leaderArrowPoint']['x'] as num).toDouble(),
+                (json['leaderArrowPoint']['y'] as num).toDouble(),
+              )
+            : null,
+        leaderLandingPoint: json['leaderLandingPoint'] is Map
+            ? Offset(
+                (json['leaderLandingPoint']['x'] as num).toDouble(),
+                (json['leaderLandingPoint']['y'] as num).toDouble(),
+              )
+            : null,
+        leaderArrowStyle: ArchitectLineEndCap.values
+                .where((c) => c.name == json['leaderArrowStyle'])
+                .firstOrNull ??
+            ArchitectLineEndCap.arrowFilled,
+        leaderArrowSize: (json['leaderArrowSize'] as num?)?.toDouble() ?? 2.5,
+        leaderLandingLength: (json['leaderLandingLength'] as num?)?.toDouble() ?? 0.8,
       );
 }
 
 // ===========================================================================
-// 8. 2D CAD PRIMITIVES (LINE, RECT, CIRCLE)
+// 8. 2D CAD PRIMITIVES (LINE, RECT, CIRCLE, ARC, MASK, SPLINE, ELLIPSE)
 // ===========================================================================
 
-enum CadPrimitiveType { line, rect, circle, hatch, polyline }
+enum CadPrimitiveType {
+  line,
+  rect,
+  circle,
+  hatch,
+  polyline,
+  arc,
+  mask,
+  spline,
+  ellipse,
+}
 
 class ArchitectCadPrimitive {
   // Publication renders eight legacy stroke units per paper millimetre.
@@ -952,6 +1087,27 @@ class ArchitectCadPrimitive {
   final double hatchScale, hatchAngle;
   final bool hatchBorder;
 
+  /// Curvature, polyline segment bulges, and width
+  final double? arcBulge;
+  final List<double>? bulges;
+  final double? customWidth;
+
+  /// Mask frame border
+  final bool? maskBorder;
+
+  /// Ellipse parameters
+  final double? radiusX;
+  final double? radiusY;
+  final double? rotationDeg;
+  final bool? isArc;
+  final double? startAngleDeg;
+  final double? endAngleDeg;
+
+  /// Line end caps
+  final ArchitectLineEndCap startCap;
+  final ArchitectLineEndCap endCap;
+  final double capSize;
+
   const ArchitectCadPrimitive({
     required this.id,
     this.holes = const [],
@@ -968,31 +1124,59 @@ class ArchitectCadPrimitive {
     this.hatchBorder = true,
     this.polygon,
     this.closed,
+    this.arcBulge,
+    this.bulges,
+    this.customWidth,
+    this.maskBorder,
+    this.radiusX,
+    this.radiusY,
+    this.rotationDeg,
+    this.isArc,
+    this.startAngleDeg,
+    this.endAngleDeg,
+    this.startCap = ArchitectLineEndCap.none,
+    this.endCap = ArchitectLineEndCap.none,
+    this.capSize = 2.5,
   });
 
+  bool get isCurved => arcBulge != null && arcBulge!.abs() > 1e-6;
+
+  ArchitectWallArc? get arc =>
+      (type == CadPrimitiveType.arc || (type == CadPrimitiveType.line && isCurved))
+          ? ArchitectWallArc(startPoint, endPoint, arcBulge ?? 0.0)
+          : null;
+
   List<Offset> get polygonCorners {
-    if (isClosedPolyline) return contourPoints;
+    if (isClosedPolyline || type == CadPrimitiveType.mask || (type == CadPrimitiveType.spline && closed == true)) {
+      return contourPoints;
+    }
     if (polygon != null) return polygon!;
+    if (type == CadPrimitiveType.arc && arc != null) {
+      return arc!.face(0, 0);
+    }
     final rect = Rect.fromPoints(startPoint, endPoint);
     return [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft];
   }
 
   bool get isClosedPolyline =>
-      type == CadPrimitiveType.polyline &&
+      (type == CadPrimitiveType.polyline || type == CadPrimitiveType.mask || type == CadPrimitiveType.spline) &&
       (closed ??
           (linePoints.length > 2 && linePoints.first == linePoints.last));
+
   List<Offset> get contourPoints =>
       isClosedPolyline && linePoints.first == linePoints.last
       ? linePoints.sublist(0, linePoints.length - 1)
       : linePoints;
+
   bool get isPolygon =>
       type == CadPrimitiveType.rect ||
       type == CadPrimitiveType.hatch ||
+      type == CadPrimitiveType.mask ||
       isClosedPolyline;
 
   /// Connected vertices; an explicit closed path exposes its closing segment.
   List<Offset> get linePoints {
-    final points = type == CadPrimitiveType.polyline
+    final points = (type == CadPrimitiveType.polyline || type == CadPrimitiveType.mask || type == CadPrimitiveType.spline)
         ? polygon ?? [startPoint, endPoint]
         : [startPoint, endPoint];
     return closed == true && points.length > 2 && points.first != points.last
@@ -1029,6 +1213,19 @@ class ArchitectCadPrimitive {
     bool? hatchBorder,
     List<Offset>? polygon,
     bool? closed,
+    double? arcBulge,
+    List<double>? bulges,
+    double? customWidth,
+    bool? maskBorder,
+    double? radiusX,
+    double? radiusY,
+    double? rotationDeg,
+    bool? isArc,
+    double? startAngleDeg,
+    double? endAngleDeg,
+    ArchitectLineEndCap? startCap,
+    ArchitectLineEndCap? endCap,
+    double? capSize,
   }) => ArchitectCadPrimitive(
     id: id ?? this.id,
     holes: holes ?? this.holes,
@@ -1051,13 +1248,27 @@ class ArchitectCadPrimitive {
     hatchBorder: hatchBorder ?? this.hatchBorder,
     polygon: polygon ?? this.polygon,
     closed: closed ?? this.closed ?? (isClosedPolyline ? true : null),
+    arcBulge: arcBulge ?? this.arcBulge,
+    bulges: bulges ?? this.bulges,
+    customWidth: customWidth ?? this.customWidth,
+    maskBorder: maskBorder ?? this.maskBorder,
+    radiusX: radiusX ?? this.radiusX,
+    radiusY: radiusY ?? this.radiusY,
+    rotationDeg: rotationDeg ?? this.rotationDeg,
+    isArc: isArc ?? this.isArc,
+    startAngleDeg: startAngleDeg ?? this.startAngleDeg,
+    endAngleDeg: endAngleDeg ?? this.endAngleDeg,
+    startCap: startCap ?? this.startCap,
+    endCap: endCap ?? this.endCap,
+    capSize: capSize ?? this.capSize,
   );
 
   Map<String, dynamic> toJson() => {
     'id': id,
     if (holes.isNotEmpty) 'holes': ArchitectContour.write(holes),
     'type': type.name,
-    if (type == CadPrimitiveType.polyline) 'closed': isClosedPolyline,
+    if (type == CadPrimitiveType.polyline || type == CadPrimitiveType.mask || type == CadPrimitiveType.spline)
+      'closed': isClosedPolyline,
     'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'colorValue': colorValue,
@@ -1074,6 +1285,19 @@ class ArchitectCadPrimitive {
       'polygon': [
         for (final p in polygon!) {'x': p.dx, 'y': p.dy},
       ],
+    if (arcBulge != null) 'arcBulge': arcBulge,
+    if (bulges != null) 'bulges': bulges,
+    if (customWidth != null) 'customWidth': customWidth,
+    if (maskBorder != null) 'maskBorder': maskBorder,
+    if (radiusX != null) 'radiusX': radiusX,
+    if (radiusY != null) 'radiusY': radiusY,
+    if (rotationDeg != null) 'rotationDeg': rotationDeg,
+    if (isArc != null) 'isArc': isArc,
+    if (startAngleDeg != null) 'startAngleDeg': startAngleDeg,
+    if (endAngleDeg != null) 'endAngleDeg': endAngleDeg,
+    if (startCap != ArchitectLineEndCap.none) 'startCap': startCap.name,
+    if (endCap != ArchitectLineEndCap.none) 'endCap': endCap.name,
+    if (capSize != 2.5) 'capSize': capSize,
   };
 
   factory ArchitectCadPrimitive.fromJson(Map<String, dynamic> json) =>
@@ -1117,5 +1341,26 @@ class ArchitectCadPrimitive {
               ),
             )
             .toList(),
+        arcBulge: (json['arcBulge'] as num?)?.toDouble(),
+        bulges: (json['bulges'] as List?)
+            ?.map((b) => (b as num).toDouble())
+            .toList(),
+        customWidth: (json['customWidth'] as num?)?.toDouble(),
+        maskBorder: json['maskBorder'] as bool?,
+        radiusX: (json['radiusX'] as num?)?.toDouble(),
+        radiusY: (json['radiusY'] as num?)?.toDouble(),
+        rotationDeg: (json['rotationDeg'] as num?)?.toDouble(),
+        isArc: json['isArc'] as bool?,
+        startAngleDeg: (json['startAngleDeg'] as num?)?.toDouble(),
+        endAngleDeg: (json['endAngleDeg'] as num?)?.toDouble(),
+        startCap: ArchitectLineEndCap.values
+                .where((c) => c.name == json['startCap'])
+                .firstOrNull ??
+            ArchitectLineEndCap.none,
+        endCap: ArchitectLineEndCap.values
+                .where((c) => c.name == json['endCap'])
+                .firstOrNull ??
+            ArchitectLineEndCap.none,
+        capSize: (json['capSize'] as num?)?.toDouble() ?? 2.5,
       );
 }

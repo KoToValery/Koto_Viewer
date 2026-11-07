@@ -1,3 +1,4 @@
+import 'architect_spline_geometry.dart';
 import '../rendering/architect_annotation_layout.dart';
 import '../widgets/architect_elevation_labels.dart';
 import '../models/architect_contour.dart';
@@ -53,6 +54,12 @@ class ArchitectSelection {
     'spanLength',
     'normalOffset',
     'frameWidth',
+    'capSize',
+    'customWidth',
+    'arcBulge',
+    'radiusX',
+    'radiusY',
+    'arrowLength',
   };
   static Iterable<Map<String, dynamic>> records(
     Map<String, dynamic> json,
@@ -341,13 +348,33 @@ class ArchitectSelection {
       if (p.id == id &&
           (p.type == CadPrimitiveType.line ||
               p.type == CadPrimitiveType.polyline)) {
+        if (p.isCurved && p.arc != null) {
+          return path..addPolygon(p.arc!.face(0, 0), false);
+        }
         return path..addPolygon(p.linePoints, false);
+      }
+      if (p.id == id && p.type == CadPrimitiveType.arc && p.arc != null) {
+        return path..addPolygon(p.arc!.face(0, 0), false);
+      }
+      if (p.id == id && p.type == CadPrimitiveType.spline) {
+        return ArchitectSplineGeometry.generatePath(p.linePoints, closed: p.closed == true);
       }
       if (p.id == id && p.type == CadPrimitiveType.circle) {
         return path..addOval(
           Rect.fromCircle(
             center: p.startPoint,
             radius: (p.endPoint - p.startPoint).distance,
+          ),
+        );
+      }
+      if (p.id == id && p.type == CadPrimitiveType.ellipse) {
+        final rx = p.radiusX ?? (p.endPoint - p.startPoint).distance;
+        final ry = p.radiusY ?? (rx * 0.6);
+        return path..addOval(
+          Rect.fromCenter(
+            center: p.startPoint,
+            width: rx * 2,
+            height: ry * 2,
           ),
         );
       }
@@ -578,6 +605,14 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
                 )
                 .toJson(),
           );
+          continue;
+        }
+        if ({'startCap', 'endCap', 'maskBorder', 'isArc', 'leaderArrowStyle'}.contains(value.key)) {
+          if (value.key == 'maskBorder' || value.key == 'isArc') {
+            e[value.key] = value.value == 'true';
+          } else {
+            e[value.key] = value.value;
+          }
           continue;
         }
         if (isText &&

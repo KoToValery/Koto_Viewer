@@ -64,6 +64,13 @@
 | **hatch** | L7025, L8043, L11392 | `_commitHatch` | `ArchitectHatchPicker` |
 | **services** | L7025, L9633, L12725 | `_commitServicePlacement` | Service component selector |
 | **stair** | L7025, L8043, L13104 | `_commitStairDraft` | `ArchitectElementPropertiesDialog` |
+| **cadLine** | L7025, L10157, L14140 | `_commitCurrentWallSegment`, `_commitLineArc` | `_lineStyleControl`, `_showLineCapsDialog`, polyline width |
+| **cadArc** | L7025, L10157, L12624 | `_commitLineArc`, `_commitWallArc` | Arc radius HUD (`R=`), line style control |
+| **mask** | L7025, L10310, L13000 | `_commitMask`, `_elementTool.cancelSlabDrafting` | Mask HUD bar, border toggle checkbox |
+| **leader** | L7025, L10212, L13380 | `_promptAddLeaderAnnotation` | Multileader HUD bar, note dialog |
+| **spline** | L7025, L10310, L13000 | `_commitSpline` | Spline HUD bar, Catmull-Rom Bezier preview |
+| **cadEllipse** | L7025, L10212, L13395 | `_commitCadEllipse` | Ellipse HUD bar, line style control |
+| **roofSlope** | L7025, L10315, L13410 | `_commitRoofSlopeArrow` | Roof slope HUD bar (format chips %, °, both; reverse arrow) |
 
 ---
 
@@ -80,6 +87,14 @@
 - `_marqueeTool` (`ArchitectMarqueeTool`): Multi-select rectangle logic.
 - `_axisTool` (`ArchitectAxisTool`): Dynamic grid axis placement controller.
 - `_zoneTool` (`ArchitectZoneTool`): Zone polygon drafting state.
+- `_activeLineStartCap` / `_activeLineEndCap` (`ArchitectLineEndCap`): Active line start/end terminating caps (arrows, dots, ticks).
+- `_activeLineCapSize` (`double`): Size in meters for line terminating end caps.
+- `_activePolylineWidth` (`double?`): Custom thickness for polyline segments.
+- `_polylineArcSegmentMode` (`bool`): Mixed polyline arc segment toggle.
+- `_maskBorder` (`bool`): Mask / wipeout border frame visibility.
+- `_activeRoofSlopeFormat` (`RoofSlopeFormat`): Roof slope display format (`percent`, `degree`, `both`).
+- `_activeRoofSlopeDirection` (`RoofSlopeDirection`): Roof slope arrow direction (`downslope`, `upslope`).
+- `_activeLeaderArrowStyle` (`ArchitectLineEndCap`): Leader arrow head terminating style.
 
 ---
 

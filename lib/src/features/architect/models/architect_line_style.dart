@@ -15,9 +15,10 @@ class ArchitectLineStyle {
   });
 
   static const solid = ArchitectLineStyle(id: 'solid', segmentsMm: []);
+  static const dashed = ArchitectLineStyle(id: 'dashed', segmentsMm: [3, 1.5]);
   static const presets = [
     solid,
-    ArchitectLineStyle(id: 'dashed', segmentsMm: [3, 1.5]),
+    dashed,
     ArchitectLineStyle(id: 'shortDashed', segmentsMm: [1.5, 1]),
     ArchitectLineStyle(id: 'longDashed', segmentsMm: [6, 2]),
     ArchitectLineStyle(id: 'dotted', segmentsMm: [.25, 1]),

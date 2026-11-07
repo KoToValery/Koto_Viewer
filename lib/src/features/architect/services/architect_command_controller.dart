@@ -1975,10 +1975,14 @@ class UpdateArchitectPolyline extends ArchitectModelCommand {
     required this.elementId,
     required this.points,
     this.closed,
+    this.bulges,
+    this.customWidth,
   });
   final String storeyId, elementId;
   final List<Offset> points;
   final bool? closed;
+  final List<double>? bulges;
+  final double? customWidth;
   @override
   ArchitectProject apply(ArchitectProject project) {
     final floor = ArchitectModelCommand.storey(project, storeyId);
@@ -2008,6 +2012,8 @@ class UpdateArchitectPolyline extends ArchitectModelCommand {
                     startPoint: vertices.first,
                     endPoint: vertices.last,
                     closed: close,
+                    bulges: bulges ?? p.bulges,
+                    customWidth: customWidth ?? p.customWidth,
                   )
                 : p,
         ],

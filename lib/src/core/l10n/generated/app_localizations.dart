@@ -7103,6 +7103,210 @@ abstract class AppLocalizations {
   /// **'Circle'**
   String get architectToolCadCircle;
 
+  /// CAD arc tool
+  ///
+  /// In en, this message translates to:
+  /// **'Arc'**
+  String get architectToolCadArc;
+
+  /// CAD wipeout mask tool
+  ///
+  /// In en, this message translates to:
+  /// **'Mask'**
+  String get architectToolMask;
+
+  /// Multileader annotation tool
+  ///
+  /// In en, this message translates to:
+  /// **'Multileader'**
+  String get architectToolLeader;
+
+  /// Spline curve tool
+  ///
+  /// In en, this message translates to:
+  /// **'Spline'**
+  String get architectToolSpline;
+
+  /// CAD ellipse tool
+  ///
+  /// In en, this message translates to:
+  /// **'Ellipse'**
+  String get architectToolCadEllipse;
+
+  /// Roof slope arrow tool
+  ///
+  /// In en, this message translates to:
+  /// **'Roof Slope'**
+  String get architectToolRoofSlope;
+
+  /// Line start cap style
+  ///
+  /// In en, this message translates to:
+  /// **'Start Element'**
+  String get architectLineStartCap;
+
+  /// Line end cap style
+  ///
+  /// In en, this message translates to:
+  /// **'End Element'**
+  String get architectLineEndCap;
+
+  /// No line end element
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get architectLineCapNone;
+
+  /// Filled arrow line end
+  ///
+  /// In en, this message translates to:
+  /// **'Filled Arrow'**
+  String get architectLineCapArrowFilled;
+
+  /// Open arrow line end
+  ///
+  /// In en, this message translates to:
+  /// **'Open Arrow'**
+  String get architectLineCapArrowOpen;
+
+  /// Filled dot line end
+  ///
+  /// In en, this message translates to:
+  /// **'Filled Dot'**
+  String get architectLineCapDotFilled;
+
+  /// Open dot line end
+  ///
+  /// In en, this message translates to:
+  /// **'Open Dot'**
+  String get architectLineCapDotOpen;
+
+  /// Architectural tick line end
+  ///
+  /// In en, this message translates to:
+  /// **'Architectural Tick'**
+  String get architectLineCapTick;
+
+  /// Size of line end elements
+  ///
+  /// In en, this message translates to:
+  /// **'End Cap Size'**
+  String get architectLineCapSize;
+
+  /// Toggle curved line mode
+  ///
+  /// In en, this message translates to:
+  /// **'Curved Line'**
+  String get architectLineCurved;
+
+  /// Hint for curved line
+  ///
+  /// In en, this message translates to:
+  /// **'Bend line into a circular arc'**
+  String get architectLineCurveHint;
+
+  /// Mask border frame
+  ///
+  /// In en, this message translates to:
+  /// **'Border Frame'**
+  String get architectMaskBorder;
+
+  /// Show mask border
+  ///
+  /// In en, this message translates to:
+  /// **'Show Border Frame'**
+  String get architectMaskBorderShow;
+
+  /// Polyline arc segment mode
+  ///
+  /// In en, this message translates to:
+  /// **'Arc Segment'**
+  String get architectPolylineModeArc;
+
+  /// Polyline straight segment mode
+  ///
+  /// In en, this message translates to:
+  /// **'Line Segment'**
+  String get architectPolylineModeLine;
+
+  /// Close polyline contour
+  ///
+  /// In en, this message translates to:
+  /// **'Close contour'**
+  String get architectPolylineClose;
+
+  /// Polyline width
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get architectPolylineWidth;
+
+  /// Roof slope display format
+  ///
+  /// In en, this message translates to:
+  /// **'Slope Format'**
+  String get architectRoofSlopeFormat;
+
+  /// Roof slope in percent
+  ///
+  /// In en, this message translates to:
+  /// **'Percent (%)'**
+  String get architectRoofSlopePercent;
+
+  /// Roof slope in degrees
+  ///
+  /// In en, this message translates to:
+  /// **'Degrees (°)'**
+  String get architectRoofSlopeDegree;
+
+  /// Roof slope in degrees and percent
+  ///
+  /// In en, this message translates to:
+  /// **'Both (° and %)'**
+  String get architectRoofSlopeBoth;
+
+  /// Reverse slope arrow direction
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse Direction'**
+  String get architectRoofSlopeReverse;
+
+  /// Hint to place roof slope arrow
+  ///
+  /// In en, this message translates to:
+  /// **'Tap on a roof plane to place a slope arrow'**
+  String get architectRoofSlopeHint;
+
+  /// Ellipse major radius
+  ///
+  /// In en, this message translates to:
+  /// **'Major Radius'**
+  String get architectEllipseMajorRadius;
+
+  /// Ellipse minor radius
+  ///
+  /// In en, this message translates to:
+  /// **'Minor Radius'**
+  String get architectEllipseMinorRadius;
+
+  /// Elliptical arc mode
+  ///
+  /// In en, this message translates to:
+  /// **'Elliptical Arc'**
+  String get architectEllipseArc;
+
+  /// Leader note
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get architectLeaderNote;
+
+  /// Prompt for leader note text
+  ///
+  /// In en, this message translates to:
+  /// **'Enter note text'**
+  String get architectLeaderPrompt;
+
   /// Window width label
   ///
   /// In en, this message translates to:
@@ -17855,6 +18059,48 @@ abstract class AppLocalizations {
   /// **'X-ray'**
   String get commandIconShadingXray;
 
+  /// No description provided for @commandIconMask.
+  ///
+  /// In en, this message translates to:
+  /// **'Mask (Wipeout)'**
+  String get commandIconMask;
+
+  /// No description provided for @commandIconMultileader.
+  ///
+  /// In en, this message translates to:
+  /// **'Multileader'**
+  String get commandIconMultileader;
+
+  /// No description provided for @commandIconSpline.
+  ///
+  /// In en, this message translates to:
+  /// **'Spline'**
+  String get commandIconSpline;
+
+  /// No description provided for @commandIconEllipse.
+  ///
+  /// In en, this message translates to:
+  /// **'Ellipse'**
+  String get commandIconEllipse;
+
+  /// No description provided for @commandIconRoofSlope.
+  ///
+  /// In en, this message translates to:
+  /// **'Roof slope'**
+  String get commandIconRoofSlope;
+
+  /// No description provided for @commandIconLineArrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrow line'**
+  String get commandIconLineArrow;
+
+  /// No description provided for @commandIconLineDot.
+  ///
+  /// In en, this message translates to:
+  /// **'Dot line'**
+  String get commandIconLineDot;
+
   /// No description provided for @commandUiCopyThisError.
   ///
   /// In en, this message translates to:
@@ -19715,12 +19961,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Underline'**
   String get architectTextUnderline;
-
-  /// No description provided for @architectPolylineClose.
-  ///
-  /// In en, this message translates to:
-  /// **'Close contour'**
-  String get architectPolylineClose;
 
   /// No description provided for @architectPolylineOpen.
   ///

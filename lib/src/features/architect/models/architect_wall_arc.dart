@@ -98,6 +98,13 @@ class ArchitectWallArc {
     ];
   }
 
+  Path toPath() {
+    final path = Path()..moveTo(start.dx, start.dy);
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    path.arcTo(rect, startAngle, sweep, false);
+    return path;
+  }
+
   List<Offset> lineIntersections(Offset a, Offset b, {bool finite = true}) {
     final d = b - a, f = a - center, aa = d.dx * d.dx + d.dy * d.dy;
     if (aa < 1e-12) return <Offset>[];

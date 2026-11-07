@@ -1121,6 +1121,51 @@ class _ArchitectElementPropertiesDialogState
               value: (texts['closed'] ?? '${_common('closed')}') == 'true',
               onChanged: (v) => setState(() => texts['closed'] = '$v'),
             ),
+          if (widget.elementIds.every(
+            (id) => widget.project.activeStorey.cadPrimitives.any(
+              (p) => p.id == id && (p.type == CadPrimitiveType.line || p.type == CadPrimitiveType.arc),
+            ),
+          )) ...[
+            DropdownButtonFormField<ArchitectLineEndCap>(
+              decoration: InputDecoration(labelText: l.architectLineStartCap),
+              value: ArchitectLineEndCap.values.where((c) => c.name == (texts['startCap'] ?? _common('startCap'))).firstOrNull ?? ArchitectLineEndCap.none,
+              items: [
+                DropdownMenuItem(value: ArchitectLineEndCap.none, child: Text(l.architectLineCapNone)),
+                DropdownMenuItem(value: ArchitectLineEndCap.arrowFilled, child: Text(l.architectLineCapArrowFilled)),
+                DropdownMenuItem(value: ArchitectLineEndCap.arrowOpen, child: Text(l.architectLineCapArrowOpen)),
+                DropdownMenuItem(value: ArchitectLineEndCap.dotFilled, child: Text(l.architectLineCapDotFilled)),
+                DropdownMenuItem(value: ArchitectLineEndCap.dotOpen, child: Text(l.architectLineCapDotOpen)),
+                DropdownMenuItem(value: ArchitectLineEndCap.tick, child: Text(l.architectLineCapTick)),
+              ],
+              onChanged: (v) => setState(() => texts['startCap'] = v?.name ?? 'none'),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<ArchitectLineEndCap>(
+              decoration: InputDecoration(labelText: l.architectLineEndCap),
+              value: ArchitectLineEndCap.values.where((c) => c.name == (texts['endCap'] ?? _common('endCap'))).firstOrNull ?? ArchitectLineEndCap.none,
+              items: [
+                DropdownMenuItem(value: ArchitectLineEndCap.none, child: Text(l.architectLineCapNone)),
+                DropdownMenuItem(value: ArchitectLineEndCap.arrowFilled, child: Text(l.architectLineCapArrowFilled)),
+                DropdownMenuItem(value: ArchitectLineEndCap.arrowOpen, child: Text(l.architectLineCapArrowOpen)),
+                DropdownMenuItem(value: ArchitectLineEndCap.dotFilled, child: Text(l.architectLineCapDotFilled)),
+                DropdownMenuItem(value: ArchitectLineEndCap.dotOpen, child: Text(l.architectLineCapDotOpen)),
+                DropdownMenuItem(value: ArchitectLineEndCap.tick, child: Text(l.architectLineCapTick)),
+              ],
+              onChanged: (v) => setState(() => texts['endCap'] = v?.name ?? 'none'),
+            ),
+          ],
+          if (widget.elementIds.every(
+            (id) => widget.project.activeStorey.cadPrimitives.any(
+              (p) => p.id == id && p.type == CadPrimitiveType.mask,
+            ),
+          ))
+            CheckboxListTile(
+              key: const ValueKey('architect-property-mask-border'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(l.architectMaskBorderShow),
+              value: (texts['maskBorder'] ?? '${_common('maskBorder')}') != 'false',
+              onChanged: (v) => setState(() => texts['maskBorder'] = '$v'),
+            ),
           for (final drain in widget.project.activeStorey.floorDrains.where(
             (d) => widget.elementIds.contains(d.id),
           ))

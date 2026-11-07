@@ -348,6 +348,23 @@ class ArchitectSnapGeometry {
             (primitive.endPoint - primitive.startPoint).distance,
             primitive.id,
           );
+        case CadPrimitiveType.arc:
+          edge(primitive.startPoint, primitive.endPoint, primitive.id);
+          final arc = primitive.arc;
+          if (arc != null) {
+            point(arc.center, 'Center', primitive.id);
+          }
+        case CadPrimitiveType.mask:
+          polygon(primitive.polygonCorners, primitive.id);
+        case CadPrimitiveType.spline:
+          final pts = primitive.polygonCorners;
+          for (var i = 0; i < pts.length; i++) {
+            point(pts[i], 'Vertex', primitive.id);
+            if (i > 0) edge(pts[i - 1], pts[i], primitive.id);
+          }
+        case CadPrimitiveType.ellipse:
+          final center = (primitive.startPoint + primitive.endPoint) * 0.5;
+          point(center, 'Center', primitive.id);
       }
     }
     for (final dimension in floor.dimensions) {

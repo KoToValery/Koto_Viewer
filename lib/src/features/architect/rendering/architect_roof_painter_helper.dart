@@ -8,6 +8,7 @@ import '../../bim_editing/geometry/bim_contour_drafting_geometry.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/architect_project.dart';
+import '../models/architect_elements.dart';
 import '../services/architect_roof_geometry.dart';
 import '../services/architect_roof_tool.dart';
 import '../services/architect_roof_junctions.dart';
@@ -421,7 +422,89 @@ class ArchitectRoofPainterHelper {
           ],
         );
       }
+
+      for (final arrow in roof.slopeArrows) {
+        drawPlacedSlopeArrow(
+          canvas: canvas,
+          roof: roof,
+          arrow: arrow,
+          scale: scale,
+          color: isSelected ? const Color(0xFFFFCC80) : baseColor,
+        );
+      }
     }
+  }
+
+  static void drawPlacedSlopeArrow({
+    required Canvas canvas,
+    required ArchitectRoofPlane roof,
+    required ArchitectRoofSlopeArrow arrow,
+    required double scale,
+    required Color color,
+  }) {
+    final scope = ArchitectTextScope.current;
+    if (scope != null) {
+      scale = 11 / scope.height(arrow.id, ArchitectAnnotationRole.symbol);
+    }
+    final label = roof.formatSlope(arrow.format);
+    final fontSize = 11.0 / scale;
+    final tp = ArchitectTextPainter(
+      elementId: arrow.id,
+      role: ArchitectAnnotationRole.symbol,
+      modelScale: 1,
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: ArchitectPaperStyle.ink,
+          fontSize: fontSize,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final center = arrow.position;
+    final slopeDir = arrow.direction == RoofSlopeDirection.upslope
+        ? roof.slopeDirection
+        : -roof.slopeDirection;
+    final arrowHalfLen = (arrow.arrowLength * 16.0).clamp(12.0, 36.0) / scale;
+    final start = center - slopeDir * arrowHalfLen;
+    final end = center + slopeDir * arrowHalfLen;
+
+    final arrowPaint = Paint()
+      ..color = color.withValues(alpha: 0.95)
+      ..strokeWidth = 1.6 / scale
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(start, end, arrowPaint);
+
+    final headLen = 6.0 / scale;
+    final perp = Offset(-slopeDir.dy, slopeDir.dx);
+    final head1 = end - slopeDir * headLen + perp * (headLen * 0.55);
+    final head2 = end - slopeDir * headLen - perp * (headLen * 0.55);
+    canvas.drawLine(end, head1, arrowPaint);
+    canvas.drawLine(end, head2, arrowPaint);
+
+    final padX = 4.0 / scale;
+    final padY = 2.0 / scale;
+    final labelOffset = center + Offset(-tp.width / 2, 6.0 / scale);
+    final bgRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        labelOffset.dx - padX,
+        labelOffset.dy - padY,
+        tp.width + padX * 2,
+        tp.height + padY * 2,
+      ),
+      Radius.circular(4.0 / scale),
+    );
+    canvas.drawRRect(
+      bgRect,
+      Paint()
+        ..color = ArchitectPaperStyle.rule.withValues(alpha: 0.15)
+        ..style = PaintingStyle.fill,
+    );
+    tp.paint(canvas, labelOffset);
   }
 
   /// Returns true if [worldPoint] hits the interactive knuckle handle of a Mansard roof.

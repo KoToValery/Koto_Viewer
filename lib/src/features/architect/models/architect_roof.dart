@@ -1,4 +1,5 @@
 import 'architect_contour.dart';
+import 'architect_elements.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. Enums (ArchitectRoofPreset, ArchitectRoofLayerRole, ArchitectRoofMaterial, ArchitectRoofEavesCut, AutoRoofType)
 // 2. ArchitectRoofLayer (Individual roof layer specification)
@@ -874,6 +875,9 @@ class ArchitectRoofPlane {
   /// If null, defaults to 45% of `maxSlopeRun`.
   final double? breakDistance;
 
+  /// User-placed slope arrows on this roof plane.
+  final List<ArchitectRoofSlopeArrow> slopeArrows;
+
   ArchitectRoofPlane({
     required this.id,
     this.holes = const [],
@@ -896,9 +900,22 @@ class ArchitectRoofPlane {
     this.isMansard = false,
     this.upperSlopeDegrees = 25.0,
     this.breakDistance,
+    this.slopeArrows = const [],
   }) : assembly =
            assembly ??
            ArchitectRoofAssembly.fromPreset(ArchitectRoofPreset.pitchedTiles);
+
+  String formatSlope(RoofSlopeFormat format, {bool upper = false}) {
+    final deg = upper ? upperSlopeDegrees : slopeDegrees;
+    final pct = upper ? upperSlopePercent : slopePercent;
+    final degStr = deg.toStringAsFixed(deg % 1 == 0 ? 0 : 1);
+    final pctStr = pct.round().toString();
+    return switch (format) {
+      RoofSlopeFormat.percent => '$pctStr%',
+      RoofSlopeFormat.degree => '$degStr°',
+      RoofSlopeFormat.both => '$degStr° ($pctStr%)',
+    };
+  }
 
   int get safeEavesEdgeIndex =>
       points.length < 2 ? 0 : eavesEdgeIndex.clamp(0, points.length - 1);
@@ -1204,6 +1221,7 @@ class ArchitectRoofPlane {
     double? upperSlopeDegrees,
     double? breakDistance,
     bool clearBreakDistance = false,
+    List<ArchitectRoofSlopeArrow>? slopeArrows,
   }) => ArchitectRoofPlane(
     id: id ?? this.id,
     holes: holes ?? this.holes,
@@ -1230,6 +1248,7 @@ class ArchitectRoofPlane {
     breakDistance: clearBreakDistance
         ? null
         : (breakDistance ?? this.breakDistance),
+    slopeArrows: slopeArrows ?? this.slopeArrows,
   );
 
   ArchitectRoofPlane clone() => copyWith();
@@ -1257,6 +1276,8 @@ class ArchitectRoofPlane {
     'isMansard': isMansard,
     'upperSlopeDegrees': upperSlopeDegrees,
     if (breakDistance != null) 'breakDistance': breakDistance,
+    if (slopeArrows.isNotEmpty)
+      'slopeArrows': slopeArrows.map((a) => a.toJson()).toList(),
   };
 
   factory ArchitectRoofPlane.fromJson(Map<String, dynamic> json) {
@@ -1297,6 +1318,10 @@ class ArchitectRoofPlane {
       upperSlopeDegrees:
           (json['upperSlopeDegrees'] as num?)?.toDouble() ?? 25.0,
       breakDistance: (json['breakDistance'] as num?)?.toDouble(),
+      slopeArrows: (json['slopeArrows'] as List?)
+              ?.map((a) => ArchitectRoofSlopeArrow.fromJson(a as Map<String, dynamic>))
+              .toList() ??
+          const [],
     );
   }
 

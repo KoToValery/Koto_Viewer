@@ -4489,8 +4489,54 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       : _draftArcExactBulge ??
           ArchitectWallArc.through(_draftStart!, _wallArcEnd!, _draftEnd!);
 
-  void _commitWallArc() {
+  void _commitLineArc() {
+    if (_wallArcEnd == null || _draftStart == null) return;
+    final bulge = _draftArcBulge;
+    if (bulge.abs() < 1e-6) {
+      _operationError();
+      return;
+    }
+    if (_activeTool == ArchitectTool.cadArc) {
+      final id = ArchitectElementId.next('arc');
+      _placeDraftSegment(
+        PlaceArchitectCadPrimitive(
+          storeyId: _project.activeStoreyId,
+          primitive: ArchitectCadPrimitive(
+            id: id,
+            type: CadPrimitiveType.arc,
+            startPoint: _draftStart!,
+            endPoint: _wallArcEnd!,
+            arcBulge: bulge,
+            colorValue: 0xFF9E9E9E,
+            lineStyle: _activeCadLineStyle,
+          ),
+        ),
+        id,
+        false,
+      );
+    } else {
+      _commitCurrentWallSegment(
+        _wallArcEnd!,
+        arcBulge: bulge,
+        continueChain: _cadPolylineMode,
+      );
+    }
+    setState(() {
+      _wallArcEnd = null;
+      if (!_cadPolylineMode) {
+        _draftStart = null;
+        _draftEnd = null;
+      }
+    });
+    _saveBiMProjectIfAttached();
+    HapticFeedback.lightImpact();
+  }
 
+  void _commitWallArc() {
+    if (_activeTool == ArchitectTool.cadLine || _activeTool == ArchitectTool.cadArc) {
+      _commitLineArc();
+      return;
+    }
     if (_wallArcEnd == null) return;
 
     final bulge = _draftArcBulge;
@@ -5387,6 +5433,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _transverseMove = false;
 
   ArchitectLineStyle _activeCadLineStyle = ArchitectLineStyle.solid;
+  ArchitectLineEndCap _activeLineStartCap = ArchitectLineEndCap.none;
+  ArchitectLineEndCap _activeLineEndCap = ArchitectLineEndCap.none;
+  double _activeLineCapSize = 0.20;
+  double? _activePolylineWidth;
+  bool _polylineArcSegmentMode = false;
+  bool _maskBorder = true;
+  RoofSlopeFormat _activeRoofSlopeFormat = RoofSlopeFormat.percent;
+  RoofSlopeDirection _activeRoofSlopeDirection = RoofSlopeDirection.down;
+  ArchitectAnnotationLeaderArrow _activeLeaderArrowStyle = ArchitectAnnotationLeaderArrow.closedFilled;
+  double _activeLeaderArrowSize = 0.18;
 
   ArchitectDrainShape _drainShape = ArchitectDrainShape.round;
 
@@ -5920,6 +5976,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool get _linearDraftTool =>
       _activeTool == ArchitectTool.wall ||
       _activeTool == ArchitectTool.cadLine ||
+      _activeTool == ArchitectTool.cadArc ||
       _activeTool == ArchitectTool.section ||
       _activeTool == ArchitectTool.elevation;
 
@@ -10143,9 +10200,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_linearDraftTool && _draftStart != null) {
 
-      if (_activeTool == ArchitectTool.wall &&
+      if ((_activeTool == ArchitectTool.wall || _activeTool == ArchitectTool.cadLine || _activeTool == ArchitectTool.cadArc) &&
 
-          _wallCurved &&
+          (_wallCurved || _activeTool == ArchitectTool.cadArc) &&
 
           _wallArcEnd != null) {
 
@@ -10193,10 +10250,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _activeTool == ArchitectTool.dimension ||
 
             _activeTool == ArchitectTool.cadLine ||
+      _activeTool == ArchitectTool.cadArc ||
 
             _activeTool == ArchitectTool.cadRect ||
 
             _activeTool == ArchitectTool.cadCircle ||
+            _activeTool == ArchitectTool.cadEllipse ||
+            _activeTool == ArchitectTool.leader ||
 
             _activeTool == ArchitectTool.measure)) {
 
@@ -10244,9 +10304,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    // 7. Slab or Roof drafting candidate
+    // 7. Slab, Mask, Spline or Roof drafting candidate
 
-    if ((_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain) &&
+    if ((_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain || _activeTool == ArchitectTool.mask || _activeTool == ArchitectTool.spline) &&
 
         _elementTool.slabDraftPoints.isNotEmpty) {
       if (_wallDirectionLocked) return;
@@ -10255,6 +10315,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _cursorModel = _elementTool.slabCandidatePoint;
 
+    } else if (_activeTool == ArchitectTool.roofSlope) {
+      _cursorModel = _snapElement(rawModel).point;
+      _repaintPreview();
+      return;
     } else if (_activeTool == ArchitectTool.roof) {
 
       final pt = _resolveRoofPoint(rawModel);
@@ -12603,13 +12667,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    // 4. In Wall tool
+    // 4. In Wall / Line / Arc tool
 
     if (_linearDraftTool) {
 
-      if (_activeTool == ArchitectTool.wall &&
+      if ((_activeTool == ArchitectTool.wall || _activeTool == ArchitectTool.cadLine || _activeTool == ArchitectTool.cadArc) &&
 
-          _wallCurved &&
+          (_wallCurved || _activeTool == ArchitectTool.cadArc) &&
 
           _wallArcEnd != null) {
 
@@ -12649,9 +12713,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _orientWallReference(snap.point);
 
-        if (_activeTool == ArchitectTool.wall &&
+        if ((_activeTool == ArchitectTool.wall || _activeTool == ArchitectTool.cadLine || _activeTool == ArchitectTool.cadArc) &&
 
-            _wallCurved &&
+            (_wallCurved || _activeTool == ArchitectTool.cadArc) &&
 
             (snap.point - _draftStart!).distance >= .001) {
 
@@ -12918,9 +12982,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    // 9. In Slab tool
+    // 9. In Slab / Mask / Spline tool
 
-    if (_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain) {
+    if (_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain || _activeTool == ArchitectTool.mask || _activeTool == ArchitectTool.spline) {
       if (_wallDirectionLocked) return;
 
       final pt = _resolveSlabPoint(rawModel);
@@ -12932,6 +12996,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           (pt - _elementTool.slabDraftPoints.first).distance <=
 
               math.min(16.0 / _currentScale, .20)) {
+
+        if (_activeTool == ArchitectTool.mask) { _commitMask(); return; }
+
+        if (_activeTool == ArchitectTool.spline) { _commitSpline(); return; }
 
         if (_activeTool == ArchitectTool.hatch) { _commitHatch(); return; }
 
@@ -13308,6 +13376,46 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       return;
 
+    }
+
+    // 14b. In Multileader tool
+    if (_activeTool == ArchitectTool.leader) {
+      if (_draftStart == null) {
+        final point = _snapElement(rawModel).point;
+        setState(() {
+          _draftStart = point;
+          _draftEnd = point;
+        });
+      } else {
+        final snap = _snapElement(rawModel, anchor: _draftStart);
+        final p1 = _draftStart!;
+        final p2 = snap.point;
+        _promptAddLeaderAnnotation(p1, p2);
+      }
+      return;
+    }
+
+    // 14c. In CAD Ellipse tool
+    if (_activeTool == ArchitectTool.cadEllipse) {
+      if (_draftStart == null) {
+        final point = _snapElement(rawModel).point;
+        setState(() {
+          _draftStart = point;
+          _draftEnd = point;
+        });
+      } else {
+        final snap = _snapElement(rawModel, anchor: _draftStart);
+        _draftEnd = snap.point;
+        _commitCadEllipse();
+      }
+      return;
+    }
+
+    // 14d. In Roof Slope Arrow tool
+    if (_activeTool == ArchitectTool.roofSlope) {
+      final point = _snapElement(rawModel).point;
+      _commitRoofSlopeArrow(point);
+      return;
     }
 
 
@@ -14054,6 +14162,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_draftStart == null) return;
 
+    if (_activeTool == ArchitectTool.cadArc) {
+      final end = targetPoint;
+      if ((end - _draftStart!).distance < .001) return;
+      final id = ArchitectElementId.next('arc');
+      _placeDraftSegment(
+        PlaceArchitectCadPrimitive(
+          storeyId: _project.activeStoreyId,
+          primitive: ArchitectCadPrimitive(
+            id: id,
+            type: CadPrimitiveType.arc,
+            startPoint: _draftStart!,
+            endPoint: end,
+            arcBulge: arcBulge,
+            colorValue: 0xFF9E9E9E,
+            lineStyle: _activeCadLineStyle,
+          ),
+        ),
+        id,
+        false,
+      );
+      setState(() {
+        _draftStart = null;
+        _draftEnd = null;
+        _wallArcEnd = null;
+        _wallDirectionLocked = false;
+        _wallPanelAnchor = null;
+        _activeSnapLabel = null;
+        _activeMagneticGuides = [];
+      });
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      return;
+    }
+
     if (_activeTool == ArchitectTool.cadLine) {
 
       if (_cadPolylineMode) {
@@ -14065,6 +14207,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ).firstOrNull;
         final chain = continueChain ?? true;
         final id = existing?.id ?? ArchitectElementId.next('polyline');
+        final segBulge = _polylineArcSegmentMode ? arcBulge : 0.0;
         if (existing == null) {
           _commands.execute(PlaceArchitectCadPrimitive(
             storeyId: _project.activeStoreyId,
@@ -14073,14 +14216,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               startPoint: _draftStart!, endPoint: end,
               polygon: [_draftStart!, end],
               colorValue: 0xFF9E9E9E, lineStyle: _activeCadLineStyle,
+              bulges: [segBulge],
+              customWidth: _activePolylineWidth,
               ),
           ),
       applyDraftingDefaults: true,
     );
         } else {
+          final existingBulges = existing.bulges ?? List.filled(existing.linePoints.length - 1, 0.0);
           _commands.execute(UpdateArchitectPolyline(
             storeyId: _project.activeStoreyId, elementId: id,
             points: [...existing.linePoints, end],
+            bulges: [...existingBulges, segBulge],
+            customWidth: _activePolylineWidth ?? existing.customWidth,
           ),
           );
         }
@@ -14125,6 +14273,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             colorValue: 0xFF9E9E9E,
 
             lineStyle: _activeCadLineStyle,
+
+            arcBulge: arcBulge,
+
+            startCap: _activeLineStartCap,
+
+            endCap: _activeLineEndCap,
+
+            capSize: _activeLineCapSize,
 
           ),
 
@@ -29498,13 +29654,207 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         Positioned(top: 8, left: 8, child: _hatchControl()),
 
+      if (_activeTool == ArchitectTool.mask && _effectiveSelection.isEmpty)
+        Positioned(
+          top: 8,
+          left: 8,
+          child: Material(
+            color: const Color(0xEE1E242C),
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Colors.white24),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const AppIcon(AppIconId.mask, size: 20, color: Colors.cyanAccent),
+                  const SizedBox(width: 8),
+                  Text(context.l10n.architectToolMask, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 8),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Checkbox(
+                        value: _maskBorder,
+                        onChanged: (v) => setState(() => _maskBorder = v ?? true),
+                      ),
+                      Text(context.l10n.architectMaskBorder, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    ],
+                  ),
+                  if (_elementTool.slabDraftPoints.length >= 3)
+                    IconButton(
+                      tooltip: context.l10n.applyAction,
+                      icon: const AppIcon(AppIconId.confirm, color: Colors.cyanAccent),
+                      onPressed: _commitMask,
+                    ),
+                  IconButton(
+                    tooltip: context.l10n.cancel,
+                    icon: const AppIcon(AppIconId.close, color: Colors.white70),
+                    onPressed: () => setState(_elementTool.cancelSlabDrafting),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+      if (_activeTool == ArchitectTool.spline && _effectiveSelection.isEmpty)
+        Positioned(
+          top: 8,
+          left: 8,
+          child: Material(
+            color: const Color(0xEE1E242C),
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Colors.white24),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const AppIcon(AppIconId.spline, size: 20, color: Colors.cyanAccent),
+                  const SizedBox(width: 8),
+                  Text(context.l10n.architectToolSpline, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 8),
+                  _lineStyleControl(),
+                  if (_elementTool.slabDraftPoints.length >= 2)
+                    IconButton(
+                      tooltip: context.l10n.applyAction,
+                      icon: const AppIcon(AppIconId.confirm, color: Colors.cyanAccent),
+                      onPressed: _commitSpline,
+                    ),
+                  IconButton(
+                    tooltip: context.l10n.cancel,
+                    icon: const AppIcon(AppIconId.close, color: Colors.white70),
+                    onPressed: () => setState(_elementTool.cancelSlabDrafting),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+      if (_activeTool == ArchitectTool.roofSlope && _effectiveSelection.isEmpty)
+        Positioned(
+          top: 8,
+          left: 8,
+          child: Material(
+            color: const Color(0xEE1E242C),
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Colors.white24),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const AppIcon(AppIconId.roofSlope, size: 20, color: Colors.cyanAccent),
+                  const SizedBox(width: 8),
+                  Text(context.l10n.architectToolRoofSlope, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: Text(context.l10n.architectRoofSlopePercent),
+                    selected: _activeRoofSlopeFormat == RoofSlopeFormat.percent,
+                    onSelected: (_) => setState(() => _activeRoofSlopeFormat = RoofSlopeFormat.percent),
+                  ),
+                  const SizedBox(width: 4),
+                  ChoiceChip(
+                    label: Text(context.l10n.architectRoofSlopeDegree),
+                    selected: _activeRoofSlopeFormat == RoofSlopeFormat.degree,
+                    onSelected: (_) => setState(() => _activeRoofSlopeFormat = RoofSlopeFormat.degree),
+                  ),
+                  const SizedBox(width: 4),
+                  ChoiceChip(
+                    label: Text(context.l10n.architectRoofSlopeBoth),
+                    selected: _activeRoofSlopeFormat == RoofSlopeFormat.both,
+                    onSelected: (_) => setState(() => _activeRoofSlopeFormat = RoofSlopeFormat.both),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: context.l10n.architectRoofSlopeReverse,
+                    icon: AppIcon(
+                      AppIconId.flipHorizontal,
+                      size: 20,
+                      color: _activeRoofSlopeDirection == RoofSlopeDirection.up ? Colors.cyanAccent : Colors.white70,
+                    ),
+                    onPressed: () => setState(() {
+                      _activeRoofSlopeDirection = _activeRoofSlopeDirection == RoofSlopeDirection.down
+                          ? RoofSlopeDirection.up
+                          : RoofSlopeDirection.down;
+                    }),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+      if (_activeTool == ArchitectTool.cadEllipse && _effectiveSelection.isEmpty)
+        Positioned(
+          top: 8,
+          left: 8,
+          child: Material(
+            color: const Color(0xEE1E242C),
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Colors.white24),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const AppIcon(AppIconId.ellipse, size: 20, color: Colors.cyanAccent),
+                  const SizedBox(width: 8),
+                  Text(context.l10n.architectToolCadEllipse, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 8),
+                  _lineStyleControl(),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+      if (_activeTool == ArchitectTool.leader && _effectiveSelection.isEmpty)
+        Positioned(
+          top: 8,
+          left: 8,
+          child: Material(
+            color: const Color(0xEE1E242C),
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Colors.white24),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const AppIcon(AppIconId.multileader, size: 20, color: Colors.cyanAccent),
+                  const SizedBox(width: 8),
+                  Text(context.l10n.architectToolLeader, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ),
+        ),
+
       if ((_activeTool == ArchitectTool.floorDrain || _selectedFloorDrain != null) &&
 
           _effectiveSelection.length <= 1)
 
         Positioned(top: 8, left: 8, child: _floorDrainControl()),
 
-      if ((_activeTool == ArchitectTool.wall || _activeTool == ArchitectTool.cadLine) && _effectiveSelection.isEmpty)
+      if ((_activeTool == ArchitectTool.wall || _activeTool == ArchitectTool.cadLine || _activeTool == ArchitectTool.cadArc) && _effectiveSelection.isEmpty)
 
         Positioned(
 
@@ -29548,9 +29898,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     children: [
 
-                      if (_activeTool == ArchitectTool.cadLine)
+                      if (_activeTool == ArchitectTool.cadLine || _activeTool == ArchitectTool.cadArc)
 
                         _lineStyleControl(),
+
+                      if (_activeTool == ArchitectTool.cadLine)
+                        IconButton(
+                          tooltip: context.l10n.architectLineEndCap,
+                          icon: AppIcon(
+                            _activeLineStartCap != ArchitectLineEndCap.none || _activeLineEndCap != ArchitectLineEndCap.none
+                                ? AppIconId.lineArrow
+                                : AppIconId.moreHorizontal,
+                            size: 20,
+                            color: _activeLineStartCap != ArchitectLineEndCap.none || _activeLineEndCap != ArchitectLineEndCap.none
+                                ? Colors.cyanAccent
+                                : Colors.white70,
+                          ),
+                          onPressed: _showLineCapsDialog,
+                        ),
 
                       if (_activeTool == ArchitectTool.wall)
 
@@ -29701,7 +30066,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         ),
 
-                      if (_activeTool == ArchitectTool.wall)
+                      if (_activeTool == ArchitectTool.wall || _activeTool == ArchitectTool.cadLine)
 
                         IconButton(
 
@@ -29877,6 +30242,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           onSelected: (_) => _setCadPolylineMode(true),
                                 ),
                               ),
+                      if (_cadPolylineMode) ...[
+                        const SizedBox(width: 8),
+                        ChoiceChip(
+                          key: const ValueKey('architect-polyline-arc-mode'),
+                          label: Text(context.l10n.architectPolylineModeArc),
+                          selected: _polylineArcSegmentMode,
+                          onSelected: (val) => setState(() => _polylineArcSegmentMode = val),
+                        ),
+                        const SizedBox(width: 8),
+                        ActionChip(
+                          key: const ValueKey('architect-polyline-width'),
+                          label: Text(_activePolylineWidth != null ? '${_activePolylineWidth}m' : context.l10n.architectPolylineWidth),
+                          onPressed: _promptPolylineWidth,
+                        ),
+                      ],
                     ],
                           ),
                         ),
@@ -30470,6 +30850,340 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+  }
+
+  // --- SUBSECTION: [TAG:CAD_EXPANSION_COMMITS] CAD EXPANSION COMMITS (ARC, MASK, SPLINE, ELLIPSE, LEADER, ROOF SLOPE) ---
+  void _commitCadEllipse() {
+    if (_draftStart == null || _draftEnd == null) return;
+    final center = _draftStart!;
+    final delta = _draftEnd! - center;
+    final rx = delta.distance;
+    if (rx < 1e-4) {
+      _cancelCadShape();
+      return;
+    }
+    final ry = rx * 0.6;
+    final rot = math.atan2(delta.dy, delta.dx) * 180 / math.pi;
+    final id = ArchitectElementId.next('ellipse');
+    try {
+      _commands.execute(
+        PlaceArchitectCadPrimitive(
+          storeyId: _project.activeStoreyId,
+          primitive: ArchitectCadPrimitive(
+            id: id,
+            type: CadPrimitiveType.ellipse,
+            startPoint: center - Offset(rx, ry),
+            endPoint: center + Offset(rx, ry),
+            radiusX: rx,
+            radiusY: ry,
+            rotationDeg: rot,
+            colorValue: 0xFF9E9E9E,
+            lineStyle: _activeCadLineStyle,
+          ),
+        ),
+        applyDraftingDefaults: true,
+      );
+      _cancelCadShape();
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+    } on ArgumentError {
+      _operationError();
+    }
+  }
+
+  void _commitMask() {
+    if (_elementTool.slabDraftPoints.length < 3) return;
+    final points = List<Offset>.from(_elementTool.slabDraftPoints);
+    final bounds = ArchitectSceneGeometry.boundsOf(points);
+    final id = ArchitectElementId.next('mask');
+    try {
+      _commands.execute(
+        PlaceArchitectCadPrimitive(
+          storeyId: _project.activeStoreyId,
+          primitive: ArchitectCadPrimitive(
+            id: id,
+            type: CadPrimitiveType.mask,
+            startPoint: bounds.topLeft,
+            endPoint: bounds.bottomRight,
+            polygon: points,
+            maskBorder: _maskBorder,
+            colorValue: 0xFFFFFFFF,
+          ),
+        ),
+        applyDraftingDefaults: true,
+      );
+      setState(() {
+        _elementTool.cancelSlabDrafting();
+        _draftStart = null;
+        _draftEnd = null;
+      });
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+    } on ArgumentError {
+      _operationError();
+    }
+  }
+
+  void _commitSpline() {
+    if (_elementTool.slabDraftPoints.length < 2) return;
+    final points = List<Offset>.from(_elementTool.slabDraftPoints);
+    final bounds = ArchitectSceneGeometry.boundsOf(points);
+    final id = ArchitectElementId.next('spline');
+    try {
+      _commands.execute(
+        PlaceArchitectCadPrimitive(
+          storeyId: _project.activeStoreyId,
+          primitive: ArchitectCadPrimitive(
+            id: id,
+            type: CadPrimitiveType.spline,
+            startPoint: bounds.topLeft,
+            endPoint: bounds.bottomRight,
+            polygon: points,
+            colorValue: 0xFF9E9E9E,
+            lineStyle: _activeCadLineStyle,
+          ),
+        ),
+        applyDraftingDefaults: true,
+      );
+      setState(() {
+        _elementTool.cancelSlabDrafting();
+        _draftStart = null;
+        _draftEnd = null;
+      });
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+    } on ArgumentError {
+      _operationError();
+    }
+  }
+
+  Future<void> _promptAddLeaderAnnotation(Offset arrowPoint, Offset landingPoint) async {
+    final controller = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.l10n.architectToolLeader),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: ctx.l10n.architectLeaderPrompt,
+          ),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(ctx.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: Text(ctx.l10n.save),
+          ),
+        ],
+      ),
+    );
+    if (text == null || text.isEmpty) {
+      setState(() {
+        _draftStart = null;
+        _draftEnd = null;
+      });
+      return;
+    }
+    final id = ArchitectElementId.next('leader');
+    final annotation = ArchitectAnnotation(
+      id: id,
+      point: landingPoint,
+      text: text,
+      hasLeader: true,
+      leaderArrowPoint: arrowPoint,
+      leaderLandingPoint: landingPoint,
+      leaderArrowStyle: _activeLeaderArrowStyle,
+      leaderArrowSize: _activeLeaderArrowSize,
+      leaderLandingLength: 0.30,
+    );
+    _commands.commit(
+      _project.updateActiveStorey(
+        _project.activeStorey.copyWith(
+          annotations: [..._project.activeStorey.annotations, annotation],
+        ),
+      ),
+      applyDraftingDefaults: true,
+    );
+    setState(() {
+      _draftStart = null;
+      _draftEnd = null;
+    });
+    _saveBiMProjectIfAttached();
+    HapticFeedback.lightImpact();
+  }
+
+  void _commitRoofSlopeArrow(Offset point) {
+    ArchitectRoof? targetRoof;
+    ArchitectRoofPlane? targetPlane;
+    int planeIndex = -1;
+
+    for (final roof in _project.activeStorey.roofs) {
+      for (var i = 0; i < roof.planes.length; i++) {
+        if (roof.planes[i].containsPoint(point)) {
+          targetRoof = roof;
+          targetPlane = roof.planes[i];
+          planeIndex = i;
+          break;
+        }
+      }
+      if (targetRoof != null) break;
+    }
+
+    if (targetRoof == null || targetPlane == null || planeIndex < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectRoofSlopeHint),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final dirVec = targetPlane.slopeDirection;
+    final angleDeg = math.atan2(dirVec.dy, dirVec.dx) * 180 / math.pi;
+    final arrowId = ArchitectElementId.next('slope');
+    final arrow = ArchitectRoofSlopeArrow(
+      id: arrowId,
+      position: point,
+      slopePercent: targetPlane.slopePercent,
+      slopeDeg: targetPlane.slopeDegrees,
+      directionAngleDeg: angleDeg,
+      format: _activeRoofSlopeFormat,
+      direction: _activeRoofSlopeDirection,
+    );
+
+    final updatedPlanes = List<ArchitectRoofPlane>.from(targetRoof.planes);
+    updatedPlanes[planeIndex] = targetPlane.copyWith(
+      slopeArrows: [...targetPlane.slopeArrows, arrow],
+    );
+    final updatedRoof = targetRoof.copyWith(planes: updatedPlanes);
+
+    final updatedRoofs = _project.activeStorey.roofs
+        .map((r) => r.id == updatedRoof.id ? updatedRoof : r)
+        .toList();
+
+    _commands.commit(
+      _project.updateActiveStorey(
+        _project.activeStorey.copyWith(roofs: updatedRoofs),
+      ),
+      applyDraftingDefaults: true,
+    );
+    _saveBiMProjectIfAttached();
+    HapticFeedback.lightImpact();
+  }
+
+  Future<void> _showLineCapsDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: Text(ctx.l10n.architectLineEndCap),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(ctx.l10n.architectLineStartCap, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  DropdownButton<ArchitectLineEndCap>(
+                    value: _activeLineStartCap,
+                    isExpanded: true,
+                    items: ArchitectLineEndCap.values.map((cap) => DropdownMenuItem(
+                      value: cap,
+                      child: Text(cap.label(ctx.l10n)),
+                    )).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _activeLineStartCap = val);
+                        setDialogState(() {});
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Text(ctx.l10n.architectLineEndCap, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  DropdownButton<ArchitectLineEndCap>(
+                    value: _activeLineEndCap,
+                    isExpanded: true,
+                    items: ArchitectLineEndCap.values.map((cap) => DropdownMenuItem(
+                      value: cap,
+                      child: Text(cap.label(ctx.l10n)),
+                    )).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _activeLineEndCap = val);
+                        setDialogState(() {});
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Text('${ctx.l10n.architectLineCapSize}: ${(_activeLineCapSize * 100).toStringAsFixed(0)} cm',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Slider(
+                    value: _activeLineCapSize,
+                    min: 0.05,
+                    max: 0.60,
+                    divisions: 11,
+                    label: '${(_activeLineCapSize * 100).toStringAsFixed(0)} cm',
+                    onChanged: (v) {
+                      setState(() => _activeLineCapSize = (v * 100).round() / 100);
+                      setDialogState(() {});
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(ctx.l10n.applyAction),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _promptPolylineWidth() async {
+    final controller = TextEditingController(
+      text: _activePolylineWidth != null ? _activePolylineWidth!.toStringAsFixed(2) : '0',
+    );
+    final width = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.l10n.architectPolylineWidth),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          autofocus: true,
+          decoration: const InputDecoration(
+            suffixText: 'm',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(ctx.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final val = double.tryParse(controller.text.trim().replaceAll(',', '.'));
+              Navigator.of(ctx).pop(val != null && val > 0 ? val : null);
+            },
+            child: Text(ctx.l10n.applyAction),
+          ),
+        ],
+      ),
+    );
+    setState(() => _activePolylineWidth = width);
   }
 
 

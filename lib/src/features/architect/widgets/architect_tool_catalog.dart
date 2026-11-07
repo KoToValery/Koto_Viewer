@@ -71,11 +71,17 @@ enum ArchitectToolCategory {
     ArchitectTool.dimension ||
     ArchitectTool.level ||
     ArchitectTool.text ||
+    ArchitectTool.leader ||
+    ArchitectTool.roofSlope ||
     ArchitectTool.measure => annotations,
     ArchitectTool.cadLine ||
     ArchitectTool.cadRect ||
     ArchitectTool.hatch ||
-    ArchitectTool.cadCircle => drawing,
+    ArchitectTool.cadCircle ||
+    ArchitectTool.cadArc ||
+    ArchitectTool.mask ||
+    ArchitectTool.spline ||
+    ArchitectTool.cadEllipse => drawing,
   };
 
   List<ArchitectTool> get tools => [
@@ -108,10 +114,16 @@ extension ArchitectToolCatalogLabel on ArchitectTool {
     ArchitectTool.dimension => (AppIconId.dimension, l.architectToolDimension),
     ArchitectTool.level => (AppIconId.level, l.architectToolLevel),
     ArchitectTool.text => (AppIconId.text, l.architectToolText),
+    ArchitectTool.leader => (AppIconId.multileader, l.architectToolLeader),
     ArchitectTool.cadLine => (AppIconId.line, l.architectToolCadLine),
     ArchitectTool.cadRect => (AppIconId.rectangle, l.architectToolCadRect),
     ArchitectTool.hatch => (AppIconId.hatch, l.architectToolHatch),
     ArchitectTool.cadCircle => (AppIconId.radioOff, l.architectToolCadCircle),
+    ArchitectTool.cadArc => (AppIconId.arc, l.architectToolCadArc),
+    ArchitectTool.mask => (AppIconId.mask, l.architectToolMask),
+    ArchitectTool.spline => (AppIconId.spline, l.architectToolSpline),
+    ArchitectTool.cadEllipse => (AppIconId.ellipse, l.architectToolCadEllipse),
+    ArchitectTool.roofSlope => (AppIconId.roofSlope, l.architectToolRoofSlope),
     ArchitectTool.section => (AppIconId.section, l.architectToolSection),
     ArchitectTool.elevation => (AppIconId.elevation, l.architectToolElevation),
     ArchitectTool.axis => (AppIconId.axis, l.architectToolAxis),

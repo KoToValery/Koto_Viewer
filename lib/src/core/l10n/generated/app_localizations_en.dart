@@ -4076,6 +4076,109 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectToolCadCircle => 'Circle';
 
   @override
+  String get architectToolCadArc => 'Arc';
+
+  @override
+  String get architectToolMask => 'Mask';
+
+  @override
+  String get architectToolLeader => 'Multileader';
+
+  @override
+  String get architectToolSpline => 'Spline';
+
+  @override
+  String get architectToolCadEllipse => 'Ellipse';
+
+  @override
+  String get architectToolRoofSlope => 'Roof Slope';
+
+  @override
+  String get architectLineStartCap => 'Start Element';
+
+  @override
+  String get architectLineEndCap => 'End Element';
+
+  @override
+  String get architectLineCapNone => 'None';
+
+  @override
+  String get architectLineCapArrowFilled => 'Filled Arrow';
+
+  @override
+  String get architectLineCapArrowOpen => 'Open Arrow';
+
+  @override
+  String get architectLineCapDotFilled => 'Filled Dot';
+
+  @override
+  String get architectLineCapDotOpen => 'Open Dot';
+
+  @override
+  String get architectLineCapTick => 'Architectural Tick';
+
+  @override
+  String get architectLineCapSize => 'End Cap Size';
+
+  @override
+  String get architectLineCurved => 'Curved Line';
+
+  @override
+  String get architectLineCurveHint => 'Bend line into a circular arc';
+
+  @override
+  String get architectMaskBorder => 'Border Frame';
+
+  @override
+  String get architectMaskBorderShow => 'Show Border Frame';
+
+  @override
+  String get architectPolylineModeArc => 'Arc Segment';
+
+  @override
+  String get architectPolylineModeLine => 'Line Segment';
+
+  @override
+  String get architectPolylineClose => 'Close contour';
+
+  @override
+  String get architectPolylineWidth => 'Width';
+
+  @override
+  String get architectRoofSlopeFormat => 'Slope Format';
+
+  @override
+  String get architectRoofSlopePercent => 'Percent (%)';
+
+  @override
+  String get architectRoofSlopeDegree => 'Degrees (°)';
+
+  @override
+  String get architectRoofSlopeBoth => 'Both (° and %)';
+
+  @override
+  String get architectRoofSlopeReverse => 'Reverse Direction';
+
+  @override
+  String get architectRoofSlopeHint =>
+      'Tap on a roof plane to place a slope arrow';
+
+  @override
+  String get architectEllipseMajorRadius => 'Major Radius';
+
+  @override
+  String get architectEllipseMinorRadius => 'Minor Radius';
+
+  @override
+  String get architectEllipseArc => 'Elliptical Arc';
+
+  @override
+  String get architectLeaderNote => 'Note';
+
+  @override
+  String get architectLeaderPrompt => 'Enter note text';
+
+  @override
   String get architectWindowWidth => 'Width';
 
   @override
@@ -9855,6 +9958,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commandIconShadingXray => 'X-ray';
 
   @override
+  String get commandIconMask => 'Mask (Wipeout)';
+
+  @override
+  String get commandIconMultileader => 'Multileader';
+
+  @override
+  String get commandIconSpline => 'Spline';
+
+  @override
+  String get commandIconEllipse => 'Ellipse';
+
+  @override
+  String get commandIconRoofSlope => 'Roof slope';
+
+  @override
+  String get commandIconLineArrow => 'Arrow line';
+
+  @override
+  String get commandIconLineDot => 'Dot line';
+
+  @override
   String get commandUiCopyThisError => 'Copy this error';
 
   @override
@@ -10844,9 +10968,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectTextUnderline => 'Underline';
-
-  @override
-  String get architectPolylineClose => 'Close contour';
 
   @override
   String get architectPolylineOpen => 'Open contour';

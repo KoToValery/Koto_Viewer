@@ -4094,6 +4094,109 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectToolCadCircle => 'Окръжност';
 
   @override
+  String get architectToolCadArc => 'Дъга';
+
+  @override
+  String get architectToolMask => 'Маска';
+
+  @override
+  String get architectToolLeader => 'Показалец със стрелка';
+
+  @override
+  String get architectToolSpline => 'Сплайн';
+
+  @override
+  String get architectToolCadEllipse => 'Елипса';
+
+  @override
+  String get architectToolRoofSlope => 'Наклон на покрив';
+
+  @override
+  String get architectLineStartCap => 'Начален елемент';
+
+  @override
+  String get architectLineEndCap => 'Краен елемент';
+
+  @override
+  String get architectLineCapNone => 'Без';
+
+  @override
+  String get architectLineCapArrowFilled => 'Плътна стрелка';
+
+  @override
+  String get architectLineCapArrowOpen => 'Отворена стрелка';
+
+  @override
+  String get architectLineCapDotFilled => 'Плътна точка';
+
+  @override
+  String get architectLineCapDotOpen => 'Отворена точка';
+
+  @override
+  String get architectLineCapTick => 'Архитектурен наклон';
+
+  @override
+  String get architectLineCapSize => 'Размер на завършека';
+
+  @override
+  String get architectLineCurved => 'Извита линия';
+
+  @override
+  String get architectLineCurveHint => 'Извиване на линията в дъга';
+
+  @override
+  String get architectMaskBorder => 'Рамка на маската';
+
+  @override
+  String get architectMaskBorderShow => 'Показване на рамка';
+
+  @override
+  String get architectPolylineModeArc => 'Сегмент дъга';
+
+  @override
+  String get architectPolylineModeLine => 'Линеен сегмент';
+
+  @override
+  String get architectPolylineClose => 'Затвори контура';
+
+  @override
+  String get architectPolylineWidth => 'Дебелина';
+
+  @override
+  String get architectRoofSlopeFormat => 'Формат на наклона';
+
+  @override
+  String get architectRoofSlopePercent => 'Процент (%)';
+
+  @override
+  String get architectRoofSlopeDegree => 'Градуси (°)';
+
+  @override
+  String get architectRoofSlopeBoth => 'Двете (° и %)';
+
+  @override
+  String get architectRoofSlopeReverse => 'Обръщане на посоката';
+
+  @override
+  String get architectRoofSlopeHint =>
+      'Щракнете върху покривен скат, за да поставите стрелка за наклон';
+
+  @override
+  String get architectEllipseMajorRadius => 'Голям радиус';
+
+  @override
+  String get architectEllipseMinorRadius => 'Малък радиус';
+
+  @override
+  String get architectEllipseArc => 'Елиптична дъга';
+
+  @override
+  String get architectLeaderNote => 'Бележка';
+
+  @override
+  String get architectLeaderPrompt => 'Въведете текст на бележката';
+
+  @override
   String get architectWindowWidth => 'Шир.';
 
   @override
@@ -9890,6 +9993,27 @@ class AppLocalizationsBg extends AppLocalizations {
   String get commandIconShadingXray => 'Прозрачен модел';
 
   @override
+  String get commandIconMask => 'Маска (Маскиращ контур)';
+
+  @override
+  String get commandIconMultileader => 'Показалец със стрелка';
+
+  @override
+  String get commandIconSpline => 'Сплайн';
+
+  @override
+  String get commandIconEllipse => 'Елипса';
+
+  @override
+  String get commandIconRoofSlope => 'Наклон на покрив';
+
+  @override
+  String get commandIconLineArrow => 'Линия със стрелка';
+
+  @override
+  String get commandIconLineDot => 'Линия с точка';
+
+  @override
   String get commandUiCopyThisError => 'Копиране на грешката';
 
   @override
@@ -10888,9 +11012,6 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectTextUnderline => 'Подчертан';
-
-  @override
-  String get architectPolylineClose => 'Затвори контура';
 
   @override
   String get architectPolylineOpen => 'Отвори контура';

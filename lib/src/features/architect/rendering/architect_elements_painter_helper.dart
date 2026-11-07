@@ -1,3 +1,4 @@
+import '../services/architect_spline_geometry.dart';
 import 'architect_annotation_layout.dart';
 import 'architect_line_presentation.dart';
 import '../models/architect_contour.dart';
@@ -669,6 +670,92 @@ class ArchitectElementsPainterHelper {
     }
   }
 
+  static void _drawEndCap({
+    required Canvas canvas,
+    required Offset point,
+    required Offset direction,
+    required ArchitectLineEndCap cap,
+    required double size,
+    required Paint paint,
+  }) {
+    if (cap == ArchitectLineEndCap.none || size <= 0) return;
+    final perp = Offset(-direction.dy, direction.dx);
+    switch (cap) {
+      case ArchitectLineEndCap.arrowFilled:
+        final p1 = point;
+        final p2 = point - direction * size + perp * (size * 0.35);
+        final p3 = point - direction * size - perp * (size * 0.35);
+        final arrowPath = Path()
+          ..moveTo(p1.dx, p1.dy)
+          ..lineTo(p2.dx, p2.dy)
+          ..lineTo(p3.dx, p3.dy)
+          ..close();
+        canvas.drawPath(
+          arrowPath,
+          Paint()
+            ..color = paint.color
+            ..style = PaintingStyle.fill,
+        );
+        break;
+      case ArchitectLineEndCap.arrowOpen:
+        final p1 = point;
+        final p2 = point - direction * size + perp * (size * 0.4);
+        final p3 = point - direction * size - perp * (size * 0.4);
+        canvas.drawLine(p1, p2, paint);
+        canvas.drawLine(p1, p3, paint);
+        break;
+      case ArchitectLineEndCap.dotFilled:
+        canvas.drawCircle(
+          point,
+          size * 0.35,
+          Paint()
+            ..color = paint.color
+            ..style = PaintingStyle.fill,
+        );
+        break;
+      case ArchitectLineEndCap.dotOpen:
+        canvas.drawCircle(point, size * 0.35, paint);
+        break;
+      case ArchitectLineEndCap.tick:
+        final tickDir = (direction + perp) / math.sqrt(2);
+        canvas.drawLine(
+          point - tickDir * (size * 0.6),
+          point + tickDir * (size * 0.6),
+          paint,
+        );
+        break;
+      case ArchitectLineEndCap.none:
+        break;
+    }
+  }
+
+  static Path _buildPolylinePath(ArchitectCadPrimitive prim) {
+    final path = Path();
+    final pts = prim.linePoints;
+    if (pts.isEmpty) return path;
+    path.moveTo(pts.first.dx, pts.first.dy);
+
+    final bulges = prim.bulges;
+    for (var i = 0; i < pts.length - 1; i++) {
+      final p1 = pts[i];
+      final p2 = pts[i + 1];
+      final b = (bulges != null && i < bulges.length) ? bulges[i] : 0.0;
+      if (b.abs() > 1e-6) {
+        final arc = ArchitectWallArc(p1, p2, b);
+        final arcPts = arc.face(0, 0);
+        for (var j = 1; j < arcPts.length; j++) {
+          path.lineTo(arcPts[j].dx, arcPts[j].dy);
+        }
+      } else {
+        path.lineTo(p2.dx, p2.dy);
+      }
+    }
+    if (prim.closed == true) {
+      path.close();
+    }
+    return path;
+  }
+
   static void drawAnnotations({
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
@@ -679,11 +766,47 @@ class ArchitectElementsPainterHelper {
     for (final ann in storey.annotations) {
       architectDrawingSources(canvas, {ann.id}, 'annotations');
       final isSelected = ann.id == selectedElementId;
+      final textPaintColor = isSelected
+          ? const Color(0xFF00E5FF)
+          : palette.foreground(Color(ann.colorValue));
+
+      if (ann.hasLeader && ann.leaderArrowPoint != null) {
+        final arrowPt = ann.leaderArrowPoint!;
+        final landingPt = ann.leaderLandingPoint ?? ann.position;
+        final leaderVec = landingPt - arrowPt;
+        final leaderDist = leaderVec.distance;
+        final unitDir = leaderDist > 1e-4 ? leaderVec / leaderDist : const Offset(1, 0);
+
+        final leaderPaint = Paint()
+          ..color = textPaintColor
+          ..strokeWidth = (isSelected ? 2.0 : 1.2) / zoomScale
+          ..strokeCap = StrokeCap.round
+          ..style = PaintingStyle.stroke;
+
+        // Leader line
+        canvas.drawLine(arrowPt, landingPt, leaderPaint);
+
+        // Arrowhead at arrowPt
+        final arrowSize = (ann.leaderArrowSize * 1.5) / zoomScale;
+        _drawEndCap(
+          canvas: canvas,
+          point: arrowPt,
+          direction: -unitDir,
+          cap: ann.leaderArrowStyle,
+          size: arrowSize,
+          paint: leaderPaint,
+        );
+
+        // Horizontal shoulder line
+        final shoulderLen = (ann.leaderLandingLength.clamp(0.4, 3.0) * 12.0) / zoomScale;
+        final textOnRight = ann.position.dx >= landingPt.dx;
+        final shoulderEnd = landingPt + Offset(textOnRight ? shoulderLen : -shoulderLen, 0);
+        canvas.drawLine(landingPt, shoulderEnd, leaderPaint);
+      }
+
       final tp = ArchitectAnnotationLayout.painter(
         ann,
-        color: isSelected
-            ? const Color(0xFF00E5FF)
-            : palette.foreground(Color(ann.colorValue)),
+        color: textPaintColor,
       );
       canvas.save();
       canvas.translate(ann.position.dx, ann.position.dy);
@@ -720,8 +843,9 @@ class ArchitectElementsPainterHelper {
         : canvas.getLocalClipBounds().inflate(4 / zoomScale);
     for (final prim in storey.cadPrimitives) {
       if (hatchesOnly != null &&
-          (prim.type == CadPrimitiveType.hatch) != hatchesOnly)
+          (prim.type == CadPrimitiveType.hatch) != hatchesOnly) {
         continue;
+      }
       architectDrawingSources(canvas, {prim.id}, 'cadPrimitives');
       final isSelected = prim.id == selectedElementId;
       final paint = Paint()
@@ -731,7 +855,26 @@ class ArchitectElementsPainterHelper {
         ..strokeWidth = (isSelected ? 2.4 : prim.strokeWidth) / zoomScale
         ..style = PaintingStyle.stroke;
 
-      if (prim.type == CadPrimitiveType.hatch) {
+      if (prim.type == CadPrimitiveType.mask) {
+        final boundary = ArchitectContour.path(prim.polygonCorners, prim.holes);
+        canvas.drawPath(
+          boundary,
+          Paint()
+            ..color = palette.background
+            ..style = PaintingStyle.fill,
+        );
+        if ((prim.maskBorder ?? true) || isSelected) {
+          canvas.drawPath(
+            boundary,
+            Paint()
+              ..color = isSelected
+                  ? const Color(0xFF00E5FF)
+                  : palette.foreground(const Color(0x669E9E9E))
+              ..strokeWidth = (isSelected ? 2.0 : 1.0) / zoomScale
+              ..style = PaintingStyle.stroke,
+          );
+        }
+      } else if (prim.type == CadPrimitiveType.hatch) {
         final boundary = ArchitectContour.path(prim.polygonCorners, prim.holes);
         final color = Color(prim.colorValue);
         // Keep fill interiors below walls and draw only an outline in the
@@ -802,17 +945,153 @@ class ArchitectElementsPainterHelper {
                     ),
           );
         }
-      } else if (prim.type == CadPrimitiveType.line ||
-          prim.type == CadPrimitiveType.polyline) {
+      } else if (prim.type == CadPrimitiveType.line) {
+        if (prim.isCurved && prim.arc != null) {
+          final arc = prim.arc!;
+          final pts = arc.face(0, 0);
+          if (pts.isNotEmpty) {
+            final arcPath = Path()..addPolygon(pts, false);
+            canvas.drawPath(
+              ArchitectLinePattern.path(
+                arcPath,
+                prim.lineStyle,
+                patternUnits,
+                visibleBounds: visible,
+              ),
+              paint,
+            );
+          }
+          final capSz = (prim.capSize * 2.0) / zoomScale;
+          if (prim.startCap != ArchitectLineEndCap.none) {
+            _drawEndCap(
+              canvas: canvas,
+              point: prim.startPoint,
+              direction: arc.tangentAt(0),
+              cap: prim.startCap,
+              size: capSz,
+              paint: paint,
+            );
+          }
+          if (prim.endCap != ArchitectLineEndCap.none) {
+            _drawEndCap(
+              canvas: canvas,
+              point: prim.endPoint,
+              direction: -arc.tangentAt(1),
+              cap: prim.endCap,
+              size: capSz,
+              paint: paint,
+            );
+          }
+        } else {
+          canvas.drawPath(
+            ArchitectLinePattern.path(
+              Path()..addPolygon(prim.linePoints, false),
+              prim.lineStyle,
+              patternUnits,
+              visibleBounds: visible,
+            ),
+            paint,
+          );
+          final lineVec = prim.endPoint - prim.startPoint;
+          final lineLen = lineVec.distance;
+          if (lineLen > 1e-4) {
+            final u = lineVec / lineLen;
+            final capSz = (prim.capSize * 2.0) / zoomScale;
+            if (prim.startCap != ArchitectLineEndCap.none) {
+              _drawEndCap(
+                canvas: canvas,
+                point: prim.startPoint,
+                direction: -u,
+                cap: prim.startCap,
+                size: capSz,
+                paint: paint,
+              );
+            }
+            if (prim.endCap != ArchitectLineEndCap.none) {
+              _drawEndCap(
+                canvas: canvas,
+                point: prim.endPoint,
+                direction: u,
+                cap: prim.endCap,
+                size: capSz,
+                paint: paint,
+              );
+            }
+          }
+        }
+      } else if (prim.type == CadPrimitiveType.polyline) {
+        final polyPath = _buildPolylinePath(prim);
+        final polyPaint = (prim.customWidth != null && prim.customWidth! > 0)
+            ? (Paint()
+                ..color = paint.color
+                ..strokeWidth = (isSelected ? 2.4 : (prim.customWidth! * unitsPerMm))
+                ..style = PaintingStyle.stroke)
+            : paint;
         canvas.drawPath(
           ArchitectLinePattern.path(
-            Path()..addPolygon(prim.linePoints, false),
+            polyPath,
+            prim.lineStyle,
+            patternUnits,
+            visibleBounds: visible,
+          ),
+          polyPaint,
+        );
+      } else if (prim.type == CadPrimitiveType.arc) {
+        final arc = prim.arc;
+        if (arc != null && arc.chordLength > 1e-4) {
+          final pts = arc.face(0, 0);
+          if (pts.isNotEmpty) {
+            final arcPath = Path()..addPolygon(pts, false);
+            canvas.drawPath(
+              ArchitectLinePattern.path(
+                arcPath,
+                prim.lineStyle,
+                patternUnits,
+                visibleBounds: visible,
+              ),
+              paint,
+            );
+          }
+        }
+      } else if (prim.type == CadPrimitiveType.spline) {
+        final splinePath = ArchitectSplineGeometry.generatePath(
+          prim.linePoints,
+          closed: prim.closed == true,
+        );
+        canvas.drawPath(
+          ArchitectLinePattern.path(
+            splinePath,
             prim.lineStyle,
             patternUnits,
             visibleBounds: visible,
           ),
           paint,
         );
+      } else if (prim.type == CadPrimitiveType.ellipse) {
+        final rx = prim.radiusX ?? (prim.endPoint - prim.startPoint).distance;
+        final ry = prim.radiusY ?? (rx * 0.6);
+        if (rx > 1e-4 && ry > 1e-4) {
+          canvas.save();
+          canvas.translate(prim.startPoint.dx, prim.startPoint.dy);
+          if (prim.rotationDeg != null && prim.rotationDeg != 0) {
+            canvas.rotate(prim.rotationDeg! * math.pi / 180);
+          }
+          final ovalRect = Rect.fromCenter(
+            center: Offset.zero,
+            width: rx * 2,
+            height: ry * 2,
+          );
+          if (prim.isArc == true) {
+            final start = (prim.startAngleDeg ?? 0) * math.pi / 180;
+            final end = (prim.endAngleDeg ?? 360) * math.pi / 180;
+            var sweep = end - start;
+            if (sweep <= 0) sweep += 2 * math.pi;
+            canvas.drawArc(ovalRect, start, sweep, false, paint);
+          } else {
+            canvas.drawOval(ovalRect, paint);
+          }
+          canvas.restore();
+        }
       } else if (prim.type == CadPrimitiveType.rect) {
         canvas.drawPath(
           ArchitectLinePattern.path(

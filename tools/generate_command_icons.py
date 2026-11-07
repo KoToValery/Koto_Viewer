@@ -375,6 +375,13 @@ add('shading_smooth', C(12, 12, 9) + P('M12 3c6 4 6 14 0 18 M16 5c6 4 6 10 0 14'
 add('shading_flat', P('m12 3 9 6-3 12H6L3 9Z M12 3l2 12-8 6 M14 15l7-6 M14 15l4 6 M3 9l11 6'))
 add('shading_wire', cube + P('M3 8l18 9 M21 8 3 17'))
 add('shading_xray', cube + '<path d="m3 17 9-5 9 5 M12 3v9" stroke-dasharray="2 2"/>')
+add('mask', P('M4 4h16v16H4Z') + detail('M4 9 9 4 M4 14 14 4 M4 19 19 4 M9 21 21 9 M14 21 21 14'))
+add('multileader', P('M4 20l7-7h10') + P('M3 20l5-1-2-4Z') + detail('M12 9h8 M12 6h6'))
+add('spline', P('M3 18C7 18 8 6 12 6s5 12 9 12') + C(3, 18, 1.5) + C(12, 6, 1.5) + C(21, 18, 1.5))
+add('ellipse', P('M12 5c5.52 0 10 3.13 10 7s-4.48 7-10 7-10-3.13-10-7 4.48-7 10-7Z') + detail('M12 9v6 M7 12h10'))
+add('roof_slope', P('M4 18 20 8') + P('m15 7 5 1-2 5') + detail('M4 18h8v-4'))
+add('line_arrow', P('M4 19 20 5') + P('m14 4 6 1-1 6Z') + C(4, 19, 1.5))
+add('line_dot', P('M4 19 20 5') + C(4, 19, 2.5) + C(20, 5, 2.5))
 
 
 def base_name(name):
