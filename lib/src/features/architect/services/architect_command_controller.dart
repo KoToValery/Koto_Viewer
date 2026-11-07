@@ -2303,6 +2303,132 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+
+    // 0. Landscape elements: Pathways, Site Fences, Hedges, Terrain Boundaries & Contours
+    final pathway = floor.pathways.where((p) => p.id == elementId).firstOrNull;
+    if (pathway != null) {
+      if (pathway.closed) {
+        final clean = ArchitectPolygonGeometry.clean(this.polygon);
+        if (!ArchitectPolygonGeometry.valid(clean)) throw ArgumentError('Invalid closed pathway contour');
+        return ArchitectModelCommand.replace(
+          project,
+          floor.copyWith(
+            pathways: [
+              for (final p in floor.pathways)
+                p.id == elementId ? p.copyWith(points: List.unmodifiable(clean)) : p,
+            ],
+          ),
+        );
+      } else {
+        if (this.polygon.length < 2) throw ArgumentError('Pathway requires at least 2 points');
+        return ArchitectModelCommand.replace(
+          project,
+          floor.copyWith(
+            pathways: [
+              for (final p in floor.pathways)
+                p.id == elementId ? p.copyWith(points: List.unmodifiable(this.polygon)) : p,
+            ],
+          ),
+        );
+      }
+    }
+
+    final siteFence = floor.siteFences.where((f) => f.id == elementId).firstOrNull;
+    if (siteFence != null) {
+      if (siteFence.closed) {
+        final clean = ArchitectPolygonGeometry.clean(this.polygon);
+        if (!ArchitectPolygonGeometry.valid(clean)) throw ArgumentError('Invalid closed fence contour');
+        return ArchitectModelCommand.replace(
+          project,
+          floor.copyWith(
+            siteFences: [
+              for (final f in floor.siteFences)
+                f.id == elementId ? f.copyWith(points: List.unmodifiable(clean)) : f,
+            ],
+          ),
+        );
+      } else {
+        if (this.polygon.length < 2) throw ArgumentError('Fence requires at least 2 points');
+        return ArchitectModelCommand.replace(
+          project,
+          floor.copyWith(
+            siteFences: [
+              for (final f in floor.siteFences)
+                f.id == elementId ? f.copyWith(points: List.unmodifiable(this.polygon)) : f,
+            ],
+          ),
+        );
+      }
+    }
+
+    final hedge = floor.vegetation.where((v) => v.id == elementId && v.isHedge).firstOrNull;
+    if (hedge != null) {
+      if (this.polygon.length < 2) throw ArgumentError('Hedge requires at least 2 points');
+      return ArchitectModelCommand.replace(
+        project,
+        floor.copyWith(
+          vegetation: [
+            for (final v in floor.vegetation)
+              v.id == elementId
+                  ? v.copyWith(
+                      points: List.unmodifiable(this.polygon),
+                      position: this.polygon.first,
+                    )
+                  : v,
+          ],
+        ),
+      );
+    }
+
+    for (final (surface, isProposed) in [
+      (project.proposedTerrain, true),
+      (project.existingTerrain, false),
+    ]) {
+      final bnd = surface.boundaries.where((b) => b.id == elementId).firstOrNull;
+      if (bnd != null) {
+        final clean = ArchitectPolygonGeometry.clean(this.polygon);
+        if (!ArchitectPolygonGeometry.valid(clean)) throw ArgumentError('Invalid terrain boundary contour');
+        final nextSurface = surface.copyWith(
+          boundaries: [
+            for (final b in surface.boundaries)
+              b.id == elementId ? b.copyWith(polygon: List.unmodifiable(clean)) : b,
+          ],
+        );
+        return isProposed
+            ? project.copyWith(proposedTerrain: nextSurface, updatedAt: DateTime.now())
+            : project.copyWith(existingTerrain: nextSurface, updatedAt: DateTime.now());
+      }
+
+      final cnt = surface.contours.where((c) => c.id == elementId).firstOrNull;
+      if (cnt != null) {
+        if (cnt.closed) {
+          final clean = ArchitectPolygonGeometry.clean(this.polygon);
+          if (!ArchitectPolygonGeometry.valid(clean)) throw ArgumentError('Invalid closed contour');
+          final nextSurface = surface.copyWith(
+            contours: [
+              for (final c in surface.contours)
+                c.id == elementId ? c.copyWith(points: List.unmodifiable(clean)) : c,
+            ],
+          );
+          return isProposed
+              ? project.copyWith(proposedTerrain: nextSurface, updatedAt: DateTime.now())
+              : project.copyWith(existingTerrain: nextSurface, updatedAt: DateTime.now());
+        } else {
+          if (this.polygon.length < 2) throw ArgumentError('Contour requires at least 2 points');
+          final nextSurface = surface.copyWith(
+            contours: [
+              for (final c in surface.contours)
+                c.id == elementId ? c.copyWith(points: List.unmodifiable(this.polygon)) : c,
+            ],
+          );
+          return isProposed
+              ? project.copyWith(proposedTerrain: nextSurface, updatedAt: DateTime.now())
+              : project.copyWith(existingTerrain: nextSurface, updatedAt: DateTime.now());
+        }
+      }
+    }
+
     // Use one canonical contour for the fill, border, handles and persistence.
     // A pull may overtake an old corner: remove that backtracking spur before
     // validating, exactly as the shared slab/contour editor does.
@@ -2310,7 +2436,6 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
     if (!ArchitectPolygonGeometry.valid(polygon)) {
       throw ArgumentError('Invalid contour');
     }
-    final floor = ArchitectModelCommand.storey(project, storeyId);
     if (holeIndex case final int index) {
       final host = CutArchitectContourOpening.target(floor, elementId);
       if (host == null || index < 0 || index >= host.$2.length) {

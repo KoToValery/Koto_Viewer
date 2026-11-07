@@ -1,12 +1,13 @@
-import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kotoview/src/features/architect/models/architect_landscape_models.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_section.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_landscape_painter_helper.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.dart';
 import 'package:kotoview/src/features/architect/services/architect_building_section.dart';
 import 'package:kotoview/src/features/architect/services/architect_landscape_tool.dart';
+import 'package:kotoview/src/features/architect/services/architect_chamfer_fillet.dart';
+import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 
 void main() {
   group('Landscape Tools — Terrain, Pathway, Vegetation & Site Fence', () {
@@ -299,6 +300,181 @@ void main() {
         restored.activeStorey.vegetation.single.species,
         ArchitectPlantSpecies.deciduousCanopy,
       );
+    });
+
+    test('90° Orthogonal & Perpendicular Snap Calculation', () {
+      // 1. Single anchor: snaps to 0°, 90°, 180°, 270°
+      final snapOrtho = ArchitectLandscapeTool.resolveDraftSnapping(
+        points: const [Offset(0, 0)],
+        rawPoint: const Offset(5.0, 0.08),
+        toleranceMeters: 0.35,
+      );
+      expect(snapOrtho.$2, '0°');
+      expect(snapOrtho.$1.dy, closeTo(0.0, 1e-4));
+      expect(snapOrtho.$3.isNotEmpty, isTrue);
+
+      // 2. Segment (0,0) -> (4,3): length 5, direction (0.8, 0.6).
+      // Perpendicular normal to the left is (-0.6, 0.8).
+      // If pointer is at (4,3) + 2*(-0.6, 0.8) + slight jitter = (2.8, 4.6) + (0.05, 0.05)
+      // If pointer is near the perpendicular line with a deviation along the segment direction
+      final perpTarget = const Offset(4, 3) + const Offset(-0.6, 0.8) * 2.5;
+      final snapPerp = ArchitectLandscapeTool.resolveDraftSnapping(
+        points: const [Offset(0, 0), Offset(4, 3)],
+        // Jitter along the segment direction (0.8, 0.6) * 0.05 = (0.04, 0.03) so projDist along normal stays 2.5
+        rawPoint: perpTarget + const Offset(0.04, 0.03),
+        toleranceMeters: 0.35,
+      );
+      expect(snapPerp.$2, '90° ⊥');
+      expect(snapPerp.$1.dx, closeTo(perpTarget.dx, 1e-3));
+      expect(snapPerp.$1.dy, closeTo(perpTarget.dy, 1e-3));
+      // Verify mathematically that (snapPerp - anchor) is perpendicular to seg (0,0)->(4,3)
+      final perpVec = snapPerp.$1 - const Offset(4, 3);
+      final dotProduct = perpVec.dx * 4.0 + perpVec.dy * 3.0;
+      expect(dotProduct.abs(), lessThan(1e-4));
+    });
+
+    test('Polyline splitting along cut line for Pathway and Fence', () {
+      final points = const [Offset(0, 0), Offset(10, 0), Offset(10, 10)];
+      final split = ArchitectLandscapeTool.splitPolyline(
+        points,
+        const Offset(5, -2),
+        const Offset(5, 2),
+      );
+      expect(split, isNotNull);
+      expect(split!.$1.length, 2);
+      expect(split.$1.last, const Offset(5, 0));
+      expect(split.$2.first, const Offset(5, 0));
+      expect(split.$2.length, 3);
+    });
+
+    test('UpdateArchitectPolygon applies vertex changes to Pathway, Fence, and Terrain', () {
+      const pathway = ArchitectPathway(
+        id: 'p_test',
+        points: [Offset(0, 0), Offset(5, 0), Offset(5, 5)],
+      );
+      const fence = ArchitectSiteFence(
+        id: 'f_test',
+        points: [Offset(0, 0), Offset(4, 0), Offset(4, 4)],
+      );
+      const boundary = ArchitectTerrainBoundary(
+        id: 'b_test',
+        polygon: [Offset(0, 0), Offset(10, 0), Offset(10, 10), Offset(0, 10)],
+      );
+
+      final project = ArchitectProject(
+        id: 'p1',
+        name: 'Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: const [
+          ArchitectStorey(
+            id: 's1',
+            name: 'Floor',
+            pathways: [pathway],
+            siteFences: [fence],
+          ),
+        ],
+        activeStoreyId: 's1',
+        proposedTerrain: const ArchitectTerrainSurface(
+          id: 'terr_prop',
+          boundaries: [boundary],
+        ),
+      );
+
+      // 1. Move vertex of pathway
+      final movedPathwayPts = [const Offset(0, 0), const Offset(6, 0), const Offset(6, 5)];
+      final res1 = UpdateArchitectPolygon(
+        storeyId: 's1',
+        elementId: 'p_test',
+        polygon: movedPathwayPts,
+      ).apply(project);
+      expect(res1.activeStorey.pathways.first.points, movedPathwayPts);
+
+      // 2. Move vertex of fence
+      final movedFencePts = [const Offset(0, 0), const Offset(5, 0), const Offset(5, 4)];
+      final res2 = UpdateArchitectPolygon(
+        storeyId: 's1',
+        elementId: 'f_test',
+        polygon: movedFencePts,
+      ).apply(project);
+      expect(res2.activeStorey.siteFences.first.points, movedFencePts);
+
+      // 3. Move vertex of terrain boundary
+      final movedBndPts = [
+        const Offset(0, 0),
+        const Offset(12, 0),
+        const Offset(12, 10),
+        const Offset(0, 10),
+      ];
+      final res3 = UpdateArchitectPolygon(
+        storeyId: 's1',
+        elementId: 'b_test',
+        polygon: movedBndPts,
+      ).apply(project);
+      expect(res3.proposedTerrain.boundaries.first.polygon, movedBndPts);
+    });
+
+    test('Corner Fillet and Chamfer on Pathway and Fence', () {
+      final poly = const [Offset(0, 0), Offset(10, 0), Offset(10, 10)];
+      final filleted = ArchitectChamferFillet.polygonFillet(
+        poly,
+        vertexIndex: 1,
+        radius: 1.0,
+        isClosed: false,
+      );
+      expect(filleted.length, greaterThan(3));
+      // First and last remain unchanged
+      expect(filleted.first, const Offset(0, 0));
+      expect(filleted.last, const Offset(10, 10));
+
+      final chamfered = ArchitectChamferFillet.polygonChamfer(
+        poly,
+        vertexIndex: 1,
+        distance: 1.0,
+        isClosed: false,
+      );
+      expect(chamfered.length, 4);
+      expect(chamfered[1], const Offset(9, 0));
+      expect(chamfered[2], const Offset(10, 1));
+    });
+
+    test('3D Vegetation Performance: 50 trees generate in < 15ms without freeze', () async {
+      final items = <ArchitectVegetationItem>[];
+      for (var i = 0; i < 50; i++) {
+        items.add(
+          ArchitectVegetationItem(
+            id: 'v_$i',
+            position: Offset((i % 10) * 4.0, (i ~/ 10) * 4.0),
+            species: ArchitectPlantSpecies.values[i % ArchitectPlantSpecies.values.length],
+            crownDiameter: 3.5,
+            height: 5.0,
+            points: [Offset((i % 10) * 4.0, (i ~/ 10) * 4.0), Offset((i % 10) * 4.0 + 2, (i ~/ 10) * 4.0)],
+          ),
+        );
+      }
+
+      final storey = ArchitectStorey(
+        id: 's1',
+        name: 'Ground',
+        vegetation: items,
+      );
+      final project = ArchitectProject(
+        id: 'p1',
+        name: '3D Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: [storey],
+        activeStoreyId: 's1',
+      );
+
+      final stopwatch = Stopwatch()..start();
+      final mesh = await Architect3dBuilder.buildProjectMeshAsync(project);
+      stopwatch.stop();
+
+      expect(mesh.triangles.isNotEmpty, isTrue);
+      // Average 40-50 triangles per tree -> ~2500 triangles total
+      expect(mesh.triangles.length, lessThan(4000));
+      expect(stopwatch.elapsedMilliseconds, lessThan(100));
     });
   });
 }

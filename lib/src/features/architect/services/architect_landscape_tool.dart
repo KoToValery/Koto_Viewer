@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../models/architect_project.dart';
 
 /// Unified controller and geometry helper for the Landscape tool category:
@@ -652,5 +653,159 @@ class ArchitectLandscapeTool extends ChangeNotifier {
       if ((p - proj).distance <= tol) return true;
     }
     return false;
+  }
+
+  // ===========================================================================
+  // PROPERTY SYNCHRONIZATION WITH SELECTED ELEMENT
+  // ===========================================================================
+
+  void loadFromPathway(ArchitectPathway pathway) {
+    pathwayWidth = pathway.width;
+    pathwayCurbMode = pathway.curbMode;
+    pathwayCurbWidth = pathway.curbWidth;
+    pathwayCurbHeight = pathway.curbHeight;
+    pathwayMaterial = pathway.material;
+    pathwayClosed = pathway.closed;
+    notifyListeners();
+  }
+
+  void loadFromFence(ArchitectSiteFence fence) {
+    fencePreset = fence.preset;
+    fenceHeight = fence.height;
+    fenceThickness = fence.thickness;
+    fencePierSpacing = fence.pierSpacing;
+    notifyListeners();
+  }
+
+  void loadFromVegetation(ArchitectVegetationItem veg) {
+    plantSpecies = veg.species;
+    plantCrownDiameter = veg.crownDiameter;
+    plantHeight = veg.height;
+    hedgeWidth = veg.hedgeWidth;
+    notifyListeners();
+  }
+
+  void loadFromTerrainBoundary(ArchitectTerrainBoundary bnd, ArchitectTerrainState state) {
+    terrainState = state;
+    terrainMode = bnd.isFlatPad ? ArchitectTerrainDraftMode.pad : ArchitectTerrainDraftMode.boundary;
+    terrainElevation = bnd.elevation;
+    notifyListeners();
+  }
+
+  void loadFromTerrainContour(ArchitectTerrainContour cnt, ArchitectTerrainState state) {
+    terrainState = state;
+    terrainMode = ArchitectTerrainDraftMode.contour;
+    terrainElevation = cnt.elevation;
+    notifyListeners();
+  }
+
+  void loadFromTerrainSpot(ArchitectTerrainSpot spot, ArchitectTerrainState state) {
+    terrainState = state;
+    terrainMode = ArchitectTerrainDraftMode.spot;
+    terrainElevation = spot.elevation;
+    notifyListeners();
+  }
+
+  // ===========================================================================
+  // 90° ORTHOGONAL & PERPENDICULAR SNAPPING
+  // ===========================================================================
+
+  /// Calculates magnetic orthogonal ($0^\circ, 90^\circ, 180^\circ, 270^\circ$) and
+  /// perpendicular ($90^\circ$ relative to previous segment) snapping guides for drafting.
+  static (Offset snappedPoint, String? label, List<(Offset, Offset)> guides) resolveDraftSnapping({
+    required List<Offset> points,
+    required Offset rawPoint,
+    required double toleranceMeters,
+  }) {
+    if (points.isEmpty) return (rawPoint, null, const []);
+    final anchor = points.last;
+    final delta = rawPoint - anchor;
+    final dist = delta.distance;
+    if (dist < 1e-4) return (anchor, null, const []);
+
+    final candidates = <({Offset point, String label, List<(Offset, Offset)> guides, double diff})>[];
+
+    // 1. Perpendicular (90 deg) relative to previous segment (if >= 2 points)
+    if (points.length >= 2) {
+      final prev = points[points.length - 2];
+      final seg = anchor - prev;
+      final segLen = seg.distance;
+      if (segLen > 1e-4) {
+        final uSeg = seg / segLen;
+        // Two perpendicular normals: left and right
+        final normals = [Offset(-uSeg.dy, uSeg.dx), Offset(uSeg.dy, -uSeg.dx)];
+        for (final n in normals) {
+          final projDist = delta.dx * n.dx + delta.dy * n.dy;
+          if (projDist > 0) {
+            final projPoint = anchor + n * projDist;
+            final dErr = (rawPoint - projPoint).distance;
+            if (dErr <= toleranceMeters) {
+              final guideSpan = math.max(projDist * 1.5, 4.0);
+              candidates.add((
+                point: projPoint,
+                label: '90° ⊥',
+                guides: [(anchor - n * (guideSpan * 0.2), anchor + n * guideSpan)],
+                diff: dErr,
+              ));
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Global orthogonal axes (0°, 90°, 180°, 270°)
+    for (final (dir, deg) in [
+      (const Offset(1, 0), '0°'),
+      (const Offset(0, 1), '90°'),
+      (const Offset(-1, 0), '180°'),
+      (const Offset(0, -1), '270°'),
+    ]) {
+      final projDist = delta.dx * dir.dx + delta.dy * dir.dy;
+      if (projDist > 0) {
+        final projPoint = anchor + dir * projDist;
+        final dErr = (rawPoint - projPoint).distance;
+        if (dErr <= toleranceMeters) {
+          final guideSpan = math.max(projDist * 1.5, 4.0);
+          candidates.add((
+            point: projPoint,
+            label: deg,
+            guides: [(anchor - dir * (guideSpan * 0.2), anchor + dir * guideSpan)],
+            diff: dErr,
+          ));
+        }
+      }
+    }
+
+    if (candidates.isEmpty) return (rawPoint, null, const []);
+    candidates.sort((a, b) => a.diff.compareTo(b.diff));
+    final best = candidates.first;
+    return (best.point, best.label, best.guides);
+  }
+
+  /// Splits a polyline chain into two sub-chains along the intersection with cut line [cutStart]->[cutEnd].
+  static (List<Offset>, List<Offset>)? splitPolyline(
+    List<Offset> points,
+    Offset cutStart,
+    Offset cutEnd,
+  ) {
+    if (points.length < 2) return null;
+    for (var i = 0; i < points.length - 1; i++) {
+      final a = points[i];
+      final b = points[i + 1];
+      final hit = BimLineGeometry.intersection(
+        cutStart,
+        cutEnd,
+        a,
+        b,
+        firstFinite: false,
+        secondFinite: true,
+      );
+      if (hit != null && (hit - a).distance > 1e-3 && (hit - b).distance > 1e-3) {
+        final part1 = [...points.sublist(0, i + 1), hit];
+        final part2 = [hit, ...points.sublist(i + 1)];
+        return (part1, part2);
+      }
+    }
+    return null;
   }
 }

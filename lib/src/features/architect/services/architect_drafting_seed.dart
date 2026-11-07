@@ -116,6 +116,37 @@ class ArchitectDraftingSeed {
     ArchitectTool.axis: {'bubbleAtStart', 'bubbleAtEnd'},
     ArchitectTool.section: {'viewDepth', 'visibility'},
     ArchitectTool.elevation: {'viewDepth'},
+    ArchitectTool.pathway: {
+      'width',
+      'curbMode',
+      'curbWidth',
+      'curbHeight',
+      'thickness',
+      'elevationOffset',
+      'material',
+    },
+    ArchitectTool.siteFence: {
+      'preset',
+      'height',
+      'thickness',
+      'plinthHeight',
+      'pierSize',
+      'pierSpacing',
+      'elevationOffset',
+    },
+    ArchitectTool.vegetation: {
+      'species',
+      'crownDiameter',
+      'height',
+      'hedgeWidth',
+      'elevationOffset',
+    },
+    ArchitectTool.terrain: {
+      'elevation',
+      'isFlatPad',
+      'closed',
+      'isMajor',
+    },
   };
 
   static const _collections = <String, ArchitectTool>{
@@ -136,6 +167,9 @@ class ArchitectDraftingSeed {
     'gridAxes': ArchitectTool.axis,
     'sections': ArchitectTool.section,
     'elevations': ArchitectTool.elevation,
+    'pathways': ArchitectTool.pathway,
+    'vegetation': ArchitectTool.vegetation,
+    'siteFences': ArchitectTool.siteFence,
   };
 
   static Iterable<(ArchitectTool, Map<String, dynamic>)> _records(
@@ -148,6 +182,20 @@ class ArchitectDraftingSeed {
                 (value['definitionId'] as String? ?? '').startsWith('service_')
             ? ArchitectTool.services : entry.value, value);
         if (entry.value == ArchitectTool.wall) yield* _records(value);
+      }
+    }
+    for (final key in ['existingTerrain', 'proposedTerrain']) {
+      final surface = json[key] as Map<String, dynamic>?;
+      if (surface != null) {
+        for (final b in (surface['boundaries'] as List? ?? const [])) {
+          if (b is Map<String, dynamic>) yield (ArchitectTool.terrain, b);
+        }
+        for (final c in (surface['contours'] as List? ?? const [])) {
+          if (c is Map<String, dynamic>) yield (ArchitectTool.terrain, c);
+        }
+        for (final s in (surface['spots'] as List? ?? const [])) {
+          if (s is Map<String, dynamic>) yield (ArchitectTool.terrain, s);
+        }
       }
     }
     for (final record in (json['cadPrimitives'] as List? ?? const [])) {

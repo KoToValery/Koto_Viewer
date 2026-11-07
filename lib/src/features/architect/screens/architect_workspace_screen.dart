@@ -1914,6 +1914,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ArchitectTool.decorativeLibrary =>
         storey.decorativeElements.any((d) => d.id == id),
 
+      ArchitectTool.pathway => storey.pathways.any((p) => p.id == id),
+      ArchitectTool.vegetation => storey.vegetation.any((v) => v.id == id),
+      ArchitectTool.siteFence => storey.siteFences.any((f) => f.id == id),
+      ArchitectTool.terrain =>
+        _project.existingTerrain.boundaries.any((b) => b.id == id) ||
+        _project.existingTerrain.contours.any((c) => c.id == id) ||
+        _project.existingTerrain.spots.any((s) => s.id == id) ||
+        _project.proposedTerrain.boundaries.any((b) => b.id == id) ||
+        _project.proposedTerrain.contours.any((c) => c.id == id) ||
+        _project.proposedTerrain.spots.any((s) => s.id == id),
+
       _ => false,
 
     };
@@ -9913,6 +9924,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    for (final pathway in _project.activeStorey.pathways) {
+      if (pathway.id == id) return pathway.points;
+    }
+
+    for (final fence in _project.activeStorey.siteFences) {
+      if (fence.id == id) return fence.points;
+    }
+
+    for (final veg in _project.activeStorey.vegetation) {
+      if (veg.id == id && veg.isHedge) return veg.points;
+    }
+
+    for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
+      for (final b in surface.boundaries) {
+        if (b.id == id) return b.polygon;
+      }
+      for (final c in surface.contours) {
+        if (c.id == id) return c.points;
+      }
+    }
+
     return null;
 
   }
@@ -11047,6 +11079,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
 
       _cursorModel = pt;
+
+    } else if (_activeTool.isLandscapeTool) {
+      if (_landscapeTool.isDrafting) {
+        final anchor = _landscapeTool.draftPoints.last;
+        final snap = _snapElement(
+          rawModel,
+          anchor: anchor,
+          tolerancePixels: _touchInput ? 18 : 12,
+        );
+        final orthoPerp = ArchitectLandscapeTool.resolveDraftSnapping(
+          points: _landscapeTool.draftPoints,
+          rawPoint: snap.isSnapped ? snap.point : rawModel,
+          toleranceMeters: math.max(16.0 / _currentScale, 0.30),
+        );
+        final finalPoint = orthoPerp.$2 != null ? orthoPerp.$1 : snap.point;
+        _cursorModel = finalPoint;
+        _activeSnapLabel = orthoPerp.$2 ?? snap.snapLabel;
+        _activeMagneticGuides = orthoPerp.$3.isNotEmpty
+            ? orthoPerp.$3
+            : snap.magneticGuides;
+      } else {
+        final snap = _snapElement(rawModel);
+        _cursorModel = snap.point;
+        _activeSnapLabel = snap.snapLabel;
+        _activeMagneticGuides = snap.magneticGuides;
+      }
 
     } else if (_activeTool == ArchitectTool.door ||
 
@@ -13882,8 +13940,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 9b. In Landscape tools (Terrain, Pathway, Vegetation, Site Fence)
     if (_activeTool.isLandscapeTool) {
+      if (!_landscapeTool.isDrafting) {
+        final hitId = ArchitectLandscapeTool.hitTestLandscapeElement(
+          project: _project,
+          storey: _project.activeStorey,
+          worldPoint: rawModel,
+          hitTolerance: math.max(22.0 / _currentScale, 0.35),
+        );
+        if (hitId != null) {
+          _selectAt(rawModel, toggle: _multiSelect);
+          return;
+        }
+      }
+
       final anchor = _landscapeTool.draftPoints.lastOrNull;
-      final pt = _snapElement(rawModel, anchor: anchor).point;
+      final snap = _snapElement(rawModel, anchor: anchor);
+      final orthoPerp = anchor != null
+          ? ArchitectLandscapeTool.resolveDraftSnapping(
+              points: _landscapeTool.draftPoints,
+              rawPoint: snap.isSnapped ? snap.point : rawModel,
+              toleranceMeters: math.max(16.0 / _currentScale, 0.30),
+            )
+          : null;
+      final pt = (orthoPerp?.$2 != null) ? orthoPerp!.$1 : snap.point;
       final nextProject = _landscapeTool.handleTap(
         toolName: _activeTool.name,
         worldPoint: pt,
@@ -15809,6 +15888,47 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ..addAll(selectedIds);
 
       _selectedElementId = selectedIds.firstOrNull;
+
+      // Also split any intersecting landscape elements (pathways and site fences)
+      final storey = _project.activeStorey;
+      var landscapeSplitChanged = false;
+      final nextPathways = <ArchitectPathway>[];
+      for (final p in storey.pathways) {
+        if (targetIds.contains(p.id) || _effectiveSelection.contains(p.id)) {
+          final split = ArchitectLandscapeTool.splitPolyline(p.points, p1, p2);
+          if (split != null) {
+            final now = DateTime.now().microsecondsSinceEpoch;
+            nextPathways.add(p.copyWith(points: split.$1));
+            nextPathways.add(p.copyWith(id: 'path_${now}_split', points: split.$2));
+            landscapeSplitChanged = true;
+            continue;
+          }
+        }
+        nextPathways.add(p);
+      }
+
+      final nextFences = <ArchitectSiteFence>[];
+      for (final f in storey.siteFences) {
+        if (targetIds.contains(f.id) || _effectiveSelection.contains(f.id)) {
+          final split = ArchitectLandscapeTool.splitPolyline(f.points, p1, p2);
+          if (split != null) {
+            final now = DateTime.now().microsecondsSinceEpoch;
+            nextFences.add(f.copyWith(points: split.$1));
+            nextFences.add(f.copyWith(id: 'fence_${now}_split', points: split.$2));
+            landscapeSplitChanged = true;
+            continue;
+          }
+        }
+        nextFences.add(f);
+      }
+
+      if (landscapeSplitChanged) {
+        final updatedProject = _project.updateActiveStorey(
+          storey.copyWith(pathways: nextPathways, siteFences: nextFences),
+        );
+        _commands.commit(updatedProject);
+        _saveBiMProjectIfAttached();
+      }
 
       HapticFeedback.mediumImpact();
 
@@ -19408,7 +19528,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final canChamferFillet = _selectedWallIds.isNotEmpty ||
         _selectedLineIds.isNotEmpty ||
         _project.activeStorey.slabs.any((s) => _effectiveSelection.contains(s.id)) ||
-        _project.activeStorey.cadPrimitives.any((p) => _effectiveSelection.contains(p.id));
+        _project.activeStorey.cadPrimitives.any((p) => _effectiveSelection.contains(p.id)) ||
+        _project.activeStorey.pathways.any((p) => _effectiveSelection.contains(p.id)) ||
+        _project.activeStorey.siteFences.any((f) => _effectiveSelection.contains(f.id)) ||
+        _project.activeStorey.vegetation.any((v) => _effectiveSelection.contains(v.id) && v.isHedge) ||
+        _project.proposedTerrain.boundaries.any((b) => _effectiveSelection.contains(b.id)) ||
+        _project.proposedTerrain.contours.any((c) => _effectiveSelection.contains(c.id)) ||
+        _project.existingTerrain.boundaries.any((b) => _effectiveSelection.contains(b.id)) ||
+        _project.existingTerrain.contours.any((c) => _effectiveSelection.contains(c.id));
     if (canChamferFillet) {
       if (!items.any((item) => item.action == ArchitectRadialAction.chamfer)) {
         items.add(_radialItem(action: ArchitectRadialAction.chamfer, color: const Color(0xFF80CBC4)));
@@ -22308,6 +22435,36 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           _axisTool.selectAxis(primary);
 
+        } else {
+          final pathway = _project.activeStorey.pathways
+              .where((p) => p.id == primary)
+              .firstOrNull;
+          if (pathway != null) {
+            _landscapeTool.loadFromPathway(pathway);
+          }
+          final fence = _project.activeStorey.siteFences
+              .where((f) => f.id == primary)
+              .firstOrNull;
+          if (fence != null) {
+            _landscapeTool.loadFromFence(fence);
+          }
+          final veg = _project.activeStorey.vegetation
+              .where((v) => v.id == primary)
+              .firstOrNull;
+          if (veg != null) {
+            _landscapeTool.loadFromVegetation(veg);
+          }
+          for (final (surf, state) in [
+            (_project.proposedTerrain, ArchitectTerrainState.proposed),
+            (_project.existingTerrain, ArchitectTerrainState.existing),
+          ]) {
+            final bnd = surf.boundaries.where((b) => b.id == primary).firstOrNull;
+            if (bnd != null) _landscapeTool.loadFromTerrainBoundary(bnd, state);
+            final cnt = surf.contours.where((c) => c.id == primary).firstOrNull;
+            if (cnt != null) _landscapeTool.loadFromTerrainContour(cnt, state);
+            final sp = surf.spots.where((s) => s.id == primary).firstOrNull;
+            if (sp != null) _landscapeTool.loadFromTerrainSpot(sp, state);
+          }
         } else if (_selectionIds.length == 1) {
 
           final roof = _project.activeStorey.roofs
@@ -26062,6 +26219,135 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }).toList();
     storey = storey.copyWith(cadPrimitives: updatedPrimitives);
 
+    final updatedPathways = storey.pathways.map((p) {
+      if (!ids.contains(p.id)) return p;
+      final newPts = options.isFillet
+          ? ArchitectChamferFillet.polygonFillet(
+              p.points,
+              vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(p.points),
+              radius: options.value,
+              isClosed: p.closed,
+            )
+          : ArchitectChamferFillet.polygonChamfer(
+              p.points,
+              vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(p.points),
+              distance: options.value,
+              isClosed: p.closed,
+            );
+      if (newPts.length >= 2) {
+        changed = true;
+        return p.copyWith(points: newPts);
+      }
+      return p;
+    }).toList();
+    storey = storey.copyWith(pathways: updatedPathways);
+
+    final updatedFences = storey.siteFences.map((f) {
+      if (!ids.contains(f.id)) return f;
+      final newPts = options.isFillet
+          ? ArchitectChamferFillet.polygonFillet(
+              f.points,
+              vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(f.points),
+              radius: options.value,
+              isClosed: f.closed,
+            )
+          : ArchitectChamferFillet.polygonChamfer(
+              f.points,
+              vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(f.points),
+              distance: options.value,
+              isClosed: f.closed,
+            );
+      if (newPts.length >= 2) {
+        changed = true;
+        return f.copyWith(points: newPts);
+      }
+      return f;
+    }).toList();
+    storey = storey.copyWith(siteFences: updatedFences);
+
+    final updatedVeg = storey.vegetation.map((v) {
+      if (!ids.contains(v.id) || !v.isHedge) return v;
+      final newPts = options.isFillet
+          ? ArchitectChamferFillet.polygonFillet(
+              v.points,
+              vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(v.points),
+              radius: options.value,
+              isClosed: false,
+            )
+          : ArchitectChamferFillet.polygonChamfer(
+              v.points,
+              vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(v.points),
+              distance: options.value,
+              isClosed: false,
+            );
+      if (newPts.length >= 2) {
+        changed = true;
+        return v.copyWith(points: newPts, position: newPts.first);
+      }
+      return v;
+    }).toList();
+    storey = storey.copyWith(vegetation: updatedVeg);
+
+    var proj = _project;
+    for (final (surf, isProposed) in [
+      (proj.proposedTerrain, true),
+      (proj.existingTerrain, false),
+    ]) {
+      var surfChanged = false;
+      final nextBnd = surf.boundaries.map((b) {
+        if (!ids.contains(b.id)) return b;
+        final newPoly = options.isFillet
+            ? ArchitectChamferFillet.polygonFillet(
+                b.polygon,
+                vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(b.polygon),
+                radius: options.value,
+                isClosed: true,
+              )
+            : ArchitectChamferFillet.polygonChamfer(
+                b.polygon,
+                vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(b.polygon),
+                distance: options.value,
+                isClosed: true,
+              );
+        if (newPoly.length >= 3) {
+          surfChanged = true;
+          changed = true;
+          return b.copyWith(polygon: newPoly);
+        }
+        return b;
+      }).toList();
+
+      final nextCnt = surf.contours.map((c) {
+        if (!ids.contains(c.id)) return c;
+        final newPts = options.isFillet
+            ? ArchitectChamferFillet.polygonFillet(
+                c.points,
+                vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(c.points),
+                radius: options.value,
+                isClosed: c.closed,
+              )
+            : ArchitectChamferFillet.polygonChamfer(
+                c.points,
+                vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(c.points),
+                distance: options.value,
+                isClosed: c.closed,
+              );
+        if (newPts.length >= 2) {
+          surfChanged = true;
+          changed = true;
+          return c.copyWith(points: newPts);
+        }
+        return c;
+      }).toList();
+
+      if (surfChanged) {
+        final nextSurface = surf.copyWith(boundaries: nextBnd, contours: nextCnt);
+        proj = isProposed
+            ? proj.copyWith(proposedTerrain: nextSurface)
+            : proj.copyWith(existingTerrain: nextSurface);
+      }
+    }
+
     final selectedWalls = storey.walls.where((w) => ids.contains(w.id)).toList();
     if (selectedWalls.length == 2) {
       final wA = selectedWalls[0];
@@ -26099,7 +26385,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (changed) {
-      _commands.commit(_project.updateActiveStorey(storey));
+      _commands.commit(proj.updateActiveStorey(storey));
       _saveBiMProjectIfAttached();
       setState(() {});
     }
@@ -26735,7 +27021,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final canChamferFillet = wallIds.isNotEmpty ||
         lineIds.isNotEmpty ||
         storey.slabs.any((s) => ids.contains(s.id)) ||
-        storey.cadPrimitives.any((p) => ids.contains(p.id) && (p.isPolygon || p.type == CadPrimitiveType.polyline || p.type == CadPrimitiveType.line));
+        storey.cadPrimitives.any((p) => ids.contains(p.id) && (p.isPolygon || p.type == CadPrimitiveType.polyline || p.type == CadPrimitiveType.line)) ||
+        storey.pathways.any((p) => ids.contains(p.id)) ||
+        storey.siteFences.any((f) => ids.contains(f.id)) ||
+        storey.vegetation.any((v) => ids.contains(v.id) && v.isHedge) ||
+        _project.proposedTerrain.boundaries.any((b) => ids.contains(b.id)) ||
+        _project.proposedTerrain.contours.any((c) => ids.contains(c.id)) ||
+        _project.existingTerrain.boundaries.any((b) => ids.contains(b.id)) ||
+        _project.existingTerrain.contours.any((c) => ids.contains(c.id));
 
     if (canChamferFillet) {
       actions.add(
@@ -28202,7 +28495,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       ? ArchitectLandscapeBar(
                           activeTool: _activeTool,
                           landscapeTool: _landscapeTool,
-                          onChanged: _repaintPreview,
+                          onChanged: () {
+                            _updateSelectedLandscapeElement();
+                            _repaintPreview();
+                          },
                           onCommitDraft: _commitLandscapeDraft,
                           onUndoPoint: () {
                             setState(_landscapeTool.undoLastPoint);
@@ -28210,6 +28506,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           },
                           onCancelDraft: _cancelDrafting,
                           onSyncTerrainFromGeodesy: _syncTerrainFromGeodesy,
+                          onTriggerChamfer: _triggerChamfer,
+                          onTriggerFillet: _triggerFillet,
                         )
                       : null,
 
@@ -29656,6 +29954,130 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  void _updateSelectedLandscapeElement() {
+    final id = _selectedElementId;
+    if (id == null) return;
+    final storey = _project.activeStorey;
+    var storeyChanged = false;
+
+    final nextPathways = [
+      for (final p in storey.pathways)
+        if (p.id == id)
+          () {
+            storeyChanged = true;
+            return p.copyWith(
+              width: _landscapeTool.pathwayWidth,
+              curbMode: _landscapeTool.pathwayCurbMode,
+              curbWidth: _landscapeTool.pathwayCurbWidth,
+              curbHeight: _landscapeTool.pathwayCurbHeight,
+              material: _landscapeTool.pathwayMaterial,
+              closed: _landscapeTool.pathwayClosed,
+            );
+          }()
+        else
+          p,
+    ];
+
+    final nextFences = [
+      for (final f in storey.siteFences)
+        if (f.id == id)
+          () {
+            storeyChanged = true;
+            return f.copyWith(
+              preset: _landscapeTool.fencePreset,
+              height: _landscapeTool.fenceHeight,
+              thickness: _landscapeTool.fenceThickness,
+              pierSpacing: _landscapeTool.fencePierSpacing,
+            );
+          }()
+        else
+          f,
+    ];
+
+    final nextVeg = [
+      for (final v in storey.vegetation)
+        if (v.id == id)
+          () {
+            storeyChanged = true;
+            return v.copyWith(
+              species: _landscapeTool.plantSpecies,
+              crownDiameter: _landscapeTool.plantCrownDiameter,
+              height: _landscapeTool.plantHeight,
+              hedgeWidth: _landscapeTool.hedgeWidth,
+            );
+          }()
+        else
+          v,
+    ];
+
+    var updated = storeyChanged
+        ? _project.updateActiveStorey(
+            storey.copyWith(
+              pathways: nextPathways,
+              siteFences: nextFences,
+              vegetation: nextVeg,
+            ),
+          )
+        : _project;
+
+    for (final (surf, isProposed) in [
+      (updated.proposedTerrain, true),
+      (updated.existingTerrain, false),
+    ]) {
+      var surfChanged = false;
+      final nextBnd = [
+        for (final b in surf.boundaries)
+          if (b.id == id)
+            () {
+              surfChanged = true;
+              return b.copyWith(
+                elevation: _landscapeTool.terrainElevation,
+                isFlatPad: _landscapeTool.terrainMode == ArchitectTerrainDraftMode.pad,
+              );
+            }()
+          else
+            b,
+      ];
+      final nextCnt = [
+        for (final c in surf.contours)
+          if (c.id == id)
+            () {
+              surfChanged = true;
+              return c.copyWith(elevation: _landscapeTool.terrainElevation);
+            }()
+          else
+            c,
+      ];
+      final nextSpots = [
+        for (final s in surf.spots)
+          if (s.id == id)
+            () {
+              surfChanged = true;
+              return s.copyWith(elevation: _landscapeTool.terrainElevation);
+            }()
+          else
+            s,
+      ];
+
+      if (surfChanged) {
+        final nextSurf = surf.copyWith(
+          boundaries: nextBnd,
+          contours: nextCnt,
+          spots: nextSpots,
+        );
+        updated = isProposed
+            ? updated.copyWith(proposedTerrain: nextSurf, updatedAt: DateTime.now())
+            : updated.copyWith(existingTerrain: nextSurf, updatedAt: DateTime.now());
+      }
+    }
+
+    if (!identical(updated, _project)) {
+      setState(() => _project = updated);
+      _commands.commit(updated);
+      _saveBiMProjectIfAttached();
+    }
   }
 
   void _onConfirmDraft() {

@@ -876,7 +876,7 @@ class ArchitectElementTool extends ChangeNotifier {
       }
     }
 
-    // Check Landscape Elements (Vegetation, Site Fences, Pathways)
+    // Check Landscape Elements (Vegetation, Site Fences, Pathways, Terrain)
     for (final veg in storey.vegetation) {
       if (veg.containsPoint(point, tolerance: tolerance)) {
         yield veg.id;
@@ -890,6 +890,52 @@ class ArchitectElementTool extends ChangeNotifier {
     for (final path in storey.pathways) {
       if (path.containsPoint(point, tolerance: tolerance)) {
         yield path.id;
+      }
+    }
+    if (annotationProject != null) {
+      for (final surface in [
+        annotationProject.proposedTerrain,
+        annotationProject.existingTerrain,
+      ]) {
+        for (final spot in surface.spots) {
+          if ((spot.position - point).distance <= 0.40 + tolerance) {
+            yield spot.id;
+          }
+        }
+        for (final contour in surface.contours) {
+          final pts = contour.points;
+          var hit = false;
+          for (var i = 1; i < pts.length; i++) {
+            if (_pointToSegmentDistance(point, pts[i - 1], pts[i]) <= tolerance) {
+              hit = true;
+              break;
+            }
+          }
+          if (!hit && contour.closed && pts.length >= 3) {
+            if (_pointToSegmentDistance(point, pts.last, pts.first) <= tolerance) {
+              hit = true;
+            }
+          }
+          if (hit) yield contour.id;
+        }
+        for (final boundary in surface.boundaries) {
+          final poly = boundary.polygon;
+          if (boundary.containsPoint(point)) {
+            yield boundary.id;
+          } else {
+            for (var i = 0; i < poly.length; i++) {
+              if (_pointToSegmentDistance(
+                    point,
+                    poly[i],
+                    poly[(i + 1) % poly.length],
+                  ) <=
+                  tolerance) {
+                yield boundary.id;
+                break;
+              }
+            }
+          }
+        }
       }
     }
   }

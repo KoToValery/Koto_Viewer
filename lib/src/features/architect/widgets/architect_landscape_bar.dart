@@ -15,6 +15,8 @@ class ArchitectLandscapeBar extends StatelessWidget {
   final VoidCallback? onUndoPoint;
   final VoidCallback? onCancelDraft;
   final VoidCallback? onSyncTerrainFromGeodesy;
+  final VoidCallback? onTriggerChamfer;
+  final VoidCallback? onTriggerFillet;
 
   const ArchitectLandscapeBar({
     super.key,
@@ -25,6 +27,8 @@ class ArchitectLandscapeBar extends StatelessWidget {
     this.onUndoPoint,
     this.onCancelDraft,
     this.onSyncTerrainFromGeodesy,
+    this.onTriggerChamfer,
+    this.onTriggerFillet,
   });
 
   ArchitectLandscapeTool get controller => landscapeTool;
@@ -59,6 +63,27 @@ class ArchitectLandscapeBar extends StatelessWidget {
               ..._buildVegetationControls(context, l, colors)
             else if (activeTool == ArchitectTool.siteFence)
               ..._buildSiteFenceControls(context, l, colors),
+            if (onTriggerFillet != null || onTriggerChamfer != null) ...[
+              const SizedBox(width: 8),
+              _divider(colors),
+              const SizedBox(width: 4),
+              if (onTriggerFillet != null)
+                IconButton(
+                  key: const ValueKey('architect-landscape-fillet'),
+                  tooltip: l.architectFillet,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onTriggerFillet,
+                  icon: const Icon(Icons.rounded_corner, size: 18),
+                ),
+              if (onTriggerChamfer != null)
+                IconButton(
+                  key: const ValueKey('architect-landscape-chamfer'),
+                  tooltip: l.architectChamfer,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onTriggerChamfer,
+                  icon: const Icon(Icons.crop_square_outlined, size: 18),
+                ),
+            ],
             if (hasDraft) ...[
               const SizedBox(width: 8),
               _divider(colors),
