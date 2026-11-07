@@ -39,6 +39,8 @@ import '../rendering/architect_floor_drain_painter_helper.dart';
 import '../services/architect_closed_contour.dart';
 
 import '../widgets/architect_terrain_editor.dart';
+import '../services/architect_landscape_tool.dart';
+import '../widgets/architect_landscape_bar.dart';
 
 import '../models/architect_line_style.dart';
 
@@ -3826,6 +3828,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // Unified tool controller for roof planes, auto-roof generation, and carpentry
 
   late final ArchitectRoofTool _roofTool;
+  late final ArchitectLandscapeTool _landscapeTool;
 
 
 
@@ -4726,6 +4729,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _elementTool.cancelSlabDrafting();
 
     _roofTool.clearDraft();
+    _landscapeTool.clearDraft();
     _marqueeTool.cancel();
 
     if (_selectionContextActive ||
@@ -4839,6 +4843,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _elementTool.cancelSlabDrafting();
 
     _roofTool.clearDraft();
+    _landscapeTool.clearDraft();
 
     _selectedZoneId = null;
 
@@ -7259,6 +7264,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     _roofTool = ArchitectRoofTool()..addListener(_repaintPreview);
+    _landscapeTool = ArchitectLandscapeTool()..addListener(_repaintPreview);
     ArchitectDecorativeLibraryService.instance.init();
 
     FenestrationLibraryService.instance.init().then((_) {
@@ -7446,6 +7452,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _elementTool.dispose();
 
     _roofTool.dispose();
+    _landscapeTool.dispose();
 
     _viewport.dispose();
 
@@ -13823,6 +13830,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
 
+
+    // 9b. In Landscape tools (Terrain, Pathway, Vegetation, Site Fence)
+    if (_activeTool.isLandscapeTool) {
+      final anchor = _landscapeTool.draftPoints.lastOrNull;
+      final pt = _snapElement(rawModel, anchor: anchor).point;
+      final nextProject = _landscapeTool.handleTap(
+        toolName: _activeTool.name,
+        worldPoint: pt,
+        project: _project,
+        closeThresholdWorld: math.min(18.0 / _currentScale, 0.35),
+      );
+      if (nextProject != null) {
+        setState(() {
+          _commands.commit(nextProject, applyDraftingDefaults: true);
+        });
+        _saveBiMProjectIfAttached();
+        HapticFeedback.mediumImpact();
+      } else {
+        setState(() {});
+        _repaintPreview();
+        HapticFeedback.lightImpact();
+      }
+      return;
+    }
 
     // 9b. In Roof tool
 
@@ -26759,6 +26790,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ...storey.elevationMarkers.map((e) => e.id),
 
       ...storey.cadPrimitives.map((e) => e.id),
+      ...storey.pathways.map((e) => e.id),
+      ...storey.vegetation.map((e) => e.id),
+      ...storey.siteFences.map((e) => e.id),
       ..._project.sections.map((e) => e.id),
       ..._project.elevations.map((e) => e.id),
     ].contains(id);
@@ -28115,6 +28149,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _saveBiMProjectIfAttached();
                   },
                   onOpenDecorativeStudio: () => _openDecorativeStudio(),
+                  landscapeBar: _activeTool.isLandscapeTool
+                      ? ArchitectLandscapeBar(
+                          activeTool: _activeTool,
+                          landscapeTool: _landscapeTool,
+                          onCommitDraft: _commitLandscapeDraft,
+                          onUndoPoint: () {
+                            setState(_landscapeTool.undoLastPoint);
+                            _repaintPreview();
+                          },
+                          onCancelDraft: _cancelDrafting,
+                          onSyncTerrainFromGeodesy: _syncTerrainFromGeodesy,
+                        )
+                      : null,
 
                   componentRotation: _componentRotation,
 
@@ -29344,6 +29391,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    if (_activeTool.isLandscapeTool && _landscapeTool.isDrafting) {
+      return _landscapeTool.draftPoints.lastOrNull ??
+          _landscapeTool.draftPoints.firstOrNull;
+    }
+
     if (_activeTool == ArchitectTool.roof && _roofTool.isDrafting) {
 
       return _roofTool.draftPoints.lastOrNull ??
@@ -29420,7 +29472,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  bool get _canConfirmDraft => _canConfirmDimension || _canConfirmRoofDraft ||
+  bool get _canConfirmLandscapeDraft =>
+      _activeTool.isLandscapeTool && _landscapeTool.canCommit(_activeTool.name);
+
+  bool get _canConfirmDraft => _canConfirmDimension || _canConfirmRoofDraft || _canConfirmLandscapeDraft ||
       _canConfirmContour || _canConfirmZone ||
       (_activeTool == ArchitectTool.services && _servicePreviewPoint != null) ||
       (_activeTool == ArchitectTool.column && _columnPreviewPoint != null && !_columnPreviewIsOccupied) ||
@@ -29521,7 +29576,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  void _commitLandscapeDraft() {
+    final nextProject = _landscapeTool.commitDraft(
+      toolName: _activeTool.name,
+      project: _project,
+    );
+    if (nextProject != null) {
+      setState(() {
+        _commands.commit(nextProject, applyDraftingDefaults: true);
+      });
+      _saveBiMProjectIfAttached();
+      HapticFeedback.mediumImpact();
+    }
+  }
+
+  void _syncTerrainFromGeodesy() {
+    final nextProject = _landscapeTool.syncTerrainFromGeodesy(_project);
+    setState(() {
+      _commands.commit(nextProject);
+    });
+    _saveBiMProjectIfAttached();
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.architectGeodesySyncedToTerrain),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _onConfirmDraft() {
+    if (_canConfirmLandscapeDraft) {
+      _commitLandscapeDraft();
+      return;
+    }
 
     if (_cutOpeningTargetId != null && _canConfirmContour) {
 
@@ -33228,6 +33316,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     marqueeContained: _selectionRelation==ArchitectSelectionRelation.contained,
 
     roofTool: _roofTool,
+    landscapeTool: _landscapeTool,
 
     polygonEditInvalid: _polygonEditor.invalid,
     polygonEditHoleIndex: _selectedPolygonHoleIndex,

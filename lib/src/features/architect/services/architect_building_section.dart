@@ -80,12 +80,18 @@ class ArchitectBuildingSection {
   /// Visible surfaces behind the cut, already masked by cut solids. These are
   /// projection lines only: they must never acquire section hatching.
   final ArchitectBuildingElevation? background;
+  final Path? existingTerrainLine;
+  final Path? proposedTerrainLine;
+  final Path? proposedTerrainHatchBand;
   const ArchitectBuildingSection(
     this.regions,
     this.bounds, {
     this.roofProfiles = const {},
     this.background,
     this.viewCoordinates = false,
+    this.existingTerrainLine,
+    this.proposedTerrainLine,
+    this.proposedTerrainHatchBand,
   });
 
   /// The model keeps legacy station coordinates. Only the view is reflected,
@@ -156,6 +162,15 @@ class ArchitectBuildingSection {
                   (lines: path(op.lines), clip: path(op.clip)),
               ],
             ),
+      existingTerrainLine: existingTerrainLine == null
+          ? null
+          : path(existingTerrainLine!),
+      proposedTerrainLine: proposedTerrainLine == null
+          ? null
+          : path(proposedTerrainLine!),
+      proposedTerrainHatchBand: proposedTerrainHatchBand == null
+          ? null
+          : path(proposedTerrainHatchBand!),
     );
   }
 
@@ -286,6 +301,9 @@ class ArchitectBuildingSection {
       final faces = <Path>[];
       final paths = <String, List<Path>>{};
       final operations = <({Path lines, Path clip})>[];
+      final existingTerrainCombined = Path();
+      final proposedTerrainCombined = Path();
+      final proposedHatchCombined = Path();
       Rect? bounds;
       for (final s in cut.segments) {
         final depth = cut.viewDepth == null ? null : cut.viewDepth! - s.offset;
@@ -301,6 +319,15 @@ class ArchitectBuildingSection {
           ),
         );
         final shift = Offset(s.station, 0);
+        if (part.existingTerrainLine != null) {
+          existingTerrainCombined.addPath(part.existingTerrainLine!, shift);
+        }
+        if (part.proposedTerrainLine != null) {
+          proposedTerrainCombined.addPath(part.proposedTerrainLine!, shift);
+        }
+        if (part.proposedTerrainHatchBand != null) {
+          proposedHatchCombined.addPath(part.proposedTerrainHatchBand!, shift);
+        }
         for (final r in part.regions) {
           regions.add(
             ArchitectSectionRegion(
@@ -355,6 +382,9 @@ class ArchitectBuildingSection {
           },
           operations: operations,
         ),
+        existingTerrainLine: existingTerrainCombined,
+        proposedTerrainLine: proposedTerrainCombined,
+        proposedTerrainHatchBand: proposedHatchCombined,
       );
     }
     final visibility = cut.visibility.resolved(project.sectionVisibility);
@@ -1312,6 +1342,91 @@ class ArchitectBuildingSection {
       }
     }
 
+    // 7. Compute Building Footprint Intervals & Slice Landscape / Terrain
+    final buildingIntervals = <(double, double)>[];
+    double minBuildingS = double.infinity;
+    double maxBuildingS = double.negativeInfinity;
+    for (final r in regions) {
+      if (r.roof) continue;
+      final b = r.path.getBounds();
+      if (b.isEmpty) continue;
+      if (b.left < minBuildingS) minBuildingS = b.left;
+      if (b.right > maxBuildingS) maxBuildingS = b.right;
+    }
+    if (minBuildingS < maxBuildingS && minBuildingS.isFinite) {
+      buildingIntervals.add((minBuildingS, maxBuildingS));
+    }
+
+    // Slice Pathways (with automatic curbs) & Site Fences / Gabion / Retaining Walls
+    _appendLandscapeCutRegions(
+      project: project,
+      cut: cut,
+      regions: regions,
+    );
+
+    // Slice Existing Terrain (passes continuously through the building!)
+    final existingTerrainPath = Path();
+    if (project.isLayerVisible(ArchitectLayer.terrainExistingLayerId) &&
+        !project.existingTerrain.isEmpty) {
+      final exSegments = project.existingTerrain.sliceProfileSegments(
+        cut.start,
+        cut.end,
+        excludedIntervals: const [],
+      );
+      for (final seg in exSegments) {
+        if (seg.length < 2) continue;
+        existingTerrainPath.moveTo(seg.first.dx, seg.first.dy);
+        for (int i = 1; i < seg.length; i++) {
+          existingTerrainPath.lineTo(seg[i].dx, seg[i].dy);
+        }
+      }
+    }
+
+    // Slice Proposed Terrain (terminates at left building wall & resumes at right building wall!)
+    final proposedTerrainPath = Path();
+    var proposedHatchBand = Path();
+    if (project.isLayerVisible(ArchitectLayer.terrainProposedLayerId) &&
+        !project.proposedTerrain.isEmpty) {
+      final propSegments = project.proposedTerrain.sliceProfileSegments(
+        cut.start,
+        cut.end,
+        excludedIntervals: buildingIntervals,
+      );
+      for (final seg in propSegments) {
+        if (seg.length < 2) continue;
+        proposedTerrainPath.moveTo(seg.first.dx, seg.first.dy);
+        for (int i = 1; i < seg.length; i++) {
+          proposedTerrainPath.lineTo(seg[i].dx, seg[i].dy);
+        }
+        final bandPoly = <Offset>[
+          ...seg,
+          for (final p in seg.reversed) Offset(p.dx, p.dy - 0.35),
+        ];
+        final segBand = Path()..addPolygon(bandPoly, true);
+        try {
+          proposedHatchBand = Path.combine(
+            PathOperation.union,
+            proposedHatchBand,
+            segBand,
+          );
+        } catch (_) {}
+      }
+      if (!proposedHatchBand.getBounds().isEmpty) {
+        for (final r in regions) {
+          if (!r.path.getBounds().overlaps(proposedHatchBand.getBounds())) {
+            continue;
+          }
+          try {
+            proposedHatchBand = Path.combine(
+              PathOperation.difference,
+              proposedHatchBand,
+              r.path,
+            );
+          } catch (_) {}
+        }
+      }
+    }
+
     // Keep disconnected members separate while triangulating: decomposing one
     // large union creates artificial strips at every other member's X station.
     final cutMasks = [
@@ -1339,6 +1454,9 @@ class ArchitectBuildingSection {
         roofProfiles,
         cutOpeningAperturePaths,
         const ArchitectBuildingElevation([], Rect.zero),
+        existingTerrainLine: existingTerrainPath,
+        proposedTerrainLine: proposedTerrainPath,
+        proposedTerrainHatchBand: proposedHatchBand,
       );
       _projectionRequests[partial] = (
         masks: cutMasks,
@@ -1365,6 +1483,9 @@ class ArchitectBuildingSection {
       roofProfiles,
       cutOpeningAperturePaths,
       projected,
+      existingTerrainLine: existingTerrainPath,
+      proposedTerrainLine: proposedTerrainPath,
+      proposedTerrainHatchBand: proposedHatchBand,
     );
   }
 
@@ -1379,6 +1500,9 @@ class ArchitectBuildingSection {
       final regions = <ArchitectSectionRegion>[];
       final profiles = <String, List<Path>>{}, paths = <String, List<Path>>{};
       final faces = <Path>[], operations = <({Path lines, Path clip})>[];
+      final existingTerrainCombined = Path();
+      final proposedTerrainCombined = Path();
+      final proposedHatchCombined = Path();
       Rect? bounds;
       for (final segment in cut.segments) {
         final depth = cut.viewDepth == null
@@ -1396,6 +1520,15 @@ class ArchitectBuildingSection {
           ),
         );
         final shift = Offset(segment.station, 0);
+        if (part.existingTerrainLine != null) {
+          existingTerrainCombined.addPath(part.existingTerrainLine!, shift);
+        }
+        if (part.proposedTerrainLine != null) {
+          proposedTerrainCombined.addPath(part.proposedTerrainLine!, shift);
+        }
+        if (part.proposedTerrainHatchBand != null) {
+          proposedHatchCombined.addPath(part.proposedTerrainHatchBand!, shift);
+        }
         regions.addAll([
           for (final r in part.regions)
             ArchitectSectionRegion(
@@ -1449,6 +1582,9 @@ class ArchitectBuildingSection {
           },
           operations: operations,
         ),
+        existingTerrainLine: existingTerrainCombined,
+        proposedTerrainLine: proposedTerrainCombined,
+        proposedTerrainHatchBand: proposedHatchCombined,
       );
     }
     for (final floor in project.storeys) {
@@ -1491,6 +1627,9 @@ class ArchitectBuildingSection {
       partial.roofProfiles,
       request.apertures,
       projected,
+      existingTerrainLine: partial.existingTerrainLine,
+      proposedTerrainLine: partial.proposedTerrainLine,
+      proposedTerrainHatchBand: partial.proposedTerrainHatchBand,
     );
   }
 
@@ -1499,8 +1638,11 @@ class ArchitectBuildingSection {
     List<ArchitectSectionRegion> regions,
     Map<String, Path> roofProfiles,
     Map<String, Path> cutOpeningAperturePaths,
-    ArchitectBuildingElevation projected,
-  ) {
+    ArchitectBuildingElevation projected, {
+    Path? existingTerrainLine,
+    Path? proposedTerrainLine,
+    Path? proposedTerrainHatchBand,
+  }) {
     final shift = Offset(
       cut.length / 2,
       0,
@@ -1543,13 +1685,232 @@ class ArchitectBuildingSection {
       bounds =
           bounds?.expandToInclude(r.path.getBounds()) ?? r.path.getBounds();
     }
+    for (final tp in [
+      existingTerrainLine,
+      proposedTerrainLine,
+      proposedTerrainHatchBand,
+    ]) {
+      if (tp != null && !tp.getBounds().isEmpty) {
+        bounds = bounds?.expandToInclude(tp.getBounds()) ?? tp.getBounds();
+      }
+    }
     final vertical = bounds ?? Rect.fromLTWH(0, -1, cut.length, 2);
     return ArchitectBuildingSection(
       regions,
       Rect.fromLTRB(0, vertical.top, cut.length, vertical.bottom),
       roofProfiles: roofProfiles,
       background: background,
+      existingTerrainLine: existingTerrainLine,
+      proposedTerrainLine: proposedTerrainLine,
+      proposedTerrainHatchBand: proposedTerrainHatchBand,
     );
+  }
+
+  static void _appendLandscapeCutRegions({
+    required ArchitectProject project,
+    required ArchitectSection cut,
+    required List<ArchitectSectionRegion> regions,
+  }) {
+    if (!project.isLayerVisible(ArchitectLayer.pathwayLayerId)) return;
+    double groundZAt(double s, double fallbackZ) {
+      final pt = cut.pointAt(s);
+      return project.proposedTerrain.evaluateElevationAt(pt) ??
+          project.existingTerrain.evaluateElevationAt(pt) ??
+          fallbackZ;
+    }
+
+    for (final floor in project.storeys) {
+      if (floor.isRoof) continue;
+      // 1. Pathways & Automatic Curbs
+      for (final pathway in floor.pathways) {
+        if (!project.isElementVisible(
+          pathway.id,
+          ArchitectLayer.pathwayLayerId,
+        )) {
+          continue;
+        }
+        for (final (s0, s1) in _polygonCutIntervals(
+          pathway.pavingPolygon,
+          cut,
+        )) {
+          final z0 = groundZAt(s0, floor.elevation);
+          final z1 = groundZAt(s1, floor.elevation);
+          final bed = Path()
+            ..addPolygon([
+              Offset(s0, z0),
+              Offset(s1, z1),
+              Offset(s1, z1 - 0.10),
+              Offset(s0, z0 - 0.10),
+            ], true);
+          regions.add(
+            ArchitectSectionRegion(
+              pathway.id,
+              SlabMaterial.gravel,
+              bed,
+              slab: true,
+              mergeOutline: false,
+            ),
+          );
+        }
+        for (final curbPoly in [
+          pathway.leftCurbPolygon,
+          pathway.rightCurbPolygon,
+        ]) {
+          if (curbPoly.length < 3) continue;
+          for (final (s0, s1) in _polygonCutIntervals(curbPoly, cut)) {
+            final zMid = groundZAt((s0 + s1) * 0.5, floor.elevation);
+            final curbRect = Path()
+              ..addRect(
+                Rect.fromLTRB(
+                  s0,
+                  zMid - 0.12,
+                  s1,
+                  zMid + pathway.curbHeight,
+                ),
+              );
+            regions.add(
+              ArchitectSectionRegion(
+                pathway.id,
+                SlabMaterial.concrete,
+                curbRect,
+                mergeOutline: false,
+              ),
+            );
+          }
+        }
+      }
+
+      // 2. Site Fences, Gabions & Retaining Walls
+      for (final fence in floor.siteFences) {
+        if (!project.isElementVisible(
+              fence.id,
+              ArchitectLayer.pathwayLayerId,
+            ) ||
+            fence.points.length < 2) {
+          continue;
+        }
+        final halfT = fence.thickness * 0.5;
+        final left = ArchitectPathway.offsetChain(
+          fence.points,
+          halfT,
+          closed: fence.closed,
+        );
+        final right = ArchitectPathway.offsetChain(
+          fence.points,
+          -halfT,
+          closed: fence.closed,
+        );
+        final fencePoly = <Offset>[...left, ...right.reversed];
+        for (final (s0, s1) in _polygonCutIntervals(fencePoly, cut)) {
+          final zBase = groundZAt((s0 + s1) * 0.5, floor.elevation);
+          switch (fence.preset) {
+            case ArchitectSiteFencePreset.rcRetaining:
+              final stem = Path()
+                ..addRect(
+                  Rect.fromLTRB(s0, zBase - 0.45, s1, zBase + fence.height),
+                );
+              final footing = Path()
+                ..addRect(
+                  Rect.fromLTRB(
+                    s0 - 0.18,
+                    zBase - 0.45,
+                    s1 + 0.52,
+                    zBase - 0.20,
+                  ),
+                );
+              regions.add(
+                ArchitectSectionRegion(
+                  fence.id,
+                  SlabMaterial.concrete,
+                  Path.combine(PathOperation.union, stem, footing),
+                  mergeOutline: false,
+                ),
+              );
+            case ArchitectSiteFencePreset.gabionFence:
+            case ArchitectSiteFencePreset.gabionRetaining:
+              final basket = Path()
+                ..addRect(
+                  Rect.fromLTRB(s0, zBase - 0.15, s1, zBase + fence.height),
+                );
+              regions.add(
+                ArchitectSectionRegion(
+                  fence.id,
+                  SlabMaterial.gravel,
+                  basket,
+                  hatchPattern: ArchitectSectionHatch.preset('dots'),
+                  mergeOutline: false,
+                ),
+              );
+            case ArchitectSiteFencePreset.piersAndSlats:
+            case ArchitectSiteFencePreset.modernLouvers:
+            case ArchitectSiteFencePreset.classicIron:
+              final plinth = Path()
+                ..addRect(Rect.fromLTRB(s0, zBase - 0.15, s1, zBase + 0.40));
+              regions.add(
+                ArchitectSectionRegion(
+                  fence.id,
+                  SlabMaterial.concrete,
+                  plinth,
+                  mergeOutline: false,
+                ),
+              );
+              final span = s1 - s0;
+              final panel = Path()
+                ..addRect(
+                  Rect.fromLTRB(
+                    s0 + span * 0.28,
+                    zBase + 0.40,
+                    s1 - span * 0.28,
+                    zBase + fence.height,
+                  ),
+                );
+              regions.add(
+                ArchitectSectionRegion(
+                  fence.id,
+                  fence.preset == ArchitectSiteFencePreset.piersAndSlats
+                      ? SlabMaterial.parquet
+                      : SlabMaterial.custom,
+                  panel,
+                  mergeOutline: false,
+                ),
+              );
+          }
+        }
+      }
+    }
+  }
+
+  static List<(double, double)> _polygonCutIntervals(
+    List<Offset> polygon,
+    ArchitectSection cut,
+  ) {
+    if (polygon.length < 3 || cut.length <= 1e-4) return const [];
+    final hits = <double>[];
+    final a = cut.start;
+    final b = cut.end;
+    final r = b - a;
+    for (int i = 0; i < polygon.length; i++) {
+      final c = polygon[i];
+      final d = polygon[(i + 1) % polygon.length];
+      final s = d - c;
+      final rxs = r.dx * s.dy - r.dy * s.dx;
+      if (rxs.abs() < 1e-9) continue;
+      final qp = c - a;
+      final t = (qp.dx * s.dy - qp.dy * s.dx) / rxs;
+      final u = (qp.dx * r.dy - qp.dy * r.dx) / rxs;
+      if (t >= 0.0 && t <= 1.0 && u >= 0.0 && u <= 1.0) {
+        hits.add(t * cut.length);
+      }
+    }
+    if (hits.length < 2) return const [];
+    hits.sort();
+    final intervals = <(double, double)>[];
+    for (int i = 0; i + 1 < hits.length; i += 2) {
+      if (hits[i + 1] - hits[i] > 1e-3) {
+        intervals.add((hits[i], hits[i + 1]));
+      }
+    }
+    return intervals;
   }
 
   static ({ArchitectStorey storey, ArchitectSlab slab})? source(

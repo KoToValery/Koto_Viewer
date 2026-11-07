@@ -89,6 +89,16 @@ class ArchitectSelection {
     for (final el in json['elevations'] as List? ?? []) {
       yield el as Map<String, dynamic>;
     }
+    for (final key in ['existingTerrain', 'proposedTerrain']) {
+      final t = json[key];
+      if (t is Map) {
+        for (final subKey in ['boundaries', 'contours', 'spots']) {
+          for (final item in (t[subKey] as List? ?? const [])) {
+            if (item is Map) yield Map<String, dynamic>.from(item);
+          }
+        }
+      }
+    }
   }
 
   static Map<String, dynamic> record(ArchitectProject project, String id) =>
@@ -336,6 +346,50 @@ class ArchitectSelection {
     }
     for (final stair in s.stairs) {
       if (stair.id == id) return stair.plan.path;
+    }
+    for (final pathway in s.pathways) {
+      if (pathway.id == id && pathway.pavingPolygon.length >= 3) {
+        return path..addPolygon(pathway.pavingPolygon, true);
+      }
+    }
+    for (final veg in s.vegetation) {
+      if (veg.id == id) {
+        if (veg.species == ArchitectPlantSpecies.trimmedHedge &&
+            veg.points.length >= 2) {
+          final halfW = veg.hedgeWidth * 0.5;
+          final left = ArchitectPathway.offsetChain(veg.points, halfW);
+          final right = ArchitectPathway.offsetChain(veg.points, -halfW);
+          return path..addPolygon([...left, ...right.reversed], true);
+        }
+        return path..addOval(
+          Rect.fromCircle(center: veg.position, radius: veg.crownDiameter / 2),
+        );
+      }
+    }
+    for (final fence in s.siteFences) {
+      if (fence.id == id && fence.points.length >= 2) {
+        final halfT = fence.thickness * 0.5;
+        final left = ArchitectPathway.offsetChain(fence.points, halfT);
+        final right = ArchitectPathway.offsetChain(fence.points, -halfT);
+        return path..addPolygon([...left, ...right.reversed], true);
+      }
+    }
+    for (final surface in [project.existingTerrain, project.proposedTerrain]) {
+      for (final b in surface.boundaries) {
+        if (b.id == id && b.polygon.length >= 3) {
+          return path..addPolygon(b.polygon, true);
+        }
+      }
+      for (final c in surface.contours) {
+        if (c.id == id && c.points.length >= 2) {
+          return path..addPolygon(c.points, c.closed);
+        }
+      }
+      for (final sp in surface.spots) {
+        if (sp.id == id) {
+          return path..addOval(Rect.fromCircle(center: sp.position, radius: .2));
+        }
+      }
     }
     for (final axis in project.gridAxes) {
       if (axis.id == id) {

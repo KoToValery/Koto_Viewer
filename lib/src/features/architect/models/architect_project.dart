@@ -29,9 +29,11 @@ import 'architect_component.dart';
 import 'architect_floor_drain.dart';
 import 'architect_decorative_element.dart';
 import 'architect_underlay_models.dart';
+import 'architect_landscape_models.dart';
 export 'architect_component.dart';
 export 'architect_decorative_element.dart';
 export 'architect_underlay_models.dart';
+export 'architect_landscape_models.dart';
 
 typedef ArchitectUnit = BimDistanceUnit;
 
@@ -72,6 +74,9 @@ class ArchitectStorey {
     ...components.map((e) => e.id),
     ...floorDrains.map((e) => e.id),
     ...decorativeElements.map((e) => e.id),
+    ...pathways.map((e) => e.id),
+    ...vegetation.map((e) => e.id),
+    ...siteFences.map((e) => e.id),
     ...zones.where((e) => !e.isAutoBoundary).map((e) => e.id),
   };
   List<ArchitectElementGroup> get groups => _groups.isEmpty
@@ -112,6 +117,9 @@ class ArchitectStorey {
   final List<ArchitectComponentInstance> components;
   final List<ArchitectFloorDrain> floorDrains;
   final List<ArchitectDecorativeElement> decorativeElements;
+  final List<ArchitectPathway> pathways;
+  final List<ArchitectVegetationItem> vegetation;
+  final List<ArchitectSiteFence> siteFences;
   final Offset? zoneScheduleOrigin;
   final bool isRoof;
 
@@ -139,6 +147,9 @@ class ArchitectStorey {
     this.components = const [],
     this.floorDrains = const [],
     this.decorativeElements = const [],
+    this.pathways = const [],
+    this.vegetation = const [],
+    this.siteFences = const [],
     this.zoneScheduleOrigin,
   }) : _zones = zones,
        _groups = groups;
@@ -173,6 +184,9 @@ class ArchitectStorey {
     List<ArchitectComponentInstance>? components,
     List<ArchitectFloorDrain>? floorDrains,
     List<ArchitectDecorativeElement>? decorativeElements,
+    List<ArchitectPathway>? pathways,
+    List<ArchitectVegetationItem>? vegetation,
+    List<ArchitectSiteFence>? siteFences,
     Offset? zoneScheduleOrigin,
     bool clearZoneScheduleOrigin = false,
   }) => ArchitectStorey(
@@ -204,6 +218,9 @@ class ArchitectStorey {
     components: components ?? this.components,
     floorDrains: floorDrains ?? this.floorDrains,
     decorativeElements: decorativeElements ?? this.decorativeElements,
+    pathways: pathways ?? this.pathways,
+    vegetation: vegetation ?? this.vegetation,
+    siteFences: siteFences ?? this.siteFences,
     zoneScheduleOrigin: clearZoneScheduleOrigin
         ? null
         : (zoneScheduleOrigin ?? this.zoneScheduleOrigin),
@@ -237,6 +254,12 @@ class ArchitectStorey {
       'floorDrains': floorDrains.map((d) => d.toJson()).toList(),
     if (decorativeElements.isNotEmpty)
       'decorativeElements': decorativeElements.map((d) => d.toJson()).toList(),
+    if (pathways.isNotEmpty)
+      'pathways': pathways.map((p) => p.toJson()).toList(),
+    if (vegetation.isNotEmpty)
+      'vegetation': vegetation.map((v) => v.toJson()).toList(),
+    if (siteFences.isNotEmpty)
+      'siteFences': siteFences.map((f) => f.toJson()).toList(),
     if (zoneScheduleOrigin != null)
       'zoneScheduleOrigin': {
         'x': zoneScheduleOrigin!.dx,
@@ -338,6 +361,19 @@ class ArchitectStorey {
         if (d is Map)
           ArchitectDecorativeElement.fromJson(Map<String, dynamic>.from(d)),
     ],
+    pathways: [
+      for (final p in json['pathways'] as List? ?? const [])
+        if (p is Map) ArchitectPathway.fromJson(Map<String, dynamic>.from(p)),
+    ],
+    vegetation: [
+      for (final v in json['vegetation'] as List? ?? const [])
+        if (v is Map)
+          ArchitectVegetationItem.fromJson(Map<String, dynamic>.from(v)),
+    ],
+    siteFences: [
+      for (final f in json['siteFences'] as List? ?? const [])
+        if (f is Map) ArchitectSiteFence.fromJson(Map<String, dynamic>.from(f)),
+    ],
     components:
         (json['components'] as List<dynamic>?)
             ?.map(
@@ -396,6 +432,8 @@ class ArchitectProject {
   final Map<String, ArchitectCadUnderlayConfig> cadUnderlays;
   final List<ArchitectRasterUnderlay> rasterUnderlays;
   final ArchitectGeodeticSurvey? geodeticSurvey;
+  final ArchitectTerrainSurface existingTerrain;
+  final ArchitectTerrainSurface proposedTerrain;
 
   const ArchitectProject({
     required this.id,
@@ -427,6 +465,12 @@ class ArchitectProject {
     this.cadUnderlays = const {},
     this.rasterUnderlays = const [],
     this.geodeticSurvey,
+    this.existingTerrain = const ArchitectTerrainSurface(
+      state: ArchitectTerrainState.existing,
+    ),
+    this.proposedTerrain = const ArchitectTerrainSurface(
+      state: ArchitectTerrainState.proposed,
+    ),
   });
 
   ArchitectCadUnderlayConfig? cadUnderlayForStorey(String storeyId) =>
@@ -693,6 +737,8 @@ class ArchitectProject {
     List<ArchitectRasterUnderlay>? rasterUnderlays,
     ArchitectGeodeticSurvey? geodeticSurvey,
     bool clearGeodeticSurvey = false,
+    ArchitectTerrainSurface? existingTerrain,
+    ArchitectTerrainSurface? proposedTerrain,
   }) => ArchitectProject(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -726,6 +772,8 @@ class ArchitectProject {
     geodeticSurvey: clearGeodeticSurvey
         ? null
         : (geodeticSurvey ?? this.geodeticSurvey),
+    existingTerrain: existingTerrain ?? this.existingTerrain,
+    proposedTerrain: proposedTerrain ?? this.proposedTerrain,
   );
 
   Map<String, dynamic> toJson() => {
@@ -760,6 +808,8 @@ class ArchitectProject {
     if (rasterUnderlays.isNotEmpty)
       'rasterUnderlays': rasterUnderlays.map((r) => r.toJson()).toList(),
     if (geodeticSurvey != null) 'geodeticSurvey': geodeticSurvey!.toJson(),
+    if (!existingTerrain.isEmpty) 'existingTerrain': existingTerrain.toJson(),
+    if (!proposedTerrain.isEmpty) 'proposedTerrain': proposedTerrain.toJson(),
   };
 
   factory ArchitectProject.fromJson(
@@ -886,6 +936,16 @@ class ArchitectProject {
             Map<String, dynamic>.from(json['geodeticSurvey'] as Map),
           )
         : null,
+    existingTerrain: json['existingTerrain'] is Map
+        ? ArchitectTerrainSurface.fromJson(
+            Map<String, dynamic>.from(json['existingTerrain'] as Map),
+          )
+        : const ArchitectTerrainSurface(state: ArchitectTerrainState.existing),
+    proposedTerrain: json['proposedTerrain'] is Map
+        ? ArchitectTerrainSurface.fromJson(
+            Map<String, dynamic>.from(json['proposedTerrain'] as Map),
+          )
+        : const ArchitectTerrainSurface(state: ArchitectTerrainState.proposed),
   );
 
   /// Factory creating an architectural project configured from the starter wizard.

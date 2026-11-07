@@ -9,6 +9,7 @@ import '../models/architect_elevation.dart';
 import '../models/architect_project.dart';
 import '../models/architect_section_visibility.dart';
 import '../rendering/architect_3d_builder.dart';
+import '../rendering/architect_landscape_painter_helper.dart';
 import 'architect_elevation_symbols.dart';
 
 /// Vector hidden-surface removal, independent of screen resolution. Coplanar
@@ -21,6 +22,7 @@ class ArchitectBuildingElevation {
   final List<({Path lines, Path clip})> operations;
   final List<ArchitectElevationSlope> slopes;
   final List<Offset> terrain;
+  final List<Offset> existingTerrain;
   const ArchitectBuildingElevation(
     this.faces,
     this.bounds, {
@@ -28,6 +30,7 @@ class ArchitectBuildingElevation {
     this.operations = const [],
     this.slopes = const [],
     this.terrain = const [],
+    this.existingTerrain = const [],
   });
 
   static ArchitectBuildingElevation build(
@@ -73,6 +76,8 @@ class ArchitectBuildingElevation {
         openingDetailLevels: classification.openingDetailLevels,
       ),
       view,
+      project: project,
+      isSectionBackground: sectionVisibility != null,
     );
   }
 
@@ -130,7 +135,14 @@ class ArchitectBuildingElevation {
       );
     }
 
-    if (view.steps.isEmpty) return withTerrain(await solve(view), view);
+    if (view.steps.isEmpty) {
+      return withTerrain(
+        await solve(view),
+        view,
+        project: project,
+        isSectionBackground: sectionVisibility != null,
+      );
+    }
     final faces = <Path>[], paths = <String, List<Path>>{};
     final operations = <({Path lines, Path clip})>[];
     final slopes = <ArchitectElevationSlope>[];
@@ -186,6 +198,8 @@ class ArchitectBuildingElevation {
         slopes: slopes,
       ),
       view,
+      project: project,
+      isSectionBackground: sectionVisibility != null,
     );
   }
 
@@ -420,26 +434,57 @@ class ArchitectBuildingElevation {
 
   static ArchitectBuildingElevation withTerrain(
     ArchitectBuildingElevation geometry,
-    ArchitectElevation view,
-  ) {
-    final points = view.terrain;
-    if (points.isEmpty) return geometry;
+    ArchitectElevation view, {
+    ArchitectProject? project,
+    bool isSectionBackground = false,
+  }) {
+    var baseGeometry = geometry;
+    if (project != null) {
+      baseGeometry = _appendVegetationToElevation(
+        baseGeometry,
+        project,
+        view,
+      );
+    }
+    final existingPts = !isSectionBackground &&
+            project != null &&
+            project.isLayerVisible(ArchitectLayer.terrainExistingLayerId)
+        ? _sampleTerrainAlongView(project.existingTerrain, view)
+        : const <Offset>[];
+    final points = view.terrain.isNotEmpty
+        ? view.terrain
+        : (!isSectionBackground &&
+                  project != null &&
+                  project.isLayerVisible(ArchitectLayer.terrainProposedLayerId)
+              ? _sampleTerrainAlongView(project.proposedTerrain, view)
+              : const <Offset>[]);
+    if (points.isEmpty) {
+      if (existingPts.isEmpty) return baseGeometry;
+      return ArchitectBuildingElevation(
+        baseGeometry.faces,
+        baseGeometry.bounds,
+        elementPaths: baseGeometry.elementPaths,
+        operations: baseGeometry.operations,
+        slopes: baseGeometry.slopes,
+        existingTerrain: existingPts,
+      );
+    }
     validateTerrain(points);
     final left =
         math.min(
           -view.length / 2,
-          math.min(geometry.bounds.left, points.first.dx),
+          math.min(baseGeometry.bounds.left, points.first.dx),
         ) -
         .5;
     final right =
         math.max(
           view.length / 2,
-          math.max(geometry.bounds.right, points.last.dx),
+          math.max(baseGeometry.bounds.right, points.last.dx),
         ) +
         .5;
     final bottom =
         math.min(
-          geometry.bounds.top,
+          baseGeometry.bounds.top,
           points.map((p) => p.dy).reduce(math.min),
         ) -
         10;
@@ -456,10 +501,11 @@ class ArchitectBuildingElevation {
       ], true);
     Path visible(Path p) => Path.combine(PathOperation.difference, p, mask);
     final faces = [
-      for (final p in geometry.faces) visible(p),
+      for (final p in baseGeometry.faces) visible(p),
     ].where((p) => !p.getBounds().isEmpty).toList();
     final paths = {
-      for (final e in geometry.elementPaths.entries) e.key: visible(e.value),
+      for (final e in baseGeometry.elementPaths.entries)
+        e.key: visible(e.value),
     };
     paths.removeWhere((id, p) => p.getBounds().isEmpty);
     final bounds = Rect.fromLTRB(
@@ -467,7 +513,7 @@ class ArchitectBuildingElevation {
       ground.map((p) => p.dy).reduce(math.min) - .4,
       right,
       math.max(
-        geometry.bounds.bottom,
+        baseGeometry.bounds.bottom,
         ground.map((p) => p.dy).reduce(math.max),
       ),
     );
@@ -476,14 +522,126 @@ class ArchitectBuildingElevation {
       bounds,
       elementPaths: paths,
       operations: [
-        for (final op in geometry.operations)
+        for (final op in baseGeometry.operations)
           (lines: op.lines, clip: visible(op.clip)),
       ],
       slopes: [
-        for (final slope in geometry.slopes)
+        for (final slope in baseGeometry.slopes)
           if (!mask.contains(slope.start) && !mask.contains(slope.end)) slope,
       ],
       terrain: ground,
+      existingTerrain: existingPts,
+    );
+  }
+
+  static List<Offset> _sampleTerrainAlongView(
+    ArchitectTerrainSurface surface,
+    ArchitectElevation view,
+  ) {
+    if (surface.isEmpty || view.length <= 1e-4) return const [];
+    final segments = surface.sliceProfileSegments(view.start, view.end);
+    if (segments.isEmpty) return const [];
+    final half = view.length / 2;
+    final pts = <Offset>[];
+    for (final seg in segments) {
+      for (final p in seg) {
+        final shifted = Offset(p.dx - half, p.dy);
+        if (pts.isEmpty || shifted.dx - pts.last.dx >= 0.01) {
+          pts.add(shifted);
+        }
+      }
+    }
+    return pts.length >= 2 ? pts : const [];
+  }
+
+  static ArchitectBuildingElevation _appendVegetationToElevation(
+    ArchitectBuildingElevation geometry,
+    ArchitectProject project,
+    ArchitectElevation view,
+  ) {
+    if (!project.isLayerVisible(ArchitectLayer.vegetationLayerId)) {
+      return geometry;
+    }
+    final newFaces = List<Path>.of(geometry.faces);
+    final newElementPaths = Map<String, Path>.of(geometry.elementPaths);
+    Rect? bounds = geometry.bounds.isEmpty ? null : geometry.bounds;
+    final buildingMask = ArchitectMeshSection.unionPaths(geometry.faces);
+
+    for (final storey in project.storeys) {
+      if (storey.isRoof) continue;
+      for (final veg in storey.vegetation) {
+        if (!project.isElementVisible(
+          veg.id,
+          ArchitectLayer.vegetationLayerId,
+        )) {
+          continue;
+        }
+        final samplePoints = veg.species == ArchitectPlantSpecies.trimmedHedge &&
+                veg.points.length >= 2
+            ? [veg.points.first, veg.points.last]
+            : [veg.position];
+        final rel = samplePoints.first - view.centre;
+        final depth =
+            rel.dx * view.viewDirection.dx + rel.dy * view.viewDirection.dy;
+        if (depth < -0.5) continue;
+        if (view.viewDepth != null && depth > view.viewDepth!) continue;
+        final stationX = rel.dx * view.right.dx + rel.dy * view.right.dy;
+        if (stationX.abs() > view.length * 0.55) continue;
+
+        double? projectedSpan;
+        if (samplePoints.length == 2) {
+          final rel2 = samplePoints.last - view.centre;
+          final s2 = rel2.dx * view.right.dx + rel2.dy * view.right.dy;
+          projectedSpan = math.max((s2 - stationX).abs(), veg.hedgeWidth);
+        }
+
+        final groundZ =
+            project.proposedTerrain.evaluateElevationAt(veg.position) ??
+            project.existingTerrain.evaluateElevationAt(veg.position) ??
+            storey.elevation;
+        final plantPaths =
+            ArchitectLandscapePainterHelper.buildElevationPlantPaths(
+              item: veg,
+              stationX:
+                  samplePoints.length == 2 && projectedSpan != null
+                  ? (stationX +
+                            ((samplePoints.last - view.centre).dx *
+                                    view.right.dx +
+                                (samplePoints.last - view.centre).dy *
+                                    view.right.dy)) *
+                        0.5
+                  : stationX,
+              groundZ: groundZ,
+              projectedSpanWidth: projectedSpan,
+            );
+        var combined = Path()
+          ..addPath(plantPaths.canopyOutline, Offset.zero)
+          ..addPath(plantPaths.trunkAndBranches, Offset.zero);
+        if (depth > 2.5 && !buildingMask.getBounds().isEmpty) {
+          try {
+            combined = Path.combine(
+              PathOperation.difference,
+              combined,
+              buildingMask,
+            );
+          } catch (_) {}
+        }
+        if (combined.getBounds().isEmpty) continue;
+        newFaces.add(combined);
+        newElementPaths[veg.id] = combined;
+        bounds =
+            bounds?.expandToInclude(combined.getBounds()) ??
+            combined.getBounds();
+      }
+    }
+    return ArchitectBuildingElevation(
+      newFaces,
+      bounds ?? geometry.bounds,
+      elementPaths: newElementPaths,
+      operations: geometry.operations,
+      slopes: geometry.slopes,
+      terrain: geometry.terrain,
+      existingTerrain: geometry.existingTerrain,
     );
   }
 

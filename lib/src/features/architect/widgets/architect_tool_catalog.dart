@@ -13,6 +13,7 @@ enum ArchitectToolCategory {
   views,
   annotations,
   drawing,
+  landscape,
   underlays,
   selection;
 
@@ -27,6 +28,7 @@ enum ArchitectToolCategory {
     views => l.architectCategoryViews,
     annotations => l.architectCategoryAnnotations,
     drawing => l.architectCategoryDrawing,
+    landscape => l.architectCategoryLandscape,
     underlays => l.architectToolCategoryUnderlays,
   };
 
@@ -41,6 +43,7 @@ enum ArchitectToolCategory {
     views => AppIconId.section,
     annotations => AppIconId.dimension,
     drawing => AppIconId.polyline,
+    landscape => AppIconId.terrain,
     underlays => AppIconId.cadUnderlay,
   };
 
@@ -86,6 +89,10 @@ enum ArchitectToolCategory {
     ArchitectTool.spline ||
     ArchitectTool.cadEllipse => drawing,
     ArchitectTool.cadUnderlay || ArchitectTool.rasterUnderlay => underlays,
+    ArchitectTool.terrain ||
+    ArchitectTool.pathway ||
+    ArchitectTool.vegetation ||
+    ArchitectTool.siteFence => landscape,
   };
 
   List<ArchitectTool> get tools => [
@@ -160,6 +167,13 @@ extension ArchitectToolCatalogLabel on ArchitectTool {
       AppIconId.rasterUnderlay,
       l.architectToolRasterUnderlay,
     ),
+    ArchitectTool.terrain => (AppIconId.terrain, l.architectToolTerrain),
+    ArchitectTool.pathway => (AppIconId.pathway, l.architectToolPathway),
+    ArchitectTool.vegetation => (
+      AppIconId.vegetation,
+      l.architectToolVegetation,
+    ),
+    ArchitectTool.siteFence => (AppIconId.fence, l.architectToolSiteFence),
   };
 }
 

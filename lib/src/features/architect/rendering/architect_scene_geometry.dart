@@ -50,6 +50,13 @@ class ArchitectSceneGeometry {
       ],
       for (final e in s.elevationMarkers) e.position,
       for (final e in s.annotations) e.position,
+      for (final p in s.pathways) ...p.points,
+      for (final v in s.vegetation) ...[
+        v.position - Offset(v.crownDiameter * 0.5, v.crownDiameter * 0.5),
+        v.position + Offset(v.crownDiameter * 0.5, v.crownDiameter * 0.5),
+        ...v.points,
+      ],
+      for (final f in s.siteFences) ...f.points,
       for (final e in s.cadPrimitives) ...[
         if (e.type == CadPrimitiveType.circle) ...[
           e.startPoint -
@@ -94,6 +101,15 @@ class ArchitectSceneGeometry {
       roofs: s.roofs.where((e) => intersects(e.points)).toList(),
       floorDrains: s.floorDrains.where((e) => intersects(e.polygon)).toList(),
       openings: s.openings.where((e) => intersects(e.boundary)).toList(),
+      pathways: s.pathways.where((e) => intersects(e.points, e.totalWidth)).toList(),
+      vegetation: s.vegetation
+          .where(
+            (e) => e.points.isNotEmpty
+                ? intersects(e.points, e.crownDiameter)
+                : intersects([e.position], e.crownDiameter),
+          )
+          .toList(),
+      siteFences: s.siteFences.where((e) => intersects(e.points, e.thickness)).toList(),
       stairs: s.stairs
           .where((e) => intersects([e.displayBounds.topLeft, e.displayBounds.bottomRight]))
           .toList(),

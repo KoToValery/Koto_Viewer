@@ -77,6 +77,10 @@
 | **wallAttach** | L11025, L12390, L23350 | _triggerWallAttach, ConnectArchitectWallsAtVertex | _buildAttachPromptBanner, quick access bar |
 | **wallDetach** | L23390, L26090 | _triggerWallDetach, _confirmWallDetach, _cancelWallDetach | _buildDetachConfirmationBanner (on-screen green checkmark) |
 | **wallOffset** | L12065, L24435, L24595 | _previewOffset, _commitOffset, dynamic distance chip | _offsetBanner with tappable distance chip & green checkmark |
+| **terrain** | L13834, L29579 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_syncTerrainFromGeodesy` | `ArchitectLandscapeBar` (Existing / Proposed Terrain, Spot / Contour / Boundary, G-TOPO sync) |
+| **pathway** | L13834, L29579 | `_landscapeTool.handleTap`, `_commitLandscapeDraft` | `ArchitectLandscapeBar` (Width, Paving Material, Automatic Curbs) |
+| **vegetation** | L13834, L29579 | `_landscapeTool.handleTap`, `_commitLandscapeDraft` | `ArchitectLandscapeBar` (7 Species, Single / Row / Hedge, Crown & Height) |
+| **siteFence** | L13834, L29579 | `_landscapeTool.handleTap`, `_commitLandscapeDraft` | `ArchitectLandscapeBar` (6 Presets: Piers+Slats, Gabion Fence/Retaining, Louvers, Iron, RC Retaining) |
 
 ---
 
@@ -93,6 +97,7 @@
 - `_marqueeTool` (`ArchitectMarqueeTool`): Multi-select rectangle logic.
 - `_axisTool` (`ArchitectAxisTool`): Dynamic grid axis placement controller.
 - `_zoneTool` (`ArchitectZoneTool`): Zone polygon drafting state.
+- `_landscapeTool` (`ArchitectLandscapeTool`): Unified controller for Terrain (`existingTerrain` / `proposedTerrain`), Pathway with automatic curbs, Vegetation, and Site Fences.
 - `_activeLineStartCap` / `_activeLineEndCap` (`ArchitectLineEndCap`): Active line start/end terminating caps (arrows, dots, ticks).
 - `_activeLineCapSize` (`double`): Size in meters for line terminating end caps.
 - `_activePolylineWidth` (`double?`): Custom thickness for polyline segments.

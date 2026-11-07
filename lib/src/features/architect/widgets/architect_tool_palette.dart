@@ -138,6 +138,7 @@ class ArchitectToolPalette extends StatefulWidget {
   final bool showDecorativeOnPlan;
   final ValueChanged<bool>? onShowDecorativeOnPlanChanged;
   final VoidCallback? onOpenDecorativeStudio;
+  final Widget? landscapeBar;
 
   const ArchitectToolPalette({
     super.key,
@@ -228,6 +229,7 @@ class ArchitectToolPalette extends StatefulWidget {
     this.showDecorativeOnPlan = false,
     this.onShowDecorativeOnPlanChanged,
     this.onOpenDecorativeStudio,
+    this.landscapeBar,
   });
 
   @override
@@ -280,6 +282,9 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     } else if (result.category == ArchitectToolCategory.underlays &&
         !activeTool.isUnderlayTool) {
       widget.onToolChanged(ArchitectTool.cadUnderlay);
+    } else if (result.category == ArchitectToolCategory.landscape &&
+        !activeTool.isLandscapeTool) {
+      widget.onToolChanged(ArchitectTool.terrain);
     } else if (ArchitectToolCategory.of(activeTool) != category &&
         mode == ArchitectInteractionMode.drawing) {
       widget.onToolChanged(ArchitectTool.pan);
@@ -418,6 +423,9 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   _buildOpeningSubBar(context)
                 else if (activeTool.isDecorativeTool)
                   _buildDecorativeSubBar(context)
+                else if (activeTool.isLandscapeTool &&
+                    widget.landscapeBar != null)
+                  widget.landscapeBar!
                 else if (activeTool == ArchitectTool.section ||
                     activeTool == ArchitectTool.elevation)
                   _buildViewsSubBar(context),

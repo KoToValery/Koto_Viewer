@@ -12300,4 +12300,180 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectRasterImportPdfButton => 'Импортирай страница';
+
+  @override
+  String get commandIconPathway => 'Алея с бордюр';
+
+  @override
+  String get commandIconVegetation => 'Озеленяване и растителност';
+
+  @override
+  String get architectCategoryLandscape => 'Ландшафт';
+
+  @override
+  String get architectToolTerrain => 'Терен';
+
+  @override
+  String get architectToolPathway => 'Алея';
+
+  @override
+  String get architectToolVegetation => 'Озеленяване';
+
+  @override
+  String get architectToolSiteFence => 'Ограда';
+
+  @override
+  String get architectTerrainStateExisting => 'Съществуващ';
+
+  @override
+  String get architectTerrainStateProposed => 'Проектен';
+
+  @override
+  String get architectTerrainStateExistingFull => 'Съществуващ терен';
+
+  @override
+  String get architectTerrainStateProposedFull => 'Проектен терен';
+
+  @override
+  String get architectTerrainModeBoundary => 'Контур';
+
+  @override
+  String get architectTerrainModeContour => 'Хоризонтал';
+
+  @override
+  String get architectTerrainModeSpot => 'Кота Z';
+
+  @override
+  String get architectTerrainModePad => 'Площадка';
+
+  @override
+  String get architectTerrainFromGeodesy => 'От геодезия';
+
+  @override
+  String get architectTerrainElevationLabel => 'Z=';
+
+  @override
+  String architectTerrainSyncedFromGeodesy(int count) {
+    return 'Синхронизирани $count геодезически хоризонтали и коти в Съществуващ терен';
+  }
+
+  @override
+  String get architectPathwayWidth => 'Ширина';
+
+  @override
+  String get architectPathwayCurb => 'Бордюр';
+
+  @override
+  String get architectPathwayCurbWidth => 'Бордюр B';
+
+  @override
+  String get architectPathwayCurbBoth => 'Двустранен';
+
+  @override
+  String get architectPathwayCurbLeft => 'Ляв бордюр';
+
+  @override
+  String get architectPathwayCurbRight => 'Десен бордюр';
+
+  @override
+  String get architectPathwayCurbNone => 'Без бордюр';
+
+  @override
+  String get architectPathwayMatStoneSlabs => 'Каменни плочи';
+
+  @override
+  String get architectPathwayMatCobblePavers => 'Павета';
+
+  @override
+  String get architectPathwayMatTimberDecking => 'Декинг';
+
+  @override
+  String get architectPathwayMatGravel => 'Чакъл';
+
+  @override
+  String get architectPathwayMatAsphalt => 'Асфалт';
+
+  @override
+  String get architectPathwayMatGrassGrid => 'Паркинг елементи';
+
+  @override
+  String get architectPathwayClosedPad => 'Площадка';
+
+  @override
+  String get architectPlantDeciduousCanopy => 'Широколистно дърво (с клони)';
+
+  @override
+  String get architectPlantDeciduousMinimal => 'Широколистно дърво (контур)';
+
+  @override
+  String get architectPlantConiferPine => 'Иглолистно (Бор / Смърч)';
+
+  @override
+  String get architectPlantColumnarCypress => 'Коловидна Туя / Кипарис';
+
+  @override
+  String get architectPlantOrnamentalPalm => 'Декоративно / Палма';
+
+  @override
+  String get architectPlantShrubCluster => 'Храстова група';
+
+  @override
+  String get architectPlantTrimmedHedge => 'Жив плет';
+
+  @override
+  String get architectVegetationModeSingle => 'Единично';
+
+  @override
+  String get architectVegetationModeRow => 'Редово';
+
+  @override
+  String get architectVegetationModeHedge => 'Жив плет';
+
+  @override
+  String get architectVegetationCrownDiameter => 'D=';
+
+  @override
+  String get architectVegetationHeight => 'H=';
+
+  @override
+  String get architectVegetationRowSpacing => 'Стъпка';
+
+  @override
+  String get architectFencePresetPiersAndSlats => 'Колони с хоризонтални дъски';
+
+  @override
+  String get architectFencePresetGabionFence => 'Ограда с габиони';
+
+  @override
+  String get architectFencePresetGabionRetaining => 'Подпорна стена с габиони';
+
+  @override
+  String get architectFencePresetModernLouvers => 'Модерна ламелна ограда';
+
+  @override
+  String get architectFencePresetClassicIron => 'Класическа кована с колони';
+
+  @override
+  String get architectFencePresetRcRetaining => 'Стоманобетонна подпорна стена';
+
+  @override
+  String get architectFenceHeight => 'H=';
+
+  @override
+  String get architectFenceThickness => 'B=';
+
+  @override
+  String get architectFencePierSpacing => 'Осово';
+
+  @override
+  String get architectLayerTerrainExisting => 'Съществуващ терен';
+
+  @override
+  String get architectLayerTerrainProposed => 'Проектен терен';
+
+  @override
+  String get architectLayerPathways => 'Алеи и бордюри';
+
+  @override
+  String get architectLayerVegetation => 'Озеленяване и огради';
 }

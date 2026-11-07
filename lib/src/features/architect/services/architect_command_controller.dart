@@ -108,6 +108,9 @@ abstract class ArchitectModelCommand {
             ...s.elevationMarkers.map((e) => e.id),
             ...s.cadPrimitives.map((e) => e.id),
             ...s.components.map((e) => e.id),
+            ...s.pathways.map((e) => e.id),
+            ...s.vegetation.map((e) => e.id),
+            ...s.siteFences.map((e) => e.id),
             ...s.floorDrains.map((e) => e.id),
             ...s.decorativeElements.map((e) => e.id),
             ...s.walls.expand(
@@ -1251,7 +1254,49 @@ class MoveArchitectElement extends ArchitectModelCommand {
         for (final e in s.decorativeElements)
           matches(e.id) ? e.translatedInPlan(delta) : e,
       ],
+      pathways: [
+        for (final e in s.pathways)
+          matches(e.id)
+              ? e.copyWith(points: [for (final p in e.points) p + delta])
+              : e,
+      ],
+      vegetation: [
+        for (final e in s.vegetation)
+          matches(e.id)
+              ? e.copyWith(
+                  position: e.position + delta,
+                  points: [for (final p in e.points) p + delta],
+                )
+              : e,
+      ],
+      siteFences: [
+        for (final e in s.siteFences)
+          matches(e.id)
+              ? e.copyWith(points: [for (final p in e.points) p + delta])
+              : e,
+      ],
     );
+    ArchitectTerrainSurface translateTerrain(ArchitectTerrainSurface surf) =>
+        surf.copyWith(
+          boundaries: [
+            for (final b in surf.boundaries)
+              matches(b.id)
+                  ? b.copyWith(polygon: [for (final p in b.polygon) p + delta])
+                  : b,
+          ],
+          contours: [
+            for (final c in surf.contours)
+              matches(c.id)
+                  ? c.copyWith(points: [for (final p in c.points) p + delta])
+                  : c,
+          ],
+          spots: [
+            for (final sp in surf.spots)
+              matches(sp.id) ? sp.copyWith(position: sp.position + delta) : sp,
+          ],
+        );
+    final nextExistingTerrain = translateTerrain(project.existingTerrain);
+    final nextProposedTerrain = translateTerrain(project.proposedTerrain);
     final axes = [
       for (final e in project.gridAxes)
         matches(e.id)
@@ -1277,7 +1322,12 @@ class MoveArchitectElement extends ArchitectModelCommand {
     if (!foundAny) throw ArgumentError('Unknown movable element: $elementId');
     return ArchitectModelCommand.replace(project, next)
         .copyWithGridAxes(axes)
-        .copyWith(sections: sections, elevations: elevations);
+        .copyWith(
+          sections: sections,
+          elevations: elevations,
+          existingTerrain: nextExistingTerrain,
+          proposedTerrain: nextProposedTerrain,
+        );
   }
 }
 
@@ -2937,4 +2987,13 @@ class DeleteArchitectStorey extends ArchitectModelCommand {
   @override
   ArchitectProject apply(ArchitectProject project) =>
       project.deleteStorey(storeyId);
+}
+
+// --- SUBSECTION: [TAG:CMD_LANDSCAPE] Terrain, Pathway, Vegetation & Site Fence Commands ---
+class UpdateArchitectLandscapeProject extends ArchitectModelCommand {
+  final ArchitectProject nextProject;
+  const UpdateArchitectLandscapeProject(this.nextProject);
+
+  @override
+  ArchitectProject apply(ArchitectProject project) => nextProject;
 }

@@ -12251,4 +12251,180 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectRasterImportPdfButton => 'Import Page';
+
+  @override
+  String get commandIconPathway => 'Pathway with curb';
+
+  @override
+  String get commandIconVegetation => 'Vegetation & planting';
+
+  @override
+  String get architectCategoryLandscape => 'Landscape';
+
+  @override
+  String get architectToolTerrain => 'Terrain';
+
+  @override
+  String get architectToolPathway => 'Pathway';
+
+  @override
+  String get architectToolVegetation => 'Planting';
+
+  @override
+  String get architectToolSiteFence => 'Site fence';
+
+  @override
+  String get architectTerrainStateExisting => 'Existing';
+
+  @override
+  String get architectTerrainStateProposed => 'Proposed';
+
+  @override
+  String get architectTerrainStateExistingFull => 'Existing terrain';
+
+  @override
+  String get architectTerrainStateProposedFull => 'Proposed terrain';
+
+  @override
+  String get architectTerrainModeBoundary => 'Boundary';
+
+  @override
+  String get architectTerrainModeContour => 'Contour';
+
+  @override
+  String get architectTerrainModeSpot => 'Spot Z';
+
+  @override
+  String get architectTerrainModePad => 'Flat pad';
+
+  @override
+  String get architectTerrainFromGeodesy => 'From G-TOPO';
+
+  @override
+  String get architectTerrainElevationLabel => 'Z=';
+
+  @override
+  String architectTerrainSyncedFromGeodesy(int count) {
+    return 'Synced $count geodetic contours & points to Existing Terrain';
+  }
+
+  @override
+  String get architectPathwayWidth => 'Width';
+
+  @override
+  String get architectPathwayCurb => 'Curb';
+
+  @override
+  String get architectPathwayCurbWidth => 'Curb W';
+
+  @override
+  String get architectPathwayCurbBoth => 'Both curbs';
+
+  @override
+  String get architectPathwayCurbLeft => 'Left curb';
+
+  @override
+  String get architectPathwayCurbRight => 'Right curb';
+
+  @override
+  String get architectPathwayCurbNone => 'No curb';
+
+  @override
+  String get architectPathwayMatStoneSlabs => 'Stone slabs';
+
+  @override
+  String get architectPathwayMatCobblePavers => 'Cobble pavers';
+
+  @override
+  String get architectPathwayMatTimberDecking => 'Timber decking';
+
+  @override
+  String get architectPathwayMatGravel => 'Crushed gravel';
+
+  @override
+  String get architectPathwayMatAsphalt => 'Asphalt';
+
+  @override
+  String get architectPathwayMatGrassGrid => 'Grass pavers';
+
+  @override
+  String get architectPathwayClosedPad => 'Plaza';
+
+  @override
+  String get architectPlantDeciduousCanopy => 'Deciduous tree (branched)';
+
+  @override
+  String get architectPlantDeciduousMinimal => 'Deciduous tree (minimal)';
+
+  @override
+  String get architectPlantConiferPine => 'Conifer / Pine / Spruce';
+
+  @override
+  String get architectPlantColumnarCypress => 'Columnar Thuja / Cypress';
+
+  @override
+  String get architectPlantOrnamentalPalm => 'Ornamental / Palm';
+
+  @override
+  String get architectPlantShrubCluster => 'Shrub cluster';
+
+  @override
+  String get architectPlantTrimmedHedge => 'Trimmed hedge';
+
+  @override
+  String get architectVegetationModeSingle => 'Single';
+
+  @override
+  String get architectVegetationModeRow => 'Row';
+
+  @override
+  String get architectVegetationModeHedge => 'Hedge';
+
+  @override
+  String get architectVegetationCrownDiameter => 'D=';
+
+  @override
+  String get architectVegetationHeight => 'H=';
+
+  @override
+  String get architectVegetationRowSpacing => 'Step';
+
+  @override
+  String get architectFencePresetPiersAndSlats => 'Piers + horizontal boards';
+
+  @override
+  String get architectFencePresetGabionFence => 'Gabion fence';
+
+  @override
+  String get architectFencePresetGabionRetaining => 'Gabion retaining wall';
+
+  @override
+  String get architectFencePresetModernLouvers => 'Modern louver fence';
+
+  @override
+  String get architectFencePresetClassicIron => 'Classic wrought iron + piers';
+
+  @override
+  String get architectFencePresetRcRetaining => 'RC retaining wall';
+
+  @override
+  String get architectFenceHeight => 'H=';
+
+  @override
+  String get architectFenceThickness => 'B=';
+
+  @override
+  String get architectFencePierSpacing => 'Span';
+
+  @override
+  String get architectLayerTerrainExisting => 'Existing Terrain';
+
+  @override
+  String get architectLayerTerrainProposed => 'Proposed Terrain';
+
+  @override
+  String get architectLayerPathways => 'Pathways & Curbs';
+
+  @override
+  String get architectLayerVegetation => 'Vegetation & Site';
 }

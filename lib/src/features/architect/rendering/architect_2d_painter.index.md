@@ -98,6 +98,7 @@
 - `activeDraftEnd` (`Offset?`, L150)
 - `stairPreview` (`ArchitectStair?`, L151)
 - `activeWallThickness` (`double`, L152)
+- `landscapeTool` (`ArchitectLandscapeTool?`, L266) — Active landscape drafting state for Terrain, Pathway, Vegetation, and Site Fence.
 - `activeWallReference` (`WallReferenceLine`, L153)
 - `activeWallTypeId` (`String?`, L154)
 - `activeWallRailing` (`ArchitectRailingDesign?`, L155)

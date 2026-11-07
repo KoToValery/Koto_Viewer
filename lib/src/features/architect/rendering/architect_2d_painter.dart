@@ -40,6 +40,8 @@ import '../models/architect_overhang.dart';
 import '../services/architect_overhang_detector.dart';
 import 'architect_overhang_painter_helper.dart';
 import '../services/architect_roof_tool.dart';
+import '../services/architect_landscape_tool.dart';
+import 'architect_landscape_painter_helper.dart';
 import 'architect_service_plan_painter.dart';
 import 'architect_roof_painter_helper.dart';
 import 'architect_railing_geometry.dart';
@@ -107,7 +109,17 @@ enum ArchitectTool {
   decorativeVoid,
   decorativeLibrary,
   cadUnderlay,
-  rasterUnderlay;
+  rasterUnderlay,
+  terrain,
+  pathway,
+  vegetation,
+  siteFence;
+
+  bool get isLandscapeTool =>
+      this == terrain ||
+      this == pathway ||
+      this == vegetation ||
+      this == siteFence;
 
   bool get usesComponent => this == component || this == services;
 
@@ -248,6 +260,7 @@ class Architect2dPainter extends CustomPainter {
   final int activeHatchColorValue;
   final Offset? slabCandidatePoint;
   final ArchitectRoofTool? roofTool;
+  final ArchitectLandscapeTool? landscapeTool;
   final bool polygonEditInvalid;
   final int? polygonEditHoleIndex;
   final (Offset, Offset)? polygonLeaderLine;
@@ -372,6 +385,7 @@ class Architect2dPainter extends CustomPainter {
     this.activeHatchColorValue = 0xFF424242,
     this.slabCandidatePoint,
     this.roofTool,
+    this.landscapeTool,
     this.polygonEditInvalid = false,
     this.polygonEditHoleIndex,
     this.polygonLeaderLine,
@@ -422,6 +436,21 @@ class Architect2dPainter extends CustomPainter {
         );
       }
       if (paintGrid) _drawDraftingGrid(canvas, size);
+      ArchitectLandscapePainterHelper.drawTerrain(
+        canvas: canvas,
+        project: _project,
+        zoomScale: zoomScale,
+        selectedIds: {...selectedElementIds, ?selectedElementId},
+        palette: palette,
+      );
+      ArchitectLandscapePainterHelper.drawPathways(
+        canvas: canvas,
+        project: _project,
+        storey: _elementLayerStorey,
+        zoomScale: zoomScale,
+        selectedIds: {...selectedElementIds, ?selectedElementId},
+        palette: palette,
+      );
       ArchitectElementsPainterHelper.drawCadPrimitives(
         canvas: canvas, storey: _elementLayerStorey, zoomScale: zoomScale,
         palette: palette, dimensionScale: _project.dimensionScale,
@@ -445,6 +474,22 @@ class Architect2dPainter extends CustomPainter {
         palette: palette,
       );
       _drawZoneSchedule(canvas);
+      ArchitectLandscapePainterHelper.drawSiteFences(
+        canvas: canvas,
+        project: _project,
+        storey: _elementLayerStorey,
+        zoomScale: zoomScale,
+        selectedIds: {...selectedElementIds, ?selectedElementId},
+        palette: palette,
+      );
+      ArchitectLandscapePainterHelper.drawVegetation(
+        canvas: canvas,
+        project: _project,
+        storey: _elementLayerStorey,
+        zoomScale: zoomScale,
+        selectedIds: {...selectedElementIds, ?selectedElementId},
+        palette: palette,
+      );
       if (showUpperOverhangs) {
         ArchitectOverhangPainterHelper.drawOverhangs(
           canvas: canvas,
@@ -1942,6 +1987,44 @@ class Architect2dPainter extends CustomPainter {
         ..strokeWidth = 1.5 / draftingScale
         ..style = PaintingStyle.stroke;
       canvas.drawCircle(target, 5 / draftingScale, paint);
+    }
+    if (activeTool.isLandscapeTool && landscapeTool != null) {
+      final lt = landscapeTool!;
+      ArchitectLandscapePainterHelper.drawActiveLandscapeDraft(
+        canvas: canvas,
+        draftPoints: lt.draftPoints,
+        cursorWorld: activeDraftEnd ?? cursorPosition,
+        zoomScale: zoomScale,
+        accentColor: switch (activeTool) {
+          ArchitectTool.terrain =>
+            lt.terrainState == ArchitectTerrainState.proposed
+                ? const Color(0xFF15803D)
+                : const Color(0xFF92400E),
+          ArchitectTool.pathway => const Color(0xFF0284C7),
+          ArchitectTool.vegetation => const Color(0xFF16A34A),
+          ArchitectTool.siteFence => const Color(0xFFB45309),
+          _ => const Color(0xFF2563EB),
+        },
+        previewWidth: switch (activeTool) {
+          ArchitectTool.pathway => lt.pathwayWidth,
+          ArchitectTool.siteFence => lt.fenceThickness,
+          ArchitectTool.vegetation
+              when lt.plantSpecies == ArchitectPlantSpecies.trimmedHedge =>
+            lt.hedgeWidth,
+          _ => 0.0,
+        },
+        showCurbs:
+            activeTool == ArchitectTool.pathway &&
+            lt.pathwayCurbMode != ArchitectPathwayCurbMode.none,
+        curbWidth: lt.pathwayCurbWidth,
+        previewRadius:
+            activeTool == ArchitectTool.vegetation &&
+                lt.plantPlacementMode ==
+                    ArchitectVegetationPlacementMode.single &&
+                lt.plantSpecies != ArchitectPlantSpecies.trimmedHedge
+            ? lt.plantCrownDiameter * 0.5
+            : null,
+      );
     }
     if (activeTool == ArchitectTool.column && columnPreview != null) {
       ArchitectElementsPainterHelper.drawColumns(

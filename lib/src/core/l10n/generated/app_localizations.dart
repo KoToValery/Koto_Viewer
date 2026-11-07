@@ -22271,6 +22271,354 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import Page'**
   String get architectRasterImportPdfButton;
+
+  /// No description provided for @commandIconPathway.
+  ///
+  /// In en, this message translates to:
+  /// **'Pathway with curb'**
+  String get commandIconPathway;
+
+  /// No description provided for @commandIconVegetation.
+  ///
+  /// In en, this message translates to:
+  /// **'Vegetation & planting'**
+  String get commandIconVegetation;
+
+  /// No description provided for @architectCategoryLandscape.
+  ///
+  /// In en, this message translates to:
+  /// **'Landscape'**
+  String get architectCategoryLandscape;
+
+  /// No description provided for @architectToolTerrain.
+  ///
+  /// In en, this message translates to:
+  /// **'Terrain'**
+  String get architectToolTerrain;
+
+  /// No description provided for @architectToolPathway.
+  ///
+  /// In en, this message translates to:
+  /// **'Pathway'**
+  String get architectToolPathway;
+
+  /// No description provided for @architectToolVegetation.
+  ///
+  /// In en, this message translates to:
+  /// **'Planting'**
+  String get architectToolVegetation;
+
+  /// No description provided for @architectToolSiteFence.
+  ///
+  /// In en, this message translates to:
+  /// **'Site fence'**
+  String get architectToolSiteFence;
+
+  /// No description provided for @architectTerrainStateExisting.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing'**
+  String get architectTerrainStateExisting;
+
+  /// No description provided for @architectTerrainStateProposed.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed'**
+  String get architectTerrainStateProposed;
+
+  /// No description provided for @architectTerrainStateExistingFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing terrain'**
+  String get architectTerrainStateExistingFull;
+
+  /// No description provided for @architectTerrainStateProposedFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed terrain'**
+  String get architectTerrainStateProposedFull;
+
+  /// No description provided for @architectTerrainModeBoundary.
+  ///
+  /// In en, this message translates to:
+  /// **'Boundary'**
+  String get architectTerrainModeBoundary;
+
+  /// No description provided for @architectTerrainModeContour.
+  ///
+  /// In en, this message translates to:
+  /// **'Contour'**
+  String get architectTerrainModeContour;
+
+  /// No description provided for @architectTerrainModeSpot.
+  ///
+  /// In en, this message translates to:
+  /// **'Spot Z'**
+  String get architectTerrainModeSpot;
+
+  /// No description provided for @architectTerrainModePad.
+  ///
+  /// In en, this message translates to:
+  /// **'Flat pad'**
+  String get architectTerrainModePad;
+
+  /// No description provided for @architectTerrainFromGeodesy.
+  ///
+  /// In en, this message translates to:
+  /// **'From G-TOPO'**
+  String get architectTerrainFromGeodesy;
+
+  /// No description provided for @architectTerrainElevationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Z='**
+  String get architectTerrainElevationLabel;
+
+  /// No description provided for @architectTerrainSyncedFromGeodesy.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced {count} geodetic contours & points to Existing Terrain'**
+  String architectTerrainSyncedFromGeodesy(int count);
+
+  /// No description provided for @architectPathwayWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get architectPathwayWidth;
+
+  /// No description provided for @architectPathwayCurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Curb'**
+  String get architectPathwayCurb;
+
+  /// No description provided for @architectPathwayCurbWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Curb W'**
+  String get architectPathwayCurbWidth;
+
+  /// No description provided for @architectPathwayCurbBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Both curbs'**
+  String get architectPathwayCurbBoth;
+
+  /// No description provided for @architectPathwayCurbLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left curb'**
+  String get architectPathwayCurbLeft;
+
+  /// No description provided for @architectPathwayCurbRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right curb'**
+  String get architectPathwayCurbRight;
+
+  /// No description provided for @architectPathwayCurbNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No curb'**
+  String get architectPathwayCurbNone;
+
+  /// No description provided for @architectPathwayMatStoneSlabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Stone slabs'**
+  String get architectPathwayMatStoneSlabs;
+
+  /// No description provided for @architectPathwayMatCobblePavers.
+  ///
+  /// In en, this message translates to:
+  /// **'Cobble pavers'**
+  String get architectPathwayMatCobblePavers;
+
+  /// No description provided for @architectPathwayMatTimberDecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Timber decking'**
+  String get architectPathwayMatTimberDecking;
+
+  /// No description provided for @architectPathwayMatGravel.
+  ///
+  /// In en, this message translates to:
+  /// **'Crushed gravel'**
+  String get architectPathwayMatGravel;
+
+  /// No description provided for @architectPathwayMatAsphalt.
+  ///
+  /// In en, this message translates to:
+  /// **'Asphalt'**
+  String get architectPathwayMatAsphalt;
+
+  /// No description provided for @architectPathwayMatGrassGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Grass pavers'**
+  String get architectPathwayMatGrassGrid;
+
+  /// No description provided for @architectPathwayClosedPad.
+  ///
+  /// In en, this message translates to:
+  /// **'Plaza'**
+  String get architectPathwayClosedPad;
+
+  /// No description provided for @architectPlantDeciduousCanopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Deciduous tree (branched)'**
+  String get architectPlantDeciduousCanopy;
+
+  /// No description provided for @architectPlantDeciduousMinimal.
+  ///
+  /// In en, this message translates to:
+  /// **'Deciduous tree (minimal)'**
+  String get architectPlantDeciduousMinimal;
+
+  /// No description provided for @architectPlantConiferPine.
+  ///
+  /// In en, this message translates to:
+  /// **'Conifer / Pine / Spruce'**
+  String get architectPlantConiferPine;
+
+  /// No description provided for @architectPlantColumnarCypress.
+  ///
+  /// In en, this message translates to:
+  /// **'Columnar Thuja / Cypress'**
+  String get architectPlantColumnarCypress;
+
+  /// No description provided for @architectPlantOrnamentalPalm.
+  ///
+  /// In en, this message translates to:
+  /// **'Ornamental / Palm'**
+  String get architectPlantOrnamentalPalm;
+
+  /// No description provided for @architectPlantShrubCluster.
+  ///
+  /// In en, this message translates to:
+  /// **'Shrub cluster'**
+  String get architectPlantShrubCluster;
+
+  /// No description provided for @architectPlantTrimmedHedge.
+  ///
+  /// In en, this message translates to:
+  /// **'Trimmed hedge'**
+  String get architectPlantTrimmedHedge;
+
+  /// No description provided for @architectVegetationModeSingle.
+  ///
+  /// In en, this message translates to:
+  /// **'Single'**
+  String get architectVegetationModeSingle;
+
+  /// No description provided for @architectVegetationModeRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Row'**
+  String get architectVegetationModeRow;
+
+  /// No description provided for @architectVegetationModeHedge.
+  ///
+  /// In en, this message translates to:
+  /// **'Hedge'**
+  String get architectVegetationModeHedge;
+
+  /// No description provided for @architectVegetationCrownDiameter.
+  ///
+  /// In en, this message translates to:
+  /// **'D='**
+  String get architectVegetationCrownDiameter;
+
+  /// No description provided for @architectVegetationHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'H='**
+  String get architectVegetationHeight;
+
+  /// No description provided for @architectVegetationRowSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Step'**
+  String get architectVegetationRowSpacing;
+
+  /// No description provided for @architectFencePresetPiersAndSlats.
+  ///
+  /// In en, this message translates to:
+  /// **'Piers + horizontal boards'**
+  String get architectFencePresetPiersAndSlats;
+
+  /// No description provided for @architectFencePresetGabionFence.
+  ///
+  /// In en, this message translates to:
+  /// **'Gabion fence'**
+  String get architectFencePresetGabionFence;
+
+  /// No description provided for @architectFencePresetGabionRetaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Gabion retaining wall'**
+  String get architectFencePresetGabionRetaining;
+
+  /// No description provided for @architectFencePresetModernLouvers.
+  ///
+  /// In en, this message translates to:
+  /// **'Modern louver fence'**
+  String get architectFencePresetModernLouvers;
+
+  /// No description provided for @architectFencePresetClassicIron.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic wrought iron + piers'**
+  String get architectFencePresetClassicIron;
+
+  /// No description provided for @architectFencePresetRcRetaining.
+  ///
+  /// In en, this message translates to:
+  /// **'RC retaining wall'**
+  String get architectFencePresetRcRetaining;
+
+  /// No description provided for @architectFenceHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'H='**
+  String get architectFenceHeight;
+
+  /// No description provided for @architectFenceThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'B='**
+  String get architectFenceThickness;
+
+  /// No description provided for @architectFencePierSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Span'**
+  String get architectFencePierSpacing;
+
+  /// No description provided for @architectLayerTerrainExisting.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing Terrain'**
+  String get architectLayerTerrainExisting;
+
+  /// No description provided for @architectLayerTerrainProposed.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed Terrain'**
+  String get architectLayerTerrainProposed;
+
+  /// No description provided for @architectLayerPathways.
+  ///
+  /// In en, this message translates to:
+  /// **'Pathways & Curbs'**
+  String get architectLayerPathways;
+
+  /// No description provided for @architectLayerVegetation.
+  ///
+  /// In en, this message translates to:
+  /// **'Vegetation & Site'**
+  String get architectLayerVegetation;
 }
 
 class _AppLocalizationsDelegate

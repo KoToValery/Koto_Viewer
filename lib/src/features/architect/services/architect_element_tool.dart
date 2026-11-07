@@ -865,7 +865,7 @@ class ArchitectElementTool extends ChangeNotifier {
       }
     }
 
-    // Check Decorative Elements (when shown on plan)
+      // Check Decorative Elements (when shown on plan)
     final showDecorAll = annotationProject?.showDecorativeOnPlan ?? false;
     for (final decor in storey.decorativeElements) {
       if (!decor.showOnPlan && !showDecorAll) continue;
@@ -873,6 +873,23 @@ class ArchitectElementTool extends ChangeNotifier {
       if (fp.contains(point) ||
           fp.getBounds().inflate(tolerance).contains(point)) {
         yield decor.id;
+      }
+    }
+
+    // Check Landscape Elements (Vegetation, Site Fences, Pathways)
+    for (final veg in storey.vegetation) {
+      if (veg.containsPoint(point, tolerance: tolerance)) {
+        yield veg.id;
+      }
+    }
+    for (final fence in storey.siteFences) {
+      if (fence.containsPoint(point, tolerance: tolerance)) {
+        yield fence.id;
+      }
+    }
+    for (final path in storey.pathways) {
+      if (path.containsPoint(point, tolerance: tolerance)) {
+        yield path.id;
       }
     }
   }
@@ -931,6 +948,9 @@ class ArchitectElementTool extends ChangeNotifier {
           .toList(),
       components: storey.components.where((c) => c.id != elementId).toList(),
       zones: storey.zones.where((z) => z.id != elementId).toList(),
+      pathways: storey.pathways.where((p) => p.id != elementId).toList(),
+      vegetation: storey.vegetation.where((v) => v.id != elementId).toList(),
+      siteFences: storey.siteFences.where((f) => f.id != elementId).toList(),
     );
   }
 
@@ -1843,6 +1863,9 @@ class ArchitectElementTool extends ChangeNotifier {
           .toList(),
       components: storey.components.where((c) => !elementIds.contains(c.id)).toList(),
       zones: storey.zones.where((z) => !elementIds.contains(z.id)).toList(),
+      pathways: storey.pathways.where((p) => !elementIds.contains(p.id)).toList(),
+      vegetation: storey.vegetation.where((v) => !elementIds.contains(v.id)).toList(),
+      siteFences: storey.siteFences.where((f) => !elementIds.contains(f.id)).toList(),
     );
   }
 

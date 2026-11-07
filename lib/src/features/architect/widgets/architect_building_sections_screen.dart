@@ -1444,6 +1444,59 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
         canvas.restore();
       }
     }
+    // Draw Proposed Terrain (solid line + 35 cm earth hatch, stops at building exterior walls)
+    final propHatch = drawing.data.proposedTerrainHatchBand;
+    if (propHatch != null && !propHatch.getBounds().isEmpty) {
+      final screenBand = propHatch.transform(matrix.storage);
+      canvas.save();
+      canvas.clipPath(screenBand);
+      canvas.drawPath(
+        ArchitectHatchGeometry.path(
+          boundary: screenBand,
+          pattern: ArchitectSectionHatch.preset('earth'),
+          unitsPerMm:
+              (ArchitectTextScope.current?.denominator ??
+                  drawing.project.dimensionScale.denominator) /
+              1000 *
+              scale,
+          origin: p(Offset.zero),
+          visibleBounds: Offset.zero & size,
+        ),
+        Paint()
+          ..color = color.withValues(alpha: 0.72)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.65,
+      );
+      canvas.restore();
+    }
+    final propLine = drawing.data.proposedTerrainLine;
+    if (propLine != null && !propLine.getBounds().isEmpty) {
+      canvas.drawPath(
+        propLine.transform(matrix.storage),
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.75
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+    // Draw Existing Terrain (dashed line passing continuously through the building)
+    final exLine = drawing.data.existingTerrainLine;
+    if (exLine != null && !exLine.getBounds().isEmpty) {
+      final screenEx = exLine.transform(matrix.storage);
+      final dashPaint = Paint()
+        ..color = color.withValues(alpha: 0.78)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.1;
+      for (final metric in screenEx.computeMetrics()) {
+        for (var s = 0.0; s < metric.length; s += 13.0) {
+          canvas.drawPath(
+            metric.extractPath(s, math.min(s + 8.0, metric.length)),
+            dashPaint,
+          );
+        }
+      }
+    }
     void text(
       String value,
       Offset at,

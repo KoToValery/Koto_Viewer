@@ -76,6 +76,10 @@ class ArchitectLayer {
       'A-XREF' => l.architectLayerCadUnderlay,
       'A-RAST' => l.architectLayerRasterUnderlay,
       'G-TOPO' => l.architectLayerGeodesyContours,
+      'L-TERR-EXST' => l.architectLayerTerrainExisting,
+      'L-TERR-PROP' => l.architectLayerTerrainProposed,
+      'L-PATH' => l.architectLayerPathways,
+      'L-VEGE' => l.architectLayerVegetation,
       _ => name,
     };
   }
@@ -99,6 +103,10 @@ class ArchitectLayer {
   static const String cadUnderlayLayerId = 'A-XREF';
   static const String rasterUnderlayLayerId = 'A-RAST';
   static const String geodesyLayerId = 'G-TOPO';
+  static const String terrainExistingLayerId = 'L-TERR-EXST';
+  static const String terrainProposedLayerId = 'L-TERR-PROP';
+  static const String pathwayLayerId = 'L-PATH';
+  static const String vegetationLayerId = 'L-VEGE';
 
   static List<ArchitectLayer> defaultLayers() => const [
     ArchitectLayer(id: wallLayerId, name: 'A-WALL', isStandard: true),
@@ -120,5 +128,17 @@ class ArchitectLayer {
     ArchitectLayer(id: cadUnderlayLayerId, name: 'A-XREF', isStandard: true),
     ArchitectLayer(id: rasterUnderlayLayerId, name: 'A-RAST', isStandard: true),
     ArchitectLayer(id: geodesyLayerId, name: 'G-TOPO', isStandard: true),
+    ArchitectLayer(
+      id: terrainExistingLayerId,
+      name: 'L-TERR-EXST',
+      isStandard: true,
+    ),
+    ArchitectLayer(
+      id: terrainProposedLayerId,
+      name: 'L-TERR-PROP',
+      isStandard: true,
+    ),
+    ArchitectLayer(id: pathwayLayerId, name: 'L-PATH', isStandard: true),
+    ArchitectLayer(id: vegetationLayerId, name: 'L-VEGE', isStandard: true),
   ];
 }

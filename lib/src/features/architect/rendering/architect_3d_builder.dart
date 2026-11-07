@@ -584,6 +584,9 @@ class Architect3dBuilder {
         }
       }
     }
+    if (previewGeometry) {
+      _appendLandscape3D(project, allTris, mark);
+    }
     return Mesh3D(name: project.name, triangles: allTris);
   }
 
@@ -1421,4 +1424,267 @@ class Architect3dBuilder {
         isDoubleSided: true,
       ),
   ];
+
+  static List<Triangle3D> _extrude(
+    Path footprint,
+    double Function(Offset) bottom,
+    double Function(Offset) top,
+    Color topColor,
+    Color sideColor,
+    Color bottomColor,
+  ) => _roofPrism(footprint, bottom, top, topColor, sideColor, bottomColor);
+
+  static void _appendLandscape3D(
+    ArchitectProject project,
+    List<Triangle3D> allTris,
+    void Function(String id, int from) mark,
+  ) {
+    double groundZ(Offset p, double fallback) =>
+        project.proposedTerrain.evaluateElevationAt(p) ??
+        project.existingTerrain.evaluateElevationAt(p) ??
+        fallback;
+
+    // 1. Proposed Terrain 2.5D Surface (with building footprint cutout)
+    if (project.isLayerVisible(ArchitectLayer.terrainProposedLayerId) &&
+        project.proposedTerrain.boundaries.isNotEmpty) {
+      var terrainFootprint = Path();
+      for (final b in project.proposedTerrain.boundaries) {
+        if (b.polygon.length < 3 || b.isCutoutPad) continue;
+        terrainFootprint = Path.combine(
+          PathOperation.union,
+          terrainFootprint,
+          Path()..addPolygon(b.polygon, true),
+        );
+      }
+      for (final b in project.proposedTerrain.boundaries) {
+        if (b.polygon.length < 3 || !b.isCutoutPad) continue;
+        terrainFootprint = Path.combine(
+          PathOperation.difference,
+          terrainFootprint,
+          Path()..addPolygon(b.polygon, true),
+        );
+      }
+      // Cut out ground-floor slabs so terrain does not poke into building interior
+      for (final s in project.storeys) {
+        if (s.isRoof || s.elevation.abs() > 0.6) continue;
+        for (final slab in s.slabs) {
+          if (slab.polygon.length >= 3) {
+            try {
+              terrainFootprint = Path.combine(
+                PathOperation.difference,
+                terrainFootprint,
+                Path()..addPolygon(slab.polygon, true),
+              );
+            } catch (_) {}
+          }
+        }
+      }
+      if (!terrainFootprint.getBounds().isEmpty) {
+        final first = allTris.length;
+        allTris.addAll(
+          _extrude(
+            terrainFootprint,
+            (p) => groundZ(p, -0.15) - 0.25,
+            (p) => groundZ(p, -0.15),
+            const Color(0xFF7FA66C),
+            const Color(0xFF8B6F4E),
+            const Color(0xFF6E553A),
+          ),
+        );
+        mark('terrain_proposed', first);
+      }
+    }
+
+    // 2. Pathways with Automatic Curbs, Site Fences, and Vegetation per storey
+    for (final storey in project.storeys) {
+      if (storey.isRoof) continue;
+
+      if (project.isLayerVisible(ArchitectLayer.pathwayLayerId)) {
+        for (final pathway in storey.pathways) {
+          if (pathway.pavingPolygon.length < 3) continue;
+          final first = allTris.length;
+          final pavPath = Path()..addPolygon(pathway.pavingPolygon, true);
+          final pavColor = switch (pathway.material) {
+            ArchitectPavingMaterial.stoneSlabs => const Color(0xFFB8C0C8),
+            ArchitectPavingMaterial.cobblePavers => const Color(0xFF9E968E),
+            ArchitectPavingMaterial.timberDecking => const Color(0xFFB5835A),
+            ArchitectPavingMaterial.gravel => const Color(0xFFC2BDB6),
+            ArchitectPavingMaterial.asphalt => const Color(0xFF525860),
+            ArchitectPavingMaterial.grassGrid => const Color(0xFF6B9E62),
+          };
+          allTris.addAll(
+            _extrude(
+              pavPath,
+              (p) => groundZ(p, storey.elevation) - 0.04,
+              (p) => groundZ(p, storey.elevation) + 0.02,
+              pavColor,
+              const Color(0xFF78716C),
+              const Color(0xFF78716C),
+            ),
+          );
+          for (final curbPoly in [
+            pathway.leftCurbPolygon,
+            pathway.rightCurbPolygon,
+          ]) {
+            if (curbPoly.length < 3) continue;
+            allTris.addAll(
+              _extrude(
+                Path()..addPolygon(curbPoly, true),
+                (p) => groundZ(p, storey.elevation) - 0.04,
+                (p) => groundZ(p, storey.elevation) + pathway.curbHeight,
+                const Color(0xFFD6D3D1),
+                const Color(0xFFA8A29E),
+                const Color(0xFFA8A29E),
+              ),
+            );
+          }
+          mark(pathway.id, first);
+        }
+
+        for (final fence in storey.siteFences) {
+          if (fence.points.length < 2) continue;
+          final first = allTris.length;
+          final halfT = fence.thickness * 0.5;
+          final left = ArchitectPathway.offsetChain(
+            fence.points,
+            halfT,
+            closed: fence.closed,
+          );
+          final right = ArchitectPathway.offsetChain(
+            fence.points,
+            -halfT,
+            closed: fence.closed,
+          );
+          final bodyPath = Path()
+            ..addPolygon([...left, ...right.reversed], true);
+          if (fence.preset == ArchitectSiteFencePreset.gabionFence ||
+              fence.preset == ArchitectSiteFencePreset.gabionRetaining ||
+              fence.preset == ArchitectSiteFencePreset.rcRetaining) {
+            final topCol = fence.preset == ArchitectSiteFencePreset.rcRetaining
+                ? const Color(0xFF94A3B8)
+                : const Color(0xFF8C857B);
+            allTris.addAll(
+              _extrude(
+                bodyPath,
+                (p) => groundZ(p, storey.elevation) - 0.10,
+                (p) => groundZ(p, storey.elevation) + fence.height,
+                topCol,
+                topCol,
+                topCol,
+              ),
+            );
+          } else {
+            // Plinth + Piers + Slat/Louver/Iron Panel
+            allTris.addAll(
+              _extrude(
+                bodyPath,
+                (p) => groundZ(p, storey.elevation) - 0.08,
+                (p) => groundZ(p, storey.elevation) + 0.42,
+                const Color(0xFFCBD5E1),
+                const Color(0xFF94A3B8),
+                const Color(0xFF94A3B8),
+              ),
+            );
+            final panelLeft = ArchitectPathway.offsetChain(
+              fence.points,
+              0.03,
+              closed: fence.closed,
+            );
+            final panelRight = ArchitectPathway.offsetChain(
+              fence.points,
+              -0.03,
+              closed: fence.closed,
+            );
+            final panelColor =
+                fence.preset == ArchitectSiteFencePreset.piersAndSlats
+                ? const Color(0xFFA47148)
+                : const Color(0xFF334155);
+            allTris.addAll(
+              _extrude(
+                Path()
+                  ..addPolygon([...panelLeft, ...panelRight.reversed], true),
+                (p) => groundZ(p, storey.elevation) + 0.42,
+                (p) => groundZ(p, storey.elevation) + fence.height - 0.06,
+                panelColor,
+                panelColor,
+                panelColor,
+              ),
+            );
+            final pierHalf = math.max(halfT * 1.25, 0.18);
+            for (final (pierCenter, _) in fence.pierPositions) {
+              allTris.addAll(
+                _extrude(
+                  Path()
+                    ..addRect(
+                      Rect.fromCenter(
+                        center: pierCenter,
+                        width: pierHalf * 2,
+                        height: pierHalf * 2,
+                      ),
+                    ),
+                  (p) => groundZ(p, storey.elevation) - 0.08,
+                  (p) => groundZ(p, storey.elevation) + fence.height,
+                  const Color(0xFFE2E8F0),
+                  const Color(0xFFCBD5E1),
+                  const Color(0xFFCBD5E1),
+                ),
+              );
+            }
+          }
+          mark(fence.id, first);
+        }
+      }
+
+      if (project.isLayerVisible(ArchitectLayer.vegetationLayerId)) {
+        for (final veg in storey.vegetation) {
+          final first = allTris.length;
+          if (veg.species == ArchitectPlantSpecies.trimmedHedge &&
+              veg.points.length >= 2) {
+            final halfW = veg.hedgeWidth * 0.5;
+            final left = ArchitectPathway.offsetChain(veg.points, halfW);
+            final right = ArchitectPathway.offsetChain(veg.points, -halfW);
+            allTris.addAll(
+              _extrude(
+                Path()..addPolygon([...left, ...right.reversed], true),
+                (p) => groundZ(p, storey.elevation),
+                (p) => groundZ(p, storey.elevation) + veg.height,
+                const Color(0xFF3E7B48),
+                const Color(0xFF2E6338),
+                const Color(0xFF2E6338),
+              ),
+            );
+          } else {
+            final z0 = groundZ(veg.position, storey.elevation);
+            final r = (veg.crownDiameter * 0.5).clamp(0.25, 10.0);
+            final trunkR = (r * 0.12).clamp(0.05, 0.22);
+            allTris.addAll(
+              _extrude(
+                Path()
+                  ..addOval(
+                    Rect.fromCircle(center: veg.position, radius: trunkR),
+                  ),
+                (_) => z0,
+                (_) => z0 + veg.height * 0.42,
+                const Color(0xFF6D4C3D),
+                const Color(0xFF5D4037),
+                const Color(0xFF5D4037),
+              ),
+            );
+            allTris.addAll(
+              _extrude(
+                Path()
+                  ..addOval(Rect.fromCircle(center: veg.position, radius: r)),
+                (_) => z0 + veg.height * 0.36,
+                (_) => z0 + veg.height,
+                const Color(0xFF4A8B56),
+                const Color(0xFF3A7245),
+                const Color(0xFF2E5C38),
+              ),
+            );
+          }
+          mark(veg.id, first);
+        }
+      }
+    }
+  }
 }

@@ -105,6 +105,8 @@ class ArchitectDrawingPublisher {
     p.elevations,
     p.northSymbol,
     p.slabCompositionNumbers,
+    p.existingTerrain,
+    p.proposedTerrain,
     p.document.viewScales,
     p.document.profileMm,
     p.document.overrideMm,

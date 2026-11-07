@@ -46,4 +46,5 @@
 | Create Roof | `CreateArchitectRoofPlane` | `[TAG:CMD_ROOFS]` |
 | Vertex Insert | `InsertArchitectElementPoint` | `[TAG:CMD_POLYGONS]` |
 | Storey Copy | `CopyArchitectElementsAcrossStoreys` | `[TAG:CMD_STOREYS]` |
+| Landscape Update | `UpdateArchitectLandscapeProject` | `[TAG:CMD_STOREYS]` |
 | Undo / Redo | `ArchitectCommandController.undo() / redo()` | `[TAG:CMD_CONTROLLER]` |
