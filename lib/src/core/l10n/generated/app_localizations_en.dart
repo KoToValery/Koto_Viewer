@@ -6013,6 +6013,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get slabMatAeratedConcrete => 'Aerated concrete';
 
   @override
+  String get slabMatTimber => 'Timber / joists';
+
+  @override
+  String get slabPresetTimberJoist => 'Timber Joist Floor (Гредоред)';
+
+  @override
   String get architectStructuralScheme => 'Structural Scheme';
 
   @override

@@ -10,6 +10,7 @@ import 'package:kotoview/src/features/architect/models/architect_window.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_section_hatch.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_wall_solids.dart';
 import 'package:kotoview/src/features/architect/services/architect_building_section.dart';
+import 'package:kotoview/src/features/architect/services/architect_section_junctions.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -158,8 +159,8 @@ void main() {
     });
   });
 
-  group('4. Window Spandrel Infill (flatSlab vs beamAndSlab)', () {
-    test('flatSlab scheme fills window spandrel up to slab underside with aerated concrete', () {
+  group('4. Window Spandrel Infill, RC Lintels & Drop Beams (flatSlab vs beamAndSlab)', () {
+    test('flatSlab scheme places RC lintel above window and fills remaining spandrel with aerated concrete', () {
       final window = ArchitectWindow(
         id: 'win_flat',
         uuid: 'uuid_win_flat',
@@ -218,7 +219,18 @@ void main() {
 
       final section = ArchitectBuildingSection.build(project, cut);
 
-      // Verify that aerated concrete infill region exists above the window
+      // Verify that RC lintel (щурц) exists directly above window head (2.30m - 2.44m)
+      final lintelRegions = section.regions.where(
+        (r) =>
+            r.sourceId.contains('rc_lintel') &&
+            r.material == SlabMaterial.concrete,
+      ).toList();
+      expect(lintelRegions, isNotEmpty);
+      final lintelBounds = lintelRegions.first.path.getBounds();
+      expect(lintelBounds.top, closeTo(2.30, 0.05));
+      expect(lintelBounds.bottom, closeTo(2.44, 0.05));
+
+      // Verify that aerated concrete infill region exists above the lintel (2.44m - 2.60m)
       final infillRegions = section.regions.where(
         (r) =>
             r.sourceId.contains('aerated_infill') &&
@@ -227,11 +239,11 @@ void main() {
 
       expect(infillRegions, isNotEmpty);
       final infillBounds = infillRegions.first.path.getBounds();
-      expect(infillBounds.top, closeTo(2.30, 0.05)); // Window head
+      expect(infillBounds.top, closeTo(2.44, 0.05));
       expect(infillBounds.bottom, closeTo(2.60, 0.05)); // Up to slab core bottom (2.80 - 0.20m slab)
     });
 
-    test('beamAndSlab scheme places exterior drop beam and fills remaining space with aerated concrete', () {
+    test('beamAndSlab scheme places continuous drop beam, RC lintel, and aerated concrete infill', () {
       final window = ArchitectWindow(
         id: 'win_beam',
         uuid: 'uuid_win_beam',
@@ -273,11 +285,17 @@ void main() {
         height: 2.80,
         slabs: [slab],
       );
-      final cut = ArchitectSection(
-        id: 'sec_beam',
-        name: 'Section Beam',
+      final cutWindow = ArchitectSection(
+        id: 'sec_beam_win',
+        name: 'Section Window',
         start: const Offset(3, -2),
         end: const Offset(3, 2),
+      );
+      final cutPier = ArchitectSection(
+        id: 'sec_beam_pier',
+        name: 'Section Pier',
+        start: const Offset(1, -2),
+        end: const Offset(1, 2),
       );
       final project = ArchitectProject.starter(
         name: 'Beam and Slab Project',
@@ -285,28 +303,183 @@ void main() {
         perimeterBeamDepth: 0.50,
       ).copyWith(
         storeys: [storey0, storey1],
-        sections: [cut],
+        sections: [cutWindow, cutPier],
         structuralScheme: ArchitectStructuralScheme.beamAndSlab,
         perimeterBeamDepth: 0.50,
       );
 
-      final section = ArchitectBuildingSection.build(project, cut);
+      final sectionWin = ArchitectBuildingSection.build(project, cutWindow);
 
-      // Verify drop beam region exists under slab
-      final beamRegions = section.regions.where(
+      // Verify drop beam region exists under slab (2.50m - 2.80m)
+      final beamRegions = sectionWin.regions.where(
         (r) =>
             r.sourceId.contains('drop_beam') &&
             r.material == SlabMaterial.concrete,
       ).toList();
       expect(beamRegions, isNotEmpty);
+      final beamBounds = beamRegions.first.path.getBounds();
+      expect(beamBounds.top, closeTo(2.50, 0.05));
+      expect(beamBounds.bottom, closeTo(2.80, 0.05));
 
-      // Verify aerated concrete infill region exists between window head and beam bottom
-      final infillRegions = section.regions.where(
+      // Verify RC lintel exists directly above window head (2.20m - 2.34m)
+      final lintelRegions = sectionWin.regions.where(
+        (r) =>
+            r.sourceId.contains('rc_lintel') &&
+            r.material == SlabMaterial.concrete,
+      ).toList();
+      expect(lintelRegions, isNotEmpty);
+      final lintelBounds = lintelRegions.first.path.getBounds();
+      expect(lintelBounds.top, closeTo(2.20, 0.05));
+      expect(lintelBounds.bottom, closeTo(2.34, 0.05));
+
+      // Verify aerated concrete infill region exists between lintel and beam bottom (2.34m - 2.50m)
+      final infillRegions = sectionWin.regions.where(
         (r) =>
             r.sourceId.contains('aerated_infill') &&
             r.material == SlabMaterial.aeratedConcrete,
       ).toList();
       expect(infillRegions, isNotEmpty);
+      final infillBounds = infillRegions.first.path.getBounds();
+      expect(infillBounds.top, closeTo(2.34, 0.05));
+      expect(infillBounds.bottom, closeTo(2.50, 0.05));
+
+      // Verify CONTINUOUS drop beam also exists across solid wall pier next to window
+      final sectionPier = ArchitectBuildingSection.build(project, cutPier);
+      final pierBeamRegions = sectionPier.regions.where(
+        (r) =>
+            r.sourceId.contains('drop_beam') &&
+            r.material == SlabMaterial.concrete,
+      ).toList();
+      expect(pierBeamRegions, isNotEmpty);
+      final pierBeamBounds = pierBeamRegions.first.path.getBounds();
+      expect(pierBeamBounds.top, closeTo(2.50, 0.05));
+      expect(pierBeamBounds.bottom, closeTo(2.80, 0.05));
+    });
+  });
+
+  group('5. Timber Joist Floor for roundLogs & studFrame schemes', () {
+    test('resolves timber joist preset for intermediate floors in roundLogs scheme', () {
+      final wall = ArchitectWall(
+        id: 'wall_log',
+        startPoint: const Offset(0, 0),
+        endPoint: const Offset(6, 0),
+        height: 2.80,
+        thickness: 0.22,
+        wallTypeId: 'round_logs_d22',
+      );
+      final storey0 = ArchitectStorey(
+        id: 'storey_0',
+        name: 'Ground',
+        elevation: 0.0,
+        height: 2.80,
+        walls: [wall],
+      );
+      final slab = ArchitectSlab(
+        id: 'slab_timber',
+        polygon: [
+          const Offset(-1, -1),
+          const Offset(7, -1),
+          const Offset(7, 3),
+          const Offset(-1, 3),
+        ],
+      );
+      final storey1 = ArchitectStorey(
+        id: 'storey_1',
+        name: 'Storey 1',
+        elevation: 2.80,
+        height: 2.80,
+        slabs: [slab],
+      );
+      final project = ArchitectProject.starter(
+        name: 'Log Home Project',
+        structuralScheme: ArchitectStructuralScheme.roundLogs,
+      ).copyWith(
+        storeys: [storey0, storey1],
+        structuralScheme: ArchitectStructuralScheme.roundLogs,
+      );
+
+      final assembly = ArchitectSectionJunctions.resolveEffectiveSlabAssembly(
+        project,
+        storey1,
+        slab,
+      );
+
+      expect(assembly, isNotNull);
+      expect(assembly!.id, 'slab-timber-joist');
+      expect(assembly.coreMaterial, SlabMaterial.timber);
+      expect(assembly.above.any((l) => l.role == SlabLayerRole.acoustic), isTrue);
+      expect(assembly.above.any((l) => l.customName.contains('OSB')), isTrue);
+      expect(assembly.below.any((l) => l.role == SlabLayerRole.ceiling), isTrue);
+    });
+  });
+
+  group('6. Sandwich Panels Elevated RC Plinth Curb & Flashing', () {
+    test('ground slab generates +35cm concrete plinth curb and base flashing for sandwich panels', () {
+      final panelWall = ArchitectWall(
+        id: 'panel_wall',
+        startPoint: const Offset(0, 0),
+        endPoint: const Offset(6, 0),
+        height: 3.00,
+        thickness: 0.12,
+        wallTypeId: 'panel_pir_120',
+        system: const ArchitectWallSystem(
+          kind: ArchitectWallSystemKind.sandwichPanels,
+        ),
+        location: ArchitectWallLocation.exterior,
+      );
+      final groundSlab = ArchitectSlab(
+        id: 'slab_ground',
+        polygon: [
+          const Offset(-1, -1),
+          const Offset(7, -1),
+          const Offset(7, 3),
+          const Offset(-1, 3),
+        ],
+      );
+      final storey0 = ArchitectStorey(
+        id: 'storey_0',
+        name: 'Ground',
+        elevation: 0.0,
+        height: 3.00,
+        walls: [panelWall],
+        slabs: [groundSlab],
+      );
+      final cut = ArchitectSection(
+        id: 'sec_panel',
+        name: 'Section Panel',
+        start: const Offset(3, -2),
+        end: const Offset(3, 2),
+      );
+      final project = ArchitectProject.starter(
+        name: 'Industrial Hall',
+        structuralScheme: ArchitectStructuralScheme.sandwichPanels,
+      ).copyWith(
+        storeys: [storey0],
+        sections: [cut],
+        structuralScheme: ArchitectStructuralScheme.sandwichPanels,
+      );
+
+      final section = ArchitectBuildingSection.build(project, cut);
+
+      // Verify that concrete stem rises 35 cm above ground slab level (up to 0.35m)
+      final stemRegions = section.regions.where(
+        (r) =>
+            r.sourceId == groundSlab.id &&
+            r.material == SlabMaterial.concrete &&
+            r.path.getBounds().bottom > 0.20,
+      ).toList();
+      expect(stemRegions, isNotEmpty);
+      final stemBounds = stemRegions.first.path.getBounds();
+      expect(stemBounds.bottom, closeTo(0.35, 0.05));
+
+      // Verify that starter channel / flashing exists at top of the concrete curb
+      final flashRegions = section.regions.where(
+        (r) =>
+            r.sourceId == panelWall.id &&
+            r.material == SlabMaterial.custom &&
+            r.path.getBounds().top >= 0.30,
+      ).toList();
+      expect(flashRegions, isNotEmpty);
     });
   });
 }

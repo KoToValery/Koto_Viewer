@@ -15,6 +15,7 @@ enum SlabUsage {
 enum SlabMaterial {
   concrete,
   aeratedConcrete,
+  timber,
   tile,
   tileAdhesive,
   parquet,
@@ -128,12 +129,14 @@ class ArchitectSlabAssembly {
   final String id;
   final String customName;
   final SlabUsage usage;
+  final SlabMaterial coreMaterial;
   final List<ArchitectSlabLayer> above;
   final List<ArchitectSlabLayer> below;
   const ArchitectSlabAssembly({
     required this.id,
     required this.usage,
     this.customName = '',
+    this.coreMaterial = SlabMaterial.concrete,
     this.above = const [],
     this.below = const [],
   });
@@ -145,12 +148,14 @@ class ArchitectSlabAssembly {
     String? id,
     String? customName,
     SlabUsage? usage,
+    SlabMaterial? coreMaterial,
     List<ArchitectSlabLayer>? above,
     List<ArchitectSlabLayer>? below,
   }) => ArchitectSlabAssembly(
     id: id ?? this.id,
     customName: customName ?? this.customName,
     usage: usage ?? this.usage,
+    coreMaterial: coreMaterial ?? this.coreMaterial,
     above: above ?? this.above,
     below: below ?? this.below,
   );
@@ -178,13 +183,14 @@ class ArchitectSlabAssembly {
 
   String signature(double concreteThickness) => jsonEncode([
     above.map((l) => l.signature).toList(),
-    ['concrete', (concreteThickness * 1e9).round()],
+    [coreMaterial.name, (concreteThickness * 1e9).round()],
     below.map((l) => l.signature).toList(),
   ]);
   Map<String, dynamic> toJson() => {
     'id': id,
     'customName': customName,
     'usage': usage.name,
+    'coreMaterial': coreMaterial.name,
     'above': above.map((l) => l.toJson()).toList(),
     'below': below.map((l) => l.toJson()).toList(),
   };
@@ -194,6 +200,9 @@ class ArchitectSlabAssembly {
     id: j['id'] as String,
     customName: j['customName'] as String? ?? '',
     usage: SlabUsage.values.byName(j['usage'] as String),
+    coreMaterial: j['coreMaterial'] != null
+        ? SlabMaterial.values.byName(j['coreMaterial'] as String)
+        : SlabMaterial.concrete,
     above: (j['above'] as List? ?? [])
         .map(
           (l) =>
@@ -258,6 +267,7 @@ class ArchitectSlabCatalog {
 
   static List<ArchitectSlabAssembly> get presets => [
     for (final usage in SlabUsage.values) preset(usage),
+    timberJoist(),
   ];
   static ArchitectSlabAssembly preset(SlabUsage usage) {
     ArchitectSlabLayer l(
@@ -402,6 +412,52 @@ class ArchitectSlabCatalog {
     return ArchitectSlabAssembly(
       id: 'slab-${usage.name}',
       usage: usage,
+      above: above,
+      below: below,
+    );
+  }
+
+  static ArchitectSlabAssembly timberJoist({String id = 'slab-timber-joist'}) {
+    ArchitectSlabLayer l(
+      String id,
+      SlabMaterial m,
+      SlabLayerRole r,
+      double d, [
+      double slope = 0,
+      String customName = '',
+    ]) => ArchitectSlabLayer(
+      id: id,
+      material: m,
+      role: r,
+      thickness: d,
+      slopePercent: slope,
+      customName: customName,
+    );
+    final above = [
+      ...finish(parquet: true),
+      l(
+        'subfloor',
+        SlabMaterial.custom,
+        SlabLayerRole.screed,
+        .022,
+        0,
+        'OSB / Vidifloor',
+      ),
+      l('acoustic', SlabMaterial.acousticWool, SlabLayerRole.acoustic, .02),
+    ];
+    final below = [
+      l(
+        'vapour',
+        SlabMaterial.vapourBarrier,
+        SlabLayerRole.vapourControl,
+        .002,
+      ),
+      l('ceiling', SlabMaterial.plasterboard, SlabLayerRole.ceiling, .0125),
+    ];
+    return ArchitectSlabAssembly(
+      id: id,
+      usage: SlabUsage.intermediate,
+      coreMaterial: SlabMaterial.timber,
       above: above,
       below: below,
     );

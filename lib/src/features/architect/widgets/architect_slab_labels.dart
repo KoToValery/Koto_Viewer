@@ -5,6 +5,7 @@ extension SlabMaterialLabel on SlabMaterial {
   String label(AppLocalizations l) => switch (this) {
     SlabMaterial.concrete => l.slabMatConcrete,
     SlabMaterial.aeratedConcrete => l.slabMatAeratedConcrete,
+    SlabMaterial.timber => l.slabMatTimber,
     SlabMaterial.tile => l.slabMatTile,
     SlabMaterial.tileAdhesive => l.slabMatTileAdhesive,
     SlabMaterial.parquet => l.slabMatParquet,
@@ -65,8 +66,10 @@ extension SlabLayerRoleLabel on SlabLayerRole {
 }
 
 extension SlabAssemblyLabel on ArchitectSlabAssembly {
-  String label(AppLocalizations l) =>
-      customName.isEmpty ? usage.label(l) : customName;
+  String label(AppLocalizations l) {
+    if (id == 'slab-timber-joist') return l.slabPresetTimberJoist;
+    return customName.isEmpty ? usage.label(l) : customName;
+  }
 }
 
 extension SlabLayerLabel on ArchitectSlabLayer {

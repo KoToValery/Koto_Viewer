@@ -173,7 +173,13 @@ class ArchitectSectionJunctions {
     if (!hasWalls || slab.coreTopOffset.abs() >= 0.35) {
       return null;
     }
-    return ArchitectSlabCatalog.preset(defaultUsageForStorey(project, storey));
+    final usage = defaultUsageForStorey(project, storey);
+    if ((project.structuralScheme.isRoundLogs ||
+            project.structuralScheme.isStudFrame) &&
+        usage == SlabUsage.intermediate) {
+      return ArchitectSlabCatalog.timberJoist();
+    }
+    return ArchitectSlabCatalog.preset(usage);
   }
 
   /// Checks whether [slab] on [storey] is a ground-bearing slab (resting on soil/sub-base).
@@ -487,9 +493,13 @@ class ArchitectSectionJunctions {
               );
 
               // For sandwich panels, foundation stem matches full panel width (min 25 cm)
+              // and rises 35 cm above slab core datum as an elevated plinth curb / socle
               var stemLeft = c0;
               var stemRight = c1;
-              if (cw.wall.system.isPanel && (c1 - c0) < 0.24) {
+              final isPanelWall =
+                  cw.wall.system.isPanel ||
+                  project.structuralScheme.isSandwichPanels;
+              if (isPanelWall && (c1 - c0) < 0.24) {
                 final scale = cw.wall.isCurved
                     ? 1.0
                     : 1.0 / math.max(0.25, cw.transverse);
@@ -501,12 +511,15 @@ class ArchitectSectionJunctions {
                 }
               }
 
+              final curbH = isPanelWall ? 0.35 : 0.0;
+              final stemTop = zCoreTop + curbH;
+
               // 4a. Concrete Strip Foundation Stem (merges monolithically with RC slab core)
               final stemRect = Rect.fromLTRB(
                 stemLeft,
                 zFoundationBot,
                 stemRight,
-                zCoreTop,
+                stemTop,
               );
               final stemPath = Path()..addRect(stemRect);
               slabAndFoundationRegions.add(
@@ -786,12 +799,29 @@ class ArchitectSectionJunctions {
         {WallCoreMaterial.brick, WallCoreMaterial.aeratedConcrete}.contains(wall.coreMaterial);
 
     if (isSandwichPanel) {
+      final curbH = isGroundSlab ? 0.35 : 0.0;
       for (final (f0, f1) in cw.fullIntervals) {
         final overlaps = spans.any(
           (sp) => math.min(sp.$2, f1) - math.max(sp.$1, f0) > -0.05,
         );
         if (!overlaps) continue;
-        final zBase = coreSurface.topAt(cut.pointAt((f0 + f1) * 0.5));
+        final zCoreTop = coreSurface.topAt(cut.pointAt((f0 + f1) * 0.5));
+        final zBase = zCoreTop + curbH;
+
+        if (isGroundSlab) {
+          // Horizontal DPC capillary break membrane on top of RC plinth curb
+          const wpH = 0.005;
+          final wpRect = Rect.fromLTRB(f0, zBase - wpH, f1, zBase);
+          onAddRegion(
+            ArchitectSectionRegion(
+              wall.id,
+              SlabMaterial.waterproofing,
+              Path()..addRect(wpRect),
+              slab: true,
+            ),
+          );
+        }
+
         final isLeftExt = cw.exteriorDirectionS < 0;
         const flashH = 0.016;
         const dripLip = 0.018;
@@ -819,7 +849,12 @@ class ArchitectSectionJunctions {
         );
         onAddWallCutout(
           Path()..addRect(
-            Rect.fromLTRB(f0 - 0.01, zBase - 0.05, f1 + 0.01, zBase + flashH),
+            Rect.fromLTRB(
+              f0 - 0.01,
+              zCoreTop - 0.10,
+              f1 + 0.01,
+              zBase + flashH,
+            ),
           ),
         );
       }

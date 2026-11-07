@@ -6039,6 +6039,12 @@ class AppLocalizationsBg extends AppLocalizations {
   String get slabMatAeratedConcrete => 'Газобетон';
 
   @override
+  String get slabMatTimber => 'Дърво / греди';
+
+  @override
+  String get slabPresetTimberJoist => 'Дървен междуетажен под (гредоред)';
+
+  @override
   String get architectStructuralScheme => 'Конструктивна схема';
 
   @override

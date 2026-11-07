@@ -15,6 +15,7 @@ class ArchitectSectionHatch {
         SlabMaterial.blindingConcrete ||
         SlabMaterial.gravel ||
         SlabMaterial.ballast => preset('concrete'),
+        SlabMaterial.timber ||
         SlabMaterial.parquet => preset('wood'),
         SlabMaterial.mineralWool || SlabMaterial.acousticWool => preset('dots'),
         SlabMaterial.xps ||

@@ -1949,6 +1949,8 @@
   "slabSectionDelete": "Изтрий разреза",
   "slabMatConcrete": "Стоманобетон",
   "slabMatAeratedConcrete": "Газобетон",
+  "slabMatTimber": "Дърво / греди",
+  "slabPresetTimberJoist": "Дървен междуетажен под (гредоред)",
   "architectStructuralScheme": "Конструктивна схема",
   "architectStructuralSchemeFlatSlab": "Безгредова плоча (Гладка плоча)",
   "architectStructuralSchemeBeamAndSlab": "Гредова система (Плоча с греди)",

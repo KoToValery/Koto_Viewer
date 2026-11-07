@@ -773,161 +773,184 @@ class ArchitectBuildingSection {
               ),
             );
           }
+        }
 
-          if (cutOp.isWindow &&
-              (wall.coreMaterial == WallCoreMaterial.brick ||
-                  wall.coreMaterial == WallCoreMaterial.aeratedConcrete) &&
-              !wall.system.isSpecial &&
-              !wallPath.getBounds().isEmpty) {
-            final zHead = cutOp.zTop;
-            final zWallBase = floor.elevation + wall.baseOffset;
-            final wallH = wall.isSlopedTop
-                ? math.max(wall.height, wall.endHeight!)
-                : wall.effectiveHeight(floor.height);
-            final zWallTop = zWallBase + wallH;
-            var zCeiling = zWallTop;
-            for (final upper in project.storeys) {
-              if (upper.elevation >= floor.elevation + 0.1) {
-                for (final slab in upper.slabs) {
-                  final surfaces = ArchitectSlabGeometry.surfaces(
-                    project,
-                    upper,
-                    slab,
-                  );
-                  final coreIdx = surfaces.indexWhere(
-                    (s) => s.layer.id == 'core',
-                  );
-                  if (coreIdx >= 0) {
-                    final midS = (cutOp.sMin + cutOp.sMax) * 0.5;
-                    final pt = cut.pointAt(midS);
-                    final slabBot = surfaces[coreIdx].bottomAt(pt);
-                    if ((slabBot - zWallTop).abs() <= 0.35) {
-                      zCeiling = math.min(zCeiling, slabBot);
-                    }
-                  }
-                }
-              }
-            }
-
-            final cw = cutWallByWallId[wall.id];
-            final c0 = cw?.coreIntervals.firstOrNull?.$1 ?? cutOp.sMin;
-            final c1 = cw?.coreIntervals.lastOrNull?.$2 ?? cutOp.sMax;
-            final sLeft = math.max(c0, cutOp.sMin);
-            final sRight = math.min(c1, cutOp.sMax);
-
-            if (sRight > sLeft + 1e-4) {
-              if (project.structuralScheme.isBeamAndSlab) {
-                // Beam and Slab Scheme:
-                // Perimeter drop beam under upper slab, aerated concrete infill between window head and beam bottom
-                final tSlab = 0.20;
-                final beamDrop = math.max(
-                  0.15,
-                  project.perimeterBeamDepth - tSlab,
+        double computeCeilingAt(double s) {
+          final zWallBase = floor.elevation + wall.baseOffset;
+          final wallH = wall.isSlopedTop
+              ? math.max(wall.height, wall.endHeight!)
+              : wall.effectiveHeight(floor.height);
+          final zWallTop = zWallBase + wallH;
+          var zCeil = zWallTop;
+          for (final upper in project.storeys) {
+            if (upper.elevation >= floor.elevation + 0.1) {
+              for (final slab in upper.slabs) {
+                final surfaces = ArchitectSlabGeometry.surfaces(
+                  project,
+                  upper,
+                  slab,
                 );
-                final zBeamBot = zCeiling - beamDrop;
-                if (zCeiling > zBeamBot + 0.01) {
-                  final beamRect = Rect.fromLTRB(
-                    sLeft,
-                    math.max(zHead, zBeamBot),
-                    sRight,
-                    zCeiling,
-                  );
-                  final beamCut = Path.combine(
-                    PathOperation.intersect,
-                    wallPath,
-                    Path()..addRect(beamRect),
-                  );
-                  if (!beamCut.getBounds().isEmpty) {
-                    wallPath = Path.combine(
-                      PathOperation.difference,
-                      wallPath,
-                      beamCut,
-                    );
-                    extraCutMaskPaths.add(beamCut);
-                    regions.add(
-                      ArchitectSectionRegion(
-                        '${wall.id}_${cutOp.id}_drop_beam',
-                        SlabMaterial.concrete,
-                        beamCut,
-                        slab: true,
-                      ),
-                    );
-                  }
-                }
-                if (zBeamBot > zHead + 0.02) {
-                  final infillRect = Rect.fromLTRB(
-                    sLeft,
-                    zHead,
-                    sRight,
-                    zBeamBot,
-                  );
-                  final infillCut = Path.combine(
-                    PathOperation.intersect,
-                    wallPath,
-                    Path()..addRect(infillRect),
-                  );
-                  if (!infillCut.getBounds().isEmpty) {
-                    wallPath = Path.combine(
-                      PathOperation.difference,
-                      wallPath,
-                      infillCut,
-                    );
-                    extraCutMaskPaths.add(infillCut);
-                    regions.add(
-                      ArchitectSectionRegion(
-                        '${wall.id}_${cutOp.id}_aerated_infill',
-                        SlabMaterial.aeratedConcrete,
-                        infillCut,
-                        customFillColor: const Color(0xFFCFD8DC),
-                        hatchPattern: ArchitectSectionHatch.wall(
-                          ArchitectMaterial.aeratedConcrete,
-                        ),
-                      ),
-                    );
-                  }
-                }
-              } else if (project.structuralScheme.isFlatSlab ||
-                  project.structuralScheme.isMasonry) {
-                // Flat Slab Scheme:
-                // Space above window head up to flat slab is automatically filled with Aerated Concrete
-                if (zCeiling > zHead + 0.02) {
-                  final infillRect = Rect.fromLTRB(
-                    sLeft,
-                    zHead,
-                    sRight,
-                    zCeiling,
-                  );
-                  final infillCut = Path.combine(
-                    PathOperation.intersect,
-                    wallPath,
-                    Path()..addRect(infillRect),
-                  );
-                  if (!infillCut.getBounds().isEmpty) {
-                    wallPath = Path.combine(
-                      PathOperation.difference,
-                      wallPath,
-                      infillCut,
-                    );
-                    extraCutMaskPaths.add(infillCut);
-                    regions.add(
-                      ArchitectSectionRegion(
-                        '${wall.id}_${cutOp.id}_aerated_infill',
-                        SlabMaterial.aeratedConcrete,
-                        infillCut,
-                        customFillColor: const Color(0xFFCFD8DC),
-                        hatchPattern: ArchitectSectionHatch.wall(
-                          ArchitectMaterial.aeratedConcrete,
-                        ),
-                      ),
-                    );
+                final coreIdx = surfaces.indexWhere(
+                  (s) => s.layer.id == 'core',
+                );
+                if (coreIdx >= 0) {
+                  final pt = cut.pointAt(s);
+                  final slabBot = surfaces[coreIdx].bottomAt(pt);
+                  if ((slabBot - zWallTop).abs() <= 0.35) {
+                    zCeil = math.min(zCeil, slabBot);
                   }
                 }
               }
             }
           }
+          return zCeil;
         }
 
-        // Automatic horizontal RC ring/tie beams (бетонни пояси) on tall masonry walls (Eurocode 6 / 8: H > 3.00 m)
+        // --- SUBSECTION: [TAG:SPANDREL_INFILL] Continuous Drop Beams, RC Lintels & Aerated Concrete Infill ---
+        // For exterior walls in beamAndSlab, a continuous reinforced concrete drop beam
+        // runs along the entire wall core underneath the upper slab.
+        if (project.structuralScheme.isBeamAndSlab &&
+            !wall.isInterior &&
+            !wall.system.isSpecial &&
+            wallPath != null &&
+            !wallPath.getBounds().isEmpty) {
+          final cw = cutWallByWallId[wall.id];
+          final intervals = cw?.coreIntervals ?? [(0.0, cut.length)];
+          const tSlab = 0.20;
+          final beamDrop = math.max(0.15, project.perimeterBeamDepth - tSlab);
+
+          for (var i = 0; i < intervals.length; i++) {
+            final (c0, c1) = intervals[i];
+            if (c1 <= c0 + 1e-4) continue;
+            final midS = (c0 + c1) * 0.5;
+            final zCeiling = computeCeilingAt(midS);
+            final zBeamBot = zCeiling - beamDrop;
+            if (zCeiling > zBeamBot + 0.01) {
+              final beamRect = Rect.fromLTRB(c0, zBeamBot, c1, zCeiling);
+              final beamCut = Path.combine(
+                PathOperation.intersect,
+                wallPath!,
+                Path()..addRect(beamRect),
+              );
+              if (!beamCut.getBounds().isEmpty) {
+                wallPath = Path.combine(
+                  PathOperation.difference,
+                  wallPath,
+                  beamCut,
+                );
+                extraCutMaskPaths.add(beamCut);
+                regions.add(
+                  ArchitectSectionRegion(
+                    '${wall.id}_core_drop_beam_$i',
+                    SlabMaterial.concrete,
+                    beamCut,
+                    slab: true,
+                  ),
+                );
+              }
+            }
+          }
+        }
+
+        // --- Automatic RC Lintels (щурцове) & Aerated Concrete Infill Over Openings ---
+        // For masonry walls (brick and aerated concrete), every opening receives an RC lintel (h = 14 cm)
+        // directly above its head. If in flatSlab or if space remains under the drop beam in beamAndSlab,
+        // the remaining vertical spandrel is filled with lightweight aerated concrete.
+        if ((wall.coreMaterial == WallCoreMaterial.brick ||
+                wall.coreMaterial == WallCoreMaterial.aeratedConcrete) &&
+            !wall.system.isSpecial &&
+            wallPath != null &&
+            !wallPath.getBounds().isEmpty) {
+          final cw = cutWallByWallId[wall.id];
+          final c0 = cw?.coreIntervals.firstOrNull?.$1;
+          final c1 = cw?.coreIntervals.lastOrNull?.$2;
+
+          for (final cutOp
+              in wallCutOpeningsByWall[wall.id] ?? const <_CutOpeningSpan>[]) {
+            final zHead = cutOp.zTop;
+            final sLeft = c0 != null ? math.max(c0, cutOp.sMin) : cutOp.sMin;
+            final sRight = c1 != null ? math.min(c1, cutOp.sMax) : cutOp.sMax;
+            if (sRight <= sLeft + 1e-4) continue;
+
+            final midS = (cutOp.sMin + cutOp.sMax) * 0.5;
+            final zCeiling = computeCeilingAt(midS);
+            final isBeam =
+                project.structuralScheme.isBeamAndSlab && !wall.isInterior;
+            const tSlab = 0.20;
+            final beamDrop = math.max(0.15, project.perimeterBeamDepth - tSlab);
+            final zTopBoundary = isBeam ? (zCeiling - beamDrop) : zCeiling;
+
+            if (zTopBoundary <= zHead + 0.01) continue;
+
+            // 1. Reinforced concrete lintel (стоманобетонен щурц h = 14 cm)
+            // In longitudinal cuts along the wall, lintel bears 15 cm into brickwork on either side.
+            final bearing = cw?.isTransverseCut == false ? 0.15 : 0.0;
+            final lintelS0 = c0 != null ? math.max(c0, sLeft - bearing) : sLeft;
+            final lintelS1 =
+                c1 != null ? math.min(c1, sRight + bearing) : sRight;
+            final zLintelTop = math.min(zHead + 0.14, zTopBoundary);
+
+            final needSeparateLintel = !isBeam || (zTopBoundary > zHead + 0.16);
+            if (needSeparateLintel && zLintelTop > zHead + 0.01) {
+              final lintelRect =
+                  Rect.fromLTRB(lintelS0, zHead, lintelS1, zLintelTop);
+              final lintelCut = Path.combine(
+                PathOperation.intersect,
+                wallPath!,
+                Path()..addRect(lintelRect),
+              );
+              if (!lintelCut.getBounds().isEmpty) {
+                wallPath = Path.combine(
+                  PathOperation.difference,
+                  wallPath,
+                  lintelCut,
+                );
+                extraCutMaskPaths.add(lintelCut);
+                regions.add(
+                  ArchitectSectionRegion(
+                    '${wall.id}_${cutOp.id}_rc_lintel',
+                    SlabMaterial.concrete,
+                    lintelCut,
+                    slab: true,
+                  ),
+                );
+              }
+            }
+
+            // 2. Aerated Concrete Infill (above lintel up to beam bottom or flat slab soffit)
+            final zInfillBot = needSeparateLintel ? zLintelTop : zHead;
+            if (cutOp.isWindow && zTopBoundary > zInfillBot + 0.02) {
+              final infillRect =
+                  Rect.fromLTRB(sLeft, zInfillBot, sRight, zTopBoundary);
+              final infillCut = Path.combine(
+                PathOperation.intersect,
+                wallPath!,
+                Path()..addRect(infillRect),
+              );
+              if (!infillCut.getBounds().isEmpty) {
+                wallPath = Path.combine(
+                  PathOperation.difference,
+                  wallPath,
+                  infillCut,
+                );
+                extraCutMaskPaths.add(infillCut);
+                regions.add(
+                  ArchitectSectionRegion(
+                    '${wall.id}_${cutOp.id}_aerated_infill',
+                    SlabMaterial.aeratedConcrete,
+                    infillCut,
+                    customFillColor: const Color(0xFFCFD8DC),
+                    hatchPattern: ArchitectSectionHatch.wall(
+                      ArchitectMaterial.aeratedConcrete,
+                    ),
+                  ),
+                );
+              }
+            }
+          }
+        }
+
+        // --- SUBSECTION: [TAG:TIE_BEAMS] Intermediate RC Tie Beams on Tall Masonry Walls (Eurocode 6 / 8: H > 3.00 m) ---
         final activeWallPath = wallPath;
         if ((wall.coreMaterial == WallCoreMaterial.brick ||
                 wall.coreMaterial == WallCoreMaterial.aeratedConcrete) &&

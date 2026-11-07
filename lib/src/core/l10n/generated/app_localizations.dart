@@ -10607,6 +10607,18 @@ abstract class AppLocalizations {
   /// **'Aerated concrete'**
   String get slabMatAeratedConcrete;
 
+  /// Timber or wooden floor joists material
+  ///
+  /// In en, this message translates to:
+  /// **'Timber / joists'**
+  String get slabMatTimber;
+
+  /// Timber joist floor assembly preset
+  ///
+  /// In en, this message translates to:
+  /// **'Timber Joist Floor (Гредоред)'**
+  String get slabPresetTimberJoist;
+
   /// Structural scheme selection title
   ///
   /// In en, this message translates to:

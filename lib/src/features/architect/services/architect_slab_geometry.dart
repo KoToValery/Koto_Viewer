@@ -51,7 +51,7 @@ class ArchitectSlabGeometry {
       SlabLayerSurface(
         ArchitectSlabLayer(
           id: 'core',
-          material: SlabMaterial.concrete,
+          material: assembly?.coreMaterial ?? SlabMaterial.concrete,
           role: SlabLayerRole.base,
           thickness: slab.thickness,
         ),
