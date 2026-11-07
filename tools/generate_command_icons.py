@@ -382,6 +382,8 @@ add('ellipse', P('M12 5c5.52 0 10 3.13 10 7s-4.48 7-10 7-10-3.13-10-7 4.48-7 10-
 add('roof_slope', P('M4 18 20 8') + P('m15 7 5 1-2 5') + detail('M4 18h8v-4'))
 add('line_arrow', P('M4 19 20 5') + P('m14 4 6 1-1 6Z') + C(4, 19, 1.5))
 add('line_dot', P('M4 19 20 5') + C(4, 19, 2.5) + C(20, 5, 2.5))
+add('cad_underlay', R(3, 5, 13, 14, 1) + detail('M3 10h13 M8 5v14') + P('M14 9a5 5 0 1 1 5 5 M19 6v3h-3') + detail('M15 18c2-2 4-2 6 0'))
+add('raster_underlay', R(3, 4, 18, 16, 1) + detail('m3 16 5-4 4 3 4-5 5 6') + C(7, 15, 1.75) + C(17, 9, 1.75) + P('M8.5 14 15.5 10'))
 
 
 def base_name(name):

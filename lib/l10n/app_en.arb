@@ -3416,6 +3416,30 @@
   "architectWallCutHint": "Tap the part between crossings",
   "architectWallDetach": "Detach",
   "architectWallAttach": "Attach",
+  "architectWallAttachSelectSecond": "Select second wall to connect at common vertex",
+  "@architectWallAttachSelectSecond": {
+    "description": "Prompt when selecting the second wall to attach"
+  },
+  "architectWallAttachSuccess": "Walls connected at common vertex",
+  "@architectWallAttachSuccess": {
+    "description": "Success message when walls are attached at common vertex"
+  },
+  "architectWallAttachIncompatible": "Walls cannot be connected at a common vertex",
+  "@architectWallAttachIncompatible": {
+    "description": "Error message when walls cannot be connected"
+  },
+  "architectWallDetachSuccess": "Wall detached",
+  "@architectWallDetachSuccess": {
+    "description": "Success message when wall is detached"
+  },
+  "architectWallDetachPrompt": "Detach wall",
+  "@architectWallDetachPrompt": {
+    "description": "Prompt shown in detach confirmation banner"
+  },
+  "architectOffsetDynamicDistance": "Offset distance",
+  "@architectOffsetDynamicDistance": {
+    "description": "Label for dynamic offset distance editing"
+  },
   "architectWallMagnet": "Magnet",
   "architectWallAlign": "Align",
   "architectWallMirror": "Flip",
@@ -6594,5 +6618,150 @@
   "architectCopyCategoriesTitle": "Transfer Categories",
   "@architectCopyCategoriesTitle": { "description": "Header for categories to transfer across storeys" },
   "architectNoDrawnElements": "No elements drawn on this storey",
-  "@architectNoDrawnElements": { "description": "Placeholder shown in storey mini-map preview when storey has no elements" }
+  "@architectNoDrawnElements": { "description": "Placeholder shown in storey mini-map preview when storey has no elements" },
+  "commandIconCadUnderlay": "CAD Underlay (DXF/DWG)",
+  "@commandIconCadUnderlay": { "description": "Command icon label for CAD Underlay" },
+  "commandIconRasterUnderlay": "Raster Underlay (2-Point Calibration)",
+  "@commandIconRasterUnderlay": { "description": "Command icon label for Raster Underlay" },
+  "architectToolCategoryUnderlays": "Underlays",
+  "@architectToolCategoryUnderlays": { "description": "Tool category label for CAD and Raster underlays" },
+  "architectToolCadUnderlay": "CAD Underlay",
+  "@architectToolCadUnderlay": { "description": "Tool label for CAD DXF/DWG underlay" },
+  "architectToolCadUnderlayTooltip": "Import or link external DWG/DXF underlay with live auto-reload and geodetic contour detection",
+  "@architectToolCadUnderlayTooltip": { "description": "Tooltip for CAD Underlay tool" },
+  "architectToolRasterUnderlay": "Raster Underlay",
+  "@architectToolRasterUnderlay": { "description": "Tool label for Raster Image/PDF underlay" },
+  "architectToolRasterUnderlayTooltip": "Insert scanned image or PDF with opacity and 2-point scale calibration",
+  "@architectToolRasterUnderlayTooltip": { "description": "Tooltip for Raster Underlay tool" },
+  "architectLayerCadUnderlay": "CAD Underlay",
+  "@architectLayerCadUnderlay": { "description": "Standard layer name for CAD Xref underlays" },
+  "architectLayerRasterUnderlay": "Raster Underlay",
+  "@architectLayerRasterUnderlay": { "description": "Standard layer name for Raster underlays" },
+  "architectLayerGeodesyContours": "Geodesy & Contours",
+  "@architectLayerGeodesyContours": { "description": "Standard layer name for Geodetic contours and elevations" },
+  "architectCadUnderlayImport": "Load DWG/DXF",
+  "@architectCadUnderlayImport": { "description": "Button to load CAD underlay" },
+  "architectCadUnderlayReplace": "Update / Replace",
+  "@architectCadUnderlayReplace": { "description": "Button to update or replace CAD underlay with another file" },
+  "architectCadUnderlayReplaceTooltip": "Replace or update with another DWG/DXF file while preserving coordinate alignment",
+  "@architectCadUnderlayReplaceTooltip": { "description": "Tooltip for replacing CAD underlay without shifting coordinates" },
+  "architectCadUnderlayAutoReload": "Auto-reload",
+  "@architectCadUnderlayAutoReload": { "description": "Toggle for automatic reload when external file changes" },
+  "architectCadUnderlayAutoReloadTooltip": "Automatically reload underlay when the external file is modified",
+  "@architectCadUnderlayAutoReloadTooltip": { "description": "Tooltip for auto-reload toggle" },
+  "architectCadUnderlayOriginLocked": "Origin Locked",
+  "@architectCadUnderlayOriginLocked": { "description": "Toggle to keep reference coordinate origin locked" },
+  "architectCadUnderlayOriginLockedTooltip": "Keep reference origin fixed when updating or replacing underlay so geometry never shifts",
+  "@architectCadUnderlayOriginLockedTooltip": { "description": "Tooltip for origin lock toggle" },
+  "architectCadUnderlayReloadNow": "Reload",
+  "@architectCadUnderlayReloadNow": { "description": "Button to manually reload external CAD file" },
+  "architectCadUnderlayLayersFilter": "DXF Layers",
+  "@architectCadUnderlayLayersFilter": { "description": "Button to open DXF layers filter sheet" },
+  "architectCadUnderlayDetectGeodesy": "Extract Contours",
+  "@architectCadUnderlayDetectGeodesy": { "description": "Button to run geodetic contour detection" },
+  "architectCadUnderlayRemove": "Remove Underlay",
+  "@architectCadUnderlayRemove": { "description": "Button to remove underlay from current storey" },
+  "architectCadUnderlayReloadedNotice": "External CAD underlay updated automatically: {fileName}",
+  "@architectCadUnderlayReloadedNotice": {
+    "description": "Snackbar notice when external CAD file changes and reloads",
+    "placeholders": {
+      "fileName": { "type": "String" }
+    }
+  },
+  "architectCadUnderlayLoadedSuccess": "CAD underlay loaded ({fileName})",
+  "@architectCadUnderlayLoadedSuccess": {
+    "description": "Snackbar notice when CAD underlay is imported",
+    "placeholders": {
+      "fileName": { "type": "String" }
+    }
+  },
+  "architectGeodesyDetectedNotice": "Detected {crs}: extracted {contours} contours and {points} elevation points to layer G-TOPO",
+  "@architectGeodesyDetectedNotice": {
+    "description": "Snackbar notice when geodetic contours and points are extracted",
+    "placeholders": {
+      "crs": { "type": "String" },
+      "contours": { "type": "int" },
+      "points": { "type": "int" }
+    }
+  },
+  "architectGeodesyNoContoursFound": "No geodetic contours or spot elevations detected in this file",
+  "@architectGeodesyNoContoursFound": { "description": "Snackbar notice when no contours are found" },
+  "architectGeodesyBadge": "G-TOPO: {contours} contours",
+  "@architectGeodesyBadge": {
+    "description": "Badge showing count of detected contours",
+    "placeholders": {
+      "contours": { "type": "int" }
+    }
+  },
+  "architectGeodesyApplyToTerrain": "To 3D Terrain",
+  "@architectGeodesyApplyToTerrain": { "description": "Button to push extracted geodetic elevations to 3D terrain" },
+  "architectGeodesyAppliedToTerrainNotice": "Transferred {count} elevation points to 3D Terrain",
+  "@architectGeodesyAppliedToTerrainNotice": {
+    "description": "Snackbar notice after transferring points to 3D terrain",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "architectCadUnderlayEmptyHint": "Load an external DWG/DXF as a read-only background underlay for this storey",
+  "@architectCadUnderlayEmptyHint": { "description": "Hint text when no CAD underlay is loaded on current storey" },
+  "architectRasterUnderlayImport": "Insert Image / PDF",
+  "@architectRasterUnderlayImport": { "description": "Button to import raster image or PDF underlay" },
+  "architectRasterUnderlayEmptyHint": "Insert a scanned survey, sketch, JPG/PNG or PDF and calibrate by 2 points",
+  "@architectRasterUnderlayEmptyHint": { "description": "Hint text when no raster underlay is on current storey" },
+  "architectRasterCalibrate2Pt": "2-Point Calibrate",
+  "@architectRasterCalibrate2Pt": { "description": "Button to start 2-point scale calibration" },
+  "architectRasterCalibrateStep1": "Click Point 1 on the raster underlay",
+  "@architectRasterCalibrateStep1": { "description": "Instruction for first calibration point" },
+  "architectRasterCalibrateStep2": "Click Point 2 on the raster underlay",
+  "@architectRasterCalibrateStep2": { "description": "Instruction for second calibration point" },
+  "architectRasterCalibrateCancel": "Cancel calibration",
+  "@architectRasterCalibrateCancel": { "description": "Button to cancel 2-point calibration" },
+  "architectRasterCalibrateDialogTitle": "2-Point Scale & Alignment Calibration",
+  "@architectRasterCalibrateDialogTitle": { "description": "Title of 2-point calibration dialog" },
+  "architectRasterCalibrateRealDistanceLabel": "Real distance between Point 1 and Point 2 (m)",
+  "@architectRasterCalibrateRealDistanceLabel": { "description": "Input label for real distance in meters" },
+  "architectRasterCalibrateCurrentDistance": "Current uncalibrated length: {distance} m",
+  "@architectRasterCalibrateCurrentDistance": {
+    "description": "Info text showing measured distance before calibration",
+    "placeholders": {
+      "distance": { "type": "String" }
+    }
+  },
+  "architectRasterAlignModeLabel": "Orientation / Deskew (Point 1 → Point 2)",
+  "@architectRasterAlignModeLabel": { "description": "Label for orientation alignment option during calibration" },
+  "architectRasterAlignKeepAngle": "Keep current angle (scale only)",
+  "@architectRasterAlignKeepAngle": { "description": "Option to keep existing image rotation" },
+  "architectRasterAlignHorizontal": "Align horizontally (0°)",
+  "@architectRasterAlignHorizontal": { "description": "Option to rotate image so P1-P2 is horizontal" },
+  "architectRasterAlignVertical": "Align vertically (90°)",
+  "@architectRasterAlignVertical": { "description": "Option to rotate image so P1-P2 is vertical" },
+  "architectRasterCalibrateApply": "Calibrate",
+  "@architectRasterCalibrateApply": { "description": "Button to apply 2-point calibration" },
+  "architectRasterCalibratedSuccess": "Raster underlay calibrated ({mmPerPixel} mm/px)",
+  "@architectRasterCalibratedSuccess": {
+    "description": "Snackbar notice after calibrating raster underlay",
+    "placeholders": {
+      "mmPerPixel": { "type": "String" }
+    }
+  },
+  "architectRasterOpacityLabel": "Opacity",
+  "@architectRasterOpacityLabel": { "description": "Label for underlay opacity slider" },
+  "architectRasterLockPosition": "Lock",
+  "@architectRasterLockPosition": { "description": "Lock raster underlay position" },
+  "architectRasterUnlockPosition": "Unlock",
+  "@architectRasterUnlockPosition": { "description": "Unlock raster underlay position" },
+  "architectRasterResetTransform": "Reset",
+  "@architectRasterResetTransform": { "description": "Reset raster underlay scale and rotation" },
+  "architectRasterSelectPdfPageTitle": "Select PDF Page for Underlay",
+  "@architectRasterSelectPdfPageTitle": { "description": "Dialog title for choosing PDF page" },
+  "architectRasterPdfPageLabel": "Page {page} of {total}",
+  "@architectRasterPdfPageLabel": {
+    "description": "Page indicator in PDF page selector",
+    "placeholders": {
+      "page": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "architectRasterImportPdfButton": "Import Page",
+  "@architectRasterImportPdfButton": { "description": "Button to confirm PDF page import" }
 }

@@ -4679,6 +4679,26 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallAttach => 'Свържи';
 
   @override
+  String get architectWallAttachSelectSecond =>
+      'Изберете втора стена за свързване с общ връх';
+
+  @override
+  String get architectWallAttachSuccess => 'Стените са свързани с общ връх';
+
+  @override
+  String get architectWallAttachIncompatible =>
+      'Стените не могат да се свържат в общ връх';
+
+  @override
+  String get architectWallDetachSuccess => 'Стената е отделена';
+
+  @override
+  String get architectWallDetachPrompt => 'Отделяне на стена';
+
+  @override
+  String get architectOffsetDynamicDistance => 'Разстояние на отместване';
+
+  @override
   String get architectWallMagnet => 'Магнит';
 
   @override
@@ -12095,4 +12115,189 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectNoDrawnElements => 'Няма начертани елементи';
+
+  @override
+  String get commandIconCadUnderlay => 'CAD Подложка (DXF/DWG)';
+
+  @override
+  String get commandIconRasterUnderlay =>
+      'Растерна подложка (2-точково калибриране)';
+
+  @override
+  String get architectToolCategoryUnderlays => 'Подложки';
+
+  @override
+  String get architectToolCadUnderlay => 'CAD подложка';
+
+  @override
+  String get architectToolCadUnderlayTooltip =>
+      'Импорт на външна DWG/DXF подложка с автоматично обновяване и откриване на геодезически хоризонтали';
+
+  @override
+  String get architectToolRasterUnderlay => 'Растерна подложка';
+
+  @override
+  String get architectToolRasterUnderlayTooltip =>
+      'Вмъкване на сканирана скица, геодезия или PDF с прозрачност и 2-точково калибриране';
+
+  @override
+  String get architectLayerCadUnderlay => 'CAD Подложка';
+
+  @override
+  String get architectLayerRasterUnderlay => 'Растерна подложка';
+
+  @override
+  String get architectLayerGeodesyContours => 'Геодезия и хоризонтали';
+
+  @override
+  String get architectCadUnderlayImport => 'Зареди DWG/DXF';
+
+  @override
+  String get architectCadUnderlayReplace => 'Обнови / Замени';
+
+  @override
+  String get architectCadUnderlayReplaceTooltip =>
+      'Замени или обнови с друг DWG/DXF файл без разместване на координатите';
+
+  @override
+  String get architectCadUnderlayAutoReload => 'Авто-обновяване';
+
+  @override
+  String get architectCadUnderlayAutoReloadTooltip =>
+      'Автоматично презареждане при промяна на външния файл';
+
+  @override
+  String get architectCadUnderlayOriginLocked => 'Фиксирана база';
+
+  @override
+  String get architectCadUnderlayOriginLockedTooltip =>
+      'Запазва базовата точка при обновяване или замяна на подложката, за да не се размества';
+
+  @override
+  String get architectCadUnderlayReloadNow => 'Презареди';
+
+  @override
+  String get architectCadUnderlayLayersFilter => 'DXF Слоеве';
+
+  @override
+  String get architectCadUnderlayDetectGeodesy => 'Извлечи хоризонтали';
+
+  @override
+  String get architectCadUnderlayRemove => 'Премахни подложка';
+
+  @override
+  String architectCadUnderlayReloadedNotice(String fileName) {
+    return 'Външната CAD подложка се обнови автоматично: $fileName';
+  }
+
+  @override
+  String architectCadUnderlayLoadedSuccess(String fileName) {
+    return 'CAD подложката е заредена ($fileName)';
+  }
+
+  @override
+  String architectGeodesyDetectedNotice(String crs, int contours, int points) {
+    return 'Открита $crs: извлечени $contours хоризонтала и $points коти в слой G-TOPO';
+  }
+
+  @override
+  String get architectGeodesyNoContoursFound =>
+      'Не са открити геодезически хоризонтали или коти в този файл';
+
+  @override
+  String architectGeodesyBadge(int contours) {
+    return 'G-TOPO: $contours хоризонтала';
+  }
+
+  @override
+  String get architectGeodesyApplyToTerrain => 'Към 3D терен';
+
+  @override
+  String architectGeodesyAppliedToTerrainNotice(int count) {
+    return 'Прехвърлени $count височинни точки към 3D терена';
+  }
+
+  @override
+  String get architectCadUnderlayEmptyHint =>
+      'Заредете външен DWG/DXF като фонова подложка за текущия етаж';
+
+  @override
+  String get architectRasterUnderlayImport => 'Вмъкни снимка / PDF';
+
+  @override
+  String get architectRasterUnderlayEmptyHint =>
+      'Вмъкнете сканирана геодезия, скица, JPG/PNG или PDF и калибрирайте по 2 точки';
+
+  @override
+  String get architectRasterCalibrate2Pt => 'Калибрирай по 2 т.';
+
+  @override
+  String get architectRasterCalibrateStep1 =>
+      'Кликнете Точка 1 върху растерната подложка';
+
+  @override
+  String get architectRasterCalibrateStep2 =>
+      'Кликнете Точка 2 върху растерната подложка';
+
+  @override
+  String get architectRasterCalibrateCancel => 'Отказ от калибриране';
+
+  @override
+  String get architectRasterCalibrateDialogTitle =>
+      '2-точково калибриране на мащаб и наклон';
+
+  @override
+  String get architectRasterCalibrateRealDistanceLabel =>
+      'Реално разстояние между Точка 1 и Точка 2 (m)';
+
+  @override
+  String architectRasterCalibrateCurrentDistance(String distance) {
+    return 'Текущо измерено разстояние: $distance m';
+  }
+
+  @override
+  String get architectRasterAlignModeLabel =>
+      'Ориентация / Изправяне (Точка 1 → Точка 2)';
+
+  @override
+  String get architectRasterAlignKeepAngle =>
+      'Запази текущия ъгъл (само мащабиране)';
+
+  @override
+  String get architectRasterAlignHorizontal => 'Изправи хоризонтално (0°)';
+
+  @override
+  String get architectRasterAlignVertical => 'Изправи вертикално (90°)';
+
+  @override
+  String get architectRasterCalibrateApply => 'Калибрирай';
+
+  @override
+  String architectRasterCalibratedSuccess(String mmPerPixel) {
+    return 'Растерната подложка е калибрирана ($mmPerPixel mm/px)';
+  }
+
+  @override
+  String get architectRasterOpacityLabel => 'Прозрачност';
+
+  @override
+  String get architectRasterLockPosition => 'Заключи';
+
+  @override
+  String get architectRasterUnlockPosition => 'Отключи';
+
+  @override
+  String get architectRasterResetTransform => 'Нулирай';
+
+  @override
+  String get architectRasterSelectPdfPageTitle =>
+      'Избор на PDF страница за подложка';
+
+  @override
+  String architectRasterPdfPageLabel(int page, int total) {
+    return 'Страница $page от $total';
+  }
+
+  @override
+  String get architectRasterImportPdfButton => 'Импортирай страница';
 }

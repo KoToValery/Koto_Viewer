@@ -77,6 +77,19 @@ class _ArchitectLayersDialogState extends State<ArchitectLayersDialog> {
     for (final fd in storey.floorDrains) {
       if (widget.project.elementLayerId(fd.id, ArchitectLayer.drainageLayerId) == layerId) count++;
     }
+    if (layerId == ArchitectLayer.cadUnderlayLayerId) {
+      if (widget.project.cadUnderlayForStorey(storey.id) != null) count++;
+    }
+    if (layerId == ArchitectLayer.rasterUnderlayLayerId) {
+      count += widget.project.rasterUnderlaysForStorey(storey.id).length;
+    }
+    if (layerId == ArchitectLayer.geodesyLayerId) {
+      final survey = widget.project.geodeticSurvey;
+      if (survey != null) {
+        count += survey.contoursForStorey(storey.id).length;
+        count += survey.pointsForStorey(storey.id).length;
+      }
+    }
     return count;
   }
 

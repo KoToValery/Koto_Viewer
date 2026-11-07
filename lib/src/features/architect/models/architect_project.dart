@@ -28,8 +28,10 @@ import 'architect_fenestration_style.dart';
 import 'architect_component.dart';
 import 'architect_floor_drain.dart';
 import 'architect_decorative_element.dart';
+import 'architect_underlay_models.dart';
 export 'architect_component.dart';
 export 'architect_decorative_element.dart';
+export 'architect_underlay_models.dart';
 
 typedef ArchitectUnit = BimDistanceUnit;
 
@@ -391,6 +393,9 @@ class ArchitectProject {
   final bool showDecorativeOnPlan;
   final List<ArchitectLayer> layers;
   final Map<String, String> elementLayers;
+  final Map<String, ArchitectCadUnderlayConfig> cadUnderlays;
+  final List<ArchitectRasterUnderlay> rasterUnderlays;
+  final ArchitectGeodeticSurvey? geodeticSurvey;
 
   const ArchitectProject({
     required this.id,
@@ -419,7 +424,16 @@ class ArchitectProject {
     this.showDecorativeOnPlan = false,
     this.layers = const [],
     this.elementLayers = const {},
+    this.cadUnderlays = const {},
+    this.rasterUnderlays = const [],
+    this.geodeticSurvey,
   });
+
+  ArchitectCadUnderlayConfig? cadUnderlayForStorey(String storeyId) =>
+      cadUnderlays[storeyId];
+
+  List<ArchitectRasterUnderlay> rasterUnderlaysForStorey(String storeyId) =>
+      rasterUnderlays.where((r) => r.storeyId == storeyId).toList();
 
   List<ArchitectLayer> get effectiveLayers {
     if (layers.isEmpty) return ArchitectLayer.defaultLayers();
@@ -675,6 +689,10 @@ class ArchitectProject {
     bool? showDecorativeOnPlan,
     List<ArchitectLayer>? layers,
     Map<String, String>? elementLayers,
+    Map<String, ArchitectCadUnderlayConfig>? cadUnderlays,
+    List<ArchitectRasterUnderlay>? rasterUnderlays,
+    ArchitectGeodeticSurvey? geodeticSurvey,
+    bool clearGeodeticSurvey = false,
   }) => ArchitectProject(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -703,6 +721,11 @@ class ArchitectProject {
     showDecorativeOnPlan: showDecorativeOnPlan ?? this.showDecorativeOnPlan,
     layers: layers ?? this.layers,
     elementLayers: elementLayers ?? this.elementLayers,
+    cadUnderlays: cadUnderlays ?? this.cadUnderlays,
+    rasterUnderlays: rasterUnderlays ?? this.rasterUnderlays,
+    geodeticSurvey: clearGeodeticSurvey
+        ? null
+        : (geodeticSurvey ?? this.geodeticSurvey),
   );
 
   Map<String, dynamic> toJson() => {
@@ -732,6 +755,11 @@ class ArchitectProject {
     if (showDecorativeOnPlan) 'showDecorativeOnPlan': true,
     if (layers.isNotEmpty) 'layers': layers.map((l) => l.toJson()).toList(),
     if (elementLayers.isNotEmpty) 'elementLayers': elementLayers,
+    if (cadUnderlays.isNotEmpty)
+      'cadUnderlays': cadUnderlays.map((k, v) => MapEntry(k, v.toJson())),
+    if (rasterUnderlays.isNotEmpty)
+      'rasterUnderlays': rasterUnderlays.map((r) => r.toJson()).toList(),
+    if (geodeticSurvey != null) 'geodeticSurvey': geodeticSurvey!.toJson(),
   };
 
   factory ArchitectProject.fromJson(
@@ -841,6 +869,23 @@ class ArchitectProject {
     elementLayers: (json['elementLayers'] as Map? ?? {}).map(
       (k, v) => MapEntry(k as String, v as String),
     ),
+    cadUnderlays: {
+      for (final entry in (json['cadUnderlays'] as Map? ?? {}).entries)
+        if (entry.key is String && entry.value is Map)
+          entry.key as String: ArchitectCadUnderlayConfig.fromJson(
+            Map<String, dynamic>.from(entry.value as Map),
+          ),
+    },
+    rasterUnderlays: [
+      for (final r in json['rasterUnderlays'] as List? ?? const [])
+        if (r is Map)
+          ArchitectRasterUnderlay.fromJson(Map<String, dynamic>.from(r)),
+    ],
+    geodeticSurvey: json['geodeticSurvey'] is Map
+        ? ArchitectGeodeticSurvey.fromJson(
+            Map<String, dynamic>.from(json['geodeticSurvey'] as Map),
+          )
+        : null,
   );
 
   /// Factory creating an architectural project configured from the starter wizard.

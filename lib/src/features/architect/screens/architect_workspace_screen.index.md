@@ -1,6 +1,6 @@
 # Architect Workspace Screen — LLM Semantic Navigation Map
 > **Path**: `lib/src/features/architect/screens/architect_workspace_screen.dart`  
-> **Total Lines**: ~31,298 | **Primary Class**: `_ArchitectWorkspaceScreenState`  
+> **Total Lines**: ~33,316 | **Primary Class**: `_ArchitectWorkspaceScreenState`  
 > **Companion Document**: Used by LLMs (Antigravity, Gemini, Codex, Copilot, Cursor) to navigate and locate code in 1 step without reading 31k lines.
 
 ---
@@ -19,27 +19,28 @@
 
 | Section ID | Tag | Approx Lines | Description & Primary Responsibilities |
 | :--- | :--- | :--- | :--- |
-| `[SEC-00-IMPORTS]` | `[TAG:IMPORTS]` | L1 – L362 | All package and internal imports (widgets, services, models) |
-| `[SEC-01-WIDGET]` | `[TAG:WIDGET_API]` | L363 – L434 | `ArchitectWorkspaceScreen` StatefulWidget & `_ArchitectSurfaceHit` |
-| `[SEC-02-STATE]` | `[TAG:STATE_CORE]` | L435 – L6794 | State fields, controllers, listeners, dialog triggers, and lifecycle |
-| ↳ `[SUB-02A]` | `[TAG:STATE_FIELDS]` | L437 – L3000 | Active tool flags, drafting caches, preview points, mode enums |
-| ↳ `[SUB-02B]` | `[TAG:STATE_PRESETS]` | L3001 – L5500 | Wall/opening style caches, layer filters, command controllers |
-| ↳ `[SUB-02C]` | `[TAG:STATE_LIFECYCLE]` | L6540 – L6794 | `initState()`, `_initTransform()`, `dispose()` |
-| `[SEC-03-XFORM]` | `[TAG:XFORM_COORDS]` | L6795 – L7020 | Coordinate transforms: `_screenToModel`, `_modelToScreen`, hit tests |
-| `[SEC-04-TOUCH]` | `[TAG:TOUCH_INPUT]` | L7021 – L13444 | 2D Pointer & Gesture dispatch for all 23 architectural tools |
-| ↳ `[SUB-04A]` | `[TAG:TOUCH_DOWN]` | L7025 – L8042 | `_onPointerDown`: hit detection, drag initiation, tool start |
-| ↳ `[SUB-04B]` | `[TAG:TOUCH_MOVE]` | L8043 – L10561 | `_onPointerMove`: hover previews, rubber-banding, snap calculations |
-| ↳ `[SUB-04C]` | `[TAG:TOUCH_UP]` | L10576 – L13444 | `_onPointerUp`: tool commits, geometry insertion, history push |
-| `[SEC-05-ZONES]` | `[TAG:ZONE_LOGIC]` | L13445 – L13949 | Zone mutations, area recalculations, room schedule dialogs |
-| `[SEC-06-WALLS]` | `[TAG:WALL_DRAFT]` | L13950 – L14463 | Wall segment chain grouping, concept draft commit, angle locks |
-| `[SEC-07-SPLIT]` | `[TAG:WALL_SPLIT]` | L14464 – L17225 | Wall splitting, cut sessions, clearance checks, intersection joints |
-| `[SEC-08-FENEST]` | `[TAG:FENEST_RADIAL]` | L17226 – L22439 | Doors, windows, vitrines, radial actions menu, opening hover |
-| `[SEC-09-SELECT]` | `[TAG:SELECTION_BAR]` | L22440 – L25613 | Selection HUD, reference line switch, layer dialogs, thickness bar |
-| `[SEC-10-GRIDS]` | `[TAG:GRID_AXIS]` | L25614 – L25927 | Dynamic grid axes actions (offset, align, resequence, delete) |
-| `[SEC-11-LAYOUT]` | `[TAG:BUILD_LAYOUT]` | L25928 – L27747 | Main `build()` method: Scaffold, HUD bars, sheets, 2D/3D toggle |
-| `[SEC-12-LOGS]` | `[TAG:LOGGER_UI]` | L27748 – L27955 | `_showDebugLogsDialog` diagnostic console |
-| `[SEC-13-VIEW2D]` | `[TAG:CANVAS_2D]` | L27956 – L31249 | 2D Canvas Viewport, CustomPainter stack, preview commit overlays |
-| `[SEC-14-VIEW3D]` | `[TAG:VIEW_3D]` | L31250 – L31298 | 3D Viewport builder & publication preview painter |
+| `[SEC-00-IMPORTS]` | `[TAG:IMPORTS]` | L1 – L329 | All package and internal imports (widgets, services, models) |
+| `[SEC-01-WIDGET]` | `[TAG:WIDGET_API]` | L362 – L433 | `ArchitectWorkspaceScreen` StatefulWidget & `_ArchitectSurfaceHit` |
+| `[SEC-02-STATE]` | `[TAG:STATE_CORE]` | L434 – L7461 | State fields, controllers, listeners, dialog triggers, and lifecycle |
+| ↳ `[SUB-02A]` | `[TAG:STATE_FIELDS]` | L435 – L3831 | Active tool flags, drafting caches, preview points, mode enums |
+| ↳ `[SUB-02B]` | `[TAG:STATE_PRESETS]` | L3001 – L6140 | Wall/opening style caches, layer filters, command controllers |
+| ↳ `[SUB-02U]` | `[TAG:UNDERLAY_TOOLS]` | L3832 – L7197 | CAD Xref live-reload, Raster 2-point calibration & Geodesy handlers |
+| ↳ `[SUB-02C]` | `[TAG:STATE_LIFECYCLE]` | L7198 – L7461 | `initState()`, `_initTransform()`, `dispose()` |
+| `[SEC-03-XFORM]` | `[TAG:XFORM_COORDS]` | L7462 – L7682 | Coordinate transforms: `_screenToModel`, `_modelToScreen`, hit tests |
+| `[SEC-04-TOUCH]` | `[TAG:TOUCH_INPUT]` | L7683 – L14324 | 2D Pointer & Gesture dispatch for all architectural tools |
+| ↳ `[SUB-04A]` | `[TAG:TOUCH_DOWN]` | L7684 – L8724 | `_onPointerDown`: hit detection, drag initiation, tool start |
+| ↳ `[SUB-04B]` | `[TAG:TOUCH_MOVE]` | L8725 – L11297 | `_onPointerMove`: hover previews, rubber-banding, snap calculations |
+| ↳ `[SUB-04C]` | `[TAG:TOUCH_UP]` | L11298 – L14324 | `_onPointerUp`: tool commits, geometry insertion, history push |
+| `[SEC-05-ZONES]` | `[TAG:ZONE_LOGIC]` | L14325 – L14830 | Zone mutations, area recalculations, room schedule dialogs |
+| `[SEC-06-WALLS]` | `[TAG:WALL_DRAFT]` | L14831 – L15393 | Wall segment chain grouping, concept draft commit, angle locks |
+| `[SEC-07-SPLIT]` | `[TAG:WALL_SPLIT]` | L15394 – L18156 | Wall splitting, cut sessions, clearance checks, intersection joints |
+| `[SEC-08-FENEST]` | `[TAG:FENEST_RADIAL]` | L18157 – L23634 | Doors, windows, vitrines, radial actions menu, opening hover |
+| `[SEC-09-SELECT]` | `[TAG:SELECTION_BAR]` | L23635 – L26917 | Selection HUD, reference line switch, layer dialogs, thickness bar |
+| `[SEC-10-GRIDS]` | `[TAG:GRID_AXIS]` | L26918 – L27232 | Dynamic grid axes actions (offset, align, resequence, delete) |
+| `[SEC-11-LAYOUT]` | `[TAG:BUILD_LAYOUT]` | L27233 – L29067 | Main `build()` method: Scaffold, HUD bars, sheets, 2D/3D toggle |
+| `[SEC-12-LOGS]` | `[TAG:LOGGER_UI]` | L29068 – L29276 | `_showDebugLogsDialog` diagnostic console |
+| `[SEC-13-VIEW2D]` | `[TAG:CANVAS_2D]` | L29277 – L33254 | 2D Canvas Viewport, CustomPainter stack, preview commit overlays |
+| `[SEC-14-VIEW3D]` | `[TAG:VIEW_3D]` | L33255 – L33316 | 3D Viewport builder & publication preview painter |
 
 ---
 
@@ -69,8 +70,13 @@
 | **mask** | L7025, L10310, L13000 | `_commitMask`, `_elementTool.cancelSlabDrafting` | Mask HUD bar, border toggle checkbox |
 | **leader** | L7025, L10212, L13380 | `_promptAddLeaderAnnotation` | Multileader HUD bar, note dialog |
 | **spline** | L7025, L10310, L13000 | `_commitSpline` | Spline HUD bar, Catmull-Rom Bezier preview |
-| **cadEllipse** | L7025, L10212, L13395 | `_commitCadEllipse` | Ellipse HUD bar, line style control |
-| **roofSlope** | L7025, L10315, L13410 | `_commitRoofSlopeArrow` | Roof slope HUD bar (format chips %, °, both; reverse arrow) |
+| **cadEllipse** | L7735, L10212, L14100 | `_commitCadEllipse` | Ellipse HUD bar, line style control |
+| **roofSlope** | L7735, L10315, L14115 | `_commitRoofSlopeArrow` | Roof slope HUD bar (format chips %, °, both; reverse arrow) |
+| **cadUnderlay** | L3890, L30506 | `_importOrReplaceCadUnderlay`, `_loadExternalCadFileForStorey`, `_extractGeodesyFromCurrentUnderlay` | `ArchitectCadUnderlayBar`, `_openCadDxfLayersSheet` |
+| **rasterUnderlay** | L7780, L9945, L13365 | `_importRasterUnderlay`, `_handleRasterCalibrationTap`, `_updateSelectedRaster` | `ArchitectRasterUnderlayBar`, `showArchitectRasterCalibrationDialog`, `showArchitectPdfPagePickerDialog` |
+| **wallAttach** | L11025, L12390, L23350 | _triggerWallAttach, ConnectArchitectWallsAtVertex | _buildAttachPromptBanner, quick access bar |
+| **wallDetach** | L23390, L26090 | _triggerWallDetach, _confirmWallDetach, _cancelWallDetach | _buildDetachConfirmationBanner (on-screen green checkmark) |
+| **wallOffset** | L12065, L24435, L24595 | _previewOffset, _commitOffset, dynamic distance chip | _offsetBanner with tappable distance chip & green checkmark |
 
 ---
 
@@ -95,6 +101,9 @@
 - `_activeRoofSlopeFormat` (`RoofSlopeFormat`): Roof slope display format (`percent`, `degree`, `both`).
 - `_activeRoofSlopeDirection` (`RoofSlopeDirection`): Roof slope arrow direction (`downslope`, `upslope`).
 - `_activeLeaderArrowStyle` (`ArchitectLineEndCap`): Leader arrow head terminating style.
+- `_cadFileWatcher` (`ArchitectCadFileWatcher?`): Watches external CAD/DXF files for live Xref reload.
+- `_rasterImages` (`Map<String, ui.Image>`): Decoded GPU images for active raster underlays.
+- `_rasterCalibrationStep` / `_rasterCalibrationP1` / `_rasterCalibrationP2`: 2-point scale + deskew calibration state.
 
 ---
 

@@ -59,6 +59,7 @@ class ArchitectLineEditing {
       TrimArchitectWall c => (c.storeyId, {c.wallId}),
       CutArchitectWalls c => (c.storeyId, c.wallIds),
       JoinArchitectWalls c => (c.storeyId, c.wallIds),
+      ConnectArchitectWallsAtVertex c => (c.storeyId, c.wallIds),
       _ => null,
     };
     if (target == null) return command;

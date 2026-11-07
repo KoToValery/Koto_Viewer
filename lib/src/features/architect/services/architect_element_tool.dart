@@ -820,6 +820,7 @@ class ArchitectElementTool extends ChangeNotifier {
         wall,
         storey.walls,
         point,
+        tolerance: math.max(tolerance, 0.10),
       )) {
         yield wall.id;
       }

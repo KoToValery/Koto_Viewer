@@ -44,6 +44,27 @@ import 'architect_service_plan_painter.dart';
 import 'architect_roof_painter_helper.dart';
 import 'architect_railing_geometry.dart';
 
+// ============================================================================
+// MASTER ARCHITECT 2D PAINTER LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'architect_2d_painter.index.md' for full method & class directory.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-ENUMS]   L66-L125     : [TAG:ARCH_PAINTER_ENUMS] Declarations: `ArchitectPaintLayer`, `ArchitectTool`, `WallDraftingM
+// [SEC-02-STATE]   L126-L387    : [TAG:ARCH_PAINTER_STATE] `Architect2dPainter` state fields (111 fields: `_project`, `_visible
+// [SEC-03-PAINT]   L388-L734    : [TAG:ARCH_PAINTER_PAINT_RENDER] Canvas Painting & Geometry Rendering: `_paint`, `paint` (2 methods)
+// [SEC-04-CORE]    L735-L825    : [TAG:ARCH_PAINTER_CORE_LOGIC] Core Operations & Helpers: `_filterElements` (1 methods)
+// [SEC-05-PAINT]   L826-L1011   : [TAG:ARCH_PAINTER_DRAW_SELECTED] Canvas Painting & Geometry Rendering: `_drawSelectedElement`, `_draw
+// [SEC-06-WALLS]   L1012-L1226  : [TAG:ARCH_PAINTER_WALL_OPS] Wall Drafting, Splitting & Joints: `_drawPolygonEditing`, `_drawNewP
+// [SEC-07-GRIDS]   L1227-L1388  : [TAG:ARCH_PAINTER_GRID_AXES] Grid Axes, Alignment & Snapping: `_drawDraftingGrid`, `_drawGridAxes
+// [SEC-08-WALLS]   L1389-L1556  : [TAG:ARCH_PAINTER_DRAW_WALLS] Wall Drafting, Splitting & Joints: `_drawWalls`, `_drawWallLayers` (
+// [SEC-09-PAINT]   L1557-L2260  : [TAG:ARCH_PAINTER_DRAW_ACTIVE] Canvas Painting & Geometry Rendering: `_drawActiveDrafting`, `_drawD
+// [SEC-10-CORE]    L2261-L2302  : [TAG:ARCH_PAINTER_SHOULD_REPAINT] Core Operations & Helpers: `shouldRepaint` (1 methods)
+// ============================================================================
+
+
+// === SECTION: [SEC-01-ENUMS] ENUMS & CONFIGURATION TYPES ===
+// --- SUBSECTION: [TAG:ARCH_PAINTER_ENUMS] Declarations: `ArchitectPaintLayer`, `ArchitectTool`, `WallDrafti ---
 enum ArchitectPaintLayer { all, model, interaction }
 
 enum ArchitectTool {
@@ -84,9 +105,13 @@ enum ArchitectTool {
   decorativeFrame,
   decorativeArc,
   decorativeVoid,
-  decorativeLibrary;
+  decorativeLibrary,
+  cadUnderlay,
+  rasterUnderlay;
 
   bool get usesComponent => this == component || this == services;
+
+  bool get isUnderlayTool => this == cadUnderlay || this == rasterUnderlay;
 
   bool get isDecorativeTool =>
       this == decorativeProfile ||
@@ -98,6 +123,8 @@ enum ArchitectTool {
 
 enum WallDraftingMode { singleLine, chained }
 
+// === SECTION: [SEC-02-STATE] ARCHITECT2DPAINTER STATE & FIELDS ===
+// --- SUBSECTION: [TAG:ARCH_PAINTER_STATE] `Architect2dPainter` state fields (111 fields: `_project`, `_visi ---
 /// High-performance 2D architectural floor plan painter.
 class Architect2dPainter extends CustomPainter {
   final ArchitectProject _project;
@@ -358,6 +385,8 @@ class Architect2dPainter extends CustomPainter {
        _zoomScale = zoomScale,
        super(repaint: viewport);
 
+// === SECTION: [SEC-03-PAINT] CANVAS PAINTING & GEOMETRY RENDERING ===
+// --- SUBSECTION: [TAG:ARCH_PAINTER_PAINT_RENDER] Canvas Painting & Geometry Rendering: `_paint`, `paint` (2 method ---
   @override
   void paint(Canvas canvas, Size size) {
     if (ArchitectTextScope.current == null) {
@@ -703,6 +732,8 @@ class Architect2dPainter extends CustomPainter {
   ArchitectStorey get _elementLayerStorey =>
       _filterElements(project.activeStorey, selectedOnly: false);
 
+// === SECTION: [SEC-04-CORE] CORE OPERATIONS & HELPERS ===
+// --- SUBSECTION: [TAG:ARCH_PAINTER_CORE_LOGIC] Core Operations & Helpers: `_filterElements` (1 methods) ---
   ArchitectStorey _filterElements(
     ArchitectStorey storey, {
     required bool selectedOnly,
@@ -792,6 +823,8 @@ class Architect2dPainter extends CustomPainter {
     );
   }
 
+// === SECTION: [SEC-05-PAINT] CANVAS PAINTING & GEOMETRY RENDERING ===
+// --- SUBSECTION: [TAG:ARCH_PAINTER_DRAW_SELECTED] Canvas Painting & Geometry Rendering: `_drawSelectedElement`, `_d ---
   void _drawSelectedElement(Canvas canvas) {
     if (newPointCandidate != null) return;
     if (selectedElementId == null) return;
@@ -976,6 +1009,8 @@ class Architect2dPainter extends CustomPainter {
     }
   }
 
+// === SECTION: [SEC-06-WALLS] WALL DRAFTING, SPLITTING & JOINTS ===
+// --- SUBSECTION: [TAG:ARCH_PAINTER_WALL_OPS] Wall Drafting, Splitting & Joints: `_drawPolygonEditing`, `_drawN ---
   void _drawSelectedWallHandles(Canvas canvas, ArchitectWall wall) {
     if(marqueePoints.isNotEmpty) return;
     final draftingScale = math.max(zoomScale, 80.0);
@@ -1189,6 +1224,8 @@ class Architect2dPainter extends CustomPainter {
     );
   }
 
+// === SECTION: [SEC-07-GRIDS] GRID AXES, ALIGNMENT & SNAPPING ===
+// --- SUBSECTION: [TAG:ARCH_PAINTER_GRID_AXES] Grid Axes, Alignment & Snapping: `_drawDraftingGrid`, `_drawGridA ---
   void _drawZoneSchedule(Canvas canvas) {
     if (!_project.isLayerVisible(ArchitectLayer.zoneLayerId)) return;
     final isDraggingOrGhostingTable =
@@ -1349,6 +1386,8 @@ class Architect2dPainter extends CustomPainter {
   // 3. WALLS & DOORS
   // ===========================================================================
 
+// === SECTION: [SEC-08-WALLS] WALL DRAFTING, SPLITTING & JOINTS ===
+// --- SUBSECTION: [TAG:ARCH_PAINTER_DRAW_WALLS] Wall Drafting, Splitting & Joints: `_drawWalls`, `_drawWallLayers ---
   void _drawWalls(Canvas canvas) {
     final activeStorey = project.activeStorey;
 
@@ -1515,6 +1554,8 @@ class Architect2dPainter extends CustomPainter {
   // 4. ACTIVE DRAFTING INTERACTION
   // ===========================================================================
 
+// === SECTION: [SEC-09-PAINT] CANVAS PAINTING & GEOMETRY RENDERING ===
+// --- SUBSECTION: [TAG:ARCH_PAINTER_DRAW_ACTIVE] Canvas Painting & Geometry Rendering: `_drawActiveDrafting`, `_dr ---
   void _drawActiveDrafting(Canvas canvas) {
     // Wall dimensions and their editable labels share one screen-space layout.
     // The workspace interaction overlay paints both witnesses and dimensions.
@@ -2217,6 +2258,8 @@ class Architect2dPainter extends CustomPainter {
     }
   }
 
+// === SECTION: [SEC-10-CORE] CORE OPERATIONS & HELPERS ===
+// --- SUBSECTION: [TAG:ARCH_PAINTER_SHOULD_REPAINT] Core Operations & Helpers: `shouldRepaint` (1 methods) ---
   @override
   bool shouldRepaint(covariant Architect2dPainter oldDelegate) =>
       l10n != oldDelegate.l10n ||

@@ -129,13 +129,14 @@ class ArchitectSpecialWallGeometry {
   static bool containsPlanPoint(
     ArchitectWall wall,
     List<ArchitectWall> walls,
-    Offset point,
-  ) {
+    Offset point, {
+    double tolerance = 0.10,
+  }) {
     if (wall.railing != null &&
         ArchitectRailingSelection.envelope(wall, walls).contains(point)) {
       return true;
     }
-    if (wall.containsPoint(point)) return true;
+    if (wall.containsPoint(point, tolerance: tolerance)) return true;
     return wall.system.isLog &&
         (Path()..addPolygon(physicalPlanCorners(wall, walls), true)).contains(
           point,

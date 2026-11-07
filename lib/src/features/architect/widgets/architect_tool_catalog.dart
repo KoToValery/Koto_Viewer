@@ -13,6 +13,7 @@ enum ArchitectToolCategory {
   views,
   annotations,
   drawing,
+  underlays,
   selection;
 
   String label(AppLocalizations l) => switch (this) {
@@ -26,6 +27,7 @@ enum ArchitectToolCategory {
     views => l.architectCategoryViews,
     annotations => l.architectCategoryAnnotations,
     drawing => l.architectCategoryDrawing,
+    underlays => l.architectToolCategoryUnderlays,
   };
 
   AppIconId get iconId => switch (this) {
@@ -39,6 +41,7 @@ enum ArchitectToolCategory {
     views => AppIconId.section,
     annotations => AppIconId.dimension,
     drawing => AppIconId.polyline,
+    underlays => AppIconId.cadUnderlay,
   };
 
   bool get availableInDrawing =>
@@ -82,6 +85,7 @@ enum ArchitectToolCategory {
     ArchitectTool.mask ||
     ArchitectTool.spline ||
     ArchitectTool.cadEllipse => drawing,
+    ArchitectTool.cadUnderlay || ArchitectTool.rasterUnderlay => underlays,
   };
 
   List<ArchitectTool> get tools => [
@@ -147,6 +151,14 @@ extension ArchitectToolCatalogLabel on ArchitectTool {
     ArchitectTool.decorativeLibrary => (
       AppIconId.library,
       l.architectToolDecorativeLibrary,
+    ),
+    ArchitectTool.cadUnderlay => (
+      AppIconId.cadUnderlay,
+      l.architectToolCadUnderlay,
+    ),
+    ArchitectTool.rasterUnderlay => (
+      AppIconId.rasterUnderlay,
+      l.architectToolRasterUnderlay,
     ),
   };
 }

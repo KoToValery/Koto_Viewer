@@ -1811,6 +1811,141 @@ class JoinArchitectWalls extends ArchitectModelCommand {
   }
 }
 
+/// Connect two or more walls at a shared common vertex.
+/// If one wall is already connected to an existing vertex cluster, the other
+/// wall is extended/snapped to join that same shared node.
+class ConnectArchitectWallsAtVertex extends ArchitectModelCommand {
+  final String storeyId;
+  final Set<String> wallIds;
+  final String? primaryWallId;
+
+  const ConnectArchitectWallsAtVertex({
+    required this.storeyId,
+    required this.wallIds,
+    this.primaryWallId,
+  });
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final s = ArchitectModelCommand.storey(project, storeyId);
+    final walls = s.walls.where((w) => wallIds.contains(w.id)).toList();
+    if (walls.length < 2) {
+      throw ArgumentError('Select at least two walls to connect');
+    }
+
+    final primary = (primaryWallId != null
+            ? walls.where((w) => w.id == primaryWallId).firstOrNull
+            : null) ??
+        walls.first;
+    final others = walls.where((w) => w.id != primary.id).toList();
+
+    // 1. Check if the primary wall already shares a vertex with ANY other wall
+    // in the storey (e.g. an existing L-junction, T-junction, etc.)
+    Offset? commonVertex;
+    for (final otherInStorey in s.walls) {
+      if (wallIds.contains(otherInStorey.id)) continue;
+      for (final pEnd in [primary.startPoint, primary.endPoint]) {
+        for (final oEnd in [otherInStorey.startPoint, otherInStorey.endPoint]) {
+          if ((pEnd - oEnd).distance <= 0.05) {
+            commonVertex = pEnd;
+            break;
+          }
+        }
+        if (commonVertex != null) break;
+      }
+      if (commonVertex != null) break;
+    }
+
+    // 2. If primary had no existing cluster vertex, check if any of the target walls do
+    if (commonVertex == null) {
+      for (final other in others) {
+        for (final otherInStorey in s.walls) {
+          if (wallIds.contains(otherInStorey.id)) continue;
+          for (final oEnd in [other.startPoint, other.endPoint]) {
+            for (final sEnd in [otherInStorey.startPoint, otherInStorey.endPoint]) {
+              if ((oEnd - sEnd).distance <= 0.05) {
+                commonVertex = oEnd;
+                break;
+              }
+            }
+            if (commonVertex != null) break;
+          }
+          if (commonVertex != null) break;
+        }
+        if (commonVertex != null) break;
+      }
+    }
+
+    // 3. If neither has an existing cluster vertex with external walls, compute
+    // their mutual shared vertex (intersection or midpoint of closest endpoints)
+    if (commonVertex == null) {
+      final a = primary;
+      final b = others.first;
+      if (a.isCurved || b.isCurved) {
+        final pts = a.intersections(b, finite: false).toList();
+        if (pts.isNotEmpty) {
+          commonVertex = pts.first;
+        }
+      } else {
+        commonVertex = ArchitectWallNetwork.intersection(
+          a.startPoint,
+          a.endPoint,
+          b.startPoint,
+          b.endPoint,
+        );
+      }
+
+      if (commonVertex == null) {
+        final pairs = [
+          (a.startPoint, b.startPoint),
+          (a.startPoint, b.endPoint),
+          (a.endPoint, b.startPoint),
+          (a.endPoint, b.endPoint),
+        ]..sort((x, y) => (x.$1 - x.$2).distance.compareTo((y.$1 - y.$2).distance));
+        commonVertex = (pairs.first.$1 + pairs.first.$2) / 2;
+      }
+    }
+
+    // 4. Snap all involved walls to the commonVertex at their nearest endpoint
+    final targets = <(String, bool), Offset>{};
+    for (final wall in walls) {
+      final dStart = (wall.startPoint - commonVertex).distance;
+      final dEnd = (wall.endPoint - commonVertex).distance;
+      final atStart = dStart <= dEnd;
+      targets[(wall.id, atStart)] = commonVertex;
+    }
+
+    var result = project;
+    for (final wall in walls) {
+      final next = wall
+          .withExtendedEnds(
+            start: targets[(wall.id, true)],
+            end: targets[(wall.id, false)],
+          )
+          .copyWith(connectStart: true, connectEnd: true);
+      result = UpdateArchitectWall(
+        storeyId: storeyId,
+        wall: next,
+        carryConnections: false,
+      ).apply(result);
+    }
+
+    final updatedStorey = ArchitectModelCommand.storey(result, storeyId);
+    return ArchitectModelCommand.replace(
+      result,
+      updatedStorey.copyWith(
+        walls: [
+          for (final w in updatedStorey.walls)
+            _wallOpeningsAfterEdit(
+              s.walls.firstWhere((old) => old.id == w.id, orElse: () => w),
+              w,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class SetArchitectWallDimensions extends ArchitectModelCommand {
   final String storeyId;
   final String wallId;

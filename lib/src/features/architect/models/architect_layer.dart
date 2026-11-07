@@ -73,6 +73,9 @@ class ArchitectLayer {
       'A-CAD' => l.architectLayerCad,
       'A-FURN' => l.architectLayerFurniture,
       'A-SITE' => l.architectLayerDrainage,
+      'A-XREF' => l.architectLayerCadUnderlay,
+      'A-RAST' => l.architectLayerRasterUnderlay,
+      'G-TOPO' => l.architectLayerGeodesyContours,
       _ => name,
     };
   }
@@ -93,6 +96,9 @@ class ArchitectLayer {
   static const String cadLayerId = 'A-CAD';
   static const String furnitureLayerId = 'A-FURN';
   static const String drainageLayerId = 'A-SITE';
+  static const String cadUnderlayLayerId = 'A-XREF';
+  static const String rasterUnderlayLayerId = 'A-RAST';
+  static const String geodesyLayerId = 'G-TOPO';
 
   static List<ArchitectLayer> defaultLayers() => const [
     ArchitectLayer(id: wallLayerId, name: 'A-WALL', isStandard: true),
@@ -111,5 +117,8 @@ class ArchitectLayer {
     ArchitectLayer(id: cadLayerId, name: 'A-CAD', isStandard: true),
     ArchitectLayer(id: furnitureLayerId, name: 'A-FURN', isStandard: true),
     ArchitectLayer(id: drainageLayerId, name: 'A-SITE', isStandard: true),
+    ArchitectLayer(id: cadUnderlayLayerId, name: 'A-XREF', isStandard: true),
+    ArchitectLayer(id: rasterUnderlayLayerId, name: 'A-RAST', isStandard: true),
+    ArchitectLayer(id: geodesyLayerId, name: 'G-TOPO', isStandard: true),
   ];
 }

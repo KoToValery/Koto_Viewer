@@ -28,6 +28,8 @@ enum BimEditAction {
   openView,
   chamfer,
   fillet,
+  detach,
+  attach,
 }
 
 class BimEditActions {
@@ -57,6 +59,8 @@ class BimEditActions {
         BimEditAction.openView => l.architectOpenView,
         BimEditAction.chamfer => l.architectChamfer,
         BimEditAction.fillet => l.architectFillet,
+        BimEditAction.detach => l.architectWallDetach,
+        BimEditAction.attach => l.architectWallAttach,
       };
   static AppIconId icon(BimEditAction action) => switch (action) {
     BimEditAction.move => AppIconId.move,
@@ -83,6 +87,8 @@ class BimEditActions {
     BimEditAction.openView => AppIconId.visible,
     BimEditAction.chamfer => AppIconId.rectangle,
     BimEditAction.fillet => AppIconId.roundedCorner,
+    BimEditAction.detach => AppIconId.unlink,
+    BimEditAction.attach => AppIconId.join,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};

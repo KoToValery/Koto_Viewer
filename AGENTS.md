@@ -46,3 +46,8 @@
     2. Add or maintain // --- SUBSECTION: [TAG:<NAME>] --- grep anchors for new features.
     3. Keep approximate line ranges in TOC and .index.md up to date so subsequent agent invocations do not search blindly.
 
+
+# Token & Resource Efficiency (Static Analysis & Verification)
+
+- **Avoid Slow Intermediate `flutter analyze` Runs**: Do NOT run `flutter analyze` after intermediate edits or on massive files (>15,000 lines) unless strictly necessary, because slow backgrounded commands force extra agent turns that re-bill the entire conversation context and dump ~100 lines of package resolution logs.
+- **Use Fast Targeted `dart analyze` Only When Needed**: When verification is needed, run `dart analyze --no-fatal-infos <changed_new_files>` **once at the very end of the task** (preferring the smaller newly created/modified service, model, and widget files rather than 30,000-line screens unless debugging a specific compile error).

@@ -277,6 +277,9 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     } else if (result.category == ArchitectToolCategory.decorative &&
         !activeTool.isDecorativeTool) {
       widget.onToolChanged(ArchitectTool.decorativeProfile);
+    } else if (result.category == ArchitectToolCategory.underlays &&
+        !activeTool.isUnderlayTool) {
+      widget.onToolChanged(ArchitectTool.cadUnderlay);
     } else if (ArchitectToolCategory.of(activeTool) != category &&
         mode == ArchitectInteractionMode.drawing) {
       widget.onToolChanged(ArchitectTool.pan);

@@ -686,9 +686,10 @@ class ArchitectWall {
   /// Tests if a screen/model point lies within the wall body.
   bool containsPoint(Offset point, {double tolerance = 0.10}) {
     final (ratio, dist) = projectPoint(point);
+    final ratioTolerance = length > 1e-4 ? tolerance / length : 0.0;
     return dist <= (thickness / 2.0 + tolerance) &&
-        ratio >= 0.0 &&
-        ratio <= 1.0;
+        ratio >= -ratioTolerance &&
+        ratio <= 1.0 + ratioTolerance;
   }
 
   Map<String, dynamic> toJson() => {

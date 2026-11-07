@@ -8,24 +8,37 @@ class BimElementOffsetOptions {
   final double distance;
   final bool copy;
   const BimElementOffsetOptions(this.distance, this.copy);
+
+  BimElementOffsetOptions copyWith({double? distance, bool? copy}) =>
+      BimElementOffsetOptions(distance ?? this.distance, copy ?? this.copy);
 }
 
 Future<BimElementOffsetOptions?> showBimElementOffsetDialog(
   BuildContext context, {
   required double unitToMeters,
   required String unitSymbol,
+  double? initialDistance,
+  bool? initialCopy,
 }) => showDialog<BimElementOffsetOptions>(
   context: context,
-  builder: (_) =>
-      _ElementOffsetDialog(unitToMeters: unitToMeters, unitSymbol: unitSymbol),
+  builder: (_) => _ElementOffsetDialog(
+    unitToMeters: unitToMeters,
+    unitSymbol: unitSymbol,
+    initialDistance: initialDistance,
+    initialCopy: initialCopy,
+  ),
 );
 
 class _ElementOffsetDialog extends StatefulWidget {
   final double unitToMeters;
   final String unitSymbol;
+  final double? initialDistance;
+  final bool? initialCopy;
   const _ElementOffsetDialog({
     required this.unitToMeters,
     required this.unitSymbol,
+    this.initialDistance,
+    this.initialCopy,
   });
   @override
   State<_ElementOffsetDialog> createState() => _ElementOffsetDialogState();
@@ -34,6 +47,22 @@ class _ElementOffsetDialog extends StatefulWidget {
 class _ElementOffsetDialogState extends State<_ElementOffsetDialog> {
   final controller = TextEditingController();
   bool copy = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialDistance != null && widget.unitToMeters > 0) {
+      final unitVal = widget.initialDistance! / widget.unitToMeters;
+      var str = unitVal.toStringAsFixed(2);
+      if (str.contains('.')) {
+        str = str.replaceAll(RegExp(r'0*$'), '').replaceAll(RegExp(r'\.$'), '');
+      }
+      controller.text = str;
+    }
+    if (widget.initialCopy != null) {
+      copy = widget.initialCopy!;
+    }
+  }
   @override
   void dispose() {
     controller.dispose();

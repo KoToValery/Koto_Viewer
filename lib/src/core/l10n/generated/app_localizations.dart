@@ -8147,6 +8147,42 @@ abstract class AppLocalizations {
   /// **'Attach'**
   String get architectWallAttach;
 
+  /// Prompt when selecting the second wall to attach
+  ///
+  /// In en, this message translates to:
+  /// **'Select second wall to connect at common vertex'**
+  String get architectWallAttachSelectSecond;
+
+  /// Success message when walls are attached at common vertex
+  ///
+  /// In en, this message translates to:
+  /// **'Walls connected at common vertex'**
+  String get architectWallAttachSuccess;
+
+  /// Error message when walls cannot be connected
+  ///
+  /// In en, this message translates to:
+  /// **'Walls cannot be connected at a common vertex'**
+  String get architectWallAttachIncompatible;
+
+  /// Success message when wall is detached
+  ///
+  /// In en, this message translates to:
+  /// **'Wall detached'**
+  String get architectWallDetachSuccess;
+
+  /// Prompt shown in detach confirmation banner
+  ///
+  /// In en, this message translates to:
+  /// **'Detach wall'**
+  String get architectWallDetachPrompt;
+
+  /// Label for dynamic offset distance editing
+  ///
+  /// In en, this message translates to:
+  /// **'Offset distance'**
+  String get architectOffsetDynamicDistance;
+
   /// No description provided for @architectWallMagnet.
   ///
   /// In en, this message translates to:
@@ -21929,6 +21965,312 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No elements drawn on this storey'**
   String get architectNoDrawnElements;
+
+  /// Command icon label for CAD Underlay
+  ///
+  /// In en, this message translates to:
+  /// **'CAD Underlay (DXF/DWG)'**
+  String get commandIconCadUnderlay;
+
+  /// Command icon label for Raster Underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Raster Underlay (2-Point Calibration)'**
+  String get commandIconRasterUnderlay;
+
+  /// Tool category label for CAD and Raster underlays
+  ///
+  /// In en, this message translates to:
+  /// **'Underlays'**
+  String get architectToolCategoryUnderlays;
+
+  /// Tool label for CAD DXF/DWG underlay
+  ///
+  /// In en, this message translates to:
+  /// **'CAD Underlay'**
+  String get architectToolCadUnderlay;
+
+  /// Tooltip for CAD Underlay tool
+  ///
+  /// In en, this message translates to:
+  /// **'Import or link external DWG/DXF underlay with live auto-reload and geodetic contour detection'**
+  String get architectToolCadUnderlayTooltip;
+
+  /// Tool label for Raster Image/PDF underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Raster Underlay'**
+  String get architectToolRasterUnderlay;
+
+  /// Tooltip for Raster Underlay tool
+  ///
+  /// In en, this message translates to:
+  /// **'Insert scanned image or PDF with opacity and 2-point scale calibration'**
+  String get architectToolRasterUnderlayTooltip;
+
+  /// Standard layer name for CAD Xref underlays
+  ///
+  /// In en, this message translates to:
+  /// **'CAD Underlay'**
+  String get architectLayerCadUnderlay;
+
+  /// Standard layer name for Raster underlays
+  ///
+  /// In en, this message translates to:
+  /// **'Raster Underlay'**
+  String get architectLayerRasterUnderlay;
+
+  /// Standard layer name for Geodetic contours and elevations
+  ///
+  /// In en, this message translates to:
+  /// **'Geodesy & Contours'**
+  String get architectLayerGeodesyContours;
+
+  /// Button to load CAD underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Load DWG/DXF'**
+  String get architectCadUnderlayImport;
+
+  /// Button to update or replace CAD underlay with another file
+  ///
+  /// In en, this message translates to:
+  /// **'Update / Replace'**
+  String get architectCadUnderlayReplace;
+
+  /// Tooltip for replacing CAD underlay without shifting coordinates
+  ///
+  /// In en, this message translates to:
+  /// **'Replace or update with another DWG/DXF file while preserving coordinate alignment'**
+  String get architectCadUnderlayReplaceTooltip;
+
+  /// Toggle for automatic reload when external file changes
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-reload'**
+  String get architectCadUnderlayAutoReload;
+
+  /// Tooltip for auto-reload toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically reload underlay when the external file is modified'**
+  String get architectCadUnderlayAutoReloadTooltip;
+
+  /// Toggle to keep reference coordinate origin locked
+  ///
+  /// In en, this message translates to:
+  /// **'Origin Locked'**
+  String get architectCadUnderlayOriginLocked;
+
+  /// Tooltip for origin lock toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Keep reference origin fixed when updating or replacing underlay so geometry never shifts'**
+  String get architectCadUnderlayOriginLockedTooltip;
+
+  /// Button to manually reload external CAD file
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get architectCadUnderlayReloadNow;
+
+  /// Button to open DXF layers filter sheet
+  ///
+  /// In en, this message translates to:
+  /// **'DXF Layers'**
+  String get architectCadUnderlayLayersFilter;
+
+  /// Button to run geodetic contour detection
+  ///
+  /// In en, this message translates to:
+  /// **'Extract Contours'**
+  String get architectCadUnderlayDetectGeodesy;
+
+  /// Button to remove underlay from current storey
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Underlay'**
+  String get architectCadUnderlayRemove;
+
+  /// Snackbar notice when external CAD file changes and reloads
+  ///
+  /// In en, this message translates to:
+  /// **'External CAD underlay updated automatically: {fileName}'**
+  String architectCadUnderlayReloadedNotice(String fileName);
+
+  /// Snackbar notice when CAD underlay is imported
+  ///
+  /// In en, this message translates to:
+  /// **'CAD underlay loaded ({fileName})'**
+  String architectCadUnderlayLoadedSuccess(String fileName);
+
+  /// Snackbar notice when geodetic contours and points are extracted
+  ///
+  /// In en, this message translates to:
+  /// **'Detected {crs}: extracted {contours} contours and {points} elevation points to layer G-TOPO'**
+  String architectGeodesyDetectedNotice(String crs, int contours, int points);
+
+  /// Snackbar notice when no contours are found
+  ///
+  /// In en, this message translates to:
+  /// **'No geodetic contours or spot elevations detected in this file'**
+  String get architectGeodesyNoContoursFound;
+
+  /// Badge showing count of detected contours
+  ///
+  /// In en, this message translates to:
+  /// **'G-TOPO: {contours} contours'**
+  String architectGeodesyBadge(int contours);
+
+  /// Button to push extracted geodetic elevations to 3D terrain
+  ///
+  /// In en, this message translates to:
+  /// **'To 3D Terrain'**
+  String get architectGeodesyApplyToTerrain;
+
+  /// Snackbar notice after transferring points to 3D terrain
+  ///
+  /// In en, this message translates to:
+  /// **'Transferred {count} elevation points to 3D Terrain'**
+  String architectGeodesyAppliedToTerrainNotice(int count);
+
+  /// Hint text when no CAD underlay is loaded on current storey
+  ///
+  /// In en, this message translates to:
+  /// **'Load an external DWG/DXF as a read-only background underlay for this storey'**
+  String get architectCadUnderlayEmptyHint;
+
+  /// Button to import raster image or PDF underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Insert Image / PDF'**
+  String get architectRasterUnderlayImport;
+
+  /// Hint text when no raster underlay is on current storey
+  ///
+  /// In en, this message translates to:
+  /// **'Insert a scanned survey, sketch, JPG/PNG or PDF and calibrate by 2 points'**
+  String get architectRasterUnderlayEmptyHint;
+
+  /// Button to start 2-point scale calibration
+  ///
+  /// In en, this message translates to:
+  /// **'2-Point Calibrate'**
+  String get architectRasterCalibrate2Pt;
+
+  /// Instruction for first calibration point
+  ///
+  /// In en, this message translates to:
+  /// **'Click Point 1 on the raster underlay'**
+  String get architectRasterCalibrateStep1;
+
+  /// Instruction for second calibration point
+  ///
+  /// In en, this message translates to:
+  /// **'Click Point 2 on the raster underlay'**
+  String get architectRasterCalibrateStep2;
+
+  /// Button to cancel 2-point calibration
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel calibration'**
+  String get architectRasterCalibrateCancel;
+
+  /// Title of 2-point calibration dialog
+  ///
+  /// In en, this message translates to:
+  /// **'2-Point Scale & Alignment Calibration'**
+  String get architectRasterCalibrateDialogTitle;
+
+  /// Input label for real distance in meters
+  ///
+  /// In en, this message translates to:
+  /// **'Real distance between Point 1 and Point 2 (m)'**
+  String get architectRasterCalibrateRealDistanceLabel;
+
+  /// Info text showing measured distance before calibration
+  ///
+  /// In en, this message translates to:
+  /// **'Current uncalibrated length: {distance} m'**
+  String architectRasterCalibrateCurrentDistance(String distance);
+
+  /// Label for orientation alignment option during calibration
+  ///
+  /// In en, this message translates to:
+  /// **'Orientation / Deskew (Point 1 → Point 2)'**
+  String get architectRasterAlignModeLabel;
+
+  /// Option to keep existing image rotation
+  ///
+  /// In en, this message translates to:
+  /// **'Keep current angle (scale only)'**
+  String get architectRasterAlignKeepAngle;
+
+  /// Option to rotate image so P1-P2 is horizontal
+  ///
+  /// In en, this message translates to:
+  /// **'Align horizontally (0°)'**
+  String get architectRasterAlignHorizontal;
+
+  /// Option to rotate image so P1-P2 is vertical
+  ///
+  /// In en, this message translates to:
+  /// **'Align vertically (90°)'**
+  String get architectRasterAlignVertical;
+
+  /// Button to apply 2-point calibration
+  ///
+  /// In en, this message translates to:
+  /// **'Calibrate'**
+  String get architectRasterCalibrateApply;
+
+  /// Snackbar notice after calibrating raster underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Raster underlay calibrated ({mmPerPixel} mm/px)'**
+  String architectRasterCalibratedSuccess(String mmPerPixel);
+
+  /// Label for underlay opacity slider
+  ///
+  /// In en, this message translates to:
+  /// **'Opacity'**
+  String get architectRasterOpacityLabel;
+
+  /// Lock raster underlay position
+  ///
+  /// In en, this message translates to:
+  /// **'Lock'**
+  String get architectRasterLockPosition;
+
+  /// Unlock raster underlay position
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get architectRasterUnlockPosition;
+
+  /// Reset raster underlay scale and rotation
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get architectRasterResetTransform;
+
+  /// Dialog title for choosing PDF page
+  ///
+  /// In en, this message translates to:
+  /// **'Select PDF Page for Underlay'**
+  String get architectRasterSelectPdfPageTitle;
+
+  /// Page indicator in PDF page selector
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page} of {total}'**
+  String architectRasterPdfPageLabel(int page, int total);
+
+  /// Button to confirm PDF page import
+  ///
+  /// In en, this message translates to:
+  /// **'Import Page'**
+  String get architectRasterImportPdfButton;
 }
 
 class _AppLocalizationsDelegate

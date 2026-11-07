@@ -4660,6 +4660,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallAttach => 'Attach';
 
   @override
+  String get architectWallAttachSelectSecond =>
+      'Select second wall to connect at common vertex';
+
+  @override
+  String get architectWallAttachSuccess => 'Walls connected at common vertex';
+
+  @override
+  String get architectWallAttachIncompatible =>
+      'Walls cannot be connected at a common vertex';
+
+  @override
+  String get architectWallDetachSuccess => 'Wall detached';
+
+  @override
+  String get architectWallDetachPrompt => 'Detach wall';
+
+  @override
+  String get architectOffsetDynamicDistance => 'Offset distance';
+
+  @override
   String get architectWallMagnet => 'Magnet';
 
   @override
@@ -12047,4 +12067,188 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectNoDrawnElements => 'No elements drawn on this storey';
+
+  @override
+  String get commandIconCadUnderlay => 'CAD Underlay (DXF/DWG)';
+
+  @override
+  String get commandIconRasterUnderlay =>
+      'Raster Underlay (2-Point Calibration)';
+
+  @override
+  String get architectToolCategoryUnderlays => 'Underlays';
+
+  @override
+  String get architectToolCadUnderlay => 'CAD Underlay';
+
+  @override
+  String get architectToolCadUnderlayTooltip =>
+      'Import or link external DWG/DXF underlay with live auto-reload and geodetic contour detection';
+
+  @override
+  String get architectToolRasterUnderlay => 'Raster Underlay';
+
+  @override
+  String get architectToolRasterUnderlayTooltip =>
+      'Insert scanned image or PDF with opacity and 2-point scale calibration';
+
+  @override
+  String get architectLayerCadUnderlay => 'CAD Underlay';
+
+  @override
+  String get architectLayerRasterUnderlay => 'Raster Underlay';
+
+  @override
+  String get architectLayerGeodesyContours => 'Geodesy & Contours';
+
+  @override
+  String get architectCadUnderlayImport => 'Load DWG/DXF';
+
+  @override
+  String get architectCadUnderlayReplace => 'Update / Replace';
+
+  @override
+  String get architectCadUnderlayReplaceTooltip =>
+      'Replace or update with another DWG/DXF file while preserving coordinate alignment';
+
+  @override
+  String get architectCadUnderlayAutoReload => 'Auto-reload';
+
+  @override
+  String get architectCadUnderlayAutoReloadTooltip =>
+      'Automatically reload underlay when the external file is modified';
+
+  @override
+  String get architectCadUnderlayOriginLocked => 'Origin Locked';
+
+  @override
+  String get architectCadUnderlayOriginLockedTooltip =>
+      'Keep reference origin fixed when updating or replacing underlay so geometry never shifts';
+
+  @override
+  String get architectCadUnderlayReloadNow => 'Reload';
+
+  @override
+  String get architectCadUnderlayLayersFilter => 'DXF Layers';
+
+  @override
+  String get architectCadUnderlayDetectGeodesy => 'Extract Contours';
+
+  @override
+  String get architectCadUnderlayRemove => 'Remove Underlay';
+
+  @override
+  String architectCadUnderlayReloadedNotice(String fileName) {
+    return 'External CAD underlay updated automatically: $fileName';
+  }
+
+  @override
+  String architectCadUnderlayLoadedSuccess(String fileName) {
+    return 'CAD underlay loaded ($fileName)';
+  }
+
+  @override
+  String architectGeodesyDetectedNotice(String crs, int contours, int points) {
+    return 'Detected $crs: extracted $contours contours and $points elevation points to layer G-TOPO';
+  }
+
+  @override
+  String get architectGeodesyNoContoursFound =>
+      'No geodetic contours or spot elevations detected in this file';
+
+  @override
+  String architectGeodesyBadge(int contours) {
+    return 'G-TOPO: $contours contours';
+  }
+
+  @override
+  String get architectGeodesyApplyToTerrain => 'To 3D Terrain';
+
+  @override
+  String architectGeodesyAppliedToTerrainNotice(int count) {
+    return 'Transferred $count elevation points to 3D Terrain';
+  }
+
+  @override
+  String get architectCadUnderlayEmptyHint =>
+      'Load an external DWG/DXF as a read-only background underlay for this storey';
+
+  @override
+  String get architectRasterUnderlayImport => 'Insert Image / PDF';
+
+  @override
+  String get architectRasterUnderlayEmptyHint =>
+      'Insert a scanned survey, sketch, JPG/PNG or PDF and calibrate by 2 points';
+
+  @override
+  String get architectRasterCalibrate2Pt => '2-Point Calibrate';
+
+  @override
+  String get architectRasterCalibrateStep1 =>
+      'Click Point 1 on the raster underlay';
+
+  @override
+  String get architectRasterCalibrateStep2 =>
+      'Click Point 2 on the raster underlay';
+
+  @override
+  String get architectRasterCalibrateCancel => 'Cancel calibration';
+
+  @override
+  String get architectRasterCalibrateDialogTitle =>
+      '2-Point Scale & Alignment Calibration';
+
+  @override
+  String get architectRasterCalibrateRealDistanceLabel =>
+      'Real distance between Point 1 and Point 2 (m)';
+
+  @override
+  String architectRasterCalibrateCurrentDistance(String distance) {
+    return 'Current uncalibrated length: $distance m';
+  }
+
+  @override
+  String get architectRasterAlignModeLabel =>
+      'Orientation / Deskew (Point 1 → Point 2)';
+
+  @override
+  String get architectRasterAlignKeepAngle => 'Keep current angle (scale only)';
+
+  @override
+  String get architectRasterAlignHorizontal => 'Align horizontally (0°)';
+
+  @override
+  String get architectRasterAlignVertical => 'Align vertically (90°)';
+
+  @override
+  String get architectRasterCalibrateApply => 'Calibrate';
+
+  @override
+  String architectRasterCalibratedSuccess(String mmPerPixel) {
+    return 'Raster underlay calibrated ($mmPerPixel mm/px)';
+  }
+
+  @override
+  String get architectRasterOpacityLabel => 'Opacity';
+
+  @override
+  String get architectRasterLockPosition => 'Lock';
+
+  @override
+  String get architectRasterUnlockPosition => 'Unlock';
+
+  @override
+  String get architectRasterResetTransform => 'Reset';
+
+  @override
+  String get architectRasterSelectPdfPageTitle =>
+      'Select PDF Page for Underlay';
+
+  @override
+  String architectRasterPdfPageLabel(int page, int total) {
+    return 'Page $page of $total';
+  }
+
+  @override
+  String get architectRasterImportPdfButton => 'Import Page';
 }
