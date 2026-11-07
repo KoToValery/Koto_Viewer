@@ -4,6 +4,19 @@ import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/rendering/dxf_snap_helper.dart';
 import '../models/structural_element.dart';
 
+// ============================================================================
+// MASTER STRUCTURAL MAGNETIC ALIGNMENT LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'structural_magnetic_alignment_helper.index.md' for snap logic.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-MODELS]  L7-L113    : [TAG:SMA_MODELS] Alignment results & guideline records
+// [SEC-02-COLUMNS] L114-L1047 : [TAG:SMA_COLUMNS] Column alignment & grid axis snapping
+// [SEC-03-WALLS]   L1048-L1525: [TAG:SMA_WALLS] Shear wall alignment & corner joints
+// [SEC-04-BEAMS]   L1526-L1828: [TAG:SMA_BEAMS] Beam alignment & node-to-node snapping
+// ============================================================================
+
+// === SECTION: [SEC-01-MODELS] ALIGNMENT RESULT RECORDS ===
 /// Magnetic alignment result for columns.
 class ColumnMagneticAlignmentResult {
   final Offset snappedCenter;

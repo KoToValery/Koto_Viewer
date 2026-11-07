@@ -15,18 +15,22 @@ import 'support_span_overlay_layout.dart';
 import 'structural_overview_layout.dart';
 
 // ============================================================================
-// TABLE OF CONTENTS (grep: "=== SECTION:")
-// 1. === SECTION: PAINTER DECLARATION & MAIN PAINT DISPATCHER ===
-// 2. === SECTION: MEASUREMENTS, SPANS & STOREY GHOSTS ===
-// 3. === SECTION: SLABS, OPENINGS & EXTRUSION PREVIEWS ===
-// 4. === SECTION: STAIRS & ELEVATORS ARCHITECTURAL GRAPHICS ===
-// 5. === SECTION: BEAMS & STRUCTURAL GRID AXES ===
-// 6. === SECTION: SHEAR WALLS, GUIDELINES & COLUMNS ===
-// 7. === SECTION: INTERACTIVE PLACEMENT PREVIEWS ===
-// 8. === SECTION: ANALYSIS OVERLAYS (CANTILEVERS & SEISMIC TARGETS) ===
+// MASTER STRUCTURAL 2D PAINTER LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'structural_2d_painter.index.md' for element paint routines.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-DISPATCH]   L29-L333   : [TAG:S2D_DISPATCH] Structural2dPainter declaration & main loop
+// [SEC-02-GHOSTS]     L334-L657  : [TAG:S2D_GHOSTS] Trace reference ghost storeys & support spans
+// [SEC-03-SLABS]      L658-L1249 : [TAG:S2D_SLABS] Floor & ceiling slabs, void contours & labels
+// [SEC-04-STAIRS]     L1250-L1347: [TAG:S2D_STAIRS] Stairs, elevator shafts & architectural cuts
+// [SEC-05-BEAMS-AXES] L1348-L1590: [TAG:S2D_BEAMS] Beams, structural grid axes & bubble layout
+// [SEC-06-WALLS-COLS] L1591-L1849: [TAG:S2D_WALLS] Shear walls, columns & reference lines
+// [SEC-07-PREVIEWS]   L1850-L2250: [TAG:S2D_PREVIEWS] Interactive drafting previews & snapping
+// [SEC-08-ANALYSIS]   L2251-L2404: [TAG:S2D_ANALYSIS] Cantilever heatmap & seismic rigidity targets
 // ============================================================================
 
-// === SECTION: PAINTER DECLARATION & MAIN PAINT DISPATCHER ===
+// === SECTION: [SEC-01-DISPATCH] PAINTER DECLARATION & MAIN PAINT DISPATCHER ===
 /// 2D CustomPainter that renders structural elements, ghost storeys (ArchiCAD Trace Reference),
 /// interactive drawing previews, and cantilever warning zones projected onto CAD scene coordinates.
 class Structural2dPainter extends CustomPainter {

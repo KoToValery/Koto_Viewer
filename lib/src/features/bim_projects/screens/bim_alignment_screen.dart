@@ -19,6 +19,21 @@ import '../services/bim_project_library_service.dart';
 import '../services/bim_underlay_picker_helper.dart';
 import 'bim_workspace_screen.dart';
 
+// ============================================================================
+// MASTER BIM ALIGNMENT SCREEN LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'bim_alignment_screen.index.md' for multi-storey alignment.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-WIDGET]  L22-L38    : [TAG:BAS_WIDGET] BimAlignmentScreen StatefulWidget
+// [SEC-02-STATE]   L39-L300   : [TAG:BAS_STATE] State variables & viewport matrix
+// [SEC-03-LOADER]  L301-L650  : [TAG:BAS_LOADER] Underlay DXF file loading & caching
+// [SEC-04-POINTS]  L651-L950  : [TAG:BAS_POINTS] Common control point placement & snap
+// [SEC-05-BUILD]   L951-L1350 : [TAG:BAS_BUILD] Main build method & storey tabs HUD
+// [SEC-06-PAINTER] L1351-L1560: [TAG:BAS_PAINTER] Control point overlay custom painter
+// ============================================================================
+
+// === SECTION: [SEC-01-WIDGET] BIM ALIGNMENT SCREEN WIDGET ===
 /// Screen allowing users to inspect each storey underlay drawing and place a common
 /// control point (reference point) on all floors for precise multi-storey BiM alignment.
 class BimAlignmentScreen extends StatefulWidget {

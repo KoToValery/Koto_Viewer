@@ -10,6 +10,26 @@ import '../rendering/dxf_quadtree.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 import '../binary/kcad_service.dart';
 
+// ============================================================================
+// MASTER DXF PARSER LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'dxf_parser.index.md' for full entity parsing directory.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-PAIRS]      L13-L24   : [TAG:DXF_P_PAIRS] _DxfPair group code & value tokenizer
+// [SEC-02-API]        L25-L150  : [TAG:DXF_P_API] DxfParser API & KCAD binary cache fast-path
+// [SEC-03-HEADER]     L151-L398 : [TAG:DXF_P_HEADER] HEADER section ($EXTMIN, $EXTMAX, $INSUNITS)
+// [SEC-04-TABLES]     L399-L737 : [TAG:DXF_P_TABLES] TABLES (LAYER, LTYPE, STYLE, DIMSTYLE, VPORT)
+// [SEC-05-BLOCKS]     L738-L814 : [TAG:DXF_P_BLOCKS] BLOCKS section (definition headers & entities)
+// [SEC-06-ENTITIES]   L815-L944 : [TAG:DXF_P_ENTITIES] ENTITIES section main dispatch loop
+// [SEC-07-PRIMITIVES] L945-L1353: [TAG:DXF_P_GEOM] LINE, CIRCLE, ARC, LWPOLYLINE, POLYLINE, SPLINE
+// [SEC-08-TEXT]       L1354-L1640: [TAG:DXF_P_TEXT] TEXT, MTEXT, font formatting & Cyrillic fix
+// [SEC-09-HATCH-INS]  L1641-L1886: [TAG:DXF_P_HATCH] HATCH boundary loops, INSERT block references
+// [SEC-10-DIMS-MISC]  L1887-L2238: [TAG:DXF_P_DIMS] DIMENSION, LEADER, SOLID, TRACE, ELLIPSE
+// [SEC-11-HELPERS]    L2239-L2587: [TAG:DXF_P_HELPERS] Text decoders, MText code stripper, colors
+// ============================================================================
+
+// === SECTION: [SEC-01-PAIRS] DXF GROUP CODE TOKENIZER ===
 /// Represents a single DXF Group Code and Value pair.
 class _DxfPair {
   final int code;

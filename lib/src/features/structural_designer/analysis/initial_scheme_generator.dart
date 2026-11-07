@@ -19,16 +19,20 @@ import 'structural_geometry_units.dart';
 import '../models/vertical_capacity_models.dart';
 
 // ============================================================================
-// TABLE OF CONTENTS (grep: "=== SECTION:")
-// 1. === SECTION: OPTIONS & PROPOSAL MODELS ===
-// 2. === SECTION: GENERATOR ENTRY & GEOMETRIC HELPERS ===
-// 3. === SECTION: STAIRCASE, SHAFTS & CORE BOUNDARY WALLS ===
-// 4. === SECTION: SHEAR WALL PLACEMENT & SEISMIC PAIRING ===
-// 5. === SECTION: COLUMN LAYOUT & SPAN OPTIMIZATION ===
-// 6. === SECTION: BEAMS & FINAL SCHEME VALIDATION ===
+// MASTER INITIAL SCHEME GENERATOR LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'initial_scheme_generator.index.md' for structural layout logic.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-OPTIONS] L31-L267   : [TAG:ISG_OPTIONS] InitialSchemeOptions, proposals & wall runs
+// [SEC-02-GEN]     L268-L1227 : [TAG:ISG_GENERATOR] InitialSchemeGenerator pipeline & geometric network
+// [SEC-03-CORES]   L1228-L1414: [TAG:ISG_CORES] Staircase, elevator shaft & core boundary walls
+// [SEC-04-WALLS]   L1415-L1791: [TAG:ISG_WALLS] Shear wall placement & seismic X/Y pairing
+// [SEC-05-COLUMNS] L1792-L2164: [TAG:ISG_COLUMNS] Column layout & span grid optimization
+// [SEC-06-BEAMS]   L2165-L2342: [TAG:ISG_BEAMS] Tie beams & final scheme structural validation
 // ============================================================================
 
-// === SECTION: OPTIONS & PROPOSAL MODELS ===
+// === SECTION: [SEC-01-OPTIONS] OPTIONS & PROPOSAL MODELS ===
 class InitialSchemeOptions {
   final double minSpacingM, minWallSpacingM, targetSpacingM, wallLengthM;
   final double? maxWallLengthM;

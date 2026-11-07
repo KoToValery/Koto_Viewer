@@ -3,6 +3,26 @@ import 'package:flutter/material.dart';
 import '../rendering/dxf_math.dart';
 import '../rendering/dxf_quadtree.dart';
 
+// ============================================================================
+// MASTER DXF MODELS LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'dxf_models.index.md' for full CAD entity class hierarchy.
+// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+//
+// [SEC-01-TABLES]    L6-L163    : [TAG:DXF_M_TABLES] DxfPolylineVertex, DxfLayer, DxfTextStyle
+// [SEC-02-COMPILED]  L164-L400  : [TAG:DXF_M_COMPILED] DxfCompiledLine & DxfCompiledBlock caches
+// [SEC-03-BLOCKS]    L401-L437  : [TAG:DXF_M_BLOCKS] DxfBlock definition container
+// [SEC-04-BASE]      L438-L466  : [TAG:DXF_M_BASE] DxfEntity abstract base entity
+// [SEC-05-CURVES]    L467-L787  : [TAG:DXF_M_CURVES] DxfLine, Circle, Arc, Ellipse, Polyline, Spline
+// [SEC-06-TEXT]      L788-L957  : [TAG:DXF_M_TEXT] DxfText & DxfMText models
+// [SEC-07-HATCHES]   L958-L1070 : [TAG:DXF_M_HATCHES] DxfSolid, DxfHatch & boundary loops
+// [SEC-08-BLOCKREFS] L1071-L1259: [TAG:DXF_M_BLOCKREFS] DxfAttribute, DxfAttdef, DxfInsert
+// [SEC-09-DIMS]      L1260-L1535: [TAG:DXF_M_DIMS] DxfDimension, DxfLeader, DxfMLeader, Viewport
+// [SEC-10-DOC]       L1536-L1854: [TAG:DXF_M_DOC] DxfDocument master model & spatial indexing
+// [SEC-11-MEASURE]   L1855-L2079: [TAG:DXF_M_MEASURE] DxfUnit, DxfMeasureTool, DxfAnnotation
+// ============================================================================
+
+// === SECTION: [SEC-01-TABLES] TABLE ENTITIES & VERTICES ===
 /// Vertex in lightweight polyline or 2D polyline.
 class DxfPolylineVertex {
   final double x;
