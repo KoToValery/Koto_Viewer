@@ -1,11 +1,12 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import '../models/architect_project.dart';
 
 /// Unified controller and geometry helper for the Landscape tool category:
 /// Terrain (`terrain`), Pathway with Automatic Curb (`pathway`),
 /// Vegetation (`vegetation`), and Site Fence / Gabion / Retaining Wall (`siteFence`).
-class ArchitectLandscapeTool {
+class ArchitectLandscapeTool extends ChangeNotifier {
   // --- Terrain State ---
   ArchitectTerrainState terrainState = ArchitectTerrainState.proposed;
   ArchitectTerrainDraftMode terrainMode = ArchitectTerrainDraftMode.boundary;
@@ -37,11 +38,17 @@ class ArchitectLandscapeTool {
   // --- Active Polyline/Polygon Draft Chain ---
   final List<Offset> draftPoints = <Offset>[];
 
-  void clearDraft() => draftPoints.clear();
+  bool get isDrafting => draftPoints.isNotEmpty;
+
+  void clearDraft() {
+    draftPoints.clear();
+    notifyListeners();
+  }
 
   void undoLastPoint() {
     if (draftPoints.isNotEmpty) {
       draftPoints.removeLast();
+      notifyListeners();
     }
   }
 

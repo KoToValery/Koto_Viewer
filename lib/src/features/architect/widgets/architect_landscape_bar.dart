@@ -9,23 +9,27 @@ import '../services/architect_landscape_tool.dart';
 /// Terrain, Pathway with Automatic Curb, Vegetation, and Site Fence / Gabion.
 class ArchitectLandscapeBar extends StatelessWidget {
   final ArchitectTool activeTool;
-  final ArchitectLandscapeTool controller;
+  final ArchitectLandscapeTool landscapeTool;
   final VoidCallback onChanged;
   final VoidCallback? onCommitDraft;
-  final VoidCallback? onUndoDraftPoint;
+  final VoidCallback? onUndoPoint;
   final VoidCallback? onCancelDraft;
-  final VoidCallback? onSyncFromGeodesy;
+  final VoidCallback? onSyncTerrainFromGeodesy;
 
   const ArchitectLandscapeBar({
     super.key,
     required this.activeTool,
-    required this.controller,
+    required this.landscapeTool,
     required this.onChanged,
     this.onCommitDraft,
-    this.onUndoDraftPoint,
+    this.onUndoPoint,
     this.onCancelDraft,
-    this.onSyncFromGeodesy,
+    this.onSyncTerrainFromGeodesy,
   });
+
+  ArchitectLandscapeTool get controller => landscapeTool;
+  VoidCallback? get onUndoDraftPoint => onUndoPoint;
+  VoidCallback? get onSyncFromGeodesy => onSyncTerrainFromGeodesy;
 
   @override
   Widget build(BuildContext context) {

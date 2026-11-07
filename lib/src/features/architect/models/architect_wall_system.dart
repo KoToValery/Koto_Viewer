@@ -37,6 +37,7 @@ class ArchitectWallSystem {
   bool get isSpecial => kind != ArchitectWallSystemKind.layered;
   bool get isLog => kind == ArchitectWallSystemKind.roundLogs;
   bool get isFrame => kind == ArchitectWallSystemKind.studFrame;
+  bool get isStud => isFrame;
   bool get isPanel => kind == ArchitectWallSystemKind.sandwichPanels;
   double pitch(double diameter) => diameter * (1 - overlapPercent / 100);
   double get additionalDepth => isPanel ? supportDepth : 0;

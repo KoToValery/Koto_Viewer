@@ -2292,21 +2292,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     });
 
-    final schemeChanged = result.structuralScheme != _project.structuralScheme;
-    final beamDepthChanged =
-        (result.perimeterBeamDepth - _project.perimeterBeamDepth).abs() > 1e-4;
-    if (schemeChanged || beamDepthChanged) {
-      setState(() {
-        _project = _project.copyWith(
-          structuralScheme: result.structuralScheme,
-          perimeterBeamDepth: result.perimeterBeamDepth,
-        );
-      });
-      if (schemeChanged) {
-        _applyStructuralSchemeDefaults(result.structuralScheme);
-      }
-    }
-
     _saveBiMProjectIfAttached();
 
     HapticFeedback.mediumImpact();
@@ -3578,6 +3563,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           : const ArchitectCanvasPalette.light();
 
     });
+
+    final schemeChanged = result.structuralScheme != _project.structuralScheme;
+    final beamDepthChanged =
+        (result.perimeterBeamDepth - _project.perimeterBeamDepth).abs() > 1e-4;
+    if (schemeChanged || beamDepthChanged) {
+      setState(() {
+        _project = _project.copyWith(
+          structuralScheme: result.structuralScheme,
+          perimeterBeamDepth: result.perimeterBeamDepth,
+        );
+      });
+      if (schemeChanged) {
+        _applyStructuralSchemeDefaults(result.structuralScheme);
+      }
+    }
 
     _saveBiMProjectIfAttached();
 
@@ -28202,6 +28202,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       ? ArchitectLandscapeBar(
                           activeTool: _activeTool,
                           landscapeTool: _landscapeTool,
+                          onChanged: _repaintPreview,
                           onCommitDraft: _commitLandscapeDraft,
                           onUndoPoint: () {
                             setState(_landscapeTool.undoLastPoint);
@@ -29640,6 +29641,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _syncTerrainFromGeodesy() {
+    final survey = _project.geodeticSurvey;
+    final count =
+        (survey?.contours.length ?? 0) + (survey?.spotElevations.length ?? 0);
     final nextProject = _landscapeTool.syncTerrainFromGeodesy(_project);
     setState(() {
       _commands.commit(nextProject);
@@ -29648,7 +29652,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     HapticFeedback.mediumImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(context.l10n.architectGeodesySyncedToTerrain),
+        content: Text(context.l10n.architectTerrainSyncedFromGeodesy(count)),
         duration: const Duration(seconds: 2),
       ),
     );

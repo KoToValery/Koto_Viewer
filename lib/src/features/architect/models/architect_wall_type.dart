@@ -98,6 +98,28 @@ class ArchitectWallType {
       (usage == WallUsage.exterior || usage == WallUsage.parapet
           ? ArchitectWallLocation.exterior
           : ArchitectWallLocation.interior);
+  WallCoreMaterial get coreMaterial => system.isLog
+      ? WallCoreMaterial.timber
+      : system.isSpecial
+      ? WallCoreMaterial.panel
+      : (layers.isNotEmpty
+            ? WallCoreMaterial.values
+                  .where(
+                    (m) =>
+                        m.name ==
+                        layers
+                            .firstWhere(
+                              (l) => l.role == ArchitectLayerRole.core,
+                              orElse: () => layers.first,
+                            )
+                            .material
+                            .name,
+                  )
+                  .firstOrNull
+            : null) ??
+        (id == 'bearing_25_concrete'
+            ? WallCoreMaterial.concrete
+            : WallCoreMaterial.brick);
   List<ArchitectMaterialLayer> get resolvedLayers => !hasSolidWallBody
       ? const []
       : layers.isNotEmpty

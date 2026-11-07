@@ -12,7 +12,7 @@ class ArchitectLineEditing {
     endPoint: line.endPoint,
     thickness: .001,
     wallTypeId: line.id,
-    arcBulge: line.arcBulge,
+    arcBulge: line.arcBulge ?? 0.0,
   );
 
   static ArchitectProject geometry(ArchitectProject project, String storeyId) {
