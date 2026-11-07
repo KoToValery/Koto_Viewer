@@ -175,6 +175,7 @@ class ArchitectDraftingSeed {
     'sections': ArchitectTool.section,
     'elevations': ArchitectTool.elevation,
     'pathways': ArchitectTool.pathway,
+    'streets': ArchitectTool.street,
     'vegetation': ArchitectTool.vegetation,
     'siteFences': ArchitectTool.siteFence,
   };

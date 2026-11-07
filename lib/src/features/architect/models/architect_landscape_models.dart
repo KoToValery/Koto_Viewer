@@ -1305,3 +1305,262 @@ class ArchitectSiteFence {
         elevationOffset: (json['elevationOffset'] as num?)?.toDouble() ?? 0.0,
       );
 }
+
+// ===========================================================================
+// 5. STREET / ROAD WITH SIDEWALKS & MARKINGS (УЛИЦА С МАРКИРОВКА И ТРОТОАРИ)
+// ===========================================================================
+
+enum ArchitectRoadMarkingStyle {
+  dashed,
+  solid,
+  doubleSolid,
+  none;
+
+  String label(AppLocalizations l) => switch (this) {
+    dashed => l.architectStreetMarkingDashed,
+    solid => l.architectStreetMarkingSolid,
+    doubleSolid => l.architectStreetMarkingDoubleSolid,
+    none => l.architectStreetMarkingNone,
+  };
+}
+
+/// Street / Roadway element with asphalt carriageway, road markings, left/right curbs and sidewalks.
+class ArchitectStreet {
+  final String id;
+  final List<Offset> points;
+  final bool closed;
+  final double roadWidth;
+  final double curbWidth;
+  final double curbHeight;
+  final bool hasLeftSidewalk;
+  final double leftSidewalkWidth;
+  final bool hasRightSidewalk;
+  final double rightSidewalkWidth;
+  final ArchitectRoadMarkingStyle markingStyle;
+  final double markingWidth;
+  final ArchitectPavingMaterial roadMaterial;
+  final ArchitectPavingMaterial sidewalkMaterial;
+  final double elevationOffset;
+
+  const ArchitectStreet({
+    required this.id,
+    required this.points,
+    this.closed = false,
+    this.roadWidth = 6.00,
+    this.curbWidth = 0.15,
+    this.curbHeight = 0.12,
+    this.hasLeftSidewalk = true,
+    this.leftSidewalkWidth = 1.50,
+    this.hasRightSidewalk = true,
+    this.rightSidewalkWidth = 1.50,
+    this.markingStyle = ArchitectRoadMarkingStyle.dashed,
+    this.markingWidth = 0.12,
+    this.roadMaterial = ArchitectPavingMaterial.asphalt,
+    this.sidewalkMaterial = ArchitectPavingMaterial.cobblePavers,
+    this.elevationOffset = 0.02,
+  });
+
+  /// Polygon of the asphalt carriageway surface.
+  List<Offset> get roadwayPolygon {
+    if (points.length < 2) return const [];
+    final halfW = roadWidth / 2.0;
+    final left = ArchitectPathway.offsetChain(points, halfW, closed: closed);
+    final right = ArchitectPathway.offsetChain(points, -halfW, closed: closed);
+    return [...left, ...right.reversed];
+  }
+
+  /// Polygon of the left curb strip separating roadway and left sidewalk.
+  List<Offset> get leftCurbPolygon {
+    if (curbWidth <= 1e-4 || points.length < 2) return const [];
+    final inner = ArchitectPathway.offsetChain(
+      points,
+      roadWidth / 2.0,
+      closed: closed,
+    );
+    final outer = ArchitectPathway.offsetChain(
+      points,
+      roadWidth / 2.0 + curbWidth,
+      closed: closed,
+    );
+    return [...outer, ...inner.reversed];
+  }
+
+  /// Polygon of the right curb strip separating roadway and right sidewalk.
+  List<Offset> get rightCurbPolygon {
+    if (curbWidth <= 1e-4 || points.length < 2) return const [];
+    final inner = ArchitectPathway.offsetChain(
+      points,
+      -roadWidth / 2.0,
+      closed: closed,
+    );
+    final outer = ArchitectPathway.offsetChain(
+      points,
+      -(roadWidth / 2.0 + curbWidth),
+      closed: closed,
+    );
+    return [...inner, ...outer.reversed];
+  }
+
+  /// Polygon of the left sidewalk paving strip.
+  List<Offset> get leftSidewalkPolygon {
+    if (!hasLeftSidewalk || leftSidewalkWidth <= 1e-4 || points.length < 2) {
+      return const [];
+    }
+    final inner = ArchitectPathway.offsetChain(
+      points,
+      roadWidth / 2.0 + curbWidth,
+      closed: closed,
+    );
+    final outer = ArchitectPathway.offsetChain(
+      points,
+      roadWidth / 2.0 + curbWidth + leftSidewalkWidth,
+      closed: closed,
+    );
+    return [...outer, ...inner.reversed];
+  }
+
+  /// Polygon of the right sidewalk paving strip.
+  List<Offset> get rightSidewalkPolygon {
+    if (!hasRightSidewalk || rightSidewalkWidth <= 1e-4 || points.length < 2) {
+      return const [];
+    }
+    final inner = ArchitectPathway.offsetChain(
+      points,
+      -(roadWidth / 2.0 + curbWidth),
+      closed: closed,
+    );
+    final outer = ArchitectPathway.offsetChain(
+      points,
+      -(roadWidth / 2.0 + curbWidth + rightSidewalkWidth),
+      closed: closed,
+    );
+    return [...inner, ...outer.reversed];
+  }
+
+  double get totalLeftWidth =>
+      roadWidth / 2.0 +
+      curbWidth +
+      (hasLeftSidewalk ? leftSidewalkWidth : 0.0);
+
+  double get totalRightWidth =>
+      roadWidth / 2.0 +
+      curbWidth +
+      (hasRightSidewalk ? rightSidewalkWidth : 0.0);
+
+  double get totalWidth => totalLeftWidth + totalRightWidth;
+
+  bool containsPoint(Offset point, {double tolerance = 0.10}) {
+    if (points.length < 2) return false;
+    if (closed && points.length >= 3) {
+      final path = Path()..addPolygon(points, true);
+      if (path.contains(point)) return true;
+    }
+    final maxDist =
+        (totalLeftWidth > totalRightWidth ? totalLeftWidth : totalRightWidth) +
+        tolerance;
+    final segCount = closed ? points.length : points.length - 1;
+    for (var i = 0; i < segCount; i++) {
+      final a = points[i];
+      final b = points[(i + 1) % points.length];
+      final closest = ArchitectTerrainSurface._closestPointOnSegment(
+        point,
+        a,
+        b,
+      );
+      if ((point - closest).distance <= maxDist) return true;
+    }
+    return false;
+  }
+
+  ArchitectStreet copyWith({
+    String? id,
+    List<Offset>? points,
+    bool? closed,
+    double? roadWidth,
+    double? curbWidth,
+    double? curbHeight,
+    bool? hasLeftSidewalk,
+    double? leftSidewalkWidth,
+    bool? hasRightSidewalk,
+    double? rightSidewalkWidth,
+    ArchitectRoadMarkingStyle? markingStyle,
+    double? markingWidth,
+    ArchitectPavingMaterial? roadMaterial,
+    ArchitectPavingMaterial? sidewalkMaterial,
+    double? elevationOffset,
+  }) => ArchitectStreet(
+    id: id ?? this.id,
+    points: points ?? this.points,
+    closed: closed ?? this.closed,
+    roadWidth: roadWidth ?? this.roadWidth,
+    curbWidth: curbWidth ?? this.curbWidth,
+    curbHeight: curbHeight ?? this.curbHeight,
+    hasLeftSidewalk: hasLeftSidewalk ?? this.hasLeftSidewalk,
+    leftSidewalkWidth: leftSidewalkWidth ?? this.leftSidewalkWidth,
+    hasRightSidewalk: hasRightSidewalk ?? this.hasRightSidewalk,
+    rightSidewalkWidth: rightSidewalkWidth ?? this.rightSidewalkWidth,
+    markingStyle: markingStyle ?? this.markingStyle,
+    markingWidth: markingWidth ?? this.markingWidth,
+    roadMaterial: roadMaterial ?? this.roadMaterial,
+    sidewalkMaterial: sidewalkMaterial ?? this.sidewalkMaterial,
+    elevationOffset: elevationOffset ?? this.elevationOffset,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'points': [
+      for (final p in points) {'x': p.dx, 'y': p.dy},
+    ],
+    if (closed) 'closed': true,
+    'roadWidth': roadWidth,
+    'curbWidth': curbWidth,
+    'curbHeight': curbHeight,
+    'hasLeftSidewalk': hasLeftSidewalk,
+    'leftSidewalkWidth': leftSidewalkWidth,
+    'hasRightSidewalk': hasRightSidewalk,
+    'rightSidewalkWidth': rightSidewalkWidth,
+    'markingStyle': markingStyle.name,
+    'markingWidth': markingWidth,
+    'roadMaterial': roadMaterial.name,
+    'sidewalkMaterial': sidewalkMaterial.name,
+    if (elevationOffset.abs() > 1e-6) 'elevationOffset': elevationOffset,
+  };
+
+  factory ArchitectStreet.fromJson(Map<String, dynamic> json) =>
+      ArchitectStreet(
+        id: json['id'] as String? ?? 'street_0',
+        points: [
+          for (final p in json['points'] as List? ?? const [])
+            if (p is Map)
+              Offset(
+                (p['x'] as num?)?.toDouble() ?? 0.0,
+                (p['y'] as num?)?.toDouble() ?? 0.0,
+              ),
+        ],
+        closed: json['closed'] == true,
+        roadWidth: (json['roadWidth'] as num?)?.toDouble() ?? 6.00,
+        curbWidth: (json['curbWidth'] as num?)?.toDouble() ?? 0.15,
+        curbHeight: (json['curbHeight'] as num?)?.toDouble() ?? 0.12,
+        hasLeftSidewalk: json['hasLeftSidewalk'] != false,
+        leftSidewalkWidth:
+            (json['leftSidewalkWidth'] as num?)?.toDouble() ?? 1.50,
+        hasRightSidewalk: json['hasRightSidewalk'] != false,
+        rightSidewalkWidth:
+            (json['rightSidewalkWidth'] as num?)?.toDouble() ?? 1.50,
+        markingStyle: ArchitectRoadMarkingStyle.values.firstWhere(
+          (m) => m.name == json['markingStyle'],
+          orElse: () => ArchitectRoadMarkingStyle.dashed,
+        ),
+        markingWidth: (json['markingWidth'] as num?)?.toDouble() ?? 0.12,
+        roadMaterial: ArchitectPavingMaterial.values.firstWhere(
+          (m) => m.name == json['roadMaterial'],
+          orElse: () => ArchitectPavingMaterial.asphalt,
+        ),
+        sidewalkMaterial: ArchitectPavingMaterial.values.firstWhere(
+          (m) => m.name == json['sidewalkMaterial'],
+          orElse: () => ArchitectPavingMaterial.cobblePavers,
+        ),
+        elevationOffset:
+            (json['elevationOffset'] as num?)?.toDouble() ?? 0.02,
+      );
+}

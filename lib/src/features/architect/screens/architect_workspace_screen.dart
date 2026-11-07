@@ -1915,6 +1915,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         storey.decorativeElements.any((d) => d.id == id),
 
       ArchitectTool.pathway => storey.pathways.any((p) => p.id == id),
+      ArchitectTool.street => storey.streets.any((s) => s.id == id),
       ArchitectTool.vegetation => storey.vegetation.any((v) => v.id == id),
       ArchitectTool.siteFence => storey.siteFences.any((f) => f.id == id),
       ArchitectTool.terrain =>
@@ -9932,6 +9933,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (pathway.id == id) return pathway.points;
     }
 
+    for (final street in _project.activeStorey.streets) {
+      if (street.id == id) return street.points;
+    }
+
     for (final fence in _project.activeStorey.siteFences) {
       if (fence.id == id) return fence.points;
     }
@@ -15926,9 +15931,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         nextFences.add(f);
       }
 
+      final nextStreets = <ArchitectStreet>[];
+      for (final s in storey.streets) {
+        if (targetIds.contains(s.id) || _effectiveSelection.contains(s.id)) {
+          final split = ArchitectLandscapeTool.splitPolyline(s.points, p1, p2);
+          if (split != null) {
+            final now = DateTime.now().microsecondsSinceEpoch;
+            nextStreets.add(s.copyWith(points: split.$1));
+            nextStreets.add(s.copyWith(id: 'street_${now}_split', points: split.$2));
+            landscapeSplitChanged = true;
+            continue;
+          }
+        }
+        nextStreets.add(s);
+      }
+
       if (landscapeSplitChanged) {
         final updatedProject = _project.updateActiveStorey(
-          storey.copyWith(pathways: nextPathways, siteFences: nextFences),
+          storey.copyWith(
+            pathways: nextPathways,
+            siteFences: nextFences,
+            streets: nextStreets,
+          ),
         );
         _commands.commit(updatedProject);
         _saveBiMProjectIfAttached();
@@ -19534,6 +19558,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _project.activeStorey.slabs.any((s) => _effectiveSelection.contains(s.id)) ||
         _project.activeStorey.cadPrimitives.any((p) => _effectiveSelection.contains(p.id)) ||
         _project.activeStorey.pathways.any((p) => _effectiveSelection.contains(p.id)) ||
+        _project.activeStorey.streets.any((s) => _effectiveSelection.contains(s.id)) ||
         _project.activeStorey.siteFences.any((f) => _effectiveSelection.contains(f.id)) ||
         _project.activeStorey.vegetation.any((v) => _effectiveSelection.contains(v.id) && v.isHedge) ||
         _project.proposedTerrain.boundaries.any((b) => _effectiveSelection.contains(b.id)) ||
@@ -22445,6 +22470,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               .firstOrNull;
           if (pathway != null) {
             _landscapeTool.loadFromPathway(pathway);
+          }
+          final street = _project.activeStorey.streets
+              .where((s) => s.id == primary)
+              .firstOrNull;
+          if (street != null) {
+            _landscapeTool.loadFromStreet(street);
           }
           final fence = _project.activeStorey.siteFences
               .where((f) => f.id == primary)
@@ -26269,6 +26300,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }).toList();
     storey = storey.copyWith(siteFences: updatedFences);
 
+    final updatedStreets = storey.streets.map((s) {
+      if (!ids.contains(s.id)) return s;
+      final newPts = options.isFillet
+          ? ArchitectChamferFillet.polygonFillet(
+              s.points,
+              vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(s.points),
+              radius: options.value,
+              isClosed: s.closed,
+            )
+          : ArchitectChamferFillet.polygonChamfer(
+              s.points,
+              vertexIndex: options.applyToAll ? null : _selectedVertexIndexFor(s.points),
+              distance: options.value,
+              isClosed: s.closed,
+            );
+      if (newPts.length >= 2) {
+        changed = true;
+        return s.copyWith(points: newPts);
+      }
+      return s;
+    }).toList();
+    storey = storey.copyWith(streets: updatedStreets);
+
     final updatedVeg = storey.vegetation.map((v) {
       if (!ids.contains(v.id) || !v.isHedge) return v;
       final newPts = options.isFillet
@@ -27027,6 +27081,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         storey.slabs.any((s) => ids.contains(s.id)) ||
         storey.cadPrimitives.any((p) => ids.contains(p.id) && (p.isPolygon || p.type == CadPrimitiveType.polyline || p.type == CadPrimitiveType.line)) ||
         storey.pathways.any((p) => ids.contains(p.id)) ||
+        storey.streets.any((s) => ids.contains(s.id)) ||
         storey.siteFences.any((f) => ids.contains(f.id)) ||
         storey.vegetation.any((v) => ids.contains(v.id) && v.isHedge) ||
         _project.proposedTerrain.boundaries.any((b) => ids.contains(b.id)) ||
@@ -27137,6 +27192,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ...storey.cadPrimitives.map((e) => e.id),
       ...storey.pathways.map((e) => e.id),
+      ...storey.streets.map((e) => e.id),
       ...storey.vegetation.map((e) => e.id),
       ...storey.siteFences.map((e) => e.id),
       ..._project.sections.map((e) => e.id),
@@ -30016,11 +30072,36 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           v,
     ];
 
+    final nextStreets = [
+      for (final s in storey.streets)
+        if (s.id == id)
+          () {
+            storeyChanged = true;
+            return s.copyWith(
+              roadWidth: _landscapeTool.streetRoadWidth,
+              curbWidth: _landscapeTool.streetCurbWidth,
+              curbHeight: _landscapeTool.streetCurbHeight,
+              hasLeftSidewalk: _landscapeTool.streetHasLeftSidewalk,
+              leftSidewalkWidth: _landscapeTool.streetLeftSidewalkWidth,
+              hasRightSidewalk: _landscapeTool.streetHasRightSidewalk,
+              rightSidewalkWidth: _landscapeTool.streetRightSidewalkWidth,
+              markingStyle: _landscapeTool.streetMarkingStyle,
+              markingWidth: _landscapeTool.streetMarkingWidth,
+              roadMaterial: _landscapeTool.streetRoadMaterial,
+              sidewalkMaterial: _landscapeTool.streetSidewalkMaterial,
+              closed: _landscapeTool.streetClosed,
+            );
+          }()
+        else
+          s,
+    ];
+
     var updated = storeyChanged
         ? _project.updateActiveStorey(
             storey.copyWith(
               pathways: nextPathways,
               siteFences: nextFences,
+              streets: nextStreets,
               vegetation: nextVeg,
             ),
           )

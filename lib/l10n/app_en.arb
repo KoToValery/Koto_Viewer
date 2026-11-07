@@ -6859,5 +6859,16 @@
   "architectTerrainRelativeElevation": "Relative elevation",
   "architectPlantArtisticLowPoly": "Artistic Low-Poly tree",
   "architectTerrainContourMajor": "Major contour",
-  "architectTerrainContourClosed": "Closed loop"
+  "architectTerrainContourClosed": "Closed loop",
+  "architectToolStreet": "Street / Road",
+  "architectStreetRoadWidth": "Carriageway",
+  "architectStreetSidewalkLeft": "Left sidewalk",
+  "architectStreetSidewalkRight": "Right sidewalk",
+  "architectStreetMarkings": "Markings",
+  "architectStreetMarkingDashed": "Dashed",
+  "architectStreetMarkingSolid": "Solid",
+  "architectStreetMarkingDoubleSolid": "Double solid",
+  "architectStreetMarkingNone": "None",
+  "architectStreetCurb": "Curb",
+  "architectLayerStreets": "Streets & Sidewalks"
 }

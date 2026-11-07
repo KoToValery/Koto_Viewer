@@ -12546,4 +12546,37 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectTerrainContourClosed => 'Затворен контур';
+
+  @override
+  String get architectToolStreet => 'Улица';
+
+  @override
+  String get architectStreetRoadWidth => 'Платно';
+
+  @override
+  String get architectStreetSidewalkLeft => 'Тротоар ляв';
+
+  @override
+  String get architectStreetSidewalkRight => 'Тротоар десен';
+
+  @override
+  String get architectStreetMarkings => 'Маркировка';
+
+  @override
+  String get architectStreetMarkingDashed => 'Прекъсната';
+
+  @override
+  String get architectStreetMarkingSolid => 'Непрекъсната';
+
+  @override
+  String get architectStreetMarkingDoubleSolid => 'Двойна';
+
+  @override
+  String get architectStreetMarkingNone => 'Без';
+
+  @override
+  String get architectStreetCurb => 'Бордюр';
+
+  @override
+  String get architectLayerStreets => 'Улици и тротоари';
 }

@@ -114,14 +114,16 @@ enum ArchitectTool {
   contour,
   pathway,
   vegetation,
-  siteFence;
+  siteFence,
+  street;
 
   bool get isLandscapeTool =>
       this == terrain ||
       this == contour ||
       this == pathway ||
       this == vegetation ||
-      this == siteFence;
+      this == siteFence ||
+      this == street;
 
   bool get usesComponent => this == component || this == services;
 
@@ -446,6 +448,14 @@ class Architect2dPainter extends CustomPainter {
         palette: palette,
       );
       ArchitectLandscapePainterHelper.drawPathways(
+        canvas: canvas,
+        project: _project,
+        storey: _elementLayerStorey,
+        zoomScale: zoomScale,
+        selectedIds: {...selectedElementIds, ?selectedElementId},
+        palette: palette,
+      );
+      ArchitectLandscapePainterHelper.drawStreets(
         canvas: canvas,
         project: _project,
         storey: _elementLayerStorey,
@@ -2003,11 +2013,13 @@ class Architect2dPainter extends CustomPainter {
                 ? const Color(0xFF15803D)
                 : const Color(0xFF92400E),
           ArchitectTool.pathway => const Color(0xFF0284C7),
+          ArchitectTool.street => const Color(0xFF475569),
           ArchitectTool.vegetation => const Color(0xFF16A34A),
           ArchitectTool.siteFence => const Color(0xFFB45309),
           _ => const Color(0xFF2563EB),
         },
         previewWidth: switch (activeTool) {
+          ArchitectTool.street => lt.streetRoadWidth,
           ArchitectTool.pathway => lt.pathwayWidth,
           ArchitectTool.siteFence => lt.fenceThickness,
           ArchitectTool.vegetation
@@ -2016,9 +2028,12 @@ class Architect2dPainter extends CustomPainter {
           _ => 0.0,
         },
         showCurbs:
-            activeTool == ArchitectTool.pathway &&
-            lt.pathwayCurbMode != ArchitectPathwayCurbMode.none,
-        curbWidth: lt.pathwayCurbWidth,
+            (activeTool == ArchitectTool.pathway &&
+                lt.pathwayCurbMode != ArchitectPathwayCurbMode.none) ||
+            activeTool == ArchitectTool.street,
+        curbWidth: activeTool == ArchitectTool.street
+            ? lt.streetCurbWidth
+            : lt.pathwayCurbWidth,
         previewRadius:
             activeTool == ArchitectTool.vegetation &&
                 lt.plantPlacementMode ==

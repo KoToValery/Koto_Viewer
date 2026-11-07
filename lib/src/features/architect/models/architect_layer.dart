@@ -107,6 +107,7 @@ class ArchitectLayer {
   static const String terrainProposedLayerId = 'L-TERR-PROP';
   static const String pathwayLayerId = 'L-PATH';
   static const String vegetationLayerId = 'L-VEGE';
+  static const String streetLayerId = 'L-ROAD';
 
   static List<ArchitectLayer> defaultLayers() => const [
     ArchitectLayer(id: wallLayerId, name: 'A-WALL', isStandard: true),
@@ -140,5 +141,6 @@ class ArchitectLayer {
     ),
     ArchitectLayer(id: pathwayLayerId, name: 'L-PATH', isStandard: true),
     ArchitectLayer(id: vegetationLayerId, name: 'L-VEGE', isStandard: true),
+    ArchitectLayer(id: streetLayerId, name: 'L-ROAD', isStandard: true),
   ];
 }

@@ -77,6 +77,7 @@ class ArchitectStorey {
     ...pathways.map((e) => e.id),
     ...vegetation.map((e) => e.id),
     ...siteFences.map((e) => e.id),
+    ...streets.map((e) => e.id),
     ...zones.where((e) => !e.isAutoBoundary).map((e) => e.id),
   };
   List<ArchitectElementGroup> get groups => _groups.isEmpty
@@ -120,6 +121,7 @@ class ArchitectStorey {
   final List<ArchitectPathway> pathways;
   final List<ArchitectVegetationItem> vegetation;
   final List<ArchitectSiteFence> siteFences;
+  final List<ArchitectStreet> streets;
   final Offset? zoneScheduleOrigin;
   final bool isRoof;
 
@@ -150,6 +152,7 @@ class ArchitectStorey {
     this.pathways = const [],
     this.vegetation = const [],
     this.siteFences = const [],
+    this.streets = const [],
     this.zoneScheduleOrigin,
   }) : _zones = zones,
        _groups = groups;
@@ -187,6 +190,7 @@ class ArchitectStorey {
     List<ArchitectPathway>? pathways,
     List<ArchitectVegetationItem>? vegetation,
     List<ArchitectSiteFence>? siteFences,
+    List<ArchitectStreet>? streets,
     Offset? zoneScheduleOrigin,
     bool clearZoneScheduleOrigin = false,
   }) => ArchitectStorey(
@@ -221,6 +225,7 @@ class ArchitectStorey {
     pathways: pathways ?? this.pathways,
     vegetation: vegetation ?? this.vegetation,
     siteFences: siteFences ?? this.siteFences,
+    streets: streets ?? this.streets,
     zoneScheduleOrigin: clearZoneScheduleOrigin
         ? null
         : (zoneScheduleOrigin ?? this.zoneScheduleOrigin),
@@ -260,6 +265,8 @@ class ArchitectStorey {
       'vegetation': vegetation.map((v) => v.toJson()).toList(),
     if (siteFences.isNotEmpty)
       'siteFences': siteFences.map((f) => f.toJson()).toList(),
+    if (streets.isNotEmpty)
+      'streets': streets.map((s) => s.toJson()).toList(),
     if (zoneScheduleOrigin != null)
       'zoneScheduleOrigin': {
         'x': zoneScheduleOrigin!.dx,
@@ -373,6 +380,10 @@ class ArchitectStorey {
     siteFences: [
       for (final f in json['siteFences'] as List? ?? const [])
         if (f is Map) ArchitectSiteFence.fromJson(Map<String, dynamic>.from(f)),
+    ],
+    streets: [
+      for (final s in json['streets'] as List? ?? const [])
+        if (s is Map) ArchitectStreet.fromJson(Map<String, dynamic>.from(s)),
     ],
     components:
         (json['components'] as List<dynamic>?)

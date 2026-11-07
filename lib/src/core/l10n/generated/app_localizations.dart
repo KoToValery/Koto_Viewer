@@ -22745,6 +22745,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Closed loop'**
   String get architectTerrainContourClosed;
+
+  /// No description provided for @architectToolStreet.
+  ///
+  /// In en, this message translates to:
+  /// **'Street / Road'**
+  String get architectToolStreet;
+
+  /// No description provided for @architectStreetRoadWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Carriageway'**
+  String get architectStreetRoadWidth;
+
+  /// No description provided for @architectStreetSidewalkLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left sidewalk'**
+  String get architectStreetSidewalkLeft;
+
+  /// No description provided for @architectStreetSidewalkRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right sidewalk'**
+  String get architectStreetSidewalkRight;
+
+  /// No description provided for @architectStreetMarkings.
+  ///
+  /// In en, this message translates to:
+  /// **'Markings'**
+  String get architectStreetMarkings;
+
+  /// No description provided for @architectStreetMarkingDashed.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashed'**
+  String get architectStreetMarkingDashed;
+
+  /// No description provided for @architectStreetMarkingSolid.
+  ///
+  /// In en, this message translates to:
+  /// **'Solid'**
+  String get architectStreetMarkingSolid;
+
+  /// No description provided for @architectStreetMarkingDoubleSolid.
+  ///
+  /// In en, this message translates to:
+  /// **'Double solid'**
+  String get architectStreetMarkingDoubleSolid;
+
+  /// No description provided for @architectStreetMarkingNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get architectStreetMarkingNone;
+
+  /// No description provided for @architectStreetCurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Curb'**
+  String get architectStreetCurb;
+
+  /// No description provided for @architectLayerStreets.
+  ///
+  /// In en, this message translates to:
+  /// **'Streets & Sidewalks'**
+  String get architectLayerStreets;
 }
 
 class _AppLocalizationsDelegate

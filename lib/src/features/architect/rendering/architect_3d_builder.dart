@@ -1559,6 +1559,180 @@ class Architect3dBuilder {
           mark(pathway.id, first);
         }
 
+        for (final street in storey.streets) {
+          if (street.points.length < 2) continue;
+          final first = allTris.length;
+          final roadPoly = street.roadwayPolygon;
+          if (roadPoly.length >= 3) {
+            final roadPath = Path()..addPolygon(roadPoly, true);
+            allTris.addAll(
+              _extrude(
+                roadPath,
+                (p) => groundZ(p, storey.elevation) - 0.06,
+                (p) => groundZ(p, storey.elevation) + 0.01,
+                const Color(0xFF334155),
+                const Color(0xFF1E293B),
+                const Color(0xFF1E293B),
+              ),
+            );
+          }
+
+          for (final swPoly in [
+            street.leftSidewalkPolygon,
+            street.rightSidewalkPolygon,
+          ]) {
+            if (swPoly.length < 3) continue;
+            final swPath = Path()..addPolygon(swPoly, true);
+            allTris.addAll(
+              _extrude(
+                swPath,
+                (p) => groundZ(p, storey.elevation) - 0.04,
+                (p) => groundZ(p, storey.elevation) + street.curbHeight,
+                const Color(0xFF9E968E),
+                const Color(0xFF78716C),
+                const Color(0xFF78716C),
+              ),
+            );
+          }
+
+          for (final curbPoly in [
+            street.leftCurbPolygon,
+            street.rightCurbPolygon,
+          ]) {
+            if (curbPoly.length < 3) continue;
+            allTris.addAll(
+              _extrude(
+                Path()..addPolygon(curbPoly, true),
+                (p) => groundZ(p, storey.elevation) - 0.06,
+                (p) =>
+                    groundZ(p, storey.elevation) +
+                    street.curbHeight +
+                    0.01,
+                const Color(0xFFD6D3D1),
+                const Color(0xFFA8A29E),
+                const Color(0xFFA8A29E),
+              ),
+            );
+          }
+
+          if (street.markingStyle != ArchitectRoadMarkingStyle.none) {
+            final markPoly = <Offset>[];
+            final mw =
+                street.markingWidth > 1e-4 ? street.markingWidth : 0.12;
+            if (street.markingStyle == ArchitectRoadMarkingStyle.solid) {
+              final left = ArchitectPathway.offsetChain(
+                street.points,
+                mw * 0.5,
+                closed: street.closed,
+              );
+              final right = ArchitectPathway.offsetChain(
+                street.points,
+                -mw * 0.5,
+                closed: street.closed,
+              );
+              markPoly.addAll([...left, ...right.reversed]);
+            } else if (street.markingStyle ==
+                ArchitectRoadMarkingStyle.doubleSolid) {
+              final spacing = 0.16;
+              final l1 = ArchitectPathway.offsetChain(
+                street.points,
+                spacing * 0.5 + mw * 0.35,
+                closed: street.closed,
+              );
+              final l2 = ArchitectPathway.offsetChain(
+                street.points,
+                spacing * 0.5 - mw * 0.35,
+                closed: street.closed,
+              );
+              final r1 = ArchitectPathway.offsetChain(
+                street.points,
+                -(spacing * 0.5 - mw * 0.35),
+                closed: street.closed,
+              );
+              final r2 = ArchitectPathway.offsetChain(
+                street.points,
+                -(spacing * 0.5 + mw * 0.35),
+                closed: street.closed,
+              );
+              markPoly.addAll([...l1, ...l2.reversed]);
+              markPoly.addAll([...r1, ...r2.reversed]);
+            } else if (street.markingStyle ==
+                ArchitectRoadMarkingStyle.dashed) {
+              const dashLen = 2.0;
+              const gapLen = 2.0;
+              const cycleLen = dashLen + gapLen;
+              double accumDist = 0.0;
+              final pts = street.closed
+                  ? [...street.points, street.points.first]
+                  : street.points;
+              for (int i = 0; i < pts.length - 1; i++) {
+                final p0 = pts[i];
+                final p1 = pts[i + 1];
+                final segVec = p1 - p0;
+                final segLen = segVec.distance;
+                if (segLen < 1e-4) continue;
+                final dir = segVec / segLen;
+                double s = 0.0;
+                while (s < segLen) {
+                  final phase = (accumDist + s) % cycleLen;
+                  if (phase < dashLen) {
+                    final remDash = dashLen - phase;
+                    final run = math.min(remDash, segLen - s);
+                    if (run > 0.1) {
+                      final segPts = [
+                        p0 + dir * s,
+                        p0 + dir * (s + run),
+                      ];
+                      final left = ArchitectPathway.offsetChain(
+                        segPts,
+                        mw * 0.5,
+                      );
+                      final right = ArchitectPathway.offsetChain(
+                        segPts,
+                        -mw * 0.5,
+                      );
+                      final dashPoly = [...left, ...right.reversed];
+                      if (dashPoly.length >= 3) {
+                        allTris.addAll(
+                          _extrude(
+                            Path()..addPolygon(dashPoly, true),
+                            (p) =>
+                                groundZ(p, storey.elevation) + 0.01,
+                            (p) =>
+                                groundZ(p, storey.elevation) + 0.018,
+                            const Color(0xFFFFFFFF),
+                            const Color(0xFFFFFFFF),
+                            const Color(0xFFFFFFFF),
+                          ),
+                        );
+                      }
+                    }
+                    s += run;
+                  } else {
+                    final remGap = cycleLen - phase;
+                    final run = math.min(remGap, segLen - s);
+                    s += run;
+                  }
+                }
+                accumDist += segLen;
+              }
+            }
+            if (markPoly.length >= 3) {
+              allTris.addAll(
+                _extrude(
+                  Path()..addPolygon(markPoly, true),
+                  (p) => groundZ(p, storey.elevation) + 0.01,
+                  (p) => groundZ(p, storey.elevation) + 0.018,
+                  const Color(0xFFFFFFFF),
+                  const Color(0xFFFFFFFF),
+                  const Color(0xFFFFFFFF),
+                ),
+              );
+            }
+          }
+          mark(street.id, first);
+        }
+
         for (final fence in storey.siteFences) {
           if (fence.points.length < 2) continue;
           final first = allTris.length;

@@ -4282,5 +4282,16 @@
   "architectTerrainRelativeElevation": "Относителна кота",
   "architectPlantArtisticLowPoly": "Артистично нискополигонално дърво",
   "architectTerrainContourMajor": "Главен хоризонтал",
-  "architectTerrainContourClosed": "Затворен контур"
+  "architectTerrainContourClosed": "Затворен контур",
+  "architectToolStreet": "Улица",
+  "architectStreetRoadWidth": "Платно",
+  "architectStreetSidewalkLeft": "Тротоар ляв",
+  "architectStreetSidewalkRight": "Тротоар десен",
+  "architectStreetMarkings": "Маркировка",
+  "architectStreetMarkingDashed": "Прекъсната",
+  "architectStreetMarkingSolid": "Непрекъсната",
+  "architectStreetMarkingDoubleSolid": "Двойна",
+  "architectStreetMarkingNone": "Без",
+  "architectStreetCurb": "Бордюр",
+  "architectLayerStreets": "Улици и тротоари"
 }

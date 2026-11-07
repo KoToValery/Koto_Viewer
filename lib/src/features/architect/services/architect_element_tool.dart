@@ -892,6 +892,11 @@ class ArchitectElementTool extends ChangeNotifier {
         yield path.id;
       }
     }
+    for (final street in storey.streets) {
+      if (street.containsPoint(point, tolerance: tolerance)) {
+        yield street.id;
+      }
+    }
     if (annotationProject != null) {
       for (final surface in [
         annotationProject.proposedTerrain,
@@ -995,6 +1000,7 @@ class ArchitectElementTool extends ChangeNotifier {
       components: storey.components.where((c) => c.id != elementId).toList(),
       zones: storey.zones.where((z) => z.id != elementId).toList(),
       pathways: storey.pathways.where((p) => p.id != elementId).toList(),
+      streets: storey.streets.where((s) => s.id != elementId).toList(),
       vegetation: storey.vegetation.where((v) => v.id != elementId).toList(),
       siteFences: storey.siteFences.where((f) => f.id != elementId).toList(),
     );
@@ -1910,6 +1916,7 @@ class ArchitectElementTool extends ChangeNotifier {
       components: storey.components.where((c) => !elementIds.contains(c.id)).toList(),
       zones: storey.zones.where((z) => !elementIds.contains(z.id)).toList(),
       pathways: storey.pathways.where((p) => !elementIds.contains(p.id)).toList(),
+      streets: storey.streets.where((s) => !elementIds.contains(s.id)).toList(),
       vegetation: storey.vegetation.where((v) => !elementIds.contains(v.id)).toList(),
       siteFences: storey.siteFences.where((f) => !elementIds.contains(f.id)).toList(),
     );

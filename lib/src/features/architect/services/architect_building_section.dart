@@ -2016,6 +2016,91 @@ class ArchitectBuildingSection {
         }
       }
 
+      // 1b. Streets, Curbs & Sidewalks
+      for (final street in floor.streets) {
+        if (!project.isElementVisible(
+          street.id,
+          ArchitectLayer.streetLayerId,
+        )) {
+          continue;
+        }
+        for (final (s0, s1) in _polygonCutIntervals(
+          street.roadwayPolygon,
+          cut,
+        )) {
+          final z0 = groundZAt(s0, floor.elevation);
+          final z1 = groundZAt(s1, floor.elevation);
+          final bed = Path()
+            ..addPolygon([
+              Offset(s0, z0),
+              Offset(s1, z1),
+              Offset(s1, z1 - 0.15),
+              Offset(s0, z0 - 0.15),
+            ], true);
+          regions.add(
+            ArchitectSectionRegion(
+              street.id,
+              SlabMaterial.gravel,
+              bed,
+              slab: true,
+              mergeOutline: false,
+            ),
+          );
+        }
+        for (final curbPoly in [
+          street.leftCurbPolygon,
+          street.rightCurbPolygon,
+        ]) {
+          if (curbPoly.length < 3) continue;
+          for (final (s0, s1) in _polygonCutIntervals(curbPoly, cut)) {
+            final zMid = groundZAt((s0 + s1) * 0.5, floor.elevation);
+            final curbRect = Path()
+              ..addRect(
+                Rect.fromLTRB(
+                  s0,
+                  zMid - 0.15,
+                  s1,
+                  zMid + street.curbHeight,
+                ),
+              );
+            regions.add(
+              ArchitectSectionRegion(
+                street.id,
+                SlabMaterial.concrete,
+                curbRect,
+                mergeOutline: false,
+              ),
+            );
+          }
+        }
+        for (final swPoly in [
+          street.leftSidewalkPolygon,
+          street.rightSidewalkPolygon,
+        ]) {
+          if (swPoly.length < 3) continue;
+          for (final (s0, s1) in _polygonCutIntervals(swPoly, cut)) {
+            final z0 = groundZAt(s0, floor.elevation) + street.curbHeight;
+            final z1 = groundZAt(s1, floor.elevation) + street.curbHeight;
+            final swBed = Path()
+              ..addPolygon([
+                Offset(s0, z0),
+                Offset(s1, z1),
+                Offset(s1, z1 - 0.10),
+                Offset(s0, z0 - 0.10),
+              ], true);
+            regions.add(
+              ArchitectSectionRegion(
+                street.id,
+                SlabMaterial.screed,
+                swBed,
+                slab: true,
+                mergeOutline: false,
+              ),
+            );
+          }
+        }
+      }
+
       // 2. Site Fences, Gabions & Retaining Walls
       for (final fence in floor.siteFences) {
         if (!project.isElementVisible(

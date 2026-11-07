@@ -40,6 +40,22 @@ class ArchitectLandscapeTool extends ChangeNotifier {
   double fenceThickness = 0.25;
   double fencePierSpacing = 2.50;
 
+  // --- Street State ---
+  double streetRoadWidth = 6.00;
+  double streetCurbWidth = 0.15;
+  double streetCurbHeight = 0.12;
+  bool streetHasLeftSidewalk = true;
+  double streetLeftSidewalkWidth = 1.50;
+  bool streetHasRightSidewalk = true;
+  double streetRightSidewalkWidth = 1.50;
+  ArchitectRoadMarkingStyle streetMarkingStyle =
+      ArchitectRoadMarkingStyle.dashed;
+  double streetMarkingWidth = 0.12;
+  ArchitectPavingMaterial streetRoadMaterial = ArchitectPavingMaterial.asphalt;
+  ArchitectPavingMaterial streetSidewalkMaterial =
+      ArchitectPavingMaterial.cobblePavers;
+  bool streetClosed = false;
+
   // --- Active Polyline/Polygon Draft Chain ---
   final List<Offset> draftPoints = <Offset>[];
 
@@ -153,6 +169,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
       },
       'contour' => draftPoints.length >= 2,
       'pathway' => draftPoints.length >= (pathwayClosed ? 3 : 2),
+      'street' => draftPoints.length >= (streetClosed ? 3 : 2),
       'vegetation' =>
         plantPlacementMode != ArchitectVegetationPlacementMode.single &&
             draftPoints.length >= 2,
@@ -223,6 +240,15 @@ class ArchitectLandscapeTool extends ChangeNotifier {
         return null;
 
       case 'siteFence':
+        draftPoints.add(worldPoint);
+        return null;
+
+      case 'street':
+        if (streetClosed &&
+            draftPoints.length >= 3 &&
+            (worldPoint - draftPoints.first).distance <= closeThresholdWorld) {
+          return commitDraft(toolName: toolName, project: project);
+        }
         draftPoints.add(worldPoint);
         return null;
 
@@ -387,6 +413,28 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           storey.copyWith(siteFences: [...storey.siteFences, fence]),
         );
 
+      case 'street':
+        final street = ArchitectStreet(
+          id: 'street_$nowMicros',
+          points: pts,
+          closed: streetClosed,
+          roadWidth: streetRoadWidth,
+          curbWidth: streetCurbWidth,
+          curbHeight: streetCurbHeight,
+          hasLeftSidewalk: streetHasLeftSidewalk,
+          leftSidewalkWidth: streetLeftSidewalkWidth,
+          hasRightSidewalk: streetHasRightSidewalk,
+          rightSidewalkWidth: streetRightSidewalkWidth,
+          markingStyle: streetMarkingStyle,
+          markingWidth: streetMarkingWidth,
+          roadMaterial: streetRoadMaterial,
+          sidewalkMaterial: streetSidewalkMaterial,
+        );
+        final storey = project.activeStorey;
+        return project.updateActiveStorey(
+          storey.copyWith(streets: [...storey.streets, street]),
+        );
+
       default:
         return null;
     }
@@ -461,6 +509,21 @@ class ArchitectLandscapeTool extends ChangeNotifier {
       }
     }
 
+    // 2. Streets on active storey
+    if (project.isLayerVisible(ArchitectLayer.streetLayerId)) {
+      for (final street in storey.streets.reversed) {
+        if (!project.isElementVisible(
+          street.id,
+          ArchitectLayer.streetLayerId,
+        )) {
+          continue;
+        }
+        if (street.containsPoint(worldPoint, tolerance: hitTolerance)) {
+          return street.id;
+        }
+      }
+    }
+
     // 2. Site fences on active storey
     if (project.isLayerVisible(ArchitectLayer.pathwayLayerId)) {
       for (final fence in storey.siteFences.reversed) {
@@ -522,7 +585,8 @@ class ArchitectLandscapeTool extends ChangeNotifier {
 
   static bool isLandscapeElementId(ArchitectProject project, String id) {
     final storey = project.activeStorey;
-    if (storey.pathways.any((p) => p.id == id) ||
+    if (storey.streets.any((s) => s.id == id) ||
+        storey.pathways.any((p) => p.id == id) ||
         storey.vegetation.any((v) => v.id == id) ||
         storey.siteFences.any((f) => f.id == id)) {
       return true;
@@ -586,12 +650,26 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           f,
     ];
 
+    final nextStreets = [
+      for (final s in storey.streets)
+        if (selectedIds.contains(s.id))
+          () {
+            storeyChanged = true;
+            return s.copyWith(
+              points: [for (final pt in s.points) pt + delta],
+            );
+          }()
+        else
+          s,
+    ];
+
     var updated = storeyChanged
         ? project.updateActiveStorey(
             storey.copyWith(
               pathways: nextPathways,
               vegetation: nextVegetation,
               siteFences: nextFences,
+              streets: nextStreets,
             ),
           )
         : project;
@@ -626,6 +704,9 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           .toList(),
       siteFences: storey.siteFences
           .where((f) => !selectedIds.contains(f.id))
+          .toList(),
+      streets: storey.streets
+          .where((s) => !selectedIds.contains(s.id))
           .toList(),
     );
     return project
@@ -720,6 +801,22 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     pathwayCurbHeight = pathway.curbHeight;
     pathwayMaterial = pathway.material;
     pathwayClosed = pathway.closed;
+    notifyListeners();
+  }
+
+  void loadFromStreet(ArchitectStreet street) {
+    streetRoadWidth = street.roadWidth;
+    streetCurbWidth = street.curbWidth;
+    streetCurbHeight = street.curbHeight;
+    streetHasLeftSidewalk = street.hasLeftSidewalk;
+    streetLeftSidewalkWidth = street.leftSidewalkWidth;
+    streetHasRightSidewalk = street.hasRightSidewalk;
+    streetRightSidewalkWidth = street.rightSidewalkWidth;
+    streetMarkingStyle = street.markingStyle;
+    streetMarkingWidth = street.markingWidth;
+    streetRoadMaterial = street.roadMaterial;
+    streetSidewalkMaterial = street.sidewalkMaterial;
+    streetClosed = street.closed;
     notifyListeners();
   }
 

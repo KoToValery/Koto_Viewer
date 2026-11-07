@@ -352,6 +352,11 @@ class ArchitectSelection {
         return path..addPolygon(pathway.pavingPolygon, true);
       }
     }
+    for (final street in s.streets) {
+      if (street.id == id && street.roadwayPolygon.length >= 3) {
+        return path..addPolygon(street.roadwayPolygon, true);
+      }
+    }
     for (final veg in s.vegetation) {
       if (veg.id == id) {
         if (veg.species == ArchitectPlantSpecies.trimmedHedge &&

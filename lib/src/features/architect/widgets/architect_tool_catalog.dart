@@ -93,7 +93,8 @@ enum ArchitectToolCategory {
     ArchitectTool.contour ||
     ArchitectTool.pathway ||
     ArchitectTool.vegetation ||
-    ArchitectTool.siteFence => landscape,
+    ArchitectTool.siteFence ||
+    ArchitectTool.street => landscape,
   };
 
   List<ArchitectTool> get tools => [
@@ -176,6 +177,7 @@ extension ArchitectToolCatalogLabel on ArchitectTool {
       l.architectToolVegetation,
     ),
     ArchitectTool.siteFence => (AppIconId.fence, l.architectToolSiteFence),
+    ArchitectTool.street => (AppIconId.roadEdit, l.architectToolStreet),
   };
 }
 

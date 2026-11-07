@@ -111,6 +111,7 @@ abstract class ArchitectModelCommand {
             ...s.pathways.map((e) => e.id),
             ...s.vegetation.map((e) => e.id),
             ...s.siteFences.map((e) => e.id),
+            ...s.streets.map((e) => e.id),
             ...s.floorDrains.map((e) => e.id),
             ...s.decorativeElements.map((e) => e.id),
             ...s.walls.expand(
@@ -1275,6 +1276,12 @@ class MoveArchitectElement extends ArchitectModelCommand {
               ? e.copyWith(points: [for (final p in e.points) p + delta])
               : e,
       ],
+      streets: [
+        for (final e in s.streets)
+          matches(e.id)
+              ? e.copyWith(points: [for (final p in e.points) p + delta])
+              : e,
+      ],
     );
     ArchitectTerrainSurface translateTerrain(ArchitectTerrainSurface surf) =>
         surf.copyWith(
@@ -2305,7 +2312,7 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     final floor = ArchitectModelCommand.storey(project, storeyId);
 
-    // 0. Landscape elements: Pathways, Site Fences, Hedges, Terrain Boundaries & Contours
+    // 0. Landscape elements: Pathways, Streets, Site Fences, Hedges, Terrain Boundaries & Contours
     final pathway = floor.pathways.where((p) => p.id == elementId).firstOrNull;
     if (pathway != null) {
       if (pathway.closed) {
@@ -2328,6 +2335,34 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
             pathways: [
               for (final p in floor.pathways)
                 p.id == elementId ? p.copyWith(points: List.unmodifiable(this.polygon)) : p,
+            ],
+          ),
+        );
+      }
+    }
+
+    final street = floor.streets.where((s) => s.id == elementId).firstOrNull;
+    if (street != null) {
+      if (street.closed) {
+        final clean = ArchitectPolygonGeometry.clean(this.polygon);
+        if (!ArchitectPolygonGeometry.valid(clean)) throw ArgumentError('Invalid closed street contour');
+        return ArchitectModelCommand.replace(
+          project,
+          floor.copyWith(
+            streets: [
+              for (final s in floor.streets)
+                s.id == elementId ? s.copyWith(points: List.unmodifiable(clean)) : s,
+            ],
+          ),
+        );
+      } else {
+        if (this.polygon.length < 2) throw ArgumentError('Street requires at least 2 points');
+        return ArchitectModelCommand.replace(
+          project,
+          floor.copyWith(
+            streets: [
+              for (final s in floor.streets)
+                s.id == elementId ? s.copyWith(points: List.unmodifiable(this.polygon)) : s,
             ],
           ),
         );

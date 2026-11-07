@@ -60,6 +60,8 @@ class ArchitectLandscapeBar extends StatelessWidget {
               ..._buildTerrainControls(context, l, colors)
             else if (activeTool == ArchitectTool.pathway)
               ..._buildPathwayControls(context, l, colors)
+            else if (activeTool == ArchitectTool.street)
+              ..._buildStreetControls(context, l, colors)
             else if (activeTool == ArchitectTool.vegetation)
               ..._buildVegetationControls(context, l, colors)
             else if (activeTool == ArchitectTool.siteFence)
@@ -478,6 +480,130 @@ class ArchitectLandscapeBar extends StatelessWidget {
         label: l.architectPathwayClosedPad,
         onTap: () {
           controller.pathwayClosed = !controller.pathwayClosed;
+          onChanged();
+        },
+      ),
+    ];
+  }
+
+  List<Widget> _buildStreetControls(
+    BuildContext context,
+    AppLocalizations l,
+    ColorScheme colors,
+  ) {
+    return [
+      _stepper(
+        colors: colors,
+        label:
+            '${l.architectStreetRoadWidth}: ${controller.streetRoadWidth.toStringAsFixed(2)} m',
+        onDec: () {
+          controller.streetRoadWidth =
+              (controller.streetRoadWidth - 0.50).clamp(2.50, 30.0);
+          onChanged();
+        },
+        onInc: () {
+          controller.streetRoadWidth =
+              (controller.streetRoadWidth + 0.50).clamp(2.50, 30.0);
+          onChanged();
+        },
+      ),
+      const SizedBox(width: 8),
+      _divider(colors),
+      const SizedBox(width: 8),
+      for (final style in ArchitectRoadMarkingStyle.values) ...[
+        _chip(
+          colors: colors,
+          selected: controller.streetMarkingStyle == style,
+          label: style.label(l),
+          onTap: () {
+            controller.streetMarkingStyle = style;
+            onChanged();
+          },
+        ),
+        const SizedBox(width: 4),
+      ],
+      const SizedBox(width: 4),
+      _divider(colors),
+      const SizedBox(width: 8),
+      _chip(
+        colors: colors,
+        selected: controller.streetHasLeftSidewalk,
+        label: l.architectStreetSidewalkLeft,
+        onTap: () {
+          controller.streetHasLeftSidewalk = !controller.streetHasLeftSidewalk;
+          onChanged();
+        },
+      ),
+      if (controller.streetHasLeftSidewalk) ...[
+        const SizedBox(width: 4),
+        _stepper(
+          colors: colors,
+          label: '${controller.streetLeftSidewalkWidth.toStringAsFixed(2)} m',
+          onDec: () {
+            controller.streetLeftSidewalkWidth =
+                (controller.streetLeftSidewalkWidth - 0.20).clamp(0.40, 8.0);
+            onChanged();
+          },
+          onInc: () {
+            controller.streetLeftSidewalkWidth =
+                (controller.streetLeftSidewalkWidth + 0.20).clamp(0.40, 8.0);
+            onChanged();
+          },
+        ),
+      ],
+      const SizedBox(width: 6),
+      _chip(
+        colors: colors,
+        selected: controller.streetHasRightSidewalk,
+        label: l.architectStreetSidewalkRight,
+        onTap: () {
+          controller.streetHasRightSidewalk =
+              !controller.streetHasRightSidewalk;
+          onChanged();
+        },
+      ),
+      if (controller.streetHasRightSidewalk) ...[
+        const SizedBox(width: 4),
+        _stepper(
+          colors: colors,
+          label: '${controller.streetRightSidewalkWidth.toStringAsFixed(2)} m',
+          onDec: () {
+            controller.streetRightSidewalkWidth =
+                (controller.streetRightSidewalkWidth - 0.20).clamp(0.40, 8.0);
+            onChanged();
+          },
+          onInc: () {
+            controller.streetRightSidewalkWidth =
+                (controller.streetRightSidewalkWidth + 0.20).clamp(0.40, 8.0);
+            onChanged();
+          },
+        ),
+      ],
+      const SizedBox(width: 8),
+      _divider(colors),
+      const SizedBox(width: 8),
+      _stepper(
+        colors: colors,
+        label:
+            '${l.architectStreetCurb}: ${(controller.streetCurbWidth * 100).round()} cm',
+        onDec: () {
+          controller.streetCurbWidth =
+              (controller.streetCurbWidth - 0.02).clamp(0.08, 0.40);
+          onChanged();
+        },
+        onInc: () {
+          controller.streetCurbWidth =
+              (controller.streetCurbWidth + 0.02).clamp(0.08, 0.40);
+          onChanged();
+        },
+      ),
+      const SizedBox(width: 6),
+      _chip(
+        colors: colors,
+        selected: controller.streetClosed,
+        label: l.architectPathwayClosedPad,
+        onTap: () {
+          controller.streetClosed = !controller.streetClosed;
           onChanged();
         },
       ),

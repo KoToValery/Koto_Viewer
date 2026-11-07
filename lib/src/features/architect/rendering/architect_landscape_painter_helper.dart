@@ -425,6 +425,277 @@ class ArchitectLandscapePainterHelper {
   };
 
   // ===========================================================================
+  // 2b. STREETS / ROADS WITH SIDEWALKS & MARKINGS IN 2D PLAN
+  // ===========================================================================
+
+  static void drawStreets({
+    required Canvas canvas,
+    required ArchitectProject project,
+    required ArchitectStorey storey,
+    required double zoomScale,
+    required Set<String> selectedIds,
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
+  }) {
+    final visibleStreets = storey.streets
+        .where(
+          (s) =>
+              s.points.length >= 2 &&
+              project.isElementVisible(s.id, ArchitectLayer.streetLayerId),
+        )
+        .toList();
+    if (visibleStreets.isEmpty) return;
+
+    final unitsPerMm = project.dimensionScale.paperToModel(1.0);
+
+    for (final street in visibleStreets) {
+      final isSelected = selectedIds.contains(street.id);
+      final roadPoly = street.roadwayPolygon;
+      if (roadPoly.length < 3) continue;
+
+      final roadPath = _polygonPath(roadPoly, closed: street.closed);
+
+      // 1. Asphalt Roadway Bed Fill
+      canvas.drawPath(
+        roadPath,
+        Paint()
+          ..color = isSelected
+              ? const Color(0x282563EB)
+              : const Color(0xFF334155).withValues(alpha: 0.18)
+          ..style = PaintingStyle.fill,
+      );
+
+      // 2. Asphalt Hatch (subtle dots/texture)
+      final roadHatch = _pavingHatchPattern(street.roadMaterial);
+      if (roadHatch != null && unitsPerMm > 0) {
+        final hatchPath = ArchitectHatchGeometry.path(
+          boundary: roadPath,
+          pattern: roadHatch,
+          unitsPerMm: unitsPerMm,
+          scale: 1.5,
+        );
+        canvas.save();
+        canvas.clipPath(roadPath);
+        canvas.drawPath(
+          hatchPath,
+          Paint()
+            ..color = const Color(0xFF475569).withValues(alpha: 0.28)
+            ..strokeWidth = 0.65 / zoomScale
+            ..style = PaintingStyle.stroke,
+        );
+        canvas.restore();
+      }
+
+      // 3. Roadway Outer Edge Stroke
+      canvas.drawPath(
+        roadPath,
+        Paint()
+          ..color = isSelected
+              ? const Color(0xFF2563EB)
+              : const Color(0xFF1E293B)
+          ..strokeWidth = (isSelected ? 1.8 : 1.2) / zoomScale
+          ..style = PaintingStyle.stroke,
+      );
+
+      // 4. Sidewalks (Left and Right)
+      for (final swPoly in [
+        street.leftSidewalkPolygon,
+        street.rightSidewalkPolygon,
+      ]) {
+        if (swPoly.length < 3) continue;
+        final swPath = _polygonPath(swPoly, closed: street.closed);
+
+        canvas.drawPath(
+          swPath,
+          Paint()
+            ..color = isSelected
+                ? const Color(0x202563EB)
+                : _pavingFillTint(street.sidewalkMaterial)
+            ..style = PaintingStyle.fill,
+        );
+
+        final swHatch = _pavingHatchPattern(street.sidewalkMaterial);
+        if (swHatch != null && unitsPerMm > 0) {
+          final hatchPath = ArchitectHatchGeometry.path(
+            boundary: swPath,
+            pattern: swHatch,
+            unitsPerMm: unitsPerMm,
+            scale: 1.0,
+          );
+          canvas.save();
+          canvas.clipPath(swPath);
+          canvas.drawPath(
+            hatchPath,
+            Paint()
+              ..color = const Color(0xFF475569).withValues(alpha: 0.35)
+              ..strokeWidth = 0.65 / zoomScale
+              ..style = PaintingStyle.stroke,
+          );
+          canvas.restore();
+        }
+
+        canvas.drawPath(
+          swPath,
+          Paint()
+            ..color = isSelected
+                ? const Color(0xFF2563EB)
+                : const Color(0xFF64748B)
+            ..strokeWidth = (isSelected ? 1.4 : 0.9) / zoomScale
+            ..style = PaintingStyle.stroke,
+        );
+      }
+
+      // 5. Curbs (Left and Right)
+      final curbFillPaint = Paint()
+        ..color = isSelected
+            ? const Color(0x382563EB)
+            : const Color(0xFFD6D3D1).withValues(alpha: 0.75)
+        ..style = PaintingStyle.fill;
+      final curbStrokePaint = Paint()
+        ..color = isSelected
+            ? const Color(0xFF2563EB)
+            : const Color(0xFF334155)
+        ..strokeWidth = (isSelected ? 1.6 : 1.0) / zoomScale
+        ..style = PaintingStyle.stroke;
+
+      for (final curbPoly in [
+        street.leftCurbPolygon,
+        street.rightCurbPolygon,
+      ]) {
+        if (curbPoly.length < 3) continue;
+        final curbPath = _polygonPath(curbPoly, closed: street.closed);
+        canvas.drawPath(curbPath, curbFillPaint);
+        canvas.drawPath(curbPath, curbStrokePaint);
+
+        final halfLen = curbPoly.length ~/ 2;
+        if (halfLen >= 2) {
+          canvas.save();
+          canvas.clipPath(curbPath);
+          _drawCurbJointTicks(
+            canvas: canvas,
+            innerEdge: curbPoly.sublist(0, halfLen),
+            outerEdge: curbPoly.sublist(halfLen).reversed.toList(),
+            zoomScale: zoomScale,
+            color: curbStrokePaint.color.withValues(alpha: 0.55),
+          );
+          canvas.restore();
+        }
+      }
+
+      // 6. Road Markings (traffic white paint along centerline)
+      _drawRoadMarkings(
+        canvas: canvas,
+        street: street,
+        zoomScale: zoomScale,
+      );
+    }
+  }
+
+  static void _drawRoadMarkings({
+    required Canvas canvas,
+    required ArchitectStreet street,
+    required double zoomScale,
+  }) {
+    if (street.markingStyle == ArchitectRoadMarkingStyle.none ||
+        street.points.length < 2) {
+      return;
+    }
+
+    final markWidth = street.markingWidth > 1e-4
+        ? street.markingWidth
+        : 0.12;
+    final markingColor = const Color(0xFFFFFFFF);
+
+    final linePaint = Paint()
+      ..color = markingColor
+      ..strokeWidth = markWidth
+      ..strokeCap = StrokeCap.square
+      ..style = PaintingStyle.stroke;
+
+    switch (street.markingStyle) {
+      case ArchitectRoadMarkingStyle.solid:
+        final path = Path();
+        path.moveTo(street.points.first.dx, street.points.first.dy);
+        for (int i = 1; i < street.points.length; i++) {
+          path.lineTo(street.points[i].dx, street.points[i].dy);
+        }
+        if (street.closed && street.points.length >= 3) {
+          path.close();
+        }
+        canvas.drawPath(path, linePaint);
+
+      case ArchitectRoadMarkingStyle.doubleSolid:
+        final spacing = 0.16;
+        final leftLine = ArchitectPathway.offsetChain(
+          street.points,
+          spacing * 0.5,
+          closed: street.closed,
+        );
+        final rightLine = ArchitectPathway.offsetChain(
+          street.points,
+          -spacing * 0.5,
+          closed: street.closed,
+        );
+        final doublePaint = Paint()
+          ..color = markingColor
+          ..strokeWidth = markWidth * 0.75
+          ..strokeCap = StrokeCap.square
+          ..style = PaintingStyle.stroke;
+
+        void drawPolyline(List<Offset> pts) {
+          if (pts.length < 2) return;
+          final p = Path()..moveTo(pts.first.dx, pts.first.dy);
+          for (int i = 1; i < pts.length; i++) {
+            p.lineTo(pts[i].dx, pts[i].dy);
+          }
+          if (street.closed && pts.length >= 3) p.close();
+          canvas.drawPath(p, doublePaint);
+        }
+        drawPolyline(leftLine);
+        drawPolyline(rightLine);
+
+      case ArchitectRoadMarkingStyle.dashed:
+        const dashLen = 2.0;
+        const gapLen = 2.0;
+        const cycleLen = dashLen + gapLen;
+
+        double accumDist = 0.0;
+        final pts = street.closed
+            ? [...street.points, street.points.first]
+            : street.points;
+
+        for (int i = 0; i < pts.length - 1; i++) {
+          final p0 = pts[i];
+          final p1 = pts[i + 1];
+          final segVec = p1 - p0;
+          final segLen = segVec.distance;
+          if (segLen < 1e-4) continue;
+          final dir = segVec / segLen;
+
+          double s = 0.0;
+          while (s < segLen) {
+            final phase = (accumDist + s) % cycleLen;
+            if (phase < dashLen) {
+              final remDash = dashLen - phase;
+              final run = math.min(remDash, segLen - s);
+              final startPt = p0 + dir * s;
+              final endPt = p0 + dir * (s + run);
+              canvas.drawLine(startPt, endPt, linePaint);
+              s += run;
+            } else {
+              final remGap = cycleLen - phase;
+              final run = math.min(remGap, segLen - s);
+              s += run;
+            }
+          }
+          accumDist += segLen;
+        }
+
+      case ArchitectRoadMarkingStyle.none:
+        break;
+    }
+  }
+
+  // ===========================================================================
   // 3. SITE FENCES, GABIONS & RETAINING WALLS IN 2D PLAN
   // ===========================================================================
 

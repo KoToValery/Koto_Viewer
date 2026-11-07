@@ -12492,4 +12492,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectTerrainContourClosed => 'Closed loop';
+
+  @override
+  String get architectToolStreet => 'Street / Road';
+
+  @override
+  String get architectStreetRoadWidth => 'Carriageway';
+
+  @override
+  String get architectStreetSidewalkLeft => 'Left sidewalk';
+
+  @override
+  String get architectStreetSidewalkRight => 'Right sidewalk';
+
+  @override
+  String get architectStreetMarkings => 'Markings';
+
+  @override
+  String get architectStreetMarkingDashed => 'Dashed';
+
+  @override
+  String get architectStreetMarkingSolid => 'Solid';
+
+  @override
+  String get architectStreetMarkingDoubleSolid => 'Double solid';
+
+  @override
+  String get architectStreetMarkingNone => 'None';
+
+  @override
+  String get architectStreetCurb => 'Curb';
+
+  @override
+  String get architectLayerStreets => 'Streets & Sidewalks';
 }

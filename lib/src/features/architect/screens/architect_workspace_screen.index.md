@@ -82,6 +82,7 @@
 | **pathway** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement`, `_applyChamferFillet` | `ArchitectLandscapeBar` (Width, Paving Material, Automatic Curbs, 90° Ortho/Perp Guide, Fillet & Chamfer, Split) |
 | **vegetation** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement`, `_applyChamferFillet` | `ArchitectLandscapeBar` (8 Species incl. Artistic Low-Poly, Single/Row/Hedge, Crown & Height, Fast 3D Meshes) |
 | **siteFence** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement`, `_applyChamferFillet` | `ArchitectLandscapeBar` (6 Presets: Piers+Slats, Gabion Fence/Retaining, Louvers, Iron, RC Retaining, 90° Guide, Fillet & Chamfer, Split) |
+| **street** | L11082, L13975, L29988 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement`, `_applyChamferFillet` | `ArchitectLandscapeBar` (Road Width, Markings: Dashed/Solid/Double/None, Left/Right Sidewalks, Curbs, Fillet & Chamfer, Split) |
 
 ---
 

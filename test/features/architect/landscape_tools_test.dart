@@ -636,5 +636,186 @@ void main() {
       // Ultra fast (< 5ms for 1 tree)
       expect(stopwatch.elapsedMilliseconds, lessThan(30));
     });
+
+    test('Street with road markings, curbs and sidewalks geometry & containsPoint', () {
+      const street = ArchitectStreet(
+        id: 'street_1',
+        points: [Offset(0, 0), Offset(20, 0)],
+        roadWidth: 6.0,
+        curbWidth: 0.15,
+        curbHeight: 0.12,
+        hasLeftSidewalk: true,
+        leftSidewalkWidth: 1.50,
+        hasRightSidewalk: true,
+        rightSidewalkWidth: 2.00,
+        markingStyle: ArchitectRoadMarkingStyle.dashed,
+      );
+
+      // 1. Roadway polygon: half-width is 3.0 m (from y = -3.0 to y = 3.0)
+      final roadPoly = street.roadwayPolygon;
+      expect(roadPoly.length, 4);
+      final roadY = roadPoly.map((p) => p.dy).toList();
+      expect(roadY.reduce(math.max), closeTo(3.0, 1e-3));
+      expect(roadY.reduce(math.min), closeTo(-3.0, 1e-3));
+
+      // 2. Curbs: 0.15 m wide strips on left and right
+      final leftCurb = street.leftCurbPolygon;
+      expect(leftCurb.length, 4);
+      final leftCurbY = leftCurb.map((p) => p.dy).toList();
+      expect(leftCurbY.reduce(math.min), closeTo(3.0, 1e-3));
+      expect(leftCurbY.reduce(math.max), closeTo(3.15, 1e-3));
+
+      final rightCurb = street.rightCurbPolygon;
+      expect(rightCurb.length, 4);
+      final rightCurbY = rightCurb.map((p) => p.dy).toList();
+      expect(rightCurbY.reduce(math.max), closeTo(-3.0, 1e-3));
+      expect(rightCurbY.reduce(math.min), closeTo(-3.15, 1e-3));
+
+      // 3. Sidewalks: left is 1.50 m (y from 3.15 to 4.65), right is 2.00 m (y from -5.15 to -3.15)
+      final leftSW = street.leftSidewalkPolygon;
+      expect(leftSW.length, 4);
+      final leftSWY = leftSW.map((p) => p.dy).toList();
+      expect(leftSWY.reduce(math.min), closeTo(3.15, 1e-3));
+      expect(leftSWY.reduce(math.max), closeTo(4.65, 1e-3));
+
+      final rightSW = street.rightSidewalkPolygon;
+      expect(rightSW.length, 4);
+      final rightSWY = rightSW.map((p) => p.dy).toList();
+      expect(rightSWY.reduce(math.max), closeTo(-3.15, 1e-3));
+      expect(rightSWY.reduce(math.min), closeTo(-5.15, 1e-3));
+
+      // 4. Hit testing
+      expect(street.containsPoint(const Offset(10, 0)), isTrue); // Road centerline
+      expect(street.containsPoint(const Offset(10, 2.5)), isTrue); // Road lane
+      expect(street.containsPoint(const Offset(10, 3.08)), isTrue); // Left curb
+      expect(street.containsPoint(const Offset(10, 4.0)), isTrue); // Left sidewalk
+      expect(street.containsPoint(const Offset(10, -4.5)), isTrue); // Right sidewalk
+      expect(street.containsPoint(const Offset(10, 12.0)), isFalse); // Far outside
+      expect(street.containsPoint(const Offset(10, -10.0)), isFalse); // Far outside
+
+      // 5. JSON round-trip
+      final json = street.toJson();
+      final fromJson = ArchitectStreet.fromJson(json);
+      expect(fromJson.id, street.id);
+      expect(fromJson.roadWidth, street.roadWidth);
+      expect(fromJson.curbWidth, street.curbWidth);
+      expect(fromJson.curbHeight, street.curbHeight);
+      expect(fromJson.hasLeftSidewalk, street.hasLeftSidewalk);
+      expect(fromJson.leftSidewalkWidth, street.leftSidewalkWidth);
+      expect(fromJson.hasRightSidewalk, street.hasRightSidewalk);
+      expect(fromJson.rightSidewalkWidth, street.rightSidewalkWidth);
+      expect(fromJson.markingStyle, street.markingStyle);
+    });
+
+    test('ArchitectLandscapeTool street drafting, committing & hit testing', () {
+      final tool = ArchitectLandscapeTool();
+      tool.streetRoadWidth = 7.0;
+      tool.streetLeftSidewalkWidth = 2.0;
+      tool.streetRightSidewalkWidth = 2.0;
+      tool.streetMarkingStyle = ArchitectRoadMarkingStyle.doubleSolid;
+
+      expect(tool.canCommit('street'), isFalse);
+
+      tool.draftPoints.add(const Offset(0, 0));
+      expect(tool.canCommit('street'), isFalse);
+
+      tool.draftPoints.add(const Offset(25, 0));
+      expect(tool.canCommit('street'), isTrue);
+
+      final project = ArchitectProject(
+        id: 'p_street',
+        name: 'Street Project',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: const [
+          ArchitectStorey(id: 's0', name: 'Ground'),
+        ],
+        activeStoreyId: 's0',
+      );
+
+      final committed = tool.commitDraft(toolName: 'street', project: project);
+      expect(committed, isNotNull);
+      expect(committed!.activeStorey.streets.length, 1);
+      final st = committed.activeStorey.streets.first;
+      expect(st.roadWidth, 7.0);
+      expect(st.leftSidewalkWidth, 2.0);
+      expect(st.markingStyle, ArchitectRoadMarkingStyle.doubleSolid);
+
+      // Hit testing
+      final hitId = ArchitectLandscapeTool.hitTestLandscapeElement(
+        project: committed,
+        storey: committed.activeStorey,
+        worldPoint: const Offset(12, 1),
+        hitTolerance: 0.1,
+      );
+      expect(hitId, st.id);
+    });
+
+    test('Street vertex editing and fillet corner rounding', () {
+      final originalPoints = [
+        const Offset(0, 0),
+        const Offset(10, 0),
+        const Offset(10, 10),
+      ];
+      final street = ArchitectStreet(
+        id: 'street_turn',
+        points: originalPoints,
+        roadWidth: 6.0,
+      );
+
+      final filletedPoints = ArchitectChamferFillet.polygonFillet(
+        street.points,
+        radius: 2.0,
+        isClosed: false,
+      );
+
+      // The 90-degree corner at (10, 0) should be smoothed into an arc of multiple vertices
+      expect(filletedPoints.length, greaterThan(originalPoints.length));
+      expect(filletedPoints.first, const Offset(0, 0));
+      expect(filletedPoints.last, const Offset(10, 10));
+
+      final updatedStreet = street.copyWith(points: filletedPoints);
+      expect(updatedStreet.roadwayPolygon.length, greaterThan(4));
+    });
+
+    test('Street 3D mesh extrusion with road, curbs, sidewalks & road markings', () async {
+      const street = ArchitectStreet(
+        id: 'street_3d',
+        points: [Offset(0, 0), Offset(15, 0)],
+        roadWidth: 6.0,
+        curbWidth: 0.15,
+        curbHeight: 0.12,
+        hasLeftSidewalk: true,
+        leftSidewalkWidth: 1.50,
+        hasRightSidewalk: true,
+        rightSidewalkWidth: 1.50,
+        markingStyle: ArchitectRoadMarkingStyle.dashed,
+      );
+
+      final project = ArchitectProject(
+        id: 'p_street_3d',
+        name: 'Street 3D Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: const [
+          ArchitectStorey(
+            id: 's0',
+            name: 'Ground',
+            streets: [street],
+          ),
+        ],
+        activeStoreyId: 's0',
+      );
+
+      final mesh = await Architect3dBuilder.buildProjectMeshAsync(project);
+      expect(mesh.triangles.isNotEmpty, isTrue);
+
+      // Triangles must include road surface, left/right curbs, sidewalks, and markings
+      final zValues = mesh.triangles.map((t) => [t.v0.z, t.v1.z, t.v2.z]).expand((z) => z).toList();
+      final maxZ = zValues.reduce(math.max);
+      final minZ = zValues.reduce(math.min);
+      expect(maxZ, greaterThan(0.10)); // Curb / sidewalk elevation
+      expect(minZ, lessThan(0.0)); // Base embedding
+    });
   });
 }
