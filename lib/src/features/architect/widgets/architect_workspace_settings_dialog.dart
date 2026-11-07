@@ -6,6 +6,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_zone.dart';
 import '../models/architect_zone_presets.dart';
+import 'architect_structural_scheme_labels.dart';
 import 'architect_wall_drafting_panel.dart';
 
 class ArchitectWorkspaceSettings {
@@ -13,11 +14,15 @@ class ArchitectWorkspaceSettings {
   final ArchitectUnit units;
   final int distanceDecimals;
   final ArchitectDimensionScale dimensionScale;
+  final ArchitectStructuralScheme structuralScheme;
+  final double perimeterBeamDepth;
   final bool ghostStoreys, upperOverhangs, grid, magnetic, underlay, darkCanvas;
   final double axisCoreThickness;
   final double handleOffsetLength;
   const ArchitectWorkspaceSettings({
     required this.units,
+    this.structuralScheme = ArchitectStructuralScheme.flatSlab,
+    this.perimeterBeamDepth = 0.45,
     this.zonePresets = const ArchitectZonePresets(),
     this.distanceDecimals = 2,
     this.dimensionScale = ArchitectDimensionScale.scale100,
@@ -67,6 +72,9 @@ class _ArchitectWorkspaceSettingsDialogState
   late int distanceDecimals = widget.settings.distanceDecimals;
   late ArchitectUnit units = widget.settings.units;
   late ArchitectDimensionScale dimensionScale = widget.settings.dimensionScale;
+  late ArchitectStructuralScheme structuralScheme =
+      widget.settings.structuralScheme;
+  late double perimeterBeamDepth = widget.settings.perimeterBeamDepth;
   late bool ghost = widget.settings.ghostStoreys,
       upperOverhangs = widget.settings.upperOverhangs,
       grid = widget.settings.grid,
@@ -148,6 +156,49 @@ class _ArchitectWorkspaceSettingsDialogState
                     ),
                 ],
               ),
+              DropdownButtonFormField<ArchitectStructuralScheme>(
+                key: const ValueKey('architect-settings-structural-scheme'),
+                initialValue: structuralScheme,
+                decoration: InputDecoration(
+                  labelText: l.architectStructuralScheme,
+                ),
+                items: [
+                  for (final scheme in ArchitectStructuralScheme.values)
+                    DropdownMenuItem(
+                      value: scheme,
+                      child: Text(scheme.label(l)),
+                    ),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => structuralScheme = value);
+                },
+              ),
+              if (structuralScheme == ArchitectStructuralScheme.beamAndSlab)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                  child: TextFormField(
+                    key: const ValueKey(
+                      'architect-settings-perimeter-beam-depth',
+                    ),
+                    initialValue: units
+                        .toUnit(perimeterBeamDepth)
+                        .toStringAsFixed(distanceDecimals),
+                    decoration: InputDecoration(
+                      labelText:
+                          '${l.architectPerimeterBeamDepth} (${units.symbol})',
+                      helperText: l.architectPerimeterBeamDepthHelp,
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    onChanged: (val) {
+                      final parsed = double.tryParse(val.replaceAll(',', '.'));
+                      if (parsed != null && parsed > 0) {
+                        perimeterBeamDepth = units.fromUnit(parsed);
+                      }
+                    },
+                  ),
+                ),
               DropdownButtonFormField<ArchitectUnit>(
                 key: const ValueKey('architect-settings-units'),
                 initialValue: units,
@@ -296,6 +347,8 @@ class _ArchitectWorkspaceSettingsDialogState
             context,
             ArchitectWorkspaceSettings(
               units: units,
+              structuralScheme: structuralScheme,
+              perimeterBeamDepth: perimeterBeamDepth,
               zonePresets: ArchitectZonePresets(Map.unmodifiable(zoneOverrides),
               ),
               distanceDecimals: distanceDecimals,

@@ -1,3 +1,13 @@
+// === SECTION: [SEC-00-TOC] TABLE OF CONTENTS ===
+// [SEC-01-REGIONS] ArchitectSectionRegion data class (L40-L190)
+// [SEC-02-ROOF_MAT] Roof member materials to SlabMaterial (L191-L345)
+// [SEC-03-BUILD_MAIN] ArchitectBuildingSection.build (L346-L1310)
+//   --- SUBSECTION: [TAG:SPANDREL_INFILL] Window Spandrel Aerated Concrete Infill ---
+//   --- SUBSECTION: [TAG:TIE_BEAMS] Intermediate RC Tie Beams on Tall Masonry Walls ---
+// [SEC-04-ELEVATION] Elevation line projection & hidden lines (L1311-L1960)
+// [SEC-05-OPENINGS] Opening cut analyzer & profiles (L1961-L2380)
+// [SEC-06-DATA] Helper data structures (L2381-L2615)
+
 import 'architect_drain_surface.dart';
 import 'architect_stair_floor_contact.dart';
 import '../models/architect_hatch_pattern.dart';
@@ -434,6 +444,7 @@ class ArchitectBuildingSection {
 
     // 2. Analyze Cut Walls & Build Symbiotic Slab + Foundation + Wall-Base Junctions
     final cutWalls = ArchitectSectionJunctions.analyzeCutWalls(project, cut);
+    final cutWallByWallId = {for (final cw in cutWalls) cw.wall.id: cw};
     final junctionPlan =
         ArchitectSectionJunctions.buildSlabAndFoundationJunctions(
           project: project,
@@ -762,6 +773,207 @@ class ArchitectBuildingSection {
               ),
             );
           }
+
+          if (cutOp.isWindow &&
+              (wall.coreMaterial == WallCoreMaterial.brick ||
+                  wall.coreMaterial == WallCoreMaterial.aeratedConcrete) &&
+              !wall.system.isSpecial &&
+              !wallPath.getBounds().isEmpty) {
+            final zHead = cutOp.zTop;
+            final zWallBase = floor.elevation + wall.baseOffset;
+            final wallH = wall.isSlopedTop
+                ? math.max(wall.height, wall.endHeight!)
+                : wall.effectiveHeight(floor.height);
+            final zWallTop = zWallBase + wallH;
+            var zCeiling = zWallTop;
+            for (final upper in project.storeys) {
+              if (upper.elevation >= floor.elevation + 0.1) {
+                for (final slab in upper.slabs) {
+                  final surfaces = ArchitectSlabGeometry.surfaces(
+                    project,
+                    upper,
+                    slab,
+                  );
+                  final coreIdx = surfaces.indexWhere(
+                    (s) => s.layer.id == 'core',
+                  );
+                  if (coreIdx >= 0) {
+                    final midS = (cutOp.sMin + cutOp.sMax) * 0.5;
+                    final pt = cut.pointAt(midS);
+                    final slabBot = surfaces[coreIdx].bottomAt(pt);
+                    if ((slabBot - zWallTop).abs() <= 0.35) {
+                      zCeiling = math.min(zCeiling, slabBot);
+                    }
+                  }
+                }
+              }
+            }
+
+            final cw = cutWallByWallId[wall.id];
+            final c0 = cw?.coreIntervals.firstOrNull?.$1 ?? cutOp.sMin;
+            final c1 = cw?.coreIntervals.lastOrNull?.$2 ?? cutOp.sMax;
+            final sLeft = math.max(c0, cutOp.sMin);
+            final sRight = math.min(c1, cutOp.sMax);
+
+            if (sRight > sLeft + 1e-4) {
+              if (project.structuralScheme.isBeamAndSlab) {
+                // Beam and Slab Scheme:
+                // Perimeter drop beam under upper slab, aerated concrete infill between window head and beam bottom
+                final tSlab = 0.20;
+                final beamDrop = math.max(
+                  0.15,
+                  project.perimeterBeamDepth - tSlab,
+                );
+                final zBeamBot = zCeiling - beamDrop;
+                if (zCeiling > zBeamBot + 0.01) {
+                  final beamRect = Rect.fromLTRB(
+                    sLeft,
+                    math.max(zHead, zBeamBot),
+                    sRight,
+                    zCeiling,
+                  );
+                  final beamCut = Path.combine(
+                    PathOperation.intersect,
+                    wallPath,
+                    Path()..addRect(beamRect),
+                  );
+                  if (!beamCut.getBounds().isEmpty) {
+                    wallPath = Path.combine(
+                      PathOperation.difference,
+                      wallPath,
+                      beamCut,
+                    );
+                    extraCutMaskPaths.add(beamCut);
+                    regions.add(
+                      ArchitectSectionRegion(
+                        '${wall.id}_${cutOp.id}_drop_beam',
+                        SlabMaterial.concrete,
+                        beamCut,
+                        slab: true,
+                      ),
+                    );
+                  }
+                }
+                if (zBeamBot > zHead + 0.02) {
+                  final infillRect = Rect.fromLTRB(
+                    sLeft,
+                    zHead,
+                    sRight,
+                    zBeamBot,
+                  );
+                  final infillCut = Path.combine(
+                    PathOperation.intersect,
+                    wallPath,
+                    Path()..addRect(infillRect),
+                  );
+                  if (!infillCut.getBounds().isEmpty) {
+                    wallPath = Path.combine(
+                      PathOperation.difference,
+                      wallPath,
+                      infillCut,
+                    );
+                    extraCutMaskPaths.add(infillCut);
+                    regions.add(
+                      ArchitectSectionRegion(
+                        '${wall.id}_${cutOp.id}_aerated_infill',
+                        SlabMaterial.aeratedConcrete,
+                        infillCut,
+                        customFillColor: const Color(0xFFCFD8DC),
+                        hatchPattern: ArchitectSectionHatch.wall(
+                          ArchitectMaterial.aeratedConcrete,
+                        ),
+                      ),
+                    );
+                  }
+                }
+              } else if (project.structuralScheme.isFlatSlab ||
+                  project.structuralScheme.isMasonry) {
+                // Flat Slab Scheme:
+                // Space above window head up to flat slab is automatically filled with Aerated Concrete
+                if (zCeiling > zHead + 0.02) {
+                  final infillRect = Rect.fromLTRB(
+                    sLeft,
+                    zHead,
+                    sRight,
+                    zCeiling,
+                  );
+                  final infillCut = Path.combine(
+                    PathOperation.intersect,
+                    wallPath,
+                    Path()..addRect(infillRect),
+                  );
+                  if (!infillCut.getBounds().isEmpty) {
+                    wallPath = Path.combine(
+                      PathOperation.difference,
+                      wallPath,
+                      infillCut,
+                    );
+                    extraCutMaskPaths.add(infillCut);
+                    regions.add(
+                      ArchitectSectionRegion(
+                        '${wall.id}_${cutOp.id}_aerated_infill',
+                        SlabMaterial.aeratedConcrete,
+                        infillCut,
+                        customFillColor: const Color(0xFFCFD8DC),
+                        hatchPattern: ArchitectSectionHatch.wall(
+                          ArchitectMaterial.aeratedConcrete,
+                        ),
+                      ),
+                    );
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Automatic horizontal RC ring/tie beams (бетонни пояси) on tall masonry walls (Eurocode 6 / 8: H > 3.00 m)
+        final activeWallPath = wallPath;
+        if ((wall.coreMaterial == WallCoreMaterial.brick ||
+                wall.coreMaterial == WallCoreMaterial.aeratedConcrete) &&
+            !wall.isParapet &&
+            !wall.system.isSpecial &&
+            activeWallPath != null &&
+            !activeWallPath.getBounds().isEmpty) {
+          final zBase = floor.elevation + wall.baseOffset;
+          final wallH = wall.isSlopedTop
+              ? math.max(wall.height, wall.endHeight!)
+              : wall.effectiveHeight(floor.height);
+          if (wallH > 3.00) {
+            final cw = cutWallByWallId[wall.id];
+            final intervals = cw?.coreIntervals ?? [(0.0, cut.length)];
+            var step = 1;
+            while (true) {
+              final zBeltBot = zBase + step * 3.00;
+              final zBeltTop = zBeltBot + 0.20;
+              if (zBase + wallH - zBeltTop < 0.40) break;
+              for (final (c0, c1) in intervals) {
+                final beltRect = Rect.fromLTRB(c0, zBeltBot, c1, zBeltTop);
+                final clippedBelt = Path.combine(
+                  PathOperation.intersect,
+                  wallPath ?? activeWallPath,
+                  Path()..addRect(beltRect),
+                );
+                if (!clippedBelt.getBounds().isEmpty) {
+                  wallPath = Path.combine(
+                    PathOperation.difference,
+                    wallPath ?? activeWallPath,
+                    clippedBelt,
+                  );
+                  extraCutMaskPaths.add(clippedBelt);
+                  regions.add(
+                    ArchitectSectionRegion(
+                      '${wall.id}_belt_$step',
+                      SlabMaterial.concrete,
+                      clippedBelt,
+                      slab: true,
+                    ),
+                  );
+                }
+              }
+              step++;
+            }
+          }
         }
 
         for (final id in sources.values.toSet()) {
@@ -871,6 +1083,7 @@ class ArchitectBuildingSection {
               if (region.getBounds().isEmpty) continue;
               final material = switch (part.layer.material) {
                 ArchitectMaterial.concrete => SlabMaterial.concrete,
+                ArchitectMaterial.aeratedConcrete => SlabMaterial.aeratedConcrete,
                 ArchitectMaterial.xps => SlabMaterial.xps,
                 ArchitectMaterial.eps => SlabMaterial.floorInsulation,
                 ArchitectMaterial.stoneWool => SlabMaterial.mineralWool,

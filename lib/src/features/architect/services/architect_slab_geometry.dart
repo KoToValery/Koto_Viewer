@@ -219,6 +219,7 @@ class ArchitectSlabGeometry {
   static Color materialColor(SlabMaterial m) => switch (m) {
     SlabMaterial.concrete ||
     SlabMaterial.blindingConcrete => const Color(0xFF90A4AE),
+    SlabMaterial.aeratedConcrete => const Color(0xFFCFD8DC),
     SlabMaterial.xps ||
     SlabMaterial.floorInsulation ||
     SlabMaterial.roofInsulation => const Color(0xFFF3C4C9),

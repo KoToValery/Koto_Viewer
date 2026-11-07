@@ -232,6 +232,25 @@ class ArchitectHatchPattern {
         lineStyle: ArchitectLineStyle(id: 'woodGrain', name: '_', segmentsMm: [4, 5])),
     ]),
     ArchitectHatchPattern(id: 'metal', layers: [ArchitectHatchLayer(spacingMm: 1.5)]),
+    ArchitectHatchPattern(
+      id: 'aeratedConcrete',
+      layers: [
+        ArchitectHatchLayer(
+          angleDeg: 45,
+          spacingMm: 3.6,
+        ),
+        ArchitectHatchLayer(
+          angleDeg: 45,
+          spacingMm: 3.6,
+          phaseMm: 1.8,
+          lineStyle: ArchitectLineStyle(
+            id: 'hatchAeratedDashed',
+            name: '_',
+            segmentsMm: [2.0, 1.6],
+          ),
+        ),
+      ],
+    ),
   ];
   bool get isPreset => allPresets.any((p) => p.id == id);
   void validate() {

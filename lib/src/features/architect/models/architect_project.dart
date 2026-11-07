@@ -401,6 +401,22 @@ class ArchitectStorey {
   );
 }
 
+/// The overall structural / construction scheme of an architectural project.
+enum ArchitectStructuralScheme {
+  flatSlab,
+  beamAndSlab,
+  sandwichPanels,
+  roundLogs,
+  studFrame;
+
+  bool get isBeamAndSlab => this == ArchitectStructuralScheme.beamAndSlab;
+  bool get isFlatSlab => this == ArchitectStructuralScheme.flatSlab;
+  bool get isSandwichPanels => this == ArchitectStructuralScheme.sandwichPanels;
+  bool get isRoundLogs => this == ArchitectStructuralScheme.roundLogs;
+  bool get isStudFrame => this == ArchitectStructuralScheme.studFrame;
+  bool get isMasonry => isFlatSlab || isBeamAndSlab;
+}
+
 /// The root model for an architectural concept project.
 class ArchitectProject {
   final String id;
@@ -413,6 +429,8 @@ class ArchitectProject {
   final int levelDecimals;
   final ArchitectDimensionScale dimensionScale;
   final ArchitectDocument document;
+  final ArchitectStructuralScheme structuralScheme;
+  final double perimeterBeamDepth;
   final List<ArchitectStorey> storeys;
   final String activeStoreyId;
   final List<StructuralGridAxis> gridAxes;
@@ -446,6 +464,8 @@ class ArchitectProject {
     this.levelDecimals = 2,
     this.dimensionScale = ArchitectDimensionScale.scale100,
     this.document = const ArchitectDocument(),
+    this.structuralScheme = ArchitectStructuralScheme.flatSlab,
+    this.perimeterBeamDepth = 0.45,
     required this.storeys,
     required this.activeStoreyId,
     this.gridAxes = const [],
@@ -716,6 +736,8 @@ class ArchitectProject {
     int? levelDecimals,
     ArchitectDimensionScale? dimensionScale,
     ArchitectDocument? document,
+    ArchitectStructuralScheme? structuralScheme,
+    double? perimeterBeamDepth,
     List<ArchitectStorey>? storeys,
     String? activeStoreyId,
     List<StructuralGridAxis>? gridAxes,
@@ -750,6 +772,8 @@ class ArchitectProject {
     levelDecimals: levelDecimals ?? this.levelDecimals,
     dimensionScale: dimensionScale ?? this.dimensionScale,
     document: document ?? this.document,
+    structuralScheme: structuralScheme ?? this.structuralScheme,
+    perimeterBeamDepth: perimeterBeamDepth ?? this.perimeterBeamDepth,
     storeys: storeys ?? this.storeys,
     activeStoreyId: activeStoreyId ?? this.activeStoreyId,
     gridAxes: gridAxes ?? this.gridAxes,
@@ -787,6 +811,8 @@ class ArchitectProject {
     'levelDecimals': levelDecimals,
     'dimensionScale': dimensionScale.denominator,
     'document': document.toJson(),
+    'structuralScheme': structuralScheme.name,
+    'perimeterBeamDepth': perimeterBeamDepth,
     'storeys': storeys.map((s) => s.toJson()).toList(),
     'activeStoreyId': activeStoreyId,
     'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
@@ -843,6 +869,12 @@ class ArchitectProject {
       (scale) => scale.denominator == json['dimensionScale'],
       orElse: () => ArchitectDimensionScale.scale100,
     ),
+    structuralScheme: ArchitectStructuralScheme.values.firstWhere(
+      (s) => s.name == json['structuralScheme'],
+      orElse: () => ArchitectStructuralScheme.flatSlab,
+    ),
+    perimeterBeamDepth:
+        ((json['perimeterBeamDepth'] as num?)?.toDouble() ?? 0.45).clamp(0.20, 1.50),
     storeys:
         (json['storeys'] as List<dynamic>?)
             ?.map((s) => ArchitectStorey.fromJson(s as Map<String, dynamic>))
@@ -962,6 +994,8 @@ class ArchitectProject {
     List<double>? spacingsX,
     List<double>? spacingsY,
     List<ArchitectWallType>? wallTypes,
+    ArchitectStructuralScheme structuralScheme = ArchitectStructuralScheme.flatSlab,
+    double perimeterBeamDepth = 0.45,
     ArchitectUnit units = ArchitectUnit.meters,
   }) {
     final now = DateTime.now();
@@ -1018,6 +1052,8 @@ class ArchitectProject {
       createdAt: now,
       updatedAt: now,
       units: units,
+      structuralScheme: structuralScheme,
+      perimeterBeamDepth: perimeterBeamDepth,
       storeys: storeys,
       activeStoreyId: storeys.isNotEmpty ? storeys.first.id : 'default',
       gridAxes: axes,
@@ -1035,6 +1071,8 @@ class ArchitectProject {
     int axesY = 3,
     double spacingX = 4.0,
     double spacingY = 5.0,
+    ArchitectStructuralScheme structuralScheme = ArchitectStructuralScheme.flatSlab,
+    double perimeterBeamDepth = 0.45,
     List<ArchitectWallType>? wallTypes,
   }) {
     final now = DateTime.now();
@@ -1108,6 +1146,8 @@ class ArchitectProject {
       name: name,
       createdAt: now,
       updatedAt: now,
+      structuralScheme: structuralScheme,
+      perimeterBeamDepth: perimeterBeamDepth,
       storeys: storeys,
       activeStoreyId: storeys.isNotEmpty ? storeys.first.id : 'default',
       gridAxes: axes,

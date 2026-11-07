@@ -2292,6 +2292,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     });
 
+    final schemeChanged = result.structuralScheme != _project.structuralScheme;
+    final beamDepthChanged =
+        (result.perimeterBeamDepth - _project.perimeterBeamDepth).abs() > 1e-4;
+    if (schemeChanged || beamDepthChanged) {
+      setState(() {
+        _project = _project.copyWith(
+          structuralScheme: result.structuralScheme,
+          perimeterBeamDepth: result.perimeterBeamDepth,
+        );
+      });
+      if (schemeChanged) {
+        _applyStructuralSchemeDefaults(result.structuralScheme);
+      }
+    }
+
     _saveBiMProjectIfAttached();
 
     HapticFeedback.mediumImpact();
@@ -3515,6 +3530,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           underlay: _showUnderlay,
 
           darkCanvas: _canvasPalette.isDark,
+          structuralScheme: _project.structuralScheme,
+          perimeterBeamDepth: _project.perimeterBeamDepth,
 
           axisCoreThickness: _axisWallCoreThickness,
 
@@ -5069,6 +5086,38 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
 
+
+  void _applyStructuralSchemeDefaults(ArchitectStructuralScheme scheme) {
+    final types = _availableWallTypes;
+    ArchitectWallType? target;
+    switch (scheme) {
+      case ArchitectStructuralScheme.sandwichPanels:
+        target = types.where((t) => t.system.isPanel).firstOrNull;
+        _roofTool.setPreset(ArchitectRoofPreset.sandwichPitched);
+        break;
+      case ArchitectStructuralScheme.roundLogs:
+        target = types.where((t) => t.system.isLog).firstOrNull;
+        _roofTool.setPreset(ArchitectRoofPreset.logTimber);
+        break;
+      case ArchitectStructuralScheme.studFrame:
+        target = types.where((t) => t.system.isStud).firstOrNull;
+        _roofTool.setPreset(ArchitectRoofPreset.pitchedTiles);
+        break;
+      case ArchitectStructuralScheme.flatSlab:
+      case ArchitectStructuralScheme.beamAndSlab:
+        target = types
+            .where((t) =>
+                t.id == 'ext_25_12_eps' ||
+                (t.coreMaterial == WallCoreMaterial.brick &&
+                    t.usage == WallUsage.exterior))
+            .firstOrNull;
+        _roofTool.setPreset(ArchitectRoofPreset.pitchedTiles);
+        break;
+    }
+    if (target != null) {
+      _selectWallType(target);
+    }
+  }
 
   bool _wallCurved = false;
 

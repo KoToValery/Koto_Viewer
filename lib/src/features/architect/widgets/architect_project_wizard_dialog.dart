@@ -6,6 +6,7 @@ import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
 import 'architect_grid_scheme.dart';
 import 'architect_grid_preset_label.dart';
+import 'architect_structural_scheme_labels.dart';
 
 class ArchitectProjectWizardDialog extends StatefulWidget {
   final String? initialProjectName;
@@ -45,6 +46,8 @@ class _ArchitectProjectWizardDialogState
   final _levels = [_LevelDraft(0, 3)];
   int _step = 0, _decimals = 1;
   ArchitectUnit _unit = ArchitectUnit.centimeters;
+  ArchitectStructuralScheme _structuralScheme =
+      ArchitectStructuralScheme.flatSlab;
   ArchitectGridPreset _grid = ArchitectGridPreset.standardPresets().first;
   List<double> _spacingsX = [7.2, 7.2, 7.2], _spacingsY = [6.6, 6.6];
 
@@ -165,6 +168,7 @@ class _ArchitectProjectWizardDialogState
       gridPreset: _grid,
       spacingsX: _spacingsX,
       spacingsY: _spacingsY,
+      structuralScheme: _structuralScheme,
       units: _unit,
       wallTypes: ArchitectWallType.standardCatalog(
         l10n: l,
@@ -371,6 +375,26 @@ class _ArchitectProjectWizardDialogState
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 20),
+        Text(
+          l.architectStructuralScheme,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<ArchitectStructuralScheme>(
+          initialValue: _structuralScheme,
+          decoration: const InputDecoration(border: OutlineInputBorder()),
+          items: [
+            for (final scheme in ArchitectStructuralScheme.values)
+              DropdownMenuItem(
+                value: scheme,
+                child: Text(scheme.label(l)),
+              ),
+          ],
+          onChanged: (val) {
+            if (val != null) setState(() => _structuralScheme = val);
+          },
         ),
       ],
     );

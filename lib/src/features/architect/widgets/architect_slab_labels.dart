@@ -4,6 +4,7 @@ import '../models/architect_slab_assembly.dart';
 extension SlabMaterialLabel on SlabMaterial {
   String label(AppLocalizations l) => switch (this) {
     SlabMaterial.concrete => l.slabMatConcrete,
+    SlabMaterial.aeratedConcrete => l.slabMatAeratedConcrete,
     SlabMaterial.tile => l.slabMatTile,
     SlabMaterial.tileAdhesive => l.slabMatTileAdhesive,
     SlabMaterial.parquet => l.slabMatParquet,

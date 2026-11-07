@@ -6010,6 +6010,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get slabMatConcrete => 'Reinforced concrete';
 
   @override
+  String get slabMatAeratedConcrete => 'Aerated concrete';
+
+  @override
+  String get architectStructuralScheme => 'Structural Scheme';
+
+  @override
+  String get architectStructuralSchemeFlatSlab => 'Flat Slab (Beamless)';
+
+  @override
+  String get architectStructuralSchemeBeamAndSlab => 'Beam & Slab System';
+
+  @override
+  String get architectStructuralSchemeSandwichPanels => 'Sandwich Panels';
+
+  @override
+  String get architectStructuralSchemeRoundLogs => 'Round Timber Logs';
+
+  @override
+  String get architectStructuralSchemeStudFrame => 'Light Stud Frame';
+
+  @override
+  String get architectPerimeterBeamDepth => 'Perimeter Drop Beam Height';
+
+  @override
+  String get architectPerimeterBeamDepthHelp =>
+      'Total depth of perimeter RC drop beams under the slab core';
+
+  @override
+  String get hatchPatternAeratedConcrete => 'Aerated concrete';
+
+  @override
   String get slabMatTile => 'Tiles';
 
   @override

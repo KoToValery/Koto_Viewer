@@ -109,6 +109,7 @@
 - `_cadFileWatcher` (`ArchitectCadFileWatcher?`): Watches external CAD/DXF files for live Xref reload.
 - `_rasterImages` (`Map<String, ui.Image>`): Decoded GPU images for active raster underlays.
 - `_rasterCalibrationStep` / `_rasterCalibrationP1` / `_rasterCalibrationP2`: 2-point scale + deskew calibration state.
+- `_applyStructuralSchemeDefaults` (`void Function(ArchitectStructuralScheme)`): Synchronizes active wall types and roof assemblies with the project's structural scheme (`flatSlab`, `beamAndSlab`, `sandwichPanels`, `roundLogs`, `studFrame`).
 
 ---
 

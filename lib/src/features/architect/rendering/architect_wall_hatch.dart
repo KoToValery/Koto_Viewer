@@ -24,10 +24,33 @@ class ArchitectWallHatch {
       ..color = color
       ..strokeWidth = .6 / scale;
     if ((material ?? wall.coreMaterial) == WallCoreMaterial.aeratedConcrete) {
-      for (var x = (bounds.left / spacing).floor() * spacing; x < bounds.right; x += spacing) {
-        for (var y = (bounds.top / spacing).floor() * spacing; y < bounds.bottom; y += spacing) {
-          canvas.drawCircle(Offset(x + spacing * .5, y + spacing * .5), .65 / scale, paint);
+      final start = ((bounds.left - bounds.height) / spacing).floor() * spacing;
+      var isDashed = false;
+      final dashLen = 2.0 / scale;
+      final gapLen = 1.6 / scale;
+      for (var x = start; x <= bounds.right; x += spacing * 0.5) {
+        if (!isDashed) {
+          canvas.drawLine(
+            Offset(x, bounds.top),
+            Offset(x + bounds.height, bounds.bottom),
+            paint,
+          );
+        } else {
+          final pA = Offset(x, bounds.top);
+          final pB = Offset(x + bounds.height, bounds.bottom);
+          final dir = pB - pA;
+          final totalLen = dir.distance;
+          if (totalLen > 1e-4) {
+            final u = dir / totalLen;
+            var d = 0.0;
+            while (d < totalLen) {
+              final segEnd = math.min(d + dashLen, totalLen);
+              canvas.drawLine(pA + u * d, pA + u * segEnd, paint);
+              d += dashLen + gapLen;
+            }
+          }
         }
+        isDashed = !isDashed;
       }
       canvas.restore();
       return;

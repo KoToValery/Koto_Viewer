@@ -10601,6 +10601,66 @@ abstract class AppLocalizations {
   /// **'Reinforced concrete'**
   String get slabMatConcrete;
 
+  /// Aerated concrete material
+  ///
+  /// In en, this message translates to:
+  /// **'Aerated concrete'**
+  String get slabMatAeratedConcrete;
+
+  /// Structural scheme selection title
+  ///
+  /// In en, this message translates to:
+  /// **'Structural Scheme'**
+  String get architectStructuralScheme;
+
+  /// Flat slab structural scheme
+  ///
+  /// In en, this message translates to:
+  /// **'Flat Slab (Beamless)'**
+  String get architectStructuralSchemeFlatSlab;
+
+  /// Beam and slab structural scheme
+  ///
+  /// In en, this message translates to:
+  /// **'Beam & Slab System'**
+  String get architectStructuralSchemeBeamAndSlab;
+
+  /// Sandwich panels structural scheme
+  ///
+  /// In en, this message translates to:
+  /// **'Sandwich Panels'**
+  String get architectStructuralSchemeSandwichPanels;
+
+  /// Round logs timber structural scheme
+  ///
+  /// In en, this message translates to:
+  /// **'Round Timber Logs'**
+  String get architectStructuralSchemeRoundLogs;
+
+  /// Light gauge stud frame structural scheme
+  ///
+  /// In en, this message translates to:
+  /// **'Light Stud Frame'**
+  String get architectStructuralSchemeStudFrame;
+
+  /// Exterior perimeter drop beam height
+  ///
+  /// In en, this message translates to:
+  /// **'Perimeter Drop Beam Height'**
+  String get architectPerimeterBeamDepth;
+
+  /// Help text for exterior perimeter drop beam height
+  ///
+  /// In en, this message translates to:
+  /// **'Total depth of perimeter RC drop beams under the slab core'**
+  String get architectPerimeterBeamDepthHelp;
+
+  /// Aerated concrete hatch pattern
+  ///
+  /// In en, this message translates to:
+  /// **'Aerated concrete'**
+  String get hatchPatternAeratedConcrete;
+
   /// No description provided for @slabMatTile.
   ///
   /// In en, this message translates to:

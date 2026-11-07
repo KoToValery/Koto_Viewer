@@ -14,6 +14,7 @@ enum SlabUsage {
 
 enum SlabMaterial {
   concrete,
+  aeratedConcrete,
   tile,
   tileAdhesive,
   parquet,

@@ -10,6 +10,7 @@ class ArchitectSectionHatch {
 
   static ArchitectHatchPattern? slab(SlabMaterial material) =>
       switch (material) {
+        SlabMaterial.aeratedConcrete => preset('aeratedConcrete'),
         SlabMaterial.concrete ||
         SlabMaterial.blindingConcrete ||
         SlabMaterial.gravel ||
@@ -38,7 +39,7 @@ class ArchitectSectionHatch {
   static ArchitectHatchPattern wall(ArchitectMaterial material) =>
       switch (material) {
         ArchitectMaterial.brick => preset('brick'),
-        ArchitectMaterial.aeratedConcrete => preset('dots'),
+        ArchitectMaterial.aeratedConcrete => preset('aeratedConcrete'),
         ArchitectMaterial.concrete => preset('concrete'),
         ArchitectMaterial.timber => preset('wood'),
         ArchitectMaterial.panel ||
@@ -55,7 +56,7 @@ class ArchitectSectionHatch {
   static ArchitectHatchPattern core(WallCoreMaterial material) =>
       switch (material) {
         WallCoreMaterial.brick => preset('brick'),
-        WallCoreMaterial.aeratedConcrete => preset('dots'),
+        WallCoreMaterial.aeratedConcrete => preset('aeratedConcrete'),
         WallCoreMaterial.concrete => preset('concrete'),
         WallCoreMaterial.timber => preset('wood'),
         WallCoreMaterial.panel => preset('diagonalCross'),

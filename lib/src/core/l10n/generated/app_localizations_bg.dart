@@ -6036,6 +6036,41 @@ class AppLocalizationsBg extends AppLocalizations {
   String get slabMatConcrete => 'Стоманобетон';
 
   @override
+  String get slabMatAeratedConcrete => 'Газобетон';
+
+  @override
+  String get architectStructuralScheme => 'Конструктивна схема';
+
+  @override
+  String get architectStructuralSchemeFlatSlab =>
+      'Безгредова плоча (Гладка плоча)';
+
+  @override
+  String get architectStructuralSchemeBeamAndSlab =>
+      'Гредова система (Плоча с греди)';
+
+  @override
+  String get architectStructuralSchemeSandwichPanels => 'Стенни термопанели';
+
+  @override
+  String get architectStructuralSchemeRoundLogs =>
+      'Дървена (Кръгли трупи / Гредоред)';
+
+  @override
+  String get architectStructuralSchemeStudFrame =>
+      'Сухо строителство (Щендери / Рамка)';
+
+  @override
+  String get architectPerimeterBeamDepth => 'Височина на външна греда';
+
+  @override
+  String get architectPerimeterBeamDepthHelp =>
+      'Обща височина на външните СТБ греди под конструктивната плоча';
+
+  @override
+  String get hatchPatternAeratedConcrete => 'Газобетон';
+
+  @override
   String get slabMatTile => 'Плочки';
 
   @override

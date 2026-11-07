@@ -204,6 +204,21 @@ class ArchitectWallSolids {
                   ? math.max(wall.height, wall.endHeight!)
                   : wall.height);
       breaks.addAll([bottom, top, nominalTops[wall.id]!]);
+      if (wall.coreMaterial == WallCoreMaterial.brick ||
+          wall.coreMaterial == WallCoreMaterial.aeratedConcrete) {
+        final wallH = top - bottom;
+        if (wallH > 3.00) {
+          var step = 1;
+          while (true) {
+            final zBeltBot = bottom + step * 3.00;
+            final zBeltTop = zBeltBot + 0.20;
+            if (top - zBeltTop < 0.40) break;
+            breaks.add(zBeltBot);
+            breaks.add(zBeltTop);
+            step++;
+          }
+        }
+      }
       if (wall.plinth.enabled) {
         for (final z in [
           wall.plinth.baseElevation,
@@ -334,10 +349,36 @@ class ArchitectWallSolids {
             removeAbove: true,
           );
         }
-        final color =
+        var effectiveLayer = region.layer;
+        var effectiveColor =
             wall.layers.isEmpty && !wall.hasInsulation && !plinth.enabled
             ? const Color(0xFFECEFF1)
             : region.layer.material.color;
+
+        if (isCoreLayer &&
+            (wall.coreMaterial == WallCoreMaterial.brick ||
+                wall.coreMaterial == WallCoreMaterial.aeratedConcrete)) {
+          final wallBot = storey.elevation + wall.baseOffset;
+          final wallH = wall.isSlopedTop
+              ? math.max(wall.height, wall.endHeight!)
+              : wall.height;
+          if (wallH > 3.00) {
+            var step = 1;
+            while (true) {
+              final zBeltBot = wallBot + step * 3.00;
+              final zBeltTop = zBeltBot + 0.20;
+              if (wallBot + wallH - zBeltTop < 0.40) break;
+              if (mid >= zBeltBot && mid <= zBeltTop) {
+                effectiveLayer = effectiveLayer.copyWith(
+                  material: ArchitectMaterial.concrete,
+                );
+                effectiveColor = const Color(0xFFB0BEC5);
+                break;
+              }
+              step++;
+            }
+          }
+        }
         // Each clipped part is a closed solid. Keep it separate so vertical
         // sections do not trace through shared internal faces and lose masonry.
         for (final part in parts) {
@@ -345,7 +386,7 @@ class ArchitectWallSolids {
             part.path,
             part.bottom,
             part.top,
-            color,
+            effectiveColor,
           );
 
           final exteriorLayer = wall.resolvedLayers.first;
@@ -394,7 +435,7 @@ class ArchitectWallSolids {
           result.add(
             ArchitectWallSolid(
               wall,
-              region.layer,
+              effectiveLayer,
               part.path,
               bottom,
               top,

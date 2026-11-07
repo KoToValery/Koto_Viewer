@@ -2,6 +2,7 @@ import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
+import 'architect_structural_scheme_labels.dart';
 
 /// Modal Wizard Dialog for creating a new architectural concept design project.
 class ArchitectNewProjectDialog extends StatefulWidget {
@@ -15,6 +16,8 @@ class ArchitectNewProjectDialog extends StatefulWidget {
 class _ArchitectNewProjectDialogState extends State<ArchitectNewProjectDialog> {
   late final TextEditingController _nameController;
   ArchitectUnit _unit = ArchitectUnit.meters;
+  ArchitectStructuralScheme _structuralScheme =
+      ArchitectStructuralScheme.flatSlab;
   int _storeyCount = 2;
   double _groundHeight = 3.00;
   double _typicalHeight = 2.80;
@@ -60,6 +63,7 @@ class _ArchitectNewProjectDialogState extends State<ArchitectNewProjectDialog> {
       axesY: _enableGridAxes ? _axesY : 0,
       spacingX: _spacingX,
       spacingY: _spacingY,
+      structuralScheme: _structuralScheme,
     ).copyWith(units: _unit);
 
     Navigator.of(context).pop(project);
@@ -186,6 +190,47 @@ class _ArchitectNewProjectDialogState extends State<ArchitectNewProjectDialog> {
                           foregroundColor: WidgetStateProperty.all(Colors.white,
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      // Structural Scheme
+                      Text(
+                        l10n.architectStructuralScheme,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<ArchitectStructuralScheme>(
+                        initialValue: _structuralScheme,
+                        dropdownColor: const Color(0xFF262630),
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(0xFF262630),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        items: [
+                          for (final scheme in ArchitectStructuralScheme.values)
+                            DropdownMenuItem(
+                              value: scheme,
+                              child: Text(scheme.label(l10n)),
+                            ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _structuralScheme = val);
+                          }
+                        },
                       ),
                       const SizedBox(height: 18),
 
