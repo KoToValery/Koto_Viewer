@@ -77,9 +77,10 @@
 | **wallAttach** | L11025, L12390, L23350 | _triggerWallAttach, ConnectArchitectWallsAtVertex | _buildAttachPromptBanner, quick access bar |
 | **wallDetach** | L23390, L26090 | _triggerWallDetach, _confirmWallDetach, _cancelWallDetach | _buildDetachConfirmationBanner (on-screen green checkmark) |
 | **wallOffset** | L12065, L24435, L24595 | _previewOffset, _commitOffset, dynamic distance chip | _offsetBanner with tappable distance chip & green checkmark |
-| **terrain** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_syncTerrainFromGeodesy`, `_updateSelectedLandscapeElement` | `ArchitectLandscapeBar` (Existing / Proposed Terrain, Spot / Contour / Boundary, G-TOPO sync, Elevation Z edit) |
+| **terrain** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_syncTerrainFromGeodesy`, `_updateSelectedLandscapeElement` | `ArchitectLandscapeBar` (Existing / Proposed, Boundary / Hole / Contour / Spot / Pad, Datum ±0.00, G-TOPO sync) |
+| **contour** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement` | `ArchitectLandscapeBar` (Absolute / Relative Z, Datum ±0.00, Major/Minor, Closed loop, 90° Guide) |
 | **pathway** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement`, `_applyChamferFillet` | `ArchitectLandscapeBar` (Width, Paving Material, Automatic Curbs, 90° Ortho/Perp Guide, Fillet & Chamfer, Split) |
-| **vegetation** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement`, `_applyChamferFillet` | `ArchitectLandscapeBar` (7 Species, Single / Row / Hedge, Crown & Height, Fillet/Chamfer on Hedges, Fast 3D Meshes) |
+| **vegetation** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement`, `_applyChamferFillet` | `ArchitectLandscapeBar` (8 Species incl. Artistic Low-Poly, Single/Row/Hedge, Crown & Height, Fast 3D Meshes) |
 | **siteFence** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement`, `_applyChamferFillet` | `ArchitectLandscapeBar` (6 Presets: Piers+Slats, Gabion Fence/Retaining, Louvers, Iron, RC Retaining, 90° Guide, Fillet & Chamfer, Split) |
 
 ---

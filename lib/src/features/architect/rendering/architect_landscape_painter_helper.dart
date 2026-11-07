@@ -88,18 +88,22 @@ class ArchitectLandscapePainterHelper {
         Paint()
           ..color = isSelected
               ? const Color(0x222563EB)
-              : (boundary.isCutoutPad ? const Color(0x14D97706) : fillTint)
+              : (boundary.isHole
+                  ? const Color(0x12D97706)
+                  : (boundary.isCutoutPad ? const Color(0x14D97706) : fillTint))
           ..style = PaintingStyle.fill,
       );
 
       final borderPaint = Paint()
         ..color = isSelected
             ? const Color(0xFF2563EB)
-            : (boundary.isCutoutPad ? const Color(0xFFB45309) : primaryColor)
+            : (boundary.isHole
+                ? const Color(0xFFD97706)
+                : (boundary.isCutoutPad ? const Color(0xFFB45309) : primaryColor))
         ..strokeWidth = (isSelected ? 2.2 : (isProposed ? 1.6 : 1.2)) / zoomScale
         ..style = PaintingStyle.stroke;
 
-      if (isProposed && !boundary.isCutoutPad) {
+      if (isProposed && !boundary.isCutoutPad && !boundary.isHole) {
         canvas.drawPath(path, borderPaint);
         _drawBoundaryGrassTicks(
           canvas,
@@ -112,16 +116,20 @@ class ArchitectLandscapePainterHelper {
           canvas,
           path,
           borderPaint,
-          dashLength: 0.45,
-          gapLength: 0.22,
+          dashLength: boundary.isHole ? 0.60 : 0.45,
+          gapLength: boundary.isHole ? 0.25 : 0.22,
         );
       }
 
       // Label elevation at first vertex
+      final bndLabelZ = surface.datumElevation.abs() > 1e-4
+          ? (boundary.elevation + surface.datumElevation).toStringAsFixed(2)
+          : project.formatLevel(boundary.elevation);
       _drawSmallLabel(
         canvas: canvas,
-        text:
-            '${isProposed ? "ПР." : "СЪЩ."} ${project.formatLevel(boundary.elevation)}',
+        text: boundary.isHole
+            ? 'ОТВОР $bndLabelZ'
+            : '${isProposed ? "ПР." : "СЪЩ."} $bndLabelZ',
         worldPos: boundary.polygon.first + const Offset(0.18, -0.18),
         zoomScale: zoomScale,
         color: borderPaint.color,
@@ -151,9 +159,12 @@ class ArchitectLandscapePainterHelper {
       }
 
       final midIdx = contour.points.length ~/ 2;
+      final cntLabelZ = surface.datumElevation.abs() > 1e-4
+          ? (contour.elevation + surface.datumElevation).toStringAsFixed(2)
+          : project.formatLevel(contour.elevation);
       _drawSmallLabel(
         canvas: canvas,
-        text: project.formatLevel(contour.elevation),
+        text: contour.isMajor ? '$cntLabelZ [Г]' : cntLabelZ,
         worldPos: contour.points[midIdx],
         zoomScale: zoomScale,
         color: strokePaint.color,
@@ -185,9 +196,12 @@ class ArchitectLandscapePainterHelper {
         canvas.drawCircle(p, crossRadius * 0.72, spotPaint);
       }
 
+      final spotLabelZ = surface.datumElevation.abs() > 1e-4
+          ? (spot.elevation + surface.datumElevation).toStringAsFixed(2)
+          : project.formatLevel(spot.elevation);
       _drawSmallLabel(
         canvas: canvas,
-        text: project.formatLevel(spot.elevation),
+        text: spotLabelZ,
         worldPos: p + Offset(crossRadius * 1.2, -crossRadius * 0.9),
         zoomScale: zoomScale,
         color: color,
@@ -842,6 +856,24 @@ class ArchitectLandscapePainterHelper {
         );
         canvas.drawPath(crown, fillPaint);
         canvas.drawPath(crown, outlinePaint);
+
+      case ArchitectPlantSpecies.artisticLowPoly:
+        // Stylized 7-sided faceted polygon crown with internal faceted triangulation
+        final polyPath = Path();
+        const facetSides = 7;
+        final outerPts = <Offset>[];
+        for (int i = 0; i < facetSides; i++) {
+          final a = i * (2 * math.pi / facetSides) - math.pi / 2;
+          final facetR = r * (i.isEven ? 1.0 : 0.88);
+          outerPts.add(Offset(math.cos(a) * facetR, math.sin(a) * facetR));
+        }
+        polyPath.addPolygon(outerPts, true);
+        canvas.drawPath(polyPath, fillPaint);
+        canvas.drawPath(polyPath, outlinePaint);
+        for (final p in outerPts) {
+          canvas.drawLine(Offset.zero, p, detailPaint);
+        }
+        canvas.drawCircle(Offset.zero, (r * 0.12).clamp(0.06, 0.22), outlinePaint);
     }
 
     canvas.restore();
@@ -1069,6 +1101,32 @@ class ArchitectLandscapePainterHelper {
           canopyFill.addPath(frond, Offset.zero);
           canopyOutline.addPath(frond, Offset.zero);
         }
+
+      case ArchitectPlantSpecies.artisticLowPoly:
+        final trunkTopZ = groundZ + h * 0.42;
+        final crownBaseZ = groundZ + h * 0.35;
+        final crownTopZ = groundZ + h;
+        final trunkW = (w * 0.05).clamp(0.05, 0.16);
+
+        // Low-poly faceted tapered trunk with root flare buttresses
+        trunkAndBranches.moveTo(stationX - trunkW * 1.8, groundZ);
+        trunkAndBranches.lineTo(stationX - trunkW * 0.6, trunkTopZ);
+        trunkAndBranches.lineTo(stationX + trunkW * 0.6, trunkTopZ);
+        trunkAndBranches.lineTo(stationX + trunkW * 1.8, groundZ);
+        trunkAndBranches.close();
+
+        // Faceted low-poly crown contour
+        final crownPoly = Path()
+          ..moveTo(stationX, crownTopZ)
+          ..lineTo(stationX + halfW * 0.82, groundZ + h * 0.80)
+          ..lineTo(stationX + halfW, groundZ + h * 0.55)
+          ..lineTo(stationX + halfW * 0.45, crownBaseZ)
+          ..lineTo(stationX - halfW * 0.45, crownBaseZ)
+          ..lineTo(stationX - halfW, groundZ + h * 0.52)
+          ..lineTo(stationX - halfW * 0.85, groundZ + h * 0.78)
+          ..close();
+        canopyFill.addPath(crownPoly, Offset.zero);
+        canopyOutline.addPath(crownPoly, Offset.zero);
 
       case ArchitectPlantSpecies.shrubCluster:
       case ArchitectPlantSpecies.trimmedHedge:

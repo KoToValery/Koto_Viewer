@@ -12,6 +12,10 @@ class ArchitectLandscapeTool extends ChangeNotifier {
   ArchitectTerrainState terrainState = ArchitectTerrainState.proposed;
   ArchitectTerrainDraftMode terrainMode = ArchitectTerrainDraftMode.boundary;
   double terrainElevation = -0.15;
+  double terrainDatumElevation = 0.0;
+  double contourAbsoluteElevation = 0.0;
+  bool contourClosed = false;
+  bool contourMajor = false;
 
   // --- Pathway State ---
   double pathwayWidth = 1.50;
@@ -98,6 +102,12 @@ class ArchitectLandscapeTool extends ChangeNotifier {
         plantPlacementMode = ArchitectVegetationPlacementMode.hedge;
         hedgeWidth = 0.60;
         plantHeight = 1.30;
+      case ArchitectPlantSpecies.artisticLowPoly:
+        plantCrownDiameter = 3.8;
+        plantHeight = 5.6;
+        if (plantPlacementMode == ArchitectVegetationPlacementMode.hedge) {
+          plantPlacementMode = ArchitectVegetationPlacementMode.single;
+        }
     }
   }
 
@@ -135,11 +145,13 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     return switch (toolName) {
       'terrain' => switch (terrainMode) {
         ArchitectTerrainDraftMode.boundary ||
+        ArchitectTerrainDraftMode.hole ||
         ArchitectTerrainDraftMode.pad =>
           draftPoints.length >= 3,
         ArchitectTerrainDraftMode.contour => draftPoints.length >= 2,
         ArchitectTerrainDraftMode.spot => false,
       },
+      'contour' => draftPoints.length >= 2,
       'pathway' => draftPoints.length >= (pathwayClosed ? 3 : 2),
       'vegetation' =>
         plantPlacementMode != ArchitectVegetationPlacementMode.single &&
@@ -233,29 +245,71 @@ class ArchitectLandscapeTool extends ChangeNotifier {
       case 'terrain':
         final surface = _targetSurface(project);
         if (terrainMode == ArchitectTerrainDraftMode.boundary ||
+            terrainMode == ArchitectTerrainDraftMode.hole ||
             terrainMode == ArchitectTerrainDraftMode.pad) {
           final boundary = ArchitectTerrainBoundary(
             id: 'terr_bnd_$nowMicros',
             polygon: pts,
             elevation: terrainElevation,
             isCutoutPad: terrainMode == ArchitectTerrainDraftMode.pad,
+            isHole: terrainMode == ArchitectTerrainDraftMode.hole,
           );
           return _updateSurface(
             project,
             surface.copyWith(boundaries: [...surface.boundaries, boundary]),
           );
         } else if (terrainMode == ArchitectTerrainDraftMode.contour) {
+          final datum = surface.datumElevation.abs() > 1e-4
+              ? surface.datumElevation
+              : terrainDatumElevation;
+          final effectiveElevation = contourAbsoluteElevation != 0.0
+              ? (contourAbsoluteElevation - datum)
+              : terrainElevation;
           final contour = ArchitectTerrainContour(
             id: 'terr_cnt_$nowMicros',
             points: pts,
-            elevation: terrainElevation,
+            elevation: effectiveElevation,
+            rawAbsoluteElevation: contourAbsoluteElevation != 0.0
+                ? contourAbsoluteElevation
+                : (effectiveElevation + datum),
+            closed: contourClosed,
+            isMajor: contourMajor,
           );
           return _updateSurface(
             project,
-            surface.copyWith(contours: [...surface.contours, contour]),
+            surface.copyWith(
+              datumElevation: datum,
+              contours: [...surface.contours, contour],
+            ),
           );
         }
         return null;
+
+      case 'contour':
+        final surface = _targetSurface(project);
+        final datum = surface.datumElevation.abs() > 1e-4
+            ? surface.datumElevation
+            : terrainDatumElevation;
+        final effectiveElevation = contourAbsoluteElevation != 0.0
+            ? (contourAbsoluteElevation - datum)
+            : terrainElevation;
+        final contour = ArchitectTerrainContour(
+          id: 'terr_cnt_$nowMicros',
+          points: pts,
+          elevation: effectiveElevation,
+          rawAbsoluteElevation: contourAbsoluteElevation != 0.0
+              ? contourAbsoluteElevation
+              : (effectiveElevation + datum),
+          closed: contourClosed,
+          isMajor: contourMajor,
+        );
+        return _updateSurface(
+          project,
+          surface.copyWith(
+            datumElevation: datum,
+            contours: [...surface.contours, contour],
+          ),
+        );
 
       case 'pathway':
         final pathway = ArchitectPathway(
@@ -685,24 +739,36 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     notifyListeners();
   }
 
-  void loadFromTerrainBoundary(ArchitectTerrainBoundary bnd, ArchitectTerrainState state) {
+  void loadFromTerrainBoundary(ArchitectTerrainBoundary bnd, ArchitectTerrainState state, {double datum = 0.0}) {
     terrainState = state;
-    terrainMode = bnd.isFlatPad ? ArchitectTerrainDraftMode.pad : ArchitectTerrainDraftMode.boundary;
+    terrainMode = bnd.isHole
+        ? ArchitectTerrainDraftMode.hole
+        : (bnd.isFlatPad
+            ? ArchitectTerrainDraftMode.pad
+            : ArchitectTerrainDraftMode.boundary);
     terrainElevation = bnd.elevation;
+    terrainDatumElevation = datum;
+    contourAbsoluteElevation = bnd.elevation + datum;
     notifyListeners();
   }
 
-  void loadFromTerrainContour(ArchitectTerrainContour cnt, ArchitectTerrainState state) {
+  void loadFromTerrainContour(ArchitectTerrainContour cnt, ArchitectTerrainState state, {double datum = 0.0}) {
     terrainState = state;
     terrainMode = ArchitectTerrainDraftMode.contour;
     terrainElevation = cnt.elevation;
+    terrainDatumElevation = datum;
+    contourAbsoluteElevation = cnt.effectiveAbsolute(datum);
+    contourClosed = cnt.closed;
+    contourMajor = cnt.isMajor;
     notifyListeners();
   }
 
-  void loadFromTerrainSpot(ArchitectTerrainSpot spot, ArchitectTerrainState state) {
+  void loadFromTerrainSpot(ArchitectTerrainSpot spot, ArchitectTerrainState state, {double datum = 0.0}) {
     terrainState = state;
     terrainMode = ArchitectTerrainDraftMode.spot;
     terrainElevation = spot.elevation;
+    terrainDatumElevation = datum;
+    contourAbsoluteElevation = spot.effectiveAbsolute(datum);
     notifyListeners();
   }
 

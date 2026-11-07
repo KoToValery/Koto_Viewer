@@ -90,6 +90,7 @@ enum ArchitectToolCategory {
     ArchitectTool.cadEllipse => drawing,
     ArchitectTool.cadUnderlay || ArchitectTool.rasterUnderlay => underlays,
     ArchitectTool.terrain ||
+    ArchitectTool.contour ||
     ArchitectTool.pathway ||
     ArchitectTool.vegetation ||
     ArchitectTool.siteFence => landscape,
@@ -168,6 +169,7 @@ extension ArchitectToolCatalogLabel on ArchitectTool {
       l.architectToolRasterUnderlay,
     ),
     ArchitectTool.terrain => (AppIconId.terrain, l.architectToolTerrain),
+    ArchitectTool.contour => (AppIconId.spline, l.architectToolContour),
     ArchitectTool.pathway => (AppIconId.pathway, l.architectToolPathway),
     ArchitectTool.vegetation => (
       AppIconId.vegetation,

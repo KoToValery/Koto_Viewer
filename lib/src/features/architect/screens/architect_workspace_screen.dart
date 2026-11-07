@@ -1925,6 +1925,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _project.proposedTerrain.contours.any((c) => c.id == id) ||
         _project.proposedTerrain.spots.any((s) => s.id == id),
 
+      ArchitectTool.contour =>
+        _project.existingTerrain.contours.any((c) => c.id == id) ||
+        _project.proposedTerrain.contours.any((c) => c.id == id),
+
       _ => false,
 
     };
@@ -22459,11 +22463,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             (_project.existingTerrain, ArchitectTerrainState.existing),
           ]) {
             final bnd = surf.boundaries.where((b) => b.id == primary).firstOrNull;
-            if (bnd != null) _landscapeTool.loadFromTerrainBoundary(bnd, state);
+            if (bnd != null) _landscapeTool.loadFromTerrainBoundary(bnd, state, datum: surf.datumElevation);
             final cnt = surf.contours.where((c) => c.id == primary).firstOrNull;
-            if (cnt != null) _landscapeTool.loadFromTerrainContour(cnt, state);
+            if (cnt != null) _landscapeTool.loadFromTerrainContour(cnt, state, datum: surf.datumElevation);
             final sp = surf.spots.where((s) => s.id == primary).firstOrNull;
-            if (sp != null) _landscapeTool.loadFromTerrainSpot(sp, state);
+            if (sp != null) _landscapeTool.loadFromTerrainSpot(sp, state, datum: surf.datumElevation);
           }
         } else if (_selectionIds.length == 1) {
 
@@ -30035,6 +30039,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               return b.copyWith(
                 elevation: _landscapeTool.terrainElevation,
                 isFlatPad: _landscapeTool.terrainMode == ArchitectTerrainDraftMode.pad,
+                isHole: _landscapeTool.terrainMode == ArchitectTerrainDraftMode.hole,
               );
             }()
           else
@@ -30045,7 +30050,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           if (c.id == id)
             () {
               surfChanged = true;
-              return c.copyWith(elevation: _landscapeTool.terrainElevation);
+              return c.copyWith(
+                elevation: _landscapeTool.terrainElevation,
+                rawAbsoluteElevation: _landscapeTool.contourAbsoluteElevation != 0.0
+                    ? _landscapeTool.contourAbsoluteElevation
+                    : (_landscapeTool.terrainElevation + surf.datumElevation),
+                closed: _landscapeTool.contourClosed,
+                isMajor: _landscapeTool.contourMajor,
+              );
             }()
           else
             c,
@@ -30055,14 +30067,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           if (s.id == id)
             () {
               surfChanged = true;
-              return s.copyWith(elevation: _landscapeTool.terrainElevation);
+              return s.copyWith(
+                elevation: _landscapeTool.terrainElevation,
+                rawAbsoluteElevation: _landscapeTool.contourAbsoluteElevation != 0.0
+                    ? _landscapeTool.contourAbsoluteElevation
+                    : (_landscapeTool.terrainElevation + surf.datumElevation),
+              );
             }()
           else
             s,
       ];
 
-      if (surfChanged) {
+      final datumChanged = (surf.datumElevation - _landscapeTool.terrainDatumElevation).abs() > 1e-4;
+      if (surfChanged || datumChanged) {
         final nextSurf = surf.copyWith(
+          datumElevation: _landscapeTool.terrainDatumElevation,
           boundaries: nextBnd,
           contours: nextCnt,
           spots: nextSpots,

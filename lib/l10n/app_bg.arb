@@ -4273,5 +4273,14 @@
   "architectLayerTerrainExisting": "Съществуващ терен",
   "architectLayerTerrainProposed": "Проектен терен",
   "architectLayerPathways": "Алеи и бордюри",
-  "architectLayerVegetation": "Озеленяване и огради"
+  "architectLayerVegetation": "Озеленяване и огради",
+  "architectToolContour": "Хоризонтали",
+  "architectTerrainModeHole": "Отвор",
+  "architectTerrainDatum": "Кота ±0.00",
+  "architectTerrainDatumDialogTitle": "Абсолютна геодезическа кота за кота ±0.00",
+  "architectTerrainAbsoluteElevation": "Абсолютна кота",
+  "architectTerrainRelativeElevation": "Относителна кота",
+  "architectPlantArtisticLowPoly": "Артистично нискополигонално дърво",
+  "architectTerrainContourMajor": "Главен хоризонтал",
+  "architectTerrainContourClosed": "Затворен контур"
 }

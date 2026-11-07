@@ -12464,4 +12464,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectLayerVegetation => 'Vegetation & Site';
+
+  @override
+  String get architectToolContour => 'Contours';
+
+  @override
+  String get architectTerrainModeHole => 'Hole';
+
+  @override
+  String get architectTerrainDatum => 'Datum ±0.00';
+
+  @override
+  String get architectTerrainDatumDialogTitle =>
+      'Geodetic Datum for ±0.00 Level';
+
+  @override
+  String get architectTerrainAbsoluteElevation => 'Absolute elevation';
+
+  @override
+  String get architectTerrainRelativeElevation => 'Relative elevation';
+
+  @override
+  String get architectPlantArtisticLowPoly => 'Artistic Low-Poly tree';
+
+  @override
+  String get architectTerrainContourMajor => 'Major contour';
+
+  @override
+  String get architectTerrainContourClosed => 'Closed loop';
 }

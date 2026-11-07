@@ -6850,5 +6850,14 @@
   "architectLayerTerrainExisting": "Existing Terrain",
   "architectLayerTerrainProposed": "Proposed Terrain",
   "architectLayerPathways": "Pathways & Curbs",
-  "architectLayerVegetation": "Vegetation & Site"
+  "architectLayerVegetation": "Vegetation & Site",
+  "architectToolContour": "Contours",
+  "architectTerrainModeHole": "Hole",
+  "architectTerrainDatum": "Datum ±0.00",
+  "architectTerrainDatumDialogTitle": "Geodetic Datum for ±0.00 Level",
+  "architectTerrainAbsoluteElevation": "Absolute elevation",
+  "architectTerrainRelativeElevation": "Relative elevation",
+  "architectPlantArtisticLowPoly": "Artistic Low-Poly tree",
+  "architectTerrainContourMajor": "Major contour",
+  "architectTerrainContourClosed": "Closed loop"
 }

@@ -144,6 +144,13 @@ class ArchitectDraftingSeed {
     ArchitectTool.terrain: {
       'elevation',
       'isFlatPad',
+      'isHole',
+      'closed',
+      'isMajor',
+    },
+    ArchitectTool.contour: {
+      'elevation',
+      'rawAbsoluteElevation',
       'closed',
       'isMajor',
     },

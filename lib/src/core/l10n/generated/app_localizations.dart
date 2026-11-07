@@ -22691,6 +22691,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Vegetation & Site'**
   String get architectLayerVegetation;
+
+  /// No description provided for @architectToolContour.
+  ///
+  /// In en, this message translates to:
+  /// **'Contours'**
+  String get architectToolContour;
+
+  /// No description provided for @architectTerrainModeHole.
+  ///
+  /// In en, this message translates to:
+  /// **'Hole'**
+  String get architectTerrainModeHole;
+
+  /// No description provided for @architectTerrainDatum.
+  ///
+  /// In en, this message translates to:
+  /// **'Datum ±0.00'**
+  String get architectTerrainDatum;
+
+  /// No description provided for @architectTerrainDatumDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Geodetic Datum for ±0.00 Level'**
+  String get architectTerrainDatumDialogTitle;
+
+  /// No description provided for @architectTerrainAbsoluteElevation.
+  ///
+  /// In en, this message translates to:
+  /// **'Absolute elevation'**
+  String get architectTerrainAbsoluteElevation;
+
+  /// No description provided for @architectTerrainRelativeElevation.
+  ///
+  /// In en, this message translates to:
+  /// **'Relative elevation'**
+  String get architectTerrainRelativeElevation;
+
+  /// No description provided for @architectPlantArtisticLowPoly.
+  ///
+  /// In en, this message translates to:
+  /// **'Artistic Low-Poly tree'**
+  String get architectPlantArtisticLowPoly;
+
+  /// No description provided for @architectTerrainContourMajor.
+  ///
+  /// In en, this message translates to:
+  /// **'Major contour'**
+  String get architectTerrainContourMajor;
+
+  /// No description provided for @architectTerrainContourClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed loop'**
+  String get architectTerrainContourClosed;
 }
 
 class _AppLocalizationsDelegate

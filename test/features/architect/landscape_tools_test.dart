@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_section.dart';
@@ -475,6 +476,165 @@ void main() {
       // Average 40-50 triangles per tree -> ~2500 triangles total
       expect(mesh.triangles.length, lessThan(4000));
       expect(stopwatch.elapsedMilliseconds, lessThan(100));
+    });
+
+    test('Elevation Contours & Geodetic Datum ±0.00 Conversion', () {
+      const datum = 540.00;
+      final surface = const ArchitectTerrainSurface(
+        datumElevation: datum,
+      );
+
+      // 1. Absolute elevation to relative elevation conversion
+      expect(surface.toRelativeElevation(542.50), closeTo(2.50, 1e-4));
+      expect(surface.toAbsoluteElevation(2.50), closeTo(542.50, 1e-4));
+
+      // 2. Contour with explicit absolute elevation
+      const contour = ArchitectTerrainContour(
+        id: 'cnt_1',
+        points: [Offset(0, 0), Offset(10, 0)],
+        elevation: 2.50,
+        rawAbsoluteElevation: 542.50,
+      );
+      expect(contour.effectiveAbsolute(datum), closeTo(542.50, 1e-4));
+      expect(contour.effectiveRelative(datum), closeTo(2.50, 1e-4));
+
+      // Shifting building datum by +1.0m (to 541.00) relative height changes to +1.50m
+      expect(contour.effectiveRelative(541.00), closeTo(1.50, 1e-4));
+
+      // 3. Landscape Tool commitDraft with 'contour' tool
+      final tool = ArchitectLandscapeTool();
+      tool.terrainDatumElevation = 540.00;
+      tool.contourAbsoluteElevation = 543.20;
+      tool.draftPoints.addAll([const Offset(0, 5), const Offset(15, 5)]);
+
+      final emptyProject = ArchitectProject(
+        id: 'p_cnt',
+        name: 'Contour Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: const [ArchitectStorey(id: 's0', name: 'Ground')],
+        activeStoreyId: 's0',
+      );
+      final updatedProject = tool.commitDraft(
+        toolName: 'contour',
+        project: emptyProject,
+      );
+
+      expect(updatedProject, isNotNull);
+      final committedCnt = updatedProject!.proposedTerrain.contours.first;
+      expect(committedCnt.elevation, closeTo(3.20, 1e-4));
+      expect(committedCnt.effectiveAbsolute(540.00), closeTo(543.20, 1e-4));
+    });
+
+    test('Terrain Cutout Hole excludes points and clips section profiles', () {
+      // 1. Boundary with hole
+      const outer = ArchitectTerrainBoundary(
+        id: 'outer',
+        polygon: [Offset(0, 0), Offset(20, 0), Offset(20, 20), Offset(0, 20)],
+        elevation: 1.0,
+      );
+      const hole = ArchitectTerrainBoundary(
+        id: 'hole_pool',
+        polygon: [Offset(5, 5), Offset(15, 5), Offset(15, 15), Offset(5, 15)],
+        elevation: 0.0,
+        isHole: true,
+      );
+      final surface = const ArchitectTerrainSurface(
+        boundaries: [outer, hole],
+      );
+
+      // Point outside hole but inside terrain boundary evaluates elevation
+      expect(surface.evaluateElevationAt(const Offset(2, 2)), isNotNull);
+
+      // Point inside hole evaluates to null (cutout void)
+      expect(surface.evaluateElevationAt(const Offset(10, 10)), isNull);
+
+      // 2. Section slice cuts across hole
+      final segments = surface.sliceProfileSegments(
+        const Offset(0, 10),
+        const Offset(20, 10),
+      );
+      // Profile must be split into two segments: [0 -> 5] and [15 -> 20]
+      expect(segments.length, 2);
+      expect(segments.first.last.dx, closeTo(5.0, 0.25));
+      expect(segments.last.first.dx, closeTo(15.0, 0.25));
+    });
+
+    test('Automatic 3D Topographic Terrain Surface generation from Contours', () async {
+      // Contours with stepped elevations across site: 0.0m, 1.0m, 2.0m
+      final contours = [
+        const ArchitectTerrainContour(
+          id: 'c0',
+          points: [Offset(0, 0), Offset(20, 0)],
+          elevation: 0.0,
+        ),
+        const ArchitectTerrainContour(
+          id: 'c1',
+          points: [Offset(0, 10), Offset(20, 10)],
+          elevation: 1.0,
+        ),
+        const ArchitectTerrainContour(
+          id: 'c2',
+          points: [Offset(0, 20), Offset(20, 20)],
+          elevation: 2.0,
+        ),
+      ];
+
+      final project = ArchitectProject(
+        id: 'p_topo',
+        name: 'Topo Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: const [ArchitectStorey(id: 's0', name: 'Ground')],
+        activeStoreyId: 's0',
+        proposedTerrain: ArchitectTerrainSurface(
+          contours: contours,
+        ),
+      );
+
+      final mesh = await Architect3dBuilder.buildProjectMeshAsync(project);
+      expect(mesh.triangles.isNotEmpty, isTrue);
+
+      // Verify that the mesh contains elevation variation between 0.0m and 2.0m
+      final minZ = mesh.triangles.map((t) => [t.v0.z, t.v1.z, t.v2.z]).expand((z) => z).reduce(math.min);
+      final maxZ = mesh.triangles.map((t) => [t.v0.z, t.v1.z, t.v2.z]).expand((z) => z).reduce(math.max);
+      expect(maxZ, greaterThan(1.5));
+      expect(minZ, lessThan(0.2));
+    });
+
+    test('Artistic Low-Poly 3D Tree generation & shading', () async {
+      const tree = ArchitectVegetationItem(
+        id: 'tree_lowpoly',
+        position: Offset(5, 5),
+        species: ArchitectPlantSpecies.artisticLowPoly,
+        crownDiameter: 3.8,
+        height: 5.6,
+      );
+
+      final project = ArchitectProject(
+        id: 'p_lowpoly',
+        name: 'Low Poly Tree Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: const [
+          ArchitectStorey(
+            id: 's0',
+            name: 'Ground',
+            vegetation: [tree],
+          ),
+        ],
+        activeStoreyId: 's0',
+      );
+
+      final stopwatch = Stopwatch()..start();
+      final mesh = await Architect3dBuilder.buildProjectMeshAsync(project);
+      stopwatch.stop();
+
+      expect(mesh.triangles.isNotEmpty, isTrue);
+      // Low-poly tree generates 50-80 triangles
+      expect(mesh.triangles.length, inInclusiveRange(40, 120));
+      // Ultra fast (< 5ms for 1 tree)
+      expect(stopwatch.elapsedMilliseconds, lessThan(30));
     });
   });
 }

@@ -55,7 +55,8 @@ class ArchitectLandscapeBar extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (activeTool == ArchitectTool.terrain)
+            if (activeTool == ArchitectTool.terrain ||
+                activeTool == ArchitectTool.contour)
               ..._buildTerrainControls(context, l, colors)
             else if (activeTool == ArchitectTool.pathway)
               ..._buildPathwayControls(context, l, colors)
@@ -144,6 +145,10 @@ class ArchitectLandscapeBar extends StatelessWidget {
     AppLocalizations l,
     ColorScheme colors,
   ) {
+    final isContourMode = activeTool == ArchitectTool.contour ||
+        controller.terrainMode == ArchitectTerrainDraftMode.contour;
+    final isSpotMode = controller.terrainMode == ArchitectTerrainDraftMode.spot;
+
     return [
       _chip(
         colors: colors,
@@ -167,37 +172,112 @@ class ArchitectLandscapeBar extends StatelessWidget {
       const SizedBox(width: 8),
       _divider(colors),
       const SizedBox(width: 8),
-      for (final mode in ArchitectTerrainDraftMode.values) ...[
-        _chip(
+      if (activeTool != ArchitectTool.contour) ...[
+        for (final mode in ArchitectTerrainDraftMode.values) ...[
+          _chip(
+            colors: colors,
+            selected: controller.terrainMode == mode,
+            label: _terrainModeLabel(l, mode),
+            onTap: () {
+              controller.terrainMode = mode;
+              controller.clearDraft();
+              onChanged();
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
+        const SizedBox(width: 4),
+        _divider(colors),
+        const SizedBox(width: 8),
+      ],
+      // Project Datum (±0.00 Level) Button
+      ActionChip(
+        key: const ValueKey('architect-terrain-datum'),
+        visualDensity: VisualDensity.compact,
+        avatar: Icon(Icons.height_rounded, size: 15, color: colors.primary),
+        label: Text(
+          '${l.architectTerrainDatum}: ${controller.terrainDatumElevation.toStringAsFixed(2)} m',
+          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+        ),
+        onPressed: () => _promptDatumDialog(context, l),
+      ),
+      const SizedBox(width: 8),
+      _divider(colors),
+      const SizedBox(width: 8),
+      if (isContourMode || isSpotMode) ...[
+        // Absolute Elevation stepper & tap-to-edit
+        _stepper(
           colors: colors,
-          selected: controller.terrainMode == mode,
-          label: _terrainModeLabel(l, mode),
-          onTap: () {
-            controller.terrainMode = mode;
-            controller.clearDraft();
+          label:
+              '${l.architectTerrainAbsoluteElevation}: ${controller.contourAbsoluteElevation.toStringAsFixed(2)} m',
+          onDec: () {
+            controller.contourAbsoluteElevation =
+                ((controller.contourAbsoluteElevation - 0.50) * 100).round() / 100.0;
+            controller.terrainElevation = controller.contourAbsoluteElevation -
+                controller.terrainDatumElevation;
+            onChanged();
+          },
+          onInc: () {
+            controller.contourAbsoluteElevation =
+                ((controller.contourAbsoluteElevation + 0.50) * 100).round() / 100.0;
+            controller.terrainElevation = controller.contourAbsoluteElevation -
+                controller.terrainDatumElevation;
+            onChanged();
+          },
+          onTapLabel: () => _promptAbsoluteElevationDialog(context, l),
+        ),
+        const SizedBox(width: 4),
+        // Relative Elevation feedback chip
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            '(${l.architectTerrainRelativeElevation}: ${_formatSignedMeters(controller.terrainElevation)})',
+            style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
+          ),
+        ),
+        if (isContourMode) ...[
+          const SizedBox(width: 4),
+          _chip(
+            colors: colors,
+            selected: controller.contourMajor,
+            label: l.architectTerrainContourMajor,
+            onTap: () {
+              controller.contourMajor = !controller.contourMajor;
+              onChanged();
+            },
+          ),
+          const SizedBox(width: 4),
+          _chip(
+            colors: colors,
+            selected: controller.contourClosed,
+            label: l.architectTerrainContourClosed,
+            onTap: () {
+              controller.contourClosed = !controller.contourClosed;
+              onChanged();
+            },
+          ),
+        ],
+      ] else ...[
+        _stepper(
+          colors: colors,
+          label:
+              '${l.architectTerrainElevationLabel} ${_formatSignedMeters(controller.terrainElevation)}',
+          onDec: () {
+            controller.terrainElevation =
+                ((controller.terrainElevation - 0.10) * 100).round() / 100.0;
+            controller.contourAbsoluteElevation =
+                controller.terrainElevation + controller.terrainDatumElevation;
+            onChanged();
+          },
+          onInc: () {
+            controller.terrainElevation =
+                ((controller.terrainElevation + 0.10) * 100).round() / 100.0;
+            controller.contourAbsoluteElevation =
+                controller.terrainElevation + controller.terrainDatumElevation;
             onChanged();
           },
         ),
-        const SizedBox(width: 4),
       ],
-      const SizedBox(width: 4),
-      _divider(colors),
-      const SizedBox(width: 8),
-      _stepper(
-        colors: colors,
-        label:
-            '${l.architectTerrainElevationLabel} ${_formatSignedMeters(controller.terrainElevation)}',
-        onDec: () {
-          controller.terrainElevation =
-              ((controller.terrainElevation - 0.10) * 100).round() / 100.0;
-          onChanged();
-        },
-        onInc: () {
-          controller.terrainElevation =
-              ((controller.terrainElevation + 0.10) * 100).round() / 100.0;
-          onChanged();
-        },
-      ),
       if (onSyncFromGeodesy != null) ...[
         const SizedBox(width: 8),
         ActionChip(
@@ -216,6 +296,106 @@ class ArchitectLandscapeBar extends StatelessWidget {
         ),
       ],
     ];
+  }
+
+  Future<void> _promptDatumDialog(
+    BuildContext context,
+    AppLocalizations l,
+  ) async {
+    final textController = TextEditingController(
+      text: controller.terrainDatumElevation.toStringAsFixed(2),
+    );
+    final res = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.architectTerrainDatumDialogTitle),
+        content: TextField(
+          controller: textController,
+          keyboardType: const TextInputType.numberWithOptions(
+            decimal: true,
+            signed: true,
+          ),
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: l.architectTerrainDatum,
+            suffixText: 'm',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final val = double.tryParse(
+                textController.text.replaceAll(',', '.'),
+              );
+              Navigator.pop(ctx, val);
+            },
+            child: Text(l.ok),
+          ),
+        ],
+      ),
+    );
+    if (res != null) {
+      controller.terrainDatumElevation = res;
+      if (controller.contourAbsoluteElevation != 0.0) {
+        controller.terrainElevation =
+            controller.contourAbsoluteElevation - res;
+      } else {
+        controller.contourAbsoluteElevation =
+            controller.terrainElevation + res;
+      }
+      onChanged();
+    }
+  }
+
+  Future<void> _promptAbsoluteElevationDialog(
+    BuildContext context,
+    AppLocalizations l,
+  ) async {
+    final textController = TextEditingController(
+      text: controller.contourAbsoluteElevation.toStringAsFixed(2),
+    );
+    final res = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.architectTerrainAbsoluteElevation),
+        content: TextField(
+          controller: textController,
+          keyboardType: const TextInputType.numberWithOptions(
+            decimal: true,
+            signed: true,
+          ),
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: l.architectTerrainAbsoluteElevation,
+            suffixText: 'm',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final val = double.tryParse(
+                textController.text.replaceAll(',', '.'),
+              );
+              Navigator.pop(ctx, val);
+            },
+            child: Text(l.ok),
+          ),
+        ],
+      ),
+    );
+    if (res != null) {
+      controller.contourAbsoluteElevation = res;
+      controller.terrainElevation = res - controller.terrainDatumElevation;
+      onChanged();
+    }
   }
 
   List<Widget> _buildPathwayControls(
@@ -543,6 +723,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
     required String label,
     required VoidCallback onDec,
     required VoidCallback onInc,
+    VoidCallback? onTapLabel,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -562,13 +743,17 @@ class ArchitectLandscapeBar extends StatelessWidget {
               child: Icon(Icons.remove_rounded, size: 15),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
+          InkWell(
+            onTap: onTapLabel,
+            borderRadius: BorderRadius.circular(4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -601,6 +786,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
     ArchitectTerrainDraftMode mode,
   ) => switch (mode) {
     ArchitectTerrainDraftMode.boundary => l.architectTerrainModeBoundary,
+    ArchitectTerrainDraftMode.hole => l.architectTerrainModeHole,
     ArchitectTerrainDraftMode.contour => l.architectTerrainModeContour,
     ArchitectTerrainDraftMode.spot => l.architectTerrainModeSpot,
     ArchitectTerrainDraftMode.pad => l.architectTerrainModePad,
@@ -639,6 +825,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
     ArchitectPlantSpecies.ornamentalPalm => l.architectPlantOrnamentalPalm,
     ArchitectPlantSpecies.shrubCluster => l.architectPlantShrubCluster,
     ArchitectPlantSpecies.trimmedHedge => l.architectPlantTrimmedHedge,
+    ArchitectPlantSpecies.artisticLowPoly => l.architectPlantArtisticLowPoly,
   };
 
   static String _fencePresetLabel(

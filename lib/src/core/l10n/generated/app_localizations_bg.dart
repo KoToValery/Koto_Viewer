@@ -12517,4 +12517,33 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectLayerVegetation => 'Озеленяване и огради';
+
+  @override
+  String get architectToolContour => 'Хоризонтали';
+
+  @override
+  String get architectTerrainModeHole => 'Отвор';
+
+  @override
+  String get architectTerrainDatum => 'Кота ±0.00';
+
+  @override
+  String get architectTerrainDatumDialogTitle =>
+      'Абсолютна геодезическа кота за кота ±0.00';
+
+  @override
+  String get architectTerrainAbsoluteElevation => 'Абсолютна кота';
+
+  @override
+  String get architectTerrainRelativeElevation => 'Относителна кота';
+
+  @override
+  String get architectPlantArtisticLowPoly =>
+      'Артистично нискополигонално дърво';
+
+  @override
+  String get architectTerrainContourMajor => 'Главен хоризонтал';
+
+  @override
+  String get architectTerrainContourClosed => 'Затворен контур';
 }

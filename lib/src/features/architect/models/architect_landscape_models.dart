@@ -25,25 +25,28 @@ enum ArchitectTerrainState {
 /// Sub-mode when drafting or editing terrain in 2D Plan.
 enum ArchitectTerrainDraftMode {
   boundary,
+  hole,
   contour,
   spot,
   pad;
 
   String label(AppLocalizations l) => switch (this) {
     boundary => l.architectTerrainModeBoundary,
+    hole => l.architectTerrainModeHole,
     contour => l.architectTerrainModeContour,
     spot => l.architectTerrainModeSpot,
     pad => l.architectTerrainModePad,
   };
 }
 
-/// Closed boundary or flat grading pad polygon in a 2.5D terrain surface.
+/// Closed boundary, cutout hole, or flat grading pad polygon in a 2.5D terrain surface.
 class ArchitectTerrainBoundary {
   final String id;
   final List<Offset> polygon;
   final double elevation;
   final List<double>? vertexElevations;
   final bool isFlatPad;
+  final bool isHole;
 
   const ArchitectTerrainBoundary({
     required this.id,
@@ -52,9 +55,10 @@ class ArchitectTerrainBoundary {
     this.vertexElevations,
     bool isFlatPad = false,
     bool? isCutoutPad,
+    this.isHole = false,
   }) : isFlatPad = isCutoutPad ?? isFlatPad;
 
-  bool get isCutoutPad => isFlatPad;
+  bool get isCutoutPad => isHole || isFlatPad;
 
   double vertexElevationAt(int index) {
     if (vertexElevations != null &&
@@ -101,12 +105,14 @@ class ArchitectTerrainBoundary {
     double? elevation,
     List<double>? vertexElevations,
     bool? isFlatPad,
+    bool? isHole,
   }) => ArchitectTerrainBoundary(
     id: id ?? this.id,
     polygon: polygon ?? this.polygon,
     elevation: elevation ?? this.elevation,
     vertexElevations: vertexElevations ?? this.vertexElevations,
     isFlatPad: isFlatPad ?? this.isFlatPad,
+    isHole: isHole ?? this.isHole,
   );
 
   Map<String, dynamic> toJson() => {
@@ -117,6 +123,7 @@ class ArchitectTerrainBoundary {
     'elevation': elevation,
     if (vertexElevations != null) 'vertexElevations': vertexElevations,
     if (isFlatPad) 'isFlatPad': true,
+    if (isHole) 'isHole': true,
   };
 
   factory ArchitectTerrainBoundary.fromJson(Map<String, dynamic> json) =>
@@ -135,6 +142,7 @@ class ArchitectTerrainBoundary {
             ?.map((e) => (e as num).toDouble())
             .toList(),
         isFlatPad: json['isFlatPad'] == true,
+        isHole: json['isHole'] == true,
       );
 }
 
@@ -143,6 +151,7 @@ class ArchitectTerrainContour {
   final String id;
   final List<Offset> points;
   final double elevation;
+  final double? rawAbsoluteElevation;
   final bool closed;
   final bool isMajor;
 
@@ -150,20 +159,29 @@ class ArchitectTerrainContour {
     required this.id,
     required this.points,
     required this.elevation,
+    this.rawAbsoluteElevation,
     this.closed = false,
     this.isMajor = false,
   });
+
+  double effectiveAbsolute(double datum) =>
+      rawAbsoluteElevation ?? (elevation + datum);
+
+  double effectiveRelative(double datum) =>
+      rawAbsoluteElevation != null ? (rawAbsoluteElevation! - datum) : elevation;
 
   ArchitectTerrainContour copyWith({
     String? id,
     List<Offset>? points,
     double? elevation,
+    double? rawAbsoluteElevation,
     bool? closed,
     bool? isMajor,
   }) => ArchitectTerrainContour(
     id: id ?? this.id,
     points: points ?? this.points,
     elevation: elevation ?? this.elevation,
+    rawAbsoluteElevation: rawAbsoluteElevation ?? this.rawAbsoluteElevation,
     closed: closed ?? this.closed,
     isMajor: isMajor ?? this.isMajor,
   );
@@ -174,6 +192,8 @@ class ArchitectTerrainContour {
       for (final p in points) {'x': p.dx, 'y': p.dy},
     ],
     'elevation': elevation,
+    if (rawAbsoluteElevation != null)
+      'rawAbsoluteElevation': rawAbsoluteElevation,
     if (closed) 'closed': true,
     if (isMajor) 'isMajor': true,
   };
@@ -190,6 +210,8 @@ class ArchitectTerrainContour {
               ),
         ],
         elevation: (json['elevation'] as num?)?.toDouble() ?? 0.0,
+        rawAbsoluteElevation:
+            (json['rawAbsoluteElevation'] as num?)?.toDouble(),
         closed: json['closed'] == true,
         isMajor: json['isMajor'] == true,
       );
@@ -200,27 +222,39 @@ class ArchitectTerrainSpot {
   final String id;
   final Offset position;
   final double elevation;
+  final double? rawAbsoluteElevation;
 
   const ArchitectTerrainSpot({
     required this.id,
     required this.position,
     required this.elevation,
+    this.rawAbsoluteElevation,
   });
+
+  double effectiveAbsolute(double datum) =>
+      rawAbsoluteElevation ?? (elevation + datum);
+
+  double effectiveRelative(double datum) =>
+      rawAbsoluteElevation != null ? (rawAbsoluteElevation! - datum) : elevation;
 
   ArchitectTerrainSpot copyWith({
     String? id,
     Offset? position,
     double? elevation,
+    double? rawAbsoluteElevation,
   }) => ArchitectTerrainSpot(
     id: id ?? this.id,
     position: position ?? this.position,
     elevation: elevation ?? this.elevation,
+    rawAbsoluteElevation: rawAbsoluteElevation ?? this.rawAbsoluteElevation,
   );
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'position': {'x': position.dx, 'y': position.dy},
     'elevation': elevation,
+    if (rawAbsoluteElevation != null)
+      'rawAbsoluteElevation': rawAbsoluteElevation,
   };
 
   factory ArchitectTerrainSpot.fromJson(Map<String, dynamic> json) {
@@ -234,6 +268,8 @@ class ArchitectTerrainSpot {
             )
           : Offset.zero,
       elevation: (json['elevation'] as num?)?.toDouble() ?? 0.0,
+      rawAbsoluteElevation:
+          (json['rawAbsoluteElevation'] as num?)?.toDouble(),
     );
   }
 }
@@ -246,6 +282,7 @@ class ArchitectTerrainSpot {
 class ArchitectTerrainSurface {
   final String id;
   final ArchitectTerrainState state;
+  final double datumElevation;
   final List<ArchitectTerrainBoundary> boundaries;
   final List<ArchitectTerrainContour> contours;
   final List<ArchitectTerrainSpot> spots;
@@ -253,10 +290,14 @@ class ArchitectTerrainSurface {
   const ArchitectTerrainSurface({
     this.id = 'terrain_surface',
     this.state = ArchitectTerrainState.existing,
+    this.datumElevation = 0.0,
     this.boundaries = const [],
     this.contours = const [],
     this.spots = const [],
   });
+
+  double toRelativeElevation(double absZ) => absZ - datumElevation;
+  double toAbsoluteElevation(double relZ) => relZ + datumElevation;
 
   bool get isEmpty =>
       boundaries.isEmpty && contours.isEmpty && spots.isEmpty;
@@ -315,6 +356,7 @@ class ArchitectTerrainSurface {
           ? 'terrain_existing'
           : 'terrain_proposed',
       state: state,
+      datumElevation: datumZ,
       contours: [
         for (final c in survey.contours)
           if (c.points.length >= 2)
@@ -322,6 +364,7 @@ class ArchitectTerrainSurface {
               id: 'terr_${c.id}',
               points: c.points,
               elevation: double.parse((c.elevation - datumZ).toStringAsFixed(3)),
+              rawAbsoluteElevation: c.elevation,
               closed: c.closed,
               isMajor: c.isMajor,
             ),
@@ -332,6 +375,7 @@ class ArchitectTerrainSurface {
             id: 'terr_${p.id}',
             position: p.position,
             elevation: double.parse((p.elevation - datumZ).toStringAsFixed(3)),
+            rawAbsoluteElevation: p.elevation,
           ),
       ],
     );
@@ -347,6 +391,13 @@ class ArchitectTerrainSurface {
         ? ArchitectTerrainSurface.fromGeodeticSurvey(fallbackSurvey)
         : this;
     if (effective.isEmpty) return null;
+
+    // 0. Check cutout holes first: point is in an excavation hole
+    for (final hole in effective.boundaries.reversed) {
+      if (hole.isHole && hole.containsPoint(point)) {
+        return null;
+      }
+    }
 
     // 1. Check flat grading pads first (highest priority override)
     for (final pad in effective.boundaries.reversed) {
@@ -468,15 +519,37 @@ class ArchitectTerrainSurface {
       }
     }
 
-    // Add exact boundary stations of excluded building intervals
-    for (final iv in excludedIntervals) {
+    // Collect combined excluded intervals: explicit building footprint + terrain cutout holes
+    final combinedExcluded = <(double, double)>[...excludedIntervals];
+    for (final b in effective.boundaries) {
+      if (b.isHole && b.polygon.length >= 3) {
+        final hitStations = <double>[];
+        for (var i = 0; i < b.polygon.length; i++) {
+          final hit = _raySegmentIntersectionStation(
+            start,
+            dir,
+            totalLen,
+            b.polygon[i],
+            b.polygon[(i + 1) % b.polygon.length],
+          );
+          if (hit != null) hitStations.add(hit);
+        }
+        if (hitStations.length >= 2) {
+          hitStations.sort();
+          combinedExcluded.add((hitStations.first, hitStations.last));
+        }
+      }
+    }
+
+    // Add exact boundary stations of excluded intervals
+    for (final iv in combinedExcluded) {
       if (iv.$1 > 0.0 && iv.$1 < totalLen) stations.add(iv.$1);
       if (iv.$2 > 0.0 && iv.$2 < totalLen) stations.add(iv.$2);
     }
 
-    // Compute allowed intervals [a, b] after subtracting excludedIntervals
+    // Compute allowed intervals [a, b] after subtracting combinedExcluded
     var allowed = <(double, double)>[(0.0, totalLen)];
-    for (final cut in excludedIntervals) {
+    for (final cut in combinedExcluded) {
       final c0 = math.max(0.0, cut.$1);
       final c1 = math.min(totalLen, cut.$2);
       if (c1 <= c0 + 1e-4) continue;
@@ -505,7 +578,12 @@ class ArchitectTerrainSurface {
             (clampedS + stationShift - pts.last.dx).abs() < 1e-4) {
           continue;
         }
-        final worldPt = start + dir * clampedS;
+        final evalS = (clampedS >= span.$2 - 1e-5 && span.$2 > span.$1)
+            ? (span.$2 - 1e-4)
+            : ((clampedS <= span.$1 + 1e-5 && span.$1 < span.$2)
+                ? (span.$1 + 1e-4)
+                : clampedS);
+        final worldPt = start + dir * evalS;
         final z = effective.evaluateElevationAt(worldPt);
         if (z != null) {
           pts.add(Offset(clampedS + stationShift, z));
@@ -552,12 +630,14 @@ class ArchitectTerrainSurface {
   ArchitectTerrainSurface copyWith({
     String? id,
     ArchitectTerrainState? state,
+    double? datumElevation,
     List<ArchitectTerrainBoundary>? boundaries,
     List<ArchitectTerrainContour>? contours,
     List<ArchitectTerrainSpot>? spots,
   }) => ArchitectTerrainSurface(
     id: id ?? this.id,
     state: state ?? this.state,
+    datumElevation: datumElevation ?? this.datumElevation,
     boundaries: boundaries ?? this.boundaries,
     contours: contours ?? this.contours,
     spots: spots ?? this.spots,
@@ -566,6 +646,7 @@ class ArchitectTerrainSurface {
   Map<String, dynamic> toJson() => {
     'id': id,
     'state': state.name,
+    if (datumElevation.abs() > 1e-4) 'datumElevation': datumElevation,
     if (boundaries.isNotEmpty)
       'boundaries': boundaries.map((b) => b.toJson()).toList(),
     if (contours.isNotEmpty)
@@ -580,6 +661,7 @@ class ArchitectTerrainSurface {
           (s) => s.name == json['state'],
           orElse: () => ArchitectTerrainState.existing,
         ),
+        datumElevation: (json['datumElevation'] as num?)?.toDouble() ?? 0.0,
         boundaries: [
           for (final b in json['boundaries'] as List? ?? const [])
             if (b is Map)
@@ -862,7 +944,8 @@ enum ArchitectPlantSpecies {
   columnarCypress,
   ornamentalPalm,
   shrubCluster,
-  trimmedHedge;
+  trimmedHedge,
+  artisticLowPoly;
 
   String label(AppLocalizations l) => switch (this) {
     deciduousCanopy => l.architectPlantDeciduousCanopy,
@@ -872,6 +955,7 @@ enum ArchitectPlantSpecies {
     ornamentalPalm => l.architectPlantOrnamentalPalm,
     shrubCluster => l.architectPlantShrubCluster,
     trimmedHedge => l.architectPlantTrimmedHedge,
+    artisticLowPoly => l.architectPlantArtisticLowPoly,
   };
 
   double get defaultCrownDiameter => switch (this) {
@@ -882,6 +966,7 @@ enum ArchitectPlantSpecies {
     ornamentalPalm => 2.60,
     shrubCluster => 1.40,
     trimmedHedge => 0.55,
+    artisticLowPoly => 3.80,
   };
 
   double get defaultHeight => switch (this) {
@@ -892,6 +977,7 @@ enum ArchitectPlantSpecies {
     ornamentalPalm => 4.50,
     shrubCluster => 1.10,
     trimmedHedge => 1.40,
+    artisticLowPoly => 5.60,
   };
 }
 

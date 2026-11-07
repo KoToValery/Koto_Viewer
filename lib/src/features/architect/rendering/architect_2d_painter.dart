@@ -111,12 +111,14 @@ enum ArchitectTool {
   cadUnderlay,
   rasterUnderlay,
   terrain,
+  contour,
   pathway,
   vegetation,
   siteFence;
 
   bool get isLandscapeTool =>
       this == terrain ||
+      this == contour ||
       this == pathway ||
       this == vegetation ||
       this == siteFence;
