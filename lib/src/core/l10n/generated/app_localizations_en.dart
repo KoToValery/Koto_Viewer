@@ -12290,6 +12290,76 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectRasterImportPdfButton => 'Import Page';
 
   @override
+  String get architectUnderlayContextMenu => 'Underlay Options';
+
+  @override
+  String get architectUnderlayEdit => 'Edit Properties';
+
+  @override
+  String get architectUnderlayScale => 'Scale & Units';
+
+  @override
+  String get architectUnderlayMask => 'Mask / Crop';
+
+  @override
+  String get architectUnderlayMaskRect => 'Rectangular Mask';
+
+  @override
+  String get architectUnderlayMaskPolygon => 'Polygonal Mask';
+
+  @override
+  String get architectUnderlayMaskClear => 'Clear Mask';
+
+  @override
+  String get architectUnderlayMaskToggle => 'Toggle Mask';
+
+  @override
+  String get architectUnderlayMaskRectPrompt =>
+      'Drag across the underlay to define the rectangular crop area';
+
+  @override
+  String get architectUnderlayMaskPolyPrompt =>
+      'Click points to define crop boundary polygon. Tap Finish to close.';
+
+  @override
+  String get architectUnderlayMaskFinish => 'Finish Mask';
+
+  @override
+  String get architectUnderlayMaskCancel => 'Cancel Mask';
+
+  @override
+  String get architectUnderlayCadScaleTitle => 'CAD Underlay Scale & Units';
+
+  @override
+  String get architectUnderlayCadScaleUnitsLabel => 'Drawing units per meter';
+
+  @override
+  String get architectUnderlayCadScaleMeters => 'Meters (1 unit = 1 m)';
+
+  @override
+  String get architectUnderlayCadScaleMm => 'Millimeters (1000 units = 1 m)';
+
+  @override
+  String get architectUnderlayCadScaleCm => 'Centimeters (100 units = 1 m)';
+
+  @override
+  String get architectUnderlayCadScaleInches => 'Inches (39.37 units = 1 m)';
+
+  @override
+  String get architectUnderlayCadScaleCustom => 'Custom Scale Ratio';
+
+  @override
+  String get architectUnderlayCadScale2Pt => '2-Point CAD Calibrate';
+
+  @override
+  String get architectUnderlayEditDialogTitle => 'Underlay Settings';
+
+  @override
+  String architectUnderlayLoadError(String error) {
+    return 'Could not load underlay: $error';
+  }
+
+  @override
   String get commandIconPathway => 'Pathway with curb';
 
   @override

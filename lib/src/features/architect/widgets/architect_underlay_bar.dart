@@ -21,6 +21,9 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
   final VoidCallback onExtractContours;
   final VoidCallback onApplyToTerrain;
   final VoidCallback onRemoveUnderlay;
+  final VoidCallback? onOpenScale;
+  final void Function(Offset globalPosition)? onOpenMaskMenu;
+  final void Function(Offset globalPosition)? onOpenContextMenu;
 
   const ArchitectCadUnderlayBar({
     super.key,
@@ -37,6 +40,9 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
     required this.onExtractContours,
     required this.onApplyToTerrain,
     required this.onRemoveUnderlay,
+    this.onOpenScale,
+    this.onOpenMaskMenu,
+    this.onOpenContextMenu,
   });
 
   @override
@@ -70,15 +76,23 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
                 const SizedBox(width: 10),
               ],
               if (cfg == null) ...[
-                Text(
-                  l.architectCadUnderlayEmptyHint,
-                  style: const TextStyle(color: Colors.white70, fontSize: 12.5),
-                ),
-                const SizedBox(width: 12),
                 FilledButton.icon(
                   onPressed: isBusy ? null : onImportCad,
                   icon: const AppIcon(AppIconId.openFile, size: 16),
                   label: Text(l.architectCadUnderlayImport),
+                ),
+                const SizedBox(width: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 380),
+                  child: Text(
+                    l.architectCadUnderlayEmptyHint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12.5,
+                    ),
+                  ),
                 ),
               ] else ...[
                 Container(
@@ -212,6 +226,61 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(width: 6),
+                OutlinedButton.icon(
+                  onPressed: isBusy ? null : onOpenScale,
+                  icon: const AppIcon(AppIconId.measure, size: 15),
+                  label: Text(l.architectUnderlayScale),
+                ),
+                const SizedBox(width: 6),
+                Builder(
+                  builder: (btnCtx) => OutlinedButton.icon(
+                    onPressed: isBusy
+                        ? null
+                        : () {
+                            final box =
+                                btnCtx.findRenderObject() as RenderBox?;
+                            final pos = box?.localToGlobal(
+                                  Offset(0, box.size.height),
+                                ) ??
+                                Offset.zero;
+                            onOpenMaskMenu?.call(pos);
+                          },
+                    icon: AppIcon(
+                      cfg.hasActiveMask ? AppIconId.crop : AppIconId.cutOpening,
+                      size: 15,
+                      color:
+                          cfg.hasActiveMask ? const Color(0xFF00E5FF) : null,
+                    ),
+                    label: Text(
+                      cfg.hasActiveMask
+                          ? '${l.architectUnderlayMask} ●'
+                          : l.architectUnderlayMask,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Builder(
+                  builder: (btnCtx) => IconButton(
+                    tooltip: l.architectUnderlayContextMenu,
+                    onPressed: isBusy
+                        ? null
+                        : () {
+                            final box =
+                                btnCtx.findRenderObject() as RenderBox?;
+                            final pos = box?.localToGlobal(
+                                  Offset(0, box.size.height),
+                                ) ??
+                                Offset.zero;
+                            onOpenContextMenu?.call(pos);
+                          },
+                    icon: const AppIcon(
+                      AppIconId.moreVertical,
+                      size: 18,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
                 IconButton(
                   tooltip: l.architectCadUnderlayRemove,
                   onPressed: isBusy ? null : onRemoveUnderlay,
@@ -246,6 +315,9 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
   final VoidCallback onRotateCw;
   final VoidCallback onResetTransform;
   final VoidCallback onDeleteRaster;
+  final VoidCallback? onOpenScale;
+  final void Function(Offset globalPosition)? onOpenMaskMenu;
+  final void Function(Offset globalPosition)? onOpenContextMenu;
 
   const ArchitectRasterUnderlayBar({
     super.key,
@@ -263,6 +335,9 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
     required this.onRotateCw,
     required this.onResetTransform,
     required this.onDeleteRaster,
+    this.onOpenScale,
+    this.onOpenMaskMenu,
+    this.onOpenContextMenu,
   });
 
   @override
@@ -329,11 +404,16 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
                 ),
                 if (underlays.isEmpty) ...[
                   const SizedBox(width: 10),
-                  Text(
-                    l.architectRasterUnderlayEmptyHint,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12.5,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 380),
+                    child: Text(
+                      l.architectRasterUnderlayEmptyHint,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12.5,
+                      ),
                     ),
                   ),
                 ],
@@ -412,6 +492,58 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
                   TextButton(
                     onPressed: sel.locked ? null : onResetTransform,
                     child: Text(l.architectRasterResetTransform),
+                  ),
+                  const SizedBox(width: 4),
+                  Builder(
+                    builder: (btnCtx) => OutlinedButton.icon(
+                      onPressed: isBusy
+                          ? null
+                          : () {
+                              final box =
+                                  btnCtx.findRenderObject() as RenderBox?;
+                              final pos = box?.localToGlobal(
+                                    Offset(0, box.size.height),
+                                  ) ??
+                                  Offset.zero;
+                              onOpenMaskMenu?.call(pos);
+                            },
+                      icon: AppIcon(
+                        sel.hasActiveMask
+                            ? AppIconId.crop
+                            : AppIconId.cutOpening,
+                        size: 15,
+                        color: sel.hasActiveMask
+                            ? const Color(0xFF00E5FF)
+                            : null,
+                      ),
+                      label: Text(
+                        sel.hasActiveMask
+                            ? '${l.architectUnderlayMask} ●'
+                            : l.architectUnderlayMask,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Builder(
+                    builder: (btnCtx) => IconButton(
+                      tooltip: l.architectUnderlayContextMenu,
+                      onPressed: isBusy
+                          ? null
+                          : () {
+                              final box =
+                                  btnCtx.findRenderObject() as RenderBox?;
+                              final pos = box?.localToGlobal(
+                                    Offset(0, box.size.height),
+                                  ) ??
+                                  Offset.zero;
+                              onOpenContextMenu?.call(pos);
+                            },
+                      icon: const AppIcon(
+                        AppIconId.moreVertical,
+                        size: 18,
+                        color: Colors.white70,
+                      ),
+                    ),
                   ),
                   IconButton(
                     tooltip: l.delete,
@@ -594,6 +726,476 @@ Future<int?> showArchitectPdfPagePickerDialog({
           FilledButton(
             onPressed: () => Navigator.of(dialogCtx).pop(selectedPage),
             child: Text(l.architectRasterImportPdfButton),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Displays the primary underlay context menu with Edit, Scale, Mask, and Remove.
+Future<String?> showArchitectUnderlayContextMenu({
+  required BuildContext context,
+  required Offset globalPosition,
+  required bool isCad,
+  required bool hasMask,
+  required bool maskEnabled,
+}) {
+  final l = context.l10n;
+  return showMenu<String>(
+    context: context,
+    position: RelativeRect.fromLTRB(
+      globalPosition.dx,
+      globalPosition.dy,
+      globalPosition.dx,
+      globalPosition.dy,
+    ),
+    items: [
+      PopupMenuItem(
+        value: 'edit',
+        child: Row(
+          children: [
+            const AppIcon(
+              AppIconId.properties,
+              size: 18,
+              color: Color(0xFFB388FF),
+            ),
+            const SizedBox(width: 8),
+            Text(l.architectUnderlayEdit),
+          ],
+        ),
+      ),
+      PopupMenuItem(
+        value: 'scale',
+        child: Row(
+          children: [
+            const AppIcon(
+              AppIconId.measure,
+              size: 18,
+              color: Color(0xFF4FC3F7),
+            ),
+            const SizedBox(width: 8),
+            Text(l.architectUnderlayScale),
+          ],
+        ),
+      ),
+      PopupMenuItem(
+        value: 'mask',
+        child: Row(
+          children: [
+            const AppIcon(
+              AppIconId.crop,
+              size: 18,
+              color: Color(0xFF00E5FF),
+            ),
+            const SizedBox(width: 8),
+            Text(l.architectUnderlayMask),
+          ],
+        ),
+      ),
+      const PopupMenuDivider(),
+      PopupMenuItem(
+        value: 'remove',
+        child: Row(
+          children: [
+            const AppIcon(
+              AppIconId.delete,
+              size: 18,
+              color: Colors.redAccent,
+            ),
+            const SizedBox(width: 8),
+            Text(l.delete),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+/// Displays submenu for mask options: Rectangular, Polygonal, Toggle, Clear
+Future<String?> showArchitectUnderlayMaskMenu({
+  required BuildContext context,
+  required Offset globalPosition,
+  required bool hasMask,
+  required bool maskEnabled,
+}) {
+  final l = context.l10n;
+  return showMenu<String>(
+    context: context,
+    position: RelativeRect.fromLTRB(
+      globalPosition.dx,
+      globalPosition.dy,
+      globalPosition.dx,
+      globalPosition.dy,
+    ),
+    items: [
+      PopupMenuItem(
+        value: 'mask_rect',
+        child: Row(
+          children: [
+            const AppIcon(
+              AppIconId.crop,
+              size: 18,
+              color: Color(0xFF00E5FF),
+            ),
+            const SizedBox(width: 8),
+            Text(l.architectUnderlayMaskRect),
+          ],
+        ),
+      ),
+      PopupMenuItem(
+        value: 'mask_polygon',
+        child: Row(
+          children: [
+            const AppIcon(
+              AppIconId.spline,
+              size: 18,
+              color: Color(0xFF38BDF8),
+            ),
+            const SizedBox(width: 8),
+            Text(l.architectUnderlayMaskPolygon),
+          ],
+        ),
+      ),
+      if (hasMask) ...[
+        PopupMenuItem(
+          value: 'mask_toggle',
+          child: Row(
+            children: [
+              AppIcon(
+                maskEnabled ? AppIconId.hidden : AppIconId.visible,
+                size: 18,
+                color: Colors.amberAccent,
+              ),
+              const SizedBox(width: 8),
+              Text(l.architectUnderlayMaskToggle),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'mask_clear',
+          child: Row(
+            children: [
+              const AppIcon(
+                AppIconId.delete,
+                size: 18,
+                color: Colors.redAccent,
+              ),
+              const SizedBox(width: 8),
+              Text(l.architectUnderlayMaskClear),
+            ],
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+/// Dialog allowing user to switch CAD units per meter (meters, mm, cm, inches, custom)
+/// or trigger 2-point CAD calibration.
+Future<double?> showArchitectCadScaleDialog({
+  required BuildContext context,
+  required double currentUnitsPerMeter,
+}) {
+  final l = context.l10n;
+  var selectedUnits = currentUnitsPerMeter;
+  final customController = TextEditingController(
+    text: currentUnitsPerMeter.toStringAsFixed(2),
+  );
+  var isCustom = (currentUnitsPerMeter - 1.0).abs() > 0.001 &&
+      (currentUnitsPerMeter - 1000.0).abs() > 0.001 &&
+      (currentUnitsPerMeter - 100.0).abs() > 0.001 &&
+      (currentUnitsPerMeter - 39.37).abs() > 0.05;
+
+  return showDialog<double>(
+    context: context,
+    builder: (dialogCtx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        title: Row(
+          children: [
+            const AppIcon(
+              AppIconId.measure,
+              size: 20,
+              color: Color(0xFF4FC3F7),
+            ),
+            const SizedBox(width: 8),
+            Text(l.architectUnderlayCadScaleTitle),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l.architectUnderlayCadScaleUnitsLabel,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 6),
+              RadioListTile<double>(
+                dense: true,
+                value: 1.0,
+                groupValue: isCustom ? null : selectedUnits,
+                title: Text(l.architectUnderlayCadScaleMeters),
+                onChanged: (v) {
+                  setDialogState(() {
+                    selectedUnits = v!;
+                    isCustom = false;
+                  });
+                },
+              ),
+              RadioListTile<double>(
+                dense: true,
+                value: 1000.0,
+                groupValue: isCustom ? null : selectedUnits,
+                title: Text(l.architectUnderlayCadScaleMm),
+                onChanged: (v) {
+                  setDialogState(() {
+                    selectedUnits = v!;
+                    isCustom = false;
+                  });
+                },
+              ),
+              RadioListTile<double>(
+                dense: true,
+                value: 100.0,
+                groupValue: isCustom ? null : selectedUnits,
+                title: Text(l.architectUnderlayCadScaleCm),
+                onChanged: (v) {
+                  setDialogState(() {
+                    selectedUnits = v!;
+                    isCustom = false;
+                  });
+                },
+              ),
+              RadioListTile<double>(
+                dense: true,
+                value: 39.37,
+                groupValue: isCustom ? null : selectedUnits,
+                title: Text(l.architectUnderlayCadScaleInches),
+                onChanged: (v) {
+                  setDialogState(() {
+                    selectedUnits = v!;
+                    isCustom = false;
+                  });
+                },
+              ),
+              RadioListTile<bool>(
+                dense: true,
+                value: true,
+                groupValue: isCustom,
+                title: Text(l.architectUnderlayCadScaleCustom),
+                onChanged: (_) {
+                  setDialogState(() => isCustom = true);
+                },
+              ),
+              if (isCustom)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: customController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Units per Meter',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (isCustom) {
+                final raw = customController.text.trim().replaceAll(',', '.');
+                final val = double.tryParse(raw);
+                if (val != null && val > 0.00001) {
+                  Navigator.of(dialogCtx).pop(val);
+                }
+              } else {
+                Navigator.of(dialogCtx).pop(selectedUnits);
+              }
+            },
+            child: Text(l.applyAction),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Modal dialog for editing underlay properties (opacity, rotation, lock, remove).
+Future<void> showArchitectUnderlayEditDialog({
+  required BuildContext context,
+  required String title,
+  required double initialOpacity,
+  required ValueChanged<double> onOpacityChanged,
+  VoidCallback? onOpenLayers,
+  bool? isAutoReload,
+  ValueChanged<bool>? onToggleAutoReload,
+  bool? isLockOrigin,
+  ValueChanged<bool>? onToggleLockOrigin,
+  bool? isLocked,
+  VoidCallback? onToggleLock,
+  VoidCallback? onRotateCcw,
+  VoidCallback? onRotateCw,
+  VoidCallback? onRemove,
+}) {
+  final l = context.l10n;
+  var opacity = initialOpacity;
+
+  return showDialog<void>(
+    context: context,
+    builder: (dialogCtx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        title: Row(
+          children: [
+            const AppIcon(
+              AppIconId.properties,
+              size: 20,
+              color: Color(0xFFB388FF),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${l.architectRasterOpacityLabel}: ${(opacity * 100).round()}%',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+              Slider(
+                value: opacity.clamp(0.05, 1.0),
+                min: 0.05,
+                max: 1.0,
+                onChanged: (v) {
+                  setDialogState(() => opacity = v);
+                  onOpacityChanged(v);
+                },
+              ),
+              const Divider(height: 24),
+              if (onOpenLayers != null) ...[
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(dialogCtx).pop();
+                    onOpenLayers();
+                  },
+                  icon: const AppIcon(AppIconId.layers, size: 16),
+                  label: Text(l.architectCadUnderlayLayersFilter),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (isAutoReload != null && onToggleAutoReload != null) ...[
+                SwitchListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l.architectCadUnderlayAutoReload),
+                  subtitle: Text(l.architectCadUnderlayAutoReloadTooltip),
+                  value: isAutoReload,
+                  onChanged: (v) {
+                    onToggleAutoReload(v);
+                    Navigator.of(dialogCtx).pop();
+                  },
+                ),
+              ],
+              if (isLockOrigin != null && onToggleLockOrigin != null) ...[
+                SwitchListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l.architectCadUnderlayOriginLocked),
+                  subtitle: Text(l.architectCadUnderlayOriginLockedTooltip),
+                  value: isLockOrigin,
+                  onChanged: (v) {
+                    onToggleLockOrigin(v);
+                    Navigator.of(dialogCtx).pop();
+                  },
+                ),
+              ],
+              if (onRotateCcw != null && onRotateCw != null) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          onRotateCcw();
+                        },
+                        icon: const AppIcon(AppIconId.rotateLeft, size: 16),
+                        label: const Text('90° CCW'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          onRotateCw();
+                        },
+                        icon: const AppIcon(AppIconId.rotate, size: 16),
+                        label: const Text('90° CW'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (isLocked != null && onToggleLock != null) ...[
+                SwitchListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    isLocked
+                        ? l.architectRasterLockPosition
+                        : l.architectRasterUnlockPosition,
+                  ),
+                  value: isLocked,
+                  onChanged: (_) {
+                    onToggleLock();
+                    Navigator.of(dialogCtx).pop();
+                  },
+                ),
+              ],
+              if (onRemove != null) ...[
+                const Divider(height: 24),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.redAccent.shade700,
+                  ),
+                  onPressed: () {
+                    Navigator.of(dialogCtx).pop();
+                    onRemove();
+                  },
+                  icon: const AppIcon(AppIconId.delete, size: 16),
+                  label: Text(l.delete),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text(l.close),
           ),
         ],
       ),

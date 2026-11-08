@@ -72,8 +72,8 @@
 | **spline** | L7025, L10310, L13000 | `_commitSpline` | Spline HUD bar, Catmull-Rom Bezier preview |
 | **cadEllipse** | L7735, L10212, L14100 | `_commitCadEllipse` | Ellipse HUD bar, line style control |
 | **roofSlope** | L7735, L10315, L14115 | `_commitRoofSlopeArrow` | Roof slope HUD bar (format chips %, °, both; reverse arrow) |
-| **cadUnderlay** | L3890, L30506 | `_importOrReplaceCadUnderlay`, `_loadExternalCadFileForStorey`, `_extractGeodesyFromCurrentUnderlay` | `ArchitectCadUnderlayBar`, `_openCadDxfLayersSheet` |
-| **rasterUnderlay** | L7780, L9945, L13365 | `_importRasterUnderlay`, `_handleRasterCalibrationTap`, `_updateSelectedRaster` | `ArchitectRasterUnderlayBar`, `showArchitectRasterCalibrationDialog`, `showArchitectPdfPagePickerDialog` |
+| **cadUnderlay** | L3890, L30506 | `_importOrReplaceCadUnderlay`, `_openCadContextMenu`, `_openCadMaskMenu`, `_openCadScaleDialog`, `_openCadEditDialog` | `ArchitectCadUnderlayBar`, `showArchitectUnderlayContextMenu`, `showArchitectCadScaleDialog`, `showArchitectUnderlayMaskMenu` |
+| **rasterUnderlay** | L7780, L9945, L13365 | `_importRasterUnderlay`, `_openRasterContextMenu`, `_openRasterMaskMenu`, `_openRasterScaleDialog`, `_openRasterEditDialog`, `_commitUnderlayMask` | `ArchitectRasterUnderlayBar`, `showArchitectUnderlayContextMenu`, `showArchitectRasterCalibrationDialog`, `showArchitectUnderlayMaskMenu` |
 | **wallAttach** | L11025, L12390, L23350 | _triggerWallAttach, ConnectArchitectWallsAtVertex | _buildAttachPromptBanner, quick access bar |
 | **wallDetach** | L23390, L26090 | _triggerWallDetach, _confirmWallDetach, _cancelWallDetach | _buildDetachConfirmationBanner (on-screen green checkmark) |
 | **wallOffset** | L12065, L24435, L24595 | _previewOffset, _commitOffset, dynamic distance chip | _offsetBanner with tappable distance chip & green checkmark |

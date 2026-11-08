@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import '../services/architect_underlay_service.dart';
 import '../services/architect_geodetic_detector.dart';
 import '../widgets/architect_underlay_bar.dart';
+import '../../bim_projects/services/bim_underlay_picker_helper.dart';
 import '../widgets/architect_dialog.dart';
 import '../services/architect_column_clearance.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
@@ -3880,6 +3881,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   String? _draggingRasterId;
   Offset? _rasterDragStartModel;
   Offset? _rasterDragOriginalPos;
+  bool _underlayMaskDrafting = false;
+  String _underlayMaskMode = 'rect'; // 'rect' or 'polygon'
+  bool _underlayMaskTargetIsCad = true;
+  String? _underlayMaskTargetRasterId;
+  List<Offset> _underlayMaskPoints = [];
+  Offset? _underlayMaskDraftStart;
 
   double _componentRotation = 0.0;
   bool _showFurnitureLayer = true;
@@ -3975,17 +3982,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Future<void> _importOrReplaceCadUnderlay() async {
     if (_underlayBusy) return;
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['dxf', 'dwg', 'kcad'],
-    );
-    final pickedPath = result?.files.singleOrNull?.path;
-    if (pickedPath == null || !mounted) return;
-    await _loadExternalCadFileForStorey(
-      storeyId: _project.activeStorey.id,
-      sourceFile: File(pickedPath),
-      isAutoReload: false,
-    );
+    try {
+      final file = await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
+      if (file == null || !mounted) return;
+      await _loadExternalCadFileForStorey(
+        storeyId: _project.activeStorey.id,
+        sourceFile: file,
+        isAutoReload: false,
+      );
+    } catch (e, stack) {
+      debugPrint('[ArchitectWorkspaceScreen] pickCadUnderlay error: $e\n$stack');
+      if (mounted) {
+        setState(() => _underlayBusy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.architectUnderlayLoadError(e.toString())),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadExternalCadFileForStorey({
@@ -4064,8 +4080,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('[ArchitectWorkspaceScreen] _loadExternalCadFileForStorey error: $e\n$stack');
       if (mounted) {
+        setState(() => _underlayBusy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.architectUnderlayLoadError(e.toString())),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted && _underlayBusy) {
         setState(() => _underlayBusy = false);
       }
     }
@@ -4327,32 +4354,65 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Future<void> _importRasterUnderlay() async {
     if (_underlayBusy) return;
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'pdf'],
-    );
-    final pickedPath = result?.files.singleOrNull?.path;
-    if (pickedPath == null || !mounted) return;
-
-    int selectedPage = 1;
-    final isPdf = pickedPath.toLowerCase().endsWith('.pdf');
-    if (isPdf) {
-      final pageCount = await ArchitectUnderlayService.instance.getPdfPageCount(
-        pickedPath,
-      );
-      if (!mounted) return;
-      if (pageCount > 1) {
-        final chosen = await showArchitectPdfPagePickerDialog(
-          context: context,
-          pageCount: pageCount,
-        );
-        if (chosen == null || !mounted) return;
-        selectedPage = chosen;
-      }
-    }
-
-    setState(() => _underlayBusy = true);
     try {
+      FilePickerResult? result;
+      try {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'pdf'],
+        );
+      } catch (e) {
+        debugPrint(
+          '[ArchitectWorkspaceScreen] custom FilePicker failed ($e), falling back to any',
+        );
+        result = await FilePicker.platform.pickFiles(type: FileType.any);
+      }
+      if (result == null || result.files.isEmpty || !mounted) return;
+
+      String? pickedPath = result.files.single.path;
+      if (pickedPath == null && result.files.single.bytes != null) {
+        final tempDir = await Directory.systemTemp.createTemp('koto_raster_');
+        final tempFile = File('${tempDir.path}/${result.files.single.name}');
+        await tempFile.writeAsBytes(result.files.single.bytes!);
+        pickedPath = tempFile.path;
+      }
+      if (pickedPath == null || !mounted) return;
+
+      final lowerExt = pickedPath.split('.').last.toLowerCase();
+      const validExts = {'png', 'jpg', 'jpeg', 'webp', 'bmp', 'pdf'};
+      if (!validExts.contains(lowerExt)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                context.l10n.architectUnderlayLoadError('Unsupported format: $lowerExt'),
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      int selectedPage = 1;
+      final isPdf = lowerExt == 'pdf';
+      if (isPdf) {
+        final pageCount =
+            await ArchitectUnderlayService.instance.getPdfPageCount(
+          pickedPath,
+        );
+        if (!mounted) return;
+        if (pageCount > 1) {
+          final chosen = await showArchitectPdfPagePickerDialog(
+            context: context,
+            pageCount: pageCount,
+          );
+          if (chosen == null || !mounted) return;
+          selectedPage = chosen;
+        }
+      }
+
+      setState(() => _underlayBusy = true);
       final centre = _viewport.visibleRect.center;
       final projectId = widget.bimProject?.id ?? _project.name;
       final storeyId = _project.activeStorey.id;
@@ -4382,8 +4442,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _underlayBusy = false;
       });
       _saveBiMProjectIfAttached();
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint(
+        '[ArchitectWorkspaceScreen] _importRasterUnderlay error: $e\n$stack',
+      );
       if (mounted) {
+        setState(() => _underlayBusy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.architectUnderlayLoadError(e.toString())),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted && _underlayBusy) {
         setState(() => _underlayBusy = false);
       }
     }
@@ -4471,6 +4544,261 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _rasterCalibrationP2 = null;
       });
     }
+  }
+
+  void _startUnderlayMaskDraft({
+    required bool isCad,
+    required String mode, // 'rect' or 'polygon'
+    String? rasterId,
+  }) {
+    setState(() {
+      _underlayMaskDrafting = true;
+      _underlayMaskMode = mode;
+      _underlayMaskTargetIsCad = isCad;
+      _underlayMaskTargetRasterId = rasterId;
+      _underlayMaskPoints = [];
+      _underlayMaskDraftStart = null;
+    });
+  }
+
+  void _commitUnderlayMask(List<Offset> polygon) {
+    if (polygon.length < 3) {
+      _cancelUnderlayMaskDraft();
+      return;
+    }
+    if (_underlayMaskTargetIsCad) {
+      final storeyId = _project.activeStorey.id;
+      final cfg = _project.cadUnderlays[storeyId];
+      if (cfg != null) {
+        final updated = cfg.copyWith(maskPolygon: polygon, maskEnabled: true);
+        final map = Map<String, ArchitectCadUnderlayConfig>.from(
+          _project.cadUnderlays,
+        )..[storeyId] = updated;
+        _commands.commit(_project.copyWith(cadUnderlays: map));
+        _saveBiMProjectIfAttached();
+      }
+    } else {
+      final targetId = _underlayMaskTargetRasterId ?? _selectedRasterId;
+      if (targetId != null) {
+        final updatedList = [
+          for (final r in _project.rasterUnderlays)
+            if (r.id == targetId)
+              r.copyWith(maskPolygon: polygon, maskEnabled: true)
+            else
+              r,
+        ];
+        _commands.commit(_project.copyWith(rasterUnderlays: updatedList));
+        _saveBiMProjectIfAttached();
+      }
+    }
+    setState(() {
+      _underlayMaskDrafting = false;
+      _underlayMaskDraftStart = null;
+      _underlayMaskPoints = [];
+    });
+  }
+
+  void _cancelUnderlayMaskDraft() {
+    setState(() {
+      _underlayMaskDrafting = false;
+      _underlayMaskDraftStart = null;
+      _underlayMaskPoints = [];
+    });
+  }
+
+  Future<void> _openCadContextMenu(Offset globalPosition) async {
+    final cfg = _currentCadUnderlayConfig;
+    if (cfg == null) return;
+    final action = await showArchitectUnderlayContextMenu(
+      context: context,
+      globalPosition: globalPosition,
+      isCad: true,
+      hasMask: cfg.hasActiveMask,
+      maskEnabled: cfg.maskEnabled,
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'edit':
+        _openCadEditDialog();
+      case 'scale':
+        _openCadScaleDialog();
+      case 'mask':
+        _openCadMaskMenu(globalPosition);
+      case 'remove':
+        _removeCurrentCadUnderlay();
+    }
+  }
+
+  Future<void> _openCadMaskMenu(Offset globalPosition) async {
+    final cfg = _currentCadUnderlayConfig;
+    if (cfg == null) return;
+    final action = await showArchitectUnderlayMaskMenu(
+      context: context,
+      globalPosition: globalPosition,
+      hasMask: cfg.maskPolygon != null && cfg.maskPolygon!.length >= 3,
+      maskEnabled: cfg.maskEnabled,
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'mask_rect':
+        _startUnderlayMaskDraft(isCad: true, mode: 'rect');
+      case 'mask_polygon':
+        _startUnderlayMaskDraft(isCad: true, mode: 'polygon');
+      case 'mask_toggle':
+        final updated = cfg.copyWith(maskEnabled: !cfg.maskEnabled);
+        final map = Map<String, ArchitectCadUnderlayConfig>.from(
+          _project.cadUnderlays,
+        )..[cfg.storeyId] = updated;
+        setState(() => _commands.commit(_project.copyWith(cadUnderlays: map)));
+        _saveBiMProjectIfAttached();
+      case 'mask_clear':
+        final updated = cfg.copyWith(clearMask: true, maskEnabled: false);
+        final map = Map<String, ArchitectCadUnderlayConfig>.from(
+          _project.cadUnderlays,
+        )..[cfg.storeyId] = updated;
+        setState(() => _commands.commit(_project.copyWith(cadUnderlays: map)));
+        _saveBiMProjectIfAttached();
+    }
+  }
+
+  Future<void> _openCadScaleDialog() async {
+    final cfg = _currentCadUnderlayConfig;
+    if (cfg == null) return;
+    final newScale = await showArchitectCadScaleDialog(
+      context: context,
+      currentUnitsPerMeter: cfg.unitsPerMeter ?? 1.0,
+    );
+    if (!mounted || newScale == null) return;
+    final updated = cfg.copyWith(unitsPerMeter: newScale);
+    final map = Map<String, ArchitectCadUnderlayConfig>.from(
+      _project.cadUnderlays,
+    )..[cfg.storeyId] = updated;
+    setState(() => _commands.commit(_project.copyWith(cadUnderlays: map)));
+    _saveBiMProjectIfAttached();
+  }
+
+  void _openCadEditDialog() {
+    final cfg = _currentCadUnderlayConfig;
+    if (cfg == null) return;
+    showArchitectUnderlayEditDialog(
+      context: context,
+      title: '${context.l10n.architectUnderlayEditDialogTitle}: ${cfg.fileName}',
+      initialOpacity: cfg.opacity,
+      onOpacityChanged: (val) {
+        final current = _currentCadUnderlayConfig;
+        if (current == null) return;
+        final updated = current.copyWith(opacity: val);
+        final map = Map<String, ArchitectCadUnderlayConfig>.from(
+          _project.cadUnderlays,
+        )..[current.storeyId] = updated;
+        setState(() => _commands.commit(_project.copyWith(cadUnderlays: map)));
+      },
+      onOpenLayers: _openCadDxfLayersSheet,
+      isAutoReload: cfg.autoReload,
+      onToggleAutoReload: _toggleCadAutoReload,
+      isLockOrigin: cfg.lockOrigin,
+      onToggleLockOrigin: _toggleCadOriginLock,
+      onRemove: _removeCurrentCadUnderlay,
+    );
+  }
+
+  Future<void> _openRasterContextMenu(Offset globalPosition) async {
+    final sel = _selectedRasterUnderlay;
+    if (sel == null) return;
+    final action = await showArchitectUnderlayContextMenu(
+      context: context,
+      globalPosition: globalPosition,
+      isCad: false,
+      hasMask: sel.hasActiveMask,
+      maskEnabled: sel.maskEnabled,
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'edit':
+        _openRasterEditDialog();
+      case 'scale':
+        _openRasterScaleDialog();
+      case 'mask':
+        _openRasterMaskMenu(globalPosition);
+      case 'remove':
+        _deleteSelectedRaster();
+    }
+  }
+
+  Future<void> _openRasterMaskMenu(Offset globalPosition) async {
+    final sel = _selectedRasterUnderlay;
+    if (sel == null) return;
+    final action = await showArchitectUnderlayMaskMenu(
+      context: context,
+      globalPosition: globalPosition,
+      hasMask: sel.maskPolygon != null && sel.maskPolygon!.length >= 3,
+      maskEnabled: sel.maskEnabled,
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'mask_rect':
+        _startUnderlayMaskDraft(isCad: false, mode: 'rect', rasterId: sel.id);
+      case 'mask_polygon':
+        _startUnderlayMaskDraft(
+          isCad: false,
+          mode: 'polygon',
+          rasterId: sel.id,
+        );
+      case 'mask_toggle':
+        _updateSelectedRaster(sel.copyWith(maskEnabled: !sel.maskEnabled));
+      case 'mask_clear':
+        _updateSelectedRaster(
+          sel.copyWith(clearMask: true, maskEnabled: false),
+        );
+    }
+  }
+
+  void _openRasterScaleDialog() {
+    setState(() {
+      _rasterCalibrationStep = 1;
+      _rasterCalibrationP1 = null;
+      _rasterCalibrationP2 = null;
+    });
+  }
+
+  void _openRasterEditDialog() {
+    final sel = _selectedRasterUnderlay;
+    if (sel == null) return;
+    showArchitectUnderlayEditDialog(
+      context: context,
+      title: '${context.l10n.architectUnderlayEditDialogTitle}: ${sel.fileName}',
+      initialOpacity: sel.opacity,
+      onOpacityChanged: (val) {
+        final current = _selectedRasterUnderlay;
+        if (current != null) {
+          _updateSelectedRaster(current.copyWith(opacity: val));
+        }
+      },
+      isLocked: sel.locked,
+      onToggleLock: () {
+        final current = _selectedRasterUnderlay;
+        if (current != null) {
+          _updateSelectedRaster(current.copyWith(locked: !current.locked));
+        }
+      },
+      onRotateCcw: () {
+        final current = _selectedRasterUnderlay;
+        if (current != null) {
+          _updateSelectedRaster(
+            current.copyWith(rotationRad: current.rotationRad - math.pi / 2),
+          );
+        }
+      },
+      onRotateCw: () {
+        final current = _selectedRasterUnderlay;
+        if (current != null) {
+          _updateSelectedRaster(
+            current.copyWith(rotationRad: current.rotationRad + math.pi / 2),
+          );
+        }
+      },
+      onRemove: _deleteSelectedRaster,
+    );
   }
 
 
@@ -7797,6 +8125,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final rawModel = _screenToModel(event.localPosition);
 
+    if (_underlayMaskDrafting) {
+      if (_underlayMaskMode == 'rect') {
+        _underlayMaskDraftStart = rawModel;
+        _underlayMaskPoints = [rawModel, rawModel, rawModel, rawModel];
+        setState(() {});
+        return;
+      } else if (_underlayMaskMode == 'polygon') {
+        setState(() {
+          _underlayMaskPoints.add(rawModel);
+        });
+        return;
+      }
+    }
+
     if (_activeTool == ArchitectTool.rasterUnderlay &&
         _rasterCalibrationStep == 0) {
       final rasters = _project.rasterUnderlaysForStorey(
@@ -8797,6 +9139,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:TOUCH_MOVE] _onPointerMove Input Dispatch & Previews ---
   void _onPointerMove(PointerMoveEvent event) {
     if (_commandReady) return;
+    if (_underlayMaskDrafting &&
+        _underlayMaskMode == 'rect' &&
+        _underlayMaskDraftStart != null) {
+      final p1 = _underlayMaskDraftStart!;
+      final p2 = _screenToModel(event.localPosition);
+      final minX = math.min(p1.dx, p2.dx);
+      final maxX = math.max(p1.dx, p2.dx);
+      final minY = math.min(p1.dy, p2.dy);
+      final maxY = math.max(p1.dy, p2.dy);
+      setState(() {
+        _underlayMaskPoints = [
+          Offset(minX, minY),
+          Offset(maxX, minY),
+          Offset(maxX, maxY),
+          Offset(minX, maxY),
+        ];
+      });
+      return;
+    }
     if (_interactionMode == ArchitectInteractionMode.navigation && !_terrainDrafting) return;
     if (_selectionBoxDown != null && _selectionBoxDownScreen != null &&
         _marqueeTool.mode == ArchitectSelectMode.rectangle) {
@@ -11421,6 +11782,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:TOUCH_UP] _onPointerUp Input Dispatch & Tool Commits ---
   void _onPointerUp(PointerUpEvent event) {
     if (_commandReady) return;
+    if (_underlayMaskDrafting) {
+      if (_underlayMaskMode == 'rect' && _underlayMaskDraftStart != null) {
+        final p1 = _underlayMaskDraftStart!;
+        final p2 = _screenToModel(event.localPosition);
+        final minX = math.min(p1.dx, p2.dx);
+        final maxX = math.max(p1.dx, p2.dx);
+        final minY = math.min(p1.dy, p2.dy);
+        final maxY = math.max(p1.dy, p2.dy);
+        if ((maxX - minX) > 0.05 && (maxY - minY) > 0.05) {
+          _commitUnderlayMask([
+            Offset(minX, minY),
+            Offset(maxX, minY),
+            Offset(maxX, maxY),
+            Offset(minX, maxY),
+          ]);
+        } else {
+          _cancelUnderlayMaskDraft();
+        }
+        return;
+      }
+      if (_underlayMaskMode == 'polygon') {
+        return;
+      }
+    }
     if (_interactionMode == ArchitectInteractionMode.navigation && !_terrainDrafting) {
       _handleTap(_screenToModel(event.localPosition));
       return;
@@ -11678,6 +12063,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _groupDragIds = {};
 
     _isHandleEngaged = false;
+    _underlayMaskDrafting = false;
+    _underlayMaskDraftStart = null;
+    _underlayMaskPoints = [];
     _handleMoved = false;
     _handlePointerDown = null;
     _draggingElementId = null;
@@ -18949,6 +19337,37 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         unawaited(_showZoneContextMenu(screenPoint, hitZone));
         return true;
       }
+    }
+
+    // Context menu for Raster Underlay
+    final storeyRasters = _project.rasterUnderlaysForStorey(
+      _project.activeStorey.id,
+    );
+    final hitRaster = storeyRasters.reversed
+        .where((r) => r.visible && r.containsLocalPoint(raw))
+        .firstOrNull;
+    if (hitRaster != null &&
+        (_activeTool == ArchitectTool.rasterUnderlay ||
+            _activeTool == ArchitectTool.pan ||
+            _activeTool == ArchitectTool.select)) {
+      setState(() {
+        _cancelActiveDrags();
+        _selectedRasterId = hitRaster.id;
+      });
+      unawaited(_openRasterContextMenu(screenPoint));
+      return true;
+    }
+
+    // Context menu for CAD Underlay
+    final cadCfg = _currentCadUnderlayConfig;
+    if (cadCfg != null &&
+        cadCfg.visible &&
+        _underlaysByStorey[_project.activeStorey.id] != null &&
+        (_activeTool == ArchitectTool.cadUnderlay ||
+            (_activeTool == ArchitectTool.select &&
+                _effectiveSelection.isEmpty))) {
+      unawaited(_openCadContextMenu(screenPoint));
+      return true;
     }
 
 
@@ -30716,6 +31135,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     calibrationCursor: _rasterCalibrationStep > 0
                         ? _cursorModel
                         : null,
+                    cadConfig: _currentCadUnderlayConfig,
+                    maskDraftPoints: _underlayMaskPoints,
+                    isMaskDrafting: _underlayMaskDrafting,
                   ),
                 ),
               ),
@@ -31635,6 +32057,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               onExtractContours: _extractGeodesyFromCurrentUnderlay,
               onApplyToTerrain: _applyGeodesyTo3DTerrain,
               onRemoveUnderlay: _removeCurrentCadUnderlay,
+              onOpenScale: _openCadScaleDialog,
+              onOpenMaskMenu: (pos) => _openCadMaskMenu(pos),
+              onOpenContextMenu: (pos) => _openCadContextMenu(pos),
             ),
           ),
         ),
@@ -31707,6 +32132,64 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 }
               },
               onDeleteRaster: _deleteSelectedRaster,
+              onOpenScale: _openRasterScaleDialog,
+              onOpenMaskMenu: (pos) => _openRasterMaskMenu(pos),
+              onOpenContextMenu: (pos) => _openRasterContextMenu(pos),
+            ),
+          ),
+        ),
+
+      if (_underlayMaskDrafting)
+        Positioned(
+          top: 16,
+          left: 16,
+          right: 16,
+          child: Center(
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xEE1E293B),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const AppIcon(
+                      AppIconId.crop,
+                      size: 20,
+                      color: Color(0xFF00E5FF),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      _underlayMaskMode == 'rect'
+                          ? context.l10n.architectUnderlayMaskRectPrompt
+                          : context.l10n.architectUnderlayMaskPolyPrompt,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    if (_underlayMaskMode == 'polygon') ...[
+                      FilledButton(
+                        onPressed: _underlayMaskPoints.length >= 3
+                            ? () => _commitUnderlayMask(_underlayMaskPoints)
+                            : null,
+                        child: Text(context.l10n.architectUnderlayMaskFinish),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    TextButton(
+                      onPressed: _cancelUnderlayMaskDraft,
+                      child: Text(context.l10n.architectUnderlayMaskCancel),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

@@ -12343,6 +12343,77 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectRasterImportPdfButton => 'Импортирай страница';
 
   @override
+  String get architectUnderlayContextMenu => 'Опции на подложката';
+
+  @override
+  String get architectUnderlayEdit => 'Редактиране';
+
+  @override
+  String get architectUnderlayScale => 'Мащабиране';
+
+  @override
+  String get architectUnderlayMask => 'Маска / Изрязване';
+
+  @override
+  String get architectUnderlayMaskRect => 'Правоъгълна маска';
+
+  @override
+  String get architectUnderlayMaskPolygon => 'Полигонална маска';
+
+  @override
+  String get architectUnderlayMaskClear => 'Изчисти маската';
+
+  @override
+  String get architectUnderlayMaskToggle => 'Включи/Изключи маска';
+
+  @override
+  String get architectUnderlayMaskRectPrompt =>
+      'Очертайте правоъгълната зона за изрязване на подложката';
+
+  @override
+  String get architectUnderlayMaskPolyPrompt =>
+      'Кликнете точки за контура на маската. Натиснете \'Готово\' за затваряне.';
+
+  @override
+  String get architectUnderlayMaskFinish => 'Готово';
+
+  @override
+  String get architectUnderlayMaskCancel => 'Отказ';
+
+  @override
+  String get architectUnderlayCadScaleTitle =>
+      'Мащаб и единици на CAD подложката';
+
+  @override
+  String get architectUnderlayCadScaleUnitsLabel => 'Мерни единици в чертежа';
+
+  @override
+  String get architectUnderlayCadScaleMeters => 'Метри (1 единица = 1 m)';
+
+  @override
+  String get architectUnderlayCadScaleMm => 'Милиметри (1000 единици = 1 m)';
+
+  @override
+  String get architectUnderlayCadScaleCm => 'Сантиметри (100 единици = 1 m)';
+
+  @override
+  String get architectUnderlayCadScaleInches => 'Инчове (39.37 единици = 1 m)';
+
+  @override
+  String get architectUnderlayCadScaleCustom => 'Потребителски множител';
+
+  @override
+  String get architectUnderlayCadScale2Pt => '2-точково калибриране на CAD';
+
+  @override
+  String get architectUnderlayEditDialogTitle => 'Настройки на подложката';
+
+  @override
+  String architectUnderlayLoadError(String error) {
+    return 'Грешка при зареждане на подложката: $error';
+  }
+
+  @override
   String get commandIconPathway => 'Алея с бордюр';
 
   @override

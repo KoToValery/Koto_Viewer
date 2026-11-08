@@ -29,6 +29,9 @@ class ArchitectUnderlayPainter extends CustomPainter {
   final Offset? calibrationP1;
   final Offset? calibrationP2;
   final Offset? calibrationCursor;
+  final ArchitectCadUnderlayConfig? cadConfig;
+  final List<Offset>? maskDraftPoints;
+  final bool isMaskDrafting;
 
   ArchitectUnderlayPainter({
     required this.document,
@@ -46,6 +49,9 @@ class ArchitectUnderlayPainter extends CustomPainter {
     this.calibrationP1,
     this.calibrationP2,
     this.calibrationCursor,
+    this.cadConfig,
+    this.maskDraftPoints,
+    this.isMaskDrafting = false,
   }) : super(repaint: viewport);
 
   @override
@@ -56,8 +62,16 @@ class ArchitectUnderlayPainter extends CustomPainter {
         showGeodesyLayer &&
         (geodeticContours.isNotEmpty || geodeticPoints.isNotEmpty);
     final hasCalibration = calibrationP1 != null || calibrationCursor != null;
+    final hasMaskDraft =
+        isMaskDrafting && maskDraftPoints != null && maskDraftPoints!.isNotEmpty;
 
-    if (!hasCad && !hasRaster && !hasTopo && !hasCalibration) return;
+    if (!hasCad &&
+        !hasRaster &&
+        !hasTopo &&
+        !hasCalibration &&
+        !hasMaskDraft) {
+      return;
+    }
 
     // 1. Paint Raster Underlays (A-RAST) in model space
     if (hasRaster) {
@@ -71,6 +85,22 @@ class ArchitectUnderlayPainter extends CustomPainter {
         if (img == null) continue;
 
         canvas.save();
+        if (raster.hasActiveMask) {
+          final clipPath = Path()
+            ..moveTo(
+              raster.maskPolygon!.first.dx,
+              raster.maskPolygon!.first.dy,
+            );
+          for (var i = 1; i < raster.maskPolygon!.length; i++) {
+            clipPath.lineTo(
+              raster.maskPolygon![i].dx,
+              raster.maskPolygon![i].dy,
+            );
+          }
+          clipPath.close();
+          canvas.clipPath(clipPath);
+        }
+
         canvas.translate(raster.position.dx, raster.position.dy);
         if (raster.rotationRad.abs() > 1e-7) {
           canvas.rotate(raster.rotationRad);
@@ -105,6 +135,28 @@ class ArchitectUnderlayPainter extends CustomPainter {
           canvas.drawRect(dstRect, borderPaint);
         }
         canvas.restore();
+
+        // Draw mask boundary outline
+        if (raster.hasActiveMask &&
+            (raster.id == selectedRasterId || isMaskDrafting)) {
+          final maskPath = Path()
+            ..moveTo(
+              raster.maskPolygon!.first.dx,
+              raster.maskPolygon!.first.dy,
+            );
+          for (var i = 1; i < raster.maskPolygon!.length; i++) {
+            maskPath.lineTo(
+              raster.maskPolygon![i].dx,
+              raster.maskPolygon![i].dy,
+            );
+          }
+          maskPath.close();
+          final maskPaint = Paint()
+            ..color = const Color(0xFF00E5FF).withValues(alpha: 0.85)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.3 / viewport.scale;
+          canvas.drawPath(maskPath, maskPaint);
+        }
       }
       canvas.restore();
     }
@@ -113,7 +165,28 @@ class ArchitectUnderlayPainter extends CustomPainter {
     if (hasCad) {
       canvas.save();
       canvas.translate(viewport.translation.dx, viewport.translation.dy);
-      canvas.scale(viewport.scale / frame.unitsPerMeter);
+      canvas.scale(viewport.scale);
+
+      final hasCadMask = cadConfig?.hasActiveMask ?? false;
+      if (hasCadMask) {
+        canvas.save();
+        final clipPath = Path()
+          ..moveTo(
+            cadConfig!.maskPolygon!.first.dx,
+            cadConfig!.maskPolygon!.first.dy,
+          );
+        for (var i = 1; i < cadConfig!.maskPolygon!.length; i++) {
+          clipPath.lineTo(
+            cadConfig!.maskPolygon![i].dx,
+            cadConfig!.maskPolygon![i].dy,
+          );
+        }
+        clipPath.close();
+        canvas.clipPath(clipPath);
+      }
+
+      canvas.save();
+      canvas.scale(1.0 / frame.unitsPerMeter);
       canvas.translate(-frame.origin.dx, -frame.origin.dy);
       ArchitectElementsPainterHelper.drawUnderlay(
         canvas: canvas,
@@ -126,6 +199,29 @@ class ArchitectUnderlayPainter extends CustomPainter {
             .inflate(2 * frame.unitsPerMeter / viewport.scale),
       );
       canvas.restore();
+
+      if (hasCadMask) {
+        canvas.restore(); // restore clip
+        final maskPath = Path()
+          ..moveTo(
+            cadConfig!.maskPolygon!.first.dx,
+            cadConfig!.maskPolygon!.first.dy,
+          );
+        for (var i = 1; i < cadConfig!.maskPolygon!.length; i++) {
+          maskPath.lineTo(
+            cadConfig!.maskPolygon![i].dx,
+            cadConfig!.maskPolygon![i].dy,
+          );
+        }
+        maskPath.close();
+        final maskPaint = Paint()
+          ..color = const Color(0xFF00E5FF).withValues(alpha: 0.85)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.3 / viewport.scale;
+        canvas.drawPath(maskPath, maskPaint);
+      }
+
+      canvas.restore();
     }
 
     // 3. Paint Geodetic Contours & Spot Elevations (G-TOPO) - Print-First Style
@@ -137,6 +233,50 @@ class ArchitectUnderlayPainter extends CustomPainter {
     if (hasCalibration) {
       _paintCalibrationOverlay(canvas, size);
     }
+
+    // 5. Paint Mask Drafting Preview
+    if (hasMaskDraft) {
+      _paintMaskDraft(canvas);
+    }
+  }
+
+  void _paintMaskDraft(Canvas canvas) {
+    if (maskDraftPoints == null || maskDraftPoints!.isEmpty) return;
+
+    canvas.save();
+    canvas.translate(viewport.translation.dx, viewport.translation.dy);
+    canvas.scale(viewport.scale);
+
+    final previewPath = Path()
+      ..moveTo(maskDraftPoints!.first.dx, maskDraftPoints!.first.dy);
+    for (var i = 1; i < maskDraftPoints!.length; i++) {
+      previewPath.lineTo(maskDraftPoints![i].dx, maskDraftPoints![i].dy);
+    }
+    if (maskDraftPoints!.length >= 3) {
+      previewPath.close();
+      final fillPaint = Paint()
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.12)
+        ..style = PaintingStyle.fill;
+      canvas.drawPath(previewPath, fillPaint);
+    }
+    final strokePaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8 / viewport.scale;
+    canvas.drawPath(previewPath, strokePaint);
+
+    final handlePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    final handleBorder = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4 / viewport.scale;
+    for (final pt in maskDraftPoints!) {
+      canvas.drawCircle(pt, 4.0 / viewport.scale, handlePaint);
+      canvas.drawCircle(pt, 4.0 / viewport.scale, handleBorder);
+    }
+    canvas.restore();
   }
 
   void _paintGeodesyLayer(Canvas canvas) {
@@ -398,5 +538,8 @@ class ArchitectUnderlayPainter extends CustomPainter {
       !listEquals(geodeticPoints, oldDelegate.geodeticPoints) ||
       calibrationP1 != oldDelegate.calibrationP1 ||
       calibrationP2 != oldDelegate.calibrationP2 ||
-      calibrationCursor != oldDelegate.calibrationCursor;
+      calibrationCursor != oldDelegate.calibrationCursor ||
+      cadConfig != oldDelegate.cadConfig ||
+      isMaskDrafting != oldDelegate.isMaskDrafting ||
+      !listEquals(maskDraftPoints, oldDelegate.maskDraftPoints);
 }

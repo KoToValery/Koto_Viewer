@@ -28,6 +28,8 @@ class ArchitectCadUnderlayConfig {
   final String? detectedCrsName;
   final double opacity;
   final bool visible;
+  final List<Offset>? maskPolygon;
+  final bool maskEnabled;
 
   const ArchitectCadUnderlayConfig({
     required this.storeyId,
@@ -46,6 +48,8 @@ class ArchitectCadUnderlayConfig {
     this.detectedCrsName,
     this.opacity = 0.42,
     this.visible = true,
+    this.maskPolygon,
+    this.maskEnabled = true,
   });
 
   bool get hasLockedOrigin =>
@@ -53,6 +57,9 @@ class ArchitectCadUnderlayConfig {
       lockedCadOriginY != null &&
       unitsPerMeter != null &&
       unitsPerMeter! > 0;
+
+  bool get hasActiveMask =>
+      maskEnabled && maskPolygon != null && maskPolygon!.length >= 3;
 
   ArchitectCadUnderlayConfig copyWith({
     String? storeyId,
@@ -72,6 +79,9 @@ class ArchitectCadUnderlayConfig {
     String? detectedCrsName,
     double? opacity,
     bool? visible,
+    List<Offset>? maskPolygon,
+    bool clearMask = false,
+    bool? maskEnabled,
   }) => ArchitectCadUnderlayConfig(
     storeyId: storeyId ?? this.storeyId,
     fileName: fileName ?? this.fileName,
@@ -91,6 +101,8 @@ class ArchitectCadUnderlayConfig {
     detectedCrsName: detectedCrsName ?? this.detectedCrsName,
     opacity: (opacity ?? this.opacity).clamp(0.05, 1.0),
     visible: visible ?? this.visible,
+    maskPolygon: clearMask ? null : (maskPolygon ?? this.maskPolygon),
+    maskEnabled: maskEnabled ?? this.maskEnabled,
   );
 
   Map<String, dynamic> toJson() => {
@@ -111,6 +123,11 @@ class ArchitectCadUnderlayConfig {
     if (detectedCrsName != null) 'detectedCrsName': detectedCrsName,
     'opacity': opacity,
     if (!visible) 'visible': false,
+    if (maskPolygon != null && maskPolygon!.isNotEmpty)
+      'maskPolygon': [
+        for (final p in maskPolygon!) {'x': p.dx, 'y': p.dy},
+      ],
+    if (!maskEnabled) 'maskEnabled': false,
   };
 
   factory ArchitectCadUnderlayConfig.fromJson(Map<String, dynamic> json) =>
@@ -137,6 +154,17 @@ class ArchitectCadUnderlayConfig {
           1.0,
         ),
         visible: json['visible'] != false,
+        maskPolygon: json['maskPolygon'] is List
+            ? [
+                for (final item in json['maskPolygon'] as List)
+                  if (item is Map)
+                    Offset(
+                      (item['x'] as num?)?.toDouble() ?? 0.0,
+                      (item['y'] as num?)?.toDouble() ?? 0.0,
+                    ),
+              ]
+            : null,
+        maskEnabled: json['maskEnabled'] != false,
       );
 }
 
@@ -156,6 +184,8 @@ class ArchitectRasterUnderlay {
   final double opacity;
   final bool locked;
   final bool visible;
+  final List<Offset>? maskPolygon;
+  final bool maskEnabled;
 
   const ArchitectRasterUnderlay({
     required this.id,
@@ -172,7 +202,12 @@ class ArchitectRasterUnderlay {
     this.opacity = 0.55,
     this.locked = false,
     this.visible = true,
+    this.maskPolygon,
+    this.maskEnabled = true,
   });
+
+  bool get hasActiveMask =>
+      maskEnabled && maskPolygon != null && maskPolygon!.length >= 3;
 
   double get widthMeters => imageWidthPx * metersPerPixel;
   double get heightMeters => imageHeightPx * metersPerPixel;
@@ -297,6 +332,9 @@ class ArchitectRasterUnderlay {
     double? opacity,
     bool? locked,
     bool? visible,
+    List<Offset>? maskPolygon,
+    bool clearMask = false,
+    bool? maskEnabled,
   }) => ArchitectRasterUnderlay(
     id: id ?? this.id,
     storeyId: storeyId ?? this.storeyId,
@@ -312,6 +350,8 @@ class ArchitectRasterUnderlay {
     opacity: (opacity ?? this.opacity).clamp(0.05, 1.0),
     locked: locked ?? this.locked,
     visible: visible ?? this.visible,
+    maskPolygon: clearMask ? null : (maskPolygon ?? this.maskPolygon),
+    maskEnabled: maskEnabled ?? this.maskEnabled,
   );
 
   Map<String, dynamic> toJson() => {
@@ -329,6 +369,11 @@ class ArchitectRasterUnderlay {
     'opacity': opacity,
     if (locked) 'locked': true,
     if (!visible) 'visible': false,
+    if (maskPolygon != null && maskPolygon!.isNotEmpty)
+      'maskPolygon': [
+        for (final p in maskPolygon!) {'x': p.dx, 'y': p.dy},
+      ],
+    if (!maskEnabled) 'maskEnabled': false,
   };
 
   factory ArchitectRasterUnderlay.fromJson(Map<String, dynamic> json) {
@@ -353,6 +398,17 @@ class ArchitectRasterUnderlay {
       opacity: ((json['opacity'] as num?)?.toDouble() ?? 0.55).clamp(0.05, 1.0),
       locked: json['locked'] == true,
       visible: json['visible'] != false,
+      maskPolygon: json['maskPolygon'] is List
+          ? [
+              for (final item in json['maskPolygon'] as List)
+                if (item is Map)
+                  Offset(
+                    (item['x'] as num?)?.toDouble() ?? 0.0,
+                    (item['y'] as num?)?.toDouble() ?? 0.0,
+                  ),
+            ]
+          : null,
+      maskEnabled: json['maskEnabled'] != false,
     );
   }
 }

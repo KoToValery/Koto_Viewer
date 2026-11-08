@@ -22344,6 +22344,138 @@ abstract class AppLocalizations {
   /// **'Import Page'**
   String get architectRasterImportPdfButton;
 
+  /// Tooltip or header for underlay context options
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay Options'**
+  String get architectUnderlayContextMenu;
+
+  /// Action to edit underlay properties
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Properties'**
+  String get architectUnderlayEdit;
+
+  /// Action to adjust underlay scale or units
+  ///
+  /// In en, this message translates to:
+  /// **'Scale & Units'**
+  String get architectUnderlayScale;
+
+  /// Action to configure underlay clipping mask
+  ///
+  /// In en, this message translates to:
+  /// **'Mask / Crop'**
+  String get architectUnderlayMask;
+
+  /// Action to draw a rectangular mask
+  ///
+  /// In en, this message translates to:
+  /// **'Rectangular Mask'**
+  String get architectUnderlayMaskRect;
+
+  /// Action to draw a polygonal mask
+  ///
+  /// In en, this message translates to:
+  /// **'Polygonal Mask'**
+  String get architectUnderlayMaskPolygon;
+
+  /// Action to remove clipping mask
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Mask'**
+  String get architectUnderlayMaskClear;
+
+  /// Action to toggle clipping mask on or off
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Mask'**
+  String get architectUnderlayMaskToggle;
+
+  /// Prompt for rectangular mask drafting
+  ///
+  /// In en, this message translates to:
+  /// **'Drag across the underlay to define the rectangular crop area'**
+  String get architectUnderlayMaskRectPrompt;
+
+  /// Prompt for polygon mask drafting
+  ///
+  /// In en, this message translates to:
+  /// **'Click points to define crop boundary polygon. Tap Finish to close.'**
+  String get architectUnderlayMaskPolyPrompt;
+
+  /// Button to commit drafted underlay mask
+  ///
+  /// In en, this message translates to:
+  /// **'Finish Mask'**
+  String get architectUnderlayMaskFinish;
+
+  /// Button to abort underlay mask drafting
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Mask'**
+  String get architectUnderlayMaskCancel;
+
+  /// Title of CAD underlay scale dialog
+  ///
+  /// In en, this message translates to:
+  /// **'CAD Underlay Scale & Units'**
+  String get architectUnderlayCadScaleTitle;
+
+  /// Label for drawing units dropdown
+  ///
+  /// In en, this message translates to:
+  /// **'Drawing units per meter'**
+  String get architectUnderlayCadScaleUnitsLabel;
+
+  /// Scale option for meters
+  ///
+  /// In en, this message translates to:
+  /// **'Meters (1 unit = 1 m)'**
+  String get architectUnderlayCadScaleMeters;
+
+  /// Scale option for millimeters
+  ///
+  /// In en, this message translates to:
+  /// **'Millimeters (1000 units = 1 m)'**
+  String get architectUnderlayCadScaleMm;
+
+  /// Scale option for centimeters
+  ///
+  /// In en, this message translates to:
+  /// **'Centimeters (100 units = 1 m)'**
+  String get architectUnderlayCadScaleCm;
+
+  /// Scale option for inches
+  ///
+  /// In en, this message translates to:
+  /// **'Inches (39.37 units = 1 m)'**
+  String get architectUnderlayCadScaleInches;
+
+  /// Option for custom scale ratio
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Scale Ratio'**
+  String get architectUnderlayCadScaleCustom;
+
+  /// Button to calibrate CAD scale by two points
+  ///
+  /// In en, this message translates to:
+  /// **'2-Point CAD Calibrate'**
+  String get architectUnderlayCadScale2Pt;
+
+  /// Title for underlay properties dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay Settings'**
+  String get architectUnderlayEditDialogTitle;
+
+  /// Error message when underlay loading fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load underlay: {error}'**
+  String architectUnderlayLoadError(String error);
+
   /// No description provided for @commandIconPathway.
   ///
   /// In en, this message translates to:
