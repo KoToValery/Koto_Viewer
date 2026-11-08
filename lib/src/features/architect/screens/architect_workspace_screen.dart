@@ -22464,42 +22464,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           _axisTool.selectAxis(primary);
 
-        } else {
-          final pathway = _project.activeStorey.pathways
-              .where((p) => p.id == primary)
-              .firstOrNull;
-          if (pathway != null) {
-            _landscapeTool.loadFromPathway(pathway);
-          }
-          final street = _project.activeStorey.streets
-              .where((s) => s.id == primary)
-              .firstOrNull;
-          if (street != null) {
-            _landscapeTool.loadFromStreet(street);
-          }
-          final fence = _project.activeStorey.siteFences
-              .where((f) => f.id == primary)
-              .firstOrNull;
-          if (fence != null) {
-            _landscapeTool.loadFromFence(fence);
-          }
-          final veg = _project.activeStorey.vegetation
-              .where((v) => v.id == primary)
-              .firstOrNull;
-          if (veg != null) {
-            _landscapeTool.loadFromVegetation(veg);
-          }
-          for (final (surf, state) in [
-            (_project.proposedTerrain, ArchitectTerrainState.proposed),
-            (_project.existingTerrain, ArchitectTerrainState.existing),
-          ]) {
-            final bnd = surf.boundaries.where((b) => b.id == primary).firstOrNull;
-            if (bnd != null) _landscapeTool.loadFromTerrainBoundary(bnd, state, datum: surf.datumElevation);
-            final cnt = surf.contours.where((c) => c.id == primary).firstOrNull;
-            if (cnt != null) _landscapeTool.loadFromTerrainContour(cnt, state, datum: surf.datumElevation);
-            final sp = surf.spots.where((s) => s.id == primary).firstOrNull;
-            if (sp != null) _landscapeTool.loadFromTerrainSpot(sp, state, datum: surf.datumElevation);
-          }
         } else if (_selectionIds.length == 1) {
 
           final roof = _project.activeStorey.roofs
@@ -22524,6 +22488,60 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           }
 
+        }
+
+        final pathway = _project.activeStorey.pathways
+            .where((p) => p.id == primary)
+            .firstOrNull;
+        if (pathway != null) {
+          _landscapeTool.loadFromPathway(pathway);
+        }
+        final street = _project.activeStorey.streets
+            .where((s) => s.id == primary)
+            .firstOrNull;
+        if (street != null) {
+          _landscapeTool.loadFromStreet(street);
+        }
+        final fence = _project.activeStorey.siteFences
+            .where((f) => f.id == primary)
+            .firstOrNull;
+        if (fence != null) {
+          _landscapeTool.loadFromFence(fence);
+        }
+        final veg = _project.activeStorey.vegetation
+            .where((v) => v.id == primary)
+            .firstOrNull;
+        if (veg != null) {
+          _landscapeTool.loadFromVegetation(veg);
+        }
+        for (final (surf, state) in [
+          (_project.proposedTerrain, ArchitectTerrainState.proposed),
+          (_project.existingTerrain, ArchitectTerrainState.existing),
+        ]) {
+          final bnd = surf.boundaries.where((b) => b.id == primary).firstOrNull;
+          if (bnd != null) {
+            _landscapeTool.loadFromTerrainBoundary(
+              bnd,
+              state,
+              datum: surf.datumElevation,
+            );
+          }
+          final cnt = surf.contours.where((c) => c.id == primary).firstOrNull;
+          if (cnt != null) {
+            _landscapeTool.loadFromTerrainContour(
+              cnt,
+              state,
+              datum: surf.datumElevation,
+            );
+          }
+          final sp = surf.spots.where((s) => s.id == primary).firstOrNull;
+          if (sp != null) {
+            _landscapeTool.loadFromTerrainSpot(
+              sp,
+              state,
+              datum: surf.datumElevation,
+            );
+          }
         }
 
       }
