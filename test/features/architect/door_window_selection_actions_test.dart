@@ -13,7 +13,6 @@ import 'package:kotoview/src/features/architect/models/architect_window.dart';
 import 'package:kotoview/src/features/architect/services/architect_element_tool.dart';
 import 'package:kotoview/src/features/architect/services/architect_selection.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_element_properties_dialog.dart';
-import 'architect_editing_test.dart' as editing;
 
 void main() {
   group('ArchitectWindow model tests', () {
@@ -366,11 +365,6 @@ void main() {
         );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 100));
-        expect(
-          commands.project.activeStorey.walls.first.doors.first.openInward,
-          isTrue,
-        );
-        await editing.acceptGeometryCommand(tester);
 
         final doorAfterSwing =
             commands.project.activeStorey.walls.first.doors.first;
@@ -382,7 +376,6 @@ void main() {
         );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 100));
-        await editing.acceptGeometryCommand(tester);
 
         final doorAfterHinge =
             commands.project.activeStorey.walls.first.doors.first;
@@ -475,12 +468,6 @@ void main() {
         );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 100));
-        expect(
-          commands.project.activeStorey.walls.first.windows.first.isFlipped,
-          isFalse,
-        );
-        await editing.acceptGeometryCommand(tester);
-
         final winAfterFlip =
             commands.project.activeStorey.walls.first.windows.first;
         expect(winAfterFlip.isFlipped, isTrue);

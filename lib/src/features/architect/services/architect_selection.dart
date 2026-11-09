@@ -101,13 +101,19 @@ class ArchitectSelection {
     }
   }
 
+  static Map<String, dynamic>? findRecord(ArchitectProject project, String id) =>
+      records(
+        project.toJson(),
+        project.activeStoreyId,
+      ).where((e) => e['id'] == id).firstOrNull;
   static Map<String, dynamic> record(ArchitectProject project, String id) =>
       records(
         project.toJson(),
         project.activeStoreyId,
       ).firstWhere((e) => e['id'] == id);
   static Map<String, double> fields(ArchitectProject project, String id) {
-    final e = record(project, id);
+    final e = findRecord(project, id);
+    if (e == null) return const {};
     final fields = <String, double>{
       for (final key in numericKeys)
         if (e[key] is num) key: (e[key] as num).toDouble(),
@@ -206,7 +212,8 @@ class ArchitectSelection {
     for (final el in project.elevations) {
       if (el.id == id) return Rect.fromPoints(el.start, el.end).inflate(.02);
     }
-    final e = record(project, id);
+    final e = findRecord(project, id);
+    if (e == null) return null;
     Offset point(dynamic json) =>
         Offset((json['x'] as num).toDouble(), (json['y'] as num).toDouble());
     if (e['polygon'] is List || e['boundary'] is List || e['points'] is List) {

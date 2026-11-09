@@ -61,7 +61,6 @@ class ArchitectSelectionCandidates {
       for (final e in s.vegetation) e.id: ArchitectTool.vegetation,
       for (final e in s.siteFences) e.id: ArchitectTool.siteFence,
       for (final surface in [project.existingTerrain, project.proposedTerrain]) ...{
-        surface.id: ArchitectTool.terrain,
         for (final b in surface.boundaries) b.id: ArchitectTool.terrain,
         for (final c in surface.contours) c.id: ArchitectTool.terrain,
         for (final sp in surface.spots) sp.id: ArchitectTool.terrain,

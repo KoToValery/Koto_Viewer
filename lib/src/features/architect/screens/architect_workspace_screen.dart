@@ -21984,7 +21984,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (const {
       ArchitectRadialAction.move, ArchitectRadialAction.edit,
       ArchitectRadialAction.duplicate, ArchitectRadialAction.rotate,
-      ArchitectRadialAction.flip, ArchitectRadialAction.split,
+      ArchitectRadialAction.split,
       ArchitectRadialAction.cut, ArchitectRadialAction.cutOpening,
       ArchitectRadialAction.offset, ArchitectRadialAction.newPoint,
       ArchitectRadialAction.join, ArchitectRadialAction.straighten,
@@ -26486,73 +26486,82 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    void _flipDoorsSwing(Set<String> doorIds) {
-    _beginGeometryCommand(ArchitectRadialAction.flip);
+  void _flipDoorsSwing(Set<String> doorIds) {
     if (doorIds.isEmpty) return;
-    for (final id in doorIds) {
-      final door = _project.activeStorey.walls
-          .expand((w) => w.doors)
-          .where((d) => d.id == id)
-          .firstOrNull;
-      if (door != null) {
-        _commands.execute(
-          SetArchitectElementProperties(
-            storeyId: _project.activeStoreyId,
-            elementIds: {id},
-            textValues: {'openInward': (!door.openInward).toString()},
-          ),
-        );
+    try {
+      for (final id in doorIds) {
+        final door = _project.activeStorey.walls
+            .expand((w) => w.doors)
+            .where((d) => d.id == id)
+            .firstOrNull;
+        if (door != null) {
+          _commands.execute(
+            SetArchitectElementProperties(
+              storeyId: _project.activeStoreyId,
+              elementIds: {id},
+              textValues: {'openInward': (!door.openInward).toString()},
+            ),
+          );
+        }
       }
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      setState(() {});
+    } on ArgumentError {
+      _operationError();
     }
-    _saveBiMProjectIfAttached();
-    HapticFeedback.lightImpact();
-    setState(() {});
   }
 
   void _flipDoorsHinge(Set<String> doorIds) {
-    _beginGeometryCommand(ArchitectRadialAction.flip);
     if (doorIds.isEmpty) return;
-    for (final id in doorIds) {
-      final door = _project.activeStorey.walls
-          .expand((w) => w.doors)
-          .where((d) => d.id == id)
-          .firstOrNull;
-      if (door != null) {
-        _commands.execute(
-          SetArchitectElementProperties(
-            storeyId: _project.activeStoreyId,
-            elementIds: {id},
-            textValues: {'isHingeLeft': (!door.isHingeLeft).toString()},
-          ),
-        );
+    try {
+      for (final id in doorIds) {
+        final door = _project.activeStorey.walls
+            .expand((w) => w.doors)
+            .where((d) => d.id == id)
+            .firstOrNull;
+        if (door != null) {
+          _commands.execute(
+            SetArchitectElementProperties(
+              storeyId: _project.activeStoreyId,
+              elementIds: {id},
+              textValues: {'isHingeLeft': (!door.isHingeLeft).toString()},
+            ),
+          );
+        }
       }
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      setState(() {});
+    } on ArgumentError {
+      _operationError();
     }
-    _saveBiMProjectIfAttached();
-    HapticFeedback.lightImpact();
-    setState(() {});
   }
 
   void _flipWindowsSide(Set<String> windowIds) {
-    _beginGeometryCommand(ArchitectRadialAction.flip);
     if (windowIds.isEmpty) return;
-    for (final id in windowIds) {
-      final window = _project.activeStorey.walls
-          .expand((w) => w.windows)
-          .where((w) => w.id == id)
-          .firstOrNull;
-      if (window != null) {
-        _commands.execute(
-          SetArchitectElementProperties(
-            storeyId: _project.activeStoreyId,
-            elementIds: {id},
-            textValues: {'isFlipped': (!window.isFlipped).toString()},
-          ),
-        );
+    try {
+      for (final id in windowIds) {
+        final window = _project.activeStorey.walls
+            .expand((w) => w.windows)
+            .where((w) => w.id == id)
+            .firstOrNull;
+        if (window != null) {
+          _commands.execute(
+            SetArchitectElementProperties(
+              storeyId: _project.activeStoreyId,
+              elementIds: {id},
+              textValues: {'isFlipped': (!window.isFlipped).toString()},
+            ),
+          );
+        }
       }
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      setState(() {});
+    } on ArgumentError {
+      _operationError();
     }
-    _saveBiMProjectIfAttached();
-    HapticFeedback.lightImpact();
-    setState(() {});
   }
 
   void _performLinearSelectionAction(String action, Set<String> segmentIds) {
