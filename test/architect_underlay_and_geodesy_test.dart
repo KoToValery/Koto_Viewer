@@ -1,13 +1,13 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/icons/app_icon_catalog.dart';
-import 'package:kotoview/src/features/architect/models/architect_layer.dart';
+import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
-import 'package:kotoview/src/features/architect/models/architect_underlay_models.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
 import 'package:kotoview/src/features/architect/services/architect_geodetic_detector.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_cad_point_picker_dialog.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_catalog.dart';
 import 'package:kotoview/src/features/bim_projects/models/bim_coordinate_frame.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
@@ -313,6 +313,46 @@ void main() {
         unitsPerMeter: scaleGeodetic,
       );
       expect((frameGeodetic.toModel(pCadGeodetic) - pModelGeodetic).distance, lessThan(1e-9));
+    });
+
+    testWidgets('ArchitectCadPointPickerDialog renders on narrow screen without RenderFlex overflow', (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final doc = DxfDocument(
+        layers: const {},
+        blocks: const {},
+        entities: const [
+          DxfLine(p1: Offset(0, 0), p2: Offset(10, 10), layer: '0'),
+        ],
+        headerVars: const {},
+        bounds: const Rect.fromLTWH(0, 0, 10, 10),
+        entityStats: const {},
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('bg'),
+          home: Scaffold(
+            body: ArchitectCadPointPickerDialog(
+              document: doc,
+              fileName: 'Worksheet.dwg',
+              initialCadPoint: const Offset(12.345, 67.890),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('X: 12.345'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

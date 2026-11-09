@@ -22,6 +22,7 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
   final VoidCallback onApplyToTerrain;
   final VoidCallback onRemoveUnderlay;
   final VoidCallback? onReposition;
+  final VoidCallback? onDrag;
   final VoidCallback? onOpenScale;
   final void Function(Offset globalPosition)? onOpenMaskMenu;
   final void Function(Offset globalPosition)? onOpenContextMenu;
@@ -42,6 +43,7 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
     required this.onApplyToTerrain,
     required this.onRemoveUnderlay,
     this.onReposition,
+    this.onDrag,
     this.onOpenScale,
     this.onOpenMaskMenu,
     this.onOpenContextMenu,
@@ -228,6 +230,18 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(width: 6),
+                if (onDrag != null) ...[
+                  OutlinedButton.icon(
+                    onPressed: isBusy ? null : onDrag,
+                    icon: const AppIcon(
+                      AppIconId.move,
+                      size: 15,
+                      color: Color(0xFF00E5FF),
+                    ),
+                    label: Text(l.architectUnderlayDrag),
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 OutlinedButton.icon(
                   onPressed: isBusy ? null : onReposition,
                   icon: const AppIcon(
@@ -327,6 +341,7 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
   final VoidCallback onRotateCw;
   final VoidCallback onResetTransform;
   final VoidCallback onDeleteRaster;
+  final VoidCallback? onDrag;
   final VoidCallback? onOpenScale;
   final void Function(Offset globalPosition)? onOpenMaskMenu;
   final void Function(Offset globalPosition)? onOpenContextMenu;
@@ -347,6 +362,7 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
     required this.onRotateCw,
     required this.onResetTransform,
     required this.onDeleteRaster,
+    this.onDrag,
     this.onOpenScale,
     this.onOpenMaskMenu,
     this.onOpenContextMenu,
@@ -446,6 +462,18 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
                 ],
                 if (sel != null) ...[
                   const SizedBox(width: 8),
+                  if (onDrag != null) ...[
+                    OutlinedButton.icon(
+                      onPressed: (isBusy || sel.locked) ? null : onDrag,
+                      icon: const AppIcon(
+                        AppIconId.move,
+                        size: 16,
+                        color: Color(0xFF00E5FF),
+                      ),
+                      label: Text(l.architectUnderlayDrag),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   OutlinedButton.icon(
                     onPressed: onStartCalibration,
                     icon: const AppIcon(AppIconId.measure, size: 16),
@@ -763,6 +791,20 @@ Future<String?> showArchitectUnderlayContextMenu({
       globalPosition.dy,
     ),
     items: [
+      PopupMenuItem(
+        value: 'drag',
+        child: Row(
+          children: [
+            const AppIcon(
+              AppIconId.move,
+              size: 18,
+              color: Color(0xFF00E5FF),
+            ),
+            const SizedBox(width: 8),
+            Text(l.architectUnderlayDrag),
+          ],
+        ),
+      ),
       if (isCad)
         PopupMenuItem(
           value: 'reposition',

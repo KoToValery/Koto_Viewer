@@ -6881,6 +6881,27 @@
   "@architectUnderlayInsertionCancel": { "description": "Tooltip or label for cancelling CAD underlay placement" },
   "architectUnderlayPlacedSuccess": "CAD underlay positioned successfully",
   "@architectUnderlayPlacedSuccess": { "description": "Snackbar message when CAD underlay is positioned" },
+  "architectUnderlayDrag": "Move with Snap",
+  "@architectUnderlayDrag": { "description": "Action to drag and move underlay with snapping" },
+  "architectUnderlayDragTooltip": "Move underlay by picking a base point and snapping to drawing",
+  "@architectUnderlayDragTooltip": { "description": "Tooltip for underlay snap drag action" },
+  "architectUnderlayPickBasePoint": "Select base reference point on underlay",
+  "@architectUnderlayPickBasePoint": { "description": "Prompt to select base point on underlay" },
+  "architectUnderlayPickTargetPoint": "Snap to drawing location to position underlay",
+  "@architectUnderlayPickTargetPoint": { "description": "Prompt to snap underlay to target position" },
+  "architectUnderlayDragSuccess": "Underlay repositioned successfully",
+  "@architectUnderlayDragSuccess": { "description": "Snackbar message when underlay snap drag succeeds" },
+  "architectUnderlayCandidate": "Underlay: {fileName}",
+  "@architectUnderlayCandidate": {
+    "description": "Candidate picker label for underlays",
+    "placeholders": {
+      "fileName": { "type": "String" }
+    }
+  },
+  "architectUnderlayBasePoint": "Base Point",
+  "@architectUnderlayBasePoint": { "description": "Label for underlay base reference point" },
+  "architectUnderlaySelected": "Underlay selected",
+  "@architectUnderlaySelected": { "description": "HUD status text when underlay is selected" },
   "commandIconPathway": "Pathway with curb",
   "commandIconVegetation": "Vegetation & planting",
   "architectCategoryLandscape": "Landscape",

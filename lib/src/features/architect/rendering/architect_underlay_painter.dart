@@ -36,6 +36,18 @@ class ArchitectUnderlayPainter extends CustomPainter {
   final DxfDocument? ghostCadDocument;
   final BimCoordinateFrame? ghostCadFrame;
   final Offset? ghostInsertionPoint;
+  final bool isCadSelected;
+  final bool isDragActive;
+  final bool isDragPickingBase;
+  final Offset? dragBasePoint;
+  final Offset? dragCurrentPoint;
+  final String? dragSnapLabel;
+  final bool dragIsSnapped;
+  final double? dragDistanceMeters;
+  final double? dragAngleDeg;
+  final List<(Offset, Offset)> dragMagneticGuides;
+  final Offset? ghostRasterPosition;
+  final String? draggingRasterId;
 
   ArchitectUnderlayPainter({
     required this.document,
@@ -60,6 +72,18 @@ class ArchitectUnderlayPainter extends CustomPainter {
     this.ghostCadDocument,
     this.ghostCadFrame,
     this.ghostInsertionPoint,
+    this.isCadSelected = false,
+    this.isDragActive = false,
+    this.isDragPickingBase = false,
+    this.dragBasePoint,
+    this.dragCurrentPoint,
+    this.dragSnapLabel,
+    this.dragIsSnapped = false,
+    this.dragDistanceMeters,
+    this.dragAngleDeg,
+    this.dragMagneticGuides = const [],
+    this.ghostRasterPosition,
+    this.draggingRasterId,
   }) : super(repaint: viewport);
 
   @override
@@ -80,7 +104,9 @@ class ArchitectUnderlayPainter extends CustomPainter {
         !hasTopo &&
         !hasCalibration &&
         !hasMaskDraft &&
-        !hasGhostCad) {
+        !hasGhostCad &&
+        !isDragActive &&
+        !isCadSelected) {
       return;
     }
 
@@ -253,6 +279,16 @@ class ArchitectUnderlayPainter extends CustomPainter {
     // 6. Paint Ghost CAD Underlay Placement Preview
     if (hasGhostCad) {
       _paintGhostCadPlacement(canvas);
+    }
+
+    // 7. Paint CAD Selection Highlight
+    if (hasCad && isCadSelected) {
+      _paintCadSelection(canvas);
+    }
+
+    // 8. Paint Underlay 2-Point Snap Drag (Rubber-band, Guides, Anchors, Ghost)
+    if (isDragActive) {
+      _paintUnderlayDrag(canvas, size);
     }
   }
 
@@ -614,6 +650,237 @@ class ArchitectUnderlayPainter extends CustomPainter {
     tp.paint(canvas, Offset(screenPos.dx + 9, screenPos.dy - 18));
   }
 
+  void _paintCadSelection(Canvas canvas) {
+    if (document == null) return;
+    canvas.save();
+    canvas.translate(viewport.translation.dx, viewport.translation.dy);
+    canvas.scale(viewport.scale);
+
+    final modelBounds = frame.rectToModel(document!.bounds);
+    final borderPaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6 / viewport.scale;
+
+    final double dashWidth = 6.0 / viewport.scale;
+    final double dashSpace = 4.0 / viewport.scale;
+    _drawDashedRect(canvas, modelBounds, borderPaint, dashWidth, dashSpace);
+
+    final handlePaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..style = PaintingStyle.fill;
+    final handleStroke = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0 / viewport.scale;
+
+    final double hSize = 7.0 / viewport.scale;
+    final corners = [
+      modelBounds.topLeft,
+      modelBounds.topRight,
+      modelBounds.bottomRight,
+      modelBounds.bottomLeft,
+    ];
+    for (final c in corners) {
+      final r = Rect.fromCenter(center: c, width: hSize, height: hSize);
+      canvas.drawRect(r, handlePaint);
+      canvas.drawRect(r, handleStroke);
+    }
+
+    final originModel = frame.toModel(Offset.zero);
+    final originPaint = Paint()
+      ..color = const Color(0xFFFFB300)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5 / viewport.scale;
+    final arm = 14.0 / viewport.scale;
+    canvas.drawLine(
+      Offset(originModel.dx - arm, originModel.dy),
+      Offset(originModel.dx + arm, originModel.dy),
+      originPaint,
+    );
+    canvas.drawLine(
+      Offset(originModel.dx, originModel.dy - arm),
+      Offset(originModel.dx, originModel.dy + arm),
+      originPaint,
+    );
+    canvas.drawCircle(originModel, 5.0 / viewport.scale, originPaint);
+
+    canvas.restore();
+  }
+
+  void _paintUnderlayDrag(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.translate(viewport.translation.dx, viewport.translation.dy);
+    canvas.scale(viewport.scale);
+
+    if (!isDragPickingBase && ghostRasterPosition != null && draggingRasterId != null) {
+      final img = rasterImages[draggingRasterId];
+      final raster = rasterUnderlays.where((r) => r.id == draggingRasterId).firstOrNull;
+      if (img != null && raster != null) {
+        canvas.save();
+        canvas.translate(ghostRasterPosition!.dx, ghostRasterPosition!.dy);
+        if (raster.rotationRad.abs() > 1e-7) {
+          canvas.rotate(raster.rotationRad);
+        }
+        final srcRect = Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble());
+        final dstRect = Rect.fromLTWH(0, 0, raster.widthMeters, raster.heightMeters);
+        final imgPaint = Paint()
+          ..color = const Color.fromRGBO(255, 255, 255, 0.45)
+          ..filterQuality = FilterQuality.low;
+        canvas.drawImageRect(img, srcRect, dstRect, imgPaint);
+        final ghostBorder = Paint()
+          ..color = const Color(0xFF00E5FF).withValues(alpha: 0.7)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5 / viewport.scale;
+        canvas.drawRect(dstRect, ghostBorder);
+        canvas.restore();
+      }
+    }
+
+    if (dragMagneticGuides.isNotEmpty) {
+      final guidePaint = Paint()
+        ..color = const Color(0xFFFF4081).withValues(alpha: 0.75)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2 / viewport.scale;
+      for (final g in dragMagneticGuides) {
+        canvas.drawLine(g.$1, g.$2, guidePaint);
+      }
+    }
+
+    if (isDragPickingBase && dragCurrentPoint != null) {
+      final pt = dragCurrentPoint!;
+      final ringPaint = Paint()
+        ..color = const Color(0xFF00E5FF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0 / viewport.scale;
+      final fillPaint = Paint()
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.25)
+        ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(pt, 9.0 / viewport.scale, fillPaint);
+      canvas.drawCircle(pt, 9.0 / viewport.scale, ringPaint);
+      canvas.drawCircle(pt, 2.0 / viewport.scale, Paint()..color = Colors.white);
+
+      if (dragIsSnapped && dragSnapLabel != null) {
+        _drawBadge(canvas, pt, dragSnapLabel!, const Color(0xFF00E5FF));
+      }
+    }
+
+    if (!isDragPickingBase && dragBasePoint != null && dragCurrentPoint != null) {
+      final base = dragBasePoint!;
+      final target = dragCurrentPoint!;
+
+      final rubberBandPaint = Paint()
+        ..color = const Color(0xFF00E5FF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0 / viewport.scale;
+      canvas.drawLine(base, target, rubberBandPaint);
+
+      final anchorOuter = Paint()
+        ..color = const Color(0xFFFFB300)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2 / viewport.scale;
+      final anchorFill = Paint()
+        ..color = const Color(0xFFFFB300).withValues(alpha: 0.3)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(base, 8.0 / viewport.scale, anchorFill);
+      canvas.drawCircle(base, 8.0 / viewport.scale, anchorOuter);
+      canvas.drawCircle(base, 2.5 / viewport.scale, Paint()..color = Colors.white);
+
+      final targetRing = Paint()
+        ..color = dragIsSnapped ? const Color(0xFF00E676) : const Color(0xFF00E5FF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2 / viewport.scale;
+      final targetGlow = Paint()
+        ..color = (dragIsSnapped ? const Color(0xFF00E676) : const Color(0xFF00E5FF)).withValues(alpha: 0.25)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(target, 10.0 / viewport.scale, targetGlow);
+      canvas.drawCircle(target, 10.0 / viewport.scale, targetRing);
+      canvas.drawCircle(target, 2.5 / viewport.scale, Paint()..color = Colors.white);
+
+      if (dragIsSnapped && dragSnapLabel != null) {
+        _drawBadge(canvas, target, dragSnapLabel!, const Color(0xFF00E676));
+      }
+
+      final mid = Offset((base.dx + target.dx) / 2, (base.dy + target.dy) / 2);
+      final dist = dragDistanceMeters ?? (target - base).distance;
+      final deg = dragAngleDeg ?? 0.0;
+      final distText = 'L=${dist.toStringAsFixed(2)}m  ${deg.toStringAsFixed(0)}°';
+      _drawBadge(canvas, mid, distText, const Color(0xFFFFB300));
+    }
+
+    canvas.restore();
+  }
+
+  void _drawDashedRect(Canvas canvas, Rect rect, Paint paint, double dashWidth, double dashSpace) {
+    _drawDashedLine(canvas, rect.topLeft, rect.topRight, paint, dashWidth, dashSpace);
+    _drawDashedLine(canvas, rect.topRight, rect.bottomRight, paint, dashWidth, dashSpace);
+    _drawDashedLine(canvas, rect.bottomRight, rect.bottomLeft, paint, dashWidth, dashSpace);
+    _drawDashedLine(canvas, rect.bottomLeft, rect.topLeft, paint, dashWidth, dashSpace);
+  }
+
+  void _drawDashedLine(Canvas canvas, Offset p1, Offset p2, Paint paint, double dashWidth, double dashSpace) {
+    final double dx = p2.dx - p1.dx;
+    final double dy = p2.dy - p1.dy;
+    final double dist = math.sqrt(dx * dx + dy * dy);
+    if (dist < 1e-6) return;
+    final double ux = dx / dist;
+    final double uy = dy / dist;
+    double current = 0.0;
+    while (current < dist) {
+      final double seg = math.min(dashWidth, dist - current);
+      canvas.drawLine(
+        Offset(p1.dx + ux * current, p1.dy + uy * current),
+        Offset(p1.dx + ux * (current + seg), p1.dy + uy * (current + seg)),
+        paint,
+      );
+      current += dashWidth + dashSpace;
+    }
+  }
+
+  void _drawBadge(Canvas canvas, Offset modelPoint, String text, Color accentColor) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final padH = 5.0 / viewport.scale;
+    final padV = 3.0 / viewport.scale;
+    final bw = tp.width / viewport.scale + padH * 2;
+    final bh = tp.height / viewport.scale + padV * 2;
+    final badgeRect = Rect.fromLTWH(
+      modelPoint.dx - bw / 2,
+      modelPoint.dy - bh - 12.0 / viewport.scale,
+      bw,
+      bh,
+    );
+
+    final bgPaint = Paint()
+      ..color = const Color(0xFF1E242C).withValues(alpha: 0.92)
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = accentColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0 / viewport.scale;
+
+    final rrect = RRect.fromRectAndRadius(badgeRect, Radius.circular(3.0 / viewport.scale));
+    canvas.drawRRect(rrect, bgPaint);
+    canvas.drawRRect(rrect, borderPaint);
+
+    canvas.save();
+    canvas.translate(badgeRect.left + padH, badgeRect.top + padV);
+    canvas.scale(1.0 / viewport.scale);
+    tp.paint(canvas, Offset.zero);
+    canvas.restore();
+  }
+
   @override
   bool shouldRepaint(covariant ArchitectUnderlayPainter oldDelegate) =>
       palette.isDark != oldDelegate.palette.isDark ||
@@ -633,5 +900,16 @@ class ArchitectUnderlayPainter extends CustomPainter {
       calibrationCursor != oldDelegate.calibrationCursor ||
       cadConfig != oldDelegate.cadConfig ||
       isMaskDrafting != oldDelegate.isMaskDrafting ||
-      !listEquals(maskDraftPoints, oldDelegate.maskDraftPoints);
+      !listEquals(maskDraftPoints, oldDelegate.maskDraftPoints) ||
+      isCadSelected != oldDelegate.isCadSelected ||
+      isDragActive != oldDelegate.isDragActive ||
+      isDragPickingBase != oldDelegate.isDragPickingBase ||
+      dragBasePoint != oldDelegate.dragBasePoint ||
+      dragCurrentPoint != oldDelegate.dragCurrentPoint ||
+      dragSnapLabel != oldDelegate.dragSnapLabel ||
+      dragIsSnapped != oldDelegate.dragIsSnapped ||
+      dragDistanceMeters != oldDelegate.dragDistanceMeters ||
+      dragAngleDeg != oldDelegate.dragAngleDeg ||
+      ghostRasterPosition != oldDelegate.ghostRasterPosition ||
+      draggingRasterId != oldDelegate.draggingRasterId;
 }

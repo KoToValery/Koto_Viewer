@@ -238,56 +238,63 @@ class _ArchitectCadPointPickerDialogState
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             color: const Color(0xFF161B26),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    l.architectUnderlayPickPointInstruction,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF81D4FA),
-                      fontSize: 12,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isCompact ? 160 : 380,
+                    ),
+                    child: Text(
+                      l.architectUnderlayPickPointInstruction,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF81D4FA),
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                ActionChip(
-                  visualDensity: VisualDensity.compact,
-                  avatar: const AppIcon(AppIconId.newPoint, size: 14),
-                  label: Text(
-                    l.architectUnderlayPresetOrigin,
-                    style: const TextStyle(fontSize: 11),
+                  const SizedBox(width: 8),
+                  ActionChip(
+                    visualDensity: VisualDensity.compact,
+                    avatar: const AppIcon(AppIconId.newPoint, size: 14),
+                    label: Text(
+                      l.architectUnderlayPresetOrigin,
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _selectedCadPoint = Offset.zero;
+                      });
+                      _viewport.panBy(
+                        _viewport.size.center(Offset.zero) -
+                            _viewport.toScreen(Offset.zero),
+                      );
+                    },
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedCadPoint = Offset.zero;
-                    });
-                    _viewport.panBy(
-                      _viewport.size.center(Offset.zero) -
-                          _viewport.toScreen(Offset.zero),
-                    );
-                  },
-                ),
-                const SizedBox(width: 6),
-                ActionChip(
-                  visualDensity: VisualDensity.compact,
-                  avatar: const AppIcon(AppIconId.fitView, size: 14),
-                  label: Text(
-                    l.architectUnderlayPresetCenter,
-                    style: const TextStyle(fontSize: 11),
+                  const SizedBox(width: 6),
+                  ActionChip(
+                    visualDensity: VisualDensity.compact,
+                    avatar: const AppIcon(AppIconId.fitView, size: 14),
+                    label: Text(
+                      l.architectUnderlayPresetCenter,
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    onPressed: () {
+                      final c = widget.document.bounds.center;
+                      setState(() {
+                        _selectedCadPoint = c;
+                      });
+                      _viewport.panBy(
+                        _viewport.size.center(Offset.zero) - _viewport.toScreen(c),
+                      );
+                    },
                   ),
-                  onPressed: () {
-                    final c = widget.document.bounds.center;
-                    setState(() {
-                      _selectedCadPoint = c;
-                    });
-                    _viewport.panBy(
-                      _viewport.size.center(Offset.zero) - _viewport.toScreen(c),
-                    );
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
@@ -374,61 +381,146 @@ class _ArchitectCadPointPickerDialogState
 
           // 4. Bottom Coordinate Readout & Action Bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: isCompact ? 8 : 10,
+            ),
             decoration: const BoxDecoration(
               color: Color(0xFF1A212E),
               border: Border(top: BorderSide(color: Colors.white12)),
             ),
-            child: Row(
-              children: [
-                if (_selectedCadPoint != null) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white10,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'X: ${_selectedCadPoint!.dx.toStringAsFixed(3)} m   Y: ${_selectedCadPoint!.dy.toStringAsFixed(3)} m',
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        color: Color(0xFF00E676),
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+            child: isCompact
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _selectedCadPoint != null
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white10,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        'X: ${_selectedCadPoint!.dx.toStringAsFixed(3)} m   Y: ${_selectedCadPoint!.dy.toStringAsFixed(3)} m',
+                                        style: const TextStyle(
+                                          fontFamily: 'monospace',
+                                          color: Color(0xFF00E676),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : const Text(
+                                    '—',
+                                    style: TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                          ),
+                        ],
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(context).pop(null),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white70,
+                                side: const BorderSide(color: Colors.white24),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(l.cancel),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton.icon(
+                              onPressed: _selectedCadPoint != null
+                                  ? () => Navigator.of(context).pop(_selectedCadPoint)
+                                  : null,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFF00C853),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              icon: const AppIcon(AppIconId.confirm, size: 16),
+                              label: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(l.architectUnderlayPickPointConfirm),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      if (_selectedCadPoint != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white10,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'X: ${_selectedCadPoint!.dx.toStringAsFixed(3)} m   Y: ${_selectedCadPoint!.dy.toStringAsFixed(3)} m',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              color: Color(0xFF00E676),
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ] else
+                        const Text(
+                          '—',
+                          style: TextStyle(color: Colors.white54, fontSize: 13),
+                        ),
+                      const Spacer(),
+                      OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(null),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                          side: const BorderSide(color: Colors.white24),
+                        ),
+                        child: Text(l.cancel),
+                      ),
+                      const SizedBox(width: 12),
+                      FilledButton.icon(
+                        onPressed: _selectedCadPoint != null
+                            ? () => Navigator.of(context).pop(_selectedCadPoint)
+                            : null,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF00C853),
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const AppIcon(AppIconId.confirm, size: 16),
+                        label: Text(l.architectUnderlayPickPointConfirm),
+                      ),
+                    ],
                   ),
-                ] else
-                  const Text(
-                    '—',
-                    style: TextStyle(color: Colors.white54, fontSize: 13),
-                  ),
-                const Spacer(),
-                OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(null),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
-                    side: const BorderSide(color: Colors.white24),
-                  ),
-                  child: Text(l.cancel),
-                ),
-                const SizedBox(width: 12),
-                FilledButton.icon(
-                  onPressed: _selectedCadPoint != null
-                      ? () => Navigator.of(context).pop(_selectedCadPoint)
-                      : null,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF00C853),
-                    foregroundColor: Colors.white,
-                  ),
-                  icon: const AppIcon(AppIconId.confirm, size: 16),
-                  label: Text(l.architectUnderlayPickPointConfirm),
-                ),
-              ],
-            ),
           ),
         ],
       ),

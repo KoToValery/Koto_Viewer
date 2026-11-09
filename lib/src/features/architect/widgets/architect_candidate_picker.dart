@@ -134,6 +134,19 @@ List<ArchitectCandidateLabel> architectCandidateLabels(
     }
     if (labels.length == wanted.length) break;
   }
+  for (final id in ids) {
+    if (labels.containsKey(id)) continue;
+    if (id == 'underlay_cad') {
+      final cfg = project.cadUnderlays[project.activeStoreyId];
+      final name = cfg?.fileName.isNotEmpty == true ? cfg!.fileName : l.architectUnderlayToggle;
+      labels[id] = ArchitectCandidateLabel(id, l.architectUnderlayCandidate(name), null);
+    } else if (id.startsWith('underlay_raster_')) {
+      final rasterId = id.substring('underlay_raster_'.length);
+      final r = project.rasterUnderlays.where((x) => x.id == rasterId).firstOrNull;
+      final name = r?.fileName.isNotEmpty == true ? r!.fileName : 'Raster';
+      labels[id] = ArchitectCandidateLabel(id, l.architectUnderlayCandidate(name), null);
+    }
+  }
   return [
     for (final id in ids)
       labels[id] ?? ArchitectCandidateLabel(id, l.architectToolSelect, null),

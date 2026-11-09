@@ -22608,6 +22608,54 @@ abstract class AppLocalizations {
   /// **'CAD underlay positioned successfully'**
   String get architectUnderlayPlacedSuccess;
 
+  /// Action to drag and move underlay with snapping
+  ///
+  /// In en, this message translates to:
+  /// **'Move with Snap'**
+  String get architectUnderlayDrag;
+
+  /// Tooltip for underlay snap drag action
+  ///
+  /// In en, this message translates to:
+  /// **'Move underlay by picking a base point and snapping to drawing'**
+  String get architectUnderlayDragTooltip;
+
+  /// Prompt to select base point on underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Select base reference point on underlay'**
+  String get architectUnderlayPickBasePoint;
+
+  /// Prompt to snap underlay to target position
+  ///
+  /// In en, this message translates to:
+  /// **'Snap to drawing location to position underlay'**
+  String get architectUnderlayPickTargetPoint;
+
+  /// Snackbar message when underlay snap drag succeeds
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay repositioned successfully'**
+  String get architectUnderlayDragSuccess;
+
+  /// Candidate picker label for underlays
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay: {fileName}'**
+  String architectUnderlayCandidate(String fileName);
+
+  /// Label for underlay base reference point
+  ///
+  /// In en, this message translates to:
+  /// **'Base Point'**
+  String get architectUnderlayBasePoint;
+
+  /// HUD status text when underlay is selected
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay selected'**
+  String get architectUnderlaySelected;
+
   /// No description provided for @commandIconPathway.
   ///
   /// In en, this message translates to:

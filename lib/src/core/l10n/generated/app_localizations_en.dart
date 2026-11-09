@@ -12432,6 +12432,36 @@ class AppLocalizationsEn extends AppLocalizations {
       'CAD underlay positioned successfully';
 
   @override
+  String get architectUnderlayDrag => 'Move with Snap';
+
+  @override
+  String get architectUnderlayDragTooltip =>
+      'Move underlay by picking a base point and snapping to drawing';
+
+  @override
+  String get architectUnderlayPickBasePoint =>
+      'Select base reference point on underlay';
+
+  @override
+  String get architectUnderlayPickTargetPoint =>
+      'Snap to drawing location to position underlay';
+
+  @override
+  String get architectUnderlayDragSuccess =>
+      'Underlay repositioned successfully';
+
+  @override
+  String architectUnderlayCandidate(String fileName) {
+    return 'Underlay: $fileName';
+  }
+
+  @override
+  String get architectUnderlayBasePoint => 'Base Point';
+
+  @override
+  String get architectUnderlaySelected => 'Underlay selected';
+
+  @override
   String get commandIconPathway => 'Pathway with curb';
 
   @override

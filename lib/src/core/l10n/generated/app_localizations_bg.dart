@@ -12481,6 +12481,36 @@ class AppLocalizationsBg extends AppLocalizations {
       'CAD подложката е позиционирана успешно';
 
   @override
+  String get architectUnderlayDrag => 'Премести със снап';
+
+  @override
+  String get architectUnderlayDragTooltip =>
+      'Преместване на подложката чрез избор на опорна точка и прилепване към чертежа';
+
+  @override
+  String get architectUnderlayPickBasePoint =>
+      'Изберете базова опорна точка от подложката';
+
+  @override
+  String get architectUnderlayPickTargetPoint =>
+      'Прилепете към точка от чертежа за позициониране';
+
+  @override
+  String get architectUnderlayDragSuccess =>
+      'Подложката е позиционирана успешно';
+
+  @override
+  String architectUnderlayCandidate(String fileName) {
+    return 'Подложка: $fileName';
+  }
+
+  @override
+  String get architectUnderlayBasePoint => 'Опорна точка';
+
+  @override
+  String get architectUnderlaySelected => 'Селектирана подложка';
+
+  @override
   String get commandIconPathway => 'Алея с бордюр';
 
   @override
