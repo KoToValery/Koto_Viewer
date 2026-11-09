@@ -84,8 +84,8 @@ class ArchitectWallArc {
     double? envelopeOffset,
   }) {
     final outer = radius + (envelopeOffset ?? math.max(low.abs(), high.abs()));
-    final step = 2 * math.acos((1 - .00005 / outer).clamp(-1, 1));
-    final count = (sweep.abs() / step).ceil().clamp(1, 2048);
+    final step = 2 * math.acos((1 - .002 / outer).clamp(-1, 1));
+    final count = (sweep.abs() / step).ceil().clamp(8, 48);
     final ratios = [
       from,
       for (var i = (from * count).ceil(); i < to * count; i++)

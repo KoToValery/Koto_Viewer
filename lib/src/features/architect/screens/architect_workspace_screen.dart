@@ -20,7 +20,7 @@ import '../services/architect_drafting_seed.dart';
 import '../widgets/architect_selection_control.dart';
 import '../widgets/architect_selection_move_button.dart';
 import '../widgets/architect_selection_action_bar.dart';
-import '../widgets/architect_command_preview_bar.dart';
+import '../widgets/architect_floating_command_overlay.dart';
 import '../services/architect_command_preview.dart';
 import '../../bim_editing/commands/bim_edit_history.dart';
 import '../../../core/services/ui_settings_service.dart';
@@ -5935,14 +5935,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_arcEditorOpen) return;
     final draft = _draftArcWall;
     final original =
-        draft ?? (_effectiveSelection.length == 1 ? _selectedWall : null);
-    if (original == null || (draft == null && !original.isCurved)) return;
+        draft ?? (_effectiveSelection.length == 1 ? (_selectedWall ?? _selectedLinearElement) : null);
+    if (original == null) return;
     _cancelActiveDrags();
     final source = _project, start = _draftStart, end = _wallArcEnd;
     final oldPoint = _draftEnd, oldExact = _draftArcExactBulge;
     final wall = original.isCurved
         ? original
-        : original.copyWith(arcBulge: _lastDraftArcBulge);
+        : original.copyWith(arcBulge: (_lastDraftArcBulge.abs() > 1e-4 ? _lastDraftArcBulge : 0.2));
     if (dimension != null) _arcDimension = dimension;
     _arcEditorOpen = true;
     bool current() =>
@@ -6009,7 +6009,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         draft == null &&
         result != null &&
         (result.arcBulge - original.arcBulge).abs() > 1e-12) {
-      _executeWallEdit(command(result));
+      if (_selectedLineIds.contains(original.id)) {
+        final existingLine = source.activeStorey.cadPrimitives
+            .where((p) => p.id == original.id && p.type == CadPrimitiveType.line)
+            .firstOrNull;
+        if (existingLine != null) {
+          _commands.execute(
+            PlaceArchitectCadPrimitive(
+              storeyId: source.activeStoreyId,
+              primitive: existingLine.copyWith(arcBulge: result.arcBulge),
+            ),
+          );
+        }
+      } else {
+        _executeWallEdit(command(result));
+      }
     }
   }
 
@@ -6064,6 +6078,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ? _project.activeStorey.cadPrimitives.where((p) =>
           p.id == _effectiveSelection.single &&
           p.type == CadPrimitiveType.polyline,
+            ).firstOrNull
+      : null;
+
+  ArchitectCadPrimitive? get _selectedSpline => _effectiveSelection.length == 1
+      ? _project.activeStorey.cadPrimitives.where((p) =>
+          p.id == _effectiveSelection.single &&
+          p.type == CadPrimitiveType.spline,
             ).firstOrNull
       : null;
 
@@ -6162,6 +6183,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Set<String>? _pendingDetachWallIds;
 
   Offset? _wallJoinPointer;
+  String? _chamferFilletSourceId;
+  ArchitectChamferFilletOptions? _chamferFilletOptions;
 
   (Offset, Offset)? get _wallAttachLeaderLine {
     if (_wallAttachSourceId == null) return null;
@@ -6486,6 +6509,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _wallCutStart = null;
     _wallExtendId = null;
     _wallJoinSourceId = null;
+    _chamferFilletSourceId = null;
+    _chamferFilletOptions = null;
     _newPointTargetId = null;
     _newPointCandidate = null;
     _newPointSource = null;
@@ -6577,6 +6602,44 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _operationError();
     }
     _repaintPreview();
+  }
+
+  Offset _commandFloatingPosition(Size screenSize) {
+    Offset? modelTarget;
+    if (_newPointCandidate != null) {
+      modelTarget = _newPointCandidate;
+    } else if (_elementMoveDelta != null && _effectiveSelection.isNotEmpty) {
+      Rect? combined;
+      for (final id in _effectiveSelection) {
+        final b = ArchitectSelection.bounds(_project, id);
+        if (b != null) combined = combined == null ? b : combined.expandToInclude(b);
+      }
+      if (combined != null) {
+        modelTarget = combined.center + _elementMoveDelta!;
+      }
+    } else if (_cursorModel != null) {
+      modelTarget = _cursorModel;
+    } else if (_effectiveSelection.isNotEmpty) {
+      Rect? combined;
+      for (final id in _effectiveSelection) {
+        final b = ArchitectSelection.bounds(_project, id);
+        if (b != null) combined = combined == null ? b : combined.expandToInclude(b);
+      }
+      if (combined != null) {
+        modelTarget = combined.center;
+      }
+    }
+
+    Offset screenPos;
+    if (modelTarget != null) {
+      screenPos = _viewport.toScreen(modelTarget);
+    } else {
+      screenPos = Offset(screenSize.width / 2, screenSize.height / 2);
+    }
+
+    final x = (screenPos.dx - 60).clamp(16.0, screenSize.width - 170.0);
+    final y = (screenPos.dy - 60).clamp(48.0, screenSize.height - 110.0);
+    return Offset(x, y);
   }
 
   String? _editingGroupId;
@@ -8707,7 +8770,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    if (_wallExtendId != null) return;
+    if (_wallExtendId != null || _chamferFilletSourceId != null) return;
 
     if (_moveSelection ||
 
@@ -8943,11 +9006,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    final polyline = _selectedPolyline;
-    if (polyline != null && !polyline.isClosedPolyline && !_moveSelection && !_mirrorActive && _offsetOptions == null &&
+    final polyline = _selectedPolyline ?? _selectedSpline;
+    if (polyline != null && !_moveSelection && !_mirrorActive && _offsetOptions == null && _chamferFilletSourceId == null &&
         !_splitActive && _newPointTargetId == null) {
       final points = polyline.linePoints;
-      final edgeHit = ArchitectPolylineEditing.hitEdge(points,rawModel,_currentScale,_handleOffsetLength);
+      final edgeHit = polyline.type == CadPrimitiveType.spline ? null : ArchitectPolylineEditing.hitEdge(points,rawModel,_currentScale,_handleOffsetLength);
       final hit = edgeHit ?? ArchitectPolylineEditing.hit(
           points, rawModel, _currentScale, _handleOffsetLength,
       );
@@ -11101,7 +11164,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         final polylineIndex = _polylineVertexIndex;
         final polyline = _elementMoveOriginal!.activeStorey.cadPrimitives
             .where((p) => p.id == original.id &&
-                p.type == CadPrimitiveType.polyline,
+                (p.type == CadPrimitiveType.polyline || p.type == CadPrimitiveType.spline),
             ).firstOrNull;
         _elementMovePreview = polylineIndex != null && polyline != null
             ? UpdateArchitectPolyline(
@@ -13384,6 +13447,73 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
+    if (_chamferFilletSourceId != null) {
+      final sourceId = _chamferFilletSourceId!;
+      final options = _chamferFilletOptions!;
+      final storey = _project.activeStorey;
+      final targetWall = storey.walls
+          .where((w) =>
+              w.id != sourceId &&
+              (rawModel - BimLineGeometry.closest(rawModel, w.startPoint, w.endPoint)).distance < 16 / _currentScale)
+          .firstOrNull;
+      final targetLine = storey.cadPrimitives
+          .where((p) =>
+              p.id != sourceId &&
+              p.type == CadPrimitiveType.line &&
+              (rawModel - BimLineGeometry.closest(rawModel, p.startPoint, p.endPoint)).distance < 16 / _currentScale)
+          .firstOrNull;
+
+      if (targetWall != null && storey.walls.any((w) => w.id == sourceId)) {
+        final wA = storey.walls.firstWhere((w) => w.id == sourceId);
+        final wB = targetWall;
+        final res = options.isFillet
+            ? ArchitectChamferFillet.wallPairFillet(wA, wB, radius: options.value)
+            : ArchitectChamferFillet.wallPairChamfer(wA, wB, distance: options.value);
+        if (res != null) {
+          final nextWalls = storey.walls.map((w) {
+            if (w.id == wA.id) return res.wallA;
+            if (w.id == wB.id) return res.wallB;
+            return w;
+          }).toList()..add(res.connector);
+          _commands.commit(_project.updateActiveStorey(storey.copyWith(walls: nextWalls)));
+          _saveBiMProjectIfAttached();
+          HapticFeedback.lightImpact();
+        }
+        setState(() {
+          _chamferFilletSourceId = null;
+          _chamferFilletOptions = null;
+        });
+        return;
+      } else if (targetLine != null &&
+          storey.cadPrimitives.any((p) => p.id == sourceId && p.type == CadPrimitiveType.line)) {
+        final lA = storey.cadPrimitives.firstWhere((p) => p.id == sourceId);
+        final lB = targetLine;
+        final res = options.isFillet
+            ? ArchitectChamferFillet.linePairFillet(lA, lB, radius: options.value)
+            : ArchitectChamferFillet.linePairChamfer(lA, lB, distance: options.value);
+        if (res != null) {
+          final nextPrimitives = storey.cadPrimitives.map((p) {
+            if (p.id == lA.id) return res.lineA;
+            if (p.id == lB.id) return res.lineB;
+            return p;
+          }).toList()..add(res.connector);
+          _commands.commit(_project.updateActiveStorey(storey.copyWith(cadPrimitives: nextPrimitives)));
+          _saveBiMProjectIfAttached();
+          HapticFeedback.lightImpact();
+        }
+        setState(() {
+          _chamferFilletSourceId = null;
+          _chamferFilletOptions = null;
+        });
+        return;
+      }
+      setState(() {
+        _chamferFilletSourceId = null;
+        _chamferFilletOptions = null;
+      });
+      return;
+    }
+
     if (_wallJoinSourceId != null) {
 
       final sourceId = _wallJoinSourceId!;
@@ -14682,7 +14812,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         if (_activeTool == ArchitectTool.mask) { _commitMask(); return; }
 
-        if (_activeTool == ArchitectTool.spline) { _commitSpline(); return; }
+        if (_activeTool == ArchitectTool.spline) { _commitSpline(closed: true); return; }
 
         if (_activeTool == ArchitectTool.hatch) { _commitHatch(); return; }
 
@@ -24642,6 +24772,58 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
+  Widget _buildChamferFilletPromptBanner() {
+    final l = context.l10n;
+    final isFillet = _chamferFilletOptions?.isFillet ?? false;
+    return Center(
+      child: Material(
+        key: const ValueKey('architect-chamfer-fillet-banner'),
+        color: const Color(0xE61E1E26),
+        elevation: 6,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFF4DB6AC), width: 1.2),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isFillet ? Icons.rounded_corner : Icons.crop_square,
+                color: const Color(0xFF4DB6AC),
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                l.architectChamferFilletSelectSecond,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(width: 12),
+              IconButton(
+                key: const ValueKey('architect-chamfer-fillet-cancel'),
+                tooltip: l.cancel,
+                icon: const AppIcon(AppIconId.close, color: Colors.white70),
+                onPressed: () {
+                  setState(() {
+                    _chamferFilletSourceId = null;
+                    _chamferFilletOptions = null;
+                  });
+                  _repaintPreview();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _triggerWallJoin() {
     _beginGeometryCommand(ArchitectRadialAction.join);
 
@@ -25375,6 +25557,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 ),
 
                 if (wallIds.length == 1) ...[
+
+                  IconButton(
+                    key: const ValueKey('architect-wall-curve'),
+                    tooltip: l.architectWallCurveTooltip,
+                    icon: const Icon(
+                      Icons.rounded_corner,
+                      color: Color(0xFF80CBC4),
+                      size: 20,
+                    ),
+                    onPressed: () => _editWallArcDimension(),
+                  ),
 
                   IconButton(
 
@@ -27137,6 +27330,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
     if (options == null) return;
 
+    if (ids.length == 1 &&
+        (storey.walls.any((w) => w.id == ids.single) ||
+         storey.cadPrimitives.any((p) => p.id == ids.single && p.type == CadPrimitiveType.line))) {
+      setState(() {
+        _chamferFilletSourceId = ids.single;
+        _chamferFilletOptions = options;
+      });
+      return;
+    }
+
     _applyChamferFillet(options);
   }
 
@@ -27373,7 +27576,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (selectedLines.length == 2) {
       final lA = selectedLines[0];
       final lB = selectedLines[1];
-      final res = ArchitectChamferFillet.linePairChamfer(lA, lB, distance: options.value);
+      final res = options.isFillet
+          ? ArchitectChamferFillet.linePairFillet(lA, lB, radius: options.value)
+          : ArchitectChamferFillet.linePairChamfer(lA, lB, distance: options.value);
       if (res != null) {
         final nextPrimitives = storey.cadPrimitives.map((p) {
           if (p.id == lA.id) return res.lineA;
@@ -27986,26 +28191,79 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         );
       }
-      if (ids.length == 1 &&
-          InsertArchitectElementPoint.pathOf(storey, ids.single) != null) {
-        actions.add(
-          action(
-            'architect-selection-new-point',
-            l.bimNewPoint,
-            Icons.add_circle_outline,
-            () {
-              _cancelActiveDrags();
-              _startNewPointSession(ids.single);
-            },
-            color: accent,
-            commandId: 'newPoint',
-            graphic: BimEditingSymbol(
-              BimEditAction.newPoint,
+      if (ids.length == 1) {
+        final linePrim = storey.cadPrimitives.where((p) =>
+            p.id == ids.single &&
+            (p.type == CadPrimitiveType.line ||
+             p.type == CadPrimitiveType.polyline ||
+             p.type == CadPrimitiveType.spline)).firstOrNull;
+        if (linePrim != null) {
+          actions.add(
+            action(
+              'architect-selection-continue',
+              l.architectLineContinue,
+              Icons.play_arrow,
+              () => _continueLineDrafting(linePrim),
               color: accent,
-              size: 18,
+              commandId: 'continue',
+              tooltip: l.architectLineContinueTooltip,
             ),
-          ),
-        );
+          );
+          if (linePrim.type == CadPrimitiveType.line) {
+            actions.add(
+              action(
+                'architect-line-curve',
+                l.architectLineCurve,
+                Icons.rounded_corner,
+                () => _editWallArcDimension(),
+                color: accent,
+                commandId: 'curveLine',
+              ),
+            );
+          } else if (linePrim.type == CadPrimitiveType.polyline) {
+            actions.add(
+              action(
+                'architect-poly-curve',
+                l.architectPolylineCurveSegment,
+                Icons.rounded_corner,
+                () => _editPolylineSegmentArc(),
+                color: accent,
+                commandId: 'curvePolyline',
+              ),
+            );
+          } else if (linePrim.type == CadPrimitiveType.spline) {
+            final isClosed = linePrim.closed ?? false;
+            actions.add(
+              action(
+                'architect-spline-toggle-close',
+                isClosed ? l.architectSplineOpen : l.architectSplineClose,
+                isClosed ? Icons.lock_open : Icons.all_inclusive,
+                () => _toggleSplineClosed(linePrim),
+                color: accent,
+                commandId: 'toggleSpline',
+              ),
+            );
+          }
+        } else if (InsertArchitectElementPoint.pathOf(storey, ids.single) != null) {
+          actions.add(
+            action(
+              'architect-selection-new-point',
+              l.bimNewPoint,
+              Icons.add_circle_outline,
+              () {
+                _cancelActiveDrags();
+                _startNewPointSession(ids.single);
+              },
+              color: accent,
+              commandId: 'newPoint',
+              graphic: BimEditingSymbol(
+                BimEditAction.newPoint,
+                color: accent,
+                size: 18,
+              ),
+            ),
+          );
+        }
       }
       if (segmentIds.isNotEmpty) {
         actions.add(
@@ -30394,6 +30652,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         right: 16,
                         child: _buildAttachPromptBanner(),
                       ),
+                    if (_chamferFilletSourceId != null && !_is3DView)
+                      Positioned(
+                        bottom: 16,
+                        left: 16,
+                        right: 16,
+                        child: _buildChamferFilletPromptBanner(),
+                      ),
                     if (_wallJoinSourceId != null && !_is3DView)
 
                       Positioned(
@@ -32679,7 +32944,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     IconButton(
                       tooltip: context.l10n.applyAction,
                       icon: const AppIcon(AppIconId.confirm, color: Colors.cyanAccent),
-                      onPressed: _commitSpline,
+                      onPressed: () => _commitSpline(closed: false),
+                    ),
+                  if (_elementTool.slabDraftPoints.length >= 3)
+                    IconButton(
+                      tooltip: context.l10n.architectSplineClose,
+                      icon: const Icon(Icons.all_inclusive, color: Colors.cyanAccent, size: 20),
+                      onPressed: () => _commitSpline(closed: true),
                     ),
                   IconButton(
                     tooltip: context.l10n.cancel,
@@ -34012,13 +34283,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         ),
       if (_commandPreview != null)
-        Positioned(top: 8, left: 8, right: 8,
-          child: ArchitectCommandPreviewBar(
-            label: BimEditActions.label(_commandAction!, context.l10n),
-            ready: _commandCanConfirm,
-            onCancel: _cancelGeometryCommand,
-            onConfirm: _confirmGeometryCommand,
-          ),
+        ArchitectFloatingCommandOverlay(
+          label: BimEditActions.label(_commandAction!, context.l10n),
+          ready: _commandCanConfirm,
+          onCancel: _cancelGeometryCommand,
+          onConfirm: _confirmGeometryCommand,
+          position: _commandFloatingPosition(MediaQuery.sizeOf(context)),
         ),
     ],
 
@@ -34174,7 +34444,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
-  void _commitSpline() {
+  void _commitSpline({bool closed = false}) {
     if (_elementTool.slabDraftPoints.length < 2) return;
     final points = List<Offset>.from(_elementTool.slabDraftPoints);
     final bounds = ArchitectSceneGeometry.boundsOf(points);
@@ -34189,6 +34459,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             startPoint: bounds.topLeft,
             endPoint: bounds.bottomRight,
             polygon: points,
+            closed: closed,
             colorValue: 0xFF9E9E9E,
             lineStyle: _activeCadLineStyle,
           ),
@@ -34204,6 +34475,107 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       HapticFeedback.lightImpact();
     } on ArgumentError {
       _operationError();
+    }
+  }
+
+  void _continueLineDrafting(ArchitectCadPrimitive prim) {
+    _cancelActiveDrags();
+    _selectionIds.clear();
+    _selectedElementId = null;
+    if (prim.type == CadPrimitiveType.spline) {
+      final pts = prim.linePoints;
+      _activeTool = ArchitectTool.spline;
+      _elementTool.cancelSlabDrafting();
+      _commands.commit(
+        _project.updateActiveStorey(
+          _project.activeStorey.copyWith(
+            cadPrimitives: _project.activeStorey.cadPrimitives.where((p) => p.id != prim.id).toList(),
+          ),
+        ),
+      );
+      _elementTool.slabDraftPoints.addAll(pts);
+      _elementTool.slabCandidatePoint = pts.last;
+      _draftStart = pts.last;
+      _cursorModel = pts.last;
+    } else if (prim.type == CadPrimitiveType.polyline) {
+      _activeTool = ArchitectTool.cadLine;
+      _cadPolylineMode = true;
+      _polylineDraftId = prim.id;
+      _draftStart = prim.linePoints.last;
+      _cursorModel = prim.linePoints.last;
+    } else if (prim.type == CadPrimitiveType.line) {
+      final pts = [prim.startPoint, prim.endPoint];
+      _commands.execute(
+        PlaceArchitectCadPrimitive(
+          storeyId: _project.activeStoreyId,
+          primitive: prim.copyWith(
+            type: CadPrimitiveType.polyline,
+            polygon: pts,
+          ),
+        ),
+      );
+      _activeTool = ArchitectTool.cadLine;
+      _cadPolylineMode = true;
+      _polylineDraftId = prim.id;
+      _draftStart = prim.endPoint;
+      _cursorModel = prim.endPoint;
+    }
+    setState(() {});
+    _repaintPreview();
+  }
+
+  void _toggleSplineClosed(ArchitectCadPrimitive spline) {
+    final nextClosed = !(spline.closed ?? false);
+    _commands.execute(
+      PlaceArchitectCadPrimitive(
+        storeyId: _project.activeStoreyId,
+        primitive: spline.copyWith(closed: nextClosed),
+      ),
+    );
+    setState(() {});
+  }
+
+  void _editPolylineSegmentArc({int? edgeIndex}) async {
+    final poly = _selectedPolyline;
+    if (poly == null) return;
+    final pts = poly.linePoints;
+    if (pts.length < 2) return;
+    final idx = (edgeIndex ?? _polygonSelectedEdge ?? 0).clamp(0, pts.length - 2);
+    final p1 = pts[idx];
+    final p2 = pts[idx + 1];
+    final currentBulge = (poly.bulges != null && idx < poly.bulges!.length) ? poly.bulges![idx] : 0.2;
+
+    final tempWall = ArchitectWall(
+      id: 'segment_$idx',
+      startPoint: p1,
+      endPoint: p2,
+      arcBulge: currentBulge.abs() > 1e-4 ? currentBulge : 0.2,
+      thickness: 0.001,
+    );
+    final result = await showDialog<ArchitectWall>(
+      context: context,
+      builder: (_) => ArchitectWallArcDimensionDialog(
+        project: _project,
+        wall: tempWall,
+        dimension: _arcDimension,
+        confirmLabel: context.l10n.save,
+        onDimension: (d) {},
+        validate: (candidate) => candidate.validateGeometry(),
+        onPreview: (candidate) {},
+      ),
+    );
+    if (result != null) {
+      final newBulges = List<double>.generate(pts.length - 1, (i) {
+        if (i == idx) return result.arcBulge;
+        return (poly.bulges != null && i < poly.bulges!.length) ? poly.bulges![i] : 0.0;
+      });
+      _commands.execute(
+        PlaceArchitectCadPrimitive(
+          storeyId: _project.activeStoreyId,
+          primitive: poly.copyWith(bulges: newBulges),
+        ),
+      );
+      setState(() {});
     }
   }
 

@@ -3102,7 +3102,7 @@
   "@architectLeaderPrompt": { "description": "Prompt for leader note text" },
   "architectWindowWidth": "Width",
   "@architectWindowWidth": { "description": "Window width label" },
-  "architectWindowHeight": "Window Height",
+  "architectWindowHeight": "Height",
   "@architectWindowHeight": { "description": "Window height label" },
   "architectWindowSill": "Sill",
   "@architectWindowSill": { "description": "Window sill label" },
@@ -7012,5 +7012,25 @@
   "architectNoProjects": "No architectural projects yet. Create a new project or start with a blank drawing.",
   "@architectNoProjects": { "description": "Empty state description for architectural studio" },
   "structuralNoProjects": "No structural projects yet. Create a new project to start structural and seismic modeling.",
-  "@structuralNoProjects": { "description": "Empty state description for structural studio" }
+  "@structuralNoProjects": { "description": "Empty state description for structural studio" },
+  "architectLineContinue": "Continue",
+  "@architectLineContinue": { "description": "Action to continue line/polyline/spline drafting from the last point" },
+  "architectLineContinueTooltip": "Continue drafting from the end point",
+  "@architectLineContinueTooltip": { "description": "Tooltip for continue drafting action" },
+  "architectWallCurve": "Curve Wall",
+  "@architectWallCurve": { "description": "Action to curve a straight wall into an arc" },
+  "architectWallCurveTooltip": "Convert straight wall into an arc wall",
+  "@architectWallCurveTooltip": { "description": "Tooltip for curving wall" },
+  "architectLineCurve": "Curve Line",
+  "@architectLineCurve": { "description": "Action to curve a straight CAD line into an arc" },
+  "architectPolylineCurveSegment": "Curve Segment",
+  "@architectPolylineCurveSegment": { "description": "Action to curve a polyline segment into an arc" },
+  "architectSplineClose": "Close Spline",
+  "@architectSplineClose": { "description": "Action to close a spline curve" },
+  "architectSplineOpen": "Open Spline",
+  "@architectSplineOpen": { "description": "Action to open a closed spline curve" },
+  "architectChamferFilletSelectSecond": "Select second element for fillet / chamfer",
+  "@architectChamferFilletSelectSecond": {
+    "description": "Prompt to select second wall or line for chamfer/fillet"
+  }
 }

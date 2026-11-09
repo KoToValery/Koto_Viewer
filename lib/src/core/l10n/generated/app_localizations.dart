@@ -7316,7 +7316,7 @@ abstract class AppLocalizations {
   /// Window height label
   ///
   /// In en, this message translates to:
-  /// **'Window Height'**
+  /// **'Height'**
   String get architectWindowHeight;
 
   /// Window sill label
@@ -23201,6 +23201,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No structural projects yet. Create a new project to start structural and seismic modeling.'**
   String get structuralNoProjects;
+
+  /// Action to continue line/polyline/spline drafting from the last point
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get architectLineContinue;
+
+  /// Tooltip for continue drafting action
+  ///
+  /// In en, this message translates to:
+  /// **'Continue drafting from the end point'**
+  String get architectLineContinueTooltip;
+
+  /// Action to curve a straight wall into an arc
+  ///
+  /// In en, this message translates to:
+  /// **'Curve Wall'**
+  String get architectWallCurve;
+
+  /// Tooltip for curving wall
+  ///
+  /// In en, this message translates to:
+  /// **'Convert straight wall into an arc wall'**
+  String get architectWallCurveTooltip;
+
+  /// Action to curve a straight CAD line into an arc
+  ///
+  /// In en, this message translates to:
+  /// **'Curve Line'**
+  String get architectLineCurve;
+
+  /// Action to curve a polyline segment into an arc
+  ///
+  /// In en, this message translates to:
+  /// **'Curve Segment'**
+  String get architectPolylineCurveSegment;
+
+  /// Action to close a spline curve
+  ///
+  /// In en, this message translates to:
+  /// **'Close Spline'**
+  String get architectSplineClose;
+
+  /// Action to open a closed spline curve
+  ///
+  /// In en, this message translates to:
+  /// **'Open Spline'**
+  String get architectSplineOpen;
+
+  /// Prompt to select second wall or line for chamfer/fillet
+  ///
+  /// In en, this message translates to:
+  /// **'Select second element for fillet / chamfer'**
+  String get architectChamferFilletSelectSecond;
 }
 
 class _AppLocalizationsDelegate

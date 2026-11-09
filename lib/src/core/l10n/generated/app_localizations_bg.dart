@@ -12788,4 +12788,34 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get structuralNoProjects =>
       'Все още няма конструктивни проекти. Създайте нов проект за конструктивно и сеизмично моделиране.';
+
+  @override
+  String get architectLineContinue => 'Продължи';
+
+  @override
+  String get architectLineContinueTooltip =>
+      'Продължи чертането от последната точка';
+
+  @override
+  String get architectWallCurve => 'Извий в арка';
+
+  @override
+  String get architectWallCurveTooltip =>
+      'Преобразувай правата стена в извита арка';
+
+  @override
+  String get architectLineCurve => 'Извий линията';
+
+  @override
+  String get architectPolylineCurveSegment => 'Извий сегмента';
+
+  @override
+  String get architectSplineClose => 'Затвори сплайн';
+
+  @override
+  String get architectSplineOpen => 'Отвори сплайн';
+
+  @override
+  String get architectChamferFilletSelectSecond =>
+      'Изберете втори елемент за закръгляване / фаска';
 }

@@ -6,6 +6,8 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_wall.dart';
+import '../models/architect_elements.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../rendering/architect_wall_network.dart';
 
 // === SECTION: WALL CLEARANCES ===
@@ -310,8 +312,9 @@ class ArchitectWallTrimSpan {
   static ArchitectWallTrimSpan at(
     ArchitectWall wall,
     List<ArchitectWall> walls,
-    Offset pick,
-  ) {
+    Offset pick, {
+    List<ArchitectCadPrimitive>? cadPrimitives,
+  }) {
     final cuts = <double>[0, 1];
     for (final other in walls) {
       if (other.id == wall.id || other.isOpenRailing) continue;
@@ -347,6 +350,35 @@ class ArchitectWallTrimSpan {
       }
       final ratio = along / wall.length;
       if (cuts.every((c) => (c - ratio).abs() > 1e-8)) cuts.add(ratio);
+    }
+    if (cadPrimitives != null) {
+      for (final primitive in cadPrimitives) {
+        final segments = <(Offset, Offset)>[];
+        if (primitive.type == CadPrimitiveType.line) {
+          segments.add((primitive.startPoint, primitive.endPoint));
+        } else if (primitive.type == CadPrimitiveType.polyline || primitive.type == CadPrimitiveType.mask) {
+          final pts = primitive.linePoints;
+          for (var i = 1; i < pts.length; i++) {
+            segments.add((pts[i - 1], pts[i]));
+          }
+        }
+        for (final seg in segments) {
+          final pt = BimLineGeometry.intersection(
+            wall.coreCenterStart,
+            wall.coreCenterEnd,
+            seg.$1,
+            seg.$2,
+          );
+          if (pt != null) {
+            final d = pt - wall.coreCenterStart;
+            final along = d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
+            if (along > .001 && along < wall.length - .001) {
+              final ratio = along / wall.length;
+              if (cuts.every((c) => (c - ratio).abs() > 1e-8)) cuts.add(ratio);
+            }
+          }
+        }
+      }
     }
     cuts.sort();
     final d = pick - wall.coreCenterStart;

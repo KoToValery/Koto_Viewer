@@ -367,6 +367,53 @@ class ArchitectSnapGeometry {
           point(center, 'Center', primitive.id);
       }
     }
+    final cadSegments = <(Offset, Offset)>[];
+    for (final primitive in floor.cadPrimitives) {
+      if (primitive.type == CadPrimitiveType.line) {
+        cadSegments.add((primitive.startPoint, primitive.endPoint));
+      } else if (primitive.type == CadPrimitiveType.polyline || primitive.type == CadPrimitiveType.mask) {
+        final pts = primitive.linePoints;
+        for (var i = 1; i < pts.length; i++) {
+          cadSegments.add((pts[i - 1], pts[i]));
+        }
+      }
+    }
+    if (cadSegments.isNotEmpty) {
+      for (final wall in referenceWalls) {
+        if (wall.length < 1e-4) continue;
+        final wallLines = [
+          (wall.startPoint, wall.endPoint),
+          (wall.polygonCorners[0], wall.polygonCorners[1]),
+          (wall.polygonCorners[3], wall.polygonCorners[2]),
+        ];
+        for (final cadSeg in cadSegments) {
+          for (final wLine in wallLines) {
+            final pt = BimLineGeometry.intersection(
+              wLine.$1,
+              wLine.$2,
+              cadSeg.$1,
+              cadSeg.$2,
+            );
+            if (pt != null) {
+              point(pt, 'Intersection', '@wall-cad-joint');
+            }
+          }
+        }
+      }
+      for (var i = 0; i < cadSegments.length; i++) {
+        for (var j = i + 1; j < cadSegments.length; j++) {
+          final pt = BimLineGeometry.intersection(
+            cadSegments[i].$1,
+            cadSegments[i].$2,
+            cadSegments[j].$1,
+            cadSegments[j].$2,
+          );
+          if (pt != null) {
+            point(pt, 'Intersection', '@cad-joint');
+          }
+        }
+      }
+    }
     for (final dimension in floor.dimensions) {
       point(dimension.startPoint, 'Endpoint', dimension.id);
       point(dimension.endPoint, 'Endpoint', dimension.id);

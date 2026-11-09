@@ -733,13 +733,15 @@ class Architect2dPainter extends CustomPainter {
           ]), zoomScale: zoomScale, dimensionScale: _project.dimensionScale);
       }
       if (activeTool == ArchitectTool.spline && slabDraftPoints.isNotEmpty && slabCandidatePoint != null) {
-        final points = [...slabDraftPoints, slabCandidatePoint!];
+        final isNearStart = slabDraftPoints.length >= 3 &&
+            (slabCandidatePoint! - slabDraftPoints.first).distance <= (18.0 / zoomScale).clamp(0.05, 0.35);
+        final points = isNearStart ? slabDraftPoints : [...slabDraftPoints, slabCandidatePoint!];
         final bounds = ArchitectSceneGeometry.boundsOf(points);
         ArchitectElementsPainterHelper.drawCadPrimitives(canvas: canvas,
           storey: ArchitectStorey(id: 'preview', name: '', cadPrimitives: [
             ArchitectCadPrimitive(id: 'spline-preview', type: CadPrimitiveType.spline,
               startPoint: bounds.topLeft, endPoint: bounds.bottomRight,
-              polygon: points, colorValue: 0xFF00E5FF, lineStyle: ArchitectLineStyle.dashed),
+              polygon: points, closed: isNearStart, colorValue: 0xFF00E5FF, lineStyle: ArchitectLineStyle.dashed),
           ]), zoomScale: zoomScale, dimensionScale: _project.dimensionScale);
       }
       ArchitectElementsPainterHelper.drawSlabDrafting(
@@ -819,9 +821,9 @@ class Architect2dPainter extends CustomPainter {
                 doors: doorsVisible ? w.doors : const [],
                 windows: windowsVisible ? w.windows : const [],
               );
-            }
+          }
             return w;
-          })
+        })
           .toList(),
       columns: storey.columns
           .where((e) => keep(e.id, ArchitectLayer.columnLayerId))
@@ -859,9 +861,9 @@ class Architect2dPainter extends CustomPainter {
             if (selectedOnly) return e.id == selectedElementId;
             if (layer == ArchitectPaintLayer.model && selectedElementId != null) {
               return e.id != selectedElementId || e.type == CadPrimitiveType.hatch;
-            }
+          }
             return true;
-          })
+        })
           .toList(),
       floorDrains: storey.floorDrains
           .where((e) => keep(e.id, ArchitectLayer.drainageLayerId))
@@ -945,8 +947,8 @@ class Architect2dPainter extends CustomPainter {
       return;
     }
     final polyline = selected.cadPrimitives
-        .where((p) => p.type == CadPrimitiveType.polyline).firstOrNull;
-    if (polyline != null && !polyline.isClosedPolyline) {
+        .where((p) => p.type == CadPrimitiveType.polyline || p.type == CadPrimitiveType.spline).firstOrNull;
+    if (polyline != null && (!polyline.isClosedPolyline || polyline.type == CadPrimitiveType.spline)) {
       ArchitectElementsPainterHelper.drawCadPrimitives(
         dimensionScale: _project.dimensionScale,
         palette: palette,
@@ -956,9 +958,10 @@ class Architect2dPainter extends CustomPainter {
         selectedElementId: selectedElementId,
       );
       if (marqueePoints.isEmpty) {
-        final points = polyline.linePoints;
+        final points = polyline.type == CadPrimitiveType.spline ? (polyline.polygon ?? polyline.linePoints) : polyline.linePoints;
         final scale = math.max(zoomScale, 80.0);
         const color = Color(0xFF00BCD4);
+        if (polyline.type != CadPrimitiveType.spline) {
         for(var i=0;i+1<points.length;i++) {
           final mid=(points[i]+points[i+1])/2;
           canvas.drawCircle(mid,3.5/scale,Paint()..color=const Color(0xFFFF9800));
@@ -966,7 +969,8 @@ class Architect2dPainter extends CustomPainter {
             final grip=ArchitectPolylineEditing.edgeHandle(points,i,zoomScale,handleOffsetLength);
             canvas.drawLine(mid,grip,Paint()..color=const Color(0xFFFF9800)..strokeWidth=1/scale);
             _drawTouchGrip(canvas,grip,scale,const Color(0xFFFF9800));
-          }
+        }
+        }
         }
         for (var i = 0; i < points.length; i++) {
           canvas.drawCircle(points[i], 3.5 / scale, Paint()..color = color);

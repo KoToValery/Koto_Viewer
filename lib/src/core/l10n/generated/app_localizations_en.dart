@@ -4182,7 +4182,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWindowWidth => 'Width';
 
   @override
-  String get architectWindowHeight => 'Window Height';
+  String get architectWindowHeight => 'Height';
 
   @override
   String get architectWindowSill => 'Sill';
@@ -12738,4 +12738,34 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get structuralNoProjects =>
       'No structural projects yet. Create a new project to start structural and seismic modeling.';
+
+  @override
+  String get architectLineContinue => 'Continue';
+
+  @override
+  String get architectLineContinueTooltip =>
+      'Continue drafting from the end point';
+
+  @override
+  String get architectWallCurve => 'Curve Wall';
+
+  @override
+  String get architectWallCurveTooltip =>
+      'Convert straight wall into an arc wall';
+
+  @override
+  String get architectLineCurve => 'Curve Line';
+
+  @override
+  String get architectPolylineCurveSegment => 'Curve Segment';
+
+  @override
+  String get architectSplineClose => 'Close Spline';
+
+  @override
+  String get architectSplineOpen => 'Open Spline';
+
+  @override
+  String get architectChamferFilletSelectSecond =>
+      'Select second element for fillet / chamfer';
 }

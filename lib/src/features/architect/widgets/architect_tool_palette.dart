@@ -1609,14 +1609,15 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                               : FontWeight.normal,
                         ),
                       ),
-                      subtitle: Text(
-                        '${ArchitectFenestrationStyle.centimeters(s.defaultWidth)} × ${ArchitectFenestrationStyle.centimeters(s.defaultHeight)} cm'
-                        '${s.hasCasing ? ' • ${l10n.architectFenestrationCasing}' : ''}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
+                      subtitle: s.hasCasing
+                          ? Text(
+                              l10n.architectFenestrationCasing,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            )
+                          : null,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

@@ -643,7 +643,12 @@ class TrimArchitectWall extends ArchitectModelCommand {
     ArchitectModelCommand.point(pick);
     final storey = ArchitectModelCommand.storey(project, storeyId);
     final wall = storey.walls.firstWhere((w) => w.id == wallId);
-    final span = ArchitectWallTrimSpan.at(wall, storey.walls, pick);
+    final span = ArchitectWallTrimSpan.at(
+      wall,
+      storey.walls,
+      pick,
+      cadPrimitives: storey.cadPrimitives,
+    );
     for (final opening in [
       ...wall.doors.map((o) => (o.offsetRatio, o.width)),
       ...wall.windows.map((o) => (o.offsetRatio, o.width)),
@@ -2179,9 +2184,9 @@ class UpdateArchitectPolyline extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     final floor = ArchitectModelCommand.storey(project, storeyId);
     final old = floor.cadPrimitives
-        .where((p) => p.id == elementId && p.type == CadPrimitiveType.polyline)
+        .where((p) => p.id == elementId && (p.type == CadPrimitiveType.polyline || p.type == CadPrimitiveType.spline))
         .firstOrNull;
-    if (old == null) throw ArgumentError('Polyline not found');
+    if (old == null) throw ArgumentError('Polyline or Spline not found');
     final close =
         closed ??
         (old.isClosedPolyline ||
@@ -2189,10 +2194,12 @@ class UpdateArchitectPolyline extends ArchitectModelCommand {
     final vertices = List<Offset>.of(points);
     if (vertices.length > 2 && vertices.first == vertices.last)
       vertices.removeLast();
-    if (close && !ArchitectPolygonGeometry.valid(vertices))
+    if (close && old.type != CadPrimitiveType.spline && !ArchitectPolygonGeometry.valid(vertices))
       throw ArgumentError('Invalid closed contour');
-    if (close) vertices.add(vertices.first);
-    ArchitectCadPrimitive.validatePolyline(vertices);
+    if (close && old.type != CadPrimitiveType.spline) vertices.add(vertices.first);
+    if (old.type == CadPrimitiveType.polyline) {
+      ArchitectCadPrimitive.validatePolyline(vertices);
+    }
     return ArchitectModelCommand.replace(
       project,
       floor.copyWith(

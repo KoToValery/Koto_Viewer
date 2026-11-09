@@ -71,7 +71,9 @@
 | **cadArc** | L7025, L10157, L12624 | `_commitLineArc`, `_commitWallArc` | Arc radius HUD (`R=`), line style control |
 | **mask** | L7025, L10310, L13000 | `_commitMask`, `_elementTool.cancelSlabDrafting` | Mask HUD bar, border toggle checkbox |
 | **leader** | L7025, L10212, L13380 | `_promptAddLeaderAnnotation` | Multileader HUD bar, note dialog |
-| **spline** | L7025, L10310, L13000 | `_commitSpline` | Spline HUD bar, Catmull-Rom Bezier preview |
+| **spline** | L7025, L10310, L13000 | `_commitSpline`, `_continueLineDrafting`, `_toggleSplineClosed` | Spline HUD bar (Open & Close buttons), fit-point grip dragging |
+| **chamferFillet** | L8766, L13440, L27160 | `_triggerChamfer`, `_triggerFillet`, `_applyChamferFillet` | 2-step Join workflow with `_buildChamferFilletPromptBanner` |
+| **floatingHUD** | L6600, L34020 | `_commandFloatingPosition`, `_confirmGeometryCommand`, `_cancelGeometryCommand` | `ArchitectFloatingCommandOverlay` (floating ✓ & ✕ near element) |
 | **cadEllipse** | L7735, L10212, L14100 | `_commitCadEllipse` | Ellipse HUD bar, line style control |
 | **roofSlope** | L7735, L10315, L14115 | `_commitRoofSlopeArrow` | Roof slope HUD bar (format chips %, °, both; reverse arrow) |
 | **cadUnderlay** | L3890, L30506 | `_importOrReplaceCadUnderlay`, `_startCadPlacementWorkflow`, `_startUnderlaySnapDrag`, `_confirmUnderlaySnapPlacement`, `_repositionCurrentCadUnderlay`, `_confirmCadInsertion`, `_openCadContextMenu`, `_openCadMaskMenu`, `_openCadScaleDialog`, `_openCadEditDialog` | `ArchitectCadUnderlayBar`, `ArchitectCadPointPickerDialog`, `showArchitectUnderlayContextMenu`, `showArchitectCadScaleDialog`, `showArchitectUnderlayMaskMenu` |
@@ -106,6 +108,8 @@
 - `_activeLineCapSize` (`double`): Size in meters for line terminating end caps.
 - `_activePolylineWidth` (`double?`): Custom thickness for polyline segments.
 - `_polylineArcSegmentMode` (`bool`): Mixed polyline arc segment toggle.
+- `_chamferFilletSourceId` / `_chamferFilletOptions`: Join-style 2-step Chamfer and Fillet source state.
+- `_selectedSpline`: Single selected CadPrimitiveType.spline accessor.
 - `_maskBorder` (`bool`): Mask / wipeout border frame visibility.
 - `_activeRoofSlopeFormat` (`RoofSlopeFormat`): Roof slope display format (`percent`, `degree`, `both`).
 - `_activeRoofSlopeDirection` (`RoofSlopeDirection`): Roof slope arrow direction (`downslope`, `upslope`).

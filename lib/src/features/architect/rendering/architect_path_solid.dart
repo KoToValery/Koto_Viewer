@@ -6,7 +6,7 @@ import '../../dxf_3d_viewer/models/mesh_3d.dart';
 /// Extrudes boolean-clean paths, including holes and disconnected contours.
 /// Vertical decomposition avoids bridging a hole with an arbitrary diagonal.
 class ArchitectPathSolid {
-  static List<List<Offset>> contours(Path path, {double tolerance = .000001}) {
+  static List<List<Offset>> contours(Path path, {double tolerance = .002}) {
     final result = <List<Offset>>[];
     for (final metric in path.computeMetrics()) {
       final points = <Offset>[];
@@ -22,7 +22,7 @@ class ArchitectPathSolid {
           at((a + b) / 2),
           at(a + (b - a) * .75),
         ];
-        if (depth >= 14 ||
+        if (depth >= 6 ||
             ((b - a - length).abs() < tolerance &&
                 samples.every((r) => error(r) < tolerance))) {
           points.add(p);
@@ -87,7 +87,7 @@ class ArchitectPathSolid {
     double bottom,
     double top,
     Color color, {
-    double contourTolerance = .000001,
+    double contourTolerance = .002,
     bool compactCaps = false,
   }) {
     if (top - bottom < 1e-8) return const [];
@@ -106,7 +106,7 @@ class ArchitectPathSolid {
     double Function(Offset) bottom,
     double Function(Offset) top,
     Color color, {
-    double contourTolerance = .000001,
+    double contourTolerance = .002,
     bool compactCaps = false,
   }) {
     final loops = contours(path, tolerance: contourTolerance),
@@ -280,7 +280,7 @@ class ArchitectPathSolid {
   }
 
   static List<Offset> _cleanContour(List<Offset> loop) {
-    const tolerance = 1e-7;
+    const tolerance = 1e-6;
     final clean = <Offset>[];
     for (final p in loop) {
       if (clean.isEmpty || (p - clean.last).distance > tolerance) clean.add(p);
@@ -288,28 +288,26 @@ class ArchitectPathSolid {
     if (clean.length > 1 && (clean.first - clean.last).distance < tolerance) {
       clean.removeLast();
     }
-    var changed = true;
-    while (changed && clean.length > 3) {
-      changed = false;
-      for (var i = 0; i < clean.length; i++) {
-        final a = clean[(i + clean.length - 1) % clean.length],
-            b = clean[i],
-            c = clean[(i + 1) % clean.length];
-        final ab = b - a, bc = c - b;
-        if ((ab.dx * bc.dy - ab.dy * bc.dx).abs() <=
-                tolerance * math.max(ab.distance, bc.distance) &&
-            ab.dx * bc.dx + ab.dy * bc.dy >= 0) {
-          clean.removeAt(i);
-          changed = true;
-          break;
-        }
+    if (clean.length <= 3) return clean;
+
+    final result = <Offset>[];
+    for (var i = 0; i < clean.length; i++) {
+      final a = clean[(i + clean.length - 1) % clean.length],
+          b = clean[i],
+          c = clean[(i + 1) % clean.length];
+      final ab = b - a, bc = c - b;
+      final isCollinear = (ab.dx * bc.dy - ab.dy * bc.dx).abs() <=
+              tolerance * math.max(ab.distance, bc.distance) &&
+          ab.dx * bc.dx + ab.dy * bc.dy >= 0;
+      if (!isCollinear) {
+        result.add(b);
       }
     }
-    return clean;
+    return result.length >= 3 ? result : clean;
   }
 
   static List<(Offset, Offset, Offset)>? _triangulate(List<Offset> polygon) {
-    if (polygon.length < 3 || polygon.length > 1024) return null;
+    if (polygon.length < 3 || polygon.length > 2048) return null;
     double cross(Offset a, Offset b, Offset c) =>
         (b - a).dx * (c - a).dy - (b - a).dy * (c - a).dx;
     var area = 0.0;

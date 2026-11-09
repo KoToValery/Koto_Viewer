@@ -4359,5 +4359,14 @@
   "architectWizardRemoveOverlay": "Премахни подложка",
   "architectWizardStoreyOverlay": "CAD Подложка",
   "architectNoProjects": "Все още няма архитектурни проекти. Създайте нов проект или започнете с празен чертеж.",
-  "structuralNoProjects": "Все още няма конструктивни проекти. Създайте нов проект за конструктивно и сеизмично моделиране."
+  "structuralNoProjects": "Все още няма конструктивни проекти. Създайте нов проект за конструктивно и сеизмично моделиране.",
+  "architectLineContinue": "Продължи",
+  "architectLineContinueTooltip": "Продължи чертането от последната точка",
+  "architectWallCurve": "Извий в арка",
+  "architectWallCurveTooltip": "Преобразувай правата стена в извита арка",
+  "architectLineCurve": "Извий линията",
+  "architectPolylineCurveSegment": "Извий сегмента",
+  "architectSplineClose": "Затвори сплайн",
+  "architectSplineOpen": "Отвори сплайн",
+  "architectChamferFilletSelectSecond": "Изберете втори елемент за закръгляване / фаска"
 }

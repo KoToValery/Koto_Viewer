@@ -363,4 +363,88 @@ class ArchitectChamferFillet {
 
     return (lineA: newLineA, lineB: newLineB, connector: connector);
   }
+
+  /// Applies fillet to two intersecting CAD lines, returning the modified lines and an arc connector.
+  static ({
+    ArchitectCadPrimitive lineA,
+    ArchitectCadPrimitive lineB,
+    ArchitectCadPrimitive connector,
+  })? linePairFillet(
+    ArchitectCadPrimitive lineA,
+    ArchitectCadPrimitive lineB, {
+    required double radius,
+  }) {
+    final v = lineIntersection(
+      lineA.startPoint,
+      lineA.endPoint,
+      lineB.startPoint,
+      lineB.endPoint,
+    );
+    if (v == null || radius <= 1e-6) return null;
+
+    final (aNearStart, aFar) = (lineA.startPoint - v).distance < (lineA.endPoint - v).distance
+        ? (true, lineA.endPoint)
+        : (false, lineA.startPoint);
+    final (bNearStart, bFar) = (lineB.startPoint - v).distance < (lineB.endPoint - v).distance
+        ? (true, lineB.endPoint)
+        : (false, lineB.startPoint);
+
+    final lenA = (aFar - v).distance;
+    final lenB = (bFar - v).distance;
+    if (lenA < 1e-5 || lenB < 1e-5) return null;
+
+    final uA = (aFar - v) / lenA;
+    final uB = (bFar - v) / lenB;
+
+    final cosTheta = (uA.dx * uB.dx + uA.dy * uB.dy).clamp(-1.0, 1.0);
+    if (cosTheta.abs() > 0.9999) return null;
+
+    final theta = math.acos(cosTheta);
+    final alpha = theta / 2;
+    final tanAlpha = math.tan(alpha);
+    if (tanAlpha.abs() < 1e-6) return null;
+
+    final idealT = radius / tanAlpha;
+    final maxT = math.min(lenA, lenB) * 0.49;
+    final tEff = math.min(idealT, maxT);
+    final rEff = tEff * tanAlpha;
+
+    final tA = v + uA * tEff;
+    final tB = v + uB * tEff;
+
+    final newLineA = aNearStart
+        ? lineA.copyWith(startPoint: tA)
+        : lineA.copyWith(endPoint: tA);
+    final newLineB = bNearStart
+        ? lineB.copyWith(startPoint: tB)
+        : lineB.copyWith(endPoint: tB);
+
+    final bisector = uA + uB;
+    final bLen = bisector.distance;
+    if (bLen < 1e-6) return null;
+    final uBis = bisector / bLen;
+    final center = v + uBis * (rEff / math.sin(alpha));
+
+    final phiA = math.atan2(tA.dy - center.dy, tA.dx - center.dx);
+    final phiB = math.atan2(tB.dy - center.dy, tB.dx - center.dx);
+    var sweep = phiB - phiA;
+    while (sweep > math.pi) {
+      sweep -= 2 * math.pi;
+    }
+    while (sweep < -math.pi) {
+      sweep += 2 * math.pi;
+    }
+
+    final bulge = math.tan(sweep / 4);
+
+    final connector = lineA.copyWith(
+      id: 'fillet_arc_${DateTime.now().microsecondsSinceEpoch}',
+      type: CadPrimitiveType.arc,
+      startPoint: tA,
+      endPoint: tB,
+      arcBulge: bulge,
+    );
+
+    return (lineA: newLineA, lineB: newLineB, connector: connector);
+  }
 }
