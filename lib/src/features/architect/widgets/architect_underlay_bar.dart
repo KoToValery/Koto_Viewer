@@ -21,6 +21,7 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
   final VoidCallback onExtractContours;
   final VoidCallback onApplyToTerrain;
   final VoidCallback onRemoveUnderlay;
+  final VoidCallback? onReposition;
   final VoidCallback? onOpenScale;
   final void Function(Offset globalPosition)? onOpenMaskMenu;
   final void Function(Offset globalPosition)? onOpenContextMenu;
@@ -40,6 +41,7 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
     required this.onExtractContours,
     required this.onApplyToTerrain,
     required this.onRemoveUnderlay,
+    this.onReposition,
     this.onOpenScale,
     this.onOpenMaskMenu,
     this.onOpenContextMenu,
@@ -225,6 +227,16 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
                     label: Text(l.architectCadUnderlayDetectGeodesy),
                   ),
                 ],
+                const SizedBox(width: 6),
+                OutlinedButton.icon(
+                  onPressed: isBusy ? null : onReposition,
+                  icon: const AppIcon(
+                    AppIconId.newPoint,
+                    size: 15,
+                    color: Color(0xFF00E676),
+                  ),
+                  label: Text(l.architectUnderlayReposition),
+                ),
                 const SizedBox(width: 6),
                 OutlinedButton.icon(
                   onPressed: isBusy ? null : onOpenScale,
@@ -751,6 +763,21 @@ Future<String?> showArchitectUnderlayContextMenu({
       globalPosition.dy,
     ),
     items: [
+      if (isCad)
+        PopupMenuItem(
+          value: 'reposition',
+          child: Row(
+            children: [
+              const AppIcon(
+                AppIconId.newPoint,
+                size: 18,
+                color: Color(0xFF00E676),
+              ),
+              const SizedBox(width: 8),
+              Text(l.architectUnderlayReposition),
+            ],
+          ),
+        ),
       PopupMenuItem(
         value: 'edit',
         child: Row(

@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import '../services/architect_underlay_service.dart';
 import '../services/architect_geodetic_detector.dart';
 import '../widgets/architect_underlay_bar.dart';
+import '../widgets/architect_cad_point_picker_dialog.dart';
 import '../../bim_projects/services/bim_underlay_picker_helper.dart';
 import '../widgets/architect_dialog.dart';
 import '../services/architect_column_clearance.dart';
@@ -343,6 +344,7 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // [SEC-02-STATE]   L434-L7461   : [TAG:STATE_CORE] State fields, controllers, listeners, dialog triggers, and lifecycle
 //   ↳ [SUB-02A]    L435-L3831   : [TAG:STATE_FIELDS] Active tool flags, drafting caches, preview points, mode enums
 //   ↳ [SUB-02U]    L3832-L7197  : [TAG:UNDERLAY_TOOLS] CAD Xref live-reload, Raster 2-point calibration & Geodesy handlers
+//   ↳ [SUB-02UI]   L3890-L4250  : [TAG:CAD_INSERTION] CAD underlay control points, ghost preview & repositioning
 //   ↳ [SUB-02C]    L7198-L7461  : [TAG:STATE_LIFECYCLE] `initState()`, `_initTransform()`, `dispose()`
 // [SEC-03-XFORM]   L7462-L7682  : [TAG:XFORM_COORDS] Coordinate transforms: `_screenToModel`, `_modelToScreen`, hit tests
 // [SEC-04-TOUCH]   L7683-L14324 : [TAG:TOUCH_INPUT] 2D Pointer & Gesture dispatch for all architectural tools
@@ -3888,6 +3890,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   List<Offset> _underlayMaskPoints = [];
   Offset? _underlayMaskDraftStart;
 
+  // --- SUBSECTION: [TAG:CAD_INSERTION] CAD UNDERLAY INTERACTIVE PLACEMENT ---
+  bool _cadInsertionActive = false;
+  Offset? _cadInsertionControlPoint;
+  Offset? _cadInsertionPendingPoint;
+  Offset? _cadInsertionHoverPoint;
+  DxfDocument? _cadInsertionDoc;
+  double _cadInsertionUnitsPerMeter = 1.0;
+  ArchitectCadUnderlayConfig? _cadInsertionConfig;
+
+  BimCoordinateFrame? get _ghostUnderlayFrame {
+    if (!_cadInsertionActive || _cadInsertionControlPoint == null) return null;
+    final target = _cadInsertionPendingPoint ??
+        _cadInsertionHoverPoint ??
+        _cursorModel ??
+        Offset.zero;
+    final scale =
+        _cadInsertionUnitsPerMeter > 0 ? _cadInsertionUnitsPerMeter : 1.0;
+    final origin = _cadInsertionControlPoint! - target * scale;
+    return BimCoordinateFrame(origin: origin, unitsPerMeter: scale);
+  }
+
   double _componentRotation = 0.0;
   bool _showFurnitureLayer = true;
 
@@ -4079,6 +4102,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             duration: const Duration(seconds: 2),
           ),
         );
+        if (!isAutoReload) {
+          unawaited(_startCadPlacementWorkflow(doc: doc, config: nextCfg));
+        }
       }
     } catch (e, stack) {
       debugPrint('[ArchitectWorkspaceScreen] _loadExternalCadFileForStorey error: $e\n$stack');
@@ -4152,6 +4178,98 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       sourceFile: sourceFile,
       isAutoReload: true,
     );
+  }
+
+  Future<void> _startCadPlacementWorkflow({
+    required DxfDocument doc,
+    required ArchitectCadUnderlayConfig config,
+  }) async {
+    final chosenCadPoint = await ArchitectCadPointPickerDialog.show(
+      context: context,
+      document: doc,
+      fileName: config.fileName,
+      initialCadPoint: (config.lockedCadOriginX != null &&
+              config.lockedCadOriginY != null)
+          ? Offset(config.lockedCadOriginX!, config.lockedCadOriginY!)
+          : doc.bounds.center,
+      unitsPerMeter: config.unitsPerMeter ?? 1.0,
+    );
+    if (!mounted || chosenCadPoint == null) return;
+
+    setState(() {
+      _cadInsertionActive = true;
+      _cadInsertionDoc = doc;
+      _cadInsertionConfig = config;
+      _cadInsertionControlPoint = chosenCadPoint;
+      _cadInsertionPendingPoint = null;
+      _cadInsertionHoverPoint = _cursorModel ?? _viewport.visibleRect.center;
+      _cadInsertionUnitsPerMeter = config.unitsPerMeter ?? 1.0;
+      _activeTool = ArchitectTool.cadUnderlay;
+    });
+  }
+
+  Future<void> _repositionCurrentCadUnderlay() async {
+    final storeyId = _project.activeStorey.id;
+    final cfg = _project.cadUnderlays[storeyId];
+    final doc = _underlaysByStorey[storeyId];
+    if (cfg == null || doc == null) return;
+    await _startCadPlacementWorkflow(doc: doc, config: cfg);
+  }
+
+  void _confirmCadInsertion() {
+    if (!_cadInsertionActive ||
+        _cadInsertionControlPoint == null ||
+        _cadInsertionPendingPoint == null) {
+      return;
+    }
+    final scale =
+        _cadInsertionUnitsPerMeter > 0 ? _cadInsertionUnitsPerMeter : 1.0;
+    final newOriginX =
+        _cadInsertionControlPoint!.dx - _cadInsertionPendingPoint!.dx * scale;
+    final newOriginY =
+        _cadInsertionControlPoint!.dy - _cadInsertionPendingPoint!.dy * scale;
+
+    final storeyId = _project.activeStorey.id;
+    final cfg = _project.cadUnderlays[storeyId] ?? _cadInsertionConfig;
+    if (cfg != null) {
+      final updated = cfg.copyWith(
+        lockedCadOriginX: newOriginX,
+        lockedCadOriginY: newOriginY,
+        unitsPerMeter: scale,
+        lockOrigin: true,
+      );
+      final map =
+          Map<String, ArchitectCadUnderlayConfig>.from(_project.cadUnderlays)
+            ..[storeyId] = updated;
+
+      setState(() {
+        _commands.commit(_project.copyWith(cadUnderlays: map));
+        _cadInsertionActive = false;
+        _cadInsertionControlPoint = null;
+        _cadInsertionPendingPoint = null;
+        _cadInsertionHoverPoint = null;
+        _cadInsertionDoc = null;
+        _cadInsertionConfig = null;
+      });
+      _saveBiMProjectIfAttached();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectUnderlayPlacedSuccess),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _cancelCadInsertion() {
+    setState(() {
+      _cadInsertionActive = false;
+      _cadInsertionControlPoint = null;
+      _cadInsertionPendingPoint = null;
+      _cadInsertionHoverPoint = null;
+      _cadInsertionDoc = null;
+      _cadInsertionConfig = null;
+    });
   }
 
   void _openCadDxfLayersSheet() {
@@ -4618,6 +4736,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
     if (!mounted || action == null) return;
     switch (action) {
+      case 'reposition':
+        _repositionCurrentCadUnderlay();
       case 'edit':
         _openCadEditDialog();
       case 'scale':
@@ -8125,6 +8245,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final rawModel = _screenToModel(event.localPosition);
 
+    if (_cadInsertionActive) {
+      final snap = _snapDimensionPoint(rawModel);
+      setState(() {
+        _cadInsertionPendingPoint = snap.point;
+        _cadInsertionHoverPoint = snap.point;
+      });
+      return;
+    }
+
     if (_underlayMaskDrafting) {
       if (_underlayMaskMode == 'rect') {
         _underlayMaskDraftStart = rawModel;
@@ -10348,6 +10477,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     _updateMidpointReferences(rawModel);
+
+    if (_cadInsertionActive) {
+      final snap = _snapDimensionPoint(rawModel);
+      _cadInsertionHoverPoint = snap.point;
+      _cursorModel = snap.point;
+      _activeSnapLabel = snap.snapLabel;
+      _activeMagneticGuides = snap.magneticGuides;
+      _repaintPreview();
+      return;
+    }
 
     if (_draggingRasterId != null &&
         _rasterDragStartModel != null &&
@@ -31147,6 +31286,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     cadConfig: _currentCadUnderlayConfig,
                     maskDraftPoints: _underlayMaskPoints,
                     isMaskDrafting: _underlayMaskDrafting,
+                    isPlacingCadUnderlay: _cadInsertionActive,
+                    ghostCadDocument: _cadInsertionDoc,
+                    ghostCadFrame: _ghostUnderlayFrame,
+                    ghostInsertionPoint: _cadInsertionPendingPoint ??
+                        _cadInsertionHoverPoint ??
+                        _cursorModel,
                   ),
                 ),
               ),
@@ -32066,6 +32211,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               onExtractContours: _extractGeodesyFromCurrentUnderlay,
               onApplyToTerrain: _applyGeodesyTo3DTerrain,
               onRemoveUnderlay: _removeCurrentCadUnderlay,
+              onReposition: _repositionCurrentCadUnderlay,
               onOpenScale: _openCadScaleDialog,
               onOpenMaskMenu: (pos) => _openCadMaskMenu(pos),
               onOpenContextMenu: (pos) => _openCadContextMenu(pos),
@@ -32201,6 +32347,131 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ),
             ),
           ),
+        ),
+
+      if (_cadInsertionActive)
+        Positioned(
+          top: 16,
+          left: 16,
+          right: 16,
+          child: Center(
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xEE1E293B),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const AppIcon(
+                      AppIconId.newPoint,
+                      size: 20,
+                      color: Color(0xFF00E676),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _cadInsertionPendingPoint == null
+                              ? context.l10n.architectUnderlayInsertionPrompt
+                              : '${context.l10n.architectUnderlayInsertionConfirm}: (${_cadInsertionPendingPoint!.dx.toStringAsFixed(2)}, ${_cadInsertionPendingPoint!.dy.toStringAsFixed(2)})',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (_cadInsertionControlPoint != null)
+                          Text(
+                            'CAD Base: (${_cadInsertionControlPoint!.dx.toStringAsFixed(2)}, ${_cadInsertionControlPoint!.dy.toStringAsFixed(2)})',
+                            style: const TextStyle(
+                              color: Color(0xFF81D4FA),
+                              fontSize: 11,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(width: 14),
+                    if (_cadInsertionPendingPoint != null) ...[
+                      Tooltip(
+                        message: context.l10n.architectUnderlayInsertionConfirm,
+                        child: IconButton.filled(
+                          onPressed: _confirmCadInsertion,
+                          style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xFF00C853),
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: const AppIcon(AppIconId.confirm, size: 18),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Tooltip(
+                      message: context.l10n.architectUnderlayInsertionCancel,
+                      child: IconButton.outlined(
+                        onPressed: _cancelCadInsertion,
+                        style: IconButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                          side: const BorderSide(color: Colors.white24),
+                        ),
+                        icon: const AppIcon(AppIconId.close, size: 18),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+      // In-canvas floating confirmation badge pinned directly at insertion point
+      if (_cadInsertionActive && _cadInsertionPendingPoint != null)
+        Builder(
+          builder: (ctx) {
+            final screenPos = _modelToScreen(_cadInsertionPendingPoint!);
+            return Positioned(
+              left: (screenPos.dx - 64).clamp(16.0, MediaQuery.of(ctx).size.width - 140),
+              top: (screenPos.dy - 56).clamp(64.0, MediaQuery.of(ctx).size.height - 80),
+              child: Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(24),
+                color: const Color(0xEE1E293B),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: context.l10n.architectUnderlayInsertionConfirm,
+                        onPressed: _confirmCadInsertion,
+                        icon: const Icon(
+                          Icons.check_circle_rounded,
+                          color: Color(0xFF00E676),
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        tooltip: context.l10n.architectUnderlayInsertionCancel,
+                        onPressed: _cancelCadInsertion,
+                        icon: const Icon(
+                          Icons.cancel_rounded,
+                          color: Colors.redAccent,
+                          size: 26,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         ),
 
       if (_activeTool == ArchitectTool.roofSlope && _effectiveSelection.isEmpty)

@@ -12414,6 +12414,59 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
+  String get architectUnderlayReposition => 'Репозиционирай';
+
+  @override
+  String get architectUnderlayRepositionTooltip =>
+      'Репозициониране на CAD подложката чрез избор на нова контролна точка';
+
+  @override
+  String get architectUnderlayPickPointTitle =>
+      'Избор на контролна точка на подложката';
+
+  @override
+  String get architectUnderlayPickPointInstruction =>
+      'Придвижете, мащабирайте и посочете пресечна точка на оси, ъгъл или точка за база на вмъкване';
+
+  @override
+  String get architectUnderlayPickPointConfirm => 'Потвърди контролна точка';
+
+  @override
+  String get architectUnderlaySnapIntersection => 'Пресечна точка';
+
+  @override
+  String get architectUnderlaySnapEndpoint => 'Край';
+
+  @override
+  String get architectUnderlaySnapMidpoint => 'Среда';
+
+  @override
+  String get architectUnderlaySnapCenter => 'Център';
+
+  @override
+  String get architectUnderlaySnapNearest => 'Върху елемент';
+
+  @override
+  String get architectUnderlayPresetOrigin => 'Координатно начало (0,0)';
+
+  @override
+  String get architectUnderlayPresetCenter => 'Център на чертежа';
+
+  @override
+  String get architectUnderlayInsertionPrompt =>
+      'Посочете точка на вмъкване на чертежа';
+
+  @override
+  String get architectUnderlayInsertionConfirm => 'Постави подложката';
+
+  @override
+  String get architectUnderlayInsertionCancel => 'Отказ';
+
+  @override
+  String get architectUnderlayPlacedSuccess =>
+      'CAD подложката е позиционирана успешно';
+
+  @override
   String get commandIconPathway => 'Алея с бордюр';
 
   @override

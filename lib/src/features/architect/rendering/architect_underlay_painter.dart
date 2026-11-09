@@ -32,6 +32,10 @@ class ArchitectUnderlayPainter extends CustomPainter {
   final ArchitectCadUnderlayConfig? cadConfig;
   final List<Offset>? maskDraftPoints;
   final bool isMaskDrafting;
+  final bool isPlacingCadUnderlay;
+  final DxfDocument? ghostCadDocument;
+  final BimCoordinateFrame? ghostCadFrame;
+  final Offset? ghostInsertionPoint;
 
   ArchitectUnderlayPainter({
     required this.document,
@@ -52,6 +56,10 @@ class ArchitectUnderlayPainter extends CustomPainter {
     this.cadConfig,
     this.maskDraftPoints,
     this.isMaskDrafting = false,
+    this.isPlacingCadUnderlay = false,
+    this.ghostCadDocument,
+    this.ghostCadFrame,
+    this.ghostInsertionPoint,
   }) : super(repaint: viewport);
 
   @override
@@ -64,12 +72,15 @@ class ArchitectUnderlayPainter extends CustomPainter {
     final hasCalibration = calibrationP1 != null || calibrationCursor != null;
     final hasMaskDraft =
         isMaskDrafting && maskDraftPoints != null && maskDraftPoints!.isNotEmpty;
+    final hasGhostCad =
+        isPlacingCadUnderlay && ghostCadDocument != null && ghostCadFrame != null;
 
     if (!hasCad &&
         !hasRaster &&
         !hasTopo &&
         !hasCalibration &&
-        !hasMaskDraft) {
+        !hasMaskDraft &&
+        !hasGhostCad) {
       return;
     }
 
@@ -238,6 +249,87 @@ class ArchitectUnderlayPainter extends CustomPainter {
     if (hasMaskDraft) {
       _paintMaskDraft(canvas);
     }
+
+    // 6. Paint Ghost CAD Underlay Placement Preview
+    if (hasGhostCad) {
+      _paintGhostCadPlacement(canvas);
+    }
+  }
+
+  void _paintGhostCadPlacement(Canvas canvas) {
+    if (ghostCadDocument == null || ghostCadFrame == null) return;
+    canvas.save();
+    canvas.translate(viewport.translation.dx, viewport.translation.dy);
+    canvas.scale(viewport.scale);
+
+    canvas.save();
+    canvas.scale(1.0 / ghostCadFrame!.unitsPerMeter);
+    canvas.translate(-ghostCadFrame!.origin.dx, -ghostCadFrame!.origin.dy);
+
+    final ghostPalette = palette.isDark
+        ? const ArchitectCanvasPalette.dark()
+        : const ArchitectCanvasPalette.light();
+
+    ArchitectElementsPainterHelper.drawUnderlay(
+      canvas: canvas,
+      palette: ghostPalette,
+      underlayDoc: ghostCadDocument,
+      zoomScale: viewport.scale / ghostCadFrame!.unitsPerMeter,
+      layerVisibility: visibility,
+      visibleRect: ghostCadFrame!
+          .rectToCad(viewport.visibleRect)
+          .inflate(4 * ghostCadFrame!.unitsPerMeter / viewport.scale),
+    );
+    canvas.restore();
+
+    if (ghostInsertionPoint != null) {
+      final pt = ghostInsertionPoint!;
+      final double ringRadius = 10.0 / viewport.scale;
+      final double arm = 22.0 / viewport.scale;
+
+      final targetRingPaint = Paint()
+        ..color = const Color(0xFF00E676)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2 / viewport.scale;
+      canvas.drawCircle(pt, ringRadius, targetRingPaint);
+
+      final glowPaint = Paint()
+        ..color = const Color(0xFF00E676).withValues(alpha: 0.22)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(pt, ringRadius * 1.6, glowPaint);
+
+      final crossPaint = Paint()
+        ..color = const Color(0xFF00E676)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8 / viewport.scale;
+      canvas.drawLine(
+        Offset(pt.dx - arm, pt.dy),
+        Offset(pt.dx - ringRadius * 0.5, pt.dy),
+        crossPaint,
+      );
+      canvas.drawLine(
+        Offset(pt.dx + ringRadius * 0.5, pt.dy),
+        Offset(pt.dx + arm, pt.dy),
+        crossPaint,
+      );
+      canvas.drawLine(
+        Offset(pt.dx, pt.dy - arm),
+        Offset(pt.dx, pt.dy - ringRadius * 0.5),
+        crossPaint,
+      );
+      canvas.drawLine(
+        Offset(pt.dx, pt.dy + ringRadius * 0.5),
+        Offset(pt.dx, pt.dy + arm),
+        crossPaint,
+      );
+
+      final dotPaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(pt, 2.5 / viewport.scale, dotPaint);
+    }
+
+    canvas.restore();
   }
 
   void _paintMaskDraft(Canvas canvas) {

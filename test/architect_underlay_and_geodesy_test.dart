@@ -9,6 +9,7 @@ import 'package:kotoview/src/features/architect/models/architect_underlay_models
 import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
 import 'package:kotoview/src/features/architect/services/architect_geodetic_detector.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_catalog.dart';
+import 'package:kotoview/src/features/bim_projects/models/bim_coordinate_frame.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 
 void main() {
@@ -275,6 +276,43 @@ void main() {
       expect(restored.geodeticSurvey?.contoursForStorey(s1), isEmpty);
       expect(restored.geodeticSurvey?.pointsForStorey(s0).length, 1);
       expect(restored.geodeticSurvey?.pointsForStorey(s1), isEmpty);
+    });
+
+    test('CAD underlay control point positioning calculates exact origin and maps P_cad to P_model', () {
+      // Base point in CAD coordinates (e.g. intersection of axes A and 1 in millimeters: 50,000 mm, 30,000 mm)
+      const pCad = Offset(50000.0, 30000.0);
+      const unitsPerMeter = 1000.0; // 1000 mm = 1 m
+
+      // Insertion point on architectural drawing (e.g. model origin or column at (12.5 m, 8.0 m))
+      const pModel = Offset(12.5, 8.0);
+
+      // Origin calculation:
+      // toModel(cad) = (cad - origin) / unitsPerMeter = model
+      // => origin = cad - model * unitsPerMeter
+      final originX = pCad.dx - pModel.dx * unitsPerMeter;
+      final originY = pCad.dy - pModel.dy * unitsPerMeter;
+      final frame = BimCoordinateFrame(
+        origin: Offset(originX, originY),
+        unitsPerMeter: unitsPerMeter,
+      );
+
+      // Verify that the CAD base point maps exactly to the chosen model insertion point
+      final mappedModel = frame.toModel(pCad);
+      expect((mappedModel - pModel).distance, lessThan(1e-9));
+
+      // Verify reverse mapping: toCad(pModel) returns pCad
+      final mappedCad = frame.toCad(pModel);
+      expect((mappedCad - pCad).distance, lessThan(1e-9));
+
+      // Test with custom scale (e.g. imperial or geodetic 1 unit = 1 m)
+      const pCadGeodetic = Offset(318520.45, 4728415.80);
+      const pModelGeodetic = Offset(0.0, 0.0);
+      const scaleGeodetic = 1.0;
+      final frameGeodetic = BimCoordinateFrame(
+        origin: pCadGeodetic - pModelGeodetic * scaleGeodetic,
+        unitsPerMeter: scaleGeodetic,
+      );
+      expect((frameGeodetic.toModel(pCadGeodetic) - pModelGeodetic).distance, lessThan(1e-9));
     });
   });
 }

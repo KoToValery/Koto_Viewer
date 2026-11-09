@@ -12360,6 +12360,58 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get architectUnderlayReposition => 'Reposition';
+
+  @override
+  String get architectUnderlayRepositionTooltip =>
+      'Reposition CAD underlay by picking a new control point';
+
+  @override
+  String get architectUnderlayPickPointTitle => 'Select CAD Control Point';
+
+  @override
+  String get architectUnderlayPickPointInstruction =>
+      'Pan, zoom, and select an axis intersection, corner, or reference point';
+
+  @override
+  String get architectUnderlayPickPointConfirm => 'Confirm Control Point';
+
+  @override
+  String get architectUnderlaySnapIntersection => 'Intersection';
+
+  @override
+  String get architectUnderlaySnapEndpoint => 'Endpoint';
+
+  @override
+  String get architectUnderlaySnapMidpoint => 'Midpoint';
+
+  @override
+  String get architectUnderlaySnapCenter => 'Center';
+
+  @override
+  String get architectUnderlaySnapNearest => 'On Entity';
+
+  @override
+  String get architectUnderlayPresetOrigin => 'Origin (0,0)';
+
+  @override
+  String get architectUnderlayPresetCenter => 'Drawing Center';
+
+  @override
+  String get architectUnderlayInsertionPrompt =>
+      'Click on drawing to place the CAD underlay';
+
+  @override
+  String get architectUnderlayInsertionConfirm => 'Place Underlay';
+
+  @override
+  String get architectUnderlayInsertionCancel => 'Cancel Placement';
+
+  @override
+  String get architectUnderlayPlacedSuccess =>
+      'CAD underlay positioned successfully';
+
+  @override
   String get commandIconPathway => 'Pathway with curb';
 
   @override

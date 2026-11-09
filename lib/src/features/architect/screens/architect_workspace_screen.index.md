@@ -25,6 +25,7 @@
 | ↳ `[SUB-02A]` | `[TAG:STATE_FIELDS]` | L435 – L3831 | Active tool flags, drafting caches, preview points, mode enums |
 | ↳ `[SUB-02B]` | `[TAG:STATE_PRESETS]` | L3001 – L6140 | Wall/opening style caches, layer filters, command controllers |
 | ↳ `[SUB-02U]` | `[TAG:UNDERLAY_TOOLS]` | L3832 – L7197 | CAD Xref live-reload, Raster 2-point calibration & Geodesy handlers |
+| ↳ `[SUB-02UI]` | `[TAG:CAD_INSERTION]` | L3890 – L4250 | CAD underlay control points, ghost preview & repositioning workflow |
 | ↳ `[SUB-02C]` | `[TAG:STATE_LIFECYCLE]` | L7198 – L7461 | `initState()`, `_initTransform()`, `dispose()` |
 | `[SEC-03-XFORM]` | `[TAG:XFORM_COORDS]` | L7462 – L7682 | Coordinate transforms: `_screenToModel`, `_modelToScreen`, hit tests |
 | `[SEC-04-TOUCH]` | `[TAG:TOUCH_INPUT]` | L7683 – L14324 | 2D Pointer & Gesture dispatch for all architectural tools |
@@ -72,7 +73,7 @@
 | **spline** | L7025, L10310, L13000 | `_commitSpline` | Spline HUD bar, Catmull-Rom Bezier preview |
 | **cadEllipse** | L7735, L10212, L14100 | `_commitCadEllipse` | Ellipse HUD bar, line style control |
 | **roofSlope** | L7735, L10315, L14115 | `_commitRoofSlopeArrow` | Roof slope HUD bar (format chips %, °, both; reverse arrow) |
-| **cadUnderlay** | L3890, L30506 | `_importOrReplaceCadUnderlay`, `_openCadContextMenu`, `_openCadMaskMenu`, `_openCadScaleDialog`, `_openCadEditDialog` | `ArchitectCadUnderlayBar`, `showArchitectUnderlayContextMenu`, `showArchitectCadScaleDialog`, `showArchitectUnderlayMaskMenu` |
+| **cadUnderlay** | L3890, L30506 | `_importOrReplaceCadUnderlay`, `_startCadPlacementWorkflow`, `_repositionCurrentCadUnderlay`, `_confirmCadInsertion`, `_openCadContextMenu`, `_openCadMaskMenu`, `_openCadScaleDialog`, `_openCadEditDialog` | `ArchitectCadUnderlayBar`, `ArchitectCadPointPickerDialog`, `showArchitectUnderlayContextMenu`, `showArchitectCadScaleDialog`, `showArchitectUnderlayMaskMenu` |
 | **rasterUnderlay** | L7780, L9945, L13365 | `_importRasterUnderlay`, `_openRasterContextMenu`, `_openRasterMaskMenu`, `_openRasterScaleDialog`, `_openRasterEditDialog`, `_commitUnderlayMask` | `ArchitectRasterUnderlayBar`, `showArchitectUnderlayContextMenu`, `showArchitectRasterCalibrationDialog`, `showArchitectUnderlayMaskMenu` |
 | **wallAttach** | L11025, L12390, L23350 | _triggerWallAttach, ConnectArchitectWallsAtVertex | _buildAttachPromptBanner, quick access bar |
 | **wallDetach** | L23390, L26090 | _triggerWallDetach, _confirmWallDetach, _cancelWallDetach | _buildDetachConfirmationBanner (on-screen green checkmark) |

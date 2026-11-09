@@ -22476,6 +22476,102 @@ abstract class AppLocalizations {
   /// **'Could not load underlay: {error}'**
   String architectUnderlayLoadError(String error);
 
+  /// Action to reposition CAD underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Reposition'**
+  String get architectUnderlayReposition;
+
+  /// Tooltip for repositioning CAD underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Reposition CAD underlay by picking a new control point'**
+  String get architectUnderlayRepositionTooltip;
+
+  /// Title of CAD control point picker dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Select CAD Control Point'**
+  String get architectUnderlayPickPointTitle;
+
+  /// Instruction for selecting a CAD control point
+  ///
+  /// In en, this message translates to:
+  /// **'Pan, zoom, and select an axis intersection, corner, or reference point'**
+  String get architectUnderlayPickPointInstruction;
+
+  /// Button to confirm selected CAD control point
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Control Point'**
+  String get architectUnderlayPickPointConfirm;
+
+  /// Snap type label for intersection
+  ///
+  /// In en, this message translates to:
+  /// **'Intersection'**
+  String get architectUnderlaySnapIntersection;
+
+  /// Snap type label for endpoint
+  ///
+  /// In en, this message translates to:
+  /// **'Endpoint'**
+  String get architectUnderlaySnapEndpoint;
+
+  /// Snap type label for midpoint
+  ///
+  /// In en, this message translates to:
+  /// **'Midpoint'**
+  String get architectUnderlaySnapMidpoint;
+
+  /// Snap type label for center
+  ///
+  /// In en, this message translates to:
+  /// **'Center'**
+  String get architectUnderlaySnapCenter;
+
+  /// Snap type label for point on entity
+  ///
+  /// In en, this message translates to:
+  /// **'On Entity'**
+  String get architectUnderlaySnapNearest;
+
+  /// Preset button to select CAD origin 0,0
+  ///
+  /// In en, this message translates to:
+  /// **'Origin (0,0)'**
+  String get architectUnderlayPresetOrigin;
+
+  /// Preset button to select CAD drawing center
+  ///
+  /// In en, this message translates to:
+  /// **'Drawing Center'**
+  String get architectUnderlayPresetCenter;
+
+  /// HUD instruction prompt for placing CAD underlay on canvas
+  ///
+  /// In en, this message translates to:
+  /// **'Click on drawing to place the CAD underlay'**
+  String get architectUnderlayInsertionPrompt;
+
+  /// Tooltip or label for placing CAD underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Place Underlay'**
+  String get architectUnderlayInsertionConfirm;
+
+  /// Tooltip or label for cancelling CAD underlay placement
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Placement'**
+  String get architectUnderlayInsertionCancel;
+
+  /// Snackbar message when CAD underlay is positioned
+  ///
+  /// In en, this message translates to:
+  /// **'CAD underlay positioned successfully'**
+  String get architectUnderlayPlacedSuccess;
+
   /// No description provided for @commandIconPathway.
   ///
   /// In en, this message translates to:
