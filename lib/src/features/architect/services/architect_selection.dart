@@ -23,6 +23,7 @@ import '../rendering/architect_scene_geometry.dart';
 import 'architect_command_controller.dart';
 import 'architect_stair_rules.dart';
 import 'architect_panel_supports.dart';
+import 'fenestration_library_service.dart';
 import '../rendering/architect_special_wall_geometry.dart';
 import '../rendering/architect_railing_selection.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -811,6 +812,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         if ((!e.containsKey(value.key) &&
                 value.key != 'styleId' &&
                 value.key != 'cutDisplayMode' &&
+                value.key != 'hasCasing' &&
                 value.key != 'clipToRoof') ||
             !{
               'text',
@@ -824,6 +826,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
               'locationMode',
               'exteriorSideMode',
               'styleId',
+              'hasCasing',
               'followStoreyHeight',
               'coreMaterial',
               'insulationMaterial',
@@ -879,7 +882,8 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
           e[value.key] = value.value == 'true';
         } else if (value.key == 'isHingeLeft' ||
             value.key == 'openInward' ||
-            value.key == 'isFlipped') {
+            value.key == 'isFlipped' ||
+            value.key == 'hasCasing') {
           if (!{'true', 'false'}.contains(value.value)) {
             throw ArgumentError('Invalid boolean value');
           }
@@ -905,6 +909,15 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
           e[value.key] = value.value == 'true';
         } else {
           e[value.key] = value.value;
+          if (value.key == 'styleId') {
+            final newStyle =
+                FenestrationLibraryService.instance.getStyleById(value.value);
+            if (newStyle != null) {
+              e['style'] = newStyle.toJson();
+            } else {
+              e.remove('style');
+            }
+          }
         }
         if (value.key == 'coreMaterial' &&
                 !WallCoreMaterial.values.any((m) => m.name == value.value) ||

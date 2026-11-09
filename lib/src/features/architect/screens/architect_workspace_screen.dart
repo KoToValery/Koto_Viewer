@@ -7403,6 +7403,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _isHingeLeft = true;
 
+  bool _doorHasCasing = false;
+
 
 
   // Door & Window Placement Cooldown (prevents accidental duplicate taps and keeps tool active)
@@ -9540,6 +9542,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       style: activeStyle,
 
+      hasCasing: _doorHasCasing,
+
     );
 
   }
@@ -9581,6 +9585,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       styleId: activeStyle.id,
 
       style: activeStyle,
+
+      hasCasing: _elementTool.windowHasCasing,
 
     );
 
@@ -19022,6 +19028,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       style: activeStyle,
 
+      hasCasing: _doorHasCasing,
+
     );
 
 
@@ -26703,6 +26711,81 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  // --- SUBSECTION: [TAG:FENESTRATION_SELECTION_UPDATES] Live Door & Window Parameter Mutators ---
+  void _updateSelectedDoor({
+    double? width,
+    double? height,
+    double? sill,
+    bool? isHingeLeft,
+    bool? hasCasing,
+    String? styleId,
+  }) {
+    final id = _selectedElementId;
+    if (id == null) return;
+    final values = <String, double>{
+      if (width != null) 'width': width,
+      if (height != null) 'height': height,
+      if (sill != null) 'sillHeight': sill,
+    };
+    final texts = <String, String>{
+      if (isHingeLeft != null) 'isHingeLeft': '$isHingeLeft',
+      if (hasCasing != null) 'hasCasing': '$hasCasing',
+      if (styleId != null) 'styleId': styleId,
+    };
+    try {
+      _commands.execute(
+        SetArchitectElementProperties(
+          storeyId: _project.activeStoreyId,
+          elementIds: {id},
+          values: values,
+          textValues: texts,
+        ),
+      );
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      setState(() {});
+    } on ArgumentError {
+      _operationError();
+    }
+  }
+
+  void _updateSelectedWindow({
+    double? width,
+    double? height,
+    double? sill,
+    bool? isFlipped,
+    bool? hasCasing,
+    String? styleId,
+  }) {
+    final id = _selectedElementId;
+    if (id == null) return;
+    final values = <String, double>{
+      if (width != null) 'width': width,
+      if (height != null) 'height': height,
+      if (sill != null) 'sillHeight': sill,
+    };
+    final texts = <String, String>{
+      if (isFlipped != null) 'isFlipped': '$isFlipped',
+      if (hasCasing != null) 'hasCasing': '$hasCasing',
+      if (styleId != null) 'styleId': styleId,
+    };
+    try {
+      _commands.execute(
+        SetArchitectElementProperties(
+          storeyId: _project.activeStoreyId,
+          elementIds: {id},
+          values: values,
+          textValues: texts,
+        ),
+      );
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      setState(() {});
+    } on ArgumentError {
+      _operationError();
+    }
+  }
+
   void _performLinearSelectionAction(String action, Set<String> segmentIds) {
     if (action == 'cut') {
       _startCutSession(Set.of(segmentIds));
@@ -28264,6 +28347,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final compactActions = MediaQuery.sizeOf(context).width < 600;
 
+    final selectedDoor = _selectedElementId != null
+        ? _project.activeStorey.walls
+            .expand((w) => w.doors)
+            .where((d) => d.id == _selectedElementId)
+            .firstOrNull
+        : null;
+    final selectedWindow = _selectedElementId != null
+        ? _project.activeStorey.walls
+            .expand((w) => w.windows)
+            .where((w) => w.id == _selectedElementId)
+            .firstOrNull
+        : null;
+
 
 
     return CallbackShortcuts(
@@ -28970,78 +29066,136 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   onCreateFenestration: _openFenestrationEditor,
 
                   activeWindowStyle:
-
+                      selectedWindow?.resolvedStyle ??
                       _elementTool.activeWindowStyle ??
-
                       FenestrationLibraryService.instance.activeWindowStyle,
 
                   activeDoorStyle:
-
+                      selectedDoor?.resolvedStyle ??
                       _elementTool.activeDoorStyle ??
-
                       FenestrationLibraryService.instance.activeDoorStyle,
 
+                  selectedDoor: selectedDoor,
+                  selectedWindow: selectedWindow,
+
+                  doorHasCasing: selectedDoor?.effectiveHasCasing ?? _doorHasCasing,
+                  onDoorHasCasingChanged: (c) {
+                    if (selectedDoor != null) {
+                      _updateSelectedDoor(hasCasing: c);
+                    } else {
+                      setState(() => _doorHasCasing = c);
+                    }
+                  },
+
+                  windowHasCasing: selectedWindow?.effectiveHasCasing ??
+                      _elementTool.windowHasCasing,
+                  onWindowHasCasingChanged: (c) {
+                    if (selectedWindow != null) {
+                      _updateSelectedWindow(hasCasing: c);
+                    } else {
+                      _elementTool.setWindowParams(hasCasing: c);
+                    }
+                  },
+
+                  windowIsFlipped: selectedWindow?.isFlipped,
+                  onWindowFlippedChanged: (f) {
+                    if (selectedWindow != null) {
+                      _updateSelectedWindow(isFlipped: f);
+                    }
+                  },
+
                   onWindowStyleSelected: (style) {
-
-                    setState(() {
-
-                      _elementTool.setWindowStyle(style);
-
-                    });
-
+                    if (selectedWindow != null) {
+                      _updateSelectedWindow(styleId: style.id);
+                    } else {
+                      setState(() {
+                        _elementTool.setWindowStyle(style);
+                      });
+                    }
                   },
 
                   onDoorStyleSelected: (style) {
-
-                    setState(() {
-
-                      _doorWidth = style.defaultWidth;
-
-                      _doorHeight = style.defaultHeight;
-
-                      _doorSill = style.defaultSillHeight;
-
-                      _elementTool.setDoorStyle(style);
-
-                    });
-
+                    if (selectedDoor != null) {
+                      _updateSelectedDoor(styleId: style.id);
+                    } else {
+                      setState(() {
+                        _doorWidth = style.defaultWidth;
+                        _doorHeight = style.defaultHeight;
+                        _doorSill = style.defaultSillHeight;
+                        _elementTool.setDoorStyle(style);
+                      });
+                    }
                   },
 
-                  doorWidth: _doorWidth,
+                  doorWidth: selectedDoor?.width ?? _doorWidth,
 
-                  onDoorWidthChanged: (w) => setState(() => _doorWidth = w),
+                  onDoorWidthChanged: (w) {
+                    if (selectedDoor != null) {
+                      _updateSelectedDoor(width: w);
+                    } else {
+                      setState(() => _doorWidth = w);
+                    }
+                  },
 
-                  doorHeight: _doorHeight,
+                  doorHeight: selectedDoor?.height ?? _doorHeight,
 
-                  onDoorHeightChanged: (h) => setState(() => _doorHeight = h),
+                  onDoorHeightChanged: (h) {
+                    if (selectedDoor != null) {
+                      _updateSelectedDoor(height: h);
+                    } else {
+                      setState(() => _doorHeight = h);
+                    }
+                  },
 
-                  doorSill: _doorSill,
+                  doorSill: selectedDoor?.sillHeight ?? _doorSill,
 
-                  onDoorSillChanged: (s) => setState(() => _doorSill = s),
+                  onDoorSillChanged: (s) {
+                    if (selectedDoor != null) {
+                      _updateSelectedDoor(sill: s);
+                    } else {
+                      setState(() => _doorSill = s);
+                    }
+                  },
 
-                  isHingeLeft: _isHingeLeft,
+                  isHingeLeft: selectedDoor?.isHingeLeft ?? _isHingeLeft,
 
-                  onHingeSideChanged: (left) =>
+                  onHingeSideChanged: (left) {
+                    if (selectedDoor != null) {
+                      _updateSelectedDoor(isHingeLeft: left);
+                    } else {
+                      setState(() => _isHingeLeft = left);
+                    }
+                  },
 
-                      setState(() => _isHingeLeft = left),
+                  windowWidth: selectedWindow?.width ?? _elementTool.windowWidth,
 
-                  windowWidth: _elementTool.windowWidth,
+                  onWindowWidthChanged: (w) {
+                    if (selectedWindow != null) {
+                      _updateSelectedWindow(width: w);
+                    } else {
+                      _elementTool.setWindowParams(width: w);
+                    }
+                  },
 
-                  onWindowWidthChanged: (w) =>
+                  windowHeight: selectedWindow?.height ?? _elementTool.windowHeight,
 
-                      _elementTool.setWindowParams(width: w),
+                  onWindowHeightChanged: (h) {
+                    if (selectedWindow != null) {
+                      _updateSelectedWindow(height: h);
+                    } else {
+                      _elementTool.setWindowParams(height: h);
+                    }
+                  },
 
-                  windowHeight: _elementTool.windowHeight,
+                  windowSill: selectedWindow?.sillHeight ?? _elementTool.windowSill,
 
-                  onWindowHeightChanged: (h) =>
-
-                      _elementTool.setWindowParams(height: h),
-
-                  windowSill: _elementTool.windowSill,
-
-                  onWindowSillChanged: (s) =>
-
-                      _elementTool.setWindowParams(sill: s),
+                  onWindowSillChanged: (s) {
+                    if (selectedWindow != null) {
+                      _updateSelectedWindow(sill: s);
+                    } else {
+                      _elementTool.setWindowParams(sill: s);
+                    }
+                  },
 
                   columnShape: _elementTool.columnShape,
 

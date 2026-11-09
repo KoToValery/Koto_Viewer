@@ -33,6 +33,7 @@ class ArchitectElementTool extends ChangeNotifier {
   double windowWidth = 1.20;
   double windowHeight = 1.40;
   double windowSill = 0.85;
+  bool windowHasCasing = false;
   ArchitectFenestrationStyle? activeWindowStyle;
   ArchitectFenestrationStyle? activeDoorStyle;
 
@@ -74,10 +75,16 @@ class ArchitectElementTool extends ChangeNotifier {
   // 1. CONFIGURATION SETTERS
   // ===========================================================================
 
-  void setWindowParams({double? width, double? height, double? sill}) {
+  void setWindowParams({
+    double? width,
+    double? height,
+    double? sill,
+    bool? hasCasing,
+  }) {
     if (width != null) windowWidth = width;
     if (height != null) windowHeight = height;
     if (sill != null) windowSill = sill;
+    if (hasCasing != null) windowHasCasing = hasCasing;
     notifyListeners();
   }
 
@@ -179,6 +186,7 @@ class ArchitectElementTool extends ChangeNotifier {
       uuid: 'UUID_$now',
       styleId: activeWindowStyle?.id,
       style: activeWindowStyle,
+      hasCasing: windowHasCasing,
     );
 
     final updatedWall = targetWall.addWindow(newWindow);

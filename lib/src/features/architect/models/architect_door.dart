@@ -29,6 +29,7 @@ class ArchitectDoor {
   final String uuid; // Unique persistent classifier identifier
   final String? styleId;
   final ArchitectFenestrationStyle? style;
+  final bool? hasCasing;
 
   /// Effective style from direct reference, or resolved from persistent library by [styleId].
   ArchitectFenestrationStyle? get resolvedStyle =>
@@ -36,6 +37,10 @@ class ArchitectDoor {
       (styleId != null
           ? FenestrationLibraryService.instance.getStyleById(styleId!)
           : null);
+
+  /// Whether casing is effectively enabled (explicit override or inherited from style).
+  bool get effectiveHasCasing =>
+      hasCasing ?? resolvedStyle?.hasCasing ?? false;
 
   const ArchitectDoor({
     required this.id,
@@ -53,6 +58,7 @@ class ArchitectDoor {
     required this.uuid,
     this.styleId,
     this.style,
+    this.hasCasing,
   });
 
   /// Clear passage width between jamb frames in meters.
@@ -164,6 +170,7 @@ class ArchitectDoor {
     String? uuid,
     String? styleId,
     ArchitectFenestrationStyle? style,
+    bool? hasCasing,
   }) => ArchitectDoor(
     id: id ?? this.id,
     wallId: wallId ?? this.wallId,
@@ -180,6 +187,7 @@ class ArchitectDoor {
     uuid: uuid ?? this.uuid,
     styleId: styleId ?? this.styleId,
     style: style ?? this.style,
+    hasCasing: hasCasing ?? this.hasCasing,
   );
 
   Map<String, dynamic> toJson() => {
@@ -198,6 +206,7 @@ class ArchitectDoor {
     'uuid': uuid,
     if (styleId != null) 'styleId': styleId,
     if (style != null) 'style': style!.toJson(),
+    if (hasCasing != null) 'hasCasing': hasCasing,
   };
 
   factory ArchitectDoor.fromJson(Map<String, dynamic> json) => ArchitectDoor(
@@ -220,6 +229,7 @@ class ArchitectDoor {
             json['style'] as Map<String, dynamic>,
           )
         : null,
+    hasCasing: json['hasCasing'] as bool?,
   );
 
   // ===========================================================================
@@ -262,7 +272,9 @@ class ArchitectDoor {
     final pLeftBase = centerPos - u * halfW;
     final pRightBase = centerPos + u * halfW;
 
-    final effectiveStyle = resolvedStyle;
+    final effectiveStyle = resolvedStyle != null && hasCasing != null
+        ? resolvedStyle!.copyWith(hasCasing: hasCasing!)
+        : resolvedStyle;
     if (effectiveStyle != null) {
       effectiveStyle.paintPlan2D(
         canvas: canvas,
@@ -588,7 +600,9 @@ class ArchitectDoor {
         FenestrationElevationDetail.full3D,
   }) {
     if (detailLevel == FenestrationElevationDetail.hidden) return const [];
-    final effectiveStyle = resolvedStyle;
+    final effectiveStyle = resolvedStyle != null && hasCasing != null
+        ? resolvedStyle!.copyWith(hasCasing: hasCasing!)
+        : resolvedStyle;
     if (effectiveStyle != null) {
       return Fenestration3dBuilder.buildOpening3D(
         style: effectiveStyle,

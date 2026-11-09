@@ -5450,36 +5450,50 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneCatCustom => 'Помещение';
 
   @override
-  String get architectFenestrationPresetSingleCasement =>
-      'Еднокрил 80/140 (5-камерен)';
+  String get architectFenestrationPresetSingleCasement => 'Еднокрил прозорец';
 
   @override
-  String get architectFenestrationPresetDoubleCasement =>
-      'Двукрил 140/140 (5-камерен)';
+  String get architectFenestrationPresetDoubleCasement => 'Двукрил прозорец';
 
   @override
-  String get architectFenestrationPresetDoubleWithCasing =>
-      'Двукрил 140/140 с обрамчване';
+  String get architectFenestrationPresetDoubleWithCasing => 'Двукрил с перваз';
 
   @override
-  String get architectFenestrationPresetTripleCasement =>
-      'Трикрил 210/140 (фикс + 2 крила)';
+  String get architectFenestrationPresetTripleCasement => 'Трикрил прозорец';
 
   @override
-  String get architectFenestrationPresetWithTransom =>
-      'Прозорец с надстройка 140/180';
+  String get architectFenestrationPresetWithTransom => 'Прозорец с фрамуга';
 
   @override
-  String get architectFenestrationPresetDoorInterior =>
-      'Интериорна врата 90/200';
+  String get architectFenestrationPresetDoorInterior => 'Интериорна врата';
 
   @override
   String get architectFenestrationPresetDoorEntranceCasing =>
-      'Входна врата с обрамчване 100/210';
+      'Входна врата с перваз';
 
   @override
-  String get architectFenestrationPresetDoorBalconyGlass =>
-      'Балконска остъклена врата 90/210';
+  String get architectFenestrationPresetDoorBalconyGlass => 'Балконска врата';
+
+  @override
+  String get architectFenestrationPresetBalconyDoorRight =>
+      'Балконска врата с прозорец вдясно';
+
+  @override
+  String get architectFenestrationPresetBalconyDoorLeft =>
+      'Балконска врата с прозорец вляво';
+
+  @override
+  String get architectFenestrationPresetPortalDoorCenter =>
+      'Врата с две витрини (портал)';
+
+  @override
+  String get architectCasingToggle => 'Перваз около отвора (Casing)';
+
+  @override
+  String get architectDoorCasing => 'Перваз';
+
+  @override
+  String get architectBrowseLibrary => 'Избери от библиотека...';
 
   @override
   String architectWallParapetPipe(int thickness, String height) {

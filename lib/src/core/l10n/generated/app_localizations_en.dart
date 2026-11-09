@@ -5426,34 +5426,54 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectFenestrationPresetSingleCasement =>
-      'Single casement 80/140 (5-chamber)';
+      'Single casement window';
 
   @override
   String get architectFenestrationPresetDoubleCasement =>
-      'Double casement 140/140 (5-chamber)';
+      'Double casement window';
 
   @override
   String get architectFenestrationPresetDoubleWithCasing =>
-      'Double casement 140/140 with casing';
+      'Double casement with casing';
 
   @override
   String get architectFenestrationPresetTripleCasement =>
-      'Triple casement 210/140 (fixed + 2 sashes)';
+      'Triple casement window';
 
   @override
-  String get architectFenestrationPresetWithTransom =>
-      'Window with transom 140/180';
+  String get architectFenestrationPresetWithTransom => 'Window with transom';
 
   @override
-  String get architectFenestrationPresetDoorInterior => 'Interior door 90/200';
+  String get architectFenestrationPresetDoorInterior => 'Interior door';
 
   @override
   String get architectFenestrationPresetDoorEntranceCasing =>
-      'Entrance door with casing 100/210';
+      'Entrance door with casing';
 
   @override
   String get architectFenestrationPresetDoorBalconyGlass =>
-      'Glazed balcony door 90/210';
+      'Glazed balcony door';
+
+  @override
+  String get architectFenestrationPresetBalconyDoorRight =>
+      'Balcony door with right window';
+
+  @override
+  String get architectFenestrationPresetBalconyDoorLeft =>
+      'Balcony door with left window';
+
+  @override
+  String get architectFenestrationPresetPortalDoorCenter =>
+      'Portal door between side windows';
+
+  @override
+  String get architectCasingToggle => 'Casing around opening';
+
+  @override
+  String get architectDoorCasing => 'Casing';
+
+  @override
+  String get architectBrowseLibrary => 'Browse library...';
 
   @override
   String architectWallParapetPipe(int thickness, String height) {

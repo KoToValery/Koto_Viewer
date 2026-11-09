@@ -19,6 +19,8 @@ import '../models/architect_wall_type.dart';
 import '../models/architect_zone.dart';
 import '../models/architect_zone_presets.dart';
 import '../models/architect_fenestration_style.dart';
+import '../models/architect_door.dart';
+import '../models/architect_window.dart';
 import '../services/fenestration_library_service.dart';
 import 'fenestration_preview.dart';
 import '../rendering/architect_2d_painter.dart';
@@ -85,6 +87,9 @@ class ArchitectToolPalette extends StatefulWidget {
   final ValueChanged<double> onDoorSillChanged;
   final bool isHingeLeft;
   final ValueChanged<bool> onHingeSideChanged;
+  final bool doorHasCasing;
+  final ValueChanged<bool>? onDoorHasCasingChanged;
+  final ArchitectDoor? selectedDoor;
 
   // Window options
   final double windowWidth;
@@ -93,6 +98,11 @@ class ArchitectToolPalette extends StatefulWidget {
   final ValueChanged<double>? onWindowHeightChanged;
   final double windowSill;
   final ValueChanged<double>? onWindowSillChanged;
+  final bool windowHasCasing;
+  final ValueChanged<bool>? onWindowHasCasingChanged;
+  final bool? windowIsFlipped;
+  final ValueChanged<bool>? onWindowFlippedChanged;
+  final ArchitectWindow? selectedWindow;
 
   // Column options
   final ColumnShape columnShape;
@@ -189,12 +199,20 @@ class ArchitectToolPalette extends StatefulWidget {
     required this.onDoorSillChanged,
     required this.isHingeLeft,
     required this.onHingeSideChanged,
+    this.doorHasCasing = false,
+    this.onDoorHasCasingChanged,
+    this.selectedDoor,
     this.windowWidth = 1.20,
     this.onWindowWidthChanged,
     this.windowHeight = 1.40,
     this.onWindowHeightChanged,
     this.windowSill = 0.85,
     this.onWindowSillChanged,
+    this.windowHasCasing = false,
+    this.onWindowHasCasingChanged,
+    this.windowIsFlipped,
+    this.onWindowFlippedChanged,
+    this.selectedWindow,
     this.columnShape = ColumnShape.rectangular,
     this.onColumnShapeChanged,
     this.columnWidth = 0.25,
@@ -400,16 +418,19 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (mode == ArchitectInteractionMode.drawing) ...[
-                // Contextual Sub-bar for Active Tool parameters
-                if (activeTool == ArchitectTool.zone)
+              if (mode == ArchitectInteractionMode.drawing ||
+                  widget.selectedDoor != null ||
+                  widget.selectedWindow != null) ...[
+                // Contextual Sub-bar for Active Tool parameters or Selection
+                if (widget.selectedDoor != null || activeTool == ArchitectTool.door)
+                  _buildDoorSubBar(context)
+                else if (widget.selectedWindow != null ||
+                    activeTool == ArchitectTool.window)
+                  _buildWindowSubBar(context)
+                else if (activeTool == ArchitectTool.zone)
                   _buildZoneSubBar(context)
                 else if (activeTool == ArchitectTool.wall)
                   _buildWallSubBar(context)
-                else if (activeTool == ArchitectTool.door)
-                  _buildDoorSubBar(context)
-                else if (activeTool == ArchitectTool.window)
-                  _buildWindowSubBar(context)
                 else if (activeTool == ArchitectTool.column)
                   _buildColumnSubBar(context)
                 else if (activeTool == ArchitectTool.beam)
@@ -841,231 +862,365 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
 
   Widget _buildDoorSubBar(BuildContext context) {
     final l10n = context.l10n;
+    final effectiveDoorStyle =
+        widget.selectedDoor?.resolvedStyle ?? activeDoorStyle;
+    final effectiveWidth = widget.selectedDoor?.width ?? doorWidth;
+    final effectiveHeight = widget.selectedDoor?.height ?? doorHeight;
+    final effectiveSill = widget.selectedDoor?.sillHeight ?? doorSill;
+    final effectiveHingeLeft = widget.selectedDoor?.isHingeLeft ?? isHingeLeft;
+    final effectiveCasing =
+        widget.selectedDoor?.effectiveHasCasing ?? widget.doorHasCasing;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: [
-          if (onCreateFenestration != null) ...[
-            ActionChip(
-              avatar: AppIcon(
-                AppIconId.addCircle,
-                size: 14,
-                color: colors.primary,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ROW 1: Actions, Preset, Swing/Hinge, Casing
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: [
+              if (onCreateFenestration != null) ...[
+                ActionChip(
+                  avatar: AppIcon(
+                    AppIconId.addCircle,
+                    size: 14,
+                    color: colors.primary,
+                  ),
+                  label: Text(
+                    l10n.architectFenestrationCreateNew,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: colors.primary,
+                    ),
+                  ),
+                  backgroundColor: colors.primary.withValues(alpha: 0.12),
+                  side: BorderSide(color: colors.primary),
+                  onPressed: onCreateFenestration,
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 8),
+              ],
+              if (effectiveDoorStyle != null) ...[
+                ActionChip(
+                  avatar:
+                      AppIcon(AppIconId.door, size: 14, color: colors.primary),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        effectiveDoorStyle.localizedName(l10n),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      AppIcon(
+                        AppIconId.expandMore,
+                        size: 14,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                  onPressed: () =>
+                      _showStylePicker(context, FenestrationKind.door),
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 8),
+              ],
+              ChoiceChip(
+                label: Text(
+                  effectiveHingeLeft
+                      ? l10n.architectDoorHingeLeft
+                      : l10n.architectDoorHingeRight,
+                ),
+                selected: true,
+                onSelected: (_) => onHingeSideChanged(!effectiveHingeLeft),
+                avatar: const AppIcon(AppIconId.swapHorizontal, size: 14),
+                visualDensity: VisualDensity.compact,
               ),
-              label: Text(
-                l10n.architectFenestrationCreateNew,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: colors.primary,
+              const SizedBox(width: 8),
+              FilterChip(
+                label: Text(l10n.architectDoorCasing),
+                selected: effectiveCasing,
+                onSelected: (val) => widget.onDoorHasCasingChanged?.call(val),
+                avatar: AppIcon(
+                  effectiveCasing ? AppIconId.checkCircle : AppIconId.radioOff,
+                  size: 14,
+                  color: effectiveCasing
+                      ? colors.primary
+                      : colors.onSurfaceVariant,
+                ),
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+
+        // ROW 2: Widths
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text(
+                  l10n.architectDoorWidth,
+                  style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
                 ),
               ),
-              backgroundColor: colors.primary.withValues(alpha: 0.12),
-              side: BorderSide(color: colors.primary),
-              onPressed: onCreateFenestration,
-              visualDensity: VisualDensity.compact,
-            ),
-            const SizedBox(width: 8),
-          ],
-          if (activeDoorStyle != null) ...[
-            ActionChip(
-              avatar: AppIcon(AppIconId.door, size: 14, color: colors.primary),
-              label: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    activeDoorStyle!.localizedName(l10n),
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              for (final w in [0.70, 0.80, 0.90, 1.00, 1.20, 1.50, 2.10, 2.50])
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: ChoiceChip(
+                    label: Text('${(w * 100).round()} cm'),
+                    selected: (effectiveWidth - w).abs() < 1e-3,
+                    onSelected: (sel) {
+                      if (sel) onDoorWidthChanged(w);
+                    },
+                    visualDensity: VisualDensity.compact,
                   ),
-                  const SizedBox(width: 4),
-                  AppIcon(
-                    AppIconId.expandMore,
-                    size: 14,
-                    color: colors.onSurfaceVariant,
-                  ),
-                ],
-              ),
-              onPressed: () => _showStylePicker(context, FenestrationKind.door),
-              visualDensity: VisualDensity.compact,
-            ),
-            const SizedBox(width: 8),
-          ],
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Text(
-              l10n.architectDoorWidth,
-              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-            ),
+                ),
+            ],
           ),
-          for (final w in [0.70, 0.80, 0.90, 1.00, 1.20])
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: ChoiceChip(
-                label: Text('${(w * 100).round()} cm'),
-                selected: (doorWidth - w).abs() < 1e-3,
-                onSelected: (sel) {
-                  if (sel) onDoorWidthChanged(w);
-                },
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-          const SizedBox(width: 6),
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Text(
-              l10n.architectDoorHeight,
-              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-            ),
-          ),
-          for (final h in [2.00, 2.10])
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: ChoiceChip(
-                label: Text('${(h * 100).round()} cm'),
-                selected: (doorHeight - h).abs() < 1e-3,
-                onSelected: (sel) {
-                  if (sel) onDoorHeightChanged(h);
-                },
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-          const SizedBox(width: 6),
-          ChoiceChip(
-            label: Text(l10n.architectDoorSillNone),
-            selected: doorSill == 0.0,
-            onSelected: (sel) {
-              if (sel) onDoorSillChanged(0.0);
-            },
-            visualDensity: VisualDensity.compact,
-          ),
-          const SizedBox(width: 5),
-          ChoiceChip(
-            label: Text(l10n.architectDoorSillStep),
-            selected: doorSill == 0.15,
-            onSelected: (sel) {
-              if (sel) onDoorSillChanged(0.15);
-            },
-            visualDensity: VisualDensity.compact,
-          ),
-          const SizedBox(width: 8),
+        ),
+        const SizedBox(height: 4),
 
-          ChoiceChip(
-            label: Text(
-              isHingeLeft
-                  ? l10n.architectDoorHingeLeft
-                  : l10n.architectDoorHingeRight,
-            ),
-            selected: true,
-            onSelected: (_) => onHingeSideChanged(!isHingeLeft),
-            avatar: AppIcon(AppIconId.swapHorizontal, size: 14),
-            visualDensity: VisualDensity.compact,
+        // ROW 3: Height & Sill
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text(
+                  l10n.architectDoorHeight,
+                  style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+                ),
+              ),
+              for (final h in [2.00, 2.10, 2.20])
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: ChoiceChip(
+                    label: Text('${(h * 100).round()} cm'),
+                    selected: (effectiveHeight - h).abs() < 1e-3,
+                    onSelected: (sel) {
+                      if (sel) onDoorHeightChanged(h);
+                    },
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: Text(l10n.architectDoorSillNone),
+                selected: effectiveSill == 0.0,
+                onSelected: (sel) {
+                  if (sel) onDoorSillChanged(0.0);
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+              const SizedBox(width: 5),
+              ChoiceChip(
+                label: Text(l10n.architectDoorSillStep),
+                selected: effectiveSill == 0.15,
+                onSelected: (sel) {
+                  if (sel) onDoorSillChanged(0.15);
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildWindowSubBar(BuildContext context) {
     final l10n = context.l10n;
+    final effectiveWindowStyle =
+        widget.selectedWindow?.resolvedStyle ?? activeWindowStyle;
+    final effectiveWidth = widget.selectedWindow?.width ?? windowWidth;
+    final effectiveHeight = widget.selectedWindow?.height ?? windowHeight;
+    final effectiveSill = widget.selectedWindow?.sillHeight ?? windowSill;
+    final effectiveFlipped =
+        widget.selectedWindow?.isFlipped ?? (widget.windowIsFlipped ?? false);
+    final effectiveCasing =
+        widget.selectedWindow?.effectiveHasCasing ?? widget.windowHasCasing;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: [
-          if (onCreateFenestration != null) ...[
-            ActionChip(
-              avatar: AppIcon(
-                AppIconId.addCircle,
-                size: 14,
-                color: colors.primary,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ROW 1: Actions, Preset, Casing, Flip
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: [
+              if (onCreateFenestration != null) ...[
+                ActionChip(
+                  avatar: AppIcon(
+                    AppIconId.addCircle,
+                    size: 14,
+                    color: colors.primary,
+                  ),
+                  label: Text(
+                    l10n.architectFenestrationCreateNew,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: colors.primary,
+                    ),
+                  ),
+                  backgroundColor: colors.primary.withValues(alpha: 0.12),
+                  side: BorderSide(color: colors.primary),
+                  onPressed: onCreateFenestration,
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 8),
+              ],
+              if (effectiveWindowStyle != null) ...[
+                ActionChip(
+                  avatar: AppIcon(
+                    AppIconId.window,
+                    size: 14,
+                    color: colors.primary,
+                  ),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        effectiveWindowStyle.localizedName(l10n),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      AppIcon(
+                        AppIconId.expandMore,
+                        size: 14,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                  onPressed: () =>
+                      _showStylePicker(context, FenestrationKind.window),
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 8),
+              ],
+              FilterChip(
+                label: Text(l10n.architectDoorCasing),
+                selected: effectiveCasing,
+                onSelected: (val) => widget.onWindowHasCasingChanged?.call(val),
+                avatar: AppIcon(
+                  effectiveCasing ? AppIconId.checkCircle : AppIconId.radioOff,
+                  size: 14,
+                  color: effectiveCasing
+                      ? colors.primary
+                      : colors.onSurfaceVariant,
+                ),
+                visualDensity: VisualDensity.compact,
               ),
-              label: Text(
-                l10n.architectFenestrationCreateNew,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: colors.primary,
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: Text(l10n.architectWindowFlipSide),
+                selected: effectiveFlipped,
+                onSelected: (val) => widget.onWindowFlippedChanged?.call(val),
+                avatar: const AppIcon(AppIconId.swapHorizontal, size: 14),
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+
+        // ROW 2: Widths
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text(
+                  l10n.architectWindowWidth,
+                  style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
                 ),
               ),
-              backgroundColor: colors.primary.withValues(alpha: 0.12),
-              side: BorderSide(color: colors.primary),
-              onPressed: onCreateFenestration,
-              visualDensity: VisualDensity.compact,
-            ),
-            const SizedBox(width: 8),
-          ],
-          if (activeWindowStyle != null) ...[
-            ActionChip(
-              avatar: AppIcon(
-                AppIconId.window,
-                size: 14,
-                color: colors.primary,
-              ),
-              label: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    activeWindowStyle!.localizedName(l10n),
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              for (final w in [0.60, 0.80, 0.90, 1.20, 1.40, 1.80, 2.00, 2.40])
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: ChoiceChip(
+                    label: Text('${(w * 100).round()} cm'),
+                    selected: (effectiveWidth - w).abs() < 1e-3,
+                    onSelected: (sel) {
+                      if (sel) onWindowWidthChanged?.call(w);
+                    },
+                    visualDensity: VisualDensity.compact,
                   ),
-                  const SizedBox(width: 4),
-                  AppIcon(
-                    AppIconId.expandMore,
-                    size: 14,
-                    color: colors.onSurfaceVariant,
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+
+        // ROW 3: Height & Sill
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text(
+                  l10n.architectWindowHeight,
+                  style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+                ),
+              ),
+              for (final h in [0.60, 1.20, 1.40, 1.60, 1.80])
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: ChoiceChip(
+                    label: Text('${(h * 100).round()} cm'),
+                    selected: (effectiveHeight - h).abs() < 1e-3,
+                    onSelected: (sel) {
+                      if (sel) onWindowHeightChanged?.call(h);
+                    },
+                    visualDensity: VisualDensity.compact,
                   ),
-                ],
+                ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text(
+                  l10n.architectWindowSill,
+                  style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+                ),
               ),
-              onPressed: () =>
-                  _showStylePicker(context, FenestrationKind.window),
-              visualDensity: VisualDensity.compact,
-            ),
-            const SizedBox(width: 8),
-          ],
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Text(
-              l10n.architectWindowWidth,
-              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-            ),
+              for (final s in [0.00, 0.85, 0.90])
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: ChoiceChip(
+                    label: Text(s == 0.0 ? '0' : '${(s * 100).round()} cm'),
+                    selected: (effectiveSill - s).abs() < 1e-3,
+                    onSelected: (sel) {
+                      if (sel) onWindowSillChanged?.call(s);
+                    },
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+            ],
           ),
-          for (final w in [0.60, 0.90, 1.20, 1.40, 1.80, 2.00])
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: ChoiceChip(
-                label: Text('${(w * 100).round()} cm'),
-                selected: (windowWidth - w).abs() < 1e-3,
-                onSelected: (sel) {
-                  if (sel) onWindowWidthChanged?.call(w);
-                },
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-          const SizedBox(width: 8),
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Text(
-              l10n.architectWindowSill,
-              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-            ),
-          ),
-          for (final s in [0.00, 0.85, 0.90])
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: ChoiceChip(
-                label: Text(s == 0.0 ? '0' : '${(s * 100).round()} cm'),
-                selected: (windowSill - s).abs() < 1e-3,
-                onSelected: (sel) {
-                  if (sel) onWindowSillChanged?.call(s);
-                },
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1385,8 +1540,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     final l10n = context.l10n;
     final styles = FenestrationLibraryService.instance.getStylesForKind(kind);
     final activeStyle = kind == FenestrationKind.door
-        ? activeDoorStyle
-        : activeWindowStyle;
+        ? (widget.selectedDoor?.resolvedStyle ?? activeDoorStyle)
+        : (widget.selectedWindow?.resolvedStyle ?? activeWindowStyle);
 
     showModalBottomSheet<void>(
       context: context,

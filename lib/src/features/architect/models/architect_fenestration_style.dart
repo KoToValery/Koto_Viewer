@@ -1702,6 +1702,12 @@ class ArchitectFenestrationStyle {
         return l10n.architectFenestrationPresetDoorEntranceCasing;
       case 'door_balcony_glass':
         return l10n.architectFenestrationPresetDoorBalconyGlass;
+      case 'door_combo_balcony_right':
+        return l10n.architectFenestrationPresetBalconyDoorRight;
+      case 'door_combo_balcony_left':
+        return l10n.architectFenestrationPresetBalconyDoorLeft;
+      case 'door_combo_portal_center':
+        return l10n.architectFenestrationPresetPortalDoorCenter;
       default:
         return name;
     }
@@ -1712,10 +1718,10 @@ class ArchitectFenestrationStyle {
   // ===========================================================================
 
   static List<ArchitectFenestrationStyle> standardCatalog() => [
-    // 1. Single Casement Window 80x140 cm (5-chamber, double glazing)
+    // 1. Single Casement Window (5-chamber, double glazing)
     ArchitectFenestrationStyle(
       id: 'win_single_casement',
-      name: 'Еднокрил 80/140 (5-камерен)',
+      name: 'Еднокрил прозорец',
       kind: FenestrationKind.window,
       defaultWidth: 0.80,
       defaultHeight: 1.40,
@@ -1727,10 +1733,10 @@ class ArchitectFenestrationStyle {
       ),
     ),
 
-    // 2. Double Casement Window 140x140 cm (1 turn + 1 tilt&turn)
+    // 2. Double Casement Window (1 turn + 1 tilt&turn)
     ArchitectFenestrationStyle(
       id: 'win_double_casement',
-      name: 'Двукрил 140/140 (5-камерен)',
+      name: 'Двукрил прозорец',
       kind: FenestrationKind.window,
       defaultWidth: 1.40,
       defaultHeight: 1.40,
@@ -1763,7 +1769,7 @@ class ArchitectFenestrationStyle {
     // 3. Double Casement Window with Exterior Casing (10 cm trim, 3 cm projection)
     ArchitectFenestrationStyle(
       id: 'win_double_with_casing',
-      name: 'Двукрил 140/140 с обрамчване',
+      name: 'Двукрил с перваз',
       kind: FenestrationKind.window,
       defaultWidth: 1.40,
       defaultHeight: 1.40,
@@ -1795,10 +1801,10 @@ class ArchitectFenestrationStyle {
       ),
     ),
 
-    // 4. Triple Casement Window 210x140 cm (center fixed, 2 sides open)
+    // 4. Triple Casement Window (center fixed, 2 sides open)
     ArchitectFenestrationStyle(
       id: 'win_triple_casement',
-      name: 'Трикрил 210/140 (фикс + 2 крила)',
+      name: 'Трикрил прозорец',
       kind: FenestrationKind.window,
       defaultWidth: 2.10,
       defaultHeight: 1.40,
@@ -1835,10 +1841,10 @@ class ArchitectFenestrationStyle {
       ),
     ),
 
-    // 5. Window with Transom 140x180 cm (Фрамуга горе + 2 крила долу)
+    // 5. Window with Transom (Фрамуга горе + 2 крила долу)
     ArchitectFenestrationStyle(
       id: 'win_with_transom',
-      name: 'Прозорец с надстройка 140/180',
+      name: 'Прозорец с фрамуга',
       kind: FenestrationKind.window,
       defaultWidth: 1.40,
       defaultHeight: 1.80,
@@ -1883,10 +1889,10 @@ class ArchitectFenestrationStyle {
       ),
     ),
 
-    // 6. Standard Interior Door 90x200 cm
+    // 6. Standard Interior Door
     ArchitectFenestrationStyle(
       id: 'door_interior_standard',
-      name: 'Интериорна врата 90/200',
+      name: 'Интериорна врата',
       kind: FenestrationKind.door,
       defaultWidth: 0.90,
       defaultHeight: 2.00,
@@ -1900,10 +1906,10 @@ class ArchitectFenestrationStyle {
       ),
     ),
 
-    // 7. Exterior Entrance Door with Casing & Glass Side Infill 100x210 cm
+    // 7. Exterior Entrance Door with Casing
     ArchitectFenestrationStyle(
       id: 'door_entrance_casing',
-      name: 'Входна врата с обрамчване 100/210',
+      name: 'Входна врата с перваз',
       kind: FenestrationKind.door,
       defaultWidth: 1.00,
       defaultHeight: 2.10,
@@ -1920,10 +1926,10 @@ class ArchitectFenestrationStyle {
       ),
     ),
 
-    // 8. Single Glazed Balcony / Terrace Door 90x210 cm (5-chamber, double glazing)
+    // 8. Single Glazed Balcony / Terrace Door
     ArchitectFenestrationStyle(
       id: 'door_balcony_glass',
-      name: 'Балконска остъклена врата 90/210',
+      name: 'Балконска врата',
       kind: FenestrationKind.door,
       defaultWidth: 0.90,
       defaultHeight: 2.10,
@@ -1937,6 +1943,148 @@ class ArchitectFenestrationStyle {
           id: 'p_balcony_glass',
           paneType: PaneType.tiltAndTurn,
         ),
+      ),
+    ),
+
+    // 9. Balcony Door Combo with Right Window (Door Left, Window Right)
+    ArchitectFenestrationStyle(
+      id: 'door_combo_balcony_right',
+      name: 'Балконска врата с прозорец вдясно',
+      kind: FenestrationKind.door,
+      defaultWidth: 2.10,
+      defaultHeight: 2.10,
+      defaultSillHeight: 0.00,
+      frameFaceWidth: 0.07,
+      frameDepth: 0.07,
+      hasCasing: false,
+      rootSubdivision: const FenestrationSubdivision(
+        id: 'root',
+        isSplit: true,
+        isVertical: true,
+        ratios: [0.43, 0.57],
+        children: [
+          FenestrationSubdivision(
+            id: 'sub_door',
+            pane: FenestrationPane(
+              id: 'p_door',
+              paneType: PaneType.doorLeaf,
+            ),
+          ),
+          FenestrationSubdivision(
+            id: 'sub_win',
+            isSplit: true,
+            isVertical: false,
+            ratios: [0.40, 0.60],
+            children: [
+              FenestrationSubdivision(
+                id: 'sub_win_sill',
+                pane: FenestrationPane(
+                  id: 'p_win_sill',
+                  paneType: PaneType.solidPanel,
+                ),
+              ),
+              FenestrationSubdivision(
+                id: 'sub_win_sash',
+                pane: FenestrationPane(
+                  id: 'p_win_sash',
+                  paneType: PaneType.tiltAndTurn,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+
+    // 10. Balcony Door Combo with Left Window (Window Left, Door Right)
+    ArchitectFenestrationStyle(
+      id: 'door_combo_balcony_left',
+      name: 'Балконска врата с прозорец вляво',
+      kind: FenestrationKind.door,
+      defaultWidth: 2.10,
+      defaultHeight: 2.10,
+      defaultSillHeight: 0.00,
+      frameFaceWidth: 0.07,
+      frameDepth: 0.07,
+      hasCasing: false,
+      rootSubdivision: const FenestrationSubdivision(
+        id: 'root',
+        isSplit: true,
+        isVertical: true,
+        ratios: [0.57, 0.43],
+        children: [
+          FenestrationSubdivision(
+            id: 'sub_win',
+            isSplit: true,
+            isVertical: false,
+            ratios: [0.40, 0.60],
+            children: [
+              FenestrationSubdivision(
+                id: 'sub_win_sill',
+                pane: FenestrationPane(
+                  id: 'p_win_sill',
+                  paneType: PaneType.solidPanel,
+                ),
+              ),
+              FenestrationSubdivision(
+                id: 'sub_win_sash',
+                pane: FenestrationPane(
+                  id: 'p_win_sash',
+                  paneType: PaneType.tiltAndTurn,
+                ),
+              ),
+            ],
+          ),
+          FenestrationSubdivision(
+            id: 'sub_door',
+            pane: FenestrationPane(
+              id: 'p_door',
+              paneType: PaneType.doorLeaf,
+            ),
+          ),
+        ],
+      ),
+    ),
+
+    // 11. Portal Door Centered Between Two Vitrines (Window Left, Door Center, Window Right)
+    ArchitectFenestrationStyle(
+      id: 'door_combo_portal_center',
+      name: 'Врата с две витрини (портал)',
+      kind: FenestrationKind.door,
+      defaultWidth: 2.50,
+      defaultHeight: 2.10,
+      defaultSillHeight: 0.00,
+      frameFaceWidth: 0.07,
+      frameDepth: 0.07,
+      hasCasing: false,
+      rootSubdivision: const FenestrationSubdivision(
+        id: 'root',
+        isSplit: true,
+        isVertical: true,
+        ratios: [0.32, 0.36, 0.32],
+        children: [
+          FenestrationSubdivision(
+            id: 'sub_left_vitrine',
+            pane: FenestrationPane(
+              id: 'p_left_vitrine',
+              paneType: PaneType.fixedGlazing,
+            ),
+          ),
+          FenestrationSubdivision(
+            id: 'sub_center_door',
+            pane: FenestrationPane(
+              id: 'p_center_door',
+              paneType: PaneType.doorLeaf,
+            ),
+          ),
+          FenestrationSubdivision(
+            id: 'sub_right_vitrine',
+            pane: FenestrationPane(
+              id: 'p_right_vitrine',
+              paneType: PaneType.fixedGlazing,
+            ),
+          ),
+        ],
       ),
     ),
   ];

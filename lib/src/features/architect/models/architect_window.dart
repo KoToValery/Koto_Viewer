@@ -27,6 +27,7 @@ class ArchitectWindow {
   final bool isFlipped;
   final String? styleId;
   final ArchitectFenestrationStyle? style;
+  final bool? hasCasing;
 
   /// Effective style from direct reference, or resolved from persistent library by [styleId].
   ArchitectFenestrationStyle? get resolvedStyle =>
@@ -34,6 +35,10 @@ class ArchitectWindow {
       (styleId != null
           ? FenestrationLibraryService.instance.getStyleById(styleId!)
           : null);
+
+  /// Whether casing is effectively enabled (explicit override or inherited from style).
+  bool get effectiveHasCasing =>
+      hasCasing ?? resolvedStyle?.hasCasing ?? false;
 
   const ArchitectWindow({
     required this.id,
@@ -50,6 +55,7 @@ class ArchitectWindow {
 
     this.styleId,
     this.style,
+    this.hasCasing,
   });
 
   ArchitectWindow copyWith({
@@ -66,6 +72,7 @@ class ArchitectWindow {
     bool? isFlipped,
     String? styleId,
     ArchitectFenestrationStyle? style,
+    bool? hasCasing,
   }) => ArchitectWindow(
     id: id ?? this.id,
     wallId: wallId ?? this.wallId,
@@ -80,6 +87,7 @@ class ArchitectWindow {
     isFlipped: isFlipped ?? this.isFlipped,
     styleId: styleId ?? this.styleId,
     style: style ?? this.style,
+    hasCasing: hasCasing ?? this.hasCasing,
   );
 
   Map<String, dynamic> toJson() => {
@@ -96,6 +104,7 @@ class ArchitectWindow {
     'isFlipped': isFlipped,
     if (styleId != null) 'styleId': styleId,
     if (style != null) 'style': style!.toJson(),
+    if (hasCasing != null) 'hasCasing': hasCasing,
   };
 
   factory ArchitectWindow.fromJson(Map<String, dynamic> json) =>
@@ -118,6 +127,7 @@ class ArchitectWindow {
                 json['style'] as Map<String, dynamic>,
               )
             : null,
+        hasCasing: json['hasCasing'] as bool?,
       );
 
   // ===========================================================================
@@ -156,7 +166,9 @@ class ArchitectWindow {
     final pLeftBase = centerPos - u * halfW;
     final pRightBase = centerPos + u * halfW;
 
-    final effectiveStyle = resolvedStyle;
+    final effectiveStyle = resolvedStyle != null && hasCasing != null
+        ? resolvedStyle!.copyWith(hasCasing: hasCasing!)
+        : resolvedStyle;
     if (effectiveStyle != null) {
       effectiveStyle.paintPlan2D(
         palette: palette,
@@ -396,7 +408,9 @@ class ArchitectWindow {
       return const [];
     }
     final effectiveExtSign = (isFlipped ? -1.0 : 1.0) * exteriorSign;
-    final effectiveStyle = resolvedStyle;
+    final effectiveStyle = resolvedStyle != null && hasCasing != null
+        ? resolvedStyle!.copyWith(hasCasing: hasCasing!)
+        : resolvedStyle;
     if (effectiveStyle != null) {
       return Fenestration3dBuilder.buildOpening3D(
         style: effectiveStyle,

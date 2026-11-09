@@ -9524,50 +9524,86 @@ abstract class AppLocalizations {
   /// Single casement window preset name
   ///
   /// In en, this message translates to:
-  /// **'Single casement 80/140 (5-chamber)'**
+  /// **'Single casement window'**
   String get architectFenestrationPresetSingleCasement;
 
   /// Double casement window preset name
   ///
   /// In en, this message translates to:
-  /// **'Double casement 140/140 (5-chamber)'**
+  /// **'Double casement window'**
   String get architectFenestrationPresetDoubleCasement;
 
   /// Double casement window with casing preset name
   ///
   /// In en, this message translates to:
-  /// **'Double casement 140/140 with casing'**
+  /// **'Double casement with casing'**
   String get architectFenestrationPresetDoubleWithCasing;
 
   /// Triple casement window preset name
   ///
   /// In en, this message translates to:
-  /// **'Triple casement 210/140 (fixed + 2 sashes)'**
+  /// **'Triple casement window'**
   String get architectFenestrationPresetTripleCasement;
 
   /// Window with transom preset name
   ///
   /// In en, this message translates to:
-  /// **'Window with transom 140/180'**
+  /// **'Window with transom'**
   String get architectFenestrationPresetWithTransom;
 
   /// Interior door preset name
   ///
   /// In en, this message translates to:
-  /// **'Interior door 90/200'**
+  /// **'Interior door'**
   String get architectFenestrationPresetDoorInterior;
 
   /// Exterior entrance door with casing preset name
   ///
   /// In en, this message translates to:
-  /// **'Entrance door with casing 100/210'**
+  /// **'Entrance door with casing'**
   String get architectFenestrationPresetDoorEntranceCasing;
 
   /// Glazed balcony door preset name
   ///
   /// In en, this message translates to:
-  /// **'Glazed balcony door 90/210'**
+  /// **'Glazed balcony door'**
   String get architectFenestrationPresetDoorBalconyGlass;
+
+  /// Balcony door combo preset with door on left and window on right
+  ///
+  /// In en, this message translates to:
+  /// **'Balcony door with right window'**
+  String get architectFenestrationPresetBalconyDoorRight;
+
+  /// Balcony door combo preset with window on left and door on right
+  ///
+  /// In en, this message translates to:
+  /// **'Balcony door with left window'**
+  String get architectFenestrationPresetBalconyDoorLeft;
+
+  /// Portal combo preset with door centered between two windows or vitrines
+  ///
+  /// In en, this message translates to:
+  /// **'Portal door between side windows'**
+  String get architectFenestrationPresetPortalDoorCenter;
+
+  /// Toggle for casing trim around door or window
+  ///
+  /// In en, this message translates to:
+  /// **'Casing around opening'**
+  String get architectCasingToggle;
+
+  /// Short casing label for toolbar chip
+  ///
+  /// In en, this message translates to:
+  /// **'Casing'**
+  String get architectDoorCasing;
+
+  /// Button label to open library dialog from element properties
+  ///
+  /// In en, this message translates to:
+  /// **'Browse library...'**
+  String get architectBrowseLibrary;
 
   /// Parapet wall type name with handrail pipe
   ///

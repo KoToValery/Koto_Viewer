@@ -31,6 +31,7 @@ import 'architect_properties_plan_preview.dart';
 import 'architect_wall_composition_editor.dart';
 import 'architect_wall_type_label.dart';
 import 'architect_wall_type_picker.dart';
+import 'architect_component_library_dialog.dart';
 
 class ArchitectElementPropertiesDialog extends StatefulWidget {
   final bool Function(ArchitectProject)? onApplyProject;
@@ -162,6 +163,10 @@ class _ArchitectElementPropertiesDialogState
       final styleIds = records.map((e) => e['styleId'] as String?).toSet();
       if (styleIds.length == 1 && styleIds.first != null) {
         texts['styleId'] = styleIds.first!;
+      }
+      final casings = records.map((e) => e['hasCasing'] as bool?).toSet();
+      if (casings.length == 1 && casings.first != null) {
+        texts['hasCasing'] = '${casings.first}';
       }
     }
     if (isWindow) {
@@ -1260,54 +1265,92 @@ class _ArchitectElementPropertiesDialogState
             _zoneBoundaryModeSwitch(l),
           ],
           if (isDoor || isWindow) ...[
-            DropdownButtonFormField<String>(
-              key: const ValueKey('architect-property-styleId'),
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: l.architectFenestrationStyle,
-              ),
-              initialValue:
-                  FenestrationLibraryService.instance
-                      .getStylesForKind(
-                        isDoor
-                            ? FenestrationKind.door
-                            : FenestrationKind.window,
-                      )
-                      .any(
-                        (s) => s.id == (texts['styleId'] ?? _common('styleId')),
-                      )
-                  ? (texts['styleId'] ?? _common('styleId') as String?)
-                  : null,
-              items: [
-                for (final s
-                    in FenestrationLibraryService.instance.getStylesForKind(
-                      isDoor ? FenestrationKind.door : FenestrationKind.window,
-                    ))
-                  DropdownMenuItem(
-                    value: s.id,
-                    child: Text(
-                      s.localizedName(l),
-                      overflow: TextOverflow.ellipsis,
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    key: const ValueKey('architect-property-styleId'),
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: l.architectFenestrationStyle,
                     ),
-                  ),
-              ],
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() {
-                    texts['styleId'] = val;
-                    if (!_preserveDimensionsOnStyleChange) {
-                      final s = FenestrationLibraryService.instance.getStyleById(
-                        val,
-                      );
-                      if (s != null) {
-                        values['width'] = s.defaultWidth;
-                        values['height'] = s.defaultHeight;
-                        values['sillHeight'] = s.defaultSillHeight;
+                    value: FenestrationLibraryService.instance
+                            .getStylesForKind(
+                              isDoor
+                                  ? FenestrationKind.door
+                                  : FenestrationKind.window,
+                            )
+                            .any(
+                              (s) =>
+                                  s.id ==
+                                  (texts['styleId'] ?? _common('styleId')),
+                            )
+                        ? (texts['styleId'] ?? _common('styleId') as String?)
+                        : null,
+                    items: [
+                      for (final s in FenestrationLibraryService.instance
+                          .getStylesForKind(
+                        isDoor ? FenestrationKind.door : FenestrationKind.window,
+                      ))
+                        DropdownMenuItem(
+                          value: s.id,
+                          child: Text(
+                            s.localizedName(l),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          texts['styleId'] = val;
+                          if (!_preserveDimensionsOnStyleChange) {
+                            final s = FenestrationLibraryService.instance
+                                .getStyleById(val);
+                            if (s != null) {
+                              values['width'] = s.defaultWidth;
+                              values['height'] = s.defaultHeight;
+                              values['sillHeight'] = s.defaultSillHeight;
+                            }
+                          }
+                        });
                       }
-                    }
-                  });
-                }
-              },
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: l.architectBrowseLibrary,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 14,
+                      ),
+                    ),
+                    icon: const AppIcon(AppIconId.library, size: 18),
+                    label: Text(l.architectBrowseLibrary),
+                    onPressed: () {
+                      ArchitectComponentLibraryDialog.show(
+                        context,
+                        initialCategory: isDoor
+                            ? ArchitectComponentCategory.doors
+                            : ArchitectComponentCategory.windows,
+                        onSelectFenestration: (style) {
+                          setState(() {
+                            texts['styleId'] = style.id;
+                            if (!_preserveDimensionsOnStyleChange) {
+                              values['width'] = style.defaultWidth;
+                              values['height'] = style.defaultHeight;
+                              values['sillHeight'] = style.defaultSillHeight;
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
             CheckboxListTile(
               dense: true,
@@ -1324,6 +1367,31 @@ class _ArchitectElementPropertiesDialogState
               value: _preserveDimensionsOnStyleChange,
               onChanged: (v) =>
                   setState(() => _preserveDimensionsOnStyleChange = v ?? true),
+            ),
+            SwitchListTile.adaptive(
+              key: const ValueKey('architect-property-hasCasing'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                l.architectCasingToggle,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              value: texts.containsKey('hasCasing')
+                  ? texts['hasCasing'] == 'true'
+                  : (_common('hasCasing') as bool? ??
+                      FenestrationLibraryService.instance
+                          .getStyleById(
+                            texts['styleId'] ??
+                                _common('styleId') as String? ??
+                                '',
+                          )
+                          ?.hasCasing ??
+                      false),
+              onChanged: (val) {
+                setState(() => texts['hasCasing'] = '$val');
+              },
             ),
             const SizedBox(height: 8),
           ],

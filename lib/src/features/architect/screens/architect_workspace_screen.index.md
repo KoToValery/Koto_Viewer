@@ -50,8 +50,8 @@
 | Tool (`ArchitectTool`) | Pointer Down/Move/Up | Commit / Action Handler | UI Bar / Dialog Widget |
 | :--- | :--- | :--- | :--- |
 | **wall** | L7025, L10149, L12612 | `_finishChainedWall`, `_placeDraftSegment` | `ArchitectWallReferenceControl`, `ArchitectWallThicknessDialog` |
-| **door** | L7025, L10277, L11971 | `_tryPlaceDoorAt`, `_commitOpeningPlacement` | `ArchitectCandidatePicker`, `ArchitectDoorPropertiesDialog` |
-| **window** | L7025, L10277, L12045 | `_tryPlaceDoorAt`, `_commitOpeningPlacement` | `ArchitectCandidatePicker`, `ArchitectFenestrationStyle` |
+| **door** | L7025, L10277, L11971 | `_tryPlaceDoorAt`, `_commitOpeningPlacement`, `_updateSelectedDoor` | `ArchitectCandidatePicker`, `ArchitectDoorPropertiesDialog`, `ArchitectToolPalette` (3-row HUD) |
+| **window** | L7025, L10277, L12045 | `_tryPlaceDoorAt`, `_commitOpeningPlacement`, `_updateSelectedWindow` | `ArchitectCandidatePicker`, `ArchitectFenestrationStyle`, `ArchitectToolPalette` (3-row HUD) |
 | **column** | L7025, L9613, L11925 | `_commitColumnPlacement` | `ArchitectColumnClearance`, `ArchitectCandidatePicker` |
 | **beam** | L7025, L8043, L12842 | `_commitBeamPlacement` | `ArchitectElementPropertiesDialog` |
 | **slab** | L7025, L8043, L12925 | `_commitPolygonDraft` | `ArchitectSlabLayersDialog` |
