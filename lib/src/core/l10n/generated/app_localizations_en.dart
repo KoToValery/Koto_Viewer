@@ -3410,7 +3410,7 @@ class AppLocalizationsEn extends AppLocalizations {
       '3D Conceptual design, walls, doors & storeys';
 
   @override
-  String get architectNewProject => 'New Architectural Project';
+  String get architectNewProject => 'New Project';
 
   @override
   String get architectProjectName => 'Project Name';
@@ -12667,4 +12667,45 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectLayerStreets => 'Streets & Sidewalks';
+
+  @override
+  String get moduleAioViewer => 'AIO Viewer';
+
+  @override
+  String get moduleArchitectStudio => 'Architect Studio';
+
+  @override
+  String get moduleStructuralBim => 'Construction BIM';
+
+  @override
+  String get architectBlankWorkspace => 'Blank Canvas';
+
+  @override
+  String get structuralNewProject => 'New Structural Project';
+
+  @override
+  String get architectProjectsTitle => 'Architectural Projects';
+
+  @override
+  String get structuralProjectsTitle => 'Structural Projects';
+
+  @override
+  String get architectWizardAddOverlay => 'Add CAD Overlay';
+
+  @override
+  String get architectWizardChangeOverlay => 'Change Overlay';
+
+  @override
+  String get architectWizardRemoveOverlay => 'Remove Overlay';
+
+  @override
+  String get architectWizardStoreyOverlay => 'CAD Overlay';
+
+  @override
+  String get architectNoProjects =>
+      'No architectural projects yet. Create a new project or start with a blank drawing.';
+
+  @override
+  String get structuralNoProjects =>
+      'No structural projects yet. Create a new project to start structural and seismic modeling.';
 }

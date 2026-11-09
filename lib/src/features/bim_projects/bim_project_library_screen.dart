@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../core/l10n/l10n_extensions.dart';
 import '../architect/screens/architect_workspace_screen.dart';
+import '../architect/services/architect_underlay_service.dart';
+import '../architect/models/architect_underlay_models.dart';
 import '../architect/widgets/architect_project_wizard_dialog.dart';
 import 'models/bim_work_project.dart';
 import 'models/bim_coordinate_frame.dart';
@@ -84,11 +87,13 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
     if (archProject == null || !mounted) return;
 
     final storeys = archProject.storeys.map((s) {
+      final underlayConfig = archProject.cadUnderlays[s.id];
       return BimStoreyUnderlay(
         storeyId: s.id,
         name: s.name,
         elevation: s.elevation,
         height: s.height,
+        sourceFileName: underlayConfig?.fileName,
       );
     }).toList();
 
@@ -99,6 +104,37 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
       initialArchitectProject: archProject,
     );
 
+    // Import and attach any selected CAD underlays into the created project
+    final configs = <String, ArchitectCadUnderlayConfig>{};
+    for (final entry in archProject.cadUnderlays.entries) {
+      final file = entry.value.externalSourcePath != null
+          ? File(entry.value.externalSourcePath!)
+          : null;
+      if (file != null && await file.exists()) {
+        try {
+          final res = await ArchitectUnderlayService.instance
+              .importOrReloadCadUnderlay(
+            projectId: bimProject.id,
+            storeyId: entry.key,
+            sourceFile: file,
+            existingConfig: null,
+          );
+          configs[entry.key] = res.config;
+          await _library.attachUnderlayFile(bimProject.id, entry.key, file);
+        } catch (e) {
+          debugPrint('[BimProjectLibrary] import underlay error: $e');
+        }
+      }
+    }
+
+    if (configs.isNotEmpty) {
+      final updated = archProject.copyWith(
+        id: bimProject.id,
+        cadUnderlays: configs,
+      );
+      await _library.saveArchitectProject(bimProject.id, updated);
+    }
+
     _loadProjects();
     if (mounted) {
       _openProject(bimProject);
@@ -106,7 +142,8 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
   }
 
   Future<void> _openProject(BimWorkProject project) async {
-    if (!project.isAligned) {
+    final isArch = project.projectType == BimProjectType.architectural;
+    if (!isArch && !project.isAligned) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(context.l10n.bimProjectAlignFirstPrompt),
@@ -723,42 +760,42 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                       ),
                     ),
 
-                    // Status badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isReady
-                            ? const Color(0xFF00E676).withValues(alpha: 0.15)
-                            : const Color(0xFFFF9100).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AppIcon.fromMaterial(
-                            isReady ? Icons.check_circle_rounded : Icons.info_outline_rounded,
-                            size: 14,
-                            color: isReady ? const Color(0xFF00E676) : const Color(0xFFFF9100),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isReady ? l10n.bimProjectStatusReady : l10n.bimProjectStatusAlignment,
-                            style: TextStyle(
+                    // Status badge (Structural only)
+                    if (!isArch)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isReady
+                              ? const Color(0xFF00E676).withValues(alpha: 0.15)
+                              : const Color(0xFFFF9100).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AppIcon.fromMaterial(
+                              isReady ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                              size: 14,
                               color: isReady ? const Color(0xFF00E676) : const Color(0xFFFF9100),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 6),
+                            Text(
+                              isReady ? l10n.bimProjectStatusReady : l10n.bimProjectStatusAlignment,
+                              style: TextStyle(
+                                color: isReady ? const Color(0xFF00E676) : const Color(0xFFFF9100),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
 
                 const SizedBox(height: 16),
 
-                // Action buttons: Open Model & Align Drawings
+                // Action buttons: Open Model & (for structural) Align Drawings
                 Row(
                   children: [
                     Expanded(
@@ -770,45 +807,42 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                             l10n.bimProjectOpen,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00E5FF),
+                          backgroundColor: isArch ? const Color(0xFFFFB300) : const Color(0xFF00E5FF),
                           foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8,
-                          ),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
-                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                         onPressed: () => _openProject(project),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const AppIcon(AppIconId.measureAngle, size: 16),
-                        label: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            l10n.bimProjectAlignStoreys,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13),
+                    if (!isArch) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const AppIcon(AppIconId.measureAngle, size: 16),
+                          label: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              l10n.bimProjectAlignStoreys,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13),
+                            ),
                           ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white24),
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => _openAlignment(project),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white24),
-                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8,
-                          ),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onPressed: () => _openAlignment(project),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ],

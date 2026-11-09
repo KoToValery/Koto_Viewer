@@ -5855,10 +5855,10 @@ abstract class AppLocalizations {
   /// **'3D Conceptual design, walls, doors & storeys'**
   String get architectStudioSubtitle;
 
-  /// Title for new project dialog
+  /// Button to create new architectural project
   ///
   /// In en, this message translates to:
-  /// **'New Architectural Project'**
+  /// **'New Project'**
   String get architectNewProject;
 
   /// Label for project name field
@@ -23075,6 +23075,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Streets & Sidewalks'**
   String get architectLayerStreets;
+
+  /// Tab title for All-in-One file viewer
+  ///
+  /// In en, this message translates to:
+  /// **'AIO Viewer'**
+  String get moduleAioViewer;
+
+  /// Tab title for Architect Studio module
+  ///
+  /// In en, this message translates to:
+  /// **'Architect Studio'**
+  String get moduleArchitectStudio;
+
+  /// Tab title for Structural / Construction BIM module
+  ///
+  /// In en, this message translates to:
+  /// **'Construction BIM'**
+  String get moduleStructuralBim;
+
+  /// Button to open blank architectural workspace
+  ///
+  /// In en, this message translates to:
+  /// **'Blank Canvas'**
+  String get architectBlankWorkspace;
+
+  /// Button to create new structural project
+  ///
+  /// In en, this message translates to:
+  /// **'New Structural Project'**
+  String get structuralNewProject;
+
+  /// Title for architectural projects list
+  ///
+  /// In en, this message translates to:
+  /// **'Architectural Projects'**
+  String get architectProjectsTitle;
+
+  /// Title for structural projects list
+  ///
+  /// In en, this message translates to:
+  /// **'Structural Projects'**
+  String get structuralProjectsTitle;
+
+  /// Button in architect wizard to attach an underlay/overlay
+  ///
+  /// In en, this message translates to:
+  /// **'Add CAD Overlay'**
+  String get architectWizardAddOverlay;
+
+  /// Button in architect wizard to replace an underlay/overlay
+  ///
+  /// In en, this message translates to:
+  /// **'Change Overlay'**
+  String get architectWizardChangeOverlay;
+
+  /// Button in architect wizard to remove an underlay/overlay
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Overlay'**
+  String get architectWizardRemoveOverlay;
+
+  /// Label for storey CAD overlay
+  ///
+  /// In en, this message translates to:
+  /// **'CAD Overlay'**
+  String get architectWizardStoreyOverlay;
+
+  /// Empty state description for architectural studio
+  ///
+  /// In en, this message translates to:
+  /// **'No architectural projects yet. Create a new project or start with a blank drawing.'**
+  String get architectNoProjects;
+
+  /// Empty state description for structural studio
+  ///
+  /// In en, this message translates to:
+  /// **'No structural projects yet. Create a new project to start structural and seismic modeling.'**
+  String get structuralNoProjects;
 }
 
 class _AppLocalizationsDelegate

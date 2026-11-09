@@ -3423,7 +3423,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectStudioSubtitle => '3D Идеен проект, стени, врати и етажи';
 
   @override
-  String get architectNewProject => 'Нов архитектурен проект';
+  String get architectNewProject => 'Нов проект';
 
   @override
   String get architectProjectName => 'Име на проект';
@@ -12717,4 +12717,45 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectLayerStreets => 'Улици и тротоари';
+
+  @override
+  String get moduleAioViewer => 'AIO Преглед';
+
+  @override
+  String get moduleArchitectStudio => 'Архитектура';
+
+  @override
+  String get moduleStructuralBim => 'Конструкции';
+
+  @override
+  String get architectBlankWorkspace => 'Празен чертеж';
+
+  @override
+  String get structuralNewProject => 'Нов конструктивен проект';
+
+  @override
+  String get architectProjectsTitle => 'Архитектурни проекти';
+
+  @override
+  String get structuralProjectsTitle => 'Конструктивни проекти';
+
+  @override
+  String get architectWizardAddOverlay => 'Добави CAD подложка';
+
+  @override
+  String get architectWizardChangeOverlay => 'Смени подложка';
+
+  @override
+  String get architectWizardRemoveOverlay => 'Премахни подложка';
+
+  @override
+  String get architectWizardStoreyOverlay => 'CAD Подложка';
+
+  @override
+  String get architectNoProjects =>
+      'Все още няма архитектурни проекти. Създайте нов проект или започнете с празен чертеж.';
+
+  @override
+  String get structuralNoProjects =>
+      'Все още няма конструктивни проекти. Създайте нов проект за конструктивно и сеизмично моделиране.';
 }

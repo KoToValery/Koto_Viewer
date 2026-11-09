@@ -4337,5 +4337,19 @@
   "architectStreetMarkingDoubleSolid": "Двойна",
   "architectStreetMarkingNone": "Без",
   "architectStreetCurb": "Бордюр",
-  "architectLayerStreets": "Улици и тротоари"
+  "architectLayerStreets": "Улици и тротоари",
+  "moduleAioViewer": "AIO Преглед",
+  "moduleArchitectStudio": "Архитектура",
+  "moduleStructuralBim": "Конструкции",
+  "architectBlankWorkspace": "Празен чертеж",
+  "architectNewProject": "Нов проект",
+  "structuralNewProject": "Нов конструктивен проект",
+  "architectProjectsTitle": "Архитектурни проекти",
+  "structuralProjectsTitle": "Конструктивни проекти",
+  "architectWizardAddOverlay": "Добави CAD подложка",
+  "architectWizardChangeOverlay": "Смени подложка",
+  "architectWizardRemoveOverlay": "Премахни подложка",
+  "architectWizardStoreyOverlay": "CAD Подложка",
+  "architectNoProjects": "Все още няма архитектурни проекти. Създайте нов проект или започнете с празен чертеж.",
+  "structuralNoProjects": "Все още няма конструктивни проекти. Създайте нов проект за конструктивно и сеизмично моделиране."
 }

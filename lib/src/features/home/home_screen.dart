@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/errors/app_error_handler.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
@@ -21,8 +20,8 @@ import '../../core/l10n/l10n_extensions.dart';
 import 'widgets/share_options_sheet.dart';
 import 'widgets/app_info_dialog.dart';
 import 'widgets/local_network_receive_dialog.dart';
-import '../bim_projects/bim_project_library_screen.dart';
-import '../architect/screens/architect_workspace_screen.dart';
+import '../bim_projects/screens/structural_studio_tab.dart';
+import '../architect/screens/architect_studio_tab.dart';
 
 // ============================================================================
 // MASTER HOME SCREEN LLM SEARCH INDEX & TABLE OF CONTENTS
@@ -31,13 +30,13 @@ import '../architect/screens/architect_workspace_screen.dart';
 // QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
 //
 // [SEC-01-ICONS]   L39-L1635  : [TAG:HOME_ICONS] File type icons, badges & format previews
-// [SEC-02-WIDGET]  L1636-L1650: [TAG:HOME_WIDGET] HomeScreen StatefulWidget declaration
-// [SEC-03-STATE]   L1651-L1749: [TAG:HOME_STATE] State variables, file scanning & directory cache
-// [SEC-04-FOLDERS] L1750-L2046: [TAG:HOME_FOLDERS] Folder picker & directory management
-// [SEC-05-ACTIONS] L2047-L2230: [TAG:HOME_ACTIONS] File opening actions & viewer navigation
-// [SEC-06-DIALOGS] L2231-L2572: [TAG:HOME_DIALOGS] Settings, donation, app info dialogs
-// [SEC-07-HEADER]  L2573-L3064: [TAG:HOME_HEADER] Top header, search bar & category filters
-// [SEC-08-BUILD]   L3065-L3691: [TAG:HOME_BUILD] Main build method, file list/grid & empty states
+// [SEC-02-WIDGET]  L1636-L1655: [TAG:HOME_WIDGET] HomeScreen StatefulWidget declaration
+// [SEC-03-STATE]   L1656-L1755: [TAG:HOME_STATE] State variables, tab controller, file scanning & cache
+// [SEC-04-FOLDERS] L1756-L2052: [TAG:HOME_FOLDERS] Folder picker & directory management
+// [SEC-05-ACTIONS] L2053-L2236: [TAG:HOME_ACTIONS] File opening actions & viewer navigation
+// [SEC-06-DIALOGS] L2237-L2265: [TAG:HOME_DIALOGS] Settings, coordinate system & app info dialogs
+// [SEC-07-HEADER]  L2266-L2780: [TAG:HOME_HEADER] Top header, search bar & category filters
+// [SEC-08-BUILD]   L2781-L3268: [TAG:HOME_BUILD] 3-Tab Shell (AIO Viewer, Architect, Structural) & build
 // ============================================================================
 
 // === SECTION: [SEC-01-ICONS] FILE TYPE ICONS & BADGES ===
@@ -1653,7 +1652,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 // === SECTION: STATE & FILE SCANNING LOGIC ===
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
   List<PdfItem> _pdfFiles = [];
   List<PdfItem> _filteredFiles = [];
   Map<FileCategory, int> _categoryCounts = {};
@@ -1670,6 +1671,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadFiles();
     RecentFilesService.recentFilesNotifier.addListener(_onRecentFilesChanged);
 
@@ -1693,6 +1698,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     RecentFilesService.recentFilesNotifier.removeListener(_onRecentFilesChanged,
     );
     _searchController.dispose();
@@ -2232,315 +2238,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // === SECTION: DIALOGS (DONATION, ABOUT, SETTINGS) ===
-
-  void _showSupportDeveloperDialog() {
-    int? selectedIndex = 0;
-    final customController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          double? currentAmount;
-          if (selectedIndex == 0) currentAmount = 2.0;
-          if (selectedIndex == 1) currentAmount = 5.0;
-          if (selectedIndex == 2) currentAmount = 7.0;
-          if (selectedIndex == 3) {
-            currentAmount = double.tryParse(
-              customController.text.replaceAll(',', '.'),
-            );
-          }
-
-          final bool isButtonEnabled =
-              selectedIndex != null &&
-              currentAmount != null &&
-              currentAmount > 0;
-
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: const [
-                Icon(Icons.favorite, color: Color(0xFF7C3AED)),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Support Developer',
-                    style: TextStyle(fontSize: 18),
-                    maxLines: 2,
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'KoTo Viewer is a 100% free app with no ads.',
-                    style: TextStyle(fontSize: 13, color: Colors.black87),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDonateOptionTile(
-                    isSelected: selectedIndex == 0,
-                    icon: '☕',
-                    title: 'A quick coffee',
-                    amount: '€2',
-                    subtitle: 'To wake up in the morning.',
-                    onTap: () => setDialogState(() => selectedIndex = 0),
-                  ),
-                  const SizedBox(height: 6),
-                  _buildDonateOptionTile(
-                    isSelected: selectedIndex == 1,
-                    icon: '🥐',
-                    title: 'Cappuccino with croissant',
-                    amount: '€5',
-                    subtitle: "So there's no working on an empty stomach.",
-                    onTap: () => setDialogState(() => selectedIndex = 1),
-                  ),
-                  const SizedBox(height: 6),
-                  _buildDonateOptionTile(
-                    isSelected: selectedIndex == 2,
-                    icon: '🍺',
-                    title: 'Cold beer after a hard day',
-                    amount: '€7',
-                    subtitle: 'Because working hard is thirsty business.',
-                    onTap: () => setDialogState(() => selectedIndex = 2),
-                  ),
-                  const SizedBox(height: 6),
-                  _buildDonateOptionTile(
-                    isSelected: selectedIndex == 3,
-                    icon: '🎁',
-                    title: 'Custom Amount',
-                    amount: selectedIndex == 3 && currentAmount != null
-                        ? '€${currentAmount.toStringAsFixed(currentAmount.truncateToDouble() == currentAmount ? 0 : 2)}'
-                        : 'Custom',
-                    subtitle: 'Because any support is valuable.',
-                    onTap: () => setDialogState(() => selectedIndex = 3),
-                  ),
-                  if (selectedIndex == 3) ...[
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: customController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: context.l10n.commandUiEnterAmountInMax20,
-                        hintText: context.l10n.commandUiEG10,
-                        isDense: true,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        suffixText: '€',
-                      ),
-                      onChanged: (val) {
-                        final parsed = double.tryParse(
-                          val.replaceAll(',', '.'),
-                        );
-
-                        if (parsed != null && parsed > 20) {
-                          customController.text = '20';
-                          customController
-                              .selection = TextSelection.fromPosition(
-                            TextPosition(offset: customController.text.length),
-                          );
-                        }
-
-                        setDialogState(() {});
-                      },
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Text(
-                    selectedIndex == null
-                        ? 'Select an option above:'
-                        : 'Choose a payment method (${currentAmount != null ? "${currentAmount.toStringAsFixed(currentAmount.truncateToDouble() == currentAmount ? 0 : 2)}€" : ""}):',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: selectedIndex == null
-                          ? Colors.deepOrange
-                          : Colors.grey.shade700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isButtonEnabled
-                                ? Colors.black
-                                : Colors.grey.shade300,
-                            foregroundColor: isButtonEnabled
-                                ? Colors.white
-                                : Colors.grey.shade600,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          icon: AppIcon(
-                            AppIconId.payment,
-                            size: 18,
-                            color: isButtonEnabled
-                                ? Colors.blueAccent
-                                : Colors.grey,
-                          ),
-                          label: FittedBox(
-                            child: Text(
-                              context.l10n.commandUiRevolut,
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          onPressed: !isButtonEnabled
-                              ? null
-                              : () async {
-                                  final amountStr =
-                                      currentAmount!.truncateToDouble() ==
-                                          currentAmount
-                                      ? currentAmount.toInt().toString()
-                                      : currentAmount.toStringAsFixed(2);
-
-                                  final Uri url = Uri.parse(
-                                    'https://revolut.me/kostadc1ug/${amountStr}EUR',
-                                  );
-
-                                  if (await canLaunchUrl(url)) {
-                                    await launchUrl(
-                                      url,
-                                      mode: LaunchMode.externalApplication,
-                                    );
-                                  }
-                                },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isButtonEnabled
-                                ? const Color(0xFF003087)
-                                : Colors.grey.shade300,
-                            foregroundColor: isButtonEnabled
-                                ? Colors.white
-                                : Colors.grey.shade600,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          icon: AppIcon(
-                            AppIconId.payment,
-                            size: 18,
-                            color: isButtonEnabled
-                                ? Colors.lightBlueAccent
-                                : Colors.grey,
-                          ),
-                          label: FittedBox(
-                            child: Text(
-                              context.l10n.commandUiPaypal,
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          onPressed: !isButtonEnabled
-                              ? null
-                              : () async {
-                                  final amountStr = currentAmount!
-                                      .toStringAsFixed(2);
-
-                                  final Uri url = Uri.parse(
-                                    'https://www.paypal.com/donate/?business=kotocadastre@atomicmail.io&amount=$amountStr&currency_code=EUR',
-                                  );
-
-                                  if (await canLaunchUrl(url)) {
-                                    await launchUrl(
-                                      url,
-                                      mode: LaunchMode.externalApplication,
-                                    );
-                                  }
-                                },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(context.l10n.commandIconClose),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildDonateOptionTile({
-    required bool isSelected,
-    required String icon,
-    required String title,
-    required String amount,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEDE9FE) : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF7C3AED) : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Text(icon, style: const TextStyle(fontSize: 22)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ),
-            Text(
-              amount,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Color(0xFF7C3AED),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // === SECTION: DIALOGS (ABOUT, SETTINGS) ===
 
   void _showAboutDialog() {
     AppInfoDialog.show(context);
@@ -3105,12 +2803,7 @@ class _HomeScreenState extends State<HomeScreen> {
             visualDensity: VisualDensity.compact,
             onPressed: _showReceiveFilesDialog,
           ),
-          IconButton(
-            icon: const AppIcon(AppIconId.favorite, color: Color(0xFF7C3AED)),
-            tooltip: l10n.supportDeveloper,
-            visualDensity: VisualDensity.compact,
-            onPressed: _showSupportDeveloperDialog,
-          ),
+
           IconButton(
             icon: AppIcon.fromMaterial(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode,
             ),
@@ -3118,18 +2811,7 @@ class _HomeScreenState extends State<HomeScreen> {
             visualDensity: VisualDensity.compact,
             onPressed: () => widget.onToggleTheme(!widget.isDarkMode),
           ),
-          IconButton(
-            icon: const AppIcon(AppIconId.building),
-            tooltip: l10n.bimProjects,
-            visualDensity: VisualDensity.compact,
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const BimProjectLibraryScreen(),
-                ),
-              );
-            },
-          ),
+
           PopupMenuButton<String>(
             icon: const AppIcon(AppIconId.moreVertical),
             tooltip: l10n.contextMenuMore,
@@ -3221,13 +2903,52 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          indicatorColor: _tabController.index == 1
+              ? const Color(0xFFFFB300)
+              : const Color(0xFF00E5FF),
+          tabs: [
+            Tab(
+              icon: const AppIcon(AppIconId.folder, size: 20),
+              text: l10n.moduleAioViewer,
+            ),
+            Tab(
+              icon: const AppIcon(AppIconId.measureAngle, size: 20),
+              text: l10n.moduleArchitectStudio,
+            ),
+            Tab(
+              icon: const AppIcon(AppIconId.building, size: 20),
+              text: l10n.moduleStructuralBim,
+            ),
+          ],
+        ),
       ),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadFiles,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildViewerTab(dateFormat, l10n, theme),
+            const ArchitectStudioTab(),
+            const StructuralStudioTab(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViewerTab(
+    DateFormat dateFormat,
+    AppLocalizations l10n,
+    ThemeData theme,
+  ) {
+    return RefreshIndicator(
+      onRefresh: _loadFiles,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
@@ -3319,155 +3040,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 12),
-                        InkWell(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const BimProjectLibraryScreen(),
-                              ),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(14),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.22),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.25),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(7),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF00E5FF,
-                                    ).withValues(alpha: 0.25),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const AppIcon(
-                                    AppIconId.building,
-                                    color: Color(0xFF00E5FF),
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        l10n.bimProjects,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      Text(
-                                        l10n.bimProjectLibraryTitle,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.white.withValues(alpha: 0.8,
-                                          ),
-                                          fontSize: 11.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const AppIcon(
-                                  AppIconId.chevronRight,
-                                  color: Colors.white70,
-                                  size: 14,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        InkWell(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const ArchitectWorkspaceScreen(),
-                              ),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(14),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.22),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.25),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(7),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFB300,
-                                    )
-                                        .withValues(alpha: 0.25),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const AppIcon(
-                                    AppIconId.measureAngle,
-                                    color: Color(0xFFFFB300),
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        l10n.architectStudio,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      Text(
-                                        l10n.architectStudioSubtitle,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.8,
-                                          ),
-                                          fontSize: 11.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const AppIcon(
-                                  AppIconId.chevronRight,
-                                  color: Colors.white70,
-                                  size: 14,
-                                ),
-                              ],
-                            ),
-                          ),
                         ),
                       ],
 
@@ -3688,8 +3260,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
             ],
           ),
-        ),
-      ),
-    );
+        );
   }
 }

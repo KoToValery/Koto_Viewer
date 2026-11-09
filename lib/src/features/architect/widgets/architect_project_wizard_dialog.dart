@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import '../../bim_projects/services/bim_underlay_picker_helper.dart';
 import '../models/architect_grid_preset.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
@@ -28,6 +30,7 @@ class ArchitectProjectWizardDialog extends StatefulWidget {
 
 class _LevelDraft {
   double elevation, height;
+  File? overlayFile;
   final TextEditingController elevationInput = TextEditingController();
   final TextEditingController heightInput = TextEditingController();
   _LevelDraft(this.elevation, this.height);
@@ -159,6 +162,18 @@ class _ArchitectProjectWizardDialogState
           height: _levels[i].height,
         ),
     ];
+    final configs = <String, ArchitectCadUnderlayConfig>{};
+    for (var i = 0; i < storeys.length; i++) {
+      final file = _levels[i].overlayFile;
+      if (file != null) {
+        configs[storeys[i].id] = ArchitectCadUnderlayConfig(
+          storeyId: storeys[i].id,
+          fileName: file.uri.pathSegments.last,
+          externalSourcePath: file.path,
+          internalCopyPath: file.path,
+        );
+      }
+    }
     final project = ArchitectProject.starterWithCatalog(
       name: _name.text.trim().isEmpty
           ? l.architectDefaultProjectName
@@ -177,7 +192,11 @@ class _ArchitectProjectWizardDialogState
           storeyIndex: storeys.length,
         ),
       ),
-    ).copyWith(storeys: storeys, distanceDecimals: _decimals);
+    ).copyWith(
+      storeys: storeys,
+      cadUnderlays: configs,
+      distanceDecimals: _decimals,
+    );
     Navigator.pop(context, project);
   }
 
@@ -383,13 +402,17 @@ class _ArchitectProjectWizardDialogState
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<ArchitectStructuralScheme>(
+          isExpanded: true,
           initialValue: _structuralScheme,
           decoration: const InputDecoration(border: OutlineInputBorder()),
           items: [
             for (final scheme in ArchitectStructuralScheme.values)
               DropdownMenuItem(
                 value: scheme,
-                child: Text(scheme.label(l)),
+                child: Text(
+                  scheme.label(l),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
           ],
           onChanged: (val) {
@@ -490,53 +513,60 @@ class _ArchitectProjectWizardDialogState
           for (var i = 0; i < _levels.length; i++)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      key: ValueKey('architect-wizard-elevation-$i'),
-                      controller: _levels[i].elevationInput,
-                      readOnly: i == 0,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                        signed: true,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          key: ValueKey('architect-wizard-elevation-$i'),
+                          controller: _levels[i].elevationInput,
+                          readOnly: i == 0,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                            signed: true,
+                          ),
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (text) => _elevationChanged(i, text),
+                          validator: (text) {
+                            final value = _parse(text ?? '', elevation: true);
+                            return value == null ||
+                                    (i > 0 && value <= _levels[i - 1].elevation) ||
+                                    (i + 1 < _levels.length &&
+                                        value >= _levels[i + 1].elevation)
+                                ? l.architectWizardInvalidLevel
+                                : null;
+                          },
+                        ),
                       ),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          key: ValueKey('architect-wizard-height-$i'),
+                          controller: _levels[i].heightInput,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (text) => _heightChanged(i, text),
+                          validator: (text) {
+                            final value = _parse(text ?? '');
+                            return value == null || value <= 0
+                                ? l.architectWizardInvalidLevel
+                                : null;
+                          },
+                        ),
                       ),
-                      onChanged: (text) => _elevationChanged(i, text),
-                      validator: (text) {
-                        final value = _parse(text ?? '', elevation: true);
-                        return value == null ||
-                                (i > 0 && value <= _levels[i - 1].elevation) ||
-                                (i + 1 < _levels.length &&
-                                    value >= _levels[i + 1].elevation)
-                            ? l.architectWizardInvalidLevel
-                            : null;
-                      },
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      key: ValueKey('architect-wizard-height-$i'),
-                      controller: _levels[i].heightInput,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (text) => _heightChanged(i, text),
-                      validator: (text) {
-                        final value = _parse(text ?? '');
-                        return value == null || value <= 0
-                            ? l.architectWizardInvalidLevel
-                            : null;
-                      },
-                    ),
-                  ),
+                  const SizedBox(height: 6),
+                  _buildStoreyOverlayPicker(i, l),
                 ],
               ),
             ),
@@ -558,6 +588,109 @@ class _ArchitectProjectWizardDialogState
                       setState(() => _levels.removeLast().dispose()),
                 ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStoreyOverlayPicker(int index, AppLocalizations l) {
+    final level = _levels[index];
+    if (level.overlayFile == null) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: InkWell(
+          key: ValueKey('architect-wizard-overlay-add-$index'),
+          borderRadius: BorderRadius.circular(8),
+          onTap: () async {
+            final file =
+                await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
+            if (file != null && mounted) {
+              setState(() {
+                level.overlayFile = file;
+              });
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.35),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const AppIcon(AppIconId.cadUnderlay, size: 14),
+                const SizedBox(width: 6),
+                Text(
+                  l.architectWizardAddOverlay,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(fontSize: 11.5),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        children: [
+          const AppIcon(AppIconId.cadUnderlay, size: 14, color: Color(0xFF00E5FF)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              level.overlayFile!.uri.pathSegments.last,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+          InkWell(
+            onTap: () async {
+              final file =
+                  await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
+              if (file != null && mounted) {
+                setState(() {
+                  level.overlayFile = file;
+                });
+              }
+            },
+            child: Tooltip(
+              message: l.architectWizardChangeOverlay,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: AppIcon(AppIconId.edit, size: 14),
+              ),
+            ),
+          ),
+          InkWell(
+            key: ValueKey('architect-wizard-overlay-remove-$index'),
+            onTap: () {
+              setState(() {
+                level.overlayFile = null;
+              });
+            },
+            child: Tooltip(
+              message: l.architectWizardRemoveOverlay,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: AppIcon(AppIconId.close, size: 14),
+              ),
+            ),
           ),
         ],
       ),
