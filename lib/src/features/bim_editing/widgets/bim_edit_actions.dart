@@ -88,7 +88,7 @@ class BimEditActions {
     BimEditAction.chamfer => AppIconId.rectangle,
     BimEditAction.fillet => AppIconId.roundedCorner,
     BimEditAction.detach => AppIconId.unlink,
-    BimEditAction.attach => AppIconId.join,
+    BimEditAction.attach => AppIconId.link,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};

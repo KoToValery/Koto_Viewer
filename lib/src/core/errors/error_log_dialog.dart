@@ -206,31 +206,32 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                                           children: [
                                             Row(
                                               children: [
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1,
+                                                Expanded(
+                                                  child: Align(
+                                                    alignment: Alignment.centerLeft,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                                      decoration: BoxDecoration(
+                                                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                                        borderRadius: BorderRadius.circular(4),
                                                       ),
-                                                  decoration: BoxDecoration(
-                                                    color: isDark ? const Color(0xFF334155,
-                                                          ) : const Color(0xFFE2E8F0,
-                                                          ),
-                                                    borderRadius: BorderRadius.circular(4,
+                                                      child: Text(
+                                                        record.errorContext,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          fontWeight: FontWeight.w600,
+                                                          color: textColor,
                                                         ),
-                                                  ),
-                                                  child: Text(
-                                                    record.errorContext,
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: textColor,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
-                                                const Spacer(),
+                                                const SizedBox(width: 8),
                                                 Text(
-                                                  _timeFormat.format(record.timestamp,
-                                                  ),
-                                                  style: TextStyle(fontSize: 11, color: subtextColor,
-                                                  ),
+                                                  _timeFormat.format(record.timestamp),
+                                                  style: TextStyle(fontSize: 11, color: subtextColor),
                                                 ),
                                               ],
                                             ),
@@ -339,35 +340,40 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
             // Footer actions
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  if (errors.isNotEmpty) ...[
-                    OutlinedButton.icon(
-                      onPressed: _clearLogs,
-                      icon: const AppIcon(AppIconId.deleteAll, size: 16),
-                      label: Text(_l10n.architectSelectionClear),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFEF4444),
-                        side: const BorderSide(color: Color(0xFFFCA5A5)),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (errors.isNotEmpty) ...[
+                      OutlinedButton.icon(
+                        onPressed: _clearLogs,
+                        icon: const AppIcon(AppIconId.deleteAll, size: 16),
+                        label: Text(_l10n.architectSelectionClear),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFEF4444),
+                          side: const BorderSide(color: Color(0xFFFCA5A5)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    FilledButton.icon(
+                      onPressed: errors.isEmpty ? null : _copyAll,
+                      icon: AppIcon.fromMaterial(
+                        _copied ? Icons.check_rounded : Icons.copy_all_rounded,
+                        size: 16,
+                      ),
+                      label: Text(
+                        _copied
+                            ? _l10n.commandUiCopied
+                            : _l10n.commandUiCopyAllLogs,
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
                       ),
                     ),
-                    const SizedBox(width: 8),
                   ],
-                  const Spacer(),
-                  FilledButton.icon(
-                    onPressed: errors.isEmpty ? null : _copyAll,
-                    icon: AppIcon.fromMaterial(
-                      _copied ? Icons.check_rounded : Icons.copy_all_rounded,
-                      size: 16,
-                    ),
-                    label: Text(_copied ? _l10n.commandUiCopied
-                          : _l10n.commandUiCopyAllLogs,
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ],

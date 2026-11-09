@@ -140,5 +140,36 @@ void main() {
 
       expect(find.text('No errors recorded'), findsOneWidget);
     });
+
+    testWidgets('ErrorLogDialog handles very long context string on narrow screen without overflow', (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      AppErrorHandler.recordError(
+        'Invalid argument (icon): Unregistered command icon',
+        StackTrace.current,
+        context:
+            'building ArchitectWorkspaceScreen(dirty, dependencies: [InheritedCupertinoTheme, MediaQuery, _InheritedTheme, _LocalizationsScope-[GlobalKey#b4e87]], state: _ArchitectWorkspaceScreenState#7470b)',
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: ErrorLogDialog(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Error Log'), findsOneWidget);
+      expect(find.textContaining('Unregistered command icon'), findsOneWidget);
+      // Ensure no exceptions or overflows occurred during layout
+      expect(tester.takeException(), isNull);
+    });
   });
 }
