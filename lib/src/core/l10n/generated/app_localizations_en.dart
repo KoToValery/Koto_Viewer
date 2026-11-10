@@ -5009,6 +5009,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectRadialMove => 'Drag';
 
   @override
+  String get architectToolDrag => 'Drag';
+
+  @override
+  String get architectToolDragDesc =>
+      'Freely drag elements by picking any base point';
+
+  @override
+  String get architectDragPickBasePoint =>
+      'Click anywhere on element to grab base point';
+
+  @override
+  String get architectDragPickTargetPoint =>
+      'Pick new position to move element';
+
+  @override
+  String get architectDragSuccess => 'Element moved successfully';
+
+  @override
   String get snapAlignPoint1 => 'Alignment with Point 1';
 
   @override

@@ -8819,6 +8819,36 @@ abstract class AppLocalizations {
   /// **'Drag'**
   String get architectRadialMove;
 
+  /// Drag tool label
+  ///
+  /// In en, this message translates to:
+  /// **'Drag'**
+  String get architectToolDrag;
+
+  /// Drag tool description
+  ///
+  /// In en, this message translates to:
+  /// **'Freely drag elements by picking any base point'**
+  String get architectToolDragDesc;
+
+  /// Drag tool prompt to pick base point
+  ///
+  /// In en, this message translates to:
+  /// **'Click anywhere on element to grab base point'**
+  String get architectDragPickBasePoint;
+
+  /// Drag tool prompt to pick target point
+  ///
+  /// In en, this message translates to:
+  /// **'Pick new position to move element'**
+  String get architectDragPickTargetPoint;
+
+  /// Drag tool success message
+  ///
+  /// In en, this message translates to:
+  /// **'Element moved successfully'**
+  String get architectDragSuccess;
+
   /// Snap helper label for orthogonal alignment with 1st point of polygon
   ///
   /// In en, this message translates to:

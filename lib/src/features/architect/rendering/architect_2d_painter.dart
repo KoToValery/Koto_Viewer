@@ -41,6 +41,8 @@ import '../services/architect_overhang_detector.dart';
 import 'architect_overhang_painter_helper.dart';
 import '../services/architect_roof_tool.dart';
 import '../services/architect_landscape_tool.dart';
+import '../services/architect_drag_controller.dart';
+import 'architect_drag_painter_helper.dart';
 import 'architect_landscape_painter_helper.dart';
 import 'architect_service_plan_painter.dart';
 import 'architect_roof_painter_helper.dart';
@@ -71,6 +73,7 @@ enum ArchitectPaintLayer { all, model, interaction }
 
 enum ArchitectTool {
   select,
+  drag,
   axis,
   zone,
   zoneTable,
@@ -265,6 +268,7 @@ class Architect2dPainter extends CustomPainter {
   final Offset? slabCandidatePoint;
   final ArchitectRoofTool? roofTool;
   final ArchitectLandscapeTool? landscapeTool;
+  final ArchitectDragController? dragController;
   final bool polygonEditInvalid;
   final int? polygonEditHoleIndex;
   final (Offset, Offset)? polygonLeaderLine;
@@ -295,6 +299,7 @@ class Architect2dPainter extends CustomPainter {
     this.upperOverhangs,
     this.showUpperOverhangs = true,
     this.showFurniture = true,
+    this.dragController,
     this.componentPreview,
     this.marqueePoints = const [],
     this.marqueePolygon = const [],

@@ -5034,6 +5034,24 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectRadialMove => 'Влачене';
 
   @override
+  String get architectToolDrag => 'Влачене';
+
+  @override
+  String get architectToolDragDesc =>
+      'Свободно преместване на елементи чрез избиране на базова точка';
+
+  @override
+  String get architectDragPickBasePoint =>
+      'Кликнете навсякъде по елемента за базова точка';
+
+  @override
+  String get architectDragPickTargetPoint =>
+      'Посочете новата позиция на елемента';
+
+  @override
+  String get architectDragSuccess => 'Елементът е преместен успешно';
+
+  @override
   String get snapAlignPoint1 => 'Подравняване с Точка 1';
 
   @override

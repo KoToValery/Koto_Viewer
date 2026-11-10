@@ -56,7 +56,7 @@ enum ArchitectToolCategory {
   // A tool has one home. Sanitary fittings belong to furnishing; roofs are
   // architectural building elements rather than structural analysis tools.
   static ArchitectToolCategory of(ArchitectTool tool) => switch (tool) {
-    ArchitectTool.select || ArchitectTool.pan => selection,
+    ArchitectTool.select || ArchitectTool.pan || ArchitectTool.drag => selection,
     ArchitectTool.zone || ArchitectTool.zoneTable || ArchitectTool.axis => plan,
     ArchitectTool.wall ||
     ArchitectTool.door ||
@@ -107,6 +107,7 @@ extension ArchitectToolCatalogLabel on ArchitectTool {
   (AppIconId, String) presentation(AppLocalizations l) => switch (this) {
     ArchitectTool.pan => (AppIconId.pan, l.architectToolPan),
     ArchitectTool.select => (AppIconId.select, l.architectToolSelect),
+    ArchitectTool.drag => (AppIconId.move, l.architectToolDrag),
     ArchitectTool.wall => (AppIconId.wall, l.architectToolWall),
     ArchitectTool.door => (AppIconId.door, l.architectToolDoor),
     ArchitectTool.window => (AppIconId.window, l.architectToolWindow),
