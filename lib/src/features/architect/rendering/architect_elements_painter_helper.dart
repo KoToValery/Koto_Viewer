@@ -147,7 +147,8 @@ class ArchitectElementsPainterHelper {
           : slabBorderPaint;
 
       final path = ArchitectContour.path(slab.polygon,
-          ArchitectSlabGeometry.holes(storey, slab, project: project));
+          ArchitectSlabGeometry.holes(storey, slab, project: project),
+          bulges: slab.bulges);
 
       if (isSelected) canvas.drawPath(path, slabFillPaint);
       canvas.drawPath(path, border);
@@ -856,7 +857,7 @@ class ArchitectElementsPainterHelper {
         ..style = PaintingStyle.stroke;
 
       if (prim.type == CadPrimitiveType.mask) {
-        final boundary = ArchitectContour.path(prim.polygonCorners, prim.holes);
+        final boundary = ArchitectContour.path(prim.polygonCorners, prim.holes, bulges: prim.bulges);
         canvas.drawPath(
           boundary,
           Paint()
@@ -875,7 +876,7 @@ class ArchitectElementsPainterHelper {
           );
         }
       } else if (prim.type == CadPrimitiveType.hatch) {
-        final boundary = ArchitectContour.path(prim.polygonCorners, prim.holes);
+        final boundary = ArchitectContour.path(prim.polygonCorners, prim.holes, bulges: prim.bulges);
         final color = Color(prim.colorValue);
         // Keep fill interiors below walls and draw only an outline in the
         // selection layer, without compounding their transparency.

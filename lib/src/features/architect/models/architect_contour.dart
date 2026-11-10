@@ -1,15 +1,72 @@
 import 'dart:ui';
 import '../../bim_editing/geometry/bim_polygon_geometry.dart';
+import 'architect_wall_arc.dart';
 
 /// Persistent inner rings use model coordinates, just like the outer contour.
 class ArchitectContour {
-  static Path path(List<Offset> outer, List<List<Offset>> holes) {
-    var result = Path()..addPolygon(outer, true);
-    for (final hole in holes) {
+  static Path ringPath(List<Offset> pts, {List<double>? bulges}) {
+    final path = Path();
+    if (pts.isEmpty) return path;
+    if (bulges == null || !bulges.any((b) => b.abs() > 1e-6)) {
+      path.addPolygon(pts, true);
+      return path;
+    }
+    path.moveTo(pts[0].dx, pts[0].dy);
+    for (var i = 0; i < pts.length; i++) {
+      final p1 = pts[i];
+      final p2 = pts[(i + 1) % pts.length];
+      final b = i < bulges.length ? bulges[i] : 0.0;
+      if (b.abs() > 1e-6) {
+        final arc = ArchitectWallArc(p1, p2, b);
+        final arcPts = arc.arcPoints();
+        for (var j = 1; j < arcPts.length; j++) {
+          path.lineTo(arcPts[j].dx, arcPts[j].dy);
+        }
+      } else {
+        path.lineTo(p2.dx, p2.dy);
+      }
+    }
+    path.close();
+    return path;
+  }
+
+  static List<Offset> tessellate(List<Offset> polygon, [List<double>? bulges]) {
+    if (polygon.isEmpty) return const [];
+    if (bulges == null || !bulges.any((b) => b.abs() > 1e-6)) {
+      return polygon;
+    }
+    final result = <Offset>[];
+    for (var i = 0; i < polygon.length; i++) {
+      final p1 = polygon[i];
+      final p2 = polygon[(i + 1) % polygon.length];
+      final b = i < bulges.length ? bulges[i] : 0.0;
+      if (b.abs() > 1e-6) {
+        final arc = ArchitectWallArc(p1, p2, b);
+        final pts = arc.arcPoints();
+        for (var j = 0; j < pts.length - 1; j++) {
+          result.add(pts[j]);
+        }
+      } else {
+        result.add(p1);
+      }
+    }
+    return result;
+  }
+
+  static Path path(
+    List<Offset> outer,
+    List<List<Offset>> holes, {
+    List<double>? bulges,
+    List<List<double>>? holeBulges,
+  }) {
+    var result = ringPath(outer, bulges: bulges);
+    for (var i = 0; i < holes.length; i++) {
+      final hole = holes[i];
+      final hb = (holeBulges != null && i < holeBulges.length) ? holeBulges[i] : null;
       result = Path.combine(
         PathOperation.difference,
         result,
-        Path()..addPolygon(hole, true),
+        ringPath(hole, bulges: hb),
       );
     }
     return result;

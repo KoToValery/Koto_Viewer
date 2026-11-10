@@ -105,6 +105,14 @@ class ArchitectWallArc {
     return path;
   }
 
+  List<Offset> arcPoints({int? subdivisions}) {
+    if (bulge.abs() < 1e-6) return [start, end];
+    final count = subdivisions ?? (sweep.abs() / (math.pi / 16)).ceil().clamp(8, 36);
+    return [
+      for (var i = 0; i <= count; i++) pointAt(i / count),
+    ];
+  }
+
   List<Offset> lineIntersections(Offset a, Offset b, {bool finite = true}) {
     final d = b - a, f = a - center, aa = d.dx * d.dx + d.dy * d.dy;
     if (aa < 1e-12) return <Offset>[];

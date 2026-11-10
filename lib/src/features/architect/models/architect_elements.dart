@@ -202,6 +202,7 @@ class ArchitectSlab {
   final List<List<Offset>> holes;
   final String id;
   final List<Offset> polygon;
+  final List<double>? bulges;
   final double thickness; // in meters (default 0.20 m = 20 cm)
   final String label;
   final String? assemblyId;
@@ -212,6 +213,7 @@ class ArchitectSlab {
     required this.id,
     this.holes = const [],
     required this.polygon,
+    this.bulges,
     this.thickness = 0.20,
     this.label = 'Slab d=20cm',
     this.assemblyId,
@@ -219,12 +221,15 @@ class ArchitectSlab {
     this.slopeDirection,
   });
 
+  List<Offset> get tessellatedPolygon => ArchitectContour.tessellate(polygon, bulges);
+
   double get area {
-    if (polygon.length < 3) return 0.0;
+    final pts = tessellatedPolygon;
+    if (pts.length < 3) return 0.0;
     double sum = 0.0;
-    for (int i = 0; i < polygon.length; i++) {
-      final p1 = polygon[i];
-      final p2 = polygon[(i + 1) % polygon.length];
+    for (int i = 0; i < pts.length; i++) {
+      final p1 = pts[i];
+      final p2 = pts[(i + 1) % pts.length];
       sum += (p1.dx * p2.dy - p2.dx * p1.dy);
     }
     return (sum.abs() / 2.0) - ArchitectContour.area(holes);
@@ -244,6 +249,8 @@ class ArchitectSlab {
     String? id,
     List<List<Offset>>? holes,
     List<Offset>? polygon,
+    List<double>? bulges,
+    bool clearBulges = false,
     double? thickness,
     String? label,
     String? assemblyId,
@@ -254,6 +261,7 @@ class ArchitectSlab {
     id: id ?? this.id,
     holes: holes ?? this.holes,
     polygon: polygon ?? this.polygon,
+    bulges: clearBulges ? null : bulges ?? this.bulges,
     thickness: thickness ?? this.thickness,
     label: label ?? this.label,
     assemblyId: clearAssembly ? null : assemblyId ?? this.assemblyId,
@@ -265,6 +273,7 @@ class ArchitectSlab {
     'id': id,
     if (holes.isNotEmpty) 'holes': ArchitectContour.write(holes),
     'polygon': polygon.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
+    if (bulges != null && bulges!.any((b) => b.abs() > 1e-6)) 'bulges': bulges,
     'thickness': thickness,
     'label': label,
     'assemblyId': assemblyId,
@@ -285,6 +294,9 @@ class ArchitectSlab {
             )
             .toList() ??
         const [],
+    bulges: (json['bulges'] as List<dynamic>?)
+        ?.map((b) => (b as num).toDouble())
+        .toList(),
     thickness: (json['thickness'] as num?)?.toDouble() ?? 0.20,
     label: json['label'] as String? ?? 'Slab d=20cm',
     assemblyId: json['assemblyId'] as String?,
@@ -294,19 +306,8 @@ class ArchitectSlab {
 
   bool containsPoint(Offset pt) {
     if (polygon.length < 3) return false;
-    bool inside = false;
-    for (int i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      if (((polygon[i].dy > pt.dy) != (polygon[j].dy > pt.dy)) &&
-          (pt.dx <
-              (polygon[j].dx - polygon[i].dx) *
-                      (pt.dy - polygon[i].dy) /
-                      (polygon[j].dy - polygon[i].dy) +
-                  polygon[i].dx)) {
-        inside = !inside;
-      }
-    }
-    return inside &&
-        !holes.any((h) => (Path()..addPolygon(h, true)).contains(pt));
+    final path = ArchitectContour.path(polygon, holes, bulges: bulges);
+    return path.contains(pt);
   }
 }
 

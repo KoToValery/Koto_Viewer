@@ -2303,6 +2303,46 @@ class DeleteArchitectRoofPlane extends ArchitectModelCommand {
   }
 }
 
+class UpdateArchitectBulges extends ArchitectModelCommand {
+  final String storeyId, elementId;
+  final List<double> bulges;
+  const UpdateArchitectBulges({
+    required this.storeyId,
+    required this.elementId,
+    required this.bulges,
+  });
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    final slab = floor.slabs.where((s) => s.id == elementId).firstOrNull;
+    if (slab != null) {
+      return ArchitectModelCommand.replace(
+        project,
+        floor.copyWith(
+          slabs: [
+            for (final s in floor.slabs)
+              s.id == elementId ? s.copyWith(bulges: bulges) : s,
+          ],
+        ),
+      );
+    }
+    final prim = floor.cadPrimitives.where((p) => p.id == elementId).firstOrNull;
+    if (prim != null) {
+      return ArchitectModelCommand.replace(
+        project,
+        floor.copyWith(
+          cadPrimitives: [
+            for (final p in floor.cadPrimitives)
+              p.id == elementId ? p.copyWith(bulges: bulges) : p,
+          ],
+        ),
+      );
+    }
+    return project;
+  }
+}
+
 class UpdateArchitectPolygon extends ArchitectModelCommand {
   final String storeyId, elementId;
   final List<Offset> polygon;

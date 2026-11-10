@@ -6273,6 +6273,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _curvingEdgeStartPoint;
   Offset? _curvingEdgeEndPoint;
   double _curvingEdgeBulge = 0.0;
+  bool _isCurvingEdgeDragging = false;
+  bool _curvingEdgePrecisionOpen = false;
+  ArchitectArcDimension _curvingDimensionMode = ArchitectArcDimension.sagitta;
+  Offset? _lastTapModelPosition;
 
   (Offset, Offset)? get _chamferFilletLeaderLine {
     if (_chamferFilletSourceId == null) return null;
@@ -6627,6 +6631,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _curvingEdgeStartPoint = null;
     _curvingEdgeEndPoint = null;
     _curvingEdgeBulge = 0.0;
+    _isCurvingEdgeDragging = false;
+    _curvingEdgePrecisionOpen = false;
     _newPointTargetId = null;
     _newPointCandidate = null;
     _newPointSource = null;
@@ -8628,6 +8634,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     final rawModel = _screenToModel(event.localPosition);
+    _lastTapModelPosition = rawModel;
 
     if (_underlayDragController.isActive) {
       _underlayDragController.updateHover(
@@ -8661,11 +8668,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _curvingEdgeEndPoint != null) {
       final p1 = _curvingEdgeStartPoint!;
       final p2 = _curvingEdgeEndPoint!;
-      final bulge = ArchitectWallArc.through(p1, p2, rawModel);
-      _curvingEdgeBulge = bulge.clamp(-20.0, 20.0);
-      _isHandleEngaged = true;
-      _repaintPreview();
-      return;
+      final chordMid = (p1 + p2) / 2;
+      final arc = ArchitectWallArc(p1, p2, _curvingEdgeBulge);
+      final handlePos = _curvingEdgeBulge.abs() > 1e-4 ? arc.midpoint : chordMid;
+      final handleScreen = _viewport.toScreen(handlePos);
+      final touchScreen = event.localPosition;
+      final touchDist = (touchScreen - handleScreen).distance;
+      if (touchDist <= 48 || (rawModel - handlePos).distance <= 0.6) {
+        _isCurvingEdgeDragging = true;
+        _isHandleEngaged = true;
+        setState(() {
+          _curvingEdgePrecisionOpen = false;
+        });
+        _repaintPreview();
+        return;
+      }
     }
 
     if (_cadInsertionActive) {
@@ -9693,6 +9710,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_commandReady) return;
     if (_underlayDragController.isActive) {
       final rawModel = _screenToModel(event.localPosition);
+    _lastTapModelPosition = rawModel;
       _underlayDragController.updateHover(
         rawModel,
         project: _project,
@@ -12118,42 +12136,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _chamferFilletPointer = rawModel;
     }
 
-    if (_curvingEdgeElementId != null &&
+    if (_isCurvingEdgeDragging &&
+        _curvingEdgeElementId != null &&
         _curvingEdgeStartPoint != null &&
         _curvingEdgeEndPoint != null) {
       final p1 = _curvingEdgeStartPoint!;
       final p2 = _curvingEdgeEndPoint!;
-      final bulge = ArchitectWallArc.through(p1, p2, rawModel);
-      _curvingEdgeBulge = bulge.clamp(-20.0, 20.0);
-
-      final storey = _project.activeStorey;
-      final wall = storey.walls.where((w) => w.id == _curvingEdgeElementId).firstOrNull;
-      if (wall != null) {
-        final previewWall = wall.copyWith(arcBulge: _curvingEdgeBulge);
-        final nextWalls = storey.walls.map((w) => w.id == wall.id ? previewWall : w).toList();
-        _elementMovePreview = _project.updateActiveStorey(storey.copyWith(walls: nextWalls));
-      } else {
-        final prim = storey.cadPrimitives.where((p) => p.id == _curvingEdgeElementId).firstOrNull;
-        if (prim != null) {
-          if (prim.type == CadPrimitiveType.line || prim.type == CadPrimitiveType.arc) {
-            final previewPrim = prim.copyWith(
-              type: _curvingEdgeBulge.abs() > 1e-6 ? CadPrimitiveType.arc : CadPrimitiveType.line,
-              arcBulge: _curvingEdgeBulge,
-            );
-            final nextPrims = storey.cadPrimitives.map((p) => p.id == prim.id ? previewPrim : p).toList();
-            _elementMovePreview = _project.updateActiveStorey(storey.copyWith(cadPrimitives: nextPrims));
-          } else if (prim.type == CadPrimitiveType.polyline) {
-            final bulges = List<double>.from(prim.bulges ?? List.filled(prim.linePoints.length, 0.0));
-            final segIdx = _curvingEdgeSegmentIndex ?? 0;
-            if (segIdx < bulges.length) {
-              bulges[segIdx] = _curvingEdgeBulge;
-              final previewPrim = prim.copyWith(bulges: bulges);
-              final nextPrims = storey.cadPrimitives.map((p) => p.id == prim.id ? previewPrim : p).toList();
-              _elementMovePreview = _project.updateActiveStorey(storey.copyWith(cadPrimitives: nextPrims));
-            }
-          }
-        }
+      final chord = p2 - p1;
+      final len = chord.distance;
+      if (len > 1e-4) {
+        final n = Offset(-chord.dy, chord.dx) / len;
+        final chordMid = (p1 + p2) / 2;
+        final v = rawModel - chordMid;
+        final proj = v.dx * n.dx + v.dy * n.dy;
+        _curvingEdgeBulge = (-2.0 * proj / len).clamp(-20.0, 20.0);
+        _updateCurvingPreview();
       }
+      _repaintPreview();
+      return;
     }
 
     _repaintPreview();
@@ -12420,6 +12420,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:TOUCH_UP] _onPointerUp Input Dispatch & Tool Commits ---
   void _onPointerUp(PointerUpEvent event) {
     if (_commandReady) return;
+    if (_isCurvingEdgeDragging) {
+      _isCurvingEdgeDragging = false;
+      _isHandleEngaged = false;
+      setState(() {
+        _curvingEdgePrecisionOpen = true;
+      });
+      _repaintPreview();
+      return;
+    }
     if (_underlayMaskDrafting) {
       if (_underlayMaskMode == 'rect' && _underlayMaskDraftStart != null) {
         final p1 = _underlayMaskDraftStart!;
@@ -21096,20 +21105,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
 
     } else if (isSlab || isRoof || isCadPrim) {
-
       items.add(
-
         _radialItem(
-
           action: ArchitectRadialAction.edit,
-
-
-
           color: const Color(0xFF00E5FF),
-
         ),
-
       );
+      if (isSlab || (isCadPrim && !isLine)) {
+        items.add(
+          _radialItem(
+            action: ArchitectRadialAction.curve,
+            color: const Color(0xFF00E5FF),
+          ),
+        );
+      }
 
       if (isRoof) {
 
@@ -24644,7 +24653,78 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
-  void _startEdgeCurvingSession(String id) {
+  int _findClosestSegmentIndex(List<Offset> pts, Offset target) {
+    if (pts.length < 2) return 0;
+    var bestIdx = 0;
+    var bestDist = double.infinity;
+    for (var i = 0; i < pts.length; i++) {
+      final p1 = pts[i];
+      final p2 = pts[(i + 1) % pts.length];
+      final d = _pointToSegmentDistance(target, p1, p2);
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = i;
+      }
+    }
+    return bestIdx;
+  }
+
+  double _pointToSegmentDistance(Offset p, Offset a, Offset b) {
+    final ab = b - a;
+    final lenSq = ab.dx * ab.dx + ab.dy * ab.dy;
+    if (lenSq < 1e-8) return (p - a).distance;
+    final t = (((p.dx - a.dx) * ab.dx + (p.dy - a.dy) * ab.dy) / lenSq).clamp(0.0, 1.0);
+    final proj = Offset(a.dx + t * ab.dx, a.dy + t * ab.dy);
+    return (p - proj).distance;
+  }
+
+  void _updateCurvingPreview() {
+    if (_curvingEdgeElementId == null) return;
+    final storey = _project.activeStorey;
+    final wall = storey.walls.where((w) => w.id == _curvingEdgeElementId).firstOrNull;
+    if (wall != null) {
+      final previewWall = wall.copyWith(arcBulge: _curvingEdgeBulge);
+      final nextWalls = storey.walls.map((w) => w.id == wall.id ? previewWall : w).toList();
+      _elementMovePreview = _project.updateActiveStorey(storey.copyWith(walls: nextWalls));
+      return;
+    }
+    final prim = storey.cadPrimitives.where((p) => p.id == _curvingEdgeElementId).firstOrNull;
+    if (prim != null) {
+      if (prim.type == CadPrimitiveType.line || prim.type == CadPrimitiveType.arc) {
+        final previewPrim = prim.copyWith(
+          type: _curvingEdgeBulge.abs() > 1e-6 ? CadPrimitiveType.arc : CadPrimitiveType.line,
+          arcBulge: _curvingEdgeBulge,
+        );
+        final nextPrims = storey.cadPrimitives.map((p) => p.id == prim.id ? previewPrim : p).toList();
+        _elementMovePreview = _project.updateActiveStorey(storey.copyWith(cadPrimitives: nextPrims));
+      } else {
+        final pts = prim.isPolygon ? prim.polygonCorners : prim.linePoints;
+        final bulges = List<double>.from(prim.bulges ?? List.filled(pts.length, 0.0));
+        final segIdx = _curvingEdgeSegmentIndex ?? 0;
+        if (segIdx < bulges.length) {
+          bulges[segIdx] = _curvingEdgeBulge;
+          final previewPrim = prim.copyWith(bulges: bulges);
+          final nextPrims = storey.cadPrimitives.map((p) => p.id == prim.id ? previewPrim : p).toList();
+          _elementMovePreview = _project.updateActiveStorey(storey.copyWith(cadPrimitives: nextPrims));
+        }
+      }
+      return;
+    }
+    final slab = storey.slabs.where((s) => s.id == _curvingEdgeElementId).firstOrNull;
+    if (slab != null) {
+      final bulges = List<double>.from(slab.bulges ?? List.filled(slab.polygon.length, 0.0));
+      final segIdx = _curvingEdgeSegmentIndex ?? 0;
+      if (segIdx < bulges.length) {
+        bulges[segIdx] = _curvingEdgeBulge;
+        final previewSlab = slab.copyWith(bulges: bulges);
+        final nextSlabs = storey.slabs.map((s) => s.id == slab.id ? previewSlab : s).toList();
+        _elementMovePreview = _project.updateActiveStorey(storey.copyWith(slabs: nextSlabs));
+      }
+      return;
+    }
+  }
+
+  void _startEdgeCurvingSession(String id, [int? segmentIndex]) {
     final storey = _project.activeStorey;
     final wall = storey.walls.where((w) => w.id == id).firstOrNull;
     if (wall != null) {
@@ -24655,6 +24735,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _curvingEdgeStartPoint = wall.startPoint;
         _curvingEdgeEndPoint = wall.endPoint;
         _curvingEdgeBulge = wall.arcBulge;
+        _isCurvingEdgeDragging = false;
+        _curvingEdgePrecisionOpen = false;
+        _curvingDimensionMode = ArchitectArcDimension.sagitta;
       });
       _repaintPreview();
       return;
@@ -24669,21 +24752,75 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _curvingEdgeStartPoint = prim.startPoint;
           _curvingEdgeEndPoint = prim.endPoint;
           _curvingEdgeBulge = prim.arcBulge ?? 0.0;
+          _isCurvingEdgeDragging = false;
+          _curvingEdgePrecisionOpen = false;
+          _curvingDimensionMode = ArchitectArcDimension.sagitta;
         });
         _repaintPreview();
         return;
       } else if (prim.type == CadPrimitiveType.polyline && prim.linePoints.length >= 2) {
+        int segIdx = segmentIndex ?? _polygonSelectedEdge ?? 0;
+        final pts = prim.linePoints;
+        if (segmentIndex == null && _polygonSelectedEdge == null && _lastTapModelPosition != null) {
+          segIdx = _findClosestSegmentIndex(pts, _lastTapModelPosition!);
+        }
+        segIdx = segIdx.clamp(0, pts.length - 2);
         setState(() {
           _cancelActiveDrags();
           _curvingEdgeElementId = id;
-          _curvingEdgeSegmentIndex = 0;
-          _curvingEdgeStartPoint = prim.linePoints[0];
-          _curvingEdgeEndPoint = prim.linePoints[1];
-          _curvingEdgeBulge = (prim.bulges != null && prim.bulges!.isNotEmpty) ? prim.bulges![0] : 0.0;
+          _curvingEdgeSegmentIndex = segIdx;
+          _curvingEdgeStartPoint = pts[segIdx];
+          _curvingEdgeEndPoint = pts[segIdx + 1];
+          _curvingEdgeBulge = (prim.bulges != null && segIdx < prim.bulges!.length) ? prim.bulges![segIdx] : 0.0;
+          _isCurvingEdgeDragging = false;
+          _curvingEdgePrecisionOpen = false;
+          _curvingDimensionMode = ArchitectArcDimension.sagitta;
+        });
+        _repaintPreview();
+        return;
+      } else if ((prim.type == CadPrimitiveType.hatch || prim.isPolygon) && prim.polygonCorners.length >= 3) {
+        final pts = prim.polygonCorners;
+        int segIdx = segmentIndex ?? _polygonSelectedEdge ?? 0;
+        if (segmentIndex == null && _polygonSelectedEdge == null && _lastTapModelPosition != null) {
+          segIdx = _findClosestSegmentIndex(pts, _lastTapModelPosition!);
+        }
+        segIdx = segIdx.clamp(0, pts.length - 1);
+        setState(() {
+          _cancelActiveDrags();
+          _curvingEdgeElementId = id;
+          _curvingEdgeSegmentIndex = segIdx;
+          _curvingEdgeStartPoint = pts[segIdx];
+          _curvingEdgeEndPoint = pts[(segIdx + 1) % pts.length];
+          _curvingEdgeBulge = (prim.bulges != null && segIdx < prim.bulges!.length) ? prim.bulges![segIdx] : 0.0;
+          _isCurvingEdgeDragging = false;
+          _curvingEdgePrecisionOpen = false;
+          _curvingDimensionMode = ArchitectArcDimension.sagitta;
         });
         _repaintPreview();
         return;
       }
+    }
+    final slab = storey.slabs.where((s) => s.id == id).firstOrNull;
+    if (slab != null && slab.polygon.length >= 3) {
+      final pts = slab.polygon;
+      int segIdx = segmentIndex ?? _polygonSelectedEdge ?? 0;
+      if (segmentIndex == null && _polygonSelectedEdge == null && _lastTapModelPosition != null) {
+        segIdx = _findClosestSegmentIndex(pts, _lastTapModelPosition!);
+      }
+      segIdx = segIdx.clamp(0, pts.length - 1);
+      setState(() {
+        _cancelActiveDrags();
+        _curvingEdgeElementId = id;
+        _curvingEdgeSegmentIndex = segIdx;
+        _curvingEdgeStartPoint = pts[segIdx];
+        _curvingEdgeEndPoint = pts[(segIdx + 1) % pts.length];
+        _curvingEdgeBulge = (slab.bulges != null && segIdx < slab.bulges!.length) ? slab.bulges![segIdx] : 0.0;
+        _isCurvingEdgeDragging = false;
+        _curvingEdgePrecisionOpen = false;
+        _curvingDimensionMode = ArchitectArcDimension.sagitta;
+      });
+      _repaintPreview();
+      return;
     }
   }
 
@@ -24730,6 +24867,37 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ),
             );
           }
+        } else if (prim.type == CadPrimitiveType.hatch || prim.isPolygon) {
+          final pts = prim.polygonCorners;
+          final bulges = List<double>.from(prim.bulges ?? List.filled(pts.length, 0.0));
+          final segIdx = _curvingEdgeSegmentIndex ?? 0;
+          if (segIdx < bulges.length) {
+            bulges[segIdx] = bulge;
+            _commands.execute(
+              PlaceArchitectCadPrimitive(
+                storeyId: storey.id,
+                primitive: prim.copyWith(bulges: bulges),
+              ),
+            );
+          }
+        }
+      } else {
+        final slab = storey.slabs.where((s) => s.id == id).firstOrNull;
+        if (slab != null) {
+          final bulges = List<double>.from(slab.bulges ?? List.filled(slab.polygon.length, 0.0));
+          final segIdx = _curvingEdgeSegmentIndex ?? 0;
+          if (segIdx < bulges.length) {
+            bulges[segIdx] = bulge;
+            _commands.execute(
+              _linearCommand(
+                UpdateArchitectBulges(
+                  storeyId: storey.id,
+                  elementId: id,
+                  bulges: bulges,
+                ),
+              ),
+            );
+          }
         }
       }
     }
@@ -24741,6 +24909,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _curvingEdgeStartPoint = null;
       _curvingEdgeEndPoint = null;
       _curvingEdgeBulge = 0.0;
+      _isCurvingEdgeDragging = false;
+      _curvingEdgePrecisionOpen = false;
       _elementMovePreview = null;
     });
     _repaintPreview();
@@ -24753,6 +24923,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _curvingEdgeStartPoint = null;
       _curvingEdgeEndPoint = null;
       _curvingEdgeBulge = 0.0;
+      _isCurvingEdgeDragging = false;
+      _curvingEdgePrecisionOpen = false;
       _elementMovePreview = null;
     });
     _repaintPreview();
@@ -24766,48 +24938,148 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     final p1 = _curvingEdgeStartPoint!;
     final p2 = _curvingEdgeEndPoint!;
+    final chordMid = (p1 + p2) / 2;
     final arc = ArchitectWallArc(p1, p2, _curvingEdgeBulge);
-    final arcMid = _curvingEdgeBulge.abs() > 1e-4 ? arc.midpoint : (p1 + p2) / 2;
-    final screenPos = _viewport.toScreen(arcMid);
-    final clamped = _clampOverlayPosition(screenPos, width: 220);
+    final handlePos = _curvingEdgeBulge.abs() > 1e-4 ? arc.midpoint : chordMid;
+    final handleScreen = _viewport.toScreen(handlePos);
+    final chordMidScreen = _viewport.toScreen(chordMid);
+    final p1Screen = _viewport.toScreen(p1);
+    final p2Screen = _viewport.toScreen(p2);
 
     final l = context.l10n;
-    final radiusStr = arc.radius.isFinite ? arc.radius.toStringAsFixed(2) : '--';
-    final sagittaStr = arc.sagitta.isFinite ? arc.sagitta.toStringAsFixed(2) : '--';
+    final chordDist = arc.sagitta;
 
-    return ArchitectFloatingCommandOverlay(
-      position: clamped,
-      label: 'R: ${radiusStr}m (H: ${sagittaStr}m)',
-      ready: _curvingEdgeBulge.abs() > 1e-4,
-      onCancel: _cancelCurvingEdgeSession,
-      onConfirm: _commitCurvingEdgeSession,
-      customContent: GestureDetector(
-        onTap: () async {
-          final curR = arc.radius.isFinite ? arc.radius : 2.0;
-          final newR = await _showNumericInputDialog(
-            title: l.architectFilletRadius,
-            initialValue: curR,
-          );
-          if (newR != null && newR > 0 && mounted) {
-            try {
-              final newArc = arc.withRadius(newR);
-              setState(() {
-                _curvingEdgeBulge = newArc.bulge;
-              });
-              _repaintPreview();
-            } catch (_) {}
-          }
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.white12,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.cyanAccent, width: 0.8),
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(
+            child: CustomPaint(
+              painter: _CurvingEdgeGuidePainter(
+                p1: p1Screen,
+                p2: p2Screen,
+                chordMid: chordMidScreen,
+                handlePos: handleScreen,
+                isCurved: _curvingEdgeBulge.abs() > 1e-4,
+                distanceText: '${chordDist.toStringAsFixed(2)} m',
+              ),
+            ),
           ),
-          child: const Icon(Icons.edit, size: 14, color: Colors.cyanAccent),
         ),
-      ),
+        Positioned(
+          left: handleScreen.dx - 24,
+          top: handleScreen.dy - 24,
+          width: 48,
+          height: 48,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              setState(() {
+                _curvingEdgePrecisionOpen = !_curvingEdgePrecisionOpen;
+              });
+            },
+            child: const SizedBox.expand(),
+          ),
+        ),
+        if (_curvingEdgePrecisionOpen) ...[
+          () {
+            const panelWidth = 260.0;
+            var targetTop = handleScreen.dy + 32;
+            final screenHeight = MediaQuery.sizeOf(context).height;
+            if (targetTop + 240 > screenHeight - 64) {
+              targetTop = math.max(64.0, handleScreen.dy - 250);
+            }
+            final clamped = _clampOverlayPosition(
+              Offset(handleScreen.dx - panelWidth / 2, targetTop),
+              width: panelWidth,
+            );
+
+            final currentVal = _curvingDimensionMode == ArchitectArcDimension.sagitta
+                ? arc.sagitta
+                : (arc.radius.isFinite ? arc.radius : 1.0);
+
+            return Positioned(
+              left: clamped.dx,
+              top: clamped.dy,
+              width: panelWidth,
+              child: Card(
+                elevation: 8,
+                shadowColor: Colors.black54,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFF00E5FF), width: 1.2),
+                ),
+                color: Theme.of(context).colorScheme.surface,
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: ArchitectWallDraftingPanel(
+                    key: ValueKey((_curvingDimensionMode, _curvingEdgeBulge)),
+                    title: _curvingDimensionMode == ArchitectArcDimension.sagitta
+                        ? l.architectChordDistance
+                        : l.architectRadius,
+                    length: _project.units.toUnit(currentVal),
+                    unit: _project.units.symbol,
+                    decimals: _project.distanceDecimals,
+                    minimumLength: _project.units.toUnit(.001),
+                    keypadInitiallyOpen: false,
+                    showContinue: false,
+                    showDirection: false,
+                    extraControls: Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: SegmentedButton<ArchitectArcDimension>(
+                        showSelectedIcon: false,
+                        style: SegmentedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                        ),
+                        segments: [
+                          ButtonSegment(
+                            value: ArchitectArcDimension.sagitta,
+                            label: Text(l.wallArcSagitta, style: const TextStyle(fontSize: 12)),
+                            tooltip: l.wallArcSagittaHelp,
+                          ),
+                          ButtonSegment(
+                            value: ArchitectArcDimension.radius,
+                            label: Text(l.architectRadius, style: const TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                        selected: {_curvingDimensionMode},
+                        onSelectionChanged: (values) {
+                          setState(() {
+                            _curvingDimensionMode = values.single;
+                          });
+                        },
+                      ),
+                    ),
+                    onLength: (val) {
+                      final meters = _project.units.fromUnit(val);
+                      if (meters < .0001) return;
+                      final sign = _curvingEdgeBulge < 0 ? -1.0 : 1.0;
+                      final chordLen = (p2 - p1).distance;
+                      if (chordLen < 1e-4) return;
+                      setState(() {
+                        if (_curvingDimensionMode == ArchitectArcDimension.sagitta) {
+                          _curvingEdgeBulge = sign * 2.0 * meters / chordLen;
+                        } else {
+                          try {
+                            final newArc = arc.withRadius(meters);
+                            _curvingEdgeBulge = sign * newArc.bulge.abs();
+                          } catch (_) {}
+                        }
+                        _updateCurvingPreview();
+                      });
+                      _repaintPreview();
+                    },
+                    onCancel: _cancelCurvingEdgeSession,
+                    onEnd: _commitCurvingEdgeSession,
+                    onContinue: () {},
+                    onUnlock: () {},
+                  ),
+                ),
+              ),
+            );
+          }(),
+        ],
+      ],
     );
   }
 
@@ -28518,7 +28790,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ),
             );
           }
-        } else if (InsertArchitectElementPoint.pathOf(storey, ids.single) != null) {
+        }
+        final isSlabSelected = storey.slabs.any((s) => s.id == ids.single);
+        final polygonPrim = storey.cadPrimitives.where((p) =>
+            p.id == ids.single &&
+            (p.type == CadPrimitiveType.hatch || p.isPolygon)).firstOrNull;
+        if (isSlabSelected || polygonPrim != null) {
+          actions.add(
+            action(
+              'architect-contour-curve',
+              l.architectLineCurve,
+              Icons.rounded_corner,
+              () => _startEdgeCurvingSession(ids.single),
+              color: accent,
+              commandId: 'curveContour',
+              tooltip: l.architectLineCurve,
+            ),
+          );
+        }
+        if (InsertArchitectElementPoint.pathOf(storey, ids.single) != null) {
           actions.add(
             action(
               'architect-selection-new-point',
@@ -35771,5 +36061,103 @@ extension _ArchitectLineEndCapL10n on ArchitectLineEndCap {
     ArchitectLineEndCap.dotOpen => l.architectLineCapDotOpen,
     ArchitectLineEndCap.tick => l.architectLineCapTick,
   };
+}
+
+class _CurvingEdgeGuidePainter extends CustomPainter {
+  final Offset p1, p2, chordMid, handlePos;
+  final bool isCurved;
+  final String distanceText;
+
+  _CurvingEdgeGuidePainter({
+    required this.p1,
+    required this.p2,
+    required this.chordMid,
+    required this.handlePos,
+    required this.isCurved,
+    required this.distanceText,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final chordPaint = Paint()
+      ..color = const Color(0x9900E5FF)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    _drawDashedLine(canvas, p1, p2, chordPaint, 6, 4);
+
+    final leaderPaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(chordMid, handlePos, leaderPaint);
+
+    final midDotPaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(chordMid, 3.5, midDotPaint);
+
+    final glowPaint = Paint()
+      ..color = const Color(0x5500E5FF)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(handlePos, 14, glowPaint);
+
+    final outerHandlePaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4;
+    canvas.drawCircle(handlePos, 9, outerHandlePaint);
+
+    final innerHandlePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(handlePos, 5, innerHandlePaint);
+
+    if (isCurved && (handlePos - chordMid).distance > 12) {
+      final midLeader = (chordMid + handlePos) / 2;
+      final textSpan = TextSpan(
+        text: distanceText,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          backgroundColor: Color(0xCC1A1A1A),
+        ),
+      );
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      )..layout();
+      textPainter.paint(
+        canvas,
+        midLeader + const Offset(8, -6),
+      );
+    }
+  }
+
+  void _drawDashedLine(Canvas canvas, Offset p1, Offset p2, Paint paint, double dashWidth, double dashSpace) {
+    final dx = p2.dx - p1.dx;
+    final dy = p2.dy - p1.dy;
+    final distance = math.sqrt(dx * dx + dy * dy);
+    if (distance < 1e-4) return;
+    final unitX = dx / distance;
+    final unitY = dy / distance;
+    var current = 0.0;
+    while (current < distance) {
+      final start = Offset(p1.dx + unitX * current, p1.dy + unitY * current);
+      final endDist = math.min(current + dashWidth, distance);
+      final end = Offset(p1.dx + unitX * endDist, p1.dy + unitY * endDist);
+      canvas.drawLine(start, end, paint);
+      current += dashWidth + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CurvingEdgeGuidePainter old) =>
+      old.p1 != p1 ||
+      old.p2 != p2 ||
+      old.chordMid != chordMid ||
+      old.handlePos != handlePos ||
+      old.isCurved != isCurved ||
+      old.distanceText != distanceText;
 }
 

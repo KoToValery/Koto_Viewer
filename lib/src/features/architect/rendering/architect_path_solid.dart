@@ -349,7 +349,7 @@ class ArchitectPathSolid {
       0,
       (sum, t) => sum + cross(t.$1, t.$2, t.$3).abs(),
     );
-    if ((covered - area.abs()).abs() > math.max(1e-10, area.abs() * 1e-7)) {
+    if ((covered - area.abs()).abs() > math.max(1e-6, area.abs() * 1e-3)) {
       return null;
     }
     return result;

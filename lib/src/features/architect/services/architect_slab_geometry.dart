@@ -138,9 +138,10 @@ class ArchitectSlabGeometry {
     ArchitectSlab slab, {
     ArchitectProject? project,
   }) {
+    final poly = slab.tessellatedPolygon;
     var pieces = [
-      for (final (a, b, c) in ArchitectStairMesh.triangulate(slab.polygon))
-        [slab.polygon[a], slab.polygon[b], slab.polygon[c]],
+      for (final (a, b, c) in ArchitectStairMesh.triangulate(poly))
+        [poly[a], poly[b], poly[c]],
     ];
     for (final boundary in [
       ...holes(storey, slab, project: project),

@@ -6940,6 +6940,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wallArc => 'Arc wall';
 
   @override
+  String get architectChordDistance => 'Distance to chord';
+
+  @override
   String get wallArcSagitta => 'Rise';
 
   @override

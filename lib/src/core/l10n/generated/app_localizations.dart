@@ -12347,6 +12347,12 @@ abstract class AppLocalizations {
   /// **'Arc wall'**
   String get wallArc;
 
+  /// Perpendicular distance from the chord midpoint to the curve handle
+  ///
+  /// In en, this message translates to:
+  /// **'Distance to chord'**
+  String get architectChordDistance;
+
   /// No description provided for @wallArcSagitta.
   ///
   /// In en, this message translates to:

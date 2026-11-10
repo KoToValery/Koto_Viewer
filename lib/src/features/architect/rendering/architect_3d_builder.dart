@@ -99,8 +99,7 @@ class Architect3dBuilder {
             w.hasRailingDesign ||
             w.system.isSpecial ||
             w.layers.isNotEmpty ||
-            w.plinth.enabled ||
-            w.isCurved,
+            w.plinth.enabled,
       );
       final compositions = composed
           ? ArchitectWallSolids.build(

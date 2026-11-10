@@ -6966,6 +6966,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get wallArc => 'Заоблена стена';
 
   @override
+  String get architectChordDistance => 'Разстояние до хордата';
+
+  @override
   String get wallArcSagitta => 'Стрела';
 
   @override
