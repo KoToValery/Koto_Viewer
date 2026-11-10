@@ -391,7 +391,7 @@ void main() {
         expect(changed.endPoint, arc.endPoint);
         expect(
           model.project.activeStorey.walls.last.toJson(),
-          neighbor.toJson(),
+          neighbor.copyWith(exteriorResolved: true).toJson(),
         );
         expect(model.undoCount, 1);
         model.undo();

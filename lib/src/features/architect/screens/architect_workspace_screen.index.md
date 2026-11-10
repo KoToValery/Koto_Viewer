@@ -73,7 +73,7 @@
 | **leader** | L7025, L10212, L13380 | `_promptAddLeaderAnnotation` | Multileader HUD bar, note dialog |
 | **spline** | L7025, L10310, L13000 | `_commitSpline`, `_continueLineDrafting`, `_toggleSplineClosed` | Spline HUD bar (Open & Close buttons), fit-point grip dragging |
 | **chamferFillet** | L8766, L13440, L27160 | `_triggerChamfer`, `_triggerFillet`, `_startChamferFilletSession`, `_chamferFilletLeaderLine` | 2-step Join workflow with `_buildChamferFilletFloatingOverlay` |
-| **edgeCurving** | L8750, L11200, L25050 | `_startEdgeCurvingSession`, `_commitCurvingEdgeSession`, `_cancelCurvingEdgeSession` | Interactive edge curving into arc with `_buildCurvingEdgeFloatingOverlay` |
+| **edgeCurving** | L8700, L12170, L12470, L24800–L25120 | `_startEdgeCurvingSession`, `_initCurvingEdgeSession`, `_showCurvingEdgeExactInputDialog`, `_commitCurvingEdgeSession`, `_cancelCurvingEdgeSession` | Interactive edge curving with remote offset grip, magnetic snap HUD & exact dimension dialog |
 | **floatingHUD** | L25000, L34020 | `_buildDetachFloatingOverlay`, `_buildAttachFloatingOverlay`, `_buildChamferFilletFloatingOverlay`, `_buildWallJoinFloatingOverlay`, `_buildCurvingEdgeFloatingOverlay`, `_buildUnderlayDragFloatingOverlay`, `_buildCutFloatingOverlay`, `_buildSplitFloatingOverlay`, `_buildNewPointFloatingOverlay`, `_buildMirrorFloatingOverlay`, `_buildOffsetFloatingOverlay` | `ArchitectFloatingCommandOverlay` (contextual floating ✓ & ✕ near active element) |
 | **cadEllipse** | L7735, L10212, L14100 | `_commitCadEllipse` | Ellipse HUD bar, line style control |
 | **roofSlope** | L7735, L10315, L14115 | `_commitRoofSlopeArrow` | Roof slope HUD bar (format chips %, °, both; reverse arrow) |
@@ -110,7 +110,7 @@
 - `_activePolylineWidth` (`double?`): Custom thickness for polyline segments.
 - `_polylineArcSegmentMode` (`bool`): Mixed polyline arc segment toggle.
 - `_chamferFilletSourceId` / `_chamferFilletOptions` / `_chamferFilletPointer` / `_lastFilletRadius` / `_lastChamferDistance`: Join-style 2-step Chamfer and Fillet source state, sticky radius/distance, and dynamic rubber-band pointer.
-- `_curvingEdgeElementId` / `_curvingEdgeSegmentIndex` / `_curvingEdgeStartPoint` / `_curvingEdgeEndPoint` / `_curvingEdgeBulge`: Dynamic edge curving interactive session state for walls, lines, and polylines.
+- `_curvingEdgeElementId` / `_curvingEdgeSegmentIndex` / `_curvingEdgeStartPoint` / `_curvingEdgeEndPoint` / `_curvingEdgeBulge` / `_curvingEdgeGripDirection` / `_curvingEdgeSnapped` / `_curvingEdgePendingConfirmation`: Dynamic edge curving interactive session state with remote grip, magnetic snapping, and exact precision dialog for walls, lines, polylines, slabs, and contours.
 - `_selectedSpline`: Single selected CadPrimitiveType.spline accessor.
 - `_maskBorder` (`bool`): Mask / wipeout border frame visibility.
 - `_activeRoofSlopeFormat` (`RoofSlopeFormat`): Roof slope display format (`percent`, `degree`, `both`).

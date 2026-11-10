@@ -23,11 +23,11 @@ class ArchitectLineEditing {
         walls: [
           ...floor.walls,
           ...floor.cadPrimitives
-              .where((p) => p.type == CadPrimitiveType.line)
+              .where((p) => p.type == CadPrimitiveType.line || p.type == CadPrimitiveType.arc)
               .map(segment),
         ],
         cadPrimitives: floor.cadPrimitives
-            .where((p) => p.type != CadPrimitiveType.line)
+            .where((p) => p.type != CadPrimitiveType.line && p.type != CadPrimitiveType.arc)
             .toList(),
       ),
     );
@@ -65,7 +65,7 @@ class ArchitectLineEditing {
     if (target == null) return command;
     final floor = ArchitectModelCommand.storey(project, target.$1);
     final lines = floor.cadPrimitives
-        .where((p) => p.type == CadPrimitiveType.line)
+        .where((p) => p.type == CadPrimitiveType.line || p.type == CadPrimitiveType.arc)
         .map((p) => p.id)
         .toSet();
     if (!target.$2.any(lines.contains)) return command;
@@ -86,7 +86,7 @@ class _EditLines extends ArchitectModelCommand {
     final original = ArchitectModelCommand.storey(project, storeyId);
     final sources = {
       for (final p in original.cadPrimitives)
-        if (p.type == CadPrimitiveType.line) p.id: p,
+        if (p.type == CadPrimitiveType.line || p.type == CadPrimitiveType.arc) p.id: p,
     };
     final before = ArchitectLineEditing.geometry(project, storeyId);
     final after = ArchitectModelCommand.storey(command.apply(before), storeyId);
@@ -107,6 +107,9 @@ class _EditLines extends ArchitectModelCommand {
                 startPoint: wall.startPoint,
                 endPoint: wall.endPoint,
                 arcBulge: wall.arcBulge,
+                type: wall.arcBulge.abs() > 1e-6
+                    ? CadPrimitiveType.arc
+                    : CadPrimitiveType.line,
               ),
       );
     }
@@ -116,7 +119,10 @@ class _EditLines extends ArchitectModelCommand {
         groups: after.groups,
         cadPrimitives: [
           for (final p in original.cadPrimitives)
-            if (p.type == CadPrimitiveType.line) ...?result[p.id] else p,
+            if (p.type == CadPrimitiveType.line || p.type == CadPrimitiveType.arc)
+              ...?result[p.id]
+            else
+              p,
         ],
       ),
     );
