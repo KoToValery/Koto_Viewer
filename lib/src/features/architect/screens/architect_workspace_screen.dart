@@ -4010,12 +4010,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       onExternalFileModified: _onExternalCadModified,
     );
     _cadFileWatcher!.updateConfigs(_project.cadUnderlays);
+    final projId = widget.bimProject?.id ?? (_project.id.isNotEmpty ? _project.id : null);
     for (final entry in _project.cadUnderlays.entries) {
       final storeyId = entry.key;
       final cfg = entry.value;
       if (!_underlaysByStorey.containsKey(storeyId)) {
         final doc = await ArchitectUnderlayService.instance
-            .loadSavedCadUnderlay(cfg);
+            .loadSavedCadUnderlay(cfg, projectId: projId);
         if (doc != null && mounted) {
           setState(() {
             _underlaysByStorey[storeyId] = doc;
@@ -4026,6 +4027,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               );
             }
           });
+        }
+      }
+    }
+    if (widget.bimProject != null && projId != null) {
+      for (final s in widget.bimProject!.storeys) {
+        if (s.hasUnderlay && !_underlaysByStorey.containsKey(s.storeyId)) {
+          try {
+            final doc = await BimProjectLibraryService.instance.loadUnderlay(projId, s);
+            if (mounted) {
+              setState(() {
+                _underlaysByStorey[s.storeyId] = doc;
+                for (final layerName in doc.layers.keys) {
+                  _underlayLayerVisibility.putIfAbsent(layerName, () => true);
+                }
+              });
+            }
+          } catch (e) {
+            debugPrint('[ArchitectWorkspace] Failed to restore storey underlay: $e');
+          }
         }
       }
     }
@@ -4312,11 +4332,38 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
   }
 
-  void _startUnderlaySnapDrag({required bool isCad, String? rasterId}) {
+  void _startUnderlaySnapDrag({required bool isCad, String? rasterId}) async {
     final storeyId = _project.activeStorey.id;
     if (isCad) {
-      final cfg = _currentCadUnderlayConfig;
-      final doc = _currentUnderlayDoc;
+      var cfg = _currentCadUnderlayConfig;
+      var doc = _currentUnderlayDoc;
+      if (doc == null && cfg != null) {
+        final projId = widget.bimProject?.id ?? (_project.id.isNotEmpty ? _project.id : null);
+        final loaded = await ArchitectUnderlayService.instance.loadSavedCadUnderlay(cfg, projectId: projId);
+        if (loaded != null && mounted) {
+          setState(() => _underlaysByStorey[storeyId] = loaded);
+          doc = loaded;
+        }
+      }
+      if (doc == null && widget.bimProject != null) {
+        final storey = widget.bimProject!.storeys.where((s) => s.storeyId == storeyId).firstOrNull;
+        if (storey != null && storey.hasUnderlay) {
+          try {
+            final loaded = await BimProjectLibraryService.instance.loadUnderlay(widget.bimProject!.id, storey);
+            if (mounted) {
+              setState(() => _underlaysByStorey[storeyId] = loaded);
+              doc = loaded;
+            }
+          } catch (_) {}
+        }
+      }
+      if (cfg == null && doc != null) {
+        cfg = ArchitectCadUnderlayConfig(
+          storeyId: storeyId,
+          fileName: 'underlay.kcad',
+          internalCopyPath: '',
+        );
+      }
       if (cfg == null || doc == null) return;
       final currentOrigin = cfg.hasLockedOrigin
           ? Offset(cfg.lockedCadOriginX!, cfg.lockedCadOriginY!)
@@ -4334,12 +4381,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _selectionIds.clear();
         _selectedElementId = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.architectUnderlayPickBasePoint),
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.architectUnderlayPickBasePoint),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } else {
       final raster = _selectedRasterUnderlay ??
           _project.rasterUnderlaysForStorey(storeyId).where((r) => r.id == rasterId).firstOrNull;
@@ -8035,16 +8084,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   /// Whether gestures should be captured exclusively by the tool instead of panning.
 
   bool get _isActivelyDraggingHandle =>
-
       _draftCancelPointer != null ||
-
       _isDraggingVertexOrHandle ||
-
       _wallCutIds.isNotEmpty ||
-
       _wallExtendId != null ||
-
-      _wallJoinSourceId != null;
+      _wallJoinSourceId != null ||
+      _underlayDragController.isActive ||
+      _curvingEdgeElementId != null ||
+      _chamferFilletSourceId != null ||
+      _wallAttachSourceId != null;
 
 
 
@@ -8602,10 +8650,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         );
         return;
       } else if (_underlayDragController.isDraggingToTarget) {
-        _confirmUnderlaySnapPlacement();
-        HapticFeedback.mediumImpact();
+        _isHandleEngaged = true;
+        setState(() {});
         return;
       }
+    }
+
+    if (_curvingEdgeElementId != null &&
+        _curvingEdgeStartPoint != null &&
+        _curvingEdgeEndPoint != null) {
+      final p1 = _curvingEdgeStartPoint!;
+      final p2 = _curvingEdgeEndPoint!;
+      final bulge = ArchitectWallArc.through(p1, p2, rawModel);
+      _curvingEdgeBulge = bulge.clamp(-20.0, 20.0);
+      _isHandleEngaged = true;
+      _repaintPreview();
+      return;
     }
 
     if (_cadInsertionActive) {
@@ -12075,8 +12135,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       } else {
         final prim = storey.cadPrimitives.where((p) => p.id == _curvingEdgeElementId).firstOrNull;
         if (prim != null) {
-          if (prim.type == CadPrimitiveType.line) {
-            final previewPrim = prim.copyWith(arcBulge: _curvingEdgeBulge);
+          if (prim.type == CadPrimitiveType.line || prim.type == CadPrimitiveType.arc) {
+            final previewPrim = prim.copyWith(
+              type: _curvingEdgeBulge.abs() > 1e-6 ? CadPrimitiveType.arc : CadPrimitiveType.line,
+              arcBulge: _curvingEdgeBulge,
+            );
             final nextPrims = storey.cadPrimitives.map((p) => p.id == prim.id ? previewPrim : p).toList();
             _elementMovePreview = _project.updateActiveStorey(storey.copyWith(cadPrimitives: nextPrims));
           } else if (prim.type == CadPrimitiveType.polyline) {
@@ -14712,8 +14775,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }
 
         if ((snap.point - _draftStart!).distance >= .001 &&
-
-            _wallPrecisionMode && !_viewMarkerTool) {
+            !_viewMarkerTool) {
 
           setState(() {
 
@@ -15467,31 +15529,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             : CadPrimitiveType.circle;
 
-        final attached =
+        setState(() {
 
-            snap.isSnapped &&
+          _pendingShape = type;
 
-            snap.snapLabel != 'Alignment' &&
+          _shapePanelAnchor = snap.point;
 
-            !(snap.snapLabel?.endsWith('°') ?? false);
-
-        if (type == CadPrimitiveType.circle ||
-
-            (type == CadPrimitiveType.rect && !attached)) {
-
-          setState(() {
-
-            _pendingShape = type;
-
-            _shapePanelAnchor = snap.point;
-
-          });
-
-        } else {
-
-          _commitCadShape(type);
-
-        }
+        });
 
       }
 
@@ -19689,8 +19733,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       setState(() {
         _cancelActiveDrags();
         _selectedRasterId = hitRaster.id;
+        _isCadUnderlaySelected = false;
+        _selectedElementId = null;
+        _selectionIds.clear();
+        _radialMenuScreenPosition = screenPoint;
+        _radialMenuElementId = 'underlay_raster_${hitRaster.id}';
+        _radialMenuItems = _buildRadialMenuItems('underlay_raster_${hitRaster.id}');
       });
-      unawaited(_openRasterContextMenu(screenPoint));
       return true;
     }
 
@@ -19713,8 +19762,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _selectedRasterId = null;
         _selectedElementId = null;
         _selectionIds.clear();
+        _radialMenuScreenPosition = screenPoint;
+        _radialMenuElementId = 'underlay_cad';
+        _radialMenuItems = _buildRadialMenuItems('underlay_cad');
       });
-      unawaited(_openCadContextMenu(screenPoint));
       return true;
     }
 
@@ -20626,6 +20677,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+    if (elementId == 'underlay_cad') {
+      items.add(_radialItem(action: ArchitectRadialAction.move, color: const Color(0xFFFFB300)));
+      items.add(_radialItem(action: ArchitectRadialAction.properties, color: const Color(0xFFB388FF)));
+      items.add(_radialItem(action: ArchitectRadialAction.offset, color: const Color(0xFF4FC3F7)));
+      items.add(_radialItem(action: ArchitectRadialAction.cut, color: const Color(0xFFFF7043)));
+      items.add(_radialItem(action: ArchitectRadialAction.hide, color: const Color(0xFF90CAF9)));
+      items.add(_radialItem(action: ArchitectRadialAction.delete, color: const Color(0xFFFF5252)));
+      return items;
+    }
+    if (elementId.startsWith('underlay_raster')) {
+      items.add(_radialItem(action: ArchitectRadialAction.move, color: const Color(0xFFFFB300)));
+      items.add(_radialItem(action: ArchitectRadialAction.properties, color: const Color(0xFFB388FF)));
+      items.add(_radialItem(action: ArchitectRadialAction.offset, color: const Color(0xFF4FC3F7)));
+      items.add(_radialItem(action: ArchitectRadialAction.hide, color: const Color(0xFF90CAF9)));
+      items.add(_radialItem(action: ArchitectRadialAction.delete, color: const Color(0xFFFF5252)));
+      return items;
+    }
+
     final isSection = _project.sections.any((s) => s.id == elementId);
     final isElevation = _project.elevations.any((e) => e.id == elementId);
     if (isSection || isElevation) {
@@ -20877,6 +20946,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             color: const Color(0xFFFFB74D),
           ),
         );
+        final wall = storey.walls.where((w) => w.id == elementId).firstOrNull;
+        if (wall != null && wall.isCurved) {
+          items.add(
+            _radialItem(
+              action: ArchitectRadialAction.straighten,
+              color: const Color(0xFF00E5FF),
+            ),
+          );
+        } else {
+          items.add(
+            _radialItem(
+              action: ArchitectRadialAction.curve,
+              color: const Color(0xFF00E5FF),
+            ),
+          );
+        }
+      } else if (isLine) {
+        final prim = storey.cadPrimitives.where((c) => c.id == elementId).firstOrNull;
+        final isCurved = prim != null && (prim.type == CadPrimitiveType.arc || (prim.arcBulge != null && prim.arcBulge!.abs() > 1e-6));
+        if (isCurved) {
+          items.add(
+            _radialItem(
+              action: ArchitectRadialAction.straighten,
+              color: const Color(0xFF00E5FF),
+            ),
+          );
+        } else {
+          items.add(
+            _radialItem(
+              action: ArchitectRadialAction.curve,
+              color: const Color(0xFF00E5FF),
+            ),
+          );
+        }
       }
 
       items.add(
@@ -22241,6 +22344,60 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
 
     if (id == null) return;
+    if (id == 'underlay_cad') {
+      switch (action) {
+        case ArchitectRadialAction.move:
+          _startUnderlaySnapDrag(isCad: true);
+          return;
+        case ArchitectRadialAction.properties:
+          _openCadEditDialog();
+          return;
+        case ArchitectRadialAction.offset:
+          _openCadScaleDialog();
+          return;
+        case ArchitectRadialAction.cut:
+          _openCadMaskMenu(Offset.zero);
+          return;
+        case ArchitectRadialAction.hide:
+          _toggleCadVisibility(false);
+          return;
+        case ArchitectRadialAction.delete:
+          _removeCurrentCadUnderlay();
+          return;
+        default:
+          return;
+      }
+    }
+    if (id.startsWith('underlay_raster')) {
+      final rasterId = id.replaceFirst('underlay_raster_', '');
+      switch (action) {
+        case ArchitectRadialAction.move:
+          _startUnderlaySnapDrag(isCad: false, rasterId: rasterId);
+          return;
+        case ArchitectRadialAction.properties:
+          _openRasterEditDialog();
+          return;
+        case ArchitectRadialAction.offset:
+          _openRasterScaleDialog();
+          return;
+        case ArchitectRadialAction.cut:
+          _openRasterMaskMenu(Offset.zero);
+          return;
+        case ArchitectRadialAction.hide:
+          _toggleRasterVisibility(rasterId, false);
+          return;
+        case ArchitectRadialAction.delete:
+          _deleteSelectedRaster();
+          return;
+        default:
+          return;
+      }
+    }
+
+    if (action == ArchitectRadialAction.curve) {
+      _startEdgeCurvingSession(id);
+      return;
+    }
     if (const {
       ArchitectRadialAction.move, ArchitectRadialAction.edit,
       ArchitectRadialAction.duplicate, ArchitectRadialAction.rotate,
@@ -22492,15 +22649,41 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
       case ArchitectRadialAction.straighten:
-
-        final wall = _selectedWall;
-
+        final wall = _selectedWall ?? _project.activeStorey.walls.where((w) => w.id == id).firstOrNull;
         if (wall != null) {
-
-          _straightenWall(wall);
-
+          if (wall.isCurved) {
+            _commands.execute(
+              _linearCommand(
+                UpdateArchitectWall(
+                  storeyId: _project.activeStorey.id,
+                  wall: wall.copyWith(arcBulge: 0.0),
+                ),
+              ),
+            );
+            _saveBiMProjectIfAttached();
+            HapticFeedback.mediumImpact();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.l10n.architectWallStraightened)),
+            );
+          } else {
+            _straightenWall(wall);
+          }
+        } else {
+          final prim = _project.activeStorey.cadPrimitives.where((c) => c.id == id).firstOrNull;
+          if (prim != null) {
+            _commands.execute(
+              PlaceArchitectCadPrimitive(
+                storeyId: _project.activeStorey.id,
+                primitive: prim.copyWith(
+                  type: CadPrimitiveType.line,
+                  arcBulge: 0.0,
+                ),
+              ),
+            );
+            _saveBiMProjectIfAttached();
+            HapticFeedback.mediumImpact();
+          }
         }
-
         break;
 
 
@@ -22794,6 +22977,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       case ArchitectRadialAction.fillet:
         _triggerFillet();
+        break;
+
+      case ArchitectRadialAction.curve:
+        _startEdgeCurvingSession(id);
         break;
 
       case ArchitectRadialAction.hide:
@@ -24474,7 +24661,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     final prim = storey.cadPrimitives.where((p) => p.id == id).firstOrNull;
     if (prim != null) {
-      if (prim.type == CadPrimitiveType.line) {
+      if (prim.type == CadPrimitiveType.line || prim.type == CadPrimitiveType.arc) {
         setState(() {
           _cancelActiveDrags();
           _curvingEdgeElementId = id;
@@ -24521,11 +24708,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     } else {
       final prim = storey.cadPrimitives.where((p) => p.id == id).firstOrNull;
       if (prim != null) {
-        if (prim.type == CadPrimitiveType.line) {
+        if (prim.type == CadPrimitiveType.line || prim.type == CadPrimitiveType.arc) {
           _commands.execute(
             PlaceArchitectCadPrimitive(
               storeyId: storey.id,
-              primitive: prim.copyWith(arcBulge: bulge),
+              primitive: prim.copyWith(
+                type: bulge.abs() > 1e-6 ? CadPrimitiveType.arc : CadPrimitiveType.line,
+                arcBulge: bulge,
+              ),
             ),
           );
         } else if (prim.type == CadPrimitiveType.polyline) {
@@ -25760,7 +25950,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       color: Color(0xFF80CBC4),
                       size: 20,
                     ),
-                    onPressed: () => _editWallArcDimension(),
+                    onPressed: () => _startEdgeCurvingSession(wallIds.single),
                   ),
 
                   IconButton(

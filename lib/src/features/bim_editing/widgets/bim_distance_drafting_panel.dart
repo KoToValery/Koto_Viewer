@@ -188,75 +188,13 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                     ),
                     const SizedBox(width: 6),
                   ],
-                  Expanded(
-                    child: OutlinedButton(
-                      key: const ValueKey('wall-end'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: colors.primary,
-                        side: BorderSide(color: colors.primary, width: 1.0),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        visualDensity: VisualDensity.compact,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
-                      onPressed: _valid ? widget.onEnd : null,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          widget.endLabel ?? l10n.architectWallEnd,
-                          maxLines: 1,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (widget.showContinue) ...[
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: FilledButton(
-                        key: const ValueKey('wall-continue'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: colors.primary,
-                          foregroundColor:
-                              ThemeData.estimateBrightnessForColor(
-                                    colors.primary,
-                                  ) ==
-                                  Brightness.dark
-                              ? Colors.white
-                              : Colors.black,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          visualDensity: VisualDensity.compact,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        onPressed: _valid ? widget.onContinue : null,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            l10n.architectWallContinue,
-                            maxLines: 1,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(width: 6),
                   IconButton(
                     key: const ValueKey('wall-cancel'),
                     tooltip: l10n.cancel,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints.tightFor(
-                      width: 32,
-                      height: 32,
+                      width: 36,
+                      height: 36,
                     ),
                     style: IconButton.styleFrom(
                       foregroundColor: colors.error,
@@ -270,7 +208,57 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                     icon: AppIcon(
                       AppIconId.close,
                       color: colors.error,
-                      size: 19,
+                      size: 20,
+                    ),
+                  ),
+                  if (widget.showContinue) ...[
+                    const Spacer(),
+                    IconButton(
+                      key: const ValueKey('wall-continue'),
+                      tooltip: l10n.architectWallContinue,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 36,
+                        height: 36,
+                      ),
+                      style: IconButton.styleFrom(
+                        foregroundColor: colors.primary,
+                        backgroundColor: colors.primary.withValues(alpha: 0.12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          side: BorderSide(color: colors.primary, width: 1.5),
+                        ),
+                      ),
+                      onPressed: _valid ? widget.onContinue : null,
+                      icon: AppIcon(
+                        AppIconId.redo,
+                        color: colors.primary,
+                        size: 20,
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  IconButton(
+                    key: const ValueKey('wall-end'),
+                    tooltip: widget.endLabel ?? l10n.architectWallEnd,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 36,
+                      height: 36,
+                    ),
+                    style: IconButton.styleFrom(
+                      foregroundColor: const Color(0xFF00E676),
+                      backgroundColor: const Color(0xFF00E676).withValues(alpha: 0.15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        side: const BorderSide(color: Color(0xFF00E676), width: 1.5),
+                      ),
+                    ),
+                    onPressed: _valid ? widget.onEnd : null,
+                    icon: const AppIcon(
+                      AppIconId.confirm,
+                      color: Color(0xFF00E676),
+                      size: 20,
                     ),
                   ),
                 ],

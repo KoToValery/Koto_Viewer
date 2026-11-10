@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/icons/app_icon.dart';
 import '../properties/bim_numeric_rule.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import 'bim_numeric_keypad.dart';
@@ -138,42 +139,56 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
               ),
             ),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: TextButton(
-                  key: const ValueKey('shape-cancel'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.onSurface,
+              IconButton(
+                key: const ValueKey('shape-cancel'),
+                tooltip: context.l10n.cancel,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 36,
+                  height: 36,
+                ),
+                style: IconButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                  backgroundColor: Theme.of(context).colorScheme.error.withValues(alpha: 0.12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    side: BorderSide(color: Theme.of(context).colorScheme.error, width: 1.5),
                   ),
-                  onPressed: widget.onCancel,
-                  child: Text(context.l10n.cancel),
+                ),
+                onPressed: widget.onCancel,
+                icon: AppIcon(
+                  AppIconId.close,
+                  color: Theme.of(context).colorScheme.error,
+                  size: 20,
                 ),
               ),
-              Expanded(
-                child: FilledButton(
-                  key: const ValueKey('shape-save'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor:
-                        ThemeData.estimateBrightnessForColor(
-                              Theme.of(context).colorScheme.primary,
-                            ) ==
-                            Brightness.dark
-                        ? Colors.white
-                        : Colors.black,
-                    disabledForegroundColor: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: .6),
-                    disabledBackgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: .12),
+              IconButton(
+                key: const ValueKey('shape-save'),
+                tooltip: context.l10n.save,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 36,
+                  height: 36,
+                ),
+                style: IconButton.styleFrom(
+                  foregroundColor: const Color(0xFF00E676),
+                  backgroundColor: const Color(0xFF00E676).withValues(alpha: 0.15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    side: const BorderSide(color: Color(0xFF00E676), width: 1.5),
                   ),
-                  onPressed:
-                      widget.canSave &&
-                          List.generate(input.length, valid).every((v) => v)
-                      ? widget.onSave
-                      : null,
-                  child: Text(context.l10n.save),
+                ),
+                onPressed:
+                    widget.canSave &&
+                        List.generate(input.length, valid).every((v) => v)
+                    ? widget.onSave
+                    : null,
+                icon: const AppIcon(
+                  AppIconId.confirm,
+                  color: Color(0xFF00E676),
+                  size: 20,
                 ),
               ),
             ],

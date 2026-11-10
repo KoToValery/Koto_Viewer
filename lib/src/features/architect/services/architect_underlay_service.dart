@@ -161,8 +161,9 @@ class ArchitectUnderlayService {
 
   /// Loads a previously saved CAD underlay from the project's internal cache or copy.
   Future<DxfDocument?> loadSavedCadUnderlay(
-    ArchitectCadUnderlayConfig config,
-  ) async {
+    ArchitectCadUnderlayConfig config, {
+    String? projectId,
+  }) async {
     try {
       if (config.kcadCachePath != null) {
         final kcadFile = File(config.kcadCachePath!);
@@ -180,6 +181,53 @@ class ArchitectUnderlayService {
         if (await extFile.exists()) {
           final ext = extFile.path.split('.').last.toLowerCase();
           return await _parseCadFile(extFile, ext);
+        }
+      }
+
+      // Fallback: Resolve relative paths inside the project directory
+      if (projectId != null && projectId.isNotEmpty) {
+        final projDir = await BimProjectLibraryService.instance.getProjectDirectory(projectId);
+        if (await projDir.exists()) {
+          final candidatePaths = <String>[
+            if (config.kcadCachePath != null) config.kcadCachePath!,
+            config.internalCopyPath,
+            if (config.externalSourcePath != null) config.externalSourcePath!,
+          ];
+          for (final raw in candidatePaths) {
+            final underlayIdx = raw.indexOf('underlays');
+            if (underlayIdx != -1) {
+              final rel = raw.substring(underlayIdx).replaceAll('\\', '/');
+              final f = File('${projDir.path}/$rel');
+              if (await f.exists()) {
+                final ext = f.path.split('.').last.toLowerCase();
+                return await _parseCadFile(f, ext);
+              }
+            }
+          }
+          final underlaysDir = Directory('${projDir.path}/underlays');
+          if (await underlaysDir.exists()) {
+            await for (final entity in underlaysDir.list(recursive: true)) {
+              if (entity is File) {
+                final name = entity.path.split(RegExp(r'[/\\]')).last.toLowerCase();
+                if (name.endsWith('.kcad') || name.endsWith('.dwg') || name.endsWith('.dxf')) {
+                  if (name.contains(config.storeyId.toLowerCase()) ||
+                      name == config.fileName.toLowerCase()) {
+                    final ext = entity.path.split('.').last.toLowerCase();
+                    return await _parseCadFile(entity, ext);
+                  }
+                }
+              }
+            }
+            final allKcad = <File>[];
+            await for (final entity in underlaysDir.list(recursive: true)) {
+              if (entity is File && entity.path.toLowerCase().endsWith('.kcad')) {
+                allKcad.add(entity);
+              }
+            }
+            if (allKcad.length == 1) {
+              return await KcadService.loadKcadFile(allKcad.first);
+            }
+          }
         }
       }
     } catch (e) {

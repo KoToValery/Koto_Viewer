@@ -31,6 +31,7 @@ enum BimEditAction {
   detach,
   attach,
   hide,
+  curve,
 }
 
 class BimEditActions {
@@ -63,6 +64,7 @@ class BimEditActions {
         BimEditAction.detach => l.architectWallDetach,
         BimEditAction.attach => l.architectWallAttach,
         BimEditAction.hide => l.architectUnderlayHide,
+        BimEditAction.curve => l.architectLineCurve,
       };
   static AppIconId icon(BimEditAction action) => switch (action) {
     BimEditAction.move => AppIconId.move,
@@ -92,6 +94,7 @@ class BimEditActions {
     BimEditAction.detach => AppIconId.unlink,
     BimEditAction.attach => AppIconId.link,
     BimEditAction.hide => AppIconId.hidden,
+    BimEditAction.curve => AppIconId.roundedCorner,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};
