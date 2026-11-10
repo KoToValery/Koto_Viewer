@@ -269,6 +269,7 @@ class Architect2dPainter extends CustomPainter {
   final ArchitectRoofTool? roofTool;
   final ArchitectLandscapeTool? landscapeTool;
   final ArchitectDragController? dragController;
+  final String? Function(String)? localizeSnap;
   final bool polygonEditInvalid;
   final int? polygonEditHoleIndex;
   final (Offset, Offset)? polygonLeaderLine;
@@ -300,6 +301,7 @@ class Architect2dPainter extends CustomPainter {
     this.showUpperOverhangs = true,
     this.showFurniture = true,
     this.dragController,
+    this.localizeSnap,
     this.componentPreview,
     this.marqueePoints = const [],
     this.marqueePolygon = const [],
@@ -789,6 +791,15 @@ class Architect2dPainter extends CustomPainter {
       }
       // This marker must remain above general cursor and selection graphics.
       _drawNewPointPreview(canvas);
+      if (dragController != null) {
+        ArchitectDragPainterHelper.drawDragInteraction(
+          canvas: canvas,
+          dragController: dragController!,
+          zoomScale: zoomScale,
+          palette: palette,
+          localizeSnap: localizeSnap,
+        );
+      }
     }
     canvas.restore();
   }
@@ -2407,5 +2418,7 @@ class Architect2dPainter extends CustomPainter {
       isZoneTableSelected != oldDelegate.isZoneTableSelected ||
       zoneTableDragPreviewOrigin != oldDelegate.zoneTableDragPreviewOrigin ||
       _zoomScale != oldDelegate._zoomScale ||
-      underlayDoc != oldDelegate.underlayDoc;
+      underlayDoc != oldDelegate.underlayDoc ||
+      dragController != oldDelegate.dragController ||
+      localizeSnap != oldDelegate.localizeSnap;
 }

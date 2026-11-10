@@ -26,6 +26,7 @@
 | ↳ `[SUB-02B]` | `[TAG:STATE_PRESETS]` | L3001 – L6140 | Wall/opening style caches, layer filters, command controllers |
 | ↳ `[SUB-02U]` | `[TAG:UNDERLAY_TOOLS]` | L3832 – L7197 | CAD Xref live-reload, Raster 2-point calibration & Geodesy handlers |
 | ↳ `[SUB-02UI]` | `[TAG:CAD_INSERTION]` | L3890 – L4250 | CAD underlay control points, ghost preview & repositioning workflow |
+| ↳ `[SUB-02DRAG]` | `[TAG:DRAG_TOOL]` | L3920 – L3924 | Architect 2-point snap Drag controller & element relocation |
 | ↳ `[SUB-02UD]` | `[TAG:UNDERLAY_DRAG]` | L4280 – L4450 | Underlay 2-point snap & drag controller, rubber-band preview & selection |
 | ↳ `[SUB-02C]` | `[TAG:STATE_LIFECYCLE]` | L7198 – L7461 | `initState()`, `_initTransform()`, `dispose()` |
 | `[SEC-03-XFORM]` | `[TAG:XFORM_COORDS]` | L7462 – L7682 | Coordinate transforms: `_screenToModel`, `_modelToScreen`, hit tests |
@@ -63,6 +64,7 @@
 | **dimension** | L7151, L9267, L11451 | `_commitDimensionDraft` | `ArchitectAnnotationSettings` |
 | **measure** | L7025, L8043, L13383 | `_finishMeasurement` | Distance preview tooltip |
 | **select** | L7025, L10139, L11323 | `_commitMarquee`, `_handleSelectionTap` | `ArchitectSelectionActionBar`, `ArchitectSelectionControl` |
+| **drag** | L8715, L9823, L12630 | `_startDragSession`, `_confirmDragPlacement`, `_cancelDragPlacement` | `_buildDragFloatingOverlay` (`ArchitectFloatingCommandOverlay`), Radial Menu, `Ctrl+D` |
 | **floorDrain** | L7025, L8043, L11366 | `_commitFloorDrain` | `ArchitectFloorDrainBar` |
 | **hatch** | L7025, L8043, L11392 | `_commitHatch` | `ArchitectHatchPicker` |
 | **services** | L7025, L9633, L12725 | `_commitServicePlacement` | Service component selector |
@@ -105,6 +107,8 @@
 - `_axisTool` (`ArchitectAxisTool`): Dynamic grid axis placement controller.
 - `_zoneTool` (`ArchitectZoneTool`): Zone polygon drafting state.
 - `_landscapeTool` (`ArchitectLandscapeTool`): Unified controller for Terrain (`existingTerrain` / `proposedTerrain`), Pathway with automatic curbs, Vegetation, and Site Fences.
+- `_dragController` (`ArchitectDragController`): 2-point snap Drag controller for walls, components, underlays, and drawing geometry.
+- `_dragMovedSinceBaseGrab` (`bool`): Tracks pointer translation to arbitrate between Click-Click and continuous Drag-and-Drop.
 - `_activeLineStartCap` / `_activeLineEndCap` (`ArchitectLineEndCap`): Active line start/end terminating caps (arrows, dots, ticks).
 - `_activeLineCapSize` (`double`): Size in meters for line terminating end caps.
 - `_activePolylineWidth` (`double?`): Custom thickness for polyline segments.

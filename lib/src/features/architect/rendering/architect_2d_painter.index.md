@@ -120,6 +120,8 @@
 - `activeHatchColorValue` (`int`, L248)
 - `roofTool` (`ArchitectRoofTool?`, L250)
 - `activeOvershoot` (`ArchitectWallOvershoot?`, L260)
+- `dragController` (`ArchitectDragController?`, L271) — Interactive 2-point snap Drag tool controller
+- `localizeSnap` (`String? Function(String)?`, L272) — Localization callback for drag snap badges
 - `_elementLayerStorey` (`ArchitectStorey`, L732)
 - `_zoneLayerProject` (`ArchitectProject`, L1259)
 - *+65 additional fields in `L130–L1271`*

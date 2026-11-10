@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import '../services/architect_underlay_service.dart';
 import '../services/architect_underlay_drag_controller.dart';
+import '../services/architect_drag_controller.dart';
 import '../services/architect_geodetic_detector.dart';
 import '../widgets/architect_underlay_bar.dart';
 import '../../bim_projects/services/bim_underlay_picker_helper.dart';
@@ -345,6 +346,7 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 //   ↳ [SUB-02A]    L435-L3831   : [TAG:STATE_FIELDS] Active tool flags, drafting caches, preview points, mode enums
 //   ↳ [SUB-02U]    L3832-L7197  : [TAG:UNDERLAY_TOOLS] CAD Xref live-reload, Raster 2-point calibration & Geodesy handlers
 //   ↳ [SUB-02UI]   L3890-L4250  : [TAG:CAD_INSERTION] CAD underlay control points, ghost preview & repositioning
+//   ↳ [SUB-02DRAG] L3920-L3923  : [TAG:DRAG_TOOL] Architect 2-point snap Drag controller & element relocation
 //   ↳ [SUB-02UD]   L4280-L4450  : [TAG:UNDERLAY_DRAG] Underlay 2-point snap & drag controller, rubber-band preview & selection
 //   ↳ [SUB-02C]    L7198-L7461  : [TAG:STATE_LIFECYCLE] `initState()`, `_initTransform()`, `dispose()`
 // [SEC-03-XFORM]   L7462-L7682  : [TAG:XFORM_COORDS] Coordinate transforms: `_screenToModel`, `_modelToScreen`, hit tests
@@ -3916,6 +3918,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   List<Offset> _underlayMaskPoints = [];
   Offset? _underlayMaskDraftStart;
 
+  // --- SUBSECTION: [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG CONTROLLER ---
+  final ArchitectDragController _dragController = ArchitectDragController();
+  bool _dragMovedSinceBaseGrab = false;
+
   // --- SUBSECTION: [TAG:UNDERLAY_DRAG] UNDERLAY 2-POINT SNAP DRAG & SELECTION ---
   final ArchitectUnderlayDragController _underlayDragController =
       ArchitectUnderlayDragController();
@@ -3931,6 +3937,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   ArchitectCadUnderlayConfig? _cadInsertionConfig;
 
   BimCoordinateFrame? get _ghostUnderlayFrame {
+    if (_dragController.isDraggingToTarget && _dragController.isCadUnderlay) {
+      return _dragController.ghostCadFrame;
+    }
     if (_underlayDragController.isDraggingToTarget && _underlayDragController.isCad) {
       return _underlayDragController.ghostCadFrame;
     }
@@ -4368,6 +4377,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final currentOrigin = cfg.hasLockedOrigin
           ? Offset(cfg.lockedCadOriginX!, cfg.lockedCadOriginY!)
           : _effectiveUnderlayFrame.origin;
+      final defaultAnchor = _effectiveUnderlayFrame.toModel(doc.bounds.center);
+      _dragController.startDrag(
+        isUnderlay: true,
+        isCadUnderlay: true,
+        underlayName: cfg.fileName,
+        storeyId: storeyId,
+        unitsPerMeter: cfg.unitsPerMeter ?? 1.0,
+        originalCadOrigin: currentOrigin,
+        defaultAnchor: defaultAnchor,
+        handleOffsetLength: _handleOffsetLength,
+        zoomScale: _currentScale,
+      );
+      _dragMovedSinceBaseGrab = false;
       _underlayDragController.startDrag(
         isCad: true,
         underlayName: cfg.fileName,
@@ -4393,6 +4415,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final raster = _selectedRasterUnderlay ??
           _project.rasterUnderlaysForStorey(storeyId).where((r) => r.id == rasterId).firstOrNull;
       if (raster == null || raster.locked) return;
+      final defaultAnchor = raster.position +
+          Offset(raster.widthMeters / 2, raster.heightMeters / 2);
+      _dragController.startDrag(
+        isUnderlay: true,
+        isCadUnderlay: false,
+        rasterId: raster.id,
+        underlayName: raster.fileName,
+        storeyId: storeyId,
+        unitsPerMeter: 1.0,
+        originalRasterPosition: raster.position,
+        defaultAnchor: defaultAnchor,
+        handleOffsetLength: _handleOffsetLength,
+        zoomScale: _currentScale,
+      );
+      _dragMovedSinceBaseGrab = false;
       _underlayDragController.startDrag(
         isCad: false,
         rasterId: raster.id,
@@ -5420,6 +5457,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _cancelDrafting() {
+    if (_dragController.isActive) {
+      _cancelDragPlacement();
+      return;
+    }
     if (_commandPreview != null) { _cancelGeometryCommand(); return; }
     _touchCandidates = null;
 
@@ -5630,6 +5671,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (nextTool == ArchitectTool.select && keepSingle != null) {
       _selectionIds.add(keepSingle);
       _selectedElementId = keepSingle;
+    }
+    if (nextTool == ArchitectTool.drag) {
+      if (keepSingle != null) {
+        _selectionIds.add(keepSingle);
+        _selectedElementId = keepSingle;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _startDragSession();
+      });
     }
 
     _midpointTracking.clear();
@@ -7626,6 +7676,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   String? _activeWallClearanceKey;
 
   void _setSelectionMove(ArchitectSelectionMoveAction action) {
+    if (action == ArchitectSelectionMoveAction.free) {
+      _startDragSession();
+      return;
+    }
     if (action == ArchitectSelectionMoveAction.offset) {
       _editMoveOffset();
       return;
@@ -8126,6 +8180,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _wallExtendId != null ||
       _wallJoinSourceId != null ||
       _underlayDragController.isActive ||
+      _dragController.isActive ||
       _curvingEdgeElementId != null ||
       _chamferFilletSourceId != null ||
       _wallAttachSourceId != null;
@@ -8355,6 +8410,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void dispose() {
     _underlayDragController.dispose();
+    _dragController.dispose();
 
     _cadFileWatcher?.dispose();
 
@@ -8661,10 +8717,39 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _isHandleEngaged = false;
 
-
-
     final rawModel = _screenToModel(event.localPosition);
     _lastTapModelPosition = rawModel;
+
+    if (_dragController.isActive) {
+      if (_dragController.isPickingBasePoint) {
+        _dragController.updateBaseHover(
+          rawModel,
+          project: _project,
+          scale: _currentScale,
+          dxfDoc: _currentUnderlayDoc,
+          frame: _effectiveUnderlayFrame,
+          raster: _selectedRasterUnderlay,
+        );
+        final base = _dragController.currentPointModel ?? rawModel;
+        _dragController.grabBasePoint(base, frame: _effectiveUnderlayFrame);
+        _dragMovedSinceBaseGrab = false;
+        _isHandleEngaged = true;
+        HapticFeedback.selectionClick();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.l10n.architectDragPickTargetPoint),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        setState(() {});
+        return;
+      } else if (_dragController.isDraggingToTarget) {
+        _confirmDragPlacement();
+        return;
+      }
+    }
 
     if (_underlayDragController.isActive) {
       _underlayDragController.updateHover(
@@ -9743,6 +9828,46 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:TOUCH_MOVE] _onPointerMove Input Dispatch & Previews ---
   void _onPointerMove(PointerMoveEvent event) {
     if (_commandReady) return;
+    if (_dragController.isActive) {
+      final rawModel = _screenToModel(event.localPosition);
+      _lastTapModelPosition = rawModel;
+      if (_dragController.isPickingBasePoint) {
+        _dragController.updateBaseHover(
+          rawModel,
+          project: _project,
+          scale: _currentScale,
+          dxfDoc: _currentUnderlayDoc,
+          frame: _effectiveUnderlayFrame,
+          raster: _selectedRasterUnderlay,
+        );
+      } else if (_dragController.isDraggingToTarget) {
+        _dragMovedSinceBaseGrab = true;
+        _dragController.updateTargetHover(
+          rawModel,
+          project: _project,
+          scale: _currentScale,
+        );
+        if (!_dragController.isUnderlay && _elementMoveOriginal != null && _dragController.deltaModel != null) {
+          final delta = _dragController.deltaModel!;
+          try {
+            _elementMovePreview = MoveArchitectElements(
+              storeyId: _project.activeStoreyId,
+              elementIds: _dragController.elementIds,
+              delta: delta,
+            ).apply(_elementMoveOriginal!);
+            _elementMoveDelta = delta;
+          } on ArgumentError {
+            _elementMoveDelta = null;
+          }
+        }
+      }
+      _cursorModel = _dragController.currentPointModel;
+      _activeSnapLabel = _dragController.currentSnapLabel;
+      _activeMagneticGuides = _dragController.magneticGuides;
+      _repaintPreview();
+      setState(() {});
+      return;
+    }
     if (_underlayDragController.isActive) {
       final rawModel = _screenToModel(event.localPosition);
     _lastTapModelPosition = rawModel;
@@ -10971,6 +11096,44 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     _updateMidpointReferences(rawModel);
+
+    if (_dragController.isActive) {
+      if (_dragController.isPickingBasePoint) {
+        _dragController.updateBaseHover(
+          rawModel,
+          project: _project,
+          scale: _currentScale,
+          dxfDoc: _currentUnderlayDoc,
+          frame: _effectiveUnderlayFrame,
+          raster: _selectedRasterUnderlay,
+        );
+      } else if (_dragController.isDraggingToTarget) {
+        _dragMovedSinceBaseGrab = true;
+        _dragController.updateTargetHover(
+          rawModel,
+          project: _project,
+          scale: _currentScale,
+        );
+        if (!_dragController.isUnderlay && _elementMoveOriginal != null && _dragController.deltaModel != null) {
+          final delta = _dragController.deltaModel!;
+          try {
+            _elementMovePreview = MoveArchitectElements(
+              storeyId: _project.activeStoreyId,
+              elementIds: _dragController.elementIds,
+              delta: delta,
+            ).apply(_elementMoveOriginal!);
+            _elementMoveDelta = delta;
+          } on ArgumentError {
+            _elementMoveDelta = null;
+          }
+        }
+      }
+      _cursorModel = _dragController.currentPointModel;
+      _activeSnapLabel = _dragController.currentSnapLabel;
+      _activeMagneticGuides = _dragController.magneticGuides;
+      _repaintPreview();
+      return;
+    }
 
     if (_underlayDragController.isActive) {
       _underlayDragController.updateHover(
@@ -12473,6 +12636,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:TOUCH_UP] _onPointerUp Input Dispatch & Tool Commits ---
   void _onPointerUp(PointerUpEvent event) {
     if (_commandReady) return;
+    if (_dragController.isActive && _dragController.isDraggingToTarget && _dragMovedSinceBaseGrab) {
+      if (_dragController.distanceMeters > 0.05) {
+        _confirmDragPlacement();
+        return;
+      }
+    }
     if (_isCurvingEdgeDragging) {
       _isCurvingEdgeDragging = false;
       _isHandleEngaged = false;
@@ -12775,6 +12944,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _groupDragIds = {};
 
     _isHandleEngaged = false;
+    _dragController.cancel();
+    _dragMovedSinceBaseGrab = false;
     _underlayMaskDrafting = false;
     _underlayMaskDraftStart = null;
     _underlayMaskPoints = [];
@@ -12824,6 +12995,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _elementMovePreview = null;
 
     _isHandleEngaged = false;
+    _dragController.cancel();
 
     _zoneMoveStartPoint = null;
 
@@ -22588,19 +22760,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           return;
 
         case ArchitectRadialAction.move:
-
           _cancelActiveDrags();
-
-          setState(() {
-
-            _polygonEditId = null;
-
-            _polygonSelectedEdge = null;
-
-            _moveSelection = true;
-
-          });
-
+          _startDragSession();
           return;
 
         case ArchitectRadialAction.properties:
@@ -22763,24 +22924,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
       case ArchitectRadialAction.move:
-
         _cancelActiveDrags();
-
-
-
-
-        setState(() {
-
-          _polygonEditId = null;
-
-          _polygonSelectedEdge = null;
-
-          _transverseMove = false;
-
-          _moveSelection = true;
-
-        });
-
+        _startDragSession();
         break;
 
 
@@ -25307,6 +25452,234 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         });
         _repaintPreview();
       },
+    );
+  }
+
+  // --- SUBSECTION: [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG METHODS ---
+
+  void _startDragSession() {
+    _cancelActiveDrags();
+
+    final storeyId = _project.activeStorey.id;
+
+    if (_isCadUnderlaySelected) {
+      final cfg = _currentCadUnderlayConfig;
+      final doc = _currentUnderlayDoc;
+      final currentOrigin = cfg != null && cfg.hasLockedOrigin
+          ? Offset(cfg.lockedCadOriginX!, cfg.lockedCadOriginY!)
+          : _effectiveUnderlayFrame.origin;
+      final defaultAnchor = doc != null
+          ? _effectiveUnderlayFrame.toModel(doc.bounds.center)
+          : currentOrigin;
+
+      _dragController.startDrag(
+        isUnderlay: true,
+        isCadUnderlay: true,
+        underlayName: cfg?.fileName ?? 'underlay.kcad',
+        storeyId: storeyId,
+        unitsPerMeter: cfg?.unitsPerMeter ?? 1.0,
+        originalCadOrigin: currentOrigin,
+        defaultAnchor: defaultAnchor,
+        handleOffsetLength: _handleOffsetLength,
+        zoomScale: _currentScale,
+      );
+      _dragMovedSinceBaseGrab = false;
+      setState(() {});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.architectDragPickBasePoint),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (_selectedRasterId != null) {
+      final raster = _selectedRasterUnderlay ??
+          _project.rasterUnderlaysForStorey(storeyId).where((r) => r.id == _selectedRasterId).firstOrNull;
+      if (raster != null && !raster.locked) {
+        final defaultAnchor = raster.position +
+            Offset(raster.widthMeters / 2, raster.heightMeters / 2);
+        _dragController.startDrag(
+          isUnderlay: true,
+          isCadUnderlay: false,
+          rasterId: raster.id,
+          underlayName: raster.fileName,
+          storeyId: storeyId,
+          unitsPerMeter: 1.0,
+          originalRasterPosition: raster.position,
+          defaultAnchor: defaultAnchor,
+          handleOffsetLength: _handleOffsetLength,
+          zoomScale: _currentScale,
+        );
+        _dragMovedSinceBaseGrab = false;
+        setState(() {});
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.l10n.architectDragPickBasePoint),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    final ids = <String>{
+      ..._effectiveSelection,
+      if (_selectedElementId case final id?) id,
+      if (_selectedZoneId case final id?) id,
+    };
+
+    if (ids.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.architectNavigationHint),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    Rect? overallBounds;
+    for (final id in ids) {
+      final b = ArchitectSelection.bounds(_project, id);
+      if (b != null) {
+        overallBounds = overallBounds == null ? b : overallBounds.expandToInclude(b);
+      }
+    }
+    final defaultAnchor = overallBounds?.center;
+
+    _dragController.startDrag(
+      elementIds: ids,
+      isUnderlay: false,
+      storeyId: storeyId,
+      defaultAnchor: defaultAnchor,
+      handleOffsetLength: _handleOffsetLength,
+      zoomScale: _currentScale,
+    );
+    _elementMoveOriginal = _project;
+    _elementMovePreview = null;
+    _elementMoveDelta = null;
+    _dragMovedSinceBaseGrab = false;
+    setState(() {});
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectDragPickBasePoint),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  void _confirmDragPlacement() {
+    if (!_dragController.isDraggingToTarget) return;
+    final target = _dragController.currentPointModel;
+    if (target == null) return;
+
+    if (_dragController.isUnderlay) {
+      final storeyId = _dragController.storeyId;
+      if (_dragController.isCadUnderlay) {
+        final cfg = _project.cadUnderlays[storeyId];
+        if (cfg != null) {
+          final placement = _dragController.computeCadPlacement(
+            targetPointModel: target,
+            existingMask: cfg.maskPolygon,
+          );
+          final updated = cfg.copyWith(
+            lockedCadOriginX: placement.newOriginX,
+            lockedCadOriginY: placement.newOriginY,
+            maskPolygon: placement.translatedMask,
+            lockOrigin: true,
+          );
+          final map = Map<String, ArchitectCadUnderlayConfig>.from(
+            _project.cadUnderlays,
+          )..[storeyId] = updated;
+
+          _commands.commit(_project.copyWith(cadUnderlays: map));
+          _saveBiMProjectIfAttached();
+        }
+      } else {
+        final rasterId = _dragController.rasterId;
+        final raster = _project.rasterUnderlays.where((r) => r.id == rasterId).firstOrNull;
+        if (raster != null) {
+          final placement = _dragController.computeRasterPlacement(
+            targetPointModel: target,
+            existingMask: raster.maskPolygon,
+          );
+          final updated = raster.copyWith(
+            position: placement.newPosition,
+            maskPolygon: placement.translatedMask,
+          );
+          final list = [
+            for (final r in _project.rasterUnderlays)
+              if (r.id == rasterId) updated else r,
+          ];
+          _commands.commit(_project.copyWith(rasterUnderlays: list));
+          _saveBiMProjectIfAttached();
+        }
+      }
+    } else {
+      if (_elementMovePreview != null) {
+        _commands.commit(_elementMovePreview!);
+        _saveBiMProjectIfAttached();
+      }
+    }
+
+    _dragController.cancel();
+    _underlayDragController.cancel();
+    _elementMovePreview = null;
+    _elementMoveOriginal = null;
+    _elementMoveDelta = null;
+    _dragMovedSinceBaseGrab = false;
+    _isHandleEngaged = false;
+    setState(() {});
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectDragSuccess),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _cancelDragPlacement() {
+    _dragController.cancel();
+    _underlayDragController.cancel();
+    _elementMovePreview = null;
+    _elementMoveOriginal = null;
+    _elementMoveDelta = null;
+    _dragMovedSinceBaseGrab = false;
+    _isHandleEngaged = false;
+    setState(() {});
+  }
+
+  Widget _buildDragFloatingOverlay() {
+    final l = context.l10n;
+    final targetModel = _dragController.currentPointModel ??
+        _dragController.defaultHandleAnchor ??
+        _cursorModel ??
+        Offset.zero;
+    final screenPos = _viewport.toScreen(targetModel);
+    final clamped = _clampOverlayPosition(screenPos, width: 240);
+    final isPicking = _dragController.isPickingBasePoint;
+    final prompt = isPicking
+        ? l.architectDragPickBasePoint
+        : l.architectDragPickTargetPoint;
+    return ArchitectFloatingCommandOverlay(
+      position: clamped,
+      label: prompt,
+      ready: !isPicking,
+      showConfirm: !isPicking,
+      onCancel: _cancelDragPlacement,
+      onConfirm: _confirmDragPlacement,
     );
   }
 
@@ -29614,6 +29987,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             _redoModel,
 
+        const SingleActivator(LogicalKeyboardKey.keyD, control: true):
+            _startDragSession,
+
+        const SingleActivator(LogicalKeyboardKey.keyD, meta: true):
+            _startDragSession,
+
         const SingleActivator(LogicalKeyboardKey.keyF, control: true):
             _openFindAndSelectDialog,
 
@@ -31337,6 +31716,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           ),
                         ),
                       ),
+                    if (_dragController.isActive && !_is3DView)
+                      _buildDragFloatingOverlay(),
                     if (_underlayDragController.isActive && !_is3DView)
                       _buildUnderlayDragFloatingOverlay(),
                     if (_pendingDetachWallIds != null && !_is3DView)
@@ -32584,8 +32965,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     dragDistanceMeters: _underlayDragController.distanceMeters,
                     dragAngleDeg: _underlayDragController.angleDeg,
                     dragMagneticGuides: _underlayDragController.magneticGuides,
-                    ghostRasterPosition: _underlayDragController.ghostRasterPosition,
-                    draggingRasterId: _underlayDragController.rasterId,
+                    ghostRasterPosition: _dragController.ghostRasterPosition ??
+                        _underlayDragController.ghostRasterPosition,
+                    draggingRasterId: _dragController.rasterId ??
+                        _underlayDragController.rasterId,
                     showRasterLayer:
                         _showUnderlay &&
                         _commands.isPlan &&
@@ -36062,6 +36445,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     newPointLeaderLine: _newPointLeaderLine,
 
     activeOvershoot: _activeOvershoot,
+    dragController: _dragController,
+    localizeSnap: _localizedSnapLabel,
 
   );
 
