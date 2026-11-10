@@ -4429,62 +4429,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     setState(() {});
   }
 
-  Widget _buildUnderlayDragBanner() {
-    final l = context.l10n;
-    final isPicking = _underlayDragController.isPickingBasePoint;
-    final prompt = isPicking
-        ? l.architectUnderlayPickBasePoint
-        : l.architectUnderlayPickTargetPoint;
-
-    return Center(
-      child: Material(
-        key: const ValueKey('architect-underlay-drag-banner'),
-        color: const Color(0xE61E1E26),
-        elevation: 6,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFF00E5FF), width: 1.2),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.open_with, color: Color(0xFF00E5FF), size: 20),
-              const SizedBox(width: 10),
-              Text(
-                prompt,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(width: 16),
-              IconButton(
-                key: const ValueKey('architect-underlay-drag-cancel'),
-                tooltip: l.cancel,
-                icon: const AppIcon(AppIconId.close, color: Colors.white70),
-                onPressed: _cancelUnderlaySnapDrag,
-              ),
-              if (!isPicking)
-                IconButton(
-                  key: const ValueKey('architect-underlay-drag-confirm'),
-                  tooltip: l.applyAction,
-                  icon: const AppIcon(
-                    AppIconId.confirm,
-                    color: Color(0xFF00E676),
-                  ),
-                  onPressed: _confirmUnderlaySnapPlacement,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _openCadDxfLayersSheet() {
     final doc = _underlaysByStorey[_project.activeStorey.id];
     final cfg = _currentCadUnderlayConfig;
@@ -6271,6 +6215,37 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _wallJoinPointer;
   String? _chamferFilletSourceId;
   ArchitectChamferFilletOptions? _chamferFilletOptions;
+  Offset? _chamferFilletPointer;
+  double? _lastFilletRadius;
+  double? _lastChamferDistance;
+
+  String? _curvingEdgeElementId;
+  int? _curvingEdgeSegmentIndex;
+  Offset? _curvingEdgeStartPoint;
+  Offset? _curvingEdgeEndPoint;
+  double _curvingEdgeBulge = 0.0;
+
+  (Offset, Offset)? get _chamferFilletLeaderLine {
+    if (_chamferFilletSourceId == null) return null;
+    final wall = _linearEditWalls
+        .where((w) => w.id == _chamferFilletSourceId)
+        .firstOrNull;
+    if (wall != null) {
+      final center = wall.referencePointAt(.5);
+      final target = _chamferFilletPointer ??
+          (center + wall.normalVector * (wall.thickness + 0.6));
+      return (center, target);
+    }
+    final line = _project.activeStorey.cadPrimitives
+        .where((p) => p.id == _chamferFilletSourceId && p.type == CadPrimitiveType.line)
+        .firstOrNull;
+    if (line != null) {
+      final center = (line.startPoint + line.endPoint) / 2;
+      final target = _chamferFilletPointer ?? center;
+      return (center, target);
+    }
+    return null;
+  }
 
   (Offset, Offset)? get _wallAttachLeaderLine {
     if (_wallAttachSourceId == null) return null;
@@ -6597,6 +6572,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _wallJoinSourceId = null;
     _chamferFilletSourceId = null;
     _chamferFilletOptions = null;
+    _chamferFilletPointer = null;
+    _curvingEdgeElementId = null;
+    _curvingEdgeSegmentIndex = null;
+    _curvingEdgeStartPoint = null;
+    _curvingEdgeEndPoint = null;
+    _curvingEdgeBulge = 0.0;
     _newPointTargetId = null;
     _newPointCandidate = null;
     _newPointSource = null;
@@ -12073,6 +12054,45 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _wallAttachPointer = rawModel;
     }
 
+    if (_chamferFilletSourceId != null) {
+      _chamferFilletPointer = rawModel;
+    }
+
+    if (_curvingEdgeElementId != null &&
+        _curvingEdgeStartPoint != null &&
+        _curvingEdgeEndPoint != null) {
+      final p1 = _curvingEdgeStartPoint!;
+      final p2 = _curvingEdgeEndPoint!;
+      final bulge = ArchitectWallArc.through(p1, p2, rawModel);
+      _curvingEdgeBulge = bulge.clamp(-20.0, 20.0);
+
+      final storey = _project.activeStorey;
+      final wall = storey.walls.where((w) => w.id == _curvingEdgeElementId).firstOrNull;
+      if (wall != null) {
+        final previewWall = wall.copyWith(arcBulge: _curvingEdgeBulge);
+        final nextWalls = storey.walls.map((w) => w.id == wall.id ? previewWall : w).toList();
+        _elementMovePreview = _project.updateActiveStorey(storey.copyWith(walls: nextWalls));
+      } else {
+        final prim = storey.cadPrimitives.where((p) => p.id == _curvingEdgeElementId).firstOrNull;
+        if (prim != null) {
+          if (prim.type == CadPrimitiveType.line) {
+            final previewPrim = prim.copyWith(arcBulge: _curvingEdgeBulge);
+            final nextPrims = storey.cadPrimitives.map((p) => p.id == prim.id ? previewPrim : p).toList();
+            _elementMovePreview = _project.updateActiveStorey(storey.copyWith(cadPrimitives: nextPrims));
+          } else if (prim.type == CadPrimitiveType.polyline) {
+            final bulges = List<double>.from(prim.bulges ?? List.filled(prim.linePoints.length, 0.0));
+            final segIdx = _curvingEdgeSegmentIndex ?? 0;
+            if (segIdx < bulges.length) {
+              bulges[segIdx] = _curvingEdgeBulge;
+              final previewPrim = prim.copyWith(bulges: bulges);
+              final nextPrims = storey.cadPrimitives.map((p) => p.id == prim.id ? previewPrim : p).toList();
+              _elementMovePreview = _project.updateActiveStorey(storey.copyWith(cadPrimitives: nextPrims));
+            }
+          }
+        }
+      }
+    }
+
     _repaintPreview();
 
   }
@@ -13545,21 +13565,34 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final sourceId = _chamferFilletSourceId!;
       final options = _chamferFilletOptions!;
       final storey = _project.activeStorey;
-      final targetWall = storey.walls
+      final hit = _hitSelection(rawModel);
+
+      var hitWall = _linearEditWalls
           .where((w) =>
-              w.id != sourceId &&
-              (rawModel - BimLineGeometry.closest(rawModel, w.startPoint, w.endPoint)).distance < 16 / _currentScale)
+              (w.id == hit ||
+               w.doors.any((d) => d.id == hit) ||
+               w.windows.any((win) => win.id == hit)) &&
+              w.id != sourceId)
           .firstOrNull;
-      final targetLine = storey.cadPrimitives
+      hitWall ??= _linearEditWalls.where((w) {
+        if (w.id == sourceId) return false;
+        return w.containsPoint(
+          rawModel,
+          tolerance: math.max(24.0 / _currentScale, 0.4),
+        );
+      }).firstOrNull;
+
+      final hitLine = storey.cadPrimitives
           .where((p) =>
               p.id != sourceId &&
               p.type == CadPrimitiveType.line &&
-              (rawModel - BimLineGeometry.closest(rawModel, p.startPoint, p.endPoint)).distance < 16 / _currentScale)
+              (p.id == hit ||
+               (rawModel - BimLineGeometry.closest(rawModel, p.startPoint, p.endPoint)).distance <= math.max(24.0 / _currentScale, 0.4)))
           .firstOrNull;
 
-      if (targetWall != null && storey.walls.any((w) => w.id == sourceId)) {
+      if (hitWall != null && storey.walls.any((w) => w.id == sourceId)) {
         final wA = storey.walls.firstWhere((w) => w.id == sourceId);
-        final wB = targetWall;
+        final wB = hitWall;
         final res = options.isFillet
             ? ArchitectChamferFillet.wallPairFillet(wA, wB, radius: options.value)
             : ArchitectChamferFillet.wallPairChamfer(wA, wB, distance: options.value);
@@ -13571,17 +13604,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           }).toList()..add(res.connector);
           _commands.commit(_project.updateActiveStorey(storey.copyWith(walls: nextWalls)));
           _saveBiMProjectIfAttached();
-          HapticFeedback.lightImpact();
+          HapticFeedback.mediumImpact();
+          setState(() {
+            _chamferFilletSourceId = null;
+            _chamferFilletOptions = null;
+            _chamferFilletPointer = null;
+            _selectionIds.clear();
+            _selectedElementId = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(options.isFillet
+                  ? context.l10n.architectFillet
+                  : context.l10n.architectChamfer),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.l10n.architectChamferFilletInvalid),
+              duration: const Duration(seconds: 2),
+            ),
+          );
         }
-        setState(() {
-          _chamferFilletSourceId = null;
-          _chamferFilletOptions = null;
-        });
         return;
-      } else if (targetLine != null &&
+      } else if (hitLine != null &&
           storey.cadPrimitives.any((p) => p.id == sourceId && p.type == CadPrimitiveType.line)) {
         final lA = storey.cadPrimitives.firstWhere((p) => p.id == sourceId);
-        final lB = targetLine;
+        final lB = hitLine;
         final res = options.isFillet
             ? ArchitectChamferFillet.linePairFillet(lA, lB, radius: options.value)
             : ArchitectChamferFillet.linePairChamfer(lA, lB, distance: options.value);
@@ -13593,18 +13644,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           }).toList()..add(res.connector);
           _commands.commit(_project.updateActiveStorey(storey.copyWith(cadPrimitives: nextPrimitives)));
           _saveBiMProjectIfAttached();
-          HapticFeedback.lightImpact();
+          HapticFeedback.mediumImpact();
+          setState(() {
+            _chamferFilletSourceId = null;
+            _chamferFilletOptions = null;
+            _chamferFilletPointer = null;
+            _selectionIds.clear();
+            _selectedElementId = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(options.isFillet
+                  ? context.l10n.architectFillet
+                  : context.l10n.architectChamfer),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.l10n.architectChamferFilletInvalid),
+              duration: const Duration(seconds: 2),
+            ),
+          );
         }
-        setState(() {
-          _chamferFilletSourceId = null;
-          _chamferFilletOptions = null;
-        });
         return;
       }
-      setState(() {
-        _chamferFilletSourceId = null;
-        _chamferFilletOptions = null;
-      });
       return;
     }
 
@@ -17115,359 +17180,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _repaintPreview();
 
     }
-
-  }
-
-
-
-  Widget _buildCutPromptBanner() {
-
-    return Material(
-
-      key: const ValueKey('architect-cut-banner'),
-
-      color: const Color(0xE61E1E26),
-
-      borderRadius: BorderRadius.circular(8),
-
-      elevation: 4,
-
-      shadowColor: Colors.black54,
-
-      child: Container(
-
-        decoration: BoxDecoration(
-
-          borderRadius: BorderRadius.circular(8),
-
-          border: Border.all(color: const Color(0xFFFF9100), width: 1.0),
-
-        ),
-
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-
-        child: SingleChildScrollView(
-
-          scrollDirection: Axis.horizontal,
-
-          child: Row(
-
-            mainAxisSize: MainAxisSize.min,
-
-            children: [
-
-              const Icon(Icons.content_cut, color: Color(0xFFFF9100), size: 18),
-
-              const SizedBox(width: 8),
-
-              Text(
-
-                context.l10n.architectWallCutHint,
-
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-
-              ),
-
-              const SizedBox(width: 8),
-
-              if (_commandPreview == null) GestureDetector(
-
-                key: const ValueKey('architect-cut-cancel'),
-
-                onTap: _cancelCutSession,
-
-                child: const AppIcon(
-                    AppIconId.close, color: Colors.white70, size: 18,
-                  ),
-
-              ),
-
-            ],
-
-          ),
-
-        ),
-
-      ),
-
-    );
-
-  }
-
-
-
-  Widget _buildSplitPromptBanner() {
-
-    final l = context.l10n;
-
-    final isPoint1Set = _splitPoint1 != null;
-
-    final isWaitingSide = _splitWaitingForSide;
-
-
-
-    return Material(
-
-      key: const ValueKey('architect-split-banner'),
-
-      color: const Color(0xE61E1E26),
-
-      borderRadius: BorderRadius.circular(8),
-
-      elevation: 4,
-
-      shadowColor: Colors.black54,
-
-      child: Container(
-
-        decoration: BoxDecoration(
-
-          borderRadius: BorderRadius.circular(8),
-
-          border: Border.all(color: const Color(0xFFFF9100), width: 1.0),
-
-        ),
-
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-
-        child: SingleChildScrollView(
-
-          scrollDirection: Axis.horizontal,
-
-          child: Row(
-
-            mainAxisSize: MainAxisSize.min,
-
-            children: [
-
-              const Icon(Icons.content_cut, size: 18, color: Color(0xFFFF9100)),
-
-              const SizedBox(width: 8),
-
-              Text(
-
-                !isPoint1Set
-
-                    ? l.architectWallSplitPromptPickFirst
-
-                    : (!isWaitingSide
-
-                          ? l.architectWallSplitPromptPickSecond
-
-                          : l.architectWallSplitPromptPickSide),
-
-                maxLines: 1,
-
-                overflow: TextOverflow.ellipsis,
-
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-
-              ),
-
-              if (isPoint1Set && !isWaitingSide) ...[
-
-                const SizedBox(width: 6),
-
-                TextButton(
-
-                  key: const ValueKey('architect-split-perpendicular-btn'),
-
-                  style: TextButton.styleFrom(
-
-                    padding: const EdgeInsets.symmetric(
-
-                      horizontal: 6,
-
-                      vertical: 2,
-
-                    ),
-
-                    minimumSize: Size.zero,
-
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-
-                  ),
-
-                  onPressed: _confirmPerpendicularSplitPoint,
-
-                  child: Text(
-
-                    l.architectWallSplitPerpendicular,
-
-                    style: const TextStyle(
-
-                      color: Color(0xFF00E5FF),
-
-                      fontSize: 11,
-
-                      fontWeight: FontWeight.bold,
-
-                    ),
-
-                  ),
-
-                ),
-
-              ],
-
-              if (isWaitingSide) ...[
-
-                const SizedBox(width: 6),
-
-                TextButton(
-
-                  key: const ValueKey('architect-split-side1-btn'),
-
-                  style: TextButton.styleFrom(
-
-                    padding: const EdgeInsets.symmetric(
-
-                      horizontal: 6,
-
-                      vertical: 2,
-
-                    ),
-
-                    minimumSize: Size.zero,
-
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-
-                  ),
-
-                  onPressed: () => _commitSplitSide(-1),
-
-                  child: Text(
-
-                    l.architectWallSplitSide1,
-
-                    style: const TextStyle(
-
-                      color: Color(0xFFFFB300),
-
-                      fontSize: 11,
-
-                    ),
-
-                  ),
-
-                ),
-
-                const SizedBox(width: 4),
-
-                TextButton(
-
-                  key: const ValueKey('architect-split-side2-btn'),
-
-                  style: TextButton.styleFrom(
-
-                    padding: const EdgeInsets.symmetric(
-
-                      horizontal: 6,
-
-                      vertical: 2,
-
-                    ),
-
-                    minimumSize: Size.zero,
-
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-
-                  ),
-
-                  onPressed: () => _commitSplitSide(1),
-
-                  child: Text(
-
-                    l.architectWallSplitSide2,
-
-                    style: const TextStyle(
-
-                      color: Color(0xFFFFB300),
-
-                      fontSize: 11,
-
-                    ),
-
-                  ),
-
-                ),
-
-                const SizedBox(width: 4),
-
-                TextButton(
-
-                  key: const ValueKey('architect-split-both-btn'),
-
-                  style: TextButton.styleFrom(
-
-                    padding: const EdgeInsets.symmetric(
-
-                      horizontal: 6,
-
-                      vertical: 2,
-
-                    ),
-
-                    minimumSize: Size.zero,
-
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-
-                  ),
-
-                  onPressed: () => _commitSplitSide(0),
-
-                  child: Text(
-
-                    l.architectWallSplitBoth,
-
-                    style: const TextStyle(color: Colors.white70, fontSize: 11),
-
-                  ),
-
-                ),
-
-              ],
-
-              const SizedBox(width: 6),
-
-              if (_commandPreview == null) IconButton(
-
-                key: const ValueKey('architect-split-cancel-btn'),
-
-                constraints: const BoxConstraints.tightFor(
-
-                  width: 24,
-
-                  height: 24,
-
-                ),
-
-                padding: EdgeInsets.zero,
-
-                icon: const AppIcon(
-                    AppIconId.close,
-
-                  size: 16,
-
-                  color: Colors.redAccent,
-
-                ),
-
-                tooltip: l.cancel,
-
-                onPressed: _cancelSplitSession,
-
-              ),
-
-            ],
-
-          ),
-
-        ),
-
-      ),
-
-    );
 
   }
 
@@ -22408,94 +22120,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  Widget _buildNewPointPromptBanner() {
-
-    return Tooltip(
-      message: context.l10n.bimNewPointHint,
-      child: Material(
-
-      key: const ValueKey('architect-new-point-banner'),
-
-      color: const Color(0xE61E1E26),
-
-      borderRadius: BorderRadius.circular(8),
-
-      elevation: 4,
-
-      shadowColor: Colors.black54,
-
-      child: Container(
-
-        decoration: BoxDecoration(
-
-          borderRadius: BorderRadius.circular(8),
-
-          border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
-
-        ),
-
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-
-        child: SingleChildScrollView(
-
-          scrollDirection: Axis.horizontal,
-
-          child: Row(
-
-            mainAxisSize: MainAxisSize.min,
-
-            children: [
-
-              const BimEditingSymbol(
-
-                BimEditAction.newPoint,
-
-                color: Color(0xFF00E5FF),
-
-                size: 18,
-
-              ),
-
-              const SizedBox(width: 8),
-
-              Text(
-
-                _newPointValid ? context.l10n.architectNewPointPrompt
-                    : context.l10n.architectNewPointInvalid,
-
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-
-              ),
-
-              const SizedBox(width: 8),
-
-              if (_commandPreview == null) GestureDetector(
-
-                key: const ValueKey('architect-new-point-cancel'),
-
-                onTap: _cancelNewPointSession,
-
-                child: const AppIcon(
-                      AppIconId.close, color: Colors.white70, size: 18,
-                    ),
-
-              ),
-
-            ],
-
-          ),
-
-        ),
-
-      ),
-
-    ),
-    );
-
-  }
-
-
-
   void _groupSelection() {
     _discardGeometryCommand();
 
@@ -23165,7 +22789,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         break;
 
       case ArchitectRadialAction.chamfer:
+        _triggerChamfer();
+        break;
+
       case ArchitectRadialAction.fillet:
+        _triggerFillet();
+        break;
+
+      case ArchitectRadialAction.hide:
         break;
 
     }
@@ -24781,152 +24412,609 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _repaintPreview();
   }
 
-  Widget _buildDetachConfirmationBanner() {
+  // --- SUBSECTION: [TAG:FLOATING_HUD] Contextual Floating Command Overlays & Interactive Edge Curving ---
+
+  Offset _clampOverlayPosition(Offset screenPos, {double width = 240, double height = 48}) {
+    final media = MediaQuery.sizeOf(context);
+    final left = (screenPos.dx + 12).clamp(8.0, math.max(8.0, media.width - width - 8.0));
+    final top = (screenPos.dy - height - 12).clamp(8.0, math.max(8.0, media.height - height - 12.0));
+    return Offset(left.toDouble(), top.toDouble());
+  }
+
+  Future<double?> _showNumericInputDialog({
+    required String title,
+    required double initialValue,
+  }) async {
+    final controller = TextEditingController(text: initialValue.toStringAsFixed(2));
     final l = context.l10n;
-    return Center(
-      child: Material(
-        key: const ValueKey('architect-detach-banner'),
-        color: const Color(0xE61E1E26),
-        elevation: 6,
-        borderRadius: BorderRadius.circular(24),
+    return showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          autofocus: true,
+          decoration: InputDecoration(
+            suffixText: _project.units.symbol,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final parsed = double.tryParse(controller.text.replaceAll(',', '.'));
+              Navigator.of(ctx).pop(parsed);
+            },
+            child: Text(l.applyAction),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _startEdgeCurvingSession(String id) {
+    final storey = _project.activeStorey;
+    final wall = storey.walls.where((w) => w.id == id).firstOrNull;
+    if (wall != null) {
+      setState(() {
+        _cancelActiveDrags();
+        _curvingEdgeElementId = id;
+        _curvingEdgeSegmentIndex = null;
+        _curvingEdgeStartPoint = wall.startPoint;
+        _curvingEdgeEndPoint = wall.endPoint;
+        _curvingEdgeBulge = wall.arcBulge;
+      });
+      _repaintPreview();
+      return;
+    }
+    final prim = storey.cadPrimitives.where((p) => p.id == id).firstOrNull;
+    if (prim != null) {
+      if (prim.type == CadPrimitiveType.line) {
+        setState(() {
+          _cancelActiveDrags();
+          _curvingEdgeElementId = id;
+          _curvingEdgeSegmentIndex = null;
+          _curvingEdgeStartPoint = prim.startPoint;
+          _curvingEdgeEndPoint = prim.endPoint;
+          _curvingEdgeBulge = prim.arcBulge ?? 0.0;
+        });
+        _repaintPreview();
+        return;
+      } else if (prim.type == CadPrimitiveType.polyline && prim.linePoints.length >= 2) {
+        setState(() {
+          _cancelActiveDrags();
+          _curvingEdgeElementId = id;
+          _curvingEdgeSegmentIndex = 0;
+          _curvingEdgeStartPoint = prim.linePoints[0];
+          _curvingEdgeEndPoint = prim.linePoints[1];
+          _curvingEdgeBulge = (prim.bulges != null && prim.bulges!.isNotEmpty) ? prim.bulges![0] : 0.0;
+        });
+        _repaintPreview();
+        return;
+      }
+    }
+  }
+
+  void _commitCurvingEdgeSession() {
+    if (_curvingEdgeElementId == null) {
+      _cancelCurvingEdgeSession();
+      return;
+    }
+    final id = _curvingEdgeElementId!;
+    final bulge = _curvingEdgeBulge;
+    final storey = _project.activeStorey;
+    final wall = storey.walls.where((w) => w.id == id).firstOrNull;
+    if (wall != null) {
+      _commands.execute(
+        _linearCommand(
+          UpdateArchitectWall(
+            storeyId: storey.id,
+            wall: wall.copyWith(arcBulge: bulge),
+          ),
+        ),
+      );
+    } else {
+      final prim = storey.cadPrimitives.where((p) => p.id == id).firstOrNull;
+      if (prim != null) {
+        if (prim.type == CadPrimitiveType.line) {
+          _commands.execute(
+            PlaceArchitectCadPrimitive(
+              storeyId: storey.id,
+              primitive: prim.copyWith(arcBulge: bulge),
+            ),
+          );
+        } else if (prim.type == CadPrimitiveType.polyline) {
+          final bulges = List<double>.from(prim.bulges ?? List.filled(prim.linePoints.length, 0.0));
+          final segIdx = _curvingEdgeSegmentIndex ?? 0;
+          if (segIdx < bulges.length) {
+            bulges[segIdx] = bulge;
+            _commands.execute(
+              PlaceArchitectCadPrimitive(
+                storeyId: storey.id,
+                primitive: prim.copyWith(bulges: bulges),
+              ),
+            );
+          }
+        }
+      }
+    }
+    _saveBiMProjectIfAttached();
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _curvingEdgeElementId = null;
+      _curvingEdgeSegmentIndex = null;
+      _curvingEdgeStartPoint = null;
+      _curvingEdgeEndPoint = null;
+      _curvingEdgeBulge = 0.0;
+      _elementMovePreview = null;
+    });
+    _repaintPreview();
+  }
+
+  void _cancelCurvingEdgeSession() {
+    setState(() {
+      _curvingEdgeElementId = null;
+      _curvingEdgeSegmentIndex = null;
+      _curvingEdgeStartPoint = null;
+      _curvingEdgeEndPoint = null;
+      _curvingEdgeBulge = 0.0;
+      _elementMovePreview = null;
+    });
+    _repaintPreview();
+  }
+
+  Widget _buildCurvingEdgeFloatingOverlay() {
+    if (_curvingEdgeElementId == null ||
+        _curvingEdgeStartPoint == null ||
+        _curvingEdgeEndPoint == null) {
+      return const SizedBox.shrink();
+    }
+    final p1 = _curvingEdgeStartPoint!;
+    final p2 = _curvingEdgeEndPoint!;
+    final arc = ArchitectWallArc(p1, p2, _curvingEdgeBulge);
+    final arcMid = _curvingEdgeBulge.abs() > 1e-4 ? arc.midpoint : (p1 + p2) / 2;
+    final screenPos = _viewport.toScreen(arcMid);
+    final clamped = _clampOverlayPosition(screenPos, width: 220);
+
+    final l = context.l10n;
+    final radiusStr = arc.radius.isFinite ? arc.radius.toStringAsFixed(2) : '--';
+    final sagittaStr = arc.sagitta.isFinite ? arc.sagitta.toStringAsFixed(2) : '--';
+
+    return ArchitectFloatingCommandOverlay(
+      position: clamped,
+      label: 'R: ${radiusStr}m (H: ${sagittaStr}m)',
+      ready: _curvingEdgeBulge.abs() > 1e-4,
+      onCancel: _cancelCurvingEdgeSession,
+      onConfirm: _commitCurvingEdgeSession,
+      customContent: GestureDetector(
+        onTap: () async {
+          final curR = arc.radius.isFinite ? arc.radius : 2.0;
+          final newR = await _showNumericInputDialog(
+            title: l.architectFilletRadius,
+            initialValue: curR,
+          );
+          if (newR != null && newR > 0 && mounted) {
+            try {
+              final newArc = arc.withRadius(newR);
+              setState(() {
+                _curvingEdgeBulge = newArc.bulge;
+              });
+              _repaintPreview();
+            } catch (_) {}
+          }
+        },
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFFFB74D), width: 1.2),
+            color: Colors.white12,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.cyanAccent, width: 0.8),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.link_off, color: Color(0xFFFFB74D), size: 20),
-              const SizedBox(width: 10),
-              Text(
-                l.architectWallDetachPrompt,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(width: 16),
-              IconButton(
-                key: const ValueKey('architect-detach-cancel'),
-                tooltip: l.cancel,
-                icon: const AppIcon(AppIconId.close, color: Colors.white70),
-                onPressed: _cancelWallDetach,
-              ),
-              IconButton(
-                key: const ValueKey('architect-detach-confirm'),
-                tooltip: l.applyAction,
-                icon: const AppIcon(
-                  AppIconId.confirm,
-                  color: Color(0xFF00E676),
-                ),
-                onPressed: _confirmWallDetach,
-              ),
-            ],
-          ),
+          child: const Icon(Icons.edit, size: 14, color: Colors.cyanAccent),
         ),
       ),
     );
   }
 
-  Widget _buildAttachPromptBanner() {
+  Widget _buildDetachFloatingOverlay() {
     final l = context.l10n;
-    return Center(
-      child: Material(
-        key: const ValueKey('architect-attach-banner'),
-        color: const Color(0xE61E1E26),
-        elevation: 6,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFF00E5FF), width: 1.2),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.join_inner, color: Color(0xFF00E5FF), size: 20),
-              const SizedBox(width: 10),
-              Text(
-                l.architectWallAttachSelectSecond,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(width: 12),
-              IconButton(
-                key: const ValueKey('architect-attach-cancel'),
-                tooltip: l.cancel,
-                icon: const AppIcon(AppIconId.close, color: Colors.white70),
-                onPressed: () {
-                  setState(() {
-                    _wallAttachSourceId = null;
-                    _wallAttachPointer = null;
-                  });
-                  _repaintPreview();
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
+    final anchor = _selectedLinearElement?.referencePointAt(0.5) ?? Offset.zero;
+    final screenPos = _viewport.toScreen(anchor);
+    final clamped = _clampOverlayPosition(screenPos, width: 210);
+    return ArchitectFloatingCommandOverlay(
+      position: clamped,
+      label: l.architectWallDetach,
+      ready: true,
+      onCancel: _cancelWallDetach,
+      onConfirm: _confirmWallDetach,
     );
   }
 
-  Widget _buildChamferFilletPromptBanner() {
+  Widget _buildAttachFloatingOverlay() {
+    final l = context.l10n;
+    final anchor = _wallAttachPointer ??
+        (_linearEditWalls.where((w) => w.id == _wallAttachSourceId).firstOrNull?.referencePointAt(0.5) ?? Offset.zero);
+    final screenPos = _viewport.toScreen(anchor);
+    final clamped = _clampOverlayPosition(screenPos, width: 220);
+    return ArchitectFloatingCommandOverlay(
+      position: clamped,
+      label: l.architectWallAttachSelectSecond,
+      showConfirm: false,
+      onCancel: () {
+        setState(() {
+          _wallAttachSourceId = null;
+          _wallAttachPointer = null;
+        });
+        _repaintPreview();
+      },
+    );
+  }
+
+  Widget _buildChamferFilletFloatingOverlay() {
     final l = context.l10n;
     final isFillet = _chamferFilletOptions?.isFillet ?? false;
-    return Center(
-      child: Material(
-        key: const ValueKey('architect-chamfer-fillet-banner'),
-        color: const Color(0xE61E1E26),
-        elevation: 6,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFF4DB6AC), width: 1.2),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isFillet ? Icons.rounded_corner : Icons.crop_square,
-                color: const Color(0xFF4DB6AC),
-                size: 20,
+    final anchor = _chamferFilletPointer ??
+        (_linearEditWalls.where((w) => w.id == _chamferFilletSourceId).firstOrNull?.referencePointAt(0.5) ??
+         _project.activeStorey.cadPrimitives.where((p) => p.id == _chamferFilletSourceId).firstOrNull?.startPoint ??
+         Offset.zero);
+    final screenPos = _viewport.toScreen(anchor);
+    final clamped = _clampOverlayPosition(screenPos, width: 260);
+
+    final curVal = _chamferFilletOptions?.value ?? (isFillet ? 0.50 : 0.30);
+    return ArchitectFloatingCommandOverlay(
+      position: clamped,
+      label: l.architectChamferFilletSelectSecond,
+      showConfirm: false,
+      onCancel: () {
+        setState(() {
+          _chamferFilletSourceId = null;
+          _chamferFilletOptions = null;
+          _chamferFilletPointer = null;
+        });
+        _repaintPreview();
+      },
+      customContent: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () async {
+              final newVal = await _showNumericInputDialog(
+                title: isFillet ? l.architectFilletRadius : l.architectChamferDistance,
+                initialValue: curVal,
+              );
+              if (newVal != null && newVal > 0 && mounted) {
+                setState(() {
+                  _chamferFilletOptions = ArchitectChamferFilletOptions(
+                    isFillet: isFillet,
+                    value: newVal,
+                  );
+                  if (isFillet) {
+                    _lastFilletRadius = newVal;
+                  } else {
+                    _lastChamferDistance = newVal;
+                  }
+                });
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white12,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
               ),
-              const SizedBox(width: 10),
-              Text(
-                l.architectChamferFilletSelectSecond,
+              child: Text(
+                '${isFillet ? "R" : "D"}: ${curVal.toStringAsFixed(2)}m',
                 style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+                  color: Color(0xFF00E5FF),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(width: 12),
-              IconButton(
-                key: const ValueKey('architect-chamfer-fillet-cancel'),
-                tooltip: l.cancel,
-                icon: const AppIcon(AppIconId.close, color: Colors.white70),
-                onPressed: () {
+            ),
+          ),
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: () {
+              final next = math.max(0.05, curVal - 0.10);
+              setState(() {
+                _chamferFilletOptions = ArchitectChamferFilletOptions(
+                  isFillet: isFillet,
+                  value: double.parse(next.toStringAsFixed(2)),
+                );
+              });
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+              child: Text('-', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+            ),
+          ),
+          InkWell(
+            onTap: () {
+              final next = curVal + 0.10;
+              setState(() {
+                _chamferFilletOptions = ArchitectChamferFilletOptions(
+                  isFillet: isFillet,
+                  value: double.parse(next.toStringAsFixed(2)),
+                );
+              });
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+              child: Text('+', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWallJoinFloatingOverlay() {
+    final l = context.l10n;
+    final anchor = _wallJoinPointer ??
+        (_linearEditWalls.where((w) => w.id == _wallJoinSourceId).firstOrNull?.referencePointAt(0.5) ??
+         _project.activeStorey.cadPrimitives.where((p) => p.id == _wallJoinSourceId).firstOrNull?.startPoint ??
+         Offset.zero);
+    final screenPos = _viewport.toScreen(anchor);
+    final clamped = _clampOverlayPosition(screenPos, width: 230);
+    final label = _selectedLineIds.isNotEmpty
+        ? l.architectLineJoinSelectSecond
+        : l.architectWallJoinSelectSecond;
+    return ArchitectFloatingCommandOverlay(
+      position: clamped,
+      label: label,
+      showConfirm: false,
+      onCancel: () {
+        setState(() {
+          _wallJoinSourceId = null;
+          _wallJoinPointer = null;
+        });
+        _repaintPreview();
+      },
+    );
+  }
+
+  Widget _buildUnderlayDragFloatingOverlay() {
+    final l = context.l10n;
+    final targetModel = _underlayDragController.currentPointModel ??
+        _currentUnderlayDoc?.bounds.center ??
+        Offset.zero;
+    final screenPos = _viewport.toScreen(targetModel);
+    final clamped = _clampOverlayPosition(screenPos, width: 200);
+    final isPicking = _underlayDragController.isPickingBasePoint;
+    final prompt = isPicking
+        ? l.architectUnderlayPickBasePoint
+        : l.architectUnderlayPickTargetPoint;
+    return ArchitectFloatingCommandOverlay(
+      position: clamped,
+      label: prompt,
+      ready: !isPicking,
+      showConfirm: !isPicking,
+      onCancel: _cancelUnderlaySnapDrag,
+      onConfirm: _confirmUnderlaySnapPlacement,
+    );
+  }
+
+  Widget _buildCutFloatingOverlay() {
+    final l = context.l10n;
+    final anchor = _wallCutStart ?? _cursorModel ?? Offset.zero;
+    final screenPos = _viewport.toScreen(anchor);
+    final clamped = _clampOverlayPosition(screenPos, width: 210);
+    return ArchitectFloatingCommandOverlay(
+      position: clamped,
+      label: l.architectWallCutHint,
+      showConfirm: false,
+      onCancel: _cancelCutSession,
+    );
+  }
+
+  Widget _buildSplitFloatingOverlay() {
+    final l = context.l10n;
+    final anchor = _splitPoint1 ?? _cursorModel ?? Offset.zero;
+    final screenPos = _viewport.toScreen(anchor);
+    final clamped = _clampOverlayPosition(screenPos, width: 280);
+    final isPoint1Set = _splitPoint1 != null;
+    final isWaitingSide = _splitWaitingForSide;
+    final hint = !isPoint1Set
+        ? l.architectWallSplitPromptPickFirst
+        : (!isWaitingSide
+            ? l.architectWallSplitPromptPickSecond
+            : l.architectWallSplitPromptPickSide);
+
+    return ArchitectFloatingCommandOverlay(
+      position: clamped,
+      label: hint,
+      showConfirm: false,
+      onCancel: _cancelSplitSession,
+      customContent: (isPoint1Set && !isWaitingSide) || isWaitingSide
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isPoint1Set && !isWaitingSide)
+                  TextButton(
+                    key: const ValueKey('architect-split-perpendicular-btn'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: _confirmPerpendicularSplitPoint,
+                    child: Text(
+                      l.architectWallSplitPerpendicular,
+                      style: const TextStyle(
+                        color: Color(0xFF00E5FF),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                if (isWaitingSide) ...[
+                  TextButton(
+                    key: const ValueKey('architect-split-side1-btn'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () => _commitSplitSide(-1),
+                    child: Text(l.architectWallSplitSide1, style: const TextStyle(color: Color(0xFFFFB300), fontSize: 11)),
+                  ),
+                  const SizedBox(width: 4),
+                  TextButton(
+                    key: const ValueKey('architect-split-side2-btn'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () => _commitSplitSide(1),
+                    child: Text(l.architectWallSplitSide2, style: const TextStyle(color: Color(0xFFFFB300), fontSize: 11)),
+                  ),
+                  const SizedBox(width: 4),
+                  TextButton(
+                    key: const ValueKey('architect-split-both-btn'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () => _commitSplitSide(0),
+                    child: Text(l.architectWallSplitBoth, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                  ),
+                ],
+              ],
+            )
+          : null,
+    );
+  }
+
+  Widget _buildNewPointFloatingOverlay() {
+    final l = context.l10n;
+    final anchor = _newPointCandidate ?? _cursorModel ?? Offset.zero;
+    final screenPos = _viewport.toScreen(anchor);
+    final clamped = _clampOverlayPosition(screenPos, width: 200);
+    return ArchitectFloatingCommandOverlay(
+      position: clamped,
+      label: l.bimNewPoint,
+      ready: _newPointValid,
+      onCancel: _cancelNewPointSession,
+      onConfirm: _commitNewPoint,
+    );
+  }
+
+  Widget _buildMirrorFloatingOverlay() {
+    final l = context.l10n;
+    final anchor = _mirrorAnchor ?? _mirrorCurrentPoint ?? _cursorModel ?? Offset.zero;
+    final screenPos = _viewport.toScreen(anchor);
+    final clamped = _clampOverlayPosition(screenPos, width: 280);
+    return ArchitectFloatingCommandOverlay(
+      position: clamped,
+      label: _mirrorAnchor == null
+          ? l.architectMirrorPromptPickAnchor
+          : l.architectMirrorPromptPickAxis,
+      showConfirm: false,
+      onCancel: _cancelMirrorSession,
+      customContent: _mirrorAnchor != null
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  key: const ValueKey('architect-mirror-vertical-btn'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => _executeMirror(anchor: _mirrorAnchor!, direction: const Offset(0, 1)),
+                  child: Text(l.architectMirrorAxisVertical, style: const TextStyle(fontSize: 11, color: Color(0xFF00E5FF))),
+                ),
+                const SizedBox(width: 4),
+                TextButton(
+                  key: const ValueKey('architect-mirror-horizontal-btn'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => _executeMirror(anchor: _mirrorAnchor!, direction: const Offset(1, 0)),
+                  child: Text(l.architectMirrorAxisHorizontal, style: const TextStyle(fontSize: 11, color: Color(0xFF00E5FF))),
+                ),
+              ],
+            )
+          : null,
+    );
+  }
+
+  Widget _buildOffsetFloatingOverlay() {
+    final l = context.l10n;
+    final anchor = _offsetSide ?? _cursorModel ?? Offset.zero;
+    final screenPos = _viewport.toScreen(anchor);
+    final clamped = _clampOverlayPosition(screenPos, width: 220);
+    final options = _offsetOptions;
+    return ArchitectFloatingCommandOverlay(
+      position: clamped,
+      label: _offsetSide != null && !_offsetValid
+          ? l.bimOffsetInvalid
+          : (_offsetSide == null
+              ? l.bimOffsetSide
+              : l.architectOffsetDynamicDistance),
+      ready: _offsetValid,
+      onCancel: () {
+        setState(() {
+          _offsetOptions = null;
+          _offsetSide = null;
+          _elementMovePreview = null;
+        });
+        _repaintPreview();
+      },
+      onConfirm: () {
+        if (_offsetSide != null) {
+          _commitOffset(_offsetSide!);
+        }
+      },
+      customContent: options != null
+          ? GestureDetector(
+              onTap: () async {
+                final res = await showBimElementOffsetDialog(
+                  context,
+                  unitToMeters: _project.units.scaleToMeters,
+                  unitSymbol: _project.units.symbol,
+                  initialDistance: options.distance,
+                  initialCopy: options.copy,
+                );
+                if (res != null && mounted) {
                   setState(() {
-                    _chamferFilletSourceId = null;
-                    _chamferFilletOptions = null;
+                    _offsetOptions = res;
+                    if (_offsetSide != null) {
+                      _previewOffset(_offsetSide!);
+                    }
                   });
                   _repaintPreview();
-                },
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.cyanAccent, width: 0.8),
+                ),
+                child: Text(
+                  _project.formatLength(options.distance),
+                  style: const TextStyle(
+                    color: Colors.cyanAccent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-            ],
-          ),
-        ),
-      ),
+            )
+          : null,
     );
   }
 
@@ -26400,116 +26488,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  Widget _offsetBanner() {
-    final l = context.l10n;
-    final options = _offsetOptions;
-    final unitVal = options != null ? _project.units.toUnit(options.distance) : 0.0;
-    final formattedVal = BimDistanceUnit.trimZeros(unitVal.toStringAsFixed(_project.distanceDecimals));
-    final unitSym = _project.units.symbol;
-
-    return Center(
-      child: Material(
-        key: const ValueKey('architect-offset-banner'),
-        color: const Color(0xE61E1E26),
-        elevation: 6,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _offsetSide != null && !_offsetValid
-                    ? l.bimOffsetInvalid
-                    : (_offsetSide == null
-                        ? l.bimOffsetSide
-                        : l.architectOffsetDynamicDistance),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-              if (options != null) ...[
-                const SizedBox(width: 10),
-                InkWell(
-                  key: const ValueKey('architect-offset-distance-edit'),
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () async {
-                    final res = await showBimElementOffsetDialog(
-                      context,
-                      unitToMeters: _project.units.scaleToMeters,
-                      unitSymbol: _project.units.symbol,
-                      initialDistance: options.distance,
-                      initialCopy: options.copy,
-                    );
-                    if (res != null && mounted) {
-                      setState(() {
-                        _offsetOptions = res;
-                        if (_offsetSide != null) {
-                          _previewOffset(_offsetSide!);
-                        }
-                      });
-                      _repaintPreview();
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.black45,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.cyanAccent, width: 1.2),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.edit, size: 14, color: Colors.cyanAccent),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$formattedVal $unitSym',
-                          style: const TextStyle(
-                            color: Colors.cyanAccent,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(width: 10),
-              IconButton(
-                key: const ValueKey('architect-offset-cancel'),
-                tooltip: l.cancel,
-                icon: const AppIcon(AppIconId.close, color: Colors.white70),
-                onPressed: () {
-                  setState(_cancelActiveDrags);
-                  _repaintPreview();
-                },
-              ),
-              IconButton(
-                key: const ValueKey('architect-offset-confirm'),
-                tooltip: l.applyAction,
-                icon: AppIcon(
-                  AppIconId.confirm,
-                  color: (_offsetSide != null && _offsetValid)
-                      ? const Color(0xFF00E676)
-                      : Colors.white24,
-                ),
-                onPressed: (_offsetSide != null && _offsetValid)
-                    ? () => _commitOffset(_offsetSide!)
-                    : null,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-
-
   void _previewMirrorSnap(ArchitectSnapResult snap) {
     _cursorModel = snap.point;
     _activeSnapLabel = snap.snapLabel;
@@ -26704,55 +26682,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   }
 
-
-
-  Widget _buildMirrorPromptBanner() {
-    final l = context.l10n;
-    final anchor = _mirrorAnchor;
-    return Material(key: const ValueKey('architect-mirror-banner'),
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Row(children: [
-            Icon(_mirrorIsDuplicate ? Icons.copy_all : Icons.flip, size: 18,
-                ),
-            const SizedBox(width: 8),
-            Expanded(child: Text(anchor == null ? l.architectMirrorPromptPickAnchor : l.architectMirrorPromptPickAxis,
-              maxLines: 2, overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            IconButton(key: const ValueKey('architect-mirror-pick-anchor'),
-              tooltip: l.architectMirrorPickAnchor,
-              icon: const AppIcon(AppIconId.fitView),
-              onPressed: () { setState(() { _mirrorAnchor = null; _mirrorCurrentPoint = null;
-                _elementMovePreview = null; }); _repaintPreview(); },
-                ),
-            if (_commandPreview == null) IconButton(key: const ValueKey('architect-mirror-cancel-btn'),
-              tooltip: l.cancel, onPressed: _cancelMirrorSession, icon: const AppIcon(AppIconId.close),
-                  ),
-          ],
-            ),
-          if (anchor != null) Row(children: [
-            Expanded(child: TextButton(key: const ValueKey('architect-mirror-vertical-btn'),
-              onPressed: () => _executeMirror(anchor: anchor, direction: const Offset(0, 1),
-                      ),
-              child: Text(l.architectMirrorAxisVertical),
-                    ),
-                  ),
-            Expanded(child: TextButton(key: const ValueKey('architect-mirror-horizontal-btn'),
-              onPressed: () => _executeMirror(anchor: anchor, direction: const Offset(1, 0),
-                      ),
-              child: Text(l.architectMirrorAxisHorizontal),
-                    ),
-                  ),
-          ],
-              ),
-        ],
-        ),
-      ),
-    );
-  }
 
 
   void _openSectionOrElevationView(String id) {
@@ -27417,8 +27346,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return null;
   }
 
-  Future<void> _triggerChamfer() => _openChamferFilletDialog(isFillet: false);
-  Future<void> _triggerFillet() => _openChamferFilletDialog(isFillet: true);
+  void _triggerChamfer() => _startChamferFilletSession(isFillet: false);
+  void _triggerFillet() => _startChamferFilletSession(isFillet: true);
+
+  void _startChamferFilletSession({required bool isFillet}) {
+    final ids = _effectiveSelection;
+    final storey = _project.activeStorey;
+    if (ids.length == 1) {
+      final id = ids.single;
+      final isWall = storey.walls.any((w) => w.id == id);
+      final isLine = storey.cadPrimitives.any((p) => p.id == id && p.type == CadPrimitiveType.line);
+      if (isWall || isLine) {
+        setState(() {
+          _cancelActiveDrags();
+          _chamferFilletSourceId = id;
+          _chamferFilletOptions = ArchitectChamferFilletOptions(
+            isFillet: isFillet,
+            value: isFillet ? (_lastFilletRadius ?? 0.50) : (_lastChamferDistance ?? 0.30),
+          );
+          _chamferFilletPointer = null;
+        });
+        HapticFeedback.selectionClick();
+        return;
+      }
+    }
+    _openChamferFilletDialog(isFillet: isFillet);
+  }
 
   Future<void> _openChamferFilletDialog({required bool isFillet}) async {
     final ids = _effectiveSelection;
@@ -27811,7 +27764,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ? Theme.of(context).colorScheme.error
         : Colors.redAccent;
     Widget icon(IconData data, [Color? color]) =>
-        AppIcon.fromMaterial(data, color: color ?? foreground, size: 20);
+        AppIcons.isRegistered(data)
+            ? AppIcon.fromMaterial(data, color: color ?? foreground, size: 20)
+            : Icon(data, color: color ?? foreground, size: 20);
     ArchitectSelectionAction action(
       String id,
       String label,
@@ -28306,6 +28261,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             tooltip: l.architectWallDetachPrompt,
           ),
         );
+        if (wallIds.length == 1) {
+          actions.add(
+            action(
+              'wall-curve',
+              l.architectLineCurve,
+              Icons.rounded_corner,
+              () => _startEdgeCurvingSession(wallIds.single),
+              color: accent,
+              commandId: 'curveWall',
+              tooltip: l.architectLineCurve,
+            ),
+          );
+        }
       }
       if (ids.length == 1) {
         final linePrim = storey.cadPrimitives.where((p) =>
@@ -28331,7 +28299,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 'architect-line-curve',
                 l.architectLineCurve,
                 Icons.rounded_corner,
-                () => _editWallArcDimension(),
+                () => _startEdgeCurvingSession(linePrim.id),
                 color: accent,
                 commandId: 'curveLine',
               ),
@@ -28342,7 +28310,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 'architect-poly-curve',
                 l.architectPolylineCurveSegment,
                 Icons.rounded_corner,
-                () => _editPolylineSegmentArc(),
+                () => _startEdgeCurvingSession(linePrim.id),
                 color: accent,
                 commandId: 'curvePolyline',
               ),
@@ -28389,6 +28357,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             icon: icon(Icons.more_horiz),
             children: [
               linear('wall-cut', l.architectWallCut, Icons.content_cut, 'cut'),
+              action(
+                'wall-chamfer',
+                l.architectChamfer,
+                Icons.crop_square,
+                _triggerChamfer,
+                color: accent,
+                commandId: 'chamfer',
+              ),
+              action(
+                'wall-fillet',
+                l.architectFillet,
+                Icons.rounded_corner,
+                _triggerFillet,
+                color: accent,
+                commandId: 'fillet',
+              ),
               linear(
                 'wall-split-stroke',
                 l.architectWallSplit,
@@ -30805,166 +30789,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         ),
                       ),
                     if (_underlayDragController.isActive && !_is3DView)
-                      Positioned(
-                        bottom: 16,
-                        left: 16,
-                        right: 16,
-                        child: _buildUnderlayDragBanner(),
-                      ),
+                      _buildUnderlayDragFloatingOverlay(),
                     if (_pendingDetachWallIds != null && !_is3DView)
-                      Positioned(
-                        bottom: 16,
-                        left: 16,
-                        right: 16,
-                        child: _buildDetachConfirmationBanner(),
-                      ),
+                      _buildDetachFloatingOverlay(),
                     if (_wallAttachSourceId != null && !_is3DView)
-                      Positioned(
-                        bottom: 16,
-                        left: 16,
-                        right: 16,
-                        child: _buildAttachPromptBanner(),
-                      ),
+                      _buildAttachFloatingOverlay(),
                     if (_chamferFilletSourceId != null && !_is3DView)
-                      Positioned(
-                        bottom: 16,
-                        left: 16,
-                        right: 16,
-                        child: _buildChamferFilletPromptBanner(),
-                      ),
+                      _buildChamferFilletFloatingOverlay(),
                     if (_wallJoinSourceId != null && !_is3DView)
-
-                      Positioned(
-
-                        bottom: 16,
-
-                        left: 16,
-
-                        right: 16,
-
-                        child: Center(
-
-                          child: Material(
-
-                            key: const ValueKey('architect-wall-join-banner'),
-
-                            color: const Color(0xEE1E242C),
-
-                            borderRadius: BorderRadius.circular(24),
-
-                            elevation: 4,
-
-                            child: Container(
-
-                              padding: const EdgeInsets.symmetric(
-
-                                horizontal: 16,
-
-                                vertical: 8,
-
-                              ),
-
-                              decoration: BoxDecoration(
-
-                                borderRadius: BorderRadius.circular(24),
-
-                                border: Border.all(
-
-                                  color: const Color(0xFF00E5FF),
-
-                                  width: 1.2,
-
-                                ),
-
-                              ),
-
-                              child: Row(
-
-                                mainAxisSize: MainAxisSize.min,
-
-                                children: [
-
-                                  BimEditingSymbol(
-
-                                    BimEditAction.join,
-
-                                    color: Color(0xFF00E5FF),
-
-                                    size: 20,
-
-                                  ),
-
-                                  const SizedBox(width: 8),
-
-                                  Text(
-
-                                    (_selectedLineIds.isNotEmpty
-
-                                        ? context
-
-                                              .l10n
-
-                                              .architectLineJoinSelectSecond
-
-                                        : context
-
-                                              .l10n
-
-                                              .architectWallJoinSelectSecond),
-
-                                    style: const TextStyle(
-
-                                      color: Colors.white,
-
-                                      fontSize: 13,
-
-                                      fontWeight: FontWeight.w500,
-
-                                    ),
-
-                                  ),
-
-                                  const SizedBox(width: 12),
-
-                                  if (_commandPreview == null) GestureDetector(
-
-                                    key: const ValueKey(
-
-                                      'architect-wall-join-cancel',
-
-                                    ),
-
-                                    onTap: () => setState(() {
-
-                                      _wallJoinSourceId = null;
-
-                                      _wallJoinPointer = null;
-
-                                    }),
-
-                                    child: const AppIcon(
-                                        AppIconId.close,
-
-                                      color: Colors.white70,
-
-                                      size: 18,
-
-                                    ),
-
-                                  ),
-
-                                ],
-
-                              ),
-
-                            ),
-
-                          ),
-
-                        ),
-
-                      ),
-
+                      _buildWallJoinFloatingOverlay(),
+                    if (_curvingEdgeElementId != null && !_is3DView)
+                      _buildCurvingEdgeFloatingOverlay(),
                     if (_showSelectionActions ||
                         (_touchCandidates != null && !_is3DView && !_printPreview) ||
                         (MediaQuery.sizeOf(context).width < 600 &&
@@ -32966,25 +32801,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         Positioned(top: 8, left: 8, right: 8, child: _buildDimensionBar()),
 
       if (_wallCutIds.isNotEmpty && !_wallCutStroke)
-
-        Positioned(top: _commandPreview == null ? 8 : null,
-          bottom: _commandPreview == null ? null : 8, left: 8, right: 64, child: _buildCutPromptBanner(),
-        ),
+        _buildCutFloatingOverlay(),
 
       if (_splitActive)
-
-        Positioned(
-
-          top: _commandPreview == null ? 8 : null,
-          bottom: _commandPreview == null ? null : 8,
-
-          left: 8,
-
-          right: 64,
-
-          child: _buildSplitPromptBanner(),
-
-        ),
+        _buildSplitFloatingOverlay(),
 
       if (_newPointTargetId != null && _newPointWall != null)
         Positioned.fill(child: AnimatedBuilder(
@@ -33005,19 +32825,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         )),
 
       if (_newPointTargetId != null)
-
-        Positioned(
-
-          top: _commandPreview == null ? 8 : null,
-          bottom: _commandPreview == null ? null : 8,
-
-          left: 8,
-
-          right: 64,
-
-          child: _buildNewPointPromptBanner(),
-
-        ),
+        _buildNewPointFloatingOverlay(),
 
       if (_activeTool == ArchitectTool.cadRect && _effectiveSelection.isEmpty)
 
@@ -34394,8 +34202,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           ),
         ),
-        Positioned(bottom: 8, left: 8, right: 8, child: _buildMirrorPromptBanner(),
-        ),
+        _buildMirrorFloatingOverlay(),
       ],
       if (_offsetOptions != null) ...[
         Positioned.fill(child: IgnorePointer(child: AnimatedBuilder(
@@ -34414,7 +34221,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
           ),
         ),
-        Positioned(bottom: 8, left: 8, right: 8, child: _offsetBanner()),
+        _buildOffsetFloatingOverlay(),
       ],
       if (_rotationSource != null)
         Positioned.fill(child: AnimatedBuilder(animation: _viewport,
@@ -34706,50 +34513,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ),
     );
     setState(() {});
-  }
-
-  void _editPolylineSegmentArc({int? edgeIndex}) async {
-    final poly = _selectedPolyline;
-    if (poly == null) return;
-    final pts = poly.linePoints;
-    if (pts.length < 2) return;
-    final idx = (edgeIndex ?? _polygonSelectedEdge ?? 0).clamp(0, pts.length - 2);
-    final p1 = pts[idx];
-    final p2 = pts[idx + 1];
-    final currentBulge = (poly.bulges != null && idx < poly.bulges!.length) ? poly.bulges![idx] : 0.2;
-
-    final tempWall = ArchitectWall(
-      id: 'segment_$idx',
-      startPoint: p1,
-      endPoint: p2,
-      arcBulge: currentBulge.abs() > 1e-4 ? currentBulge : 0.2,
-      thickness: 0.001,
-    );
-    final result = await showDialog<ArchitectWall>(
-      context: context,
-      builder: (_) => ArchitectWallArcDimensionDialog(
-        project: _project,
-        wall: tempWall,
-        dimension: _arcDimension,
-        confirmLabel: context.l10n.save,
-        onDimension: (d) {},
-        validate: (candidate) => candidate.validateGeometry(),
-        onPreview: (candidate) {},
-      ),
-    );
-    if (result != null) {
-      final newBulges = List<double>.generate(pts.length - 1, (i) {
-        if (i == idx) return result.arcBulge;
-        return (poly.bulges != null && i < poly.bulges!.length) ? poly.bulges![i] : 0.0;
-      });
-      _commands.execute(
-        PlaceArchitectCadPrimitive(
-          storeyId: _project.activeStoreyId,
-          primitive: poly.copyWith(bulges: newBulges),
-        ),
-      );
-      setState(() {});
-    }
   }
 
   Future<void> _promptAddLeaderAnnotation(Offset arrowPoint, Offset landingPoint) async {
@@ -35744,7 +35507,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     wallEndpointLeaderLine: _wallEndpointLeaderLine,
 
-    wallJoinLeaderLine: _wallJoinLeaderLine ?? _wallAttachLeaderLine,
+    wallJoinLeaderLine: _wallJoinLeaderLine ?? _wallAttachLeaderLine ?? _chamferFilletLeaderLine,
 
     newPointCandidate: _newPointCandidate,
     newPointHandleOffset: _newPointTargetId == null ? null : _newPointGripOffset,

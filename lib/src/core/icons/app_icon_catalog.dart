@@ -975,6 +975,8 @@ abstract final class AppIcons {
     MapEntry(Icons.align_horizontal_center, AppIconId.alignCenter),
     MapEntry(Icons.align_horizontal_left, AppIconId.alignLeft),
     MapEntry(Icons.align_horizontal_left_rounded, AppIconId.alignLeft),
+    MapEntry(Icons.all_inclusive, AppIconId.spline),
+    MapEntry(Icons.all_inclusive_rounded, AppIconId.spline),
     MapEntry(Icons.alt_route_rounded, AppIconId.alternativeRoute),
     MapEntry(Icons.analytics_outlined, AppIconId.analysis),
     MapEntry(Icons.analytics_rounded, AppIconId.analysis),
@@ -1499,6 +1501,8 @@ abstract final class AppIcons {
     MapEntry(Icons.wrap_text, AppIconId.wrapText),
     MapEntry(Icons.zoom_in, AppIconId.zoomIn),
   ]);
+
+  static bool isRegistered(IconData? icon) => _material.containsKey(icon);
 
   static AppIconId fromMaterial(IconData? icon) {
     final id = _material[icon];

@@ -7,16 +7,24 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
   final String label;
   final bool ready;
   final VoidCallback onCancel;
-  final VoidCallback onConfirm;
+  final VoidCallback? onConfirm;
   final Offset position;
+  final Widget? customContent;
+  final bool showConfirm;
+  final String? confirmTooltip;
+  final String? cancelTooltip;
 
   const ArchitectFloatingCommandOverlay({
     super.key,
     required this.label,
-    required this.ready,
+    this.ready = true,
     required this.onCancel,
-    required this.onConfirm,
+    this.onConfirm,
     required this.position,
+    this.customContent,
+    this.showConfirm = true,
+    this.confirmTooltip,
+    this.cancelTooltip,
   });
 
   @override
@@ -35,7 +43,9 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: ready ? const Color(0xFF00E676).withValues(alpha: 0.6) : Colors.white24,
+              color: ready && showConfirm
+                  ? const Color(0xFF00E676).withValues(alpha: 0.6)
+                  : Colors.white24,
               width: 1.2,
             ),
             boxShadow: [
@@ -51,7 +61,7 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
             children: [
               if (label.isNotEmpty) ...[
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 160),
+                  constraints: const BoxConstraints(maxWidth: 180),
                   child: Text(
                     label,
                     maxLines: 1,
@@ -65,12 +75,16 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
               ],
+              if (customContent != null) ...[
+                customContent!,
+                const SizedBox(width: 6),
+              ],
               // Cancel button (X)
               IconButton(
                 key: const ValueKey('architect-command-cancel'),
-                tooltip: l.cancel,
+                tooltip: cancelTooltip ?? l.cancel,
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                 splashRadius: 18,
                 icon: const AppIcon(
                   AppIconId.close,
@@ -79,21 +93,23 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
                 ),
                 onPressed: onCancel,
               ),
-              const SizedBox(width: 4),
-              // Confirm button (Green checkmark)
-              IconButton(
-                key: const ValueKey('architect-command-apply'),
-                tooltip: l.applyAction,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                splashRadius: 18,
-                icon: AppIcon(
-                  AppIconId.confirm,
-                  color: ready ? const Color(0xFF00E676) : Colors.white24,
-                  size: 20,
+              if (showConfirm && onConfirm != null) ...[
+                const SizedBox(width: 4),
+                // Confirm button (Green checkmark)
+                IconButton(
+                  key: const ValueKey('architect-command-apply'),
+                  tooltip: confirmTooltip ?? l.applyAction,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                  splashRadius: 18,
+                  icon: AppIcon(
+                    AppIconId.confirm,
+                    color: ready ? const Color(0xFF00E676) : Colors.white24,
+                    size: 20,
+                  ),
+                  onPressed: ready ? onConfirm : null,
                 ),
-                onPressed: ready ? onConfirm : null,
-              ),
+              ],
             ],
           ),
         ),

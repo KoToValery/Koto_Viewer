@@ -30,6 +30,7 @@ enum BimEditAction {
   fillet,
   detach,
   attach,
+  hide,
 }
 
 class BimEditActions {
@@ -61,6 +62,7 @@ class BimEditActions {
         BimEditAction.fillet => l.architectFillet,
         BimEditAction.detach => l.architectWallDetach,
         BimEditAction.attach => l.architectWallAttach,
+        BimEditAction.hide => l.architectUnderlayHide,
       };
   static AppIconId icon(BimEditAction action) => switch (action) {
     BimEditAction.move => AppIconId.move,
@@ -89,6 +91,7 @@ class BimEditActions {
     BimEditAction.fillet => AppIconId.roundedCorner,
     BimEditAction.detach => AppIconId.unlink,
     BimEditAction.attach => AppIconId.link,
+    BimEditAction.hide => AppIconId.hidden,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};
