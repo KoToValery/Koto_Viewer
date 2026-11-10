@@ -5,7 +5,6 @@ import '../services/architect_underlay_service.dart';
 import '../services/architect_underlay_drag_controller.dart';
 import '../services/architect_geodetic_detector.dart';
 import '../widgets/architect_underlay_bar.dart';
-import '../widgets/architect_cad_point_picker_dialog.dart';
 import '../../bim_projects/services/bim_underlay_picker_helper.dart';
 import '../widgets/architect_dialog.dart';
 import '../services/architect_column_clearance.dart';
@@ -1977,18 +1976,36 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
-  List<String> _touchHits(Offset point) =>
-      ArchitectSelectionCandidates.planHits(
-        _project,
-        _elementTool,
-        point,
-        _currentScale,
-        includeComponents: _showFurnitureLayer,
-        drawingViewKey: _workspaceViewKey,
-        allowed: (id) =>
-            (_editingGroup == null || _editingGroup!.elementIds.contains(id)) &&
-            (_acceptsAnySelection || _isElementAllowedForTool(id, _activeTool)),
-      );
+  List<String> _touchHits(Offset point) {
+    final hits = ArchitectSelectionCandidates.planHits(
+      _project,
+      _elementTool,
+      point,
+      _currentScale,
+      includeComponents: _showFurnitureLayer,
+      drawingViewKey: _workspaceViewKey,
+      allowed: (id) =>
+          (_editingGroup == null || _editingGroup!.elementIds.contains(id)) &&
+          (_acceptsAnySelection || _isElementAllowedForTool(id, _activeTool)),
+    );
+    if (_acceptsAnySelection && _commands.isPlan) {
+      if (_currentUnderlayDoc != null &&
+          _effectiveUnderlayFrame.rectToModel(_currentUnderlayDoc!.bounds).contains(point)) {
+        if (!hits.contains('underlay_cad')) {
+          hits.add('underlay_cad');
+        }
+      }
+      for (final r in _project.rasterUnderlaysForStorey(_project.activeStorey.id)) {
+        if (r.containsLocalPoint(point)) {
+          final id = 'underlay_raster_${r.id}';
+          if (!hits.contains(id)) {
+            hits.add(id);
+          }
+        }
+      }
+    }
+    return hits;
+  }
 
   bool _candidateSelected(String id) {
     final members = _commands.isPlan && _editingGroupId == null
@@ -3882,6 +3899,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   final Map<String, bool> _underlayLayerVisibility = {};
   bool _showUnderlay = true;
   bool _underlayBusy = false;
+  String? _underlayBusyMessage;
   ArchitectCadFileWatcher? _cadFileWatcher;
   final Map<String, ui.Image> _rasterImages = {};
   String? _selectedRasterId;
@@ -4030,6 +4048,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     try {
       final file = await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
       if (file == null || !mounted) return;
+      final isDwg = file.path.toLowerCase().endsWith('.dwg');
+      setState(() {
+        _underlayBusy = true;
+        _underlayBusyMessage = isDwg
+            ? context.l10n.convertingDwg
+            : context.l10n.bimProjectConvertingUnderlay;
+      });
       await _loadExternalCadFileForStorey(
         storeyId: _project.activeStorey.id,
         sourceFile: file,
@@ -4038,7 +4063,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     } catch (e, stack) {
       debugPrint('[ArchitectWorkspaceScreen] pickCadUnderlay error: $e\n$stack');
       if (mounted) {
-        setState(() => _underlayBusy = false);
+        setState(() {
+          _underlayBusy = false;
+          _underlayBusyMessage = null;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(context.l10n.architectUnderlayLoadError(e.toString())),
@@ -4055,7 +4083,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     required bool isAutoReload,
   }) async {
     if (!mounted) return;
-    setState(() => _underlayBusy = true);
+    final isDwg = sourceFile.path.toLowerCase().endsWith('.dwg');
+    setState(() {
+      _underlayBusy = true;
+      _underlayBusyMessage = isDwg
+          ? context.l10n.convertingDwg
+          : context.l10n.bimProjectConvertingUnderlay;
+    });
     try {
       final existingCfg = _project.cadUnderlays[storeyId];
       final importRes = await ArchitectUnderlayService.instance
@@ -4097,6 +4131,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         );
         _underlayBusy = false;
+        _underlayBusyMessage = null;
       });
       _saveBiMProjectIfAttached();
 
@@ -4125,13 +4160,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         );
         if (!isAutoReload) {
-          unawaited(_startCadPlacementWorkflow(doc: doc, config: nextCfg));
+          setState(() {
+            _isCadUnderlaySelected = true;
+            _selectedRasterId = null;
+            _selectionIds.clear();
+            _selectedElementId = null;
+          });
         }
       }
     } catch (e, stack) {
       debugPrint('[ArchitectWorkspaceScreen] _loadExternalCadFileForStorey error: $e\n$stack');
       if (mounted) {
-        setState(() => _underlayBusy = false);
+        setState(() {
+          _underlayBusy = false;
+          _underlayBusyMessage = null;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(context.l10n.architectUnderlayLoadError(e.toString())),
@@ -4141,7 +4184,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     } finally {
       if (mounted && _underlayBusy) {
-        setState(() => _underlayBusy = false);
+        setState(() {
+          _underlayBusy = false;
+          _underlayBusyMessage = null;
+        });
       }
     }
   }
@@ -4202,40 +4248,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
-  Future<void> _startCadPlacementWorkflow({
-    required DxfDocument doc,
-    required ArchitectCadUnderlayConfig config,
-  }) async {
-    final chosenCadPoint = await ArchitectCadPointPickerDialog.show(
-      context: context,
-      document: doc,
-      fileName: config.fileName,
-      initialCadPoint: (config.lockedCadOriginX != null &&
-              config.lockedCadOriginY != null)
-          ? Offset(config.lockedCadOriginX!, config.lockedCadOriginY!)
-          : doc.bounds.center,
-      unitsPerMeter: config.unitsPerMeter ?? 1.0,
-    );
-    if (!mounted || chosenCadPoint == null) return;
-
-    setState(() {
-      _cadInsertionActive = true;
-      _cadInsertionDoc = doc;
-      _cadInsertionConfig = config;
-      _cadInsertionControlPoint = chosenCadPoint;
-      _cadInsertionPendingPoint = null;
-      _cadInsertionHoverPoint = _cursorModel ?? _viewport.visibleRect.center;
-      _cadInsertionUnitsPerMeter = config.unitsPerMeter ?? 1.0;
-      _activeTool = ArchitectTool.cadUnderlay;
-    });
-  }
-
   Future<void> _repositionCurrentCadUnderlay() async {
     final storeyId = _project.activeStorey.id;
     final cfg = _project.cadUnderlays[storeyId];
     final doc = _underlaysByStorey[storeyId];
     if (cfg == null || doc == null) return;
-    await _startCadPlacementWorkflow(doc: doc, config: cfg);
+    _startUnderlaySnapDrag(isCad: true);
   }
 
   void _confirmCadInsertion() {
@@ -4665,6 +4683,58 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _saveBiMProjectIfAttached();
   }
 
+  void _toggleCadVisibility(bool visible) {
+    final cfg = _currentCadUnderlayConfig;
+    if (cfg == null) return;
+    final updated = cfg.copyWith(visible: visible);
+    final map = Map<String, ArchitectCadUnderlayConfig>.from(
+      _project.cadUnderlays,
+    )..[cfg.storeyId] = updated;
+    setState(() {
+      _commands.commit(_project.copyWith(cadUnderlays: map));
+      if (!visible) _isCadUnderlaySelected = false;
+    });
+    _saveBiMProjectIfAttached();
+    if (!visible && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectUnderlayHiddenNotice),
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: context.l10n.undoAction,
+            onPressed: () => _toggleCadVisibility(true),
+          ),
+        ),
+      );
+    }
+  }
+
+  void _toggleRasterVisibility(String rasterId, bool visible) {
+    final list = [
+      for (final r in _project.rasterUnderlays)
+        if (r.id == rasterId) r.copyWith(visible: visible) else r,
+    ];
+    setState(() {
+      _commands.commit(_project.copyWith(rasterUnderlays: list));
+      if (!visible && _selectedRasterId == rasterId) {
+        _selectedRasterId = null;
+      }
+    });
+    _saveBiMProjectIfAttached();
+    if (!visible && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectUnderlayHiddenNotice),
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: context.l10n.undoAction,
+            onPressed: () => _toggleRasterVisibility(rasterId, true),
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _importRasterUnderlay() async {
     if (_underlayBusy) return;
     try {
@@ -4725,7 +4795,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }
       }
 
-      setState(() => _underlayBusy = true);
+      setState(() {
+        _underlayBusy = true;
+        _underlayBusyMessage = context.l10n.architectUnderlayConverting;
+      });
       final centre = _viewport.visibleRect.center;
       final projectId = widget.bimProject?.id ?? _project.name;
       final storeyId = _project.activeStorey.id;
@@ -4753,6 +4826,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         );
         _underlayBusy = false;
+        _underlayBusyMessage = null;
       });
       _saveBiMProjectIfAttached();
     } catch (e, stack) {
@@ -4760,7 +4834,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         '[ArchitectWorkspaceScreen] _importRasterUnderlay error: $e\n$stack',
       );
       if (mounted) {
-        setState(() => _underlayBusy = false);
+        setState(() {
+          _underlayBusy = false;
+          _underlayBusyMessage = null;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(context.l10n.architectUnderlayLoadError(e.toString())),
@@ -4770,7 +4847,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     } finally {
       if (mounted && _underlayBusy) {
-        setState(() => _underlayBusy = false);
+        setState(() {
+          _underlayBusy = false;
+          _underlayBusyMessage = null;
+        });
       }
     }
   }
@@ -4931,10 +5011,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
     if (!mounted || action == null) return;
     switch (action) {
+      case 'position':
+      case 'reposition':
       case 'drag':
         _startUnderlaySnapDrag(isCad: true);
-      case 'reposition':
-        _repositionCurrentCadUnderlay();
+      case 'hide':
+        _toggleCadVisibility(false);
       case 'edit':
         _openCadEditDialog();
       case 'scale':
@@ -5031,8 +5113,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
     if (!mounted || action == null) return;
     switch (action) {
+      case 'position':
+      case 'reposition':
       case 'drag':
         _startUnderlaySnapDrag(isCad: false, rasterId: sel.id);
+      case 'hide':
+        _toggleRasterVisibility(sel.id, false);
       case 'edit':
         _openRasterEditDialog();
       case 'scale':
@@ -8515,6 +8601,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final rawModel = _screenToModel(event.localPosition);
 
     if (_underlayDragController.isActive) {
+      _underlayDragController.updateHover(
+        rawModel,
+        project: _project,
+        dxfDoc: _currentUnderlayDoc,
+        frame: _effectiveUnderlayFrame,
+        raster: _selectedRasterUnderlay,
+        scale: _currentScale,
+      );
       if (_underlayDragController.isPickingBasePoint) {
         _underlayDragController.confirmBasePoint(frame: _effectiveUnderlayFrame);
         HapticFeedback.selectionClick();
@@ -19890,12 +19984,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // Context menu for CAD Underlay
     final cadCfg = _currentCadUnderlayConfig;
-    if (cadCfg != null &&
+    final cadDoc = _underlaysByStorey[_project.activeStorey.id];
+    final isOverCad = cadCfg != null &&
         cadCfg.visible &&
-        _underlaysByStorey[_project.activeStorey.id] != null &&
+        cadDoc != null &&
+        (_isCadUnderlaySelected ||
+            _effectiveUnderlayFrame.rectToModel(cadDoc.bounds).contains(raw));
+    if (isOverCad &&
         (_activeTool == ArchitectTool.cadUnderlay ||
+            _activeTool == ArchitectTool.pan ||
             (_activeTool == ArchitectTool.select &&
                 _effectiveSelection.isEmpty))) {
+      setState(() {
+        _cancelActiveDrags();
+        _isCadUnderlaySelected = true;
+        _selectedRasterId = null;
+        _selectedElementId = null;
+        _selectionIds.clear();
+      });
       unawaited(_openCadContextMenu(screenPoint));
       return true;
     }
@@ -27747,13 +27853,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return ArchitectSelectionActionBar(
         actions: [
           action(
-            'underlay-drag',
-            l.architectUnderlayDrag,
+            'underlay-position',
+            l.architectUnderlayPositionAction,
             Icons.open_with,
             () => _startUnderlaySnapDrag(isCad: isCad, rasterId: raster?.id),
             primary: true,
             color: const Color(0xFF00E5FF),
-            tooltip: l.architectUnderlayDragTooltip,
+            tooltip: l.architectUnderlayPositionTooltip,
+          ),
+          action(
+            'underlay-hide',
+            l.architectUnderlayHide,
+            Icons.visibility_off_outlined,
+            () => isCad
+                ? _toggleCadVisibility(false)
+                : (raster != null ? _toggleRasterVisibility(raster.id, false) : null),
+            color: Colors.white70,
+            tooltip: l.architectUnderlayHideTooltip,
           ),
           action(
             'underlay-scale',
@@ -30631,6 +30747,63 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ),
 
+                    if (_underlayBusy)
+                      Positioned.fill(
+                        child: AbsorbPointer(
+                          child: Center(
+                            child: Material(
+                              elevation: 12,
+                              borderRadius: BorderRadius.circular(16),
+                              color: const Color(0xF01E242C),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 18,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.5),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.8,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Color(0xFF00E5FF),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Text(
+                                      _underlayBusyMessage ??
+                                          context.l10n.bimProjectConvertingUnderlay,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     if (_underlayDragController.isActive && !_is3DView)
                       Positioned(
                         bottom: 16,
@@ -35030,10 +35203,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   String? _localizedSnapLabel(String? label) {
-
     if (label == null) return null;
-
     final l10n = context.l10n;
+
+    if (label == 'Origin (0,0)') return l10n.architectUnderlayPresetOrigin;
+    if (label == 'Center') return l10n.architectUnderlayPresetCenter;
 
     if (label == 'Merge' || label == 'Обединяване (Merge)') {
 

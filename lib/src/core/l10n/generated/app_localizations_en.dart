@@ -12462,6 +12462,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectUnderlaySelected => 'Underlay selected';
 
   @override
+  String get architectUnderlayPositionAction => 'Position';
+
+  @override
+  String get architectUnderlayPositionTooltip =>
+      'Position underlay by selecting a reference point and moving to location';
+
+  @override
+  String get architectUnderlayHide => 'Hide';
+
+  @override
+  String get architectUnderlayHideTooltip =>
+      'Hide this underlay from workspace';
+
+  @override
+  String get architectUnderlayHiddenNotice => 'Underlay hidden';
+
+  @override
+  String get architectUnderlayConverting => 'Converting & loading underlay...';
+
+  @override
   String get commandIconPathway => 'Pathway with curb';
 
   @override

@@ -158,6 +158,24 @@ class ArchitectUnderlayDragController extends ChangeNotifier {
     required double scale,
   }) {
     if (_isCad && dxfDoc != null) {
+      final originModel = frame.toModel(Offset.zero);
+      final tolModel = 22.0 / math.max(scale, 1e-4);
+      if ((rawModelPoint - originModel).distance <= tolModel) {
+        _currentPointModel = originModel;
+        _currentSnapLabel = 'Origin (0,0)';
+        _isSnapped = true;
+        _magneticGuides = const [];
+        return;
+      }
+      final centerModel = frame.toModel(dxfDoc.bounds.center);
+      if ((rawModelPoint - centerModel).distance <= tolModel) {
+        _currentPointModel = centerModel;
+        _currentSnapLabel = 'Center';
+        _isSnapped = true;
+        _magneticGuides = const [];
+        return;
+      }
+
       final cadPoint = frame.toCad(rawModelPoint);
       final tolCad = (22.0 / math.max(scale, 1e-4)) * frame.unitsPerMeter;
       final snap = DxfSnapHelper.findSnapPoint(

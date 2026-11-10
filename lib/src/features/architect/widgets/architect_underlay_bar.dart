@@ -230,26 +230,14 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(width: 6),
-                if (onDrag != null) ...[
-                  OutlinedButton.icon(
-                    onPressed: isBusy ? null : onDrag,
-                    icon: const AppIcon(
-                      AppIconId.move,
-                      size: 15,
-                      color: Color(0xFF00E5FF),
-                    ),
-                    label: Text(l.architectUnderlayDrag),
-                  ),
-                  const SizedBox(width: 6),
-                ],
                 OutlinedButton.icon(
                   onPressed: isBusy ? null : onReposition,
                   icon: const AppIcon(
-                    AppIconId.newPoint,
+                    AppIconId.move,
                     size: 15,
-                    color: Color(0xFF00E676),
+                    color: Color(0xFF00E5FF),
                   ),
-                  label: Text(l.architectUnderlayReposition),
+                  label: Text(l.architectUnderlayPositionAction),
                 ),
                 const SizedBox(width: 6),
                 OutlinedButton.icon(
@@ -470,7 +458,7 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
                         size: 16,
                         color: Color(0xFF00E5FF),
                       ),
-                      label: Text(l.architectUnderlayDrag),
+                      label: Text(l.architectUnderlayPositionAction),
                     ),
                     const SizedBox(width: 8),
                   ],
@@ -792,7 +780,7 @@ Future<String?> showArchitectUnderlayContextMenu({
     ),
     items: [
       PopupMenuItem(
-        value: 'drag',
+        value: 'position',
         child: Row(
           children: [
             const AppIcon(
@@ -801,25 +789,24 @@ Future<String?> showArchitectUnderlayContextMenu({
               color: Color(0xFF00E5FF),
             ),
             const SizedBox(width: 8),
-            Text(l.architectUnderlayDrag),
+            Text(l.architectUnderlayPositionAction),
           ],
         ),
       ),
-      if (isCad)
-        PopupMenuItem(
-          value: 'reposition',
-          child: Row(
-            children: [
-              const AppIcon(
-                AppIconId.newPoint,
-                size: 18,
-                color: Color(0xFF00E676),
-              ),
-              const SizedBox(width: 8),
-              Text(l.architectUnderlayReposition),
-            ],
-          ),
+      PopupMenuItem(
+        value: 'hide',
+        child: Row(
+          children: [
+            const Icon(
+              Icons.visibility_off_outlined,
+              size: 18,
+              color: Colors.white70,
+            ),
+            const SizedBox(width: 8),
+            Text(l.architectUnderlayHide),
+          ],
         ),
+      ),
       PopupMenuItem(
         value: 'edit',
         child: Row(

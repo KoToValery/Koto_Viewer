@@ -223,6 +223,12 @@ class ArchitectUnderlayPainter extends CustomPainter {
       }
 
       canvas.save();
+      if (hasGhostCad) {
+        canvas.saveLayer(
+          null,
+          Paint()..color = const Color.fromRGBO(255, 255, 255, 0.28),
+        );
+      }
       canvas.scale(1.0 / frame.unitsPerMeter);
       canvas.translate(-frame.origin.dx, -frame.origin.dy);
       ArchitectElementsPainterHelper.drawUnderlay(
@@ -235,6 +241,9 @@ class ArchitectUnderlayPainter extends CustomPainter {
             .rectToCad(viewport.visibleRect)
             .inflate(2 * frame.unitsPerMeter / viewport.scale),
       );
+      if (hasGhostCad) {
+        canvas.restore();
+      }
       canvas.restore();
 
       if (hasCadMask) {

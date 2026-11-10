@@ -22656,6 +22656,42 @@ abstract class AppLocalizations {
   /// **'Underlay selected'**
   String get architectUnderlaySelected;
 
+  /// Action to position underlay on workspace
+  ///
+  /// In en, this message translates to:
+  /// **'Position'**
+  String get architectUnderlayPositionAction;
+
+  /// Tooltip for positioning underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Position underlay by selecting a reference point and moving to location'**
+  String get architectUnderlayPositionTooltip;
+
+  /// Action to hide underlay from workspace
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get architectUnderlayHide;
+
+  /// Tooltip for hiding underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Hide this underlay from workspace'**
+  String get architectUnderlayHideTooltip;
+
+  /// Snackbar notice when underlay is hidden
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay hidden'**
+  String get architectUnderlayHiddenNotice;
+
+  /// Loading message while underlay is converting
+  ///
+  /// In en, this message translates to:
+  /// **'Converting & loading underlay...'**
+  String get architectUnderlayConverting;
+
   /// No description provided for @commandIconPathway.
   ///
   /// In en, this message translates to:

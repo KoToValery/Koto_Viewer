@@ -12511,6 +12511,27 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectUnderlaySelected => 'Селектирана подложка';
 
   @override
+  String get architectUnderlayPositionAction => 'Позиционирай';
+
+  @override
+  String get architectUnderlayPositionTooltip =>
+      'Позициониране на подложката чрез избор на точка и придвижване на място';
+
+  @override
+  String get architectUnderlayHide => 'Скрий';
+
+  @override
+  String get architectUnderlayHideTooltip =>
+      'Скриване на подложката от работния плот';
+
+  @override
+  String get architectUnderlayHiddenNotice => 'Подложката е скрита';
+
+  @override
+  String get architectUnderlayConverting =>
+      'Конвертиране и зареждане на подложка...';
+
+  @override
   String get commandIconPathway => 'Алея с бордюр';
 
   @override
