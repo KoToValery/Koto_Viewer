@@ -5065,15 +5065,13 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectToolDragDesc =>
-      'Свободно преместване на елементи чрез избиране на базова точка';
+      'Избери базова точка където и да е, после целева точка. Задръж за точно посочване над пръста.';
 
   @override
-  String get architectDragPickBasePoint =>
-      'Кликнете навсякъде по елемента за базова точка';
+  String get architectDragPickBasePoint => 'Базова точка';
 
   @override
-  String get architectDragPickTargetPoint =>
-      'Посочете новата позиция на елемента';
+  String get architectDragPickTargetPoint => 'Целева точка';
 
   @override
   String get architectDragSuccess => 'Елементът е преместен успешно';

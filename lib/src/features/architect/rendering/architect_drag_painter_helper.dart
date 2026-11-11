@@ -33,7 +33,7 @@ class ArchitectDragPainterHelper {
       // 1. Draw default offset leader handle if present
       final anchor = dragController.defaultHandleAnchor;
       final grip = dragController.defaultHandleGrip;
-      if (anchor != null && grip != null) {
+      if (dragController.showBaseHandle && anchor != null && grip != null) {
         final bgLeader = Paint()
           ..color = const Color(0x66000000)
           ..strokeWidth = 2.6 / draftingScale

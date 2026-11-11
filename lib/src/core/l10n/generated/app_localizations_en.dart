@@ -5040,15 +5040,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectToolDragDesc =>
-      'Freely drag elements by picking any base point';
+      'Pick a base point anywhere, then its destination. Hold for a precise point above your finger.';
 
   @override
-  String get architectDragPickBasePoint =>
-      'Click anywhere on element to grab base point';
+  String get architectDragPickBasePoint => 'Pick base point';
 
   @override
-  String get architectDragPickTargetPoint =>
-      'Pick new position to move element';
+  String get architectDragPickTargetPoint => 'Pick target point';
 
   @override
   String get architectDragSuccess => 'Element moved successfully';

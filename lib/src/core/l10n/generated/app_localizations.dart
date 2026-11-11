@@ -8876,19 +8876,19 @@ abstract class AppLocalizations {
   /// Drag tool description
   ///
   /// In en, this message translates to:
-  /// **'Freely drag elements by picking any base point'**
+  /// **'Pick a base point anywhere, then its destination. Hold for a precise point above your finger.'**
   String get architectToolDragDesc;
 
   /// Drag tool prompt to pick base point
   ///
   /// In en, this message translates to:
-  /// **'Click anywhere on element to grab base point'**
+  /// **'Pick base point'**
   String get architectDragPickBasePoint;
 
   /// Drag tool prompt to pick target point
   ///
   /// In en, this message translates to:
-  /// **'Pick new position to move element'**
+  /// **'Pick target point'**
   String get architectDragPickTargetPoint;
 
   /// Drag tool success message

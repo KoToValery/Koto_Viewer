@@ -67,8 +67,14 @@ These are existing reference patterns, not mandatory templates. For a new featur
 | Transverse move or numeric offset | _beginGeometryCommand(move) and the existing constrained-edit state | Generic geometry-command handlers; do not merge with free Drag |
 
 Free Drag must not coexist with _commandPreview: one owner of preview, cancel,
-and commit. Pointer release or a second canvas pick never commits. Release
-freezes a valid candidate (_dragTargetPlaced); a later canvas pick may revise it,
+and commit. The entire first gesture only aims the base (on or off the element);
+its release locks the base without moving anything. A separate second gesture
+aims the target, and its release freezes a valid candidate (_dragTargetPlaced).
+`_updateDragAim` shares the drafting hold/offset-pointer pattern through
+`_beginPlacementHold` and `StructuralPointerInteraction.placementTarget`;
+grabbing the default leader preserves its offset while relocating the base.
+The viewport allows the precision hold on this active handle, keeps single-pointer
+pan locked, and disables selection/context hold timers. A later canvas pick may revise the target,
 and the sole Drag Apply control publishes one undoable mutation and saves.
 While active, drafting/selection/context-hold controls and the bottom palette
 are hidden. The palette retains its state and returns after confirm/cancel;

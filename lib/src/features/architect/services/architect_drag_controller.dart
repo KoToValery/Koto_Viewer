@@ -3,17 +3,14 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 
 import '../../bim_projects/models/bim_coordinate_frame.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/rendering/dxf_snap_helper.dart';
 import '../models/architect_project.dart';
 import '../rendering/architect_snap_helper.dart';
 
 /// Phase of the interactive 2-point snap Drag workflow.
-enum ArchitectDragPhase {
-  idle,
-  pickingBasePoint,
-  draggingToTarget,
-}
+enum ArchitectDragPhase { idle, pickingBasePoint, draggingToTarget }
 
 /// Manages interactive 2-point snap & drag workflow for any architectural element:
 /// - Walls, furniture/components, slabs, columns, beams, roofs, zones, openings, CAD primitives
@@ -22,7 +19,8 @@ enum ArchitectDragPhase {
 /// Interaction lifecycle:
 /// 1. Phase [pickingBasePoint]:
 ///    - Shows default offset leader handle with grip dot ("изнесена линия с точка").
-///    - Allows clicking ANYWHERE on the selected element(s) with full object snap (corners, endpoints, midpoints, center, edges).
+///    - Aims anywhere on or outside the selected element(s), without moving them.
+///    - Release locks the base; a separate gesture places the target.
 /// 2. Phase [draggingToTarget]:
 ///    - Base point is locked. Rubber-band leader line connects base point to target.
 ///    - Distance and angle badge (`L=...m  ...°`) and magnetic guides.
@@ -46,6 +44,7 @@ class ArchitectDragController extends ChangeNotifier {
 
   Offset? _defaultHandleAnchor;
   Offset? _defaultHandleGrip;
+  bool _showBaseHandle = true;
 
   Offset? _basePointModel;
   Offset? _basePointCad;
@@ -70,6 +69,7 @@ class ArchitectDragController extends ChangeNotifier {
 
   Offset? get defaultHandleAnchor => _defaultHandleAnchor;
   Offset? get defaultHandleGrip => _defaultHandleGrip;
+  bool get showBaseHandle => _showBaseHandle;
 
   Offset? get basePointModel => _basePointModel;
   Offset? get basePointCad => _basePointCad;
@@ -79,7 +79,9 @@ class ArchitectDragController extends ChangeNotifier {
   List<(Offset, Offset)> get magneticGuides => _magneticGuides;
 
   Offset? get deltaModel {
-    if (!isDraggingToTarget || _basePointModel == null || _currentPointModel == null) {
+    if (!isDraggingToTarget ||
+        _basePointModel == null ||
+        _currentPointModel == null) {
       return null;
     }
     return _currentPointModel! - _basePointModel!;
@@ -96,7 +98,11 @@ class ArchitectDragController extends ChangeNotifier {
 
   /// Ghost CAD frame for CAD underlay during drag.
   BimCoordinateFrame? get ghostCadFrame {
-    if (!isDraggingToTarget || !_isUnderlay || !_isCadUnderlay || _basePointCad == null || _currentPointModel == null) {
+    if (!isDraggingToTarget ||
+        !_isUnderlay ||
+        !_isCadUnderlay ||
+        _basePointCad == null ||
+        _currentPointModel == null) {
       return null;
     }
     final scale = _unitsPerMeter > 0 ? _unitsPerMeter : 1.0;
@@ -106,7 +112,10 @@ class ArchitectDragController extends ChangeNotifier {
 
   /// Ghost top-left position for raster underlay during drag.
   Offset? get ghostRasterPosition {
-    if (!isDraggingToTarget || !_isUnderlay || _isCadUnderlay || _originalRasterPosition == null) {
+    if (!isDraggingToTarget ||
+        !_isUnderlay ||
+        _isCadUnderlay ||
+        _originalRasterPosition == null) {
       return null;
     }
     final d = deltaModel ?? Offset.zero;
@@ -140,11 +149,15 @@ class ArchitectDragController extends ChangeNotifier {
     _originalRasterPosition = originalRasterPosition;
 
     _defaultHandleAnchor = defaultAnchor;
+    _showBaseHandle = true;
     if (defaultAnchor != null) {
       final length = handleOffsetLength > 0 ? handleOffsetLength : 48.0;
       final scale = math.max(zoomScale, 1e-4);
       // Offset upward-right by default (screen coordinates: negative Y, positive X)
-      final offsetModel = Offset(length * 0.7071 / scale, -length * 0.7071 / scale);
+      final offsetModel = Offset(
+        length * 0.7071 / scale,
+        -length * 0.7071 / scale,
+      );
       _defaultHandleGrip = defaultAnchor + offsetModel;
     } else {
       _defaultHandleGrip = null;
@@ -168,8 +181,24 @@ class ArchitectDragController extends ChangeNotifier {
     DxfDocument? dxfDoc,
     BimCoordinateFrame? frame,
     ArchitectRasterUnderlay? raster,
+    bool snapToDefaultGrip = true,
+    bool relocateHandle = false,
+    bool showHandle = true,
   }) {
     if (_phase != ArchitectDragPhase.pickingBasePoint) return;
+    _showBaseHandle = showHandle;
+
+    final tolerance = (22.0 / math.max(scale, 1e-4)).clamp(0.08, 0.60);
+    if (snapToDefaultGrip &&
+        _defaultHandleGrip != null &&
+        (rawModelPoint - _defaultHandleGrip!).distance <= tolerance) {
+      _currentPointModel = _defaultHandleAnchor ?? _defaultHandleGrip;
+      _currentSnapLabel = 'Grip';
+      _isSnapped = true;
+      _magneticGuides = const [];
+      notifyListeners();
+      return;
+    }
 
     if (_isUnderlay) {
       _resolveUnderlayBaseSnap(
@@ -182,6 +211,29 @@ class ArchitectDragController extends ChangeNotifier {
     } else {
       _resolveElementBaseSnap(rawModelPoint, project: project, scale: scale);
     }
+    // A base may also be an existing point elsewhere in the drawing.
+    if (!_isSnapped) {
+      final snap = ArchitectSnapHelper.snapFree(
+        rawPoint: rawModelPoint,
+        project: project,
+        tolerance: tolerance,
+        magnetic: true,
+        underlay: _isCadUnderlay ? null : dxfDoc,
+        frame: frame ?? const BimCoordinateFrame(),
+      );
+      _currentPointModel = snap.point;
+      _currentSnapLabel = snap.snapLabel;
+      _isSnapped = snap.isSnapped;
+      _magneticGuides = snap.magneticGuides;
+    }
+    if (relocateHandle &&
+        _defaultHandleAnchor != null &&
+        _defaultHandleGrip != null &&
+        _currentPointModel != null) {
+      final offset = _defaultHandleGrip! - _defaultHandleAnchor!;
+      _defaultHandleAnchor = _currentPointModel;
+      _defaultHandleGrip = _currentPointModel! + offset;
+    }
     notifyListeners();
   }
 
@@ -192,19 +244,7 @@ class ArchitectDragController extends ChangeNotifier {
   }) {
     final tolerance = (22.0 / math.max(scale, 1e-4)).clamp(0.08, 0.60);
 
-    // 1. Check if hovering near default handle grip
-    if (_defaultHandleGrip != null) {
-      final d = (rawModelPoint - _defaultHandleGrip!).distance;
-      if (d <= tolerance) {
-        _currentPointModel = _defaultHandleAnchor ?? _defaultHandleGrip;
-        _currentSnapLabel = 'Grip';
-        _isSnapped = true;
-        _magneticGuides = const [];
-        return;
-      }
-    }
-
-    // 2. Snap to features of the selected elements
+    // Prefer features of the selected elements before other drawing geometry.
     if (_elementIds.isNotEmpty) {
       final snap = ArchitectSnapHelper.snapFree(
         rawPoint: rawModelPoint,
@@ -272,17 +312,29 @@ class ArchitectDragController extends ChangeNotifier {
       }
     } else if (!_isCadUnderlay && raster != null) {
       final corners = [
-        raster.position,
-        raster.position + Offset(raster.widthMeters, 0),
-        raster.position + Offset(raster.widthMeters, raster.heightMeters),
-        raster.position + Offset(0, raster.heightMeters),
-        raster.position + Offset(raster.widthMeters / 2, raster.heightMeters / 2),
+        ...raster.localCorners,
+        raster.pixelToLocal(
+          Offset(raster.imageWidthPx / 2, raster.imageHeightPx / 2),
+        ),
       ];
       final labels = ['Corner', 'Corner', 'Corner', 'Corner', 'Center'];
       for (var i = 0; i < corners.length; i++) {
         if ((rawModelPoint - corners[i]).distance <= tolModel) {
           _currentPointModel = corners[i];
           _currentSnapLabel = labels[i];
+          _isSnapped = true;
+          _magneticGuides = const [];
+          return;
+        }
+      }
+      for (var i = 0; i < 4; i++) {
+        final a = corners[i], b = corners[(i + 1) % 4];
+        final midpoint = (a + b) / 2;
+        final nearest = BimLineGeometry.closest(rawModelPoint, a, b);
+        final atMidpoint = (rawModelPoint - midpoint).distance <= tolModel;
+        if (atMidpoint || (rawModelPoint - nearest).distance <= tolModel) {
+          _currentPointModel = atMidpoint ? midpoint : nearest;
+          _currentSnapLabel = atMidpoint ? 'Midpoint' : 'Edge';
           _isSnapped = true;
           _magneticGuides = const [];
           return;
@@ -315,8 +367,14 @@ class ArchitectDragController extends ChangeNotifier {
     Offset rawModelPoint, {
     required ArchitectProject project,
     double scale = 1.0,
+    DxfDocument? dxfDoc,
+    BimCoordinateFrame frame = const BimCoordinateFrame(),
+    Map<String, bool> visibility = const {},
   }) {
-    if (_phase != ArchitectDragPhase.draggingToTarget || _basePointModel == null) return;
+    if (_phase != ArchitectDragPhase.draggingToTarget ||
+        _basePointModel == null) {
+      return;
+    }
 
     final tolerance = (22.0 / math.max(scale, 1e-4)).clamp(0.08, 0.60);
 
@@ -329,6 +387,9 @@ class ArchitectDragController extends ChangeNotifier {
       magnetic: true,
       alignment: true,
       excludedIds: _elementIds,
+      underlay: _isCadUnderlay ? null : dxfDoc,
+      frame: frame,
+      visibility: visibility,
     );
 
     _currentPointModel = snap.point;
@@ -339,7 +400,8 @@ class ArchitectDragController extends ChangeNotifier {
   }
 
   /// Calculates the new CAD origin and translated mask.
-  ({double newOriginX, double newOriginY, List<Offset>? translatedMask}) computeCadPlacement({
+  ({double newOriginX, double newOriginY, List<Offset>? translatedMask})
+  computeCadPlacement({
     required Offset targetPointModel,
     List<Offset>? existingMask,
   }) {
@@ -351,9 +413,7 @@ class ArchitectDragController extends ChangeNotifier {
     List<Offset>? translatedMask;
     final d = targetPointModel - (_basePointModel ?? targetPointModel);
     if (existingMask != null && existingMask.isNotEmpty) {
-      translatedMask = [
-        for (final pt in existingMask) pt + d,
-      ];
+      translatedMask = [for (final pt in existingMask) pt + d];
     }
 
     return (
@@ -374,15 +434,10 @@ class ArchitectDragController extends ChangeNotifier {
 
     List<Offset>? translatedMask;
     if (existingMask != null && existingMask.isNotEmpty) {
-      translatedMask = [
-        for (final pt in existingMask) pt + d,
-      ];
+      translatedMask = [for (final pt in existingMask) pt + d];
     }
 
-    return (
-      newPosition: newPos,
-      translatedMask: translatedMask,
-    );
+    return (newPosition: newPos, translatedMask: translatedMask);
   }
 
   /// Cancels the Drag session and resets state.

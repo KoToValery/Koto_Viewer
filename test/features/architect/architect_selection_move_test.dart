@@ -129,10 +129,11 @@ void main() {
     await editing.hold(tester, const Offset(1, .75));
     await chooseMove(tester, 'transverse');
     await chooseMove(tester, 'free');
+    await tester.tapAt(workspace.screen(tester, const Offset(2, 1.5)));
+    await tester.pumpAndSettle();
     final gesture = await tester.startGesture(
       workspace.screen(tester, const Offset(2, 1.5)),
     );
-    await tester.pump(const Duration(milliseconds: 451));
     await gesture.moveTo(workspace.screen(tester, const Offset(3, 2.5)));
     await gesture.up();
     await tester.pumpAndSettle();
@@ -188,7 +189,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('architect-axis-value-save')));
       await tester.pumpAndSettle();
       await editing.acceptGeometryCommand(tester);
-    final next = model.project.activeStorey.cadPrimitives.single;
+      final next = model.project.activeStorey.cadPrimitives.single;
       expect(next.startPoint, const Offset(-2, -.5));
       expect(next.endPoint, const Offset(2, -.5));
       expect(next.id, line.id);

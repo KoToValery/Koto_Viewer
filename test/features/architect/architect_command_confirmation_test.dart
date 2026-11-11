@@ -319,6 +319,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('architect-move-free')));
       await tester.pumpAndSettle();
+      await tester.tapAt(workspace.screen(tester, const Offset(2, -1)));
+      await tester.pumpAndSettle();
       final gesture = await tester.startGesture(
         workspace.screen(tester, const Offset(2, -1)),
       );

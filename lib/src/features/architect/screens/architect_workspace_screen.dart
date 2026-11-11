@@ -4411,8 +4411,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final raster = _selectedRasterUnderlay ??
           _project.rasterUnderlaysForStorey(storeyId).where((r) => r.id == rasterId).firstOrNull;
       if (raster == null || raster.locked) return;
-      final defaultAnchor = raster.position +
-          Offset(raster.widthMeters / 2, raster.heightMeters / 2);
+      final defaultAnchor = raster.localBounds.center;
       _dragController.startDrag(
         isUnderlay: true,
         isCadUnderlay: false,
@@ -8732,6 +8731,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _lastTapModelPosition = rawModel;
 
     if (_dragController.isActive) {
+      _placingWithHold = false;
+      _touchPosition = null;
       if (_dragController.isPickingBasePoint) {
         _dragController.updateBaseHover(
           rawModel,
@@ -8744,9 +8745,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         final base = _dragController.currentPointModel ?? rawModel;
         _dragPointerOffset = _dragController.currentSnapLabel == 'Grip'
             ? base - rawModel : Offset.zero;
-        _dragController.grabBasePoint(base, frame: _effectiveUnderlayFrame);
+        // The whole first gesture aims the base; only release locks it.
         _dragTargetPlaced = false;
         _isHandleEngaged = true;
+        _updateDragAim(event.localPosition);
         HapticFeedback.selectionClick();
         setState(() {});
         return;
@@ -9812,24 +9814,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _onPointerMove(PointerMoveEvent event) {
     if (_commandReady) return;
     if (_dragController.isActive) {
-      final rawModel = _screenToModel(event.localPosition);
-      _lastTapModelPosition = rawModel;
-      if (_dragController.isPickingBasePoint) {
-        _dragController.updateBaseHover(
-          rawModel,
-          project: _project,
-          scale: _currentScale,
-          dxfDoc: _currentUnderlayDoc,
-          frame: _effectiveUnderlayFrame,
-          raster: _selectedRasterUnderlay,
-        );
-      } else if (_dragController.isDraggingToTarget) {
-        _updateDragTarget(rawModel);
-      }
-      _cursorModel = _dragController.currentPointModel;
-      _activeSnapLabel = _dragController.currentSnapLabel;
-      _activeMagneticGuides = _dragController.magneticGuides;
-      _repaintPreview();
+      _updateDragAim(event.localPosition);
       setState(() {});
       return;
     }
@@ -9908,6 +9893,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _beginPlacementHold(Offset point) {
 
+    if (_dragController.isActive) {
+      _placingWithHold = true;
+      _updateDragAim(point);
+      HapticFeedback.selectionClick();
+      return;
+    }
+
     if (_draftCancelPointer != null) return;
 
     if (!_canPlaceWithMarker) return;
@@ -9955,7 +9947,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool get _canPlaceWithMarker =>
 
-      ((_activeTool != ArchitectTool.select && _activeTool != ArchitectTool.pan && !_selectionContextActive) ||
+      (_dragController.isActive ||
+          (_activeTool != ArchitectTool.select && _activeTool != ArchitectTool.pan && !_selectionContextActive) ||
 
           _mirrorActive ||
 
@@ -10162,6 +10155,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   Offset? get _placementPreviewTarget {
+
+    if (_dragController.isActive) return _dragController.currentPointModel;
 
     final raw = _cursorModel;
 
@@ -12545,7 +12540,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _onPointerHover(PointerHoverEvent event) {
     if (_commandReady) return;
-    if (_interactionMode == ArchitectInteractionMode.navigation && !_terrainDrafting) return;
+    if (_interactionMode == ArchitectInteractionMode.navigation &&
+        !_terrainDrafting && !_dragController.isActive) return;
 
     if (_draftOverlayContains(event.localPosition)) return;
 
@@ -12561,11 +12557,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _onPointerUp(PointerUpEvent event) {
     if (_commandReady) return;
     if (_dragController.isActive) {
-      // Release freezes the preview; only the Drag overlay may commit it.
-      _dragTargetPlaced = _hasValidDragTarget;
+      _updateDragAim(event.localPosition);
+      if (_dragController.isPickingBasePoint) {
+        _dragController.grabBasePoint(
+          _dragController.currentPointModel!, frame: _effectiveUnderlayFrame,
+        );
+        _dragTargetPlaced = false;
+        HapticFeedback.selectionClick();
+      } else {
+        // Only the second gesture places a target for review and Apply.
+        _dragTargetPlaced = _hasValidDragTarget;
+      }
       _dragPointerOffset = Offset.zero;
+      _placingWithHold = false;
+      _touchPosition = null;
       _isHandleEngaged = false;
       _handlePointerDown = null;
+      _repaintPreview();
       setState(() {});
       return;
     }
@@ -25368,8 +25376,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final raster = _selectedRasterUnderlay ??
           _project.rasterUnderlaysForStorey(storeyId).where((r) => r.id == _selectedRasterId).firstOrNull;
       if (raster != null && !raster.locked) {
-        final defaultAnchor = raster.position +
-            Offset(raster.widthMeters / 2, raster.heightMeters / 2);
+        final defaultAnchor = raster.localBounds.center;
         _dragController.startDrag(
           isUnderlay: true,
           isCadUnderlay: false,
@@ -25435,9 +25442,44 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _dragController.distanceMeters > 1e-7 &&
       (_dragController.isUnderlay || _elementMovePreview != null);
 
+  /// Both picks use the drafting tools' lifted touch target. A grabbed leader
+  /// retains its own offset so it can aim the base without moving the element.
+  void _updateDragAim(Offset screenPosition) {
+    if (_touchInput && _placingWithHold) _touchPosition = screenPosition;
+    final aim = StructuralPointerInteraction.placementTarget(
+      screenPosition,
+      isMouse: !_touchInput || !_placingWithHold ||
+          _dragPointerOffset != Offset.zero,
+    );
+    final raw = _screenToModel(aim);
+    _lastTapModelPosition = raw;
+    if (_dragController.isPickingBasePoint) {
+      _dragController.updateBaseHover(
+        raw + _dragPointerOffset,
+        project: _project,
+        scale: _currentScale,
+        dxfDoc: _currentUnderlayDoc,
+        frame: _effectiveUnderlayFrame,
+        raster: _selectedRasterUnderlay,
+        snapToDefaultGrip: false,
+        relocateHandle: true,
+        showHandle: !_touchInput || !_placingWithHold,
+      );
+    } else {
+      _updateDragTarget(raw);
+    }
+    _cursorModel = _dragController.currentPointModel;
+    _activeSnapLabel = _dragController.currentSnapLabel;
+    _activeMagneticGuides = _dragController.magneticGuides;
+    _repaintPreview();
+  }
+
   void _updateDragTarget(Offset rawModel) {
     _dragController.updateTargetHover(
       rawModel + _dragPointerOffset, project: _project, scale: _currentScale,
+      dxfDoc: _currentUnderlayDoc,
+      frame: _effectiveUnderlayFrame,
+      visibility: _effectiveUnderlayLayerVisibility,
     );
     _cursorModel = _dragController.currentPointModel;
     _activeSnapLabel = _dragController.currentSnapLabel;
@@ -25525,6 +25567,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _elementMoveDelta = null;
     _dragTargetPlaced = false;
     _dragPointerOffset = Offset.zero;
+    _placingWithHold = false;
+    _touchPosition = null;
     _isHandleEngaged = false;
     _cursorModel = null;
     _activeSnapLabel = null;
@@ -32767,7 +32811,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             _newPointTargetId == null,
 
-        touchHoldToPlace: !_dragController.isActive && _canPlaceWithMarker,
+        touchHoldToPlace: _canPlaceWithMarker,
+
+        holdExistingHandles: _dragController.isActive,
 
         onToolHoldStart: _beginPlacementHold,
 
@@ -32981,6 +33027,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ),
 
             ),
+
+            if (_dragController.isActive)
+              Positioned(
+                left: 8,
+                top: 8,
+                child: IgnorePointer(
+                  child: ArchitectCanvasHint(
+                    key: const ValueKey('architect-drag-step-hint'),
+                    message: _dragController.isPickingBasePoint
+                        ? context.l10n.architectDragPickBasePoint
+                        : context.l10n.architectDragPickTargetPoint,
+                    maxLines: 1,
+                  ),
+                ),
+              ),
 
             if (_canPlaceWithMarker)
 

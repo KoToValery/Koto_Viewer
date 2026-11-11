@@ -13,6 +13,9 @@ import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
+import 'package:kotoview/src/features/bim_editing/interaction/bim_pointer_interaction.dart';
+import 'package:kotoview/src/features/bim_projects/models/bim_coordinate_frame.dart';
+import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_floating_command_overlay.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_radial_menu.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
@@ -73,8 +76,10 @@ ArchitectCommandController _dragModel({bool wall = false}) {
 
 Future<void> _openPhone(
   WidgetTester tester,
-  ArchitectCommandController model,
-) async {
+  ArchitectCommandController model, {
+  String language = 'en',
+  Map<String, DxfDocument>? underlays,
+}) async {
   tester.view.physicalSize = const Size(360, 800);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -96,10 +101,13 @@ Future<void> _openPhone(
       key: _captureKey,
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        locale: const Locale('en'),
+        locale: Locale(language),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: ArchitectWorkspaceScreen(commandController: model),
+        home: ArchitectWorkspaceScreen(
+          commandController: model,
+          underlaysByStorey: underlays,
+        ),
       ),
     ),
   );
@@ -249,6 +257,24 @@ void main() {
         await start();
         final camera = workspace.camera(tester);
         final fixedPoint = camera.toScreen(Offset.zero);
+        // The first complete gesture chooses a base without moving anything.
+        final baseGesture = await tester.startGesture(
+          workspace.screen(tester, const Offset(2, 4)),
+        );
+        const baseCorner = Offset(2.875, 4.875);
+        await baseGesture.moveTo(workspace.screen(tester, baseCorner));
+        await baseGesture.up();
+        await tester.pumpAndSettle();
+        expect(
+          workspace.overlay(tester).dragController!.basePointModel,
+          baseCorner,
+        );
+        expect(workspace.overlay(tester).dragController!.distanceMeters, 0);
+        expect(
+          workspace.overlay(tester).project.activeStorey.columns.first.position,
+          _columnPosition,
+        );
+        expect(_apply(tester).onPressed, isNull);
         final gesture = await tester.startGesture(
           workspace.screen(tester, _columnPosition),
         );
@@ -315,6 +341,101 @@ void main() {
     );
   }
 
+  for (final language in ['en', 'bg']) {
+    testWidgets('precise base and target are separate picks ($language)', (
+      tester,
+    ) async {
+      final model = _dragModel();
+      addTearDown(model.dispose);
+      await _openPhone(tester, model, language: language);
+      await _radialMove(tester, _columnPosition);
+      final l = AppLocalizations.of(tester.element(find.byKey(_dragSurface)))!;
+      expect(find.text(l.architectDragPickBasePoint), findsOneWidget);
+
+      // First aim from empty space at a point outside the selected column.
+      // The standard lifted pointer must mark the reference column exactly.
+      const base = Offset(-1.125, -1.125);
+      final finger =
+          workspace.screen(tester, base) +
+          const Offset(0, BimPointerInteraction.touchClearancePx);
+      final first = await tester.startGesture(finger + const Offset(25, 0));
+      await tester.pump(BimPointerInteraction.placementHoldDuration);
+      await first.moveTo(finger);
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('architect-offset-pointer')),
+        findsOneWidget,
+      );
+      final drag = workspace.overlay(tester).dragController!;
+      expect(drag.isPickingBasePoint, isTrue);
+      expect(drag.currentPointModel, base);
+      expect(drag.deltaModel, isNull);
+      await _snapshot(tester, 'drag_base_precision_$language');
+      expect(model.undoCount, 0);
+      expect(
+        workspace.overlay(tester).project.activeStorey.columns.first.position,
+        _columnPosition,
+      );
+      await first.up();
+      await tester.pumpAndSettle();
+      expect(drag.basePointModel, base);
+      expect(drag.distanceMeters, 0);
+      expect(find.text(l.architectDragPickTargetPoint), findsOneWidget);
+      expect(_apply(tester).onPressed, isNull);
+
+      // A separate gesture places that reference at the destination.
+      const target = Offset(0, 1);
+      await tester.tapAt(workspace.screen(tester, target));
+      await tester.pumpAndSettle();
+      expect((drag.deltaModel! - (target - base)).distance, lessThan(1e-6));
+      expect(model.undoCount, 0);
+      await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
+      await tester.pumpAndSettle();
+      expect(
+        model.project.activeStorey.columns.first.position,
+        _columnPosition + target - base,
+      );
+      expect(model.undoCount, 1);
+      model.undo();
+      await tester.pumpAndSettle();
+      expect(
+        model.project.activeStorey.columns.first.position,
+        _columnPosition,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('default leader relocates the base before moving the element', (
+    tester,
+  ) async {
+    final model = _dragModel();
+    addTearDown(model.dispose);
+    await _openPhone(tester, model);
+    await _radialMove(tester, _columnPosition);
+    final drag = workspace.overlay(tester).dragController!;
+    final grip = workspace.screen(tester, drag.defaultHandleGrip!);
+    final base = drag.defaultHandleAnchor!;
+    final destination = workspace.screen(tester, base + const Offset(-1, -1));
+    final first = await tester.startGesture(
+      grip,
+      kind: PointerDeviceKind.mouse,
+    );
+    await first.moveTo(destination + grip - workspace.screen(tester, base));
+    await first.up();
+    await tester.pumpAndSettle();
+    expect(
+      (drag.basePointModel! - (base + const Offset(-1, -1))).distance,
+      lessThan(1e-6),
+    );
+    expect(drag.distanceMeters, 0);
+    expect(model.project.activeStorey.columns.first.position, _columnPosition);
+    expect(model.undoCount, 0);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byKey(_dragSurface), findsNothing);
+  });
+
   testWidgets(
     'radial wall Move keeps connected joints and one clear phone overlay',
     (tester) async {
@@ -343,6 +464,93 @@ void main() {
       expect(
         model.project.activeStorey.walls.first.startPoint,
         preview.first.startPoint,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'CAD underlay reference pick stays fixed, then snaps and saves one move',
+    (tester) async {
+      const config = ArchitectCadUnderlayConfig(
+        storeyId: 's',
+        fileName: 'plan.dxf',
+        internalCopyPath: '',
+        lockedCadOriginX: 5000,
+        lockedCadOriginY: 10000,
+        unitsPerMeter: 1000,
+        lockOrigin: true,
+        maskPolygon: [Offset(0, 0), Offset(4, 0), Offset(4, 2), Offset(0, 2)],
+      );
+      final document = DxfDocument(
+        layers: {},
+        blocks: {},
+        headerVars: {},
+        entityStats: {},
+        bounds: const Rect.fromLTRB(5000, 10000, 9000, 12000),
+        entities: [
+          const DxfLine(p1: Offset(5000, 10000), p2: Offset(9000, 12000)),
+        ],
+      );
+      final model = _dragModel();
+      addTearDown(model.dispose);
+      model.restore(model.project.copyWith(cadUnderlays: {'s': config}));
+      await _openPhone(tester, model, underlays: {'s': document});
+      await _radialMove(tester, const Offset(2, 1));
+      final drag = workspace.overlay(tester).dragController!;
+      expect(drag.isCadUnderlay, isTrue);
+
+      final finger =
+          workspace.screen(tester, Offset.zero) +
+          const Offset(0, BimPointerInteraction.touchClearancePx);
+      final first = await tester.startGesture(finger + const Offset(30, 0));
+      await tester.pump(BimPointerInteraction.placementHoldDuration);
+      await first.moveTo(finger);
+      await tester.pump();
+      expect(drag.currentPointModel, Offset.zero);
+      expect(drag.currentSnapLabel, 'Endpoint');
+      expect(drag.isPickingBasePoint, isTrue);
+      expect(drag.ghostCadFrame, isNull);
+      expect(model.project.cadUnderlays['s'], same(config));
+      await _snapshot(tester, 'drag_cad_base_precision_phone');
+      await first.up();
+      await tester.pumpAndSettle();
+      expect(drag.basePointCad, const Offset(5000, 10000));
+      expect(drag.distanceMeters, 0);
+      expect(model.undoCount, 0);
+
+      const target = Offset(-1.125, -1.125);
+      await tester.tapAt(workspace.screen(tester, target));
+      await tester.pumpAndSettle();
+      expect(drag.currentPointModel, target);
+      expect(drag.ghostCadFrame!.toModel(drag.basePointCad!), target);
+      expect(model.project.cadUnderlays['s'], same(config));
+      await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
+      await tester.pumpAndSettle();
+      final moved = model.project.cadUnderlays['s']!;
+      final movedFrame = BimCoordinateFrame(
+        origin: Offset(moved.lockedCadOriginX!, moved.lockedCadOriginY!),
+        unitsPerMeter: moved.unitsPerMeter!,
+      );
+      expect(movedFrame.toModel(const Offset(5000, 10000)), target);
+      expect(moved.maskPolygon, [
+        for (final point in config.maskPolygon!) point + target,
+      ]);
+      expect(model.undoCount, 1);
+      final restored = ArchitectProject.fromJson(model.project.toJson());
+      expect(
+        restored.cadUnderlays['s']!.lockedCadOriginX,
+        moved.lockedCadOriginX,
+      );
+      expect(restored.cadUnderlays['s']!.maskPolygon, moved.maskPolygon);
+      model.undo();
+      await tester.pumpAndSettle();
+      expect(model.project.cadUnderlays['s'], same(config));
+      model.redo();
+      await tester.pumpAndSettle();
+      expect(
+        model.project.cadUnderlays['s']!.lockedCadOriginX,
+        moved.lockedCadOriginX,
       );
       expect(tester.takeException(), isNull);
     },
